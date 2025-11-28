@@ -634,167 +634,167 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
 // --- REST OF THE COMPONENTS (CardBuilder, LessonBuilder, etc.) ---
 
 function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard, availableDecks, initialDeckId }: any) {
-  const [formData, setFormData] = useState({
-    front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '', deckId: initialDeckId || 'custom'
-  });
-  const [isCreatingDeck, setIsCreatingDeck] = useState(false);
-  const [newDeckTitle, setNewDeckTitle] = useState('');
-  const [morphology, setMorphology] = useState<any[]>([]);
-  const [newMorphPart, setNewMorphPart] = useState({ part: '', meaning: '', type: 'root' });
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '', deckId: initialDeckId || 'custom'
+  });
+  const [isCreatingDeck, setIsCreatingDeck] = useState(false);
+  const [newDeckTitle, setNewDeckTitle] = useState('');
+  const [morphology, setMorphology] = useState<any[]>([]);
+  const [newMorphPart, setNewMorphPart] = useState({ part: '', meaning: '', type: 'root' });
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (initialDeckId) setFormData(prev => ({...prev, deckId: initialDeckId}));
-  }, [initialDeckId]);
+  useEffect(() => {
+    if (initialDeckId) setFormData(prev => ({...prev, deckId: initialDeckId}));
+  }, [initialDeckId]);
 
-  const handleChange = (e: any) => {
-    if (e.target.name === 'deckId') {
-      if (e.target.value === 'new') {
-        setIsCreatingDeck(true);
-        setFormData({ ...formData, deckId: 'new' });
-      } else {
-        setIsCreatingDeck(false);
-        setFormData({ ...formData, deckId: e.target.value });
-      }
-    } else {
-      setFormData({ ...formData, [e.target.name]: e.target.value });
-    }
-  };
+  const handleChange = (e: any) => {
+    if (e.target.name === 'deckId') {
+      if (e.target.value === 'new') {
+        setIsCreatingDeck(true);
+        setFormData({ ...formData, deckId: 'new' });
+      } else {
+        setIsCreatingDeck(false);
+        setFormData({ ...formData, deckId: e.target.value });
+      }
+    } else {
+      setFormData({ ...formData, [e.target.name]: e.target.value });
+    }
+  };
 
-  const addMorphology = () => {
-    if (newMorphPart.part && newMorphPart.meaning) {
-      setMorphology([...morphology, newMorphPart]);
-      setNewMorphPart({ part: '', meaning: '', type: 'root' });
-    }
-  };
+  const addMorphology = () => {
+    if (newMorphPart.part && newMorphPart.meaning) {
+      setMorphology([...morphology, newMorphPart]);
+      setNewMorphPart({ part: '', meaning: '', type: 'root' });
+    }
+  };
 
-  const removeMorphology = (index: number) => {
-    setMorphology(morphology.filter((_, i) => i !== index));
-  };
+  const removeMorphology = (index: number) => {
+    setMorphology(morphology.filter((_, i) => i !== index));
+  };
 
-  const handleSelectCard = (card: any) => {
-    setEditingId(card.id);
-    setFormData({
-      front: card.front,
-      back: card.back,
-      type: card.type || 'noun',
-      ipa: card.ipa || '',
-      sentence: card.usage?.sentence || '',
-      sentenceTrans: card.usage?.translation || '',
-      grammarTags: card.grammar_tags?.join(', ') || '',
-      deckId: card.deckId || formData.deckId
-    });
-    setMorphology(card.morphology || []);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  const handleSelectCard = (card: any) => {
+    setEditingId(card.id);
+    setFormData({
+      front: card.front,
+      back: card.back,
+      type: card.type || 'noun',
+      ipa: card.ipa || '',
+      sentence: card.usage?.sentence || '',
+      sentenceTrans: card.usage?.translation || '',
+      grammarTags: card.grammar_tags?.join(', ') || '',
+      deckId: card.deckId || formData.deckId
+    });
+    setMorphology(card.morphology || []);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
-  const handleClear = () => {
-    setEditingId(null);
-    setFormData(prev => ({ ...prev, front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' }));
-    setMorphology([]);
-  };
+  const handleClear = () => {
+    setEditingId(null);
+    setFormData(prev => ({ ...prev, front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' }));
+    setMorphology([]);
+  };
 
-  const handleSubmit = (e: any) => { 
-    e.preventDefault(); 
-    if (!formData.front || !formData.back) return; 
-    
-    let finalDeckId = formData.deckId;
-    let finalDeckTitle = null;
+  const handleSubmit = (e: any) => { 
+    e.preventDefault(); 
+    if (!formData.front || !formData.back) return; 
+    
+    let finalDeckId = formData.deckId;
+    let finalDeckTitle = null;
 
-    if (formData.deckId === 'new') {
-        if (!newDeckTitle) return alert("Please name your new deck.");
-        finalDeckId = `custom_${Date.now()}`;
-        finalDeckTitle = newDeckTitle;
-    }
+    if (formData.deckId === 'new') {
+        if (!newDeckTitle) return alert("Please name your new deck.");
+        finalDeckId = `custom_${Date.now()}`;
+        finalDeckTitle = newDeckTitle;
+    }
 
-    const cardData = { 
-      front: formData.front,
-      back: formData.back,
-      type: formData.type,
-      deckId: finalDeckId,
-      deckTitle: finalDeckTitle,
-      ipa: formData.ipa || "/.../",
-      mastery: 0,
-      morphology: morphology.length > 0 ? morphology : [{ part: formData.front, meaning: "Root", type: "root" }],
-      usage: { sentence: formData.sentence || "-", translation: formData.sentenceTrans || "-" },
-      grammar_tags: formData.grammarTags ? formData.grammarTags.split(',').map(t => t.trim()) : ["Custom"]
-    };
+    const cardData = { 
+      front: formData.front,
+      back: formData.back,
+      type: formData.type,
+      deckId: finalDeckId,
+      deckTitle: finalDeckTitle,
+      ipa: formData.ipa || "/.../",
+      mastery: 0,
+      morphology: morphology.length > 0 ? morphology : [{ part: formData.front, meaning: "Root", type: "root" }],
+      usage: { sentence: formData.sentence || "-", translation: formData.sentenceTrans || "-" },
+      grammar_tags: formData.grammarTags ? formData.grammarTags.split(',').map(t => t.trim()) : ["Custom"]
+    };
 
-    if (editingId) {
-      onUpdateCard(editingId, cardData);
-      setToastMsg("Card Updated Successfully");
-    } else {
-      onSaveCard(cardData);
-      setToastMsg("Card Created Successfully");
-    }
-    
-    handleClear();
-    if (isCreatingDeck) {
-        setIsCreatingDeck(false);
-        setNewDeckTitle('');
-        setFormData(prev => ({ ...prev, deckId: finalDeckId })); 
-    }
-  };
+    if (editingId) {
+      onUpdateCard(editingId, cardData);
+      setToastMsg("Card Updated Successfully");
+    } else {
+      onSaveCard(cardData);
+      setToastMsg("Card Created Successfully");
+    }
+    
+    handleClear();
+    if (isCreatingDeck) {
+        setIsCreatingDeck(false);
+        setNewDeckTitle('');
+        setFormData(prev => ({ ...prev, deckId: finalDeckId })); 
+    }
+  };
 
-  const validDecks = availableDecks || {};
-  const deckOptions = Object.entries(validDecks).map(([key, deck]: any) => ({ id: key, title: deck.title }));
-  const currentDeckCards = validDecks[formData.deckId] ? validDecks[formData.deckId].cards || [] : validDecks['custom'] ? validDecks['custom'].cards || [] : [];
-  
-  useEffect(() => {
-    if (editingId && !currentDeckCards.some((c: any) => c.id === editingId)) {
-        handleClear();
-    }
-  }, [currentDeckCards, editingId]);
+  const validDecks = availableDecks || {};
+  const deckOptions = Object.entries(validDecks).map(([key, deck]: any) => ({ id: key, title: deck.title }));
+  const currentDeckCards = validDecks[formData.deckId] ? validDecks[formData.deckId].cards || [] : validDecks['custom'] ? validDecks['custom'].cards || [] : [];
+  
+  useEffect(() => {
+    if (editingId && !currentDeckCards.some((c: any) => c.id === editingId)) {
+        handleClear();
+    }
+  }, [currentDeckCards, editingId]);
 
-  return (
-    <div className="px-6 mt-4 space-y-6 pb-20 relative">
-      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
-      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800 flex justify-between items-center">
-        <div><p className="font-bold flex items-center gap-2"><Layers size={16}/> {editingId ? 'Editing Card' : 'Card Creator'}</p><p className="opacity-80 text-xs mt-1">{editingId ? 'Update details below.' : 'Define deep linguistic data (X-Ray).'}</p></div>
-        {editingId && <button onClick={handleClear} className="text-xs font-bold bg-white px-3 py-1 rounded-lg shadow-sm hover:text-indigo-600">Cancel Edit</button>}
-      </div>
-      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Core Data</h3>
-        <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-400">Target Deck</label>
-            <select name="deckId" value={formData.deckId} onChange={handleChange} disabled={!!editingId} className="w-full p-3 rounded-lg border border-slate-200 bg-indigo-50/50 font-bold text-indigo-900 disabled:opacity-50"><option value="custom">✍️ Scriptorium (My Deck)</option>{deckOptions.filter(d => d.id !== 'custom').map(d => (<option key={d.id} value={d.id}>{d.title}</option>))}<option value="new">✨ + Create New Deck</option></select>
-            {isCreatingDeck && <input value={newDeckTitle} onChange={(e) => setNewDeckTitle(e.target.value)} placeholder="Enter New Deck Name" className="w-full p-3 rounded-lg border-2 border-indigo-500 bg-white font-bold mt-2 animate-in fade-in slide-in-from-top-2" autoFocus />}
-        </div>
-        <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><label className="text-xs font-bold text-slate-400">Latin Word</label><input name="front" value={formData.front} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 font-bold" placeholder="e.g. Bellum" /></div><div className="space-y-2"><label className="text-xs font-bold text-slate-400">English</label><input name="back" value={formData.back} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="e.g. War" /></div></div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Part of Speech</label><select name="type" value={formData.type} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 bg-white"><option value="noun">Noun</option><option value="verb">Verb</option><option value="adjective">Adjective</option><option value="adverb">Adverb</option><option value="phrase">Phrase</option></select></div>
-          <div className="space-y-2"><label className="text-xs font-bold text-slate-400">IPA</label><input name="ipa" value={formData.ipa} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 font-mono text-sm" placeholder="/ˈbel.lum/" /></div>
-        </div>
-      </section>
+  return (
+    <div className="px-6 mt-4 space-y-6 pb-20 relative">
+      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
+      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800 flex justify-between items-center">
+        <div><p className="font-bold flex items-center gap-2"><Layers size={16}/> {editingId ? 'Editing Card' : 'Card Creator'}</p><p className="opacity-80 text-xs mt-1">{editingId ? 'Update details below.' : 'Define deep linguistic data (X-Ray).'}</p></div>
+        {editingId && <button onClick={handleClear} className="text-xs font-bold bg-white px-3 py-1 rounded-lg shadow-sm hover:text-indigo-600">Cancel Edit</button>}
+      </div>
+      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Core Data</h3>
+        <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-400">Target Deck</label>
+            <select name="deckId" value={formData.deckId} onChange={handleChange} disabled={!!editingId} className="w-full p-3 rounded-lg border border-slate-200 bg-indigo-50/50 font-bold text-indigo-900 disabled:opacity-50"><option value="custom">✍️ Scriptorium (My Deck)</option>{deckOptions.filter(d => d.id !== 'custom').map(d => (<option key={d.id} value={d.id}>{d.title}</option>))}<option value="new">✨ + Create New Deck</option></select>
+            {isCreatingDeck && <input value={newDeckTitle} onChange={(e) => setNewDeckTitle(e.target.value)} placeholder="Enter New Deck Name" className="w-full p-3 rounded-lg border-2 border-indigo-500 bg-white font-bold mt-2 animate-in fade-in slide-in-from-top-2" autoFocus />}
+        </div>
+        <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><label className="text-xs font-bold text-slate-400">Latin Word</label><input name="front" value={formData.front} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 font-bold" placeholder="e.g. Bellum" /></div><div className="space-y-2"><label className="text-xs font-bold text-slate-400">English</label><input name="back" value={formData.back} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="e.g. War" /></div></div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Part of Speech</label><select name="type" value={formData.type} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 bg-white"><option value="noun">Noun</option><option value="verb">Verb</option><option value="adjective">Adjective</option><option value="adverb">Adverb</option><option value="phrase">Phrase</option></select></div>
+          <div className="space-y-2"><label className="text-xs font-bold text-slate-400">IPA</label><input name="ipa" value={formData.ipa} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 font-mono text-sm" placeholder="/ˈbel.lum/" /></div>
+        </div>
+      </section>
 
-      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Morphology (X-Ray Data)</h3>
-        <div className="flex gap-2 items-end"><div className="flex-1 space-y-1"><label className="text-[10px] font-bold text-slate-400">Part</label><input value={newMorphPart.part} onChange={(e) => setNewMorphPart({...newMorphPart, part: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" placeholder="Bell-" /></div><div className="flex-1 space-y-1"><label className="text-[10px] font-bold text-slate-400">Meaning</label><input value={newMorphPart.meaning} onChange={(e) => setNewMorphPart({...newMorphPart, meaning: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" placeholder="War" /></div><div className="w-24 space-y-1"><label className="text-[10px] font-bold text-slate-400">Type</label><select value={newMorphPart.type} onChange={(e) => setNewMorphPart({...newMorphPart, type: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm bg-white"><option value="root">Root</option><option value="prefix">Prefix</option><option value="suffix">Suffix</option></select></div><button type="button" onClick={addMorphology} className="bg-indigo-100 text-indigo-600 p-2 rounded-lg hover:bg-indigo-200"><Plus size={20}/></button></div>
-        <div className="flex flex-wrap gap-2 mt-2">{morphology.map((m, i) => (<div key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1 rounded-full text-sm"><span className="font-bold text-indigo-700">{m.part}</span><span className="text-slate-500 text-xs">({m.meaning})</span><button type="button" onClick={() => removeMorphology(i)} className="text-slate-300 hover:text-rose-500"><X size={14}/></button></div>))}</div>
-      </section>
+      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Morphology (X-Ray Data)</h3>
+        <div className="flex gap-2 items-end"><div className="flex-1 space-y-1"><label className="text-[10px] font-bold text-slate-400">Part</label><input value={newMorphPart.part} onChange={(e) => setNewMorphPart({...newMorphPart, part: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" placeholder="Bell-" /></div><div className="flex-1 space-y-1"><label className="text-[10px] font-bold text-slate-400">Meaning</label><input value={newMorphPart.meaning} onChange={(e) => setNewMorphPart({...newMorphPart, meaning: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" placeholder="War" /></div><div className="w-24 space-y-1"><label className="text-[10px] font-bold text-slate-400">Type</label><select value={newMorphPart.type} onChange={(e) => setNewMorphPart({...newMorphPart, type: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm bg-white"><option value="root">Root</option><option value="prefix">Prefix</option><option value="suffix">Suffix</option></select></div><button type="button" onClick={addMorphology} className="bg-indigo-100 text-indigo-600 p-2 rounded-lg hover:bg-indigo-200"><Plus size={20}/></button></div>
+        <div className="flex flex-wrap gap-2 mt-2">{morphology.map((m, i) => (<div key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1 rounded-full text-sm"><span className="font-bold text-indigo-700">{m.part}</span><span className="text-slate-500 text-xs">({m.meaning})</span><button type="button" onClick={() => removeMorphology(i)} className="text-slate-300 hover:text-rose-500"><X size={14}/></button></div>))}</div>
+      </section>
 
-      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Context & Grammar</h3>
-        <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Example Sentence</label><input name="sentence" value={formData.sentence} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 italic" placeholder="Si vis pacem, para bellum." /></div>
-        <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Translation</label><input name="sentenceTrans" value={formData.sentenceTrans} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="If you want peace, prepare for war." /></div>
-        <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Grammar Tags</label><input name="grammarTags" value={formData.grammarTags} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="2nd Declension, Neuter" /></div>
-      </section>
+      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Context & Grammar</h3>
+        <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Example Sentence</label><input name="sentence" value={formData.sentence} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 italic" placeholder="Si vis pacem, para bellum." /></div>
+        <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Translation</label><input name="sentenceTrans" value={formData.sentenceTrans} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="If you want peace, prepare for war." /></div>
+        <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Grammar Tags</label><input name="grammarTags" value={formData.grammarTags} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="2nd Declension, Neuter" /></div>
+      </section>
 
-      <button onClick={handleSubmit} className={`w-full text-white p-4 rounded-xl font-bold shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${editingId ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}>{editingId ? <><Save size={20}/> Update Card</> : <><Plus size={20}/> Create Card</>}</button>
-      {currentDeckCards && currentDeckCards.length > 0 && (
-        <div className="pt-6 border-t border-slate-200">
-            <h3 className="font-bold text-slate-800 mb-4">Cards in this Deck ({currentDeckCards.length})</h3>
-            <div className="space-y-2">
-                {currentDeckCards.map((card: any, idx: number) => (
-                    <div key={idx} onClick={() => handleSelectCard(card)} className={`p-3 rounded-xl border flex justify-between items-center cursor-pointer transition-colors ${editingId === card.id ? 'bg-indigo-50 border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-300'}`}>
-                        <div><span className="font-bold text-slate-800">{card.front}</span><span className="text-slate-400 mx-2">•</span><span className="text-sm text-slate-500">{card.back}</span></div>
-                        <div className="flex items-center gap-2"><Edit3 size={16} className="text-indigo-400" />{/* @ts-ignore */ !(INITIAL_SYSTEM_DECKS as any)[card.deckId] && (<button onClick={(e) => { e.stopPropagation(); onDeleteCard(card.id); }} className="p-1 text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button>)}</div>
-                    </div>
-                ))}
-            </div>
-        </div>
-      )}
+      <button onClick={handleSubmit} className={`w-full text-white p-4 rounded-xl font-bold shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${editingId ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}>{editingId ? <><Save size={20}/> Update Card</> : <><Plus size={20}/> Create Card</>}</button>
+      {currentDeckCards && currentDeckCards.length > 0 && (
+        <div className="pt-6 border-t border-slate-200">
+            <h3 className="font-bold text-slate-800 mb-4">Cards in this Deck ({currentDeckCards.length})</h3>
+            <div className="space-y-2">
+                {currentDeckCards.map((card: any, idx: number) => (
+                    <div key={idx} onClick={() => handleSelectCard(card)} className={`p-3 rounded-xl border flex justify-between items-center cursor-pointer transition-colors ${editingId === card.id ? 'bg-indigo-50 border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-300'}`}>
+                        <div><span className="font-bold text-slate-800">{card.front}</span><span className="text-slate-400 mx-2">•</span><span className="text-sm text-slate-500">{card.back}</span></div>
+                        <div className="flex items-center gap-2"><Edit3 size={16} className="text-indigo-400" />{/* @ts-ignore */ !(INITIAL_SYSTEM_DECKS as any)[card.deckId] && (<button onClick={(e) => { e.stopPropagation(); onDeleteCard(card.id); }} className="p-1 text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button>)}</div>
+                    </div>
+                ))}
+            </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -843,6 +843,7 @@ function ClassManagerView({ user, lessons, allDecks }: any) {
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const selectedClass = classes.find(c => c.id === selectedClassId);
+
   useEffect(() => {
     const q = collection(db, 'artifacts', appId, 'users', user.uid, 'classes');
     const unsubscribe = onSnapshot(q, (snapshot) => setClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))), (error) => console.error("Class snapshot error:", error));
@@ -856,7 +857,21 @@ function ClassManagerView({ user, lessons, allDecks }: any) {
   const handleDeleteClass = async (id: string) => { if (window.confirm("Delete this class?")) { try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id)); if (selectedClassId === id) setSelectedClassId(null); } catch (error) { console.error("Delete class failed:", error); alert("Failed to delete class."); } } };
   const handleRenameClass = async (classId: string, currentName: string) => { const newName = prompt("Enter new class name:", currentName); if (newName && newName.trim() !== "" && newName !== currentName) { try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { name: newName.trim() }); setToastMsg("Class renamed successfully"); } catch (error) { console.error("Rename failed", error); alert("Failed to rename class"); } } };
   const addStudent = async (e: any) => { e.preventDefault(); if (!newStudentEmail || !selectedClass) return; const normalizedEmail = newStudentEmail.toLowerCase().trim(); try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { students: arrayUnion(normalizedEmail), studentEmails: arrayUnion(normalizedEmail) }); setNewStudentEmail(''); setToastMsg(`Added ${normalizedEmail}`); } catch (error) { console.error("Add student failed:", error); alert("Failed to add student."); } };
-  const assignContent = async (item: any, type: string) => { if (!selectedClass) return; try { const assignment = JSON.parse(JSON.stringify({ ...item, id: item.id || `assign_${Date.now()}`, contentType: type })); await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { assignments: arrayUnion(assignment) }); setAssignModalOpen(false); setToastMsg(`Assigned: ${item.title}`); } catch (error) { console.error("Assign failed:", error); alert("Failed to assign."); } };
+  
+  const assignContent = async (item: any, type: string) => { 
+      if (!selectedClass) return; 
+      try { 
+          const assignment = JSON.parse(JSON.stringify({ 
+              ...item, 
+              id: `assign_${Date.now()}_${Math.random().toString(36).substr(2,5)}`, 
+              originalId: item.id,
+              contentType: type 
+          })); 
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { assignments: arrayUnion(assignment) }); 
+          setAssignModalOpen(false); 
+          setToastMsg(`Assigned: ${item.title}`); 
+      } catch (error) { console.error("Assign failed:", error); alert("Failed to assign."); } 
+  };
 
   if (selectedClass) {
     return (
@@ -873,7 +888,17 @@ function ClassManagerView({ user, lessons, allDecks }: any) {
             <div className="space-y-4">
               <h3 className="font-bold text-slate-800 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3>
               {(!selectedClass.assignments || selectedClass.assignments.length === 0) && <div className="p-6 border-2 border-dashed border-slate-200 rounded-xl text-center text-slate-400 text-sm">No content assigned yet.</div>}
-              {selectedClass.assignments?.map((l: any, idx: number) => ( <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center"><div><h4 className="font-bold text-slate-800">{l.title}</h4><span className="text-[10px] text-slate-500 uppercase">{l.contentType || 'Lesson'}</span></div><span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded text-xs font-bold">Active</span></div> ))}
+              {selectedClass.assignments?.map((l: any, idx: number) => ( 
+                <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${l.contentType === 'deck' ? 'bg-orange-100 text-orange-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                            {l.contentType === 'deck' ? <Layers size={18} /> : <FileText size={18} />}
+                        </div>
+                        <div><h4 className="font-bold text-slate-800">{l.title}</h4><span className="text-[10px] text-slate-500 uppercase">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Lesson'}</span></div>
+                    </div>
+                    <span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded text-xs font-bold">Active</span>
+                </div> 
+               ))}
             </div>
             <div className="space-y-4">
               <h3 className="font-bold text-slate-800 flex items-center gap-2"><Users size={18} className="text-indigo-600"/> Roster</h3>
@@ -905,15 +930,15 @@ function ClassManagerView({ user, lessons, allDecks }: any) {
                   </div>
                   
                   <div>
-                     <h4 className="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-50 rounded-lg mb-2 flex items-center gap-2"><BookOpen size={12}/> Lessons</h4>
-                     {lessons.length === 0 ? <p className="px-3 text-xs text-slate-400 italic">No lessons found.</p> : lessons.map((l: any) => (
-                         <button key={l.id} onClick={() => assignContent(l, 'lesson')} className="w-full text-left p-3 hover:bg-slate-50 rounded-xl transition-colors border-b border-transparent hover:border-slate-100 group">
-                            <div className="flex items-center justify-between">
+                      <h4 className="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-50 rounded-lg mb-2 flex items-center gap-2"><BookOpen size={12}/> Lessons</h4>
+                      {lessons.length === 0 ? <p className="px-3 text-xs text-slate-400 italic">No lessons found.</p> : lessons.map((l: any) => (
+                          <button key={l.id} onClick={() => assignContent(l, 'lesson')} className="w-full text-left p-3 hover:bg-slate-50 rounded-xl transition-colors border-b border-transparent hover:border-slate-100 group">
+                             <div className="flex items-center justify-between">
                                 <div><h4 className="font-bold text-indigo-900 group-hover:text-indigo-600">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div>
                                 <PlusCircle size={20} className="text-slate-300 group-hover:text-indigo-500 transition-colors"/>
-                            </div>
-                         </button> 
-                     ))}
+                             </div>
+                          </button> 
+                      ))}
                   </div>
               </div>
             </div>
@@ -1079,11 +1104,32 @@ function ProfileView({ user, userData }: any) {
 
 function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, userData }: any) {
   const completedSet = new Set(userData?.completedAssignments || []);
-  const handleAssignmentClick = (assignment: any) => { if (assignment.contentType === 'deck') { onSelectDeck(assignment); } else { onSelectLesson(assignment); } };
+  
+  const handleAssignmentClick = (assignment: any) => { 
+      if (assignment.contentType === 'deck') { 
+          onSelectDeck(assignment); 
+      } else { 
+          onSelectLesson(assignment); 
+      } 
+  };
+
   return (
     <div className="h-full flex flex-col bg-slate-50">
       <div className="px-6 pt-12 pb-6 bg-white sticky top-0 z-40 border-b border-slate-100"><button onClick={onBack} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Home</button><h1 className="text-2xl font-bold text-slate-900">{classData.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {classData.code}</p></div>
-      <div className="flex-1 px-6 mt-4 overflow-y-auto pb-24"><div className="space-y-6"><div className="bg-indigo-600 rounded-2xl p-6 text-white shadow-lg"><h3 className="text-lg font-bold mb-1">Your Progress</h3><p className="text-indigo-200 text-sm">Keep up the great work!</p><div className="mt-4 flex gap-4"><div><span className="text-2xl font-bold block">{classData.assignments ? classData.assignments.filter((l: any) => !completedSet.has(l.id)).length : 0}</span><span className="text-xs opacity-70">To Do</span></div><div><span className="text-2xl font-bold block">{classData.students?.length || 0}</span><span className="text-xs opacity-70">Classmates</span></div></div></div><div><h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3><div className="space-y-3">{classData.assignments && classData.assignments.length > 0 ? ( classData.assignments.filter((l: any) => !completedSet.has(l.id)).map((l: any, i: number) => ( <button key={`${l.id}-${i}`} onClick={() => handleAssignmentClick(l)} className="w-full bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all"><div className="flex items-center space-x-4"><div className={`h-10 w-10 rounded-xl flex items-center justify-center ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600' : 'bg-indigo-50 text-indigo-600'}`}>{l.contentType === 'deck' ? <Layers size={20}/> : <PlayCircle size={20} />}</div><div className="text-left"><h4 className="font-bold text-indigo-900">{l.title}</h4><p className="text-xs text-indigo-600/70">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Assigned Lesson'}</p></div></div><ChevronRight size={20} className="text-slate-300" /></button> )) ) : ( <div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">No pending assignments.</div> )}{classData.assignments && classData.assignments.every((l: any) => completedSet.has(l.id)) && classData.assignments.length > 0 && (<div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">All assignments completed! 🎉</div>)}</div></div></div></div>
+      <div className="flex-1 px-6 mt-4 overflow-y-auto pb-24"><div className="space-y-6"><div className="bg-indigo-600 rounded-2xl p-6 text-white shadow-lg"><h3 className="text-lg font-bold mb-1">Your Progress</h3><p className="text-indigo-200 text-sm">Keep up the great work!</p><div className="mt-4 flex gap-4"><div><span className="text-2xl font-bold block">{classData.assignments ? classData.assignments.filter((l: any) => !completedSet.has(l.id)).length : 0}</span><span className="text-xs opacity-70">To Do</span></div><div><span className="text-2xl font-bold block">{classData.students?.length || 0}</span><span className="text-xs opacity-70">Classmates</span></div></div></div><div><h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3><div className="space-y-3">{classData.assignments && classData.assignments.length > 0 ? ( classData.assignments.filter((l: any) => !completedSet.has(l.id)).map((l: any, i: number) => ( 
+          <button key={`${l.id}-${i}`} onClick={() => handleAssignmentClick(l)} className="w-full bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all">
+              <div className="flex items-center space-x-4">
+                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                      {l.contentType === 'deck' ? <Layers size={20}/> : <PlayCircle size={20} />}
+                  </div>
+                  <div className="text-left">
+                      <h4 className="font-bold text-indigo-900">{l.title}</h4>
+                      <p className="text-xs text-indigo-600/70">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Assigned Lesson'}</p>
+                  </div>
+              </div>
+              <ChevronRight size={20} className="text-slate-300" />
+          </button> 
+      )) ) : ( <div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">No pending assignments.</div> )}{classData.assignments && classData.assignments.every((l: any) => completedSet.has(l.id)) && classData.assignments.length > 0 && (<div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">All assignments completed! 🎉</div>)}</div></div></div></div>
     </div>
   );
 }
@@ -1103,7 +1149,17 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
     <div className="px-6 space-y-6 mt-4">
       <div className="bg-gradient-to-br from-red-800 to-rose-900 rounded-3xl p-6 text-white shadow-xl"><div className="flex justify-between"><div><p className="text-rose-100 text-sm font-bold uppercase">Hebdomada</p><h3 className="text-4xl font-serif font-bold">{userData?.xp} XP</h3></div><Zap size={28} className="text-yellow-400 fill-current"/></div><div className="mt-6 bg-black/20 rounded-full h-3"><div className="bg-yellow-400 h-full w-3/4 rounded-full"/></div></div>
       {classes && classes.length > 0 && (<div className="mb-6"><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><School size={18} className="text-indigo-600"/> My Classes</h3><div className="flex gap-4 overflow-x-auto pb-4">{classes.map((cls: any) => { const pendingCount = (cls.assignments || []).filter((l: any) => !completedSet.has(l.id)).length; return ( <button key={cls.id} onClick={() => handleSelectClass(cls)} className="min-w-[200px] bg-white p-4 rounded-2xl border border-slate-200 shadow-sm text-left active:scale-95 transition-transform"><div className="flex items-center justify-between mb-2"><div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">{cls.name.charAt(0)}</div><span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500 font-mono">{cls.code}</span></div><h4 className="font-bold text-slate-900">{cls.name}</h4><p className="text-xs text-slate-500 mt-1">{pendingCount} Pending Tasks</p></button> ); })}</div></div>)}
-      {activeAssignments.length > 0 && (<div><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3><div className="space-y-3">{activeAssignments.map((l: any, i: number) => ( <button key={`${l.id}-${i}`} onClick={() => l.contentType === 'deck' ? onSelectDeck(l) : onSelectLesson(l)} className="w-full bg-indigo-50 border border-indigo-100 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all"><div className="flex items-center space-x-4"><div className={`h-10 w-10 rounded-xl flex items-center justify-center ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600' : 'bg-white text-indigo-600'}`}>{l.contentType === 'deck' ? <Layers size={20}/> : <PlayCircle size={20} />}</div><div className="text-left"><h4 className="font-bold text-indigo-900">{l.title}</h4><p className="text-xs text-indigo-600/70">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Assigned Lesson'}</p></div></div><ChevronRight size={20} className="text-indigo-300" /></button>))}</div></div>)}
+      {activeAssignments.length > 0 && (<div><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3><div className="space-y-3">{activeAssignments.map((l: any, i: number) => ( 
+          <button key={`${l.id}-${i}`} onClick={() => l.contentType === 'deck' ? onSelectDeck(l) : onSelectLesson(l)} className="w-full bg-indigo-50 border border-indigo-100 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all">
+              <div className="flex items-center space-x-4">
+                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600' : 'bg-white text-indigo-600'}`}>
+                      {l.contentType === 'deck' ? <Layers size={20}/> : <PlayCircle size={20} />}
+                  </div>
+                  <div className="text-left"><h4 className="font-bold text-indigo-900">{l.title}</h4><p className="text-xs text-indigo-600/70">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Assigned Lesson'}</p></div>
+              </div>
+              <ChevronRight size={20} className="text-indigo-300" />
+          </button>
+      ))}</div></div>)}
       <div><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Lessons</h3><div className="space-y-3">{lessons.map((l: any) => (<button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-14 w-14 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-700"><PlayCircle size={28}/></div><div className="text-left"><h4 className="font-bold text-slate-900">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div></div><ChevronRight className="text-slate-300"/></button>))}</div></div>
       <div className="grid grid-cols-2 gap-4"><button onClick={() => setActiveTab('flashcards')} className="p-5 bg-orange-50 rounded-2xl border border-orange-100 text-center"><Layers className="mx-auto text-orange-500 mb-2"/><span className="block font-bold text-slate-800">Repetitio</span></button><button onClick={() => setActiveTab('create')} className="p-5 bg-emerald-50 rounded-2xl border border-emerald-100 text-center"><Feather className="mx-auto text-emerald-500 mb-2"/><span className="block font-bold text-slate-800">Scriptorium</span></button></div>
     </div>
@@ -1138,12 +1194,13 @@ function App() {
     return decks;
   }, [systemDecks, customCards]);
 
-  const lessons = useMemo(() => [...systemLessons, ...customLessons, ...classLessons], [systemLessons, customLessons, classLessons]);
+  const lessons = useMemo(() => [...systemLessons, ...customLessons, ...classLessons.filter(l => l.contentType !== 'deck')], [systemLessons, customLessons, classLessons]);
   const libraryLessons = useMemo(() => [...systemLessons, ...customLessons], [systemLessons, customLessons]);
 
   const handleContentSelection = (item: any) => {
     if (item.contentType === 'deck') {
-       setSelectedDeckKey(item.id || item.deckId); 
+       // Note: item.id here is the assignment ID if coming from class, or deck ID if from library
+       setSelectedDeckKey(item.id); 
        setActiveTab('flashcards');
        setActiveStudentClass(null); 
        setActiveLesson(null); 
@@ -1190,13 +1247,16 @@ function App() {
 
   const renderStudentView = () => {
     if (activeLesson) return <LessonView lesson={activeLesson} onFinish={(id: string, xp: number) => { handleFinishLesson(id, xp); setActiveLesson(null); }} />;
-    if (activeTab === 'home' && activeStudentClass) return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={(d: any) => handleContentSelection({...d, contentType: 'deck'})} userData={userData} />;
+    if (activeTab === 'home' && activeStudentClass) return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} />;
     switch (activeTab) {
-      case 'home': return <HomeView setActiveTab={setActiveTab} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={(d: any) => handleContentSelection({...d, contentType: 'deck'})} userData={userData} />;
+      case 'home': return <HomeView setActiveTab={setActiveTab} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} />;
       case 'flashcards': 
-         const deckToLoad = allDecks[selectedDeckKey];
+         // Logic: Is the current selectedDeckKey actually an Assignment ID?
          const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
-         return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} activeDeckOverride={assignedDeck || deckToLoad} onComplete={handleFinishLesson} />;
+         // If it is an assignment, use that object (contains completion data). If not, fallback to standard deck.
+         const deckToLoad = assignedDeck || allDecks[selectedDeckKey];
+         
+         return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} activeDeckOverride={deckToLoad} onComplete={handleFinishLesson} />;
       case 'create': return <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} />;
       case 'profile': return <ProfileView user={user} userData={userData} />;
       default: return <HomeView />;
