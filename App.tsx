@@ -30,7 +30,7 @@ import {
   PlayCircle, Award, Trash2, Plus, FileText, Brain, Loader, LogOut, UploadCloud, 
   School, Users, Copy, List, ArrowRight, LayoutDashboard, ArrowLeft, Library, 
   Pencil, Image, Info, Edit3, FileJson, AlertTriangle, FlipVertical, GanttChart, 
-  Club, AlignLeft, HelpCircle, CheckCircle2, Circle, UserPlus
+  Club, AlignLeft, HelpCircle, CheckCircle2, Circle, UserPlus, MousePointerClick
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -45,7 +45,6 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-// eslint-disable-next-line no-unused-vars
 const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db = getFirestore(app);
