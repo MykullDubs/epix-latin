@@ -84,7 +84,6 @@ const INITIAL_SYSTEM_LESSONS: any[] = [
     id: 'l1',
     title: "Salutationes",
     subtitle: "Greetings in the Forum",
-    description: "Learn how to greet friends and elders.",
     xp: 50,
     vocab: ['Salve', 'Vale', 'Quid agis?'],
     blocks: [
@@ -181,6 +180,96 @@ function MatchingGame({ deckCards, onGameEnd }: any) {
                     return (
                         <div key={card.key} onClick={() => handleCardClick(index)} className={`h-24 p-2 rounded-xl text-center flex items-center justify-center transition-all duration-300 transform perspective-1000 cursor-pointer ${isMatched ? 'scale-95 opacity-50 bg-emerald-100' : 'bg-white shadow-md hover:scale-[1.03]'}`} style={{ opacity: isMatched ? 0.4 : 1, transform: isFlippedOrMatched ? 'rotateY(0deg)' : 'rotateY(180deg)' }}>
                             <div className={`absolute inset-0 backface-hidden rounded-xl flex items-center justify-center p-2 text-sm font-bold transition-transform ${isFlippedOrMatched ? 'bg-white text-slate-800' : 'bg-indigo-600 text-white rotate-y-180'}`}>
+                                {isFlippedOrMatched ? <span className={card.isTerm ? 'font-serif' : 'font-sans text-slate-600 text-xs'}>{card.content}</span> : <span className="text-xl font-black">?</span>}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+            {matchedIndices.length === cards.length && cards.length > 0 && <div className="p-4 bg-emerald-50 text-emerald-800 font-bold text-center rounded-xl animate-in zoom-in">VICTORIA! All Matched. +50 XP!</div>}
+        </div>
+    );
+}
+
+function VocabJack({ deckCards, onGameEnd }: any) {
+    const [playerHand, setPlayerHand] = useState<any[]>([]);
+    const [dealerHand, setDealerHand] = useState<any[]>([]);
+    const [gameState, setGameState] = useState('start'); 
+    const [deck, setDeck] = useState<any[]>([]);
+    const [question, setQuestion] = useState<any>(null);
+
+    const createDeck = () => {
+        const suits = ['♠', '♥', '♦', '♣']; const values = ['2','3','4','5','6','7','8','9','10','J','Q','K','A']; const newDeck: any[] = [];
+        suits.forEach(s => values.forEach(v => newDeck.push({ s, v, val: v === 'A' ? 11 : ['J','Q','K'].includes(v) ? 10 : parseInt(v) })));
+        return newDeck.sort(() => Math.random() - 0.5);
+    };
+    const calculateScore = (hand: any[]) => { let score = hand.reduce((acc, c) => acc + c.val, 0); let aces = hand.filter(c => c.v === 'A').length; while (score > 21 && aces > 0) { score -= 10; aces--; } return score; };
+    const startGame = useCallback(() => { const d = createDeck(); setPlayerHand([d.pop(), d.pop()]); setDealerHand([d.pop(), d.pop()]); setDeck(d); setGameState('playing'); }, []);
+    const triggerHit = () => {
+        const target = deckCards[Math.floor(Math.random() * deckCards.length)];
+        const distractors = deckCards.filter((c: any) => c.id !== target.id).sort(() => 0.5 - Math.random()).slice(0, 2);
+        const options = [...distractors, target].sort(() => 0.5 - Math.random());
+        setQuestion({ target, options: options.map((o: any) => ({id: o.id, text: o.back})), question: `What is the English definition of: ${target.front}?` });
+        setGameState('question');
+    };
+    const answerQuestion = (answerId: string) => {
+        if (answerId === question.target.id) {
+            const newHand = [...playerHand, deck.pop()]; setPlayerHand(newHand);
+            if (calculateScore(newHand) > 21) setGameState('result'); else setGameState('playing');
+        } else { alert("Incorrect! Turn passed to dealer."); stand(); }
+    };
+    const stand = () => {
+        let dHand = [...dealerHand]; let dScore = calculateScore(dHand); const dDeck = [...deck];
+        while (dScore < 17) { dHand.push(dDeck.pop()); dScore = calculateScore(dHand); }
+        setDealerHand(dHand); setDeck(dDeck); setGameState('result');
+    };
+    const pScore = calculateScore(playerHand); const dScore = calculateScore(dealerHand);
+    let result = ""; if (gameState === 'result') { if (pScore > 21) result = "Bust! Dealer Wins."; else if (dScore > 21) result = "Dealer Busts! You Win!"; else if (pScore > dScore) result = "You Win!"; else if (dScore > pScore) result = "Dealer Wins."; else result = "Push (Tie)."; }
+
+    if (deckCards.length < 3) return <div className="p-10 text-center text-slate-400">Need at least 3 cards to play VocabJack.</div>;
+
+    return (
+        <div className="p-4 flex flex-col h-full overflow-y-auto">
+            {gameState === 'start' && (<div className="text-center py-10"><Club size={64} className="mx-auto text-indigo-600 mb-4"/><h2 className="text-3xl font-bold text-slate-900">VocabJack</h2><p className="text-slate-500 mb-6">Answer vocab questions to HIT.</p><button onClick={startGame} className="bg-indigo-600 text-white px-8 py-3 rounded-full font-bold shadow-lg">Deal Cards</button></div>)}
+            {(gameState === 'playing' || gameState === 'result' || gameState === 'question') && (
+                <div className="flex-1 flex flex-col justify-between gap-4">
+                   <div className="text-center"><p className="text-xs font-bold text-slate-400 uppercase mb-2">Dealer {gameState === 'result' && `(${dScore})`}</p><div className="flex justify-center gap-2">{dealerHand.map((c, i) => (<div key={i} className="w-12 h-16 bg-white rounded shadow-md border border-slate-200 flex items-center justify-center text-lg font-bold">{gameState !== 'result' && i === 0 ? '?' : <span className={['♥','♦'].includes(c.s) ? 'text-red-500' : 'text-slate-900'}>{c.v}{c.s}</span>}</div>))}</div></div>
+                   {gameState === 'result' && (<div className="text-center animate-in zoom-in"><h2 className="text-2xl font-bold text-slate-900 mb-2">{result}</h2>{result.includes("You Win") && <p className="text-emerald-600 font-bold mb-2">+50 XP</p>}<button onClick={() => { if(result.includes("You Win")) onGameEnd(50); startGame(); }} className="bg-indigo-600 text-white px-6 py-2 rounded-full font-bold text-sm">Re-Deal</button></div>)}
+                   {gameState === 'question' && (<div className="bg-white p-4 rounded-2xl shadow-xl border-2 border-indigo-100 mx-4"><p className="text-center font-bold text-slate-800 mb-4">Translate: <span className="text-indigo-600">{question.target.front}</span></p><div className="grid grid-cols-1 gap-2">{question.options.map((opt: any) => (<button key={opt.id} onClick={() => answerQuestion(opt.id)} className="p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm hover:bg-indigo-50">{opt.text}</button>))}</div></div>)}
+                   <div className="text-center pb-4"><div className="flex justify-center gap-2 mb-4">{playerHand.map((c, i) => (<div key={i} className="w-12 h-16 bg-white rounded shadow-md border border-slate-200 flex items-center justify-center text-lg font-bold"><span className={['♥','♦'].includes(c.s) ? 'text-red-500' : 'text-slate-900'}>{c.v}{c.s}</span></div>))}</div><p className="text-xs font-bold text-slate-400 uppercase mb-4">You ({pScore})</p>{gameState === 'playing' && (<div className="flex justify-center gap-4"><button onClick={triggerHit} className="bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold shadow-md active:scale-95">HIT</button><button onClick={stand} className="bg-rose-500 text-white px-6 py-3 rounded-xl font-bold shadow-md active:scale-95">STAND</button></div>)}</div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// --- FLASHCARD VIEW ---
+function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, activeDeckOverride, onComplete }: any) {
+  const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+  const [manageMode, setManageMode] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [xrayMode, setXrayMode] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [quickAddData, setQuickAddData] = useState({ front: '', back: '', type: 'noun' });
+  const [gameMode, setGameMode] = useState('study'); 
+  
+  const currentDeck = activeDeckOverride || allDecks[selectedDeckKey];
+  const deckCards = currentDeck?.cards || [];
+  const card = deckCards[currentIndex];
+  const theme = card ? (TYPE_COLORS[card.type] || TYPE_COLORS.noun) : TYPE_COLORS.noun;
+
+  const handleDeckChange = (key: string) => { onSelectDeck(key); setIsSelectorOpen(false); setCurrentIndex(0); setIsFlipped(false); setXrayMode(false); setManageMode(false); setGameMode('study'); };
+  const handleGameEnd = (xp: number) => { alert(`Game Over! You earned ${xp} XP.`); setGameMode('study'); if (activeDeckOverride && onComplete) { onComplete(activeDeckOverride.id, xp); } }
+  const filteredCards = deckCards.filter((c: any) => (c.front || '').toLowerCase().includes(searchTerm.toLowerCase()) || (c.back || '').toLowerCase().includes(searchTerm.toLowerCase()));
+  const handleQuickAdd = (e: any) => { e.preventDefault(); if(!quickAddData.front || !quickAddData.back) return; onSaveCard({ ...quickAddData, deckId: selectedDeckKey, ipa: "/.../", mastery: 0, morphology: [{ part: quickAddData.front, meaning: "Custom", type: "root" }], usage: { sentence: "-", translation: "-" }, grammar_tags: ["Quick Add"] }); setQuickAddData({ front: '', back: '', type: 'noun' }); setSearchTerm(''); alert("Card Added!"); };
+
+  if (!card && !manageMode) return <div className="h-full flex flex-col bg-slate-50"><Header title={currentDeck?.title || "Empty Deck"} onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} rightAction={<button onClick={() => setManageMode(true)} className="p-2 bg-slate-100 rounded-full"><List size={20} className="text-slate-600" /></button>} /><div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400"><Layers size={48} className="mb-4 opacity-20" /><p>This deck is empty.</p><button onClick={() => setManageMode(true)} className="mt-4 text-indigo-600 font-bold text-sm">Add Cards</button></div></div>;
+
+  return (
+    <div className="h-[calc(100vh-80px)] flex flex-col bg-slate-50 pb-6 relative overflow-hidden">
+      <Header title={currentDeck?.title.split(' ')[1] || "Deck"} subtitle={`${currentIndex + 1} / ${deckCards.length}`} onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} rightAction={<div className="flex items-center gap-2">{activeDeckOverride && onComplete && (<button onClick={() => onComplete(activeDeckOverride.id, 50)} className="bg-emerald-500 text-white px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-sm hover:scale-105 transition-transform"><Check size={14}/> Complete</button>)}<button onClick={() => setManageMode(!manageMode)} className={`p-2 rounded-full transition-colors ${manageMode ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>{manageMode ? <X size={20} /> : <List size={20} />}</button></div>} />
+      {isSelectorOpen && <div className="absolute top-24 left-6 right-6 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 animate-in fade-in slide-in-from-top-4">{Object.entries(allDecks).ma text-white rotate-y-180'}`}>
                                 {isFlippedOrMatched ? <span className={card.isTerm ? 'font-serif' : 'font-sans text-slate-600 text-xs'}>{card.content}</span> : <span className="text-xl font-black">?</span>}
                             </div>
                         </div>
