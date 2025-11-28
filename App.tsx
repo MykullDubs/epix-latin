@@ -69,7 +69,9 @@ import {
   GanttChart, 
   Club,
   AlignLeft,
-  HelpCircle
+  HelpCircle,
+  CheckCircle2,
+  Circle
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -842,6 +844,11 @@ function ClassManagerView({ user, lessons, allDecks }: any) {
   const [newStudentEmail, setNewStudentEmail] = useState('');
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  
+  // NEW STATE: Assignments
+  const [targetStudentMode, setTargetStudentMode] = useState('all'); // 'all' or 'specific'
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
+  
   const selectedClass = classes.find(c => c.id === selectedClassId);
 
   useEffect(() => {
@@ -858,6 +865,14 @@ function ClassManagerView({ user, lessons, allDecks }: any) {
   const handleRenameClass = async (classId: string, currentName: string) => { const newName = prompt("Enter new class name:", currentName); if (newName && newName.trim() !== "" && newName !== currentName) { try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { name: newName.trim() }); setToastMsg("Class renamed successfully"); } catch (error) { console.error("Rename failed", error); alert("Failed to rename class"); } } };
   const addStudent = async (e: any) => { e.preventDefault(); if (!newStudentEmail || !selectedClass) return; const normalizedEmail = newStudentEmail.toLowerCase().trim(); try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { students: arrayUnion(normalizedEmail), studentEmails: arrayUnion(normalizedEmail) }); setNewStudentEmail(''); setToastMsg(`Added ${normalizedEmail}`); } catch (error) { console.error("Add student failed:", error); alert("Failed to add student."); } };
   
+  const toggleAssignee = (email: string) => {
+      if (selectedAssignees.includes(email)) {
+          setSelectedAssignees(selectedAssignees.filter(e => e !== email));
+      } else {
+          setSelectedAssignees([...selectedAssignees, email]);
+      }
+  };
+
   const assignContent = async (item: any, type: string) => { 
       if (!selectedClass) return; 
       try { 
@@ -865,10 +880,13 @@ function ClassManagerView({ user, lessons, allDecks }: any) {
               ...item, 
               id: `assign_${Date.now()}_${Math.random().toString(36).substr(2,5)}`, 
               originalId: item.id,
-              contentType: type 
+              contentType: type,
+              targetStudents: targetStudentMode === 'specific' ? selectedAssignees : null // Null means everyone
           })); 
           await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { assignments: arrayUnion(assignment) }); 
           setAssignModalOpen(false); 
+          setTargetStudentMode('all');
+          setSelectedAssignees([]);
           setToastMsg(`Assigned: ${item.title}`); 
       } catch (error) { console.error("Assign failed:", error); alert("Failed to assign."); } 
   };
@@ -894,7 +912,15 @@ function ClassManagerView({ user, lessons, allDecks }: any) {
                         <div className={`p-2 rounded-lg ${l.contentType === 'deck' ? 'bg-orange-100 text-orange-600' : 'bg-indigo-100 text-indigo-600'}`}>
                             {l.contentType === 'deck' ? <Layers size={18} /> : <FileText size={18} />}
                         </div>
-                        <div><h4 className="font-bold text-slate-800">{l.title}</h4><span className="text-[10px] text-slate-500 uppercase">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Lesson'}</span></div>
+                        <div>
+                            <h4 className="font-bold text-slate-800">{l.title}</h4>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-slate-500 uppercase">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Lesson'}</span>
+                                {l.targetStudents && l.targetStudents.length > 0 && (
+                                    <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold flex items-center gap-1"><Users size={10}/> {l.targetStudents.length} Students</span>
+                                )}
+                            </div>
+                        </div>
                     </div>
                     <span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded text-xs font-bold">Active</span>
                 </div> 
@@ -908,13 +934,34 @@ function ClassManagerView({ user, lessons, allDecks }: any) {
         </div>
         {assignModalOpen && (
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[80vh] flex flex-col">
-              <div className="p-4 border-b border-slate-100">
-                  <div className="flex justify-between items-center mb-2">
+            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+              <div className="p-4 border-b border-slate-100 bg-slate-50">
+                  <div className="flex justify-between items-center mb-4">
                       <h3 className="font-bold text-lg">Assign Content</h3>
                       <button onClick={() => setAssignModalOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-600"/></button>
                   </div>
-                  <p className="text-xs text-slate-500">Select an item to assign it to the entire class.</p>
+                  
+                  {/* TARGET TOGGLE */}
+                  <div className="bg-white p-1 rounded-lg border border-slate-200 flex mb-2">
+                      <button onClick={() => setTargetStudentMode('all')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${targetStudentMode === 'all' ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Entire Class</button>
+                      <button onClick={() => setTargetStudentMode('specific')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${targetStudentMode === 'specific' ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Specific Students</button>
+                  </div>
+
+                  {targetStudentMode === 'specific' && (
+                      <div className="mt-2 max-h-32 overflow-y-auto border border-slate-200 rounded-lg bg-white p-2">
+                          {(!selectedClass.students || selectedClass.students.length === 0) ? (
+                              <p className="text-xs text-slate-400 italic text-center p-2">No students in roster.</p>
+                          ) : (
+                              selectedClass.students.map((studentEmail: string) => (
+                                  <button key={studentEmail} onClick={() => toggleAssignee(studentEmail)} className="flex items-center gap-2 w-full p-2 hover:bg-slate-50 rounded text-left">
+                                      {selectedAssignees.includes(studentEmail) ? <CheckCircle2 size={16} className="text-indigo-600"/> : <Circle size={16} className="text-slate-300"/>}
+                                      <span className="text-xs font-medium text-slate-700 truncate">{studentEmail}</span>
+                                  </button>
+                              ))
+                          )}
+                      </div>
+                  )}
+                  {targetStudentMode === 'specific' && <p className="text-[10px] text-slate-400 mt-2 text-right">{selectedAssignees.length} selected</p>}
               </div>
               <div className="flex-1 overflow-y-auto p-2">
                   <div className="mb-4">
@@ -1112,11 +1159,21 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
           onSelectLesson(assignment); 
       } 
   };
+  
+  // Filter assignments relevant to this user
+  const relevantAssignments = (classData.assignments || []).filter((l: any) => {
+      // If targetStudents is null or empty, it's for everyone.
+      // Otherwise, check if user email is in list.
+      const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email);
+      return isForMe;
+  });
+
+  const pendingCount = relevantAssignments.filter((l: any) => !completedSet.has(l.id)).length;
 
   return (
     <div className="h-full flex flex-col bg-slate-50">
       <div className="px-6 pt-12 pb-6 bg-white sticky top-0 z-40 border-b border-slate-100"><button onClick={onBack} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Home</button><h1 className="text-2xl font-bold text-slate-900">{classData.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {classData.code}</p></div>
-      <div className="flex-1 px-6 mt-4 overflow-y-auto pb-24"><div className="space-y-6"><div className="bg-indigo-600 rounded-2xl p-6 text-white shadow-lg"><h3 className="text-lg font-bold mb-1">Your Progress</h3><p className="text-indigo-200 text-sm">Keep up the great work!</p><div className="mt-4 flex gap-4"><div><span className="text-2xl font-bold block">{classData.assignments ? classData.assignments.filter((l: any) => !completedSet.has(l.id)).length : 0}</span><span className="text-xs opacity-70">To Do</span></div><div><span className="text-2xl font-bold block">{classData.students?.length || 0}</span><span className="text-xs opacity-70">Classmates</span></div></div></div><div><h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3><div className="space-y-3">{classData.assignments && classData.assignments.length > 0 ? ( classData.assignments.filter((l: any) => !completedSet.has(l.id)).map((l: any, i: number) => ( 
+      <div className="flex-1 px-6 mt-4 overflow-y-auto pb-24"><div className="space-y-6"><div className="bg-indigo-600 rounded-2xl p-6 text-white shadow-lg"><h3 className="text-lg font-bold mb-1">Your Progress</h3><p className="text-indigo-200 text-sm">Keep up the great work!</p><div className="mt-4 flex gap-4"><div><span className="text-2xl font-bold block">{pendingCount}</span><span className="text-xs opacity-70">To Do</span></div><div><span className="text-2xl font-bold block">{classData.students?.length || 0}</span><span className="text-xs opacity-70">Classmates</span></div></div></div><div><h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3><div className="space-y-3">{relevantAssignments.length > 0 ? ( relevantAssignments.filter((l: any) => !completedSet.has(l.id)).map((l: any, i: number) => ( 
           <button key={`${l.id}-${i}`} onClick={() => handleAssignmentClick(l)} className="w-full bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all">
               <div className="flex items-center space-x-4">
                   <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600' : 'bg-indigo-50 text-indigo-600'}`}>
@@ -1129,7 +1186,7 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
               </div>
               <ChevronRight size={20} className="text-slate-300" />
           </button> 
-      )) ) : ( <div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">No pending assignments.</div> )}{classData.assignments && classData.assignments.every((l: any) => completedSet.has(l.id)) && classData.assignments.length > 0 && (<div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">All assignments completed! 🎉</div>)}</div></div></div></div>
+      )) ) : ( <div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">No pending assignments.</div> )}{relevantAssignments.every((l: any) => completedSet.has(l.id)) && relevantAssignments.length > 0 && (<div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">All assignments completed! 🎉</div>)}</div></div></div></div>
     </div>
   );
 }
@@ -1137,7 +1194,13 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
 function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck }: any) {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const completedSet = new Set(userData?.completedAssignments || []);
-  const activeAssignments = (assignments || []).filter((l: any) => !completedSet.has(l.id));
+  
+  // Filter assignments relevant to this user
+  const relevantAssignments = (assignments || []).filter((l: any) => {
+     return !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email);
+  });
+  
+  const activeAssignments = relevantAssignments.filter((l: any) => !completedSet.has(l.id));
   const handleSelectClass = (cls: any) => { setActiveStudentClass(cls); };
   
   if (activeStudentClass) { return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={onSelectLesson} onSelectDeck={onSelectDeck} userData={userData} />; }
@@ -1148,7 +1211,15 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
     <Header title={`Ave, ${userData?.name || 'Discipulus'}!`} subtitle="Perge in itinere tuo." />
     <div className="px-6 space-y-6 mt-4">
       <div className="bg-gradient-to-br from-red-800 to-rose-900 rounded-3xl p-6 text-white shadow-xl"><div className="flex justify-between"><div><p className="text-rose-100 text-sm font-bold uppercase">Hebdomada</p><h3 className="text-4xl font-serif font-bold">{userData?.xp} XP</h3></div><Zap size={28} className="text-yellow-400 fill-current"/></div><div className="mt-6 bg-black/20 rounded-full h-3"><div className="bg-yellow-400 h-full w-3/4 rounded-full"/></div></div>
-      {classes && classes.length > 0 && (<div className="mb-6"><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><School size={18} className="text-indigo-600"/> My Classes</h3><div className="flex gap-4 overflow-x-auto pb-4">{classes.map((cls: any) => { const pendingCount = (cls.assignments || []).filter((l: any) => !completedSet.has(l.id)).length; return ( <button key={cls.id} onClick={() => handleSelectClass(cls)} className="min-w-[200px] bg-white p-4 rounded-2xl border border-slate-200 shadow-sm text-left active:scale-95 transition-transform"><div className="flex items-center justify-between mb-2"><div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">{cls.name.charAt(0)}</div><span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500 font-mono">{cls.code}</span></div><h4 className="font-bold text-slate-900">{cls.name}</h4><p className="text-xs text-slate-500 mt-1">{pendingCount} Pending Tasks</p></button> ); })}</div></div>)}
+      {classes && classes.length > 0 && (<div className="mb-6"><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><School size={18} className="text-indigo-600"/> My Classes</h3><div className="flex gap-4 overflow-x-auto pb-4">{classes.map((cls: any) => { 
+          // Filter count for this specific class button
+          const clsPendingCount = (cls.assignments || []).filter((l: any) => {
+              const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email);
+              return isForMe && !completedSet.has(l.id);
+          }).length;
+          
+          return ( <button key={cls.id} onClick={() => handleSelectClass(cls)} className="min-w-[200px] bg-white p-4 rounded-2xl border border-slate-200 shadow-sm text-left active:scale-95 transition-transform"><div className="flex items-center justify-between mb-2"><div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">{cls.name.charAt(0)}</div><span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500 font-mono">{cls.code}</span></div><h4 className="font-bold text-slate-900">{cls.name}</h4><p className="text-xs text-slate-500 mt-1">{clsPendingCount} Pending Tasks</p></button> ); 
+      })}</div></div>)}
       {activeAssignments.length > 0 && (<div><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3><div className="space-y-3">{activeAssignments.map((l: any, i: number) => ( 
           <button key={`${l.id}-${i}`} onClick={() => l.contentType === 'deck' ? onSelectDeck(l) : onSelectLesson(l)} className="w-full bg-indigo-50 border border-indigo-100 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all">
               <div className="flex items-center space-x-4">
