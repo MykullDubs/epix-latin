@@ -24,6 +24,8 @@ import {
   query,
   where,
   collectionGroup,
+  orderBy,
+  limit,
   DocumentData
 } from "firebase/firestore";
 import { 
@@ -32,7 +34,7 @@ import {
   PlayCircle, Award, Trash2, Plus, FileText, Brain, Loader, LogOut, UploadCloud, 
   School, Users, Copy, List, ArrowRight, LayoutDashboard, ArrowLeft, Library, 
   Pencil, Image, Info, Edit3, FileJson, AlertTriangle, FlipVertical, GanttChart, 
-  Club, AlignLeft, HelpCircle, CheckCircle2, Circle
+  Club, AlignLeft, HelpCircle, CheckCircle2, Circle, Activity, Clock
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -157,7 +159,7 @@ function LessonView({ lesson, onFinish }: any) {
 
   return (
     <div className="h-full flex flex-col bg-white">
-      <Header title={lesson.title} subtitle={lesson.subtitle} rightAction={<button onClick={() => onFinish(lesson.id, 0)} className="text-slate-400 hover:text-rose-500"><X /></button>}/>
+      <Header title={lesson.title} subtitle={lesson.subtitle} rightAction={<button onClick={() => onFinish(lesson.id, 0, lesson.title)} className="text-slate-400 hover:text-rose-500"><X /></button>}/>
       <div className="flex-1 overflow-y-auto p-6 space-y-8 pb-32">
         <div className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 text-center animate-in fade-in slide-in-from-bottom-4"><h2 className="text-2xl font-serif font-bold text-indigo-900 mb-2">{lesson.title}</h2><p className="text-indigo-800 opacity-80">{lesson.description}</p></div>
         {lesson.blocks?.slice(0, currentBlockIndex + 1).map((block: any, idx: number) => (
@@ -169,7 +171,7 @@ function LessonView({ lesson, onFinish }: any) {
             {block.type === 'image' && (<div className="rounded-xl overflow-hidden shadow-sm border border-slate-200"><img src={block.url} alt="Lesson illustration" className="w-full h-auto object-cover" />{block.caption && <div className="p-2 bg-slate-50 text-xs text-center text-slate-500 italic">{block.caption}</div>}</div>)}
           </div>
         ))}
-        <div ref={bottomRef} className="pt-8">{!isComplete ? (<button onClick={handleNext} className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 active:scale-95 transition-all flex items-center justify-center gap-2"><span>Continue</span> <ChevronDown /></button>) : (<button onClick={() => onFinish(lesson.id, lesson.xp || 50)} className="w-full py-4 bg-emerald-500 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-emerald-600 active:scale-95 transition-all animate-bounce">Complete Lesson (+{lesson.xp || 50} XP)</button>)}</div>
+        <div ref={bottomRef} className="pt-8">{!isComplete ? (<button onClick={handleNext} className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 active:scale-95 transition-all flex items-center justify-center gap-2"><span>Continue</span> <ChevronDown /></button>) : (<button onClick={() => onFinish(lesson.id, lesson.xp || 50, lesson.title)} className="w-full py-4 bg-emerald-500 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-emerald-600 active:scale-95 transition-all animate-bounce">Complete Lesson (+{lesson.xp || 50} XP)</button>)}</div>
       </div>
     </div>
   );
@@ -198,7 +200,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
 
   return (
     <div className="h-[calc(100vh-80px)] flex flex-col bg-slate-50 pb-6 relative overflow-hidden">
-      <Header title={currentDeck?.title.split(' ')[1] || "Deck"} subtitle={`${currentIndex + 1} / ${deckCards.length}`} onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} rightAction={<div className="flex items-center gap-2">{activeDeckOverride && onComplete && (<button onClick={() => onComplete(activeDeckOverride.id, 50)} className="bg-emerald-500 text-white px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-sm hover:scale-105 transition-transform"><Check size={14}/> Complete</button>)}<button onClick={() => setManageMode(!manageMode)} className={`p-2 rounded-full transition-colors ${manageMode ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>{manageMode ? <X size={20} /> : <List size={20} />}</button></div>} />
+      <Header title={currentDeck?.title.split(' ')[1] || "Deck"} subtitle={`${currentIndex + 1} / ${deckCards.length}`} onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} rightAction={<div className="flex items-center gap-2">{activeDeckOverride && onComplete && (<button onClick={() => onComplete(activeDeckOverride.id, 50, currentDeck.title)} className="bg-emerald-500 text-white px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-sm hover:scale-105 transition-transform"><Check size={14}/> Complete</button>)}<button onClick={() => setManageMode(!manageMode)} className={`p-2 rounded-full transition-colors ${manageMode ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>{manageMode ? <X size={20} /> : <List size={20} />}</button></div>} />
       {isSelectorOpen && <div className="absolute top-24 left-6 right-6 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 animate-in fade-in slide-in-from-top-4">{Object.entries(allDecks).map(([key, deck]: any) => (<button key={key} onClick={() => handleDeckChange(key)} className={`w-full text-left p-3 rounded-xl font-bold text-sm mb-1 ${selectedDeckKey === key ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'}`}>{deck.title} <span className="float-right opacity-50">{deck.cards.length}</span></button>))}</div>}
       {isSelectorOpen && <div className="absolute inset-0 z-40 bg-black/5 backdrop-blur-[1px]" onClick={() => setIsSelectorOpen(false)} />}
       <div className="flex-1 overflow-y-auto pt-4">
@@ -329,6 +331,50 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
   );
 }
 
+// --- INSTRUCTOR: LIVE FEED COMPONENT ---
+function LiveActivityFeed() {
+  const [logs, setLogs] = useState<any[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Listen to the 'activity_logs' collection, recent 20 events
+    const q = query(collection(db, 'artifacts', appId, 'activity_logs'), orderBy('timestamp', 'desc'), limit(20));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
+  }, []);
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col overflow-hidden">
+        <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+            <h2 className="font-bold text-slate-700 flex items-center gap-2"><Activity size={18} className="text-emerald-500"/> Live Student Activity</h2>
+            <div className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full animate-pulse">LIVE</div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-slate-50/50" ref={scrollRef}>
+            {logs.length === 0 && <div className="text-center text-slate-400 italic mt-10">No recent activity.</div>}
+            <div className="space-y-3">
+                {logs.map((log) => (
+                    <div key={log.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-start gap-3 animate-in slide-in-from-top-2">
+                        <div className="bg-indigo-100 text-indigo-600 p-2 rounded-full mt-1">
+                           {log.type === 'completion' ? <CheckCircle2 size={16}/> : <Zap size={16}/>}
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-sm font-bold text-slate-800">{log.studentName}</p>
+                            <p className="text-xs text-slate-500">Completed <span className="font-bold text-indigo-600">{log.itemTitle}</span></p>
+                            <div className="flex items-center gap-2 mt-2">
+                                <span className="text-[10px] font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 flex items-center gap-1"><Clock size={10}/> {new Date(log.timestamp).toLocaleTimeString()}</span>
+                                <span className="text-[10px] font-bold text-emerald-600">+{log.xp} XP</span>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    </div>
+  );
+}
+
 // --- INSTRUCTOR & DASHBOARD ---
 function ClassManagerView({ user, classes, lessons, allDecks }: any) {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
@@ -420,7 +466,7 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
 }
 
 function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, onLogout }: any) {
-  const [activeTab, setActiveTab] = useState('classes');
+  const [activeTab, setActiveTab] = useState('dashboard');
   
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden">
@@ -428,6 +474,7 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
       <div className="w-64 bg-slate-900 text-white flex-col hidden md:flex">
         <div className="p-6 border-b border-slate-800"><h1 className="text-xl font-bold flex items-center gap-2"><GraduationCap className="text-indigo-400"/> Magister</h1><p className="text-xs text-slate-400 mt-1">{user.email}</p></div>
         <div className="flex-1 p-4 space-y-2">
+            <button onClick={() => setActiveTab('dashboard')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'}`}><LayoutDashboard size={20} /> Overview</button>
             <button onClick={() => setActiveTab('classes')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'classes' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'}`}><School size={20} /> Classes & Roster</button>
             <button onClick={() => setActiveTab('content')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'content' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'}`}><Library size={20} /> Content Library</button>
             <button onClick={() => setActiveTab('profile')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'profile' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'}`}><User size={20} /> Profile & Settings</button>
@@ -436,9 +483,27 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
       </div>
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
-         <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center"><span className="font-bold flex items-center gap-2"><GraduationCap/> Magister</span><div className="flex gap-4"><button onClick={() => setActiveTab('classes')} className={activeTab === 'classes' ? 'text-indigo-400' : 'text-slate-400'}><School/></button><button onClick={() => setActiveTab('content')} className={activeTab === 'content' ? 'text-indigo-400' : 'text-slate-400'}><Library/></button><button onClick={() => setActiveTab('profile')} className={activeTab === 'profile' ? 'text-indigo-400' : 'text-slate-400'}><User/></button></div></div>
+         <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center"><span className="font-bold flex items-center gap-2"><GraduationCap/> Magister</span><div className="flex gap-4"><button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'text-indigo-400' : 'text-slate-400'}><LayoutDashboard/></button><button onClick={() => setActiveTab('classes')} className={activeTab === 'classes' ? 'text-indigo-400' : 'text-slate-400'}><School/></button><button onClick={() => setActiveTab('content')} className={activeTab === 'content' ? 'text-indigo-400' : 'text-slate-400'}><Library/></button></div></div>
          <div className="flex-1 overflow-y-auto p-4 md:p-8">
             <div className="max-w-6xl mx-auto h-full">
+                {activeTab === 'dashboard' && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
+                        <div className="md:col-span-2 space-y-6">
+                            <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 rounded-3xl p-8 text-white shadow-lg">
+                                <h2 className="text-3xl font-bold mb-2">Welcome back, Magister.</h2>
+                                <p className="text-indigo-100 mb-6">Your academy is active.</p>
+                                <div className="flex gap-8">
+                                    <div><span className="text-4xl font-bold block">{userData.classes?.length || 0}</span><span className="text-xs uppercase tracking-wider opacity-70">Active Classes</span></div>
+                                    <div><span className="text-4xl font-bold block">{allDecks.custom?.cards?.length || 0}</span><span className="text-xs uppercase tracking-wider opacity-70">Flashcards</span></div>
+                                    <div><span className="text-4xl font-bold block">{lessons.length}</span><span className="text-xs uppercase tracking-wider opacity-70">Lessons</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="h-[500px] md:h-auto">
+                            <LiveActivityFeed />
+                        </div>
+                    </div>
+                )}
                 {activeTab === 'classes' && (<ClassManagerView user={user} classes={userData?.classes || []} lessons={lessons} allDecks={allDecks} />)}
                 {activeTab === 'content' && (<div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full overflow-hidden flex flex-col"><div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center"><h2 className="font-bold text-slate-700">Content Builder</h2></div><div className="flex-1 overflow-y-auto"><BuilderHub onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} onSaveLesson={onSaveLesson} allDecks={allDecks} /></div></div>)}
                 {activeTab === 'profile' && <ProfileView user={user} userData={userData} />}
@@ -572,13 +637,10 @@ function App() {
     const unsubSysDecks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_decks'), (snap) => { const d: any = {}; snap.docs.forEach(doc => { d[doc.id] = doc.data(); }); if (Object.keys(d).length > 0) setSystemDecks(d); });
     const unsubSysLessons = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_lessons'), (snap) => { const l = snap.docs.map(d => ({ id: d.id, ...d.data() })); if (l.length > 0) setSystemLessons(l); });
 
-    // Handle Class Loading based on Role
     let qClasses;
     if (userData?.role === 'instructor') {
-         // Instructors load their own classes
          qClasses = query(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'));
     } else {
-         // Students load classes they are enrolled in (via collectionGroup)
          qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
     }
 
@@ -586,17 +648,10 @@ function App() {
         const cls = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); 
         setEnrolledClasses(cls); 
         const newAssignments: any[] = []; 
-        cls.forEach((c: any) => { 
-            if (c.assignments && Array.isArray(c.assignments)) { 
-                newAssignments.push(...c.assignments); 
-            } 
-        }); 
+        cls.forEach((c: any) => { if (c.assignments && Array.isArray(c.assignments)) { newAssignments.push(...c.assignments); } }); 
         setClassLessons(newAssignments); 
         setUserData((prev: any) => ({...prev, classes: cls, classAssignments: newAssignments})); 
-    }, (error) => { 
-        console.log("Class sync error:", error); 
-        setUserData((prev: any) => ({...prev, classSyncError: true})); 
-    });
+    }, (error) => { console.log("Class sync error:", error); setUserData((prev: any) => ({...prev, classSyncError: true})); });
     
     return () => { unsubProfile(); unsubCards(); unsubLessons(); unsubSysDecks(); unsubSysLessons(); unsubClasses(); };
   }, [user, userData?.role]);
@@ -605,7 +660,19 @@ function App() {
   const handleUpdateCard = useCallback(async (cardId: string, data: any) => { if (!user) return; try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), data); } catch (e) { console.error(e); alert("Cannot edit card. Check permissions."); } }, [user]);
   const handleDeleteCard = useCallback(async (cardId: string) => { if (!user) return; if (!window.confirm("Are you sure you want to delete this card?")) return; try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId)); } catch (e) { console.error(e); alert("Failed to delete card."); } }, [user]);
   const handleCreateLesson = useCallback(async (l: any, id = null) => { if(!user) return; if (id) { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', id), l); } else { await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), l); } setActiveTab('home'); }, [user]);
-  const handleFinishLesson = useCallback(async (lessonId: string, xp: number) => { setActiveTab('home'); if (xp > 0 && user) { try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp), completedAssignments: arrayUnion(lessonId) }); } catch (e) { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { ...DEFAULT_USER_DATA, xp: xp, completedAssignments: [lessonId] }, { merge: true }); } } }, [user]);
+  
+  const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title?: string) => { 
+    setActiveTab('home'); 
+    if (xp > 0 && user) { 
+        try { 
+            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp), completedAssignments: arrayUnion(lessonId) }); 
+            // Push to Activity Log
+            await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { studentName: userData?.name || 'Unknown', studentEmail: user.email, itemTitle: title || 'Unknown Activity', xp: xp, timestamp: Date.now(), type: 'completion' });
+        } catch (e) { 
+            await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { ...DEFAULT_USER_DATA, xp: xp, completedAssignments: [lessonId] }, { merge: true }); 
+        } 
+    } 
+  }, [user, userData]);
 
   if (!authChecked) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
   if (!user) return <AuthView />;
@@ -627,7 +694,7 @@ function App() {
   }
 
   const renderStudentView = () => {
-    if (activeLesson) return <LessonView lesson={activeLesson} onFinish={(id: string, xp: number) => { handleFinishLesson(id, xp); setActiveLesson(null); }} />;
+    if (activeLesson) return <LessonView lesson={activeLesson} onFinish={(id: string, xp: number, title: string) => { handleFinishLesson(id, xp, title); setActiveLesson(null); }} />;
     if (activeTab === 'home' && activeStudentClass) return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} />;
     switch (activeTab) {
       case 'home': return <HomeView setActiveTab={setActiveTab} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} />;
