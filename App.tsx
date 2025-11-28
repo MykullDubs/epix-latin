@@ -448,12 +448,12 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
             <div><h1 className="text-2xl font-bold text-slate-900">{selectedClass.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {selectedClass.code}</p></div>
             
-            {/* --- UPDATED: TWO EXPLICIT BUTTONS FOR ASSIGNMENT --- */}
+            {/* --- EXPLICIT BUTTONS FOR ASSIGNMENT --- */}
             <div className="flex gap-2">
                 <button onClick={() => { setAssignType('lesson'); setAssignModalOpen(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-indigo-700 active:scale-95 transition-all"><BookOpen size={16}/> Assign Lesson</button>
                 <button onClick={() => { setAssignType('deck'); setAssignModalOpen(true); }} className="bg-orange-500 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-orange-600 active:scale-95 transition-all"><Layers size={16}/> Assign Deck</button>
             </div>
-            {/* ---------------------------------------------------- */}
+            {/* -------------------------------------- */}
 
           </div>
         </div>
@@ -741,7 +741,7 @@ function App() {
          const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
          const deckToLoad = assignedDeck || allDecks[selectedDeckKey];
          return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} activeDeckOverride={deckToLoad} onComplete={handleFinishLesson} />;
-      case 'create': return <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} />;
+      case 'create': return <BuilderHub onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} />;
       case 'profile': return <ProfileView user={user} userData={userData} />;
       default: return <HomeView />;
     }
