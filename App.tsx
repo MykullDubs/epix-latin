@@ -30,7 +30,7 @@ import {
   PlayCircle, Award, Trash2, Plus, FileText, Brain, Loader, LogOut, UploadCloud, 
   School, Users, Copy, List, ArrowRight, LayoutDashboard, ArrowLeft, Library, 
   Pencil, Image, Info, Edit3, FileJson, AlertTriangle, FlipVertical, GanttChart, 
-  Club, AlignLeft, HelpCircle, CheckCircle2, Circle, UserPlus
+  Club, AlignLeft, HelpCircle, CheckCircle2, Circle, UserPlus, MousePointerClick
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -411,6 +411,7 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [targetStudentMode, setTargetStudentMode] = useState('all'); 
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
+  const [assignType, setAssignType] = useState<'deck' | 'lesson'>('lesson');
   
   const selectedClass = classes.find((c: any) => c.id === selectedClassId);
 
@@ -419,7 +420,24 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
   const handleRenameClass = async (classId: string, currentName: string) => { const newName = prompt("Enter new class name:", currentName); if (newName && newName.trim() !== "" && newName !== currentName) { try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { name: newName.trim() }); setToastMsg("Class renamed successfully"); } catch (error) { console.error("Rename failed", error); alert("Failed to rename class"); } } };
   const addStudent = async (e: any) => { e.preventDefault(); if (!newStudentEmail || !selectedClass) return; const normalizedEmail = newStudentEmail.toLowerCase().trim(); try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { students: arrayUnion(normalizedEmail), studentEmails: arrayUnion(normalizedEmail) }); setNewStudentEmail(''); setToastMsg(`Added ${normalizedEmail}`); } catch (error) { console.error("Add student failed:", error); alert("Failed to add student."); } };
   const toggleAssignee = (email: string) => { if (selectedAssignees.includes(email)) { setSelectedAssignees(selectedAssignees.filter(e => e !== email)); } else { setSelectedAssignees([...selectedAssignees, email]); } };
-  const assignContent = async (item: any, type: string) => { if (!selectedClass) return; try { const assignment = JSON.parse(JSON.stringify({ ...item, id: `assign_${Date.now()}_${Math.random().toString(36).substr(2,5)}`, originalId: item.id, contentType: type, targetStudents: targetStudentMode === 'specific' ? selectedAssignees : null })); await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { assignments: arrayUnion(assignment) }); setAssignModalOpen(false); setTargetStudentMode('all'); setSelectedAssignees([]); setToastMsg(`Assigned: ${item.title}`); } catch (error) { console.error("Assign failed:", error); alert("Failed to assign."); } };
+  
+  const assignContent = async (item: any, type: string) => { 
+      if (!selectedClass) return; 
+      try { 
+          const assignment = JSON.parse(JSON.stringify({ 
+              ...item, 
+              id: `assign_${Date.now()}_${Math.random().toString(36).substr(2,5)}`, 
+              originalId: item.id, 
+              contentType: type, 
+              targetStudents: targetStudentMode === 'specific' ? selectedAssignees : null 
+          })); 
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { assignments: arrayUnion(assignment) }); 
+          setAssignModalOpen(false); 
+          setTargetStudentMode('all'); 
+          setSelectedAssignees([]); 
+          setToastMsg(`Assigned: ${item.title}`); 
+      } catch (error) { console.error("Assign failed:", error); alert("Failed to assign."); } 
+  };
 
   if (selectedClass) {
     return (
@@ -427,9 +445,12 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
         {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
         <div className="pb-6 border-b border-slate-100 mb-6">
           <button onClick={() => setSelectedClassId(null)} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Classes</button>
-          <div className="flex justify-between items-end">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
             <div><h1 className="text-2xl font-bold text-slate-900">{selectedClass.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {selectedClass.code}</p></div>
-            <button onClick={() => setAssignModalOpen(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm"><Plus size={16}/> Assign Content</button>
+            <div className="flex gap-2">
+                <button onClick={() => { setAssignType('lesson'); setAssignModalOpen(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-indigo-700 active:scale-95 transition-all"><BookOpen size={16}/> Assign Lesson</button>
+                <button onClick={() => { setAssignType('deck'); setAssignModalOpen(true); }} className="bg-orange-500 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-orange-600 active:scale-95 transition-all"><Layers size={16}/> Assign Deck</button>
+            </div>
           </div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -440,14 +461,39 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in duration-200">
               <div className="p-4 border-b border-slate-100 bg-slate-50">
-                  <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">Assign Content</h3><button onClick={() => setAssignModalOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-600"/></button></div>
+                  <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">Assign {assignType === 'deck' ? 'Flashcard Deck' : 'Lesson'}</h3><button onClick={() => setAssignModalOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-600"/></button></div>
                   <div className="bg-white p-1 rounded-lg border border-slate-200 flex mb-2"><button onClick={() => setTargetStudentMode('all')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${targetStudentMode === 'all' ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Entire Class</button><button onClick={() => setTargetStudentMode('specific')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${targetStudentMode === 'specific' ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Specific Students</button></div>
                   {targetStudentMode === 'specific' && (<div className="mt-2 max-h-32 overflow-y-auto border border-slate-200 rounded-lg bg-white p-2 custom-scrollbar">{(!selectedClass.students || selectedClass.students.length === 0) ? (<p className="text-xs text-slate-400 italic text-center p-2">No students in roster.</p>) : (selectedClass.students.map((studentEmail: string) => (<button key={studentEmail} onClick={() => toggleAssignee(studentEmail)} className="flex items-center gap-2 w-full p-2 hover:bg-slate-50 rounded text-left">{selectedAssignees.includes(studentEmail) ? <CheckCircle2 size={16} className="text-indigo-600"/> : <Circle size={16} className="text-slate-300"/>}<span className="text-xs font-medium text-slate-700 truncate">{studentEmail}</span></button>)))}</div>)}
                   {targetStudentMode === 'specific' && <p className="text-[10px] text-slate-400 mt-2 text-right">{selectedAssignees.length} selected</p>}
               </div>
               <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                  <div className="mb-6"><h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><Layers size={14}/> Flashcard Decks</h4><div className="space-y-2">{Object.keys(allDecks || {}).length === 0 ? <p className="text-sm text-slate-400 italic">No decks found.</p> : Object.entries(allDecks).map(([key, deck]: any) => (<button key={key} onClick={() => assignContent({ ...deck, id: key }, 'deck')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{deck.title}</h4><p className="text-xs text-slate-500">{deck.cards?.length || 0} Cards</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-indigo-500"/></button>))}</div></div>
-                  <div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><BookOpen size={14}/> Lessons</h4><div className="space-y-2">{lessons.length === 0 ? <p className="text-sm text-slate-400 italic">No lessons found.</p> : lessons.map((l: any) => (<button key={l.id} onClick={() => assignContent(l, 'lesson')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-indigo-500"/></button>))}</div></div>
+                  {assignType === 'deck' && (
+                      <div>
+                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><Layers size={14}/> Available Decks</h4>
+                          <div className="space-y-2">
+                              {Object.keys(allDecks || {}).length === 0 ? <p className="text-sm text-slate-400 italic">No decks found.</p> : Object.entries(allDecks).map(([key, deck]: any) => (
+                                  <button key={key} onClick={() => assignContent({ ...deck, id: key }, 'deck')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all group flex justify-between items-center">
+                                      <div><h4 className="font-bold text-slate-800 text-sm">{deck.title}</h4><p className="text-xs text-slate-500">{deck.cards?.length || 0} Cards</p></div>
+                                      <PlusCircle size={18} className="text-slate-300 group-hover:text-orange-500"/>
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                  )}
+                  
+                  {assignType === 'lesson' && (
+                      <div>
+                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><BookOpen size={14}/> Available Lessons</h4>
+                          <div className="space-y-2">
+                              {lessons.length === 0 ? <p className="text-sm text-slate-400 italic">No lessons found.</p> : lessons.map((l: any) => (
+                                  <button key={l.id} onClick={() => assignContent(l, 'lesson')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group flex justify-between items-center">
+                                      <div><h4 className="font-bold text-slate-800 text-sm">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div>
+                                      <PlusCircle size={18} className="text-slate-300 group-hover:text-indigo-500"/>
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                  )}
               </div>
             </div>
           </div>
