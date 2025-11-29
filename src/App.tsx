@@ -315,55 +315,164 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
 
 // --- 3. STUDENT & SHARED VIEWS ---
 
+// --- GAME COMPONENTS ---
 function MatchingGame({ deckCards, onGameEnd }: any) {
-    const [cards, setCards] = useState<any[]>([]);
-    const [flippedIndices, setFlippedIndices] = useState<number[]>([]);
-    const [matchedIndices, setMatchedIndices] = useState<number[]>([]);
+    const [terms, setTerms] = useState<any[]>([]);
+    const [definitions, setDefinitions] = useState<any[]>([]);
+    const [selectedTermIndex, setSelectedTermIndex] = useState<number | null>(null);
+    const [selectedDefIndex, setSelectedDefIndex] = useState<number | null>(null);
+    const [matchedIds, setMatchedIds] = useState<number[]>([]); // Stores indices of matched items (by original index)
     const [isChecking, setIsChecking] = useState(false);
-    
+
     useEffect(() => {
         if (deckCards.length < 3) return;
-        const gameItems = deckCards.slice(0, 6).flatMap((card: any, index: number) => [
-            { id: `term-${index}`, content: card.front, matchId: index, isTerm: true, key: `t-${index}` },
-            { id: `def-${index}`, content: card.back, matchId: index, isTerm: false, key: `d-${index}` }
-        ]);
-        for (let i = gameItems.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [gameItems[i], gameItems[j]] = [gameItems[j], gameItems[i]]; }
-        setCards(gameItems); setFlippedIndices([]); setMatchedIndices([]); setIsChecking(false);
+
+        // 1. Select up to 6 cards for the round
+        const gameDeck = deckCards.slice(0, 6);
+        
+        // 2. Create Term objects (Top Row) - Shuffled
+        const termCards = gameDeck.map((card: any, i: number) => ({
+            id: `term-${i}`,
+            content: card.front,
+            originalIndex: i,
+            type: 'term'
+        })).sort(() => Math.random() - 0.5);
+
+        // 3. Create Definition objects (Bottom Row) - Shuffled differently
+        const defCards = gameDeck.map((card: any, i: number) => ({
+            id: `def-${i}`,
+            content: card.back,
+            originalIndex: i,
+            type: 'def'
+        })).sort(() => Math.random() - 0.5);
+
+        setTerms(termCards);
+        setDefinitions(defCards);
+        setMatchedIds([]);
+        setSelectedTermIndex(null);
+        setSelectedDefIndex(null);
+        setIsChecking(false);
     }, [deckCards]);
 
-    const handleCardClick = (index: number) => {
-        if (isChecking || matchedIndices.includes(index) || flippedIndices.includes(index)) return;
-        const newFlipped = [...flippedIndices, index];
-        setFlippedIndices(newFlipped);
-        if (newFlipped.length === 2) {
-            setIsChecking(true);
-            const [firstIndex, secondIndex] = newFlipped;
-            if (cards[firstIndex].matchId === cards[secondIndex].matchId) {
-                setMatchedIndices([...matchedIndices, firstIndex, secondIndex]); setFlippedIndices([]); setIsChecking(false);
-                if (matchedIndices.length + 2 === cards.length) onGameEnd(50);
-            } else { setTimeout(() => { setFlippedIndices([]); setIsChecking(false); }, 1000); }
+    const handleTermClick = (index: number) => {
+        if (isChecking || matchedIds.includes(terms[index].originalIndex) || selectedTermIndex === index) return;
+        setSelectedTermIndex(index); // Reveal this term
+        
+        // If a definition is already selected, check match immediately
+        if (selectedDefIndex !== null) {
+            checkMatch(index, selectedDefIndex);
         }
     };
-    
+
+    const handleDefClick = (index: number) => {
+        if (isChecking || matchedIds.includes(definitions[index].originalIndex)) return;
+        setSelectedDefIndex(index); // Highlight this definition
+
+        // If a term is already selected, check match immediately
+        if (selectedTermIndex !== null) {
+            checkMatch(selectedTermIndex, index);
+        }
+    };
+
+    const checkMatch = (tIndex: number, dIndex: number) => {
+        setIsChecking(true);
+        const term = terms[tIndex];
+        const def = definitions[dIndex];
+
+        if (term.originalIndex === def.originalIndex) {
+            // MATCH!
+            setMatchedIds(prev => [...prev, term.originalIndex]);
+            setSelectedTermIndex(null);
+            setSelectedDefIndex(null);
+            setIsChecking(false);
+
+            // Win Condition
+            if (matchedIds.length + 1 === terms.length) {
+                setTimeout(() => onGameEnd(50), 500);
+            }
+        } else {
+            // NO MATCH - Reset after delay
+            setTimeout(() => {
+                setSelectedTermIndex(null);
+                setSelectedDefIndex(null);
+                setIsChecking(false);
+            }, 1000);
+        }
+    };
+
     if (deckCards.length < 3) return <div className="p-6 text-center text-slate-500"><AlertTriangle size={24} className="mx-auto text-amber-500 mb-2" /><p>Need at least 3 cards in this deck for the Matching Game!</p></div>;
 
     return (
-        <div className="p-6 space-y-4 bg-slate-100 rounded-2xl h-full overflow-y-auto">
-            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><GanttChart size={24} className="text-indigo-600" /> Matching Game</h3>
-            <div className="grid grid-cols-3 gap-3 w-full max-w-sm mx-auto pb-4">
-                {cards.map((card, index) => {
-                    const isFlippedOrMatched = flippedIndices.includes(index) || matchedIndices.includes(index);
-                    const isMatched = matchedIndices.includes(index);
-                    return (
-                        <div key={card.key} onClick={() => handleCardClick(index)} className={`h-24 p-2 rounded-xl text-center flex items-center justify-center transition-all duration-300 transform perspective-1000 cursor-pointer ${isMatched ? 'scale-95 opacity-50 bg-emerald-100' : 'bg-white shadow-md hover:scale-[1.03]'}`} style={{ opacity: isMatched ? 0.4 : 1, transform: isFlippedOrMatched ? 'rotateY(0deg)' : 'rotateY(180deg)' }}>
-                            <div className={`absolute inset-0 backface-hidden rounded-xl flex items-center justify-center p-2 text-sm font-bold transition-transform ${isFlippedOrMatched ? 'bg-white text-slate-800' : 'bg-indigo-600 text-white rotate-y-180'}`}>
-                                {isFlippedOrMatched ? <span className={card.isTerm ? 'font-serif' : 'font-sans text-slate-600 text-xs'}>{card.content}</span> : <span className="text-xl font-black">?</span>}
-                            </div>
-                        </div>
-                    );
-                })}
+        <div className="p-4 space-y-6 bg-slate-100 rounded-2xl h-full overflow-y-auto flex flex-col">
+            <div className="flex justify-between items-center">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><GanttChart size={20} className="text-indigo-600" /> Matching</h3>
+                <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">{matchedIds.length} / {terms.length} Pairs</span>
             </div>
-            {matchedIndices.length === cards.length && cards.length > 0 && <div className="p-4 bg-emerald-50 text-emerald-800 font-bold text-center rounded-xl animate-in zoom-in">VICTORIA! All Matched. +50 XP!</div>}
+
+            {/* TOP SECTION: HIDDEN TERMS */}
+            <div className="space-y-2">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider text-center">1. Reveal a Word</p>
+                <div className="grid grid-cols-3 gap-3">
+                    {terms.map((card, index) => {
+                        const isMatched = matchedIds.includes(card.originalIndex);
+                        const isSelected = selectedTermIndex === index;
+                        
+                        return (
+                            <button 
+                                key={card.id} 
+                                onClick={() => handleTermClick(index)}
+                                disabled={isMatched}
+                                className={`h-24 rounded-xl border-2 transition-all duration-300 relative overflow-hidden ${
+                                    isMatched ? 'opacity-0 pointer-events-none' : 
+                                    isSelected ? 'bg-white border-indigo-500 shadow-lg transform scale-105' : 'bg-indigo-600 border-indigo-700 shadow-md hover:bg-indigo-700'
+                                }`}
+                            >
+                                <div className="absolute inset-0 flex items-center justify-center p-1 text-center">
+                                    {isSelected ? (
+                                        <span className="text-slate-800 font-bold text-sm animate-in zoom-in">{card.content}</span>
+                                    ) : (
+                                        <span className="text-indigo-300 font-black text-2xl">?</span>
+                                    )}
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* DIVIDER */}
+            <div className="relative flex py-2 items-center">
+                <div className="flex-grow border-t border-slate-300"></div>
+                <span className="flex-shrink-0 mx-4 text-slate-400"><ArrowDown size={16} /></span>
+                <div className="flex-grow border-t border-slate-300"></div>
+            </div>
+
+            {/* BOTTOM SECTION: VISIBLE DEFINITIONS */}
+            <div className="space-y-2 pb-6">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider text-center">2. Select Definition</p>
+                <div className="grid grid-cols-2 gap-3">
+                    {definitions.map((card, index) => {
+                        const isMatched = matchedIds.includes(card.originalIndex);
+                        const isSelected = selectedDefIndex === index;
+                        const isWrong = isChecking && isSelected && selectedTermIndex !== null && terms[selectedTermIndex].originalIndex !== card.originalIndex;
+
+                        return (
+                            <button 
+                                key={card.id} 
+                                onClick={() => handleDefClick(index)}
+                                disabled={isMatched}
+                                className={`p-3 min-h-[60px] rounded-xl border-2 text-sm font-medium transition-all duration-200 flex items-center justify-center text-center ${
+                                    isMatched ? 'opacity-0 pointer-events-none' : 
+                                    isWrong ? 'bg-rose-50 border-rose-500 text-rose-700 animate-shake' :
+                                    isSelected ? 'bg-indigo-50 border-indigo-500 text-indigo-900 shadow-md scale-[1.02]' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
+                                }`}
+                            >
+                                {card.content}
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
         </div>
     );
 }
