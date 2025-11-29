@@ -32,7 +32,8 @@ import {
   PlayCircle, Award, Trash2, Plus, FileText, Brain, Loader, LogOut, UploadCloud, 
   School, Users, Copy, List, ArrowRight, LayoutDashboard, ArrowLeft, Library, 
   Pencil, Image, Info, Edit3, FileJson, AlertTriangle, FlipVertical, GanttChart, 
-  Club, AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle, ArrowDown
+  Club, AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle, ArrowDown,
+  ClipboardCheck, BarChart3
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -195,12 +196,24 @@ function LiveActivityFeed() {
             <div className="space-y-3">
                 {logs.map((log) => (
                     <div key={log.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-start gap-3 animate-in slide-in-from-top-2">
-                        <div className="bg-indigo-100 text-indigo-600 p-2 rounded-full mt-1">
-                           {log.type === 'completion' ? <CheckCircle2 size={16}/> : <Zap size={16}/>}
+                        <div className={`p-2 rounded-full mt-1 ${log.type === 'quiz_score' ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                           {log.type === 'quiz_score' ? <BarChart3 size={16}/> : <CheckCircle2 size={16}/>}
                         </div>
                         <div className="flex-1">
-                            <p className="text-sm font-bold text-slate-800">{log.studentName}</p>
-                            <p className="text-xs text-slate-500">Completed <span className="font-bold text-indigo-600">{log.itemTitle}</span></p>
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <p className="text-sm font-bold text-slate-800">{log.studentName}</p>
+                                    <p className="text-xs text-slate-500">
+                                        {log.type === 'quiz_score' ? 'Quiz Result:' : 'Completed'} <span className="font-bold text-indigo-600">{log.itemTitle}</span>
+                                    </p>
+                                </div>
+                                {log.scoreDetail && (
+                                    <div className="text-right">
+                                        <span className="block text-sm font-black text-slate-800">{log.scoreDetail.score}/{log.scoreDetail.total}</span>
+                                        <span className="block text-[10px] text-slate-400 font-bold">{Math.round((log.scoreDetail.score/log.scoreDetail.total)*100)}%</span>
+                                    </div>
+                                )}
+                            </div>
                             <div className="flex items-center gap-2 mt-2">
                                 <span className="text-[10px] font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 flex items-center gap-1"><Clock size={10}/> {new Date(log.timestamp).toLocaleTimeString()}</span>
                                 <span className="text-[10px] font-bold text-emerald-600">+{log.xp} XP</span>
@@ -223,7 +236,6 @@ function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard, availableDeck
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Hydrate form if editing
   useEffect(() => { 
       if (initialData) {
           setEditingId(initialData.id);
@@ -315,88 +327,46 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
 
 // --- 3. STUDENT & SHARED VIEWS ---
 
-// --- GAME COMPONENTS ---
 function MatchingGame({ deckCards, onGameEnd }: any) {
     const [terms, setTerms] = useState<any[]>([]);
     const [definitions, setDefinitions] = useState<any[]>([]);
     const [selectedTermIndex, setSelectedTermIndex] = useState<number | null>(null);
     const [selectedDefIndex, setSelectedDefIndex] = useState<number | null>(null);
-    const [matchedIds, setMatchedIds] = useState<number[]>([]); // Stores indices of matched items (by original index)
+    const [matchedIds, setMatchedIds] = useState<number[]>([]); 
     const [isChecking, setIsChecking] = useState(false);
 
     useEffect(() => {
         if (deckCards.length < 3) return;
-
-        // 1. Select up to 6 cards for the round
         const gameDeck = deckCards.slice(0, 6);
-        
-        // 2. Create Term objects (Top Row) - Shuffled
-        const termCards = gameDeck.map((card: any, i: number) => ({
-            id: `term-${i}`,
-            content: card.front,
-            originalIndex: i,
-            type: 'term'
-        })).sort(() => Math.random() - 0.5);
-
-        // 3. Create Definition objects (Bottom Row) - Shuffled differently
-        const defCards = gameDeck.map((card: any, i: number) => ({
-            id: `def-${i}`,
-            content: card.back,
-            originalIndex: i,
-            type: 'def'
-        })).sort(() => Math.random() - 0.5);
-
-        setTerms(termCards);
-        setDefinitions(defCards);
-        setMatchedIds([]);
-        setSelectedTermIndex(null);
-        setSelectedDefIndex(null);
-        setIsChecking(false);
+        const termCards = gameDeck.map((card: any, i: number) => ({ id: `term-${i}`, content: card.front, originalIndex: i, type: 'term' })).sort(() => Math.random() - 0.5);
+        const defCards = gameDeck.map((card: any, i: number) => ({ id: `def-${i}`, content: card.back, originalIndex: i, type: 'def' })).sort(() => Math.random() - 0.5);
+        setTerms(termCards); setDefinitions(defCards); setMatchedIds([]); setSelectedTermIndex(null); setSelectedDefIndex(null); setIsChecking(false);
     }, [deckCards]);
 
     const handleTermClick = (index: number) => {
         if (isChecking || matchedIds.includes(terms[index].originalIndex) || selectedTermIndex === index) return;
-        setSelectedTermIndex(index); // Reveal this term
-        
-        // If a definition is already selected, check match immediately
-        if (selectedDefIndex !== null) {
-            checkMatch(index, selectedDefIndex);
-        }
+        setSelectedTermIndex(index);
+        if (selectedDefIndex !== null) checkMatch(index, selectedDefIndex);
     };
 
     const handleDefClick = (index: number) => {
         if (isChecking || matchedIds.includes(definitions[index].originalIndex)) return;
-        setSelectedDefIndex(index); // Highlight this definition
-
-        // If a term is already selected, check match immediately
-        if (selectedTermIndex !== null) {
-            checkMatch(selectedTermIndex, index);
-        }
+        setSelectedDefIndex(index);
+        if (selectedTermIndex !== null) checkMatch(selectedTermIndex, index);
     };
 
     const checkMatch = (tIndex: number, dIndex: number) => {
         setIsChecking(true);
         const term = terms[tIndex];
         const def = definitions[dIndex];
-
         if (term.originalIndex === def.originalIndex) {
-            // MATCH!
             setMatchedIds(prev => [...prev, term.originalIndex]);
             setSelectedTermIndex(null);
             setSelectedDefIndex(null);
             setIsChecking(false);
-
-            // Win Condition
-            if (matchedIds.length + 1 === terms.length) {
-                setTimeout(() => onGameEnd(50), 500);
-            }
+            if (matchedIds.length + 1 === terms.length) setTimeout(() => onGameEnd(50), 500);
         } else {
-            // NO MATCH - Reset after delay
-            setTimeout(() => {
-                setSelectedTermIndex(null);
-                setSelectedDefIndex(null);
-                setIsChecking(false);
-            }, 1000);
+            setTimeout(() => { setSelectedTermIndex(null); setSelectedDefIndex(null); setIsChecking(false); }, 1000);
         }
     };
 
@@ -408,46 +378,21 @@ function MatchingGame({ deckCards, onGameEnd }: any) {
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><GanttChart size={20} className="text-indigo-600" /> Matching</h3>
                 <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">{matchedIds.length} / {terms.length} Pairs</span>
             </div>
-
-            {/* TOP SECTION: HIDDEN TERMS */}
             <div className="space-y-2">
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wider text-center">1. Reveal a Word</p>
                 <div className="grid grid-cols-3 gap-3">
                     {terms.map((card, index) => {
                         const isMatched = matchedIds.includes(card.originalIndex);
                         const isSelected = selectedTermIndex === index;
-                        
                         return (
-                            <button 
-                                key={card.id} 
-                                onClick={() => handleTermClick(index)}
-                                disabled={isMatched}
-                                className={`h-24 rounded-xl border-2 transition-all duration-300 relative overflow-hidden ${
-                                    isMatched ? 'opacity-0 pointer-events-none' : 
-                                    isSelected ? 'bg-white border-indigo-500 shadow-lg transform scale-105' : 'bg-indigo-600 border-indigo-700 shadow-md hover:bg-indigo-700'
-                                }`}
-                            >
-                                <div className="absolute inset-0 flex items-center justify-center p-1 text-center">
-                                    {isSelected ? (
-                                        <span className="text-slate-800 font-bold text-sm animate-in zoom-in">{card.content}</span>
-                                    ) : (
-                                        <span className="text-indigo-300 font-black text-2xl">?</span>
-                                    )}
-                                </div>
+                            <button key={card.id} onClick={() => handleTermClick(index)} disabled={isMatched} className={`h-24 rounded-xl border-2 transition-all duration-300 relative overflow-hidden ${isMatched ? 'opacity-0 pointer-events-none' : isSelected ? 'bg-white border-indigo-500 shadow-lg transform scale-105' : 'bg-indigo-600 border-indigo-700 shadow-md hover:bg-indigo-700'}`}>
+                                <div className="absolute inset-0 flex items-center justify-center p-1 text-center">{isSelected ? (<span className="text-slate-800 font-bold text-sm animate-in zoom-in">{card.content}</span>) : (<span className="text-indigo-300 font-black text-2xl">?</span>)}</div>
                             </button>
                         );
                     })}
                 </div>
             </div>
-
-            {/* DIVIDER */}
-            <div className="relative flex py-2 items-center">
-                <div className="flex-grow border-t border-slate-300"></div>
-                <span className="flex-shrink-0 mx-4 text-slate-400"><ArrowDown size={16} /></span>
-                <div className="flex-grow border-t border-slate-300"></div>
-            </div>
-
-            {/* BOTTOM SECTION: VISIBLE DEFINITIONS */}
+            <div className="relative flex py-2 items-center"><div className="flex-grow border-t border-slate-300"></div><span className="flex-shrink-0 mx-4 text-slate-400"><ArrowDown size={16} /></span><div className="flex-grow border-t border-slate-300"></div></div>
             <div className="space-y-2 pb-6">
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wider text-center">2. Select Definition</p>
                 <div className="grid grid-cols-2 gap-3">
@@ -455,18 +400,8 @@ function MatchingGame({ deckCards, onGameEnd }: any) {
                         const isMatched = matchedIds.includes(card.originalIndex);
                         const isSelected = selectedDefIndex === index;
                         const isWrong = isChecking && isSelected && selectedTermIndex !== null && terms[selectedTermIndex].originalIndex !== card.originalIndex;
-
                         return (
-                            <button 
-                                key={card.id} 
-                                onClick={() => handleDefClick(index)}
-                                disabled={isMatched}
-                                className={`p-3 min-h-[60px] rounded-xl border-2 text-sm font-medium transition-all duration-200 flex items-center justify-center text-center ${
-                                    isMatched ? 'opacity-0 pointer-events-none' : 
-                                    isWrong ? 'bg-rose-50 border-rose-500 text-rose-700 animate-shake' :
-                                    isSelected ? 'bg-indigo-50 border-indigo-500 text-indigo-900 shadow-md scale-[1.02]' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'
-                                }`}
-                            >
+                            <button key={card.id} onClick={() => handleDefClick(index)} disabled={isMatched} className={`p-3 min-h-[60px] rounded-xl border-2 text-sm font-medium transition-all duration-200 flex items-center justify-center text-center ${isMatched ? 'opacity-0 pointer-events-none' : isWrong ? 'bg-rose-50 border-rose-500 text-rose-700 animate-shake' : isSelected ? 'bg-indigo-50 border-indigo-500 text-indigo-900 shadow-md scale-[1.02]' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'}`}>
                                 {card.content}
                             </button>
                         );
@@ -529,6 +464,91 @@ function VocabJack({ deckCards, onGameEnd }: any) {
     );
 }
 
+function QuizGame({ deckCards, onGameEnd }: any) {
+    const [questions, setQuestions] = useState<any[]>([]);
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [score, setScore] = useState(0);
+    const [isComplete, setIsComplete] = useState(false);
+    const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (deckCards.length < 4) return;
+        // Generate 10 questions (or deck length)
+        const qList = Array.from({length: Math.min(10, deckCards.length)}).map((_, i) => {
+            const target = deckCards[i % deckCards.length];
+            const others = deckCards.filter((c: any) => c.id !== target.id).sort(() => 0.5 - Math.random()).slice(0, 3);
+            const options = [...others, target].sort(() => 0.5 - Math.random());
+            return { target, options, id: i };
+        });
+        setQuestions(qList);
+    }, [deckCards]);
+
+    const handleAnswer = (answerId: string) => {
+        setSelectedAnswer(answerId);
+        const correct = questions[currentIndex].target.id === answerId;
+        if (correct) setScore(s => s + 1);
+        
+        setTimeout(() => {
+            if (currentIndex < questions.length - 1) {
+                setCurrentIndex(c => c + 1);
+                setSelectedAnswer(null);
+            } else {
+                setIsComplete(true);
+            }
+        }, 1000);
+    };
+
+    if (deckCards.length < 4) return <div className="p-6 text-center text-slate-400">Need at least 4 cards for a Quiz.</div>;
+    if (questions.length === 0) return <div className="p-6 text-center"><Loader className="animate-spin mx-auto"/></div>;
+
+    if (isComplete) {
+        return (
+            <div className="p-6 text-center h-full flex flex-col justify-center">
+                <div className="w-24 h-24 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Award size={48}/>
+                </div>
+                <h2 className="text-2xl font-bold text-slate-900">Quiz Complete!</h2>
+                <p className="text-lg text-slate-600 my-2">You scored {score} out of {questions.length}</p>
+                <button onClick={() => onGameEnd({ score, total: questions.length })} className="mt-4 bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg">Finish & Save</button>
+            </div>
+        );
+    }
+
+    const currentQ = questions[currentIndex];
+    return (
+        <div className="p-6 h-full flex flex-col">
+            <div className="flex justify-between items-center mb-6">
+                <h3 className="font-bold text-slate-400 uppercase text-xs">Question {currentIndex + 1}/{questions.length}</h3>
+                <span className="text-xs font-bold bg-indigo-100 text-indigo-700 px-2 py-1 rounded">Score: {score}</span>
+            </div>
+            <div className="flex-1 flex flex-col justify-center">
+                <h2 className="text-2xl font-bold text-center mb-8 text-slate-900">What is <span className="text-indigo-600">"{currentQ.target.front}"</span>?</h2>
+                <div className="grid gap-3">
+                    {currentQ.options.map((opt: any) => {
+                        const isSelected = selectedAnswer === opt.id;
+                        const isCorrect = opt.id === currentQ.target.id;
+                        let style = "bg-white border-slate-200 hover:bg-slate-50";
+                        if (selectedAnswer) {
+                            if (isCorrect) style = "bg-emerald-100 border-emerald-500 text-emerald-800";
+                            else if (isSelected) style = "bg-rose-100 border-rose-500 text-rose-800";
+                        }
+                        return (
+                            <button 
+                                key={opt.id} 
+                                disabled={!!selectedAnswer}
+                                onClick={() => handleAnswer(opt.id)} 
+                                className={`p-4 rounded-xl border-2 font-bold text-left transition-all ${style}`}
+                            >
+                                {opt.back}
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, activeDeckOverride, onComplete }: any) {
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [manageMode, setManageMode] = useState(false);
@@ -545,11 +565,13 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   const theme = card ? (TYPE_COLORS[card.type] || TYPE_COLORS.noun) : TYPE_COLORS.noun;
 
   const handleDeckChange = (key: string) => { onSelectDeck(key); setIsSelectorOpen(false); setCurrentIndex(0); setIsFlipped(false); setXrayMode(false); setManageMode(false); setGameMode('study'); };
-  const handleGameEnd = (xp: number) => { 
-      alert(`Game Over! You earned ${xp} XP.`); 
+  const handleGameEnd = (data: any) => { 
+      // If numeric (old games), treat as XP. If object (Quiz), handle score.
+      const xp = typeof data === 'number' ? data : (Math.round((data.score / data.total) * 50) + 10); 
+      alert(`Complete! You earned ${xp} XP.`); 
       setGameMode('study'); 
       if (activeDeckOverride && onComplete) { 
-          onComplete(activeDeckOverride.id, xp, currentDeck.title); 
+          onComplete(activeDeckOverride.id, xp, currentDeck.title, data.score ? data : null); 
       } 
   }
   
@@ -563,7 +585,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
       <Header title={currentDeck?.title.split(' ')[1] || "Deck"} subtitle={`${currentIndex + 1} / ${deckCards.length}`} onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} rightAction={<div className="flex items-center gap-2">{activeDeckOverride && onComplete && (<button onClick={() => onComplete(activeDeckOverride.id, 50, currentDeck.title)} className="bg-emerald-500 text-white px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-sm hover:scale-105 transition-transform"><Check size={14}/> Complete</button>)}<button onClick={() => setManageMode(!manageMode)} className={`p-2 rounded-full transition-colors ${manageMode ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>{manageMode ? <X size={20} /> : <List size={20} />}</button></div>} />
       {isSelectorOpen && <div className="absolute top-24 left-6 right-6 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 animate-in fade-in slide-in-from-top-4">{Object.entries(allDecks).map(([key, deck]: any) => (<button key={key} onClick={() => handleDeckChange(key)} className={`w-full text-left p-3 rounded-xl font-bold text-sm mb-1 ${selectedDeckKey === key ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'}`}>{deck.title} <span className="float-right opacity-50">{deck.cards.length}</span></button>))}</div>}
       {isSelectorOpen && <div className="absolute inset-0 z-40 bg-black/5 backdrop-blur-[1px]" onClick={() => setIsSelectorOpen(false)} />}
-      {!manageMode && (<div className="px-6 mt-2 mb-2"><div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto"><button onClick={() => setGameMode('study')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg ${gameMode === 'study' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Study</button><button onClick={() => setGameMode('match')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg ${gameMode === 'match' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Match</button><button onClick={() => setGameMode('vocabjack')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg ${gameMode === 'vocabjack' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Jack</button></div></div>)}
+      {!manageMode && (<div className="px-6 mt-2 mb-2"><div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto overflow-x-auto"><button onClick={() => setGameMode('study')} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg whitespace-nowrap ${gameMode === 'study' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Study</button><button onClick={() => setGameMode('quiz')} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg whitespace-nowrap ${gameMode === 'quiz' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Quiz</button><button onClick={() => setGameMode('match')} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg whitespace-nowrap ${gameMode === 'match' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Match</button><button onClick={() => setGameMode('vocabjack')} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg whitespace-nowrap ${gameMode === 'vocabjack' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Jack</button></div></div>)}
       <div className="flex-1 overflow-y-auto pt-4">
         {manageMode ? (
             <div className="p-6">
@@ -576,6 +598,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
             <>
             {gameMode === 'match' && <MatchingGame deckCards={deckCards} onGameEnd={handleGameEnd} />}
             {gameMode === 'vocabjack' && <VocabJack deckCards={deckCards} onGameEnd={handleGameEnd} />}
+            {gameMode === 'quiz' && <QuizGame deckCards={deckCards} onGameEnd={handleGameEnd} />}
             {gameMode === 'study' && card && (
                   <div className="flex-1 flex flex-col items-center justify-center px-4 py-2 perspective-1000 relative z-0">
                       <div className={`relative w-full h-full max-h-[520px] transition-all duration-500 transform preserve-3d cursor-pointer shadow-2xl rounded-3xl ${isFlipped ? 'rotate-y-180' : ''}`} onClick={() => !xrayMode && setIsFlipped(!isFlipped)}>
@@ -613,75 +636,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   );
 }
 
-function LessonView({ lesson, onFinish }: any) {
-  const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
-  const [quizAnswers, setQuizAnswers] = useState<any>({});
-  const [isComplete, setIsComplete] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
-  
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [currentBlockIndex]);
-
-  const handleNext = () => { if (currentBlockIndex < (lesson.blocks?.length || 0) - 1) { setCurrentBlockIndex(prev => prev + 1); } else { setIsComplete(true); } };
-  const handleQuizOption = (blockIdx: number, optionId: string) => { setQuizAnswers({ ...quizAnswers, [blockIdx]: optionId }); };
-
-  return (
-    <div className="h-full flex flex-col bg-white">
-      <Header title={lesson.title} subtitle={lesson.subtitle} rightAction={<button onClick={() => onFinish(lesson.id, 0, lesson.title)} className="text-slate-400 hover:text-rose-500"><X /></button>}/>
-      <div className="flex-1 overflow-y-auto p-6 space-y-8 pb-32">
-        <div className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 text-center animate-in fade-in slide-in-from-bottom-4"><h2 className="text-2xl font-serif font-bold text-indigo-900 mb-2">{lesson.title}</h2><p className="text-indigo-800 opacity-80">{lesson.description}</p></div>
-        {lesson.blocks?.slice(0, currentBlockIndex + 1).map((block: any, idx: number) => (
-          <div key={idx} className="animate-in slide-in-from-bottom-8 fade-in duration-500">
-            {block.type === 'text' && (<div className="prose prose-slate max-w-none"><h3 className="font-bold text-lg text-slate-800">{block.title}</h3><p className="text-slate-600 leading-relaxed">{block.content}</p></div>)}
-            {block.type === 'dialogue' && (<div className="space-y-4 my-4">{block.lines.map((line: any, i: number) => (<div key={i} className={`flex flex-col ${line.side === 'right' || line.speaker === 'B' ? 'items-end' : 'items-start'}`}><span className="text-xs font-bold text-slate-400 uppercase mb-1">{line.speaker}</span><div className={`p-4 rounded-2xl max-w-[80%] ${line.side === 'right' || line.speaker === 'B' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-slate-100 text-slate-800 rounded-tl-none'}`}><p className="font-serif text-lg">{line.text}</p><p className={`text-xs mt-1 italic ${line.side === 'right' || line.speaker === 'B' ? 'text-indigo-200' : 'text-slate-500'}`}>{line.translation}</p></div></div>))}</div>)}
-            {block.type === 'quiz' && (<div className="bg-white border-2 border-indigo-100 p-5 rounded-2xl shadow-sm"><p className="font-bold text-slate-800 mb-4 flex items-center gap-2"><HelpCircle className="text-indigo-500" size={20}/> {block.question}</p><div className="space-y-2">{block.options.map((opt: any) => { const isSelected = quizAnswers[idx] === opt.id; const isCorrect = opt.id === block.correctId; const showResult = !!quizAnswers[idx]; let style = "bg-slate-50 border-slate-200 hover:bg-slate-100"; if (showResult && isSelected && isCorrect) style = "bg-emerald-100 border-emerald-500 text-emerald-800 font-bold"; if (showResult && isSelected && !isCorrect) style = "bg-rose-100 border-rose-500 text-rose-800"; if (showResult && !isSelected && isCorrect) style = "bg-emerald-50 border-emerald-200 text-emerald-800"; return (<button key={opt.id} disabled={showResult} onClick={() => handleQuizOption(idx, opt.id)} className={`w-full p-3 rounded-xl border text-left transition-all ${style}`}>{opt.text}</button>); })}</div></div>)}
-            {block.type === 'vocab-list' && (<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{block.items.map((item: any, i:number) => (<div key={i} className="bg-white border border-slate-200 p-3 rounded-xl flex justify-between items-center"><span className="font-bold text-slate-800">{item.term}</span><span className="text-slate-500 text-sm">{item.definition}</span></div>))}</div>)}
-            {block.type === 'image' && (<div className="rounded-xl overflow-hidden shadow-sm border border-slate-200"><img src={block.url} alt="Lesson illustration" className="w-full h-auto object-cover" />{block.caption && <div className="p-2 bg-slate-50 text-xs text-center text-slate-500 italic">{block.caption}</div>}</div>)}
-          </div>
-        ))}
-        <div ref={bottomRef} className="pt-8">{!isComplete ? (<button onClick={handleNext} className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 active:scale-95 transition-all flex items-center justify-center gap-2"><span>Continue</span> <ChevronDown /></button>) : (<button onClick={() => onFinish(lesson.id, lesson.xp || 50, lesson.title)} className="w-full py-4 bg-emerald-500 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-emerald-600 active:scale-95 transition-all animate-bounce">Complete Lesson (+{lesson.xp || 50} XP)</button>)}</div>
-      </div>
-    </div>
-  );
-}
-
-function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, userData }: any) {
-  const completedSet = new Set(userData?.completedAssignments || []);
-  const handleAssignmentClick = (assignment: any) => { if (assignment.contentType === 'deck') { onSelectDeck(assignment); } else { onSelectLesson(assignment); } };
-  const relevantAssignments = (classData.assignments || []).filter((l: any) => { const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); return isForMe; });
-  const pendingCount = relevantAssignments.filter((l: any) => !completedSet.has(l.id)).length;
-
-  return (
-    <div className="h-full flex flex-col bg-slate-50">
-      <div className="px-6 pt-12 pb-6 bg-white sticky top-0 z-40 border-b border-slate-100"><button onClick={onBack} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Home</button><h1 className="text-2xl font-bold text-slate-900">{classData.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {classData.code}</p></div>
-      <div className="flex-1 px-6 mt-4 overflow-y-auto pb-24"><div className="space-y-6"><div className="bg-indigo-600 rounded-2xl p-6 text-white shadow-lg"><h3 className="text-lg font-bold mb-1">Your Progress</h3><p className="text-indigo-200 text-sm">Keep up the great work!</p><div className="mt-4 flex gap-4"><div><span className="text-2xl font-bold block">{pendingCount}</span><span className="text-xs opacity-70">To Do</span></div><div><span className="text-2xl font-bold block">{classData.students?.length || 0}</span><span className="text-xs opacity-70">Classmates</span></div></div></div><div><h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3><div className="space-y-3">{relevantAssignments.length > 0 ? ( relevantAssignments.filter((l: any) => !completedSet.has(l.id)).map((l: any, i: number) => ( <button key={`${l.id}-${i}`} onClick={() => handleAssignmentClick(l)} className="w-full bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all"><div className="flex items-center space-x-4"><div className={`h-10 w-10 rounded-xl flex items-center justify-center ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600' : 'bg-indigo-50 text-indigo-600'}`}>{l.contentType === 'deck' ? <Layers size={20}/> : <PlayCircle size={20} />}</div><div className="text-left"><h4 className="font-bold text-indigo-900">{l.title}</h4><p className="text-xs text-indigo-600/70">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Assigned Lesson'}</p></div></div><ChevronRight size={20} className="text-slate-300" /></button> )) ) : ( <div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">No pending assignments.</div> )}{relevantAssignments.every((l: any) => completedSet.has(l.id)) && relevantAssignments.length > 0 && (<div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">All assignments completed! 🎉</div>)}</div></div></div></div>
-    </div>
-  );
-}
-
-function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck }: any) {
-  const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
-  const completedSet = new Set(userData?.completedAssignments || []);
-  const relevantAssignments = (assignments || []).filter((l: any) => { return !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); });
-  const activeAssignments = relevantAssignments.filter((l: any) => !completedSet.has(l.id));
-  const handleSelectClass = (cls: any) => { setActiveStudentClass(cls); };
-  if (activeStudentClass) { return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={onSelectLesson} onSelectDeck={onSelectDeck} userData={userData} />; }
-
-  return (
-  <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full">
-    {userData?.classSyncError && (<div className="bg-rose-500 text-white p-4 text-center text-sm font-bold"><AlertTriangle className="inline-block mr-2" size={16} />System Notice: Database Index Missing.<br/><span className="text-xs font-normal opacity-80">Instructors: Check console for the Firebase setup link.</span></div>)}
-    <Header title={`Ave, ${userData?.name || 'Discipulus'}!`} subtitle="Perge in itinere tuo." />
-    <div className="px-6 space-y-6 mt-4">
-      <div className="bg-gradient-to-br from-red-800 to-rose-900 rounded-3xl p-6 text-white shadow-xl"><div className="flex justify-between"><div><p className="text-rose-100 text-sm font-bold uppercase">Hebdomada</p><h3 className="text-4xl font-serif font-bold">{userData?.xp} XP</h3></div><Zap size={28} className="text-yellow-400 fill-current"/></div><div className="mt-6 bg-black/20 rounded-full h-3"><div className="bg-yellow-400 h-full w-3/4 rounded-full"/></div></div>
-      {classes && classes.length > 0 && (<div className="mb-6"><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><School size={18} className="text-indigo-600"/> My Classes</h3><div className="flex gap-4 overflow-x-auto pb-4">{classes.map((cls: any) => { const clsPendingCount = (cls.assignments || []).filter((l: any) => { const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); return isForMe && !completedSet.has(l.id); }).length; return ( <button key={cls.id} onClick={() => handleSelectClass(cls)} className="min-w-[200px] bg-white p-4 rounded-2xl border border-slate-200 shadow-sm text-left active:scale-95 transition-transform"><div className="flex items-center justify-between mb-2"><div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">{cls.name.charAt(0)}</div><span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500 font-mono">{cls.code}</span></div><h4 className="font-bold text-slate-900">{cls.name}</h4><p className="text-xs text-slate-500 mt-1">{clsPendingCount} Pending Tasks</p></button> ); })}</div></div>)}
-      {activeAssignments.length > 0 && (<div><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3><div className="space-y-3">{activeAssignments.map((l: any, i: number) => ( <button key={`${l.id}-${i}`} onClick={() => l.contentType === 'deck' ? onSelectDeck(l) : onSelectLesson(l)} className="w-full bg-indigo-50 border border-indigo-100 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all"><div className="flex items-center space-x-4"><div className={`h-10 w-10 rounded-xl flex items-center justify-center ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600' : 'bg-white text-indigo-600'}`}>{l.contentType === 'deck' ? <Layers size={20}/> : <PlayCircle size={20} />}</div><div className="text-left"><h4 className="font-bold text-indigo-900">{l.title}</h4><p className="text-xs text-indigo-600/70">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Assigned Lesson'}</p></div></div><ChevronRight size={20} className="text-indigo-300" /></button>))}</div></div>)}
-      <div><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Lessons</h3><div className="space-y-3">{lessons.map((l: any) => (<button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-14 w-14 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-700"><PlayCircle size={28}/></div><div className="text-left"><h4 className="font-bold text-slate-900">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div></div><ChevronRight className="text-slate-300"/></button>))}</div></div>
-      <div className="grid grid-cols-2 gap-4"><button onClick={() => setActiveTab('flashcards')} className="p-5 bg-orange-50 rounded-2xl border border-orange-100 text-center"><Layers className="mx-auto text-orange-500 mb-2"/><span className="block font-bold text-slate-800">Repetitio</span></button><button onClick={() => setActiveTab('create')} className="p-5 bg-emerald-50 rounded-2xl border border-emerald-100 text-center"><Feather className="mx-auto text-emerald-500 mb-2"/><span className="block font-bold text-slate-800">Scriptorium</span></button></div>
-    </div>
-  </div>
-  );
-}
-
-// --- 4. AGGREGATOR & MANAGER COMPONENTS (Defined LAST) ---
+// --- 4. AGGREGATOR & MANAGER COMPONENTS (Defined LAST so they can see everything above) ---
 
 function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allDecks }: any) {
   const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
@@ -1046,12 +1001,20 @@ function App() {
   const handleUpdateCard = useCallback(async (cardId: string, data: any) => { if (!user) return; try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), data); } catch (e) { console.error(e); alert("Cannot edit card. Check permissions."); } }, [user]);
   const handleDeleteCard = useCallback(async (cardId: string) => { if (!user) return; if (!window.confirm("Are you sure you want to delete this card?")) return; try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId)); } catch (e) { console.error(e); alert("Failed to delete card."); } }, [user]);
   const handleCreateLesson = useCallback(async (l: any, id = null) => { if(!user) return; if (id) { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', id), l); } else { await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), l); } setActiveTab('home'); }, [user]);
-  const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title?: string) => { 
+  const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title?: string, scoreDetail?: any) => { 
     setActiveTab('home'); 
     if (xp > 0 && user) { 
         try { 
             await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp), completedAssignments: arrayUnion(lessonId) }); 
-            await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { studentName: userData?.name || 'Unknown', studentEmail: user.email, itemTitle: title || 'Unknown Activity', xp: xp, timestamp: Date.now(), type: 'completion' });
+            await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { 
+                studentName: userData?.name || 'Unknown', 
+                studentEmail: user.email, 
+                itemTitle: title || 'Unknown Activity', 
+                xp: xp, 
+                timestamp: Date.now(), 
+                type: scoreDetail ? 'quiz_score' : 'completion',
+                scoreDetail: scoreDetail || null
+            });
         } catch (e) { 
             await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { ...DEFAULT_USER_DATA, xp: xp, completedAssignments: [lessonId] }, { merge: true }); 
         } 
