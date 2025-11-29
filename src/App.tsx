@@ -33,7 +33,7 @@ import {
   School, Users, Copy, List, ArrowRight, LayoutDashboard, ArrowLeft, Library, 
   Pencil, Image, Info, Edit3, FileJson, AlertTriangle, FlipVertical, GanttChart, 
   Club, AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle, ArrowDown,
-  BarChart3
+  BarChart3, CardBuilderview, LessonBuilderView
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
