@@ -56,21 +56,32 @@ const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'epic-latin-prod';
 
 // --- DEFAULTS & SEED DATA ---
-const DEFAULT_USER_DATA = { name: "Discipulus", targetLanguage: "Latin", level: "Novice", streak: 1, xp: 0, role: 'student', classes: [], completedAssignments: [] };
-
+const DEFAULT_USER_DATA = { 
+  name: "Student", // Was "Discipulus"
+  targetLanguage: "English", // Was "Latin"
+  level: "Beginner", // Was "Novice"
+  streak: 1, 
+  xp: 0, 
+  role: 'student', 
+  classes: [], 
+  completedAssignments: [] 
+};
 const INITIAL_SYSTEM_DECKS: any = {
-  salutationes: {
-    title: "👋 Salutationes",
+  greetings: {
+    title: "👋 English Greetings",
     cards: [
-      { id: 's1', front: "Salve", back: "Hello (Singular)", ipa: "/ˈsal.weː/", type: "phrase", mastery: 4, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-e", meaning: "Imp. Sing.", type: "suffix" }], usage: { sentence: "Salve, Marce!", translation: "Hello, Marcus!" }, grammar_tags: ["Imperative", "Greeting"] },
-      { id: 's2', front: "Salvete", back: "Hello (Plural)", ipa: "/salˈweː.te/", type: "phrase", mastery: 3, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-ete", meaning: "Imp. Pl.", type: "suffix" }], usage: { sentence: "Salvete, discipuli!", translation: "Hello, students!" }, grammar_tags: ["Imperative", "Greeting"] },
-      { id: 's3', front: "Vale", back: "Goodbye", ipa: "/ˈwa.leː/", type: "phrase", mastery: 3, morphology: [{ part: "Val-", meaning: "Be strong", type: "root" }, { part: "-e", meaning: "Imp.", type: "suffix" }], usage: { sentence: "Vale, amice.", translation: "Goodbye, friend." }, grammar_tags: ["Valediction"] }
+      { id: 'g1', front: "How are you?", back: "A polite question about someone's health or mood.", type: "phrase", mastery: 0 },
+      { id: 'g2', front: "Nice to meet you", back: "Used when meeting someone for the first time.", type: "phrase", mastery: 0 },
+      { id: 'g3', front: "See you later", back: "A casual way to say goodbye.", type: "phrase", mastery: 0 }
     ]
   },
-  medicina: {
-    title: "⚕️ Medicina",
+  phrasal_verbs: {
+    title: "🏃 Phrasal Verbs",
     cards: [
-      { id: 'm1', front: "Vulnus", back: "Wound", ipa: "/ˈwul.nus/", type: "noun", mastery: 1, morphology: [{ part: "Vuln-", meaning: "Wound", type: "root" }, { part: "-us", meaning: "Nom.", type: "suffix" }], usage: { sentence: "Vulnus grave est.", translation: "The wound is serious." }, grammar_tags: ["3rd Declension"] }
+      { id: 'pv1', front: "Give up", back: "To stop trying.", type: "verb", mastery: 0 },
+      { id: 'pv2', front: "Run out", back: "To have none left.", type: "verb", mastery: 0 },
+      { id: 'pv3', front: "Find out", back: "To discover information.", type: "verb", mastery: 0 },
+      { id: 'pv4', front: "Bring up", back: "To mention a topic.", type: "verb", mastery: 0 }
     ]
   }
 };
@@ -83,11 +94,11 @@ const getLevelInfo = (xp: number) => {
   const progress = (currentLevelXP / nextLevelXP) * 100;
   
   // Latin Ranks based on Level
-  let rank = "Civis (Citizen)";
-  if (level >= 5) rank = "Miles (Soldier)";
-  if (level >= 10) rank = "Centurio (Centurion)";
-  if (level >= 20) rank = "Legatus (Commander)";
-  if (level >= 50) rank = "Imperator (Emperor)";
+let rank = "Beginner";
+  if (level >= 5) rank = "Elementary";
+  if (level >= 10) rank = "Intermediate";
+  if (level >= 20) rank = "Advanced";
+  if (level >= 50) rank = "Native-like";
 
   return { level, currentLevelXP, nextLevelXP, progress, rank };
 };
@@ -140,18 +151,20 @@ function LevelUpModal({ xp, streak, onClose }: any) {
   );
 }
 
+// FIND THIS AND REPLACE:
 const INITIAL_SYSTEM_LESSONS: any[] = [
   {
     id: 'l1',
-    title: "Salutationes",
-    subtitle: "Greetings in the Forum",
-    description: "Learn how to greet friends and elders.",
+    title: "The Verb 'To Be'",
+    subtitle: "Present Simple Tense",
+    description: "Learn how to introduce yourself and others.",
     xp: 50,
-    vocab: ['Salve', 'Vale', 'Quid agis?'],
+    vocab: ['Am', 'Is', 'Are'],
     blocks: [
-      { type: 'text', title: 'The Basics', content: 'In Latin, we distinguish between addressing one person ("Salve") and multiple people ("Salvete").' },
-      { type: 'dialogue', lines: [ { speaker: "Marcus", text: "Salve, Iulia!", translation: "Hello, Julia!", side: "left" }, { speaker: "Iulia", text: "Salve, Marce.", translation: "Hello, Marcus.", side: "right" } ] },
-      { type: 'quiz', question: "How do you say 'Hello' to a group?", options: [{ id: 'a', text: "Salve" }, { id: 'b', text: "Salvete" }, { id: 'c', text: "Vale" }], correctId: 'b' }
+      { type: 'text', title: 'Introduction', content: 'In English, the verb "To Be" changes based on who you are talking about.' },
+      { type: 'table', headers: ["Subject", "Verb Form"], rows: [ {c1: "I", c2: "am"}, {c1: "You/We/They", c2: "are"}, {c1: "He/She/It", c2: "is"} ] },
+      { type: 'dialogue', lines: [ { speaker: "John", text: "Hello, I am John.", translation: "Greeting", side: "left" }, { speaker: "Sarah", text: "Hi John, I am Sarah.", translation: "Response", side: "right" } ] },
+      { type: 'quiz', question: "Which is correct?", options: [{ id: 'a', text: "She are happy" }, { id: 'b', text: "She is happy" }, { id: 'c', text: "She am happy" }], correctId: 'b' }
     ]
   }
 ];
@@ -161,7 +174,8 @@ const TYPE_COLORS: any = {
   noun: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
   adverb: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
   phrase: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' },
-  adjective: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700' }
+  adjective: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700' },
+  idiom: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' }
 };
 
 // --- HELPER COMPONENTS ---
@@ -668,8 +682,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
 
     {userData?.classSyncError && (<div className="bg-rose-500 text-white p-4 text-center text-sm font-bold"><AlertTriangle className="inline-block mr-2" size={16} />System Notice: Database Index Missing.<br/><span className="text-xs font-normal opacity-80">Instructors: Check console for the Firebase setup link.</span></div>)}
     
-    <Header title={`Ave, ${userData?.name || 'Discipulus'}!`} subtitle={rank} />
-    
+<Header title={`Hello, ${userData?.name || 'Student'}!`} subtitle="Keep up the good work." />    
     <div className="px-6 space-y-6 mt-4">
       
       {/* --- INTERACTIVE RED WIDGET --- */}
@@ -715,7 +728,16 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
       <div><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Lessons</h3><div className="space-y-3">{lessons.map((l: any) => (<button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-14 w-14 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-700"><PlayCircle size={28}/></div><div className="text-left"><h4 className="font-bold text-slate-900">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div></div><ChevronRight className="text-slate-300"/></button>))}</div></div>
       
       {/* QUICK ACTIONS */}
-      <div className="grid grid-cols-2 gap-4"><button onClick={() => setActiveTab('flashcards')} className="p-5 bg-orange-50 rounded-2xl border border-orange-100 text-center"><Layers className="mx-auto text-orange-500 mb-2"/><span className="block font-bold text-slate-800">Repetitio</span></button><button onClick={() => setActiveTab('create')} className="p-5 bg-emerald-50 rounded-2xl border border-emerald-100 text-center"><Feather className="mx-auto text-emerald-500 mb-2"/><span className="block font-bold text-slate-800">Scriptorium</span></button></div>
+<div className="grid grid-cols-2 gap-4">
+        <button onClick={() => setActiveTab('flashcards')} className="...">
+            <Layers className="mx-auto text-orange-500 mb-2"/>
+            <span className="block font-bold text-slate-800">Practice</span> {/* Was Repetitio */}
+        </button>
+        <button onClick={() => setActiveTab('create')} className="...">
+            <Feather className="mx-auto text-emerald-500 mb-2"/>
+            <span className="block font-bold text-slate-800">Creator</span> {/* Was Scriptorium */}
+        </button>
+    </div>
     </div>
   </div>
   );
@@ -1206,7 +1228,9 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
     <div className="flex h-screen bg-slate-100 overflow-hidden">
       {/* Sidebar for Desktop */}
       <div className="w-64 bg-slate-900 text-white flex-col hidden md:flex">
-        <div className="p-6 border-b border-slate-800"><h1 className="text-xl font-bold flex items-center gap-2"><GraduationCap className="text-indigo-400"/> Magister</h1><p className="text-xs text-slate-400 mt-1">{user.email}</p></div>
+        <div className="p-6 border-b border-slate-800"><h1 className="text-xl font-bold flex items-center gap-2">
+        <GraduationCap className="text-indigo-400"/> Instructor {/* Was Magister */}
+    </h1><p className="text-xs text-slate-400 mt-1">{user.email}</p></div>
         <div className="flex-1 p-4 space-y-2">
             <button onClick={() => setActiveTab('dashboard')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'}`}><LayoutDashboard size={20} /> Overview</button>
             <button onClick={() => setActiveTab('classes')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'classes' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'}`}><School size={20} /> Classes & Roster</button>
