@@ -188,8 +188,12 @@ function Toast({ message, onClose }: any) {
   );
 }
 
-function Navigation({ activeTab, setActiveTab }: any) {
-  const tabs = [ { id: 'home', icon: Home, label: 'Domus' }, { id: 'flashcards', icon: Layers, label: 'Chartae' }, { id: 'profile', icon: User, label: 'Ego' } ];
+const tabs = [ 
+    { id: 'home', icon: Home, label: 'Home' }, 
+    { id: 'flashcards', icon: Layers, label: 'Practice' }, 
+    { id: 'profile', icon: User, label: 'Profile' } 
+  ];
+
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-3 flex justify-between items-center z-50 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
       {tabs.map((tab) => (
@@ -200,7 +204,6 @@ function Navigation({ activeTab, setActiveTab }: any) {
     </div>
   );
 }
-
 function Header({ title, subtitle, rightAction, onClickTitle }: any) {
   return (
     <div className="px-6 pt-12 pb-6 bg-white sticky top-0 z-40 border-b border-slate-100 flex justify-between items-end">
