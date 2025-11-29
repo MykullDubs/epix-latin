@@ -74,6 +74,71 @@ const INITIAL_SYSTEM_DECKS: any = {
     ]
   }
 };
+// --- XP & LEVELING LOGIC ---
+const getLevelInfo = (xp: number) => {
+  const baseXP = 100; // XP needed for first level up
+  const level = Math.floor(xp / baseXP) + 1;
+  const currentLevelXP = xp % baseXP;
+  const nextLevelXP = baseXP;
+  const progress = (currentLevelXP / nextLevelXP) * 100;
+  
+  // Latin Ranks based on Level
+  let rank = "Civis (Citizen)";
+  if (level >= 5) rank = "Miles (Soldier)";
+  if (level >= 10) rank = "Centurio (Centurion)";
+  if (level >= 20) rank = "Legatus (Commander)";
+  if (level >= 50) rank = "Imperator (Emperor)";
+
+  return { level, currentLevelXP, nextLevelXP, progress, rank };
+};
+
+function LevelUpModal({ xp, streak, onClose }: any) {
+  const { level, currentLevelXP, nextLevelXP, progress, rank } = getLevelInfo(xp);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+      <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden transform scale-100 transition-all" onClick={e => e.stopPropagation()}>
+        <div className="bg-gradient-to-br from-red-800 to-rose-900 p-8 text-white text-center relative">
+            <button onClick={onClose} className="absolute top-4 right-4 text-white/50 hover:text-white"><X /></button>
+            <div className="w-20 h-20 bg-yellow-400 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg text-rose-900">
+                <Award size={40} />
+            </div>
+            <h2 className="text-3xl font-serif font-bold">Level {level}</h2>
+            <p className="text-rose-200 font-medium uppercase tracking-widest text-xs mt-1">{rank}</p>
+        </div>
+        <div className="p-6 space-y-6">
+            <div className="text-center">
+                <p className="text-slate-500 text-xs font-bold uppercase mb-1">Total Experience</p>
+                <p className="text-4xl font-black text-slate-800">{xp} <span className="text-lg text-slate-400 font-medium">XP</span></p>
+            </div>
+
+            <div className="space-y-2">
+                <div className="flex justify-between text-xs font-bold text-slate-600">
+                    <span>Progress to Lvl {level + 1}</span>
+                    <span>{currentLevelXP} / {nextLevelXP} XP</span>
+                </div>
+                <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                    <div className="h-full bg-yellow-400 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
+                </div>
+            </div>
+
+            <div className="flex gap-4 pt-4 border-t border-slate-100">
+                <div className="flex-1 bg-orange-50 p-4 rounded-2xl text-center border border-orange-100">
+                    <Zap size={24} className="mx-auto text-orange-500 mb-1"/>
+                    <p className="text-2xl font-bold text-slate-800">{streak}</p>
+                    <p className="text-[10px] text-slate-400 uppercase font-bold">Day Streak</p>
+                </div>
+                <div className="flex-1 bg-indigo-50 p-4 rounded-2xl text-center border border-indigo-100">
+                    <BookOpen size={24} className="mx-auto text-indigo-500 mb-1"/>
+                    <p className="text-2xl font-bold text-slate-800">Active</p>
+                    <p className="text-[10px] text-slate-400 uppercase font-bold">Status</p>
+                </div>
+            </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const INITIAL_SYSTEM_LESSONS: any[] = [
   {
@@ -584,21 +649,72 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
 
 function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck }: any) {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
+  const [showLevelModal, setShowLevelModal] = useState(false); // NEW STATE
+
   const completedSet = new Set(userData?.completedAssignments || []);
   const relevantAssignments = (assignments || []).filter((l: any) => { return !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); });
   const activeAssignments = relevantAssignments.filter((l: any) => !completedSet.has(l.id));
   const handleSelectClass = (cls: any) => { setActiveStudentClass(cls); };
+  
+  // Calculate Level Data for the Widget
+  const { level, progress, rank } = getLevelInfo(userData?.xp || 0);
+
   if (activeStudentClass) { return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={onSelectLesson} onSelectDeck={onSelectDeck} userData={userData} />; }
 
   return (
-  <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full">
+  <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full relative">
+    {/* --- LEVEL UP MODAL --- */}
+    {showLevelModal && <LevelUpModal xp={userData?.xp || 0} streak={userData?.streak || 1} onClose={() => setShowLevelModal(false)} />}
+
     {userData?.classSyncError && (<div className="bg-rose-500 text-white p-4 text-center text-sm font-bold"><AlertTriangle className="inline-block mr-2" size={16} />System Notice: Database Index Missing.<br/><span className="text-xs font-normal opacity-80">Instructors: Check console for the Firebase setup link.</span></div>)}
-    <Header title={`Ave, ${userData?.name || 'Discipulus'}!`} subtitle="Perge in itinere tuo." />
+    
+    <Header title={`Ave, ${userData?.name || 'Discipulus'}!`} subtitle={rank} />
+    
     <div className="px-6 space-y-6 mt-4">
-      <div className="bg-gradient-to-br from-red-800 to-rose-900 rounded-3xl p-6 text-white shadow-xl"><div className="flex justify-between"><div><p className="text-rose-100 text-sm font-bold uppercase">Hebdomada</p><h3 className="text-4xl font-serif font-bold">{userData?.xp} XP</h3></div><Zap size={28} className="text-yellow-400 fill-current"/></div><div className="mt-6 bg-black/20 rounded-full h-3"><div className="bg-yellow-400 h-full w-3/4 rounded-full"/></div></div>
+      
+      {/* --- INTERACTIVE RED WIDGET --- */}
+      <button 
+        onClick={() => setShowLevelModal(true)}
+        className="w-full text-left bg-gradient-to-br from-red-800 to-rose-900 rounded-3xl p-6 text-white shadow-xl hover:scale-[1.02] active:scale-95 transition-all cursor-pointer relative overflow-hidden group"
+      >
+        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+            <Award size={100} />
+        </div>
+        <div className="flex justify-between items-start relative z-10">
+            <div>
+                <p className="text-rose-200 text-xs font-bold uppercase tracking-widest mb-1">Current Level</p>
+                <h3 className="text-4xl font-serif font-bold">{level}</h3>
+                <p className="text-rose-100 text-sm opacity-90">{userData?.xp} XP Total</p>
+            </div>
+            <div className="text-right">
+                <div className="flex items-center gap-1 text-yellow-400 mb-1 justify-end">
+                    <Zap size={16} fill="currentColor" />
+                    <span className="font-bold">{userData?.streak || 1}</span>
+                </div>
+                <span className="text-[10px] text-rose-200 uppercase">Day Streak</span>
+            </div>
+        </div>
+        <div className="mt-6">
+            <div className="flex justify-between text-[10px] text-rose-200 mb-1 font-bold uppercase">
+                <span>Progress</span>
+                <span>{Math.round(progress)}%</span>
+            </div>
+            <div className="bg-black/30 rounded-full h-2 overflow-hidden">
+                <div className="bg-yellow-400 h-full rounded-full shadow-[0_0_10px_rgba(250,204,21,0.5)]" style={{ width: `${progress}%` }}/>
+            </div>
+        </div>
+      </button>
+
+      {/* CLASSES SCROLLER */}
       {classes && classes.length > 0 && (<div className="mb-6"><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><School size={18} className="text-indigo-600"/> My Classes</h3><div className="flex gap-4 overflow-x-auto pb-4">{classes.map((cls: any) => { const clsPendingCount = (cls.assignments || []).filter((l: any) => { const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); return isForMe && !completedSet.has(l.id); }).length; return ( <button key={cls.id} onClick={() => handleSelectClass(cls)} className="min-w-[200px] bg-white p-4 rounded-2xl border border-slate-200 shadow-sm text-left active:scale-95 transition-transform"><div className="flex items-center justify-between mb-2"><div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">{cls.name.charAt(0)}</div><span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500 font-mono">{cls.code}</span></div><h4 className="font-bold text-slate-900">{cls.name}</h4><p className="text-xs text-slate-500 mt-1">{clsPendingCount} Pending Tasks</p></button> ); })}</div></div>)}
+      
+      {/* ASSIGNMENTS LIST */}
       {activeAssignments.length > 0 && (<div><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3><div className="space-y-3">{activeAssignments.map((l: any, i: number) => ( <button key={`${l.id}-${i}`} onClick={() => l.contentType === 'deck' ? onSelectDeck(l) : onSelectLesson(l)} className="w-full bg-indigo-50 border border-indigo-100 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all"><div className="flex items-center space-x-4"><div className={`h-10 w-10 rounded-xl flex items-center justify-center ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600' : 'bg-white text-indigo-600'}`}>{l.contentType === 'deck' ? <Layers size={20}/> : <PlayCircle size={20} />}</div><div className="text-left"><h4 className="font-bold text-indigo-900">{l.title}</h4><p className="text-xs text-indigo-600/70">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Assigned Lesson'}</p></div></div><ChevronRight size={20} className="text-indigo-300" /></button>))}</div></div>)}
+      
+      {/* STANDARD LIBRARY */}
       <div><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Lessons</h3><div className="space-y-3">{lessons.map((l: any) => (<button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-14 w-14 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-700"><PlayCircle size={28}/></div><div className="text-left"><h4 className="font-bold text-slate-900">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div></div><ChevronRight className="text-slate-300"/></button>))}</div></div>
+      
+      {/* QUICK ACTIONS */}
       <div className="grid grid-cols-2 gap-4"><button onClick={() => setActiveTab('flashcards')} className="p-5 bg-orange-50 rounded-2xl border border-orange-100 text-center"><Layers className="mx-auto text-orange-500 mb-2"/><span className="block font-bold text-slate-800">Repetitio</span></button><button onClick={() => setActiveTab('create')} className="p-5 bg-emerald-50 rounded-2xl border border-emerald-100 text-center"><Feather className="mx-auto text-emerald-500 mb-2"/><span className="block font-bold text-slate-800">Scriptorium</span></button></div>
     </div>
   </div>
