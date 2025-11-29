@@ -187,8 +187,9 @@ function Toast({ message, onClose }: any) {
     </div>
   );
 }
-
-const tabs = [ 
+function Navigation({ activeTab, setActiveTab }: any) {
+  // ESL UPDATE: English Labels
+  const tabs = [ 
     { id: 'home', icon: Home, label: 'Home' }, 
     { id: 'flashcards', icon: Layers, label: 'Practice' }, 
     { id: 'profile', icon: User, label: 'Profile' } 
