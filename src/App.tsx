@@ -313,7 +313,7 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
   );
 }
 
-// --- 3. STUDENT & SHARED VIEWS (Defined next) ---
+// --- 3. STUDENT & SHARED VIEWS ---
 
 function MatchingGame({ deckCards, onGameEnd }: any) {
     const [cards, setCards] = useState<any[]>([]);
@@ -454,6 +454,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
       <Header title={currentDeck?.title.split(' ')[1] || "Deck"} subtitle={`${currentIndex + 1} / ${deckCards.length}`} onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} rightAction={<div className="flex items-center gap-2">{activeDeckOverride && onComplete && (<button onClick={() => onComplete(activeDeckOverride.id, 50, currentDeck.title)} className="bg-emerald-500 text-white px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-sm hover:scale-105 transition-transform"><Check size={14}/> Complete</button>)}<button onClick={() => setManageMode(!manageMode)} className={`p-2 rounded-full transition-colors ${manageMode ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>{manageMode ? <X size={20} /> : <List size={20} />}</button></div>} />
       {isSelectorOpen && <div className="absolute top-24 left-6 right-6 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 animate-in fade-in slide-in-from-top-4">{Object.entries(allDecks).map(([key, deck]: any) => (<button key={key} onClick={() => handleDeckChange(key)} className={`w-full text-left p-3 rounded-xl font-bold text-sm mb-1 ${selectedDeckKey === key ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'}`}>{deck.title} <span className="float-right opacity-50">{deck.cards.length}</span></button>))}</div>}
       {isSelectorOpen && <div className="absolute inset-0 z-40 bg-black/5 backdrop-blur-[1px]" onClick={() => setIsSelectorOpen(false)} />}
+      {!manageMode && (<div className="px-6 mt-2 mb-2"><div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto"><button onClick={() => setGameMode('study')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg ${gameMode === 'study' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Study</button><button onClick={() => setGameMode('match')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg ${gameMode === 'match' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Match</button><button onClick={() => setGameMode('vocabjack')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg ${gameMode === 'vocabjack' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Jack</button></div></div>)}
       <div className="flex-1 overflow-y-auto pt-4">
         {manageMode ? (
             <div className="p-6">
@@ -490,7 +491,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
             </>
         )}
       </div>
-      {!manageMode && card && (
+      {gameMode === 'study' && !manageMode && card && (
         <div className="px-6 pb-4">
           <div className="flex items-center justify-between max-w-sm mx-auto">
             <button onClick={() => { setXrayMode(false); setIsFlipped(false); setTimeout(() => setCurrentIndex((prev) => (prev - 1 + deckCards.length) % deckCards.length), 200); }} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-rose-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all"><X size={28} strokeWidth={2.5} /></button>
@@ -571,7 +572,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   );
 }
 
-// --- 4. AGGREGATOR & MANAGER COMPONENTS (Defined LAST so they can see everything above) ---
+// --- 4. AGGREGATOR & MANAGER COMPONENTS (Defined LAST) ---
 
 function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allDecks }: any) {
   const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
@@ -637,13 +638,17 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
               </div>
               <div className="flex-1 overflow-y-auto p-6 space-y-8">
                   <div>
-                      <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Lessons</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {/* We need lessons passed down, or use INITIAL for demo */}
-                          {/* Since this component handles logic, we assume lessons are passed or fetched. For now showing placeholders if empty */}
-                          <div className="col-span-full text-center py-8 text-slate-400 bg-white rounded-2xl border border-dashed border-slate-200">
-                              <p>Library view active. (Integration: Pass 'lessons' prop to BuilderHub to see them here)</p>
-                          </div>
+                      <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Layers size={18} className="text-orange-500"/> Decks</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                           {Object.entries(allDecks).map(([key, deck]: any) => (
+                              <div key={key} onClick={() => handleEdit({...deck, deckId: key}, 'card')} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-orange-300 cursor-pointer transition-colors group">
+                                  <div className="flex justify-between mb-2">
+                                      <h4 className="font-bold text-slate-900">{deck.title}</h4>
+                                      <Edit3 size={16} className="text-slate-300 group-hover:text-orange-500"/>
+                                  </div>
+                                  <p className="text-xs text-slate-500">{deck.cards?.length || 0} Cards</p>
+                              </div>
+                           ))}
                       </div>
                   </div>
               </div>
@@ -687,31 +692,32 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
             rightAction={
                 <div className="flex gap-2">
                     <button onClick={() => setSubView('import')} className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-indigo-50 hover:text-indigo-600"><FileJson size={20}/></button>
-                    {/* Library button placeholder - requires wiring up props in parent */}
-                    {/* <button onClick={() => setSubView('library')} className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-indigo-50 hover:text-indigo-600"><Library size={20}/></button> */}
+                    <button onClick={() => setSubView('library')} className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-indigo-50 hover:text-indigo-600"><Library size={20}/></button>
                 </div>
             } 
         />
         
-        <div className="px-6 mt-2">
-            <div className="flex bg-slate-200 p-1 rounded-xl">
-                <button onClick={() => { setMode('card'); setEditingItem(null); }} className={`flex-1 py-2 text-sm font-bold rounded-lg ${mode === 'card' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Flashcard</button>
-                <button onClick={() => { setMode('lesson'); setEditingItem(null); }} className={`flex-1 py-2 text-sm font-bold rounded-lg ${mode === 'lesson' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Full Lesson</button>
+        {(subView === 'menu' || subView === 'editor') && (
+             <div className="px-6 mt-2">
+                <div className="flex bg-slate-200 p-1 rounded-xl">
+                    <button onClick={() => { setMode('card'); setEditingItem(null); setSubView('editor'); }} className={`flex-1 py-2 text-sm font-bold rounded-lg ${mode === 'card' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Flashcard</button>
+                    <button onClick={() => { setMode('lesson'); setEditingItem(null); setSubView('editor'); }} className={`flex-1 py-2 text-sm font-bold rounded-lg ${mode === 'lesson' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Full Lesson</button>
+                </div>
             </div>
-        </div>
+        )}
 
         <div className="mt-4">
-            {mode === 'card' && (
+            {subView === 'editor' && mode === 'card' && (
                 <CardBuilderView 
                     onSaveCard={onSaveCard} 
                     onUpdateCard={onUpdateCard} 
                     onDeleteCard={onDeleteCard} 
                     availableDecks={allDecks} 
                     initialData={editingItem}
-                    onCancelEdit={() => setEditingItem(null)}
+                    onCancelEdit={() => { setEditingItem(null); }}
                 />
             )}
-            {mode === 'lesson' && (
+            {subView === 'editor' && mode === 'lesson' && (
                 <LessonBuilderView 
                     data={lessonData} 
                     setData={setLessonData} 
