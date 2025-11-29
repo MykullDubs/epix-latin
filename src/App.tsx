@@ -28,7 +28,7 @@ import {
 } from "firebase/firestore";
 import { 
   BookOpen, Layers, User, Home, Check, X, Zap, ChevronRight, Search, Volume2, 
-  Puzzle, MessageSquare, GraduationCap, PlusCircle, Save, Feather, ChevronDown,
+  Puzzle, MessageSquare, GraduationCap, PlusCircle, Save, Feather, ChevronDown, 
   PlayCircle, Award, Trash2, Plus, FileText, Brain, Loader, LogOut, UploadCloud, 
   School, Users, Copy, List, ArrowRight, LayoutDashboard, ArrowLeft, Library, 
   Pencil, Image, Info, Edit3, FileJson, AlertTriangle, FlipVertical, GanttChart, 
