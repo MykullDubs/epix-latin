@@ -3,7 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from "firebase/auth";
 import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc, updateDoc, increment, writeBatch, deleteDoc, arrayUnion, query, where, collectionGroup, orderBy, limit } from "firebase/firestore";
-import { BookOpen, Layers, User, Home, Check, X, Zap, Search, Volume2, Puzzle, MessageSquare, GraduationCap, PlusCircle, Save, Feather, ChevronDown, PlayCircle, Award, Trash2, Plus, FileText, Brain, Loader, LogOut, UploadCloud, School, Users, Copy, List, ArrowRight, LayoutDashboard, ArrowLeft, Library, Pencil, Image, Info, Edit3, FileJson, AlertTriangle, FlipVertical, GanttChart, Club, AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle, ArrowDown, BarChart3 } from 'lucide-react';
+import { BookOpen, ChevronRight, Layers, User, Home, Check, X, Zap, Search, Volume2, Puzzle, MessageSquare, GraduationCap, PlusCircle, Save, Feather, ChevronDown, PlayCircle, Award, Trash2, Plus, FileText, Brain, Loader, LogOut, UploadCloud, School, Users, Copy, List, ArrowRight, LayoutDashboard, ArrowLeft, Library, Pencil, Image, Info, Edit3, FileJson, AlertTriangle, FlipVertical, GanttChart, Club, AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle, ArrowDown, BarChart3 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
