@@ -1,9 +1,40 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from "firebase/auth";
-import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc, updateDoc, increment, writeBatch, deleteDoc, arrayUnion, query, where, collectionGroup, orderBy, limit } from "firebase/firestore";
-import { BookOpen, ChevronRight, Layers, User, Home, Check, X, Zap, Search, Volume2, Puzzle, MessageSquare, GraduationCap, PlusCircle, Save, Feather, ChevronDown, PlayCircle, Award, Trash2, Plus, FileText, Brain, Loader, LogOut, UploadCloud, School, Users, Copy, List, ArrowRight, LayoutDashboard, ArrowLeft, Library, Pencil, Image, Info, Edit3, FileJson, AlertTriangle, FlipVertical, GanttChart, Club, AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle, ArrowDown, BarChart3 } from 'lucide-react';
+import { 
+  getAuth, 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged 
+} from "firebase/auth";
+import { 
+  getFirestore, 
+  doc, 
+  setDoc, 
+  onSnapshot, 
+  collection, 
+  addDoc, 
+  updateDoc, 
+  increment,
+  writeBatch,
+  deleteDoc,
+  arrayUnion,
+  query,
+  where,
+  collectionGroup,
+  orderBy,
+  limit
+} from "firebase/firestore";
+import { 
+  BookOpen, Layers, User, Home, Check, X, Zap, ChevronRight, Search, Volume2, 
+  Puzzle, MessageSquare, GraduationCap, PlusCircle, Save, Feather, ChevronDown, ChevronRight,
+  PlayCircle, Award, Trash2, Plus, FileText, Brain, Loader, LogOut, UploadCloud, 
+  School, Users, Copy, List, ArrowRight, LayoutDashboard, ArrowLeft, Library, 
+  Pencil, Image, Info, Edit3, FileJson, AlertTriangle, FlipVertical, GanttChart, 
+  Club, AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle, ArrowDown,
+  BarChart3, PenTool
+} from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
@@ -103,6 +134,7 @@ function Header({ title, subtitle, rightAction, onClickTitle }: any) {
 }
 
 // --- 1. CORE VIEWS (AUTH & PROFILE) ---
+
 function AuthView() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
@@ -140,6 +172,7 @@ function ProfileView({ user, userData }: any) {
 }
 
 // --- 2. ACTIVITY FEED & BUILDERS ---
+
 function LiveActivityFeed() {
   const [logs, setLogs] = useState<any[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -301,7 +334,7 @@ function MatchingGame({ deckCards, onGameEnd }: any) {
     const [selectedDefIndex, setSelectedDefIndex] = useState<number | null>(null);
     const [matchedIds, setMatchedIds] = useState<number[]>([]); 
     const [isChecking, setIsChecking] = useState(false);
-    
+
     useEffect(() => {
         if (deckCards.length < 3) return;
         const gameDeck = deckCards.slice(0, 6);
@@ -532,7 +565,6 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
 
   const handleDeckChange = (key: string) => { onSelectDeck(key); setIsSelectorOpen(false); setCurrentIndex(0); setIsFlipped(false); setXrayMode(false); setManageMode(false); setGameMode('study'); };
   const handleGameEnd = (data: any) => { 
-      // If numeric (old games), treat as XP. If object (Quiz), handle score.
       const xp = typeof data === 'number' ? data : (Math.round((data.score / data.total) * 50) + 10); 
       alert(`Complete! You earned ${xp} XP.`); 
       setGameMode('study'); 
@@ -602,8 +634,6 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   );
 }
 
-// --- 4. STUDENT VIEWS (StudentClassView, HomeView, LessonView) ---
-
 function LessonView({ lesson, onFinish }: any) {
   const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
   const [quizAnswers, setQuizAnswers] = useState<any>({});
@@ -671,8 +701,6 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   </div>
   );
 }
-
-// --- 5. AGGREGATOR & MANAGER COMPONENTS (Defined LAST) ---
 
 function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allDecks }: any) {
   const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
