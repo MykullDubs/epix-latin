@@ -32,7 +32,7 @@ import {
   PlayCircle, Award, Trash2, Plus, FileText, Brain, Loader, LogOut, UploadCloud, 
   School, Users, Copy, List, ArrowRight, LayoutDashboard, ArrowLeft, Library, 
   Pencil, Image, Info, Edit3, FileJson, AlertTriangle, FlipVertical, GanttChart, 
-  Club, AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle
+  Club, AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle, ArrowDown
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
