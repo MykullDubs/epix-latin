@@ -53,10 +53,9 @@ const db = getFirestore(app);
 // @ts-ignore
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'epic-latin-prod';
 
-// --- DEFAULTS ---
+// --- DEFAULTS & SEED DATA ---
 const DEFAULT_USER_DATA = { name: "Discipulus", targetLanguage: "Latin", level: "Novice", streak: 1, xp: 0, role: 'student', classes: [], completedAssignments: [] };
 
-// --- SEED DATA ---
 const INITIAL_SYSTEM_DECKS: any = {
   salutationes: {
     title: "👋 Salutationes",
@@ -133,7 +132,7 @@ function Header({ title, subtitle, rightAction, onClickTitle }: any) {
   );
 }
 
-// --- 1. CORE VIEWS (AUTH & PROFILE) - DEFINED FIRST ---
+// --- 1. CORE VIEWS (AUTH & PROFILE) ---
 
 function AuthView() {
   const [isLogin, setIsLogin] = useState(true);
@@ -171,7 +170,7 @@ function ProfileView({ user, userData }: any) {
   return (<div className="h-full flex flex-col bg-slate-50"><Header title="Ego" subtitle="Profile" /><div className="flex-1 px-6 mt-4"><div className="bg-white p-6 rounded-3xl shadow-sm border flex flex-col items-center mb-6"><h2 className="text-2xl font-bold">{userData?.name}</h2><p className="text-sm text-slate-500">{user.email}</p><div className="mt-4 px-4 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold uppercase">{userData?.role}</div></div><div className="space-y-3"><button onClick={toggleRole} className="w-full bg-white p-4 rounded-xl border text-slate-700 font-bold mb-4 flex justify-between"><span>Switch Role</span><School size={20} /></button><button onClick={handleLogout} className="w-full bg-white p-4 rounded-xl border text-rose-600 font-bold mb-4 flex justify-between"><span>Sign Out</span><LogOut/></button><button onClick={deploySystemContent} disabled={deploying} className="w-full bg-slate-800 text-white p-4 rounded-xl font-bold flex justify-between">{deploying ? <Loader className="animate-spin"/> : <UploadCloud/>}<span>Deploy Content</span></button></div></div></div>);
 }
 
-// --- 2. ACTIVITY FEED & BUILDERS - DEFINED NEXT ---
+// --- 2. ACTIVITY FEED & BUILDERS ---
 
 function LiveActivityFeed() {
   const [logs, setLogs] = useState<any[]>([]);
@@ -215,7 +214,7 @@ function LiveActivityFeed() {
   );
 }
 
-function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard, availableDecks, initialDeckId }: any) {
+function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard, availableDecks, initialDeckId, initialData, onCancelEdit }: any) {
   const [formData, setFormData] = useState({ front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '', deckId: initialDeckId || 'custom' });
   const [isCreatingDeck, setIsCreatingDeck] = useState(false);
   const [newDeckTitle, setNewDeckTitle] = useState('');
@@ -224,15 +223,36 @@ function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard, availableDeck
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  useEffect(() => { if (initialDeckId) setFormData(prev => ({...prev, deckId: initialDeckId})); }, [initialDeckId]);
+  // Hydrate form if editing
+  useEffect(() => { 
+      if (initialData) {
+          setEditingId(initialData.id);
+          setFormData({ 
+            front: initialData.front, back: initialData.back, type: initialData.type || 'noun', 
+            ipa: initialData.ipa || '', sentence: initialData.usage?.sentence || '', 
+            sentenceTrans: initialData.usage?.translation || '', 
+            grammarTags: initialData.grammar_tags?.join(', ') || '', 
+            deckId: initialData.deckId || initialDeckId || 'custom' 
+          });
+          setMorphology(initialData.morphology || []);
+      }
+  }, [initialData, initialDeckId]);
+
   const handleChange = (e: any) => { if (e.target.name === 'deckId') { if (e.target.value === 'new') { setIsCreatingDeck(true); setFormData({ ...formData, deckId: 'new' }); } else { setIsCreatingDeck(false); setFormData({ ...formData, deckId: e.target.value }); } } else { setFormData({ ...formData, [e.target.name]: e.target.value }); } };
   const addMorphology = () => { if (newMorphPart.part && newMorphPart.meaning) { setMorphology([...morphology, newMorphPart]); setNewMorphPart({ part: '', meaning: '', type: 'root' }); } };
   const removeMorphology = (index: number) => { setMorphology(morphology.filter((_, i) => i !== index)); };
-  const handleSelectCard = (card: any) => { setEditingId(card.id); setFormData({ front: card.front, back: card.back, type: card.type || 'noun', ipa: card.ipa || '', sentence: card.usage?.sentence || '', sentenceTrans: card.usage?.translation || '', grammarTags: card.grammar_tags?.join(', ') || '', deckId: card.deckId || formData.deckId }); setMorphology(card.morphology || []); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-  const handleClear = () => { setEditingId(null); setFormData(prev => ({ ...prev, front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' })); setMorphology([]); };
+  
+  const handleClear = () => { 
+      setEditingId(null); 
+      setFormData(prev => ({ ...prev, front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' })); 
+      setMorphology([]);
+      if (onCancelEdit) onCancelEdit();
+  };
+
   const handleSubmit = (e: any) => { e.preventDefault(); if (!formData.front || !formData.back) return; let finalDeckId = formData.deckId; let finalDeckTitle = null; if (formData.deckId === 'new') { if (!newDeckTitle) return alert("Please name your new deck."); finalDeckId = `custom_${Date.now()}`; finalDeckTitle = newDeckTitle; } const cardData = { front: formData.front, back: formData.back, type: formData.type, deckId: finalDeckId, deckTitle: finalDeckTitle, ipa: formData.ipa || "/.../", mastery: 0, morphology: morphology.length > 0 ? morphology : [{ part: formData.front, meaning: "Root", type: "root" }], usage: { sentence: formData.sentence || "-", translation: formData.sentenceTrans || "-" }, grammar_tags: formData.grammarTags ? formData.grammarTags.split(',').map(t => t.trim()) : ["Custom"] }; if (editingId) { onUpdateCard(editingId, cardData); setToastMsg("Card Updated Successfully"); } else { onSaveCard(cardData); setToastMsg("Card Created Successfully"); } handleClear(); if (isCreatingDeck) { setIsCreatingDeck(false); setNewDeckTitle(''); setFormData(prev => ({ ...prev, deckId: finalDeckId })); } };
-  const validDecks = availableDecks || {}; const deckOptions = Object.entries(validDecks).map(([key, deck]: any) => ({ id: key, title: deck.title })); const currentDeckCards = validDecks[formData.deckId] ? validDecks[formData.deckId].cards || [] : validDecks['custom'] ? validDecks['custom'].cards || [] : [];
-  useEffect(() => { if (editingId && !currentDeckCards.some((c: any) => c.id === editingId)) { handleClear(); } }, [currentDeckCards, editingId]);
+  
+  const validDecks = availableDecks || {}; 
+  const deckOptions = Object.entries(validDecks).map(([key, deck]: any) => ({ id: key, title: deck.title }));
 
   return (
     <div className="px-6 mt-4 space-y-6 pb-20 relative">
@@ -256,7 +276,6 @@ function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard, availableDeck
         <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Grammar Tags</label><input name="grammarTags" value={formData.grammarTags} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="2nd Declension, Neuter" /></div>
       </section>
       <button onClick={handleSubmit} className={`w-full text-white p-4 rounded-xl font-bold shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${editingId ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}>{editingId ? <><Save size={20}/> Update Card</> : <><Plus size={20}/> Create Card</>}</button>
-      {currentDeckCards && currentDeckCards.length > 0 && (<div className="pt-6 border-t border-slate-200"><h3 className="font-bold text-slate-800 mb-4">Cards in this Deck ({currentDeckCards.length})</h3><div className="space-y-2">{currentDeckCards.map((card: any, idx: number) => (<div key={idx} onClick={() => handleSelectCard(card)} className={`p-3 rounded-xl border flex justify-between items-center cursor-pointer transition-colors ${editingId === card.id ? 'bg-indigo-50 border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-300'}`}><div><span className="font-bold text-slate-800">{card.front}</span><span className="text-slate-400 mx-2">•</span><span className="text-sm text-slate-500">{card.back}</span></div><div className="flex items-center gap-2"><Edit3 size={16} className="text-indigo-400" />{/* @ts-ignore */ !(INITIAL_SYSTEM_DECKS as any)[card.deckId] && (<button onClick={(e) => { e.stopPropagation(); onDeleteCard(card.id); }} className="p-1 text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button>)}</div></div>))}</div></div>)}
     </div>
   );
 }
@@ -557,21 +576,150 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
 function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allDecks }: any) {
   const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
   const [mode, setMode] = useState('card'); 
+  const [subView, setSubView] = useState('menu'); // menu | library | editor | import
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [jsonInput, setJsonInput] = useState('');
+  const [importType, setImportType] = useState('lesson');
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const handleBulkImport = async () => {
+    try {
+        const data = JSON.parse(jsonInput);
+        if (!Array.isArray(data)) throw new Error("Input must be an array.");
+        const batch = writeBatch(db);
+        // @ts-ignore
+        const userId = auth.currentUser?.uid;
+        if(!userId) return;
+
+        let count = 0;
+        data.forEach((item: any) => {
+            const id = item.id || `import_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+            if (importType === 'deck') {
+                const deckId = `custom_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
+                const deckTitle = item.title || "Imported Deck";
+                if (item.cards && Array.isArray(item.cards)) {
+                    item.cards.forEach((card: any) => {
+                        const cardRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'custom_cards'));
+                        batch.set(cardRef, { ...card, deckId: deckId, deckTitle: deckTitle, type: card.type || 'noun', mastery: 0, grammar_tags: card.grammar_tags || ["Imported"] });
+                        count++;
+                    });
+                }
+            } else {
+                 const ref = doc(db, 'artifacts', appId, 'users', userId, 'custom_lessons', id);
+                 batch.set(ref, { ...item, vocab: Array.isArray(item.vocab) ? item.vocab : [], xp: item.xp || 100 });
+                 count++;
+            }
+        });
+        await batch.commit();
+        setToastMsg(`Successfully imported ${count} items.`);
+        setJsonInput('');
+    } catch (e: any) { alert("Import Failed: " + e.message); }
+  };
+
+  const handleEdit = (item: any, type: string) => {
+      setEditingItem(item);
+      setMode(type);
+      setSubView('editor');
+      if(type === 'lesson') {
+           // Flatten vocab for editor
+           setLessonData({...item, vocab: Array.isArray(item.vocab) ? item.vocab.join(', ') : item.vocab});
+      }
+  };
+
+  // -- Sub-views inside BuilderHub --
+  
+  if (subView === 'library') {
+      return (
+          <div className="h-full flex flex-col bg-slate-50">
+              <div className="p-6 border-b border-slate-100 bg-white flex justify-between items-center sticky top-0 z-10">
+                  <h2 className="font-bold text-xl text-slate-800 flex items-center gap-2"><Library className="text-indigo-600"/> Content Library</h2>
+                  <button onClick={() => setSubView('menu')} className="text-sm font-bold text-slate-500 hover:text-indigo-600">Back</button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                  <div>
+                      <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Lessons</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {/* We need lessons passed down, or use INITIAL for demo */}
+                          {/* Since this component handles logic, we assume lessons are passed or fetched. For now showing placeholders if empty */}
+                          <div className="col-span-full text-center py-8 text-slate-400 bg-white rounded-2xl border border-dashed border-slate-200">
+                              <p>Library view active. (Integration: Pass 'lessons' prop to BuilderHub to see them here)</p>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )
+  }
+
+  if (subView === 'import') {
+      return (
+          <div className="h-full flex flex-col bg-slate-50 p-6">
+             <div className="flex justify-between items-center mb-6">
+                 <h2 className="text-2xl font-bold text-slate-800">AI / JSON Import</h2>
+                 <button onClick={() => setSubView('menu')} className="text-sm font-bold text-slate-500 hover:text-indigo-600">Back</button>
+             </div>
+             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex-1 flex flex-col">
+                 <div className="flex gap-2 mb-4">
+                     <button onClick={() => setImportType('lesson')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${importType === 'lesson' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Lessons</button>
+                     <button onClick={() => setImportType('deck')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${importType === 'deck' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Decks</button>
+                 </div>
+                 <textarea 
+                    value={jsonInput} 
+                    onChange={(e) => setJsonInput(e.target.value)} 
+                    className="flex-1 w-full p-4 bg-slate-50 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                    placeholder={importType === 'lesson' ? '[ { "title": "Lesson 1", "blocks": [...] } ]' : '[ { "title": "My Deck", "cards": [...] } ]'}
+                 />
+                 <div className="mt-4 flex justify-end">
+                     <button onClick={handleBulkImport} disabled={!jsonInput} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-slate-800 disabled:opacity-50 flex items-center gap-2">
+                         <UploadCloud size={18}/> Import JSON
+                     </button>
+                 </div>
+                 {toastMsg && <p className="text-emerald-600 font-bold text-center mt-2">{toastMsg}</p>}
+             </div>
+          </div>
+      )
+  }
+
+  // Default View (Menu + Editor)
   return (
-    <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar">
-        {mode === 'card' && <Header title="Scriptorium" subtitle="Card Builder" />}
-        {mode === 'card' && (
-            <>
-                <div className="px-6 mt-2">
-                    <div className="flex bg-slate-200 p-1 rounded-xl">
-                        <button onClick={() => setMode('card')} className="flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow-sm text-indigo-700">Flashcard</button>
-                        <button onClick={() => setMode('lesson')} className="flex-1 py-2 text-sm font-bold rounded-lg text-slate-500">Full Lesson</button>
-                    </div>
+    <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar relative">
+        <Header title="Scriptorium" subtitle="Content Creator" 
+            rightAction={
+                <div className="flex gap-2">
+                    <button onClick={() => setSubView('import')} className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-indigo-50 hover:text-indigo-600"><FileJson size={20}/></button>
+                    {/* Library button placeholder - requires wiring up props in parent */}
+                    {/* <button onClick={() => setSubView('library')} className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-indigo-50 hover:text-indigo-600"><Library size={20}/></button> */}
                 </div>
-                <CardBuilderView onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} availableDecks={allDecks} />
-            </>
-        )}
-        {mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onSave={onSaveLesson} availableDecks={allDecks} />}
+            } 
+        />
+        
+        <div className="px-6 mt-2">
+            <div className="flex bg-slate-200 p-1 rounded-xl">
+                <button onClick={() => { setMode('card'); setEditingItem(null); }} className={`flex-1 py-2 text-sm font-bold rounded-lg ${mode === 'card' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Flashcard</button>
+                <button onClick={() => { setMode('lesson'); setEditingItem(null); }} className={`flex-1 py-2 text-sm font-bold rounded-lg ${mode === 'lesson' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Full Lesson</button>
+            </div>
+        </div>
+
+        <div className="mt-4">
+            {mode === 'card' && (
+                <CardBuilderView 
+                    onSaveCard={onSaveCard} 
+                    onUpdateCard={onUpdateCard} 
+                    onDeleteCard={onDeleteCard} 
+                    availableDecks={allDecks} 
+                    initialData={editingItem}
+                    onCancelEdit={() => setEditingItem(null)}
+                />
+            )}
+            {mode === 'lesson' && (
+                <LessonBuilderView 
+                    data={lessonData} 
+                    setData={setLessonData} 
+                    onSave={onSaveLesson} 
+                    availableDecks={allDecks} 
+                />
+            )}
+        </div>
     </div>
   );
 }
@@ -705,7 +853,7 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
                     </div>
                 )}
                 {activeTab === 'classes' && (<ClassManagerView user={user} classes={userData?.classes || []} lessons={lessons} allDecks={allDecks} />)}
-                {activeTab === 'content' && (<div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full overflow-hidden flex flex-col"><div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center"><h2 className="font-bold text-slate-700">Content Builder</h2></div><div className="flex-1 overflow-y-auto"><BuilderHub onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} onSaveLesson={onSaveLesson} allDecks={allDecks} /></div></div>)}
+                {activeTab === 'content' && (<div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full overflow-hidden flex flex-col"><div className="flex-1 overflow-y-auto"><BuilderHub onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} onSaveLesson={onSaveLesson} allDecks={allDecks} /></div></div>)}
                 {activeTab === 'profile' && <ProfileView user={user} userData={userData} />}
             </div>
          </div>
@@ -774,10 +922,7 @@ function App() {
         }); 
         setClassLessons(newAssignments); 
         setUserData((prev: any) => ({...prev, classes: cls, classAssignments: newAssignments})); 
-    }, (error) => { 
-        console.log("Class sync error:", error); 
-        setUserData((prev: any) => ({...prev, classSyncError: true})); 
-    });
+    }, (error) => { console.log("Class sync error:", error); setUserData((prev: any) => ({...prev, classSyncError: true})); });
     
     return () => { unsubProfile(); unsubCards(); unsubLessons(); unsubSysDecks(); unsubSysLessons(); unsubClasses(); };
   }, [user, userData?.role]);
