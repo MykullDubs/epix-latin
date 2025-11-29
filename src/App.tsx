@@ -1201,26 +1201,40 @@ function App() {
   const handleUpdateCard = useCallback(async (cardId: string, data: any) => { if (!user) return; try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), data); } catch (e) { console.error(e); alert("Cannot edit card. Check permissions."); } }, [user]);
   const handleDeleteCard = useCallback(async (cardId: string) => { if (!user) return; if (!window.confirm("Are you sure you want to delete this card?")) return; try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId)); } catch (e) { console.error(e); alert("Failed to delete card."); } }, [user]);
   const handleCreateLesson = useCallback(async (l: any, id = null) => { if(!user) return; if (id) { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', id), l); } else { await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), l); } setActiveTab('home'); }, [user]);
-  const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title?: string, scoreDetail?: any) => { 
-    if (userData?.role !== 'instructor') setActiveTab('home'); 
-    if (xp > 0 && user) { 
-        try { 
-            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp), completedAssignments: arrayUnion(lessonId) }); 
-            await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { 
-                studentName: userData?.name || 'Unknown', 
-                studentEmail: user.email, 
-                itemTitle: title || 'Unknown Activity', 
-                xp: xp, 
-                timestamp: Date.now(), 
-                type: scoreDetail ? 'quiz_score' : 'completion',
-                scoreDetail: scoreDetail || null
-            });
-            if(userData?.role === 'instructor') alert("Activity Logged (Instructor Preview Mode)");
-        } catch (e) { 
-            await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { ...DEFAULT_USER_DATA, xp: xp, completedAssignments: [lessonId] }, { merge: true }); 
-        } 
-    } 
-  }, [user, userData]);
+const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title?: string, scoreDetail?: any) => { 
+  if (userData?.role !== 'instructor') setActiveTab('home'); 
+  
+  if (xp > 0 && user) { 
+      try { 
+          // 1. Update User Profile
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { 
+            xp: increment(xp), 
+            completedAssignments: arrayUnion(lessonId) 
+          }); 
+
+          // 2. Log Activity to Feed
+          console.log("Attempting to write to Activity Log..."); // DEBUG LOG
+          await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { 
+              studentName: userData?.name || 'Unknown Student', 
+              studentEmail: user.email, 
+              itemTitle: title || 'Unknown Activity', 
+              xp: xp, 
+              timestamp: Date.now(), 
+              type: scoreDetail ? 'quiz_score' : 'completion',
+              scoreDetail: scoreDetail || null
+          });
+          console.log("Activity Logged Successfully!"); // DEBUG LOG
+
+          if(userData?.role === 'instructor') alert(`Activity Logged: ${title} (+${xp}XP)`);
+      } catch (e: any) { 
+          console.error("Error logging activity:", e); // VIEW THIS IN CONSOLE
+          // Fallback for new users who might not have a profile doc yet
+          await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { 
+            ...DEFAULT_USER_DATA, xp: xp, completedAssignments: [lessonId] 
+          }, { merge: true }); 
+      } 
+  } 
+}, [user, userData]);
 
   if (!authChecked) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
   if (!user) return <AuthView />;
