@@ -26,6 +26,7 @@ import {
   orderBy,
   limit
 } from "firebase/firestore";
+// FIX: Removed 'CardBuilderView' and 'LessonBuilderView' from this import list
 import { 
   BookOpen, Layers, User, Home, Check, X, Zap, ChevronRight, Search, Volume2, 
   Puzzle, MessageSquare, GraduationCap, PlusCircle, Save, Feather, ChevronDown, 
@@ -33,7 +34,7 @@ import {
   School, Users, Copy, List, ArrowRight, LayoutDashboard, ArrowLeft, Library, 
   Pencil, Image, Info, Edit3, FileJson, AlertTriangle, FlipVertical, GanttChart, 
   Club, AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle, ArrowDown,
-  BarChart3, CardBuilderview, LessonBuilderView
+  BarChart3, PenTool
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -54,10 +55,9 @@ const db = getFirestore(app);
 // @ts-ignore
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'epic-latin-prod';
 
-// --- DEFAULTS ---
+// --- DEFAULTS & SEED DATA ---
 const DEFAULT_USER_DATA = { name: "Discipulus", targetLanguage: "Latin", level: "Novice", streak: 1, xp: 0, role: 'student', classes: [], completedAssignments: [] };
 
-// --- SEED DATA ---
 const INITIAL_SYSTEM_DECKS: any = {
   salutationes: {
     title: "👋 Salutationes",
@@ -134,7 +134,9 @@ function Header({ title, subtitle, rightAction, onClickTitle }: any) {
   );
 }
 
-// --- 1. CORE & SHARED COMPONENTS (Defined First) ---
+// ============================================================================
+//  1. CORE VIEWS & GAMES
+// ============================================================================
 
 function AuthView() {
   const [isLogin, setIsLogin] = useState(true);
@@ -226,7 +228,6 @@ function LiveActivityFeed() {
   );
 }
 
-// --- 2. GAME COMPONENTS ---
 function MatchingGame({ deckCards, onGameEnd }: any) {
     const [terms, setTerms] = useState<any[]>([]);
     const [definitions, setDefinitions] = useState<any[]>([]);
@@ -448,7 +449,6 @@ function QuizGame({ deckCards, onGameEnd }: any) {
     );
 }
 
-// --- 3. STUDENT VIEWS (Lesson, Flashcard, Home) ---
 function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, activeDeckOverride, onComplete }: any) {
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [manageMode, setManageMode] = useState(false);
@@ -535,6 +535,8 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   );
 }
 
+// --- 3. STUDENT VIEWS (Defined AFTER Flashcard/Quiz/Games) ---
+
 function LessonView({ lesson, onFinish }: any) {
   const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
   const [quizAnswers, setQuizAnswers] = useState<any>({});
@@ -603,12 +605,12 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   );
 }
 
-// --- 5. AGGREGATOR & MANAGER COMPONENTS (Defined LAST) ---
+// --- 4. AGGREGATOR & MANAGER COMPONENTS (Defined LAST) ---
 
 function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allDecks }: any) {
   const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
   const [mode, setMode] = useState('card'); 
-  const [subView, setSubView] = useState('menu'); 
+  const [subView, setSubView] = useState('menu'); // menu | library | editor | import
   const [editingItem, setEditingItem] = useState<any>(null);
   const [jsonInput, setJsonInput] = useState('');
   const [importType, setImportType] = useState('lesson');
@@ -653,10 +655,13 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
       setMode(type);
       setSubView('editor');
       if(type === 'lesson') {
+           // Flatten vocab for editor
            setLessonData({...item, vocab: Array.isArray(item.vocab) ? item.vocab.join(', ') : item.vocab});
       }
   };
 
+  // -- Sub-views inside BuilderHub --
+  
   if (subView === 'library') {
       return (
           <div className="h-full flex flex-col bg-slate-50">
@@ -713,6 +718,7 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
       )
   }
 
+  // Default View (Menu + Editor)
   return (
     <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar relative">
         <Header title="Scriptorium" subtitle="Content Creator" 
