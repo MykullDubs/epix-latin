@@ -695,10 +695,7 @@ function ClassForum({ classId, user, userData }: any) {
   };
 
     
-    // Optimistic update for UI smoothness
-    setActiveThread(prev => ({ ...prev, replies: [...(prev.replies || []), reply] }));
-    setReplyContent('');
-  };
+
 
   // --- RENDER: THREAD DETAIL VIEW ---
   if (activeThread) {
