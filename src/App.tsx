@@ -103,46 +103,74 @@ let rank = "Beginner";
   return { level, currentLevelXP, nextLevelXP, progress, rank };
 };
 
-function LevelUpModal({ xp, streak, onClose }: any) {
-  const { level, currentLevelXP, nextLevelXP, progress, rank } = getLevelInfo(xp);
+function LevelUpModal({ userData, onClose }: any) {
+  const { level, currentLevelXP, nextLevelXP, progress, rank } = getLevelInfo(userData?.xp || 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
       <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden transform scale-100 transition-all" onClick={e => e.stopPropagation()}>
-        <div className="bg-gradient-to-br from-red-800 to-rose-900 p-8 text-white text-center relative">
+        {/* Header Profile Section */}
+        <div className="bg-gradient-to-br from-red-800 to-rose-900 p-6 text-white text-center relative">
             <button onClick={onClose} className="absolute top-4 right-4 text-white/50 hover:text-white"><X /></button>
-            <div className="w-20 h-20 bg-yellow-400 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg text-rose-900">
-                <Award size={40} />
+            <div className="flex flex-col items-center">
+                <div className="w-20 h-20 bg-white p-1 rounded-full mb-3 shadow-lg">
+                    <div className="w-full h-full bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-bold text-2xl">
+                        {userData?.name?.charAt(0) || "U"}
+                    </div>
+                </div>
+                <h2 className="text-2xl font-serif font-bold">{userData?.name}</h2>
+                <div className="flex items-center gap-2 text-rose-200 text-xs font-bold uppercase tracking-widest mt-1">
+                    <span>{userData?.role}</span>
+                    <span>•</span>
+                    <span>{userData?.email}</span>
+                </div>
             </div>
-            <h2 className="text-3xl font-serif font-bold">Level {level}</h2>
-            <p className="text-rose-200 font-medium uppercase tracking-widest text-xs mt-1">{rank}</p>
         </div>
+
+        {/* Stats Grid */}
         <div className="p-6 space-y-6">
-            <div className="text-center">
-                <p className="text-slate-500 text-xs font-bold uppercase mb-1">Total Experience</p>
-                <p className="text-4xl font-black text-slate-800">{xp} <span className="text-lg text-slate-400 font-medium">XP</span></p>
-            </div>
-
             <div className="space-y-2">
-                <div className="flex justify-between text-xs font-bold text-slate-600">
-                    <span>Progress to Lvl {level + 1}</span>
-                    <span>{currentLevelXP} / {nextLevelXP} XP</span>
+                <div className="flex justify-between items-end">
+                    <span className="text-2xl font-bold text-slate-800">Level {level}</span>
+                    <span className="text-sm font-bold text-indigo-600">{rank}</span>
                 </div>
-                <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
-                    <div className="h-full bg-yellow-400 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
+                <div className="h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200 relative">
+                    <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
+                </div>
+                <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase">
+                    <span>{currentLevelXP} XP</span>
+                    <span>{nextLevelXP} XP (Next Lvl)</span>
                 </div>
             </div>
 
-            <div className="flex gap-4 pt-4 border-t border-slate-100">
-                <div className="flex-1 bg-orange-50 p-4 rounded-2xl text-center border border-orange-100">
-                    <Zap size={24} className="mx-auto text-orange-500 mb-1"/>
-                    <p className="text-2xl font-bold text-slate-800">{streak}</p>
-                    <p className="text-[10px] text-slate-400 uppercase font-bold">Day Streak</p>
+            <div className="grid grid-cols-2 gap-3">
+                <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 flex items-center gap-3">
+                    <div className="p-2 bg-white rounded-full text-orange-500 shadow-sm"><Zap size={18}/></div>
+                    <div>
+                        <p className="text-lg font-bold text-slate-800 leading-none">{userData?.streak || 1}</p>
+                        <p className="text-[10px] text-slate-500 uppercase font-bold">Day Streak</p>
+                    </div>
                 </div>
-                <div className="flex-1 bg-indigo-50 p-4 rounded-2xl text-center border border-indigo-100">
-                    <BookOpen size={24} className="mx-auto text-indigo-500 mb-1"/>
-                    <p className="text-2xl font-bold text-slate-800">Active</p>
-                    <p className="text-[10px] text-slate-400 uppercase font-bold">Status</p>
+                <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 flex items-center gap-3">
+                    <div className="p-2 bg-white rounded-full text-blue-500 shadow-sm"><CheckCircle2 size={18}/></div>
+                    <div>
+                        <p className="text-lg font-bold text-slate-800 leading-none">{(userData?.completedAssignments || []).length}</p>
+                        <p className="text-[10px] text-slate-500 uppercase font-bold">Completed</p>
+                    </div>
+                </div>
+                <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100 flex items-center gap-3">
+                    <div className="p-2 bg-white rounded-full text-indigo-500 shadow-sm"><School size={18}/></div>
+                    <div>
+                        <p className="text-lg font-bold text-slate-800 leading-none">{(userData?.classes || []).length}</p>
+                        <p className="text-[10px] text-slate-500 uppercase font-bold">Classes</p>
+                    </div>
+                </div>
+                <div className="bg-purple-50 p-3 rounded-xl border border-purple-100 flex items-center gap-3">
+                    <div className="p-2 bg-white rounded-full text-purple-500 shadow-sm"><Award size={18}/></div>
+                    <div>
+                        <p className="text-lg font-bold text-slate-800 leading-none">{userData?.xp || 0}</p>
+                        <p className="text-[10px] text-slate-500 uppercase font-bold">Total XP</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -150,6 +178,7 @@ function LevelUpModal({ xp, streak, onClose }: any) {
     </div>
   );
 }
+
 
 // FIND THIS AND REPLACE:
 const INITIAL_SYSTEM_LESSONS: any[] = [
@@ -620,7 +649,7 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
 
 function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck }: any) {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
-  const [showLevelModal, setShowLevelModal] = useState(false); // NEW STATE
+  const [showLevelModal, setShowLevelModal] = useState(false);
 
   const completedSet = new Set(userData?.completedAssignments || []);
   const relevantAssignments = (assignments || []).filter((l: any) => { return !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); });
@@ -634,46 +663,59 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
 
   return (
   <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full relative">
-    {/* --- LEVEL UP MODAL --- */}
-    {showLevelModal && <LevelUpModal xp={userData?.xp || 0} streak={userData?.streak || 1} onClose={() => setShowLevelModal(false)} />}
+    {/* --- LEVEL UP MODAL (Updated Prop) --- */}
+    {showLevelModal && <LevelUpModal userData={userData} onClose={() => setShowLevelModal(false)} />}
 
     {userData?.classSyncError && (<div className="bg-rose-500 text-white p-4 text-center text-sm font-bold"><AlertTriangle className="inline-block mr-2" size={16} />System Notice: Database Index Missing.<br/><span className="text-xs font-normal opacity-80">Instructors: Check console for the Firebase setup link.</span></div>)}
     
-<Header title={`Hello, ${userData?.name || 'Student'}!`} subtitle="Keep up the good work." sticky={false} />
-    <div className="px-6 space-y-6 mt-4">
+    {/* --- DELETED: Header Component was here --- */}
+    
+    <div className="px-6 space-y-6 mt-8"> {/* Increased top margin since header is gone */}
       
-      {/* --- INTERACTIVE RED WIDGET --- */}
+      {/* --- INTERACTIVE RED WIDGET (Updated Layout) --- */}
       <button 
         onClick={() => setShowLevelModal(true)}
         className="w-full text-left bg-gradient-to-br from-red-800 to-rose-900 rounded-3xl p-6 text-white shadow-xl hover:scale-[1.02] active:scale-95 transition-all cursor-pointer relative overflow-hidden group"
       >
         <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Award size={100} />
+            <User size={140} />
         </div>
-        <div className="flex justify-between items-start relative z-10">
+        
+        {/* Top Row: Avatar and Name */}
+        <div className="flex items-center gap-4 relative z-10 mb-6">
+             <div className="w-16 h-16 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center border-2 border-white/20 shadow-inner">
+                <span className="font-bold text-2xl">{userData?.name?.charAt(0) || 'S'}</span>
+             </div>
+             <div>
+                <p className="text-rose-200 text-xs font-bold uppercase tracking-widest mb-1">Welcome back,</p>
+                <h3 className="text-3xl font-serif font-bold leading-none">{userData?.name || 'Student'}</h3>
+             </div>
+        </div>
+
+        {/* Bottom Row: Level and Stats */}
+        <div className="flex justify-between items-end relative z-10">
             <div>
-                <p className="text-rose-200 text-xs font-bold uppercase tracking-widest mb-1">Current Level</p>
-                <h3 className="text-4xl font-serif font-bold">{level}</h3>
-                <p className="text-rose-100 text-sm opacity-90">{userData?.xp} XP Total</p>
-            </div>
-            <div className="text-right">
-                <div className="flex items-center gap-1 text-yellow-400 mb-1 justify-end">
-                    <Zap size={16} fill="currentColor" />
-                    <span className="font-bold">{userData?.streak || 1}</span>
+                <div className="flex items-center gap-2 mb-2">
+                    <span className="bg-rose-950/50 px-3 py-1 rounded-lg text-xs font-bold text-rose-100 border border-white/10">{rank}</span>
+                    <span className="text-sm font-bold">Lvl {level}</span>
                 </div>
-                <span className="text-[10px] text-rose-200 uppercase">Day Streak</span>
+                <div className="w-32 bg-black/30 rounded-full h-2 overflow-hidden">
+                    <div className="bg-yellow-400 h-full rounded-full shadow-[0_0_10px_rgba(250,204,21,0.5)]" style={{ width: `${progress}%` }}/>
+                </div>
             </div>
-        </div>
-        <div className="mt-6">
-            <div className="flex justify-between text-[10px] text-rose-200 mb-1 font-bold uppercase">
-                <span>Progress</span>
-                <span>{Math.round(progress)}%</span>
-            </div>
-            <div className="bg-black/30 rounded-full h-2 overflow-hidden">
-                <div className="bg-yellow-400 h-full rounded-full shadow-[0_0_10px_rgba(250,204,21,0.5)]" style={{ width: `${progress}%` }}/>
+
+            <div className="text-right">
+                <div className="flex items-center gap-1 text-yellow-400 mb-0.5 justify-end">
+                    <Zap size={20} fill="currentColor" />
+                    <span className="font-bold text-xl">{userData?.streak || 1}</span>
+                </div>
+                <span className="text-[10px] text-rose-200 uppercase font-bold tracking-wide">Day Streak</span>
             </div>
         </div>
       </button>
+
+      {/* ... Rest of the HomeView components (Classes, Assignments, etc.) remain the same ... */}
+
 
       {/* CLASSES SCROLLER */}
       {classes && classes.length > 0 && (<div className="mb-6"><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><School size={18} className="text-indigo-600"/> My Classes</h3><div className="flex gap-4 overflow-x-auto pb-4">{classes.map((cls: any) => { const clsPendingCount = (cls.assignments || []).filter((l: any) => { const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); return isForMe && !completedSet.has(l.id); }).length; return ( <button key={cls.id} onClick={() => handleSelectClass(cls)} className="min-w-[200px] bg-white p-4 rounded-2xl border border-slate-200 shadow-sm text-left active:scale-95 transition-transform"><div className="flex items-center justify-between mb-2"><div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">{cls.name.charAt(0)}</div><span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500 font-mono">{cls.code}</span></div><h4 className="font-bold text-slate-900">{cls.name}</h4><p className="text-xs text-slate-500 mt-1">{clsPendingCount} Pending Tasks</p></button> ); })}</div></div>)}
