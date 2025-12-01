@@ -671,6 +671,45 @@ function ClassForum({ classId, user, userData }: any) {
     setIsCreating(false);
   };
 
+function ClassForum({ classId, user, userData }: any) {
+  const [threads, setThreads] = useState<any[]>([]);
+  const [activeThread, setActiveThread] = useState<any>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [newThread, setNewThread] = useState({ title: '', content: '' });
+  const [replyContent, setReplyContent] = useState('');
+
+  // 1. Sync Threads for this Class
+  useEffect(() => {
+    const q = query(
+      collection(db, 'artifacts', appId, 'forum_threads'), 
+      where('classId', '==', classId),
+      orderBy('timestamp', 'desc')
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setThreads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
+  }, [classId]);
+
+  // 2. Create a New Thread
+  const handleCreateThread = async (e: any) => {
+    e.preventDefault();
+    if (!newThread.title.trim() || !newThread.content.trim()) return;
+
+    await addDoc(collection(db, 'artifacts', appId, 'forum_threads'), {
+      classId,
+      title: newThread.title,
+      content: newThread.content,
+      authorName: userData?.name || user.email.split('@')[0],
+      authorEmail: user.email,
+      authorRole: userData?.role || 'student',
+      timestamp: Date.now(),
+      replies: []
+    });
+    setNewThread({ title: '', content: '' });
+    setIsCreating(false);
+  };
+
   // 3. Post a Reply
   const handleReply = async (e: any) => {
     e.preventDefault();
@@ -689,16 +728,14 @@ function ClassForum({ classId, user, userData }: any) {
       replies: arrayUnion(reply)
     });
     
-    // FIX: Added (prev: any) type annotation here
+    // Optimistic update
     setActiveThread((prev: any) => ({ ...prev, replies: [...(prev.replies || []), reply] }));
     setReplyContent('');
-  };
-
-    
-
+  }; 
 
   // --- RENDER: THREAD DETAIL VIEW ---
   if (activeThread) {
+     // ... rest of code
     return (
       <div className="flex flex-col h-full bg-slate-50 rounded-2xl overflow-hidden border border-slate-200">
         {/* Header */}
