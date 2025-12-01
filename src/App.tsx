@@ -205,9 +205,9 @@ function Navigation({ activeTab, setActiveTab }: any) {
     </div>
   );
 }
-function Header({ title, subtitle, rightAction, onClickTitle }: any) {
+function Header({ title, subtitle, rightAction, onClickTitle, sticky = true }: any) {
   return (
-    <div className="px-6 pt-12 pb-6 bg-white sticky top-0 z-40 border-b border-slate-100 flex justify-between items-end">
+    <div className={`px-6 pt-12 pb-6 bg-white ${sticky ? 'sticky top-0' : ''} z-40 border-b border-slate-100 flex justify-between items-end`}>
         <div onClick={onClickTitle} className={onClickTitle ? "cursor-pointer active:opacity-60 transition-opacity" : ""}>
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">{title} {onClickTitle && <ChevronDown size={20} className="text-slate-400" />}</h1>
         {subtitle && <p className="text-sm text-slate-500 mt-1 font-medium">{subtitle}</p>}
@@ -686,7 +686,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
 
     {userData?.classSyncError && (<div className="bg-rose-500 text-white p-4 text-center text-sm font-bold"><AlertTriangle className="inline-block mr-2" size={16} />System Notice: Database Index Missing.<br/><span className="text-xs font-normal opacity-80">Instructors: Check console for the Firebase setup link.</span></div>)}
     
-<Header title={`Hello, ${userData?.name || 'Student'}!`} subtitle="Keep up the good work." />    
+<Header title={`Hello, ${userData?.name || 'Student'}!`} subtitle="Keep up the good work." sticky={false} />
     <div className="px-6 space-y-6 mt-4">
       
       {/* --- INTERACTIVE RED WIDGET --- */}
