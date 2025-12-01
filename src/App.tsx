@@ -689,6 +689,12 @@ function ClassForum({ classId, user, userData }: any) {
       replies: arrayUnion(reply)
     });
     
+    // FIX: Added (prev: any) type annotation here
+    setActiveThread((prev: any) => ({ ...prev, replies: [...(prev.replies || []), reply] }));
+    setReplyContent('');
+  };
+
+    
     // Optimistic update for UI smoothness
     setActiveThread(prev => ({ ...prev, replies: [...(prev.replies || []), reply] }));
     setReplyContent('');
