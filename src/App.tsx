@@ -632,8 +632,199 @@ function LessonView({ lesson, onFinish }: any) {
     </div>
   );
 }
+function ClassForum({ classId, user, userData }: any) {
+  const [threads, setThreads] = useState<any[]>([]);
+  const [activeThread, setActiveThread] = useState<any>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [newThread, setNewThread] = useState({ title: '', content: '' });
+  const [replyContent, setReplyContent] = useState('');
+
+  // 1. Sync Threads for this Class
+  useEffect(() => {
+    const q = query(
+      collection(db, 'artifacts', appId, 'forum_threads'), 
+      where('classId', '==', classId),
+      orderBy('timestamp', 'desc')
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setThreads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
+  }, [classId]);
+
+  // 2. Create a New Thread
+  const handleCreateThread = async (e: any) => {
+    e.preventDefault();
+    if (!newThread.title.trim() || !newThread.content.trim()) return;
+
+    await addDoc(collection(db, 'artifacts', appId, 'forum_threads'), {
+      classId,
+      title: newThread.title,
+      content: newThread.content,
+      authorName: userData?.name || user.email.split('@')[0],
+      authorEmail: user.email,
+      authorRole: userData?.role || 'student',
+      timestamp: Date.now(),
+      replies: []
+    });
+    setNewThread({ title: '', content: '' });
+    setIsCreating(false);
+  };
+
+  // 3. Post a Reply
+  const handleReply = async (e: any) => {
+    e.preventDefault();
+    if (!replyContent.trim() || !activeThread) return;
+
+    const reply = {
+      id: Date.now().toString(),
+      content: replyContent,
+      authorName: userData?.name || user.email.split('@')[0],
+      authorRole: userData?.role || 'student',
+      timestamp: Date.now()
+    };
+
+    const threadRef = doc(db, 'artifacts', appId, 'forum_threads', activeThread.id);
+    await updateDoc(threadRef, {
+      replies: arrayUnion(reply)
+    });
+    
+    // Optimistic update for UI smoothness
+    setActiveThread(prev => ({ ...prev, replies: [...(prev.replies || []), reply] }));
+    setReplyContent('');
+  };
+
+  // --- RENDER: THREAD DETAIL VIEW ---
+  if (activeThread) {
+    return (
+      <div className="flex flex-col h-full bg-slate-50 rounded-2xl overflow-hidden border border-slate-200">
+        {/* Header */}
+        <div className="bg-white p-4 border-b border-slate-200 flex items-start gap-3 sticky top-0 z-10">
+          <button onClick={() => setActiveThread(null)} className="mt-1 text-slate-400 hover:text-indigo-600">
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h3 className="font-bold text-lg text-slate-800 leading-snug">{activeThread.title}</h3>
+            <p className="text-xs text-slate-500">
+              Posted by <span className="font-bold text-indigo-600">{activeThread.authorName}</span> • {new Date(activeThread.timestamp).toLocaleDateString()}
+            </p>
+          </div>
+        </div>
+
+        {/* Conversation Area */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+          {/* Main Post */}
+          <div className="bg-white p-4 rounded-xl border border-indigo-100 shadow-sm">
+             <p className="text-slate-700 whitespace-pre-wrap">{activeThread.content}</p>
+          </div>
+
+          {/* Replies */}
+          {activeThread.replies?.map((reply: any) => (
+            <div key={reply.id} className={`flex flex-col ${reply.authorRole === 'instructor' ? 'items-end' : 'items-start'}`}>
+               <div className={`max-w-[85%] p-3 rounded-xl text-sm ${
+                 reply.authorRole === 'instructor' 
+                  ? 'bg-indigo-600 text-white rounded-tr-none' 
+                  : 'bg-slate-200 text-slate-800 rounded-tl-none'
+               }`}>
+                  <p className="font-bold text-[10px] opacity-70 mb-1">{reply.authorName}</p>
+                  <p>{reply.content}</p>
+               </div>
+               <span className="text-[10px] text-slate-400 mt-1">{new Date(reply.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Input Area */}
+        <div className="p-4 bg-white border-t border-slate-200">
+          <form onSubmit={handleReply} className="flex gap-2">
+            <input 
+              className="flex-1 bg-slate-100 border-0 rounded-full px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              placeholder="Write a reply..."
+              value={replyContent}
+              onChange={(e) => setReplyContent(e.target.value)}
+            />
+            <button type="submit" className="p-2 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 active:scale-95 transition-transform">
+              <ArrowRight size={20} />
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // --- RENDER: THREAD LIST VIEW ---
+  return (
+    <div className="h-full flex flex-col">
+       <div className="flex justify-between items-center mb-4">
+          <h3 className="font-bold text-slate-700 flex items-center gap-2">
+            <MessageSquare size={18} className="text-indigo-600"/> Class Forum
+          </h3>
+          <button onClick={() => setIsCreating(true)} className="bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-200 transition-colors">
+            + New Post
+          </button>
+       </div>
+
+       {isCreating && (
+         <div className="bg-white p-4 rounded-xl border-2 border-indigo-100 mb-4 animate-in slide-in-from-top-2">
+            <input 
+              className="w-full font-bold text-slate-800 border-b border-slate-100 pb-2 mb-2 focus:outline-none placeholder:font-normal"
+              placeholder="Topic Title..."
+              value={newThread.title}
+              onChange={e => setNewThread({...newThread, title: e.target.value})}
+              autoFocus
+            />
+            <textarea 
+              className="w-full text-sm text-slate-600 bg-slate-50 p-2 rounded-lg resize-none focus:outline-none mb-2"
+              rows={3}
+              placeholder="What's on your mind?"
+              value={newThread.content}
+              onChange={e => setNewThread({...newThread, content: e.target.value})}
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setIsCreating(false)} className="px-3 py-1.5 text-xs font-bold text-slate-400 hover:text-slate-600">Cancel</button>
+              <button onClick={handleCreateThread} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700">Post</button>
+            </div>
+         </div>
+       )}
+
+       <div className="flex-1 overflow-y-auto space-y-3 pb-20 custom-scrollbar">
+          {threads.length === 0 ? (
+            <div className="text-center py-10 text-slate-400 italic">No discussions yet. Start one!</div>
+          ) : (
+            threads.map(thread => (
+              <div 
+                key={thread.id} 
+                onClick={() => setActiveThread(thread)}
+                className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-indigo-300 cursor-pointer transition-all active:scale-[0.99]"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-bold text-slate-800 line-clamp-1">{thread.title}</h4>
+                  {thread.authorRole === 'instructor' && <span className="bg-indigo-100 text-indigo-700 text-[10px] px-1.5 py-0.5 rounded font-bold">Instructor</span>}
+                </div>
+                <p className="text-sm text-slate-500 line-clamp-2 mb-3">{thread.content}</p>
+                <div className="flex justify-between items-center text-[10px] text-slate-400 font-medium uppercase tracking-wide">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-500">{thread.authorName.charAt(0)}</span>
+                    <span>{thread.authorName}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1"><MessageSquare size={12}/> {thread.replies?.length || 0}</span>
+                    <span>{new Date(thread.timestamp).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+       </div>
+    </div>
+  );
+    }
+
 
 function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, userData }: any) {
+  // NEW STATE: Tab switching
+  const [viewMode, setViewMode] = useState<'assignments' | 'forum'>('assignments');
+
   const completedSet = new Set(userData?.completedAssignments || []);
   const handleAssignmentClick = (assignment: any) => { if (assignment.contentType === 'deck') { onSelectDeck(assignment); } else { onSelectLesson(assignment); } };
   const relevantAssignments = (classData.assignments || []).filter((l: any) => { const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); return isForMe; });
@@ -641,11 +832,42 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
 
   return (
     <div className="h-full flex flex-col bg-slate-50">
-      <div className="px-6 pt-12 pb-6 bg-white sticky top-0 z-40 border-b border-slate-100"><button onClick={onBack} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Home</button><h1 className="text-2xl font-bold text-slate-900">{classData.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {classData.code}</p></div>
-      <div className="flex-1 px-6 mt-4 overflow-y-auto pb-24"><div className="space-y-6"><div className="bg-indigo-600 rounded-2xl p-6 text-white shadow-lg"><h3 className="text-lg font-bold mb-1">Your Progress</h3><p className="text-indigo-200 text-sm">Keep up the great work!</p><div className="mt-4 flex gap-4"><div><span className="text-2xl font-bold block">{pendingCount}</span><span className="text-xs opacity-70">To Do</span></div><div><span className="text-2xl font-bold block">{classData.students?.length || 0}</span><span className="text-xs opacity-70">Classmates</span></div></div></div><div><h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3><div className="space-y-3">{relevantAssignments.length > 0 ? ( relevantAssignments.filter((l: any) => !completedSet.has(l.id)).map((l: any, i: number) => ( <button key={`${l.id}-${i}`} onClick={() => handleAssignmentClick(l)} className="w-full bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all"><div className="flex items-center space-x-4"><div className={`h-10 w-10 rounded-xl flex items-center justify-center ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600' : 'bg-indigo-50 text-indigo-600'}`}>{l.contentType === 'deck' ? <Layers size={20}/> : <PlayCircle size={20} />}</div><div className="text-left"><h4 className="font-bold text-indigo-900">{l.title}</h4><p className="text-xs text-indigo-600/70">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Assigned Lesson'}</p></div></div><ChevronRight size={20} className="text-slate-300" /></button> )) ) : ( <div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">No pending assignments.</div> )}{relevantAssignments.every((l: any) => completedSet.has(l.id)) && relevantAssignments.length > 0 && (<div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">All assignments completed! 🎉</div>)}</div></div></div></div>
+      <div className="px-6 pt-12 pb-6 bg-white sticky top-0 z-40 border-b border-slate-100">
+        <button onClick={onBack} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Home</button>
+        <div className="flex justify-between items-end">
+            <div>
+                <h1 className="text-2xl font-bold text-slate-900">{classData.name}</h1>
+                <p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {classData.code}</p>
+            </div>
+            {/* VIEW TOGGLE */}
+            <div className="flex bg-slate-100 p-1 rounded-lg">
+                <button onClick={() => setViewMode('assignments')} className={`p-2 rounded-md transition-all ${viewMode === 'assignments' ? 'bg-white shadow text-indigo-600' : 'text-slate-400'}`}><BookOpen size={20}/></button>
+                <button onClick={() => setViewMode('forum')} className={`p-2 rounded-md transition-all ${viewMode === 'forum' ? 'bg-white shadow text-indigo-600' : 'text-slate-400'}`}><MessageSquare size={20}/></button>
+            </div>
+        </div>
+      </div>
+      
+      <div className="flex-1 px-6 mt-4 overflow-y-auto pb-24">
+        {viewMode === 'assignments' ? (
+            <div className="space-y-6">
+                <div className="bg-indigo-600 rounded-2xl p-6 text-white shadow-lg"><h3 className="text-lg font-bold mb-1">Your Progress</h3><p className="text-indigo-200 text-sm">Keep up the great work!</p><div className="mt-4 flex gap-4"><div><span className="text-2xl font-bold block">{pendingCount}</span><span className="text-xs opacity-70">To Do</span></div><div><span className="text-2xl font-bold block">{classData.students?.length || 0}</span><span className="text-xs opacity-70">Classmates</span></div></div></div>
+                <div>
+                    <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3>
+                    <div className="space-y-3">
+                        {relevantAssignments.length > 0 ? ( relevantAssignments.filter((l: any) => !completedSet.has(l.id)).map((l: any, i: number) => ( <button key={`${l.id}-${i}`} onClick={() => handleAssignmentClick(l)} className="w-full bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all"><div className="flex items-center space-x-4"><div className={`h-10 w-10 rounded-xl flex items-center justify-center ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600' : 'bg-indigo-50 text-indigo-600'}`}>{l.contentType === 'deck' ? <Layers size={20}/> : <PlayCircle size={20} />}</div><div className="text-left"><h4 className="font-bold text-indigo-900">{l.title}</h4><p className="text-xs text-indigo-600/70">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Assigned Lesson'}</p></div></div><ChevronRight size={20} className="text-slate-300" /></button> )) ) : ( <div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">No pending assignments.</div> )}
+                        {relevantAssignments.every((l: any) => completedSet.has(l.id)) && relevantAssignments.length > 0 && (<div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">All assignments completed! 🎉</div>)}
+                    </div>
+                </div>
+            </div>
+        ) : (
+            /* RENDER FORUM HERE */
+            <ClassForum classId={classData.id} user={{email: userData.email}} userData={userData} />
+        )}
+      </div>
     </div>
   );
 }
+
 
 function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck }: any) {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
