@@ -396,57 +396,7 @@ function MatchingGame({ deckCards, onGameEnd }: any) {
     );
 }
 
-function VocabJack({ deckCards, onGameEnd }: any) {
-    const [playerHand, setPlayerHand] = useState<any[]>([]);
-    const [dealerHand, setDealerHand] = useState<any[]>([]);
-    const [gameState, setGameState] = useState('start'); 
-    const [deck, setDeck] = useState<any[]>([]);
-    const [question, setQuestion] = useState<any>(null);
 
-    const createDeck = () => {
-        const suits = ['♠', '♥', '♦', '♣']; const values = ['2','3','4','5','6','7','8','9','10','J','Q','K','A']; const newDeck: any[] = [];
-        suits.forEach(s => values.forEach(v => newDeck.push({ s, v, val: v === 'A' ? 11 : ['J','Q','K'].includes(v) ? 10 : parseInt(v) })));
-        return newDeck.sort(() => Math.random() - 0.5);
-    };
-    const calculateScore = (hand: any[]) => { let score = hand.reduce((acc, c) => acc + c.val, 0); let aces = hand.filter(c => c.v === 'A').length; while (score > 21 && aces > 0) { score -= 10; aces--; } return score; };
-    const startGame = useCallback(() => { const d = createDeck(); setPlayerHand([d.pop(), d.pop()]); setDealerHand([d.pop(), d.pop()]); setDeck(d); setGameState('playing'); }, []);
-    const triggerHit = () => {
-        const target = deckCards[Math.floor(Math.random() * deckCards.length)];
-        const distractors = deckCards.filter((c: any) => c.id !== target.id).sort(() => 0.5 - Math.random()).slice(0, 2);
-        const options = [...distractors, target].sort(() => 0.5 - Math.random());
-        setQuestion({ target, options: options.map((o: any) => ({id: o.id, text: o.back})), question: `What is the English definition of: ${target.front}?` });
-        setGameState('question');
-    };
-    const answerQuestion = (answerId: string) => {
-        if (answerId === question.target.id) {
-            const newHand = [...playerHand, deck.pop()]; setPlayerHand(newHand);
-            if (calculateScore(newHand) > 21) setGameState('result'); else setGameState('playing');
-        } else { alert("Incorrect! Turn passed to dealer."); stand(); }
-    };
-    const stand = () => {
-        let dHand = [...dealerHand]; let dScore = calculateScore(dHand); const dDeck = [...deck];
-        while (dScore < 17) { dHand.push(dDeck.pop()); dScore = calculateScore(dHand); }
-        setDealerHand(dHand); setDeck(dDeck); setGameState('result');
-    };
-    const pScore = calculateScore(playerHand); const dScore = calculateScore(dealerHand);
-    let result = ""; if (gameState === 'result') { if (pScore > 21) result = "Bust! Dealer Wins."; else if (dScore > 21) result = "Dealer Busts! You Win!"; else if (pScore > dScore) result = "You Win!"; else if (dScore > pScore) result = "Dealer Wins."; else result = "Push (Tie)."; }
-
-    if (deckCards.length < 3) return <div className="p-10 text-center text-slate-400">Need at least 3 cards to play VocabJack.</div>;
-
-    return (
-        <div className="p-4 flex flex-col h-full overflow-y-auto">
-            {gameState === 'start' && (<div className="text-center py-10"><Club size={64} className="mx-auto text-indigo-600 mb-4"/><h2 className="text-3xl font-bold text-slate-900">VocabJack</h2><p className="text-slate-500 mb-6">Answer vocab questions to HIT.</p><button onClick={startGame} className="bg-indigo-600 text-white px-8 py-3 rounded-full font-bold shadow-lg">Deal Cards</button></div>)}
-            {(gameState === 'playing' || gameState === 'result' || gameState === 'question') && (
-                <div className="flex-1 flex flex-col justify-between gap-4">
-                   <div className="text-center"><p className="text-xs font-bold text-slate-400 uppercase mb-2">Dealer {gameState === 'result' && `(${dScore})`}</p><div className="flex justify-center gap-2">{dealerHand.map((c, i) => (<div key={i} className="w-12 h-16 bg-white rounded shadow-md border border-slate-200 flex items-center justify-center text-lg font-bold">{gameState !== 'result' && i === 0 ? '?' : <span className={['♥','♦'].includes(c.s) ? 'text-red-500' : 'text-slate-900'}>{c.v}{c.s}</span>}</div>))}</div></div>
-                   {gameState === 'result' && (<div className="text-center animate-in zoom-in"><h2 className="text-2xl font-bold text-slate-900 mb-2">{result}</h2>{result.includes("You Win") && <p className="text-emerald-600 font-bold mb-2">+50 XP</p>}<button onClick={() => { if(result.includes("You Win")) onGameEnd(50); startGame(); }} className="bg-indigo-600 text-white px-6 py-2 rounded-full font-bold text-sm">Re-Deal</button></div>)}
-                   {gameState === 'question' && (<div className="bg-white p-4 rounded-2xl shadow-xl border-2 border-indigo-100 mx-4"><p className="text-center font-bold text-slate-800 mb-4">Translate: <span className="text-indigo-600">{question.target.front}</span></p><div className="grid grid-cols-1 gap-2">{question.options.map((opt: any) => (<button key={opt.id} onClick={() => answerQuestion(opt.id)} className="p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm hover:bg-indigo-50">{opt.text}</button>))}</div></div>)}
-                   <div className="text-center pb-4"><div className="flex justify-center gap-2 mb-4">{playerHand.map((c, i) => (<div key={i} className="w-12 h-16 bg-white rounded shadow-md border border-slate-200 flex items-center justify-center text-lg font-bold"><span className={['♥','♦'].includes(c.s) ? 'text-red-500' : 'text-slate-900'}>{c.v}{c.s}</span></div>))}</div><p className="text-xs font-bold text-slate-400 uppercase mb-4">You ({pScore})</p>{gameState === 'playing' && (<div className="flex justify-center gap-4"><button onClick={triggerHit} className="bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold shadow-md active:scale-95">HIT</button><button onClick={stand} className="bg-rose-500 text-white px-6 py-3 rounded-xl font-bold shadow-md active:scale-95">STAND</button></div>)}</div>
-                </div>
-            )}
-        </div>
-    );
-}
 
 function QuizGame({ deckCards, onGameEnd }: any) {
     const [questions, setQuestions] = useState<any[]>([]);
@@ -541,7 +491,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   const [searchTerm, setSearchTerm] = useState('');
   const [quickAddData, setQuickAddData] = useState({ front: '', back: '', type: 'noun' });
   const [gameMode, setGameMode] = useState('study'); 
-  
+   
   const currentDeck = activeDeckOverride || allDecks[selectedDeckKey];
   const deckCards = currentDeck?.cards || [];
   const card = deckCards[currentIndex];
@@ -556,7 +506,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
           onComplete(activeDeckOverride.id, xp, currentDeck.title, data.score !== undefined ? data : null); 
       } 
   }
-  
+   
   const filteredCards = deckCards.filter((c: any) => (c.front || '').toLowerCase().includes(searchTerm.toLowerCase()) || (c.back || '').toLowerCase().includes(searchTerm.toLowerCase()));
   const handleQuickAdd = (e: any) => { e.preventDefault(); if(!quickAddData.front || !quickAddData.back) return; onSaveCard({ ...quickAddData, deckId: selectedDeckKey, ipa: "/.../", mastery: 0, morphology: [{ part: quickAddData.front, meaning: "Custom", type: "root" }], usage: { sentence: "-", translation: "-" }, grammar_tags: ["Quick Add"] }); setQuickAddData({ front: '', back: '', type: 'noun' }); setSearchTerm(''); alert("Card Added!"); };
 
@@ -567,7 +517,10 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
       <Header title={currentDeck?.title.split(' ')[1] || "Deck"} subtitle={`${currentIndex + 1} / ${deckCards.length}`} onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} rightAction={<div className="flex items-center gap-2">{activeDeckOverride && onComplete && (<button onClick={() => onComplete(activeDeckOverride.id, 50, currentDeck.title)} className="bg-emerald-500 text-white px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-sm hover:scale-105 transition-transform"><Check size={14}/> Complete</button>)}<button onClick={() => setManageMode(!manageMode)} className={`p-2 rounded-full transition-colors ${manageMode ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>{manageMode ? <X size={20} /> : <List size={20} />}</button></div>} />
       {isSelectorOpen && <div className="absolute top-24 left-6 right-6 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 animate-in fade-in slide-in-from-top-4">{Object.entries(allDecks).map(([key, deck]: any) => (<button key={key} onClick={() => handleDeckChange(key)} className={`w-full text-left p-3 rounded-xl font-bold text-sm mb-1 ${selectedDeckKey === key ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'}`}>{deck.title} <span className="float-right opacity-50">{deck.cards.length}</span></button>))}</div>}
       {isSelectorOpen && <div className="absolute inset-0 z-40 bg-black/5 backdrop-blur-[1px]" onClick={() => setIsSelectorOpen(false)} />}
-      {!manageMode && (<div className="px-6 mt-2 mb-2"><div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto overflow-x-auto"><button onClick={() => setGameMode('study')} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg whitespace-nowrap ${gameMode === 'study' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Study</button><button onClick={() => setGameMode('quiz')} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg whitespace-nowrap ${gameMode === 'quiz' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Quiz</button><button onClick={() => setGameMode('match')} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg whitespace-nowrap ${gameMode === 'match' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Match</button><button onClick={() => setGameMode('vocabjack')} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg whitespace-nowrap ${gameMode === 'vocabjack' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Jack</button></div></div>)}
+      
+      {/* UPDATED: Removed VocabJack Button from this list */}
+      {!manageMode && (<div className="px-6 mt-2 mb-2"><div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto overflow-x-auto"><button onClick={() => setGameMode('study')} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg whitespace-nowrap ${gameMode === 'study' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Study</button><button onClick={() => setGameMode('quiz')} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg whitespace-nowrap ${gameMode === 'quiz' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Quiz</button><button onClick={() => setGameMode('match')} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg whitespace-nowrap ${gameMode === 'match' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Match</button></div></div>)}
+      
       <div className="flex-1 overflow-y-auto pt-4">
         {manageMode ? (
             <div className="p-6">
@@ -579,7 +532,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
         ) : (
             <>
             {gameMode === 'match' && <MatchingGame deckCards={deckCards} onGameEnd={handleGameEnd} />}
-            {gameMode === 'vocabjack' && <VocabJack deckCards={deckCards} onGameEnd={handleGameEnd} />}
+            {/* UPDATED: Removed VocabJack component here */}
             {gameMode === 'quiz' && <QuizGame deckCards={deckCards} onGameEnd={handleGameEnd} />}
             {gameMode === 'study' && card && (
                   <div className="flex-1 flex flex-col items-center justify-center px-4 py-2 perspective-1000 relative z-0">
