@@ -1355,7 +1355,7 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
   );
 }
 
-function ClassManagerView({ user, classes, lessons, allDecks }: any) {
+function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [newClassName, setNewClassName] = useState('');
   const [assignModalOpen, setAssignModalOpen] = useState(false);
@@ -1563,7 +1563,7 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
                         </div>
                     </div>
                 )}
-                {activeTab === 'classes' && (<ClassManagerView user={user} classes={userData?.classes || []} lessons={lessons} allDecks={allDecks} />)}
+                {activeTab === 'classes' && (<ClassManagerView user={user} userData={userData} classes={userData?.classes || []} lessons={lessons} allDecks={allDecks} />)}
                 {activeTab === 'content' && (<div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full overflow-hidden flex flex-col"><div className="flex-1 overflow-y-auto"><BuilderHub onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} onSaveLesson={onSaveLesson} allDecks={allDecks} /></div></div>)}
                 {activeTab === 'profile' && <ProfileView user={user} userData={userData} />}
             </div>
