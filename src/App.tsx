@@ -1291,16 +1291,31 @@ function App() {
   const [classLessons, setClassLessons] = useState<any[]>([]);
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
 
-  const allDecks = useMemo(() => {
+const allDecks = useMemo(() => {
+    // 1. Start with system decks
     const decks: any = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: [] } };
+    
+    // 2. Add Custom User Cards
     customCards.forEach(card => {
         const target = card.deckId || 'custom';
         if (!decks[target]) { decks[target] = { title: card.deckTitle || "Custom Deck", cards: [] }; }
         if (!decks[target].cards) decks[target].cards = [];
         decks[target].cards.push(card);
     });
+
+    // 3. --- NEW CODE: Add Assigned Class Decks ---
+    classLessons.forEach((assignment: any) => {
+        if (assignment.contentType === 'deck') {
+            decks[assignment.id] = {
+                title: `(Class) ${assignment.title}`,
+                cards: assignment.cards || [],
+                isAssignment: true
+            };
+        }
+    });
+
     return decks;
-  }, [systemDecks, customCards]);
+  }, [systemDecks, customCards, classLessons]); // <--- Added classLessons dependency
 
   const lessons = useMemo(() => [...systemLessons, ...customLessons, ...classLessons.filter(l => l.contentType !== 'deck')], [systemLessons, customLessons, classLessons]);
   const libraryLessons = useMemo(() => [...systemLessons, ...customLessons], [systemLessons, customLessons]);
