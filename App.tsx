@@ -133,9 +133,10 @@ function Navigation({ activeTab, setActiveTab }: any) {
   );
 }
 
-function Header({ title, subtitle, rightAction, onClickTitle }: any) {
+function Header({ title, subtitle, rightAction, onClickTitle, sticky = true }: any) {
   return (
-    <div className="px-6 pt-12 pb-6 bg-white sticky top-0 z-40 border-b border-slate-100 flex justify-between items-end">
+    // Use a conditional template string for the 'sticky top-0' class
+    <div className={`px-6 pt-12 pb-6 bg-white ${sticky ? 'sticky top-0' : ''} z-40 border-b border-slate-100 flex justify-between items-end`}>
         <div onClick={onClickTitle} className={onClickTitle ? "cursor-pointer active:opacity-60 transition-opacity" : ""}>
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">{title} {onClickTitle && <ChevronDown size={20} className="text-slate-400" />}</h1>
         {subtitle && <p className="text-sm text-slate-500 mt-1 font-medium">{subtitle}</p>}
@@ -583,7 +584,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   return (
   <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full">
     {userData?.classSyncError && (<div className="bg-rose-500 text-white p-4 text-center text-sm font-bold"><AlertTriangle className="inline-block mr-2" size={16} />System Notice: Database Index Missing.<br/><span className="text-xs font-normal opacity-80">Instructors: Check console for the Firebase setup link.</span></div>)}
-    <Header title={`Ave, ${userData?.name || 'Discipulus'}!`} subtitle="Perge in itinere tuo." />
+    <Header title={`Ave, ${userData?.name || 'Discipulus'}!`} subtitle="Perge in itinere tuo." sticky={false} />
     <div className="px-6 space-y-6 mt-4">
       <div className="bg-gradient-to-br from-red-800 to-rose-900 rounded-3xl p-6 text-white shadow-xl"><div className="flex justify-between"><div><p className="text-rose-100 text-sm font-bold uppercase">Hebdomada</p><h3 className="text-4xl font-serif font-bold">{userData?.xp} XP</h3></div><Zap size={28} className="text-yellow-400 fill-current"/></div><div className="mt-6 bg-black/20 rounded-full h-3"><div className="bg-yellow-400 h-full w-3/4 rounded-full"/></div></div>
       {classes && classes.length > 0 && (<div className="mb-6"><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><School size={18} className="text-indigo-600"/> My Classes</h3><div className="flex gap-4 overflow-x-auto pb-4">{classes.map((cls: any) => { const clsPendingCount = (cls.assignments || []).filter((l: any) => { const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); return isForMe && !completedSet.has(l.id); }).length; return ( <button key={cls.id} onClick={() => handleSelectClass(cls)} className="min-w-[200px] bg-white p-4 rounded-2xl border border-slate-200 shadow-sm text-left active:scale-95 transition-transform"><div className="flex items-center justify-between mb-2"><div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">{cls.name.charAt(0)}</div><span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500 font-mono">{cls.code}</span></div><h4 className="font-bold text-slate-900">{cls.name}</h4><p className="text-xs text-slate-500 mt-1">{clsPendingCount} Pending Tasks</p></button> ); })}</div></div>)}
