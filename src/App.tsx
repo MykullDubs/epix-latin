@@ -331,7 +331,6 @@ function LiveActivityFeed() {
     </div>
   );
 }
-
 // --- LEVELING LOGIC ---
 const getLevelInfo = (xp: number) => {
   const baseXP = 100;
