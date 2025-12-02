@@ -206,9 +206,12 @@ function Header({ title, subtitle, rightAction, onClickTitle, sticky = true }: a
   );
 }
 function ExamResultModal({ log, onClose }: any) {
-    if (!log || !log.scoreDetail?.details) return null;
-    const { score, total, details } = log.scoreDetail;
-    const percentage = Math.round((score / total) * 100);
+    if (!log) return null;
+    
+    // Safely access data, defaulting to empty if missing (handles legacy logs)
+    const scoreDetail = log.scoreDetail || {};
+    const { score = 0, total = 0, details = [] } = scoreDetail;
+    const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
@@ -228,35 +231,44 @@ function ExamResultModal({ log, onClose }: any) {
 
                 {/* List of Answers */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-                    {details.map((item: any, i: number) => (
-                        <div key={i} className={`p-4 rounded-2xl border-2 ${item.isCorrect ? 'border-emerald-100 bg-emerald-50/50' : 'border-rose-100 bg-rose-50/50'}`}>
-                            <div className="flex items-start gap-3">
-                                <div className={`mt-1 w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${item.isCorrect ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
-                                    {item.isCorrect ? <Check size={14} strokeWidth={3}/> : <X size={14} strokeWidth={3}/>}
-                                </div>
-                                <div className="flex-1">
-                                    <p className="font-bold text-slate-800 mb-2">{item.prompt}</p>
-                                    
-                                    <div className="space-y-1 text-sm">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[10px] font-bold uppercase text-slate-400 w-16">Student:</span>
-                                            <span className={`font-medium ${item.isCorrect ? 'text-emerald-700' : 'text-rose-700 line-through opacity-75'}`}>
-                                                {item.studentVal === 'true' ? 'True' : item.studentVal === 'false' ? 'False' : item.studentVal}
-                                            </span>
-                                        </div>
-                                        {!item.isCorrect && (
+                    {/* FALLBACK FOR OLD DATA */}
+                    {details.length === 0 ? (
+                        <div className="text-center p-8 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
+                            <AlertCircle className="mx-auto text-slate-300 mb-2" size={32} />
+                            <p className="text-slate-500 font-bold">No Question Details Available</p>
+                            <p className="text-xs text-slate-400 mt-1">This exam was taken before detailed tracking was enabled.</p>
+                        </div>
+                    ) : (
+                        details.map((item: any, i: number) => (
+                            <div key={i} className={`p-4 rounded-2xl border-2 ${item.isCorrect ? 'border-emerald-100 bg-emerald-50/50' : 'border-rose-100 bg-rose-50/50'}`}>
+                                <div className="flex items-start gap-3">
+                                    <div className={`mt-1 w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${item.isCorrect ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                                        {item.isCorrect ? <Check size={14} strokeWidth={3}/> : <X size={14} strokeWidth={3}/>}
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="font-bold text-slate-800 mb-2">{item.prompt}</p>
+                                        
+                                        <div className="space-y-1 text-sm">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-[10px] font-bold uppercase text-slate-400 w-16">Correct:</span>
-                                                <span className="font-medium text-emerald-700">
-                                                    {item.correctVal === 'true' ? 'True' : item.correctVal === 'false' ? 'False' : item.correctVal}
+                                                <span className="text-[10px] font-bold uppercase text-slate-400 w-16">Student:</span>
+                                                <span className={`font-medium ${item.isCorrect ? 'text-emerald-700' : 'text-rose-700 line-through opacity-75'}`}>
+                                                    {item.studentVal === 'true' ? 'True' : item.studentVal === 'false' ? 'False' : item.studentVal}
                                                 </span>
                                             </div>
-                                        )}
+                                            {!item.isCorrect && (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-bold uppercase text-slate-400 w-16">Correct:</span>
+                                                    <span className="font-medium text-emerald-700">
+                                                        {item.correctVal === 'true' ? 'True' : item.correctVal === 'false' ? 'False' : item.correctVal}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        ))
+                    )}
                 </div>
 
                 {/* Footer */}
@@ -271,7 +283,7 @@ function ExamResultModal({ log, onClose }: any) {
 }
 function LiveActivityFeed() {
   const [logs, setLogs] = useState<any[]>([]);
-  const [selectedLog, setSelectedLog] = useState<any>(null); // New state for modal
+  const [selectedLog, setSelectedLog] = useState<any>(null); 
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -284,7 +296,6 @@ function LiveActivityFeed() {
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col overflow-hidden relative">
-        {/* Render Modal if log selected */}
         {selectedLog && <ExamResultModal log={selectedLog} onClose={() => setSelectedLog(null)} />}
 
         <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
@@ -297,7 +308,10 @@ function LiveActivityFeed() {
                 {logs.map((log) => (
                     <div 
                         key={log.id} 
-                        onClick={() => log.scoreDetail ? setSelectedLog(log) : null} // Click handler added
+                        onClick={() => {
+                            console.log("Clicked log:", log); // DEBUG LOG
+                            if (log.scoreDetail) setSelectedLog(log);
+                        }}
                         className={`bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-start gap-3 animate-in slide-in-from-top-2 transition-all ${log.scoreDetail ? 'cursor-pointer hover:border-indigo-300 hover:shadow-md' : ''}`}
                     >
                         <div className={`p-2 rounded-full mt-1 ${log.type === 'quiz_score' ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'}`}>
