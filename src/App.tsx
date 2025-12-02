@@ -203,7 +203,6 @@ function Header({ title, subtitle, rightAction, onClickTitle, sticky = true }: a
     </div>
   );
 }
-
 function LiveActivityFeed() {
   const [logs, setLogs] = useState<any[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -300,15 +299,15 @@ function LevelUpModal({ userData, onClose }: any) {
                 <X size={20} />
             </button>
 
-            <div className="flex flex-col items-center relative z-10">
-                {/* Avatar with Halo */}
-                <div className="w-24 h-24 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border-2 border-white/40 shadow-[0_0_30px_rgba(255,255,255,0.25)] mb-4 overflow-hidden">
-                    {userData?.photoURL ? (
-                        <img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />
-                    ) : (
-                        <span className="font-serif font-bold text-4xl text-white drop-shadow-md">{userData?.name?.charAt(0) || "U"}</span>
-                    )}
-                </div>
+           <div className="flex flex-col items-center relative z-10">
+    {/* Avatar with Halo */}
+    <div className="w-24 h-24 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border-2 border-white/40 shadow-[0_0_30px_rgba(255,255,255,0.25)] mb-4 overflow-hidden">
+        {userData?.photoURL ? (
+            <img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />
+        ) : (
+            <span className="font-serif font-bold text-4xl text-white drop-shadow-md">{userData?.name?.charAt(0) || "U"}</span>
+        )}
+    </div>
                 
                 <h2 className="text-3xl font-serif font-bold tracking-tight">{userData?.name}</h2>
                 <p className="text-blue-100 text-xs font-bold uppercase tracking-widest mt-1 opacity-80">{userData?.email}</p>
@@ -348,7 +347,7 @@ function LevelUpModal({ userData, onClose }: any) {
                 </p>
             </div>
 
-            {/* Stats Grid */}
+            {/* Stats Grid (The Bento Box of Works) */}
             <div className="grid grid-cols-2 gap-3">
                 {/* Streak */}
                 <div className="bg-gradient-to-br from-orange-50 to-amber-50 p-4 rounded-2xl border border-orange-100 flex flex-col items-center justify-center gap-2 shadow-sm">
@@ -386,8 +385,9 @@ function LevelUpModal({ userData, onClose }: any) {
     </div>
   );
 }
-
-// --- 1. CORE VIEWS & GAMES ---
+// ============================================================================
+//  1. CORE VIEWS & GAMES
+// ============================================================================
 
 function AuthView() {
   const [isLogin, setIsLogin] = useState(true);
@@ -417,6 +417,7 @@ function AuthView() {
   );
 }
 
+// --- BEEFED UP PROFILE VIEW (FIXED LAYOUT) ---
 function ProfileView({ user, userData }: any) {
   const [deploying, setDeploying] = useState(false);
   const [uploading, setUploading] = useState(false); // New state for upload spinner
@@ -433,15 +434,24 @@ function ProfileView({ user, userData }: any) {
       const file = e.target.files[0];
       if (!file) return;
 
+      // Simple validation
       if (file.size > 5 * 1024 * 1024) { alert("File is too large (Max 5MB)"); return; }
       if (!file.type.startsWith('image/')) { alert("Please upload an image file"); return; }
 
       setUploading(true);
       try {
+          // 1. Create Reference
           const storageRef = ref(storage, `avatars/${user.uid}_${Date.now()}`);
+          
+          // 2. Upload
           await uploadBytes(storageRef, file);
+          
+          // 3. Get URL
           const photoURL = await getDownloadURL(storageRef);
+          
+          // 4. Update Profile Doc
           await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { photoURL });
+          
       } catch (error) {
           console.error("Upload failed", error);
           alert("Failed to upload image.");
@@ -479,7 +489,14 @@ function ProfileView({ user, userData }: any) {
                 <div className="absolute inset-0 border border-white/20 rounded-full scale-125 animate-pulse pointer-events-none"></div>
                 <div className="absolute inset-0 border border-white/10 rounded-full scale-150 pointer-events-none"></div>
                 
-                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
+                {/* Hidden Input */}
+                <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/*" 
+                    onChange={handleImageUpload} 
+                />
             </div>
 
             <h1 className="text-3xl font-serif font-bold text-white drop-shadow-md mb-1">{userData?.name}</h1>
@@ -559,7 +576,6 @@ function ProfileView({ user, userData }: any) {
     </div>
   );
 }
-
 function MatchingGame({ deckCards, onGameEnd }: any) {
     const [terms, setTerms] = useState<any[]>([]);
     const [definitions, setDefinitions] = useState<any[]>([]);
@@ -816,7 +832,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   );
 }
 
-// --- 3. STUDENT VIEWS ---
+// --- 3. STUDENT VIEWS (Defined AFTER Flashcard/Quiz/Games) ---
 
 function EmailSimulatorView({ module, onFinish }: any) {
   const [currentEmailIndex, setCurrentEmailIndex] = useState(0);
@@ -1007,6 +1023,7 @@ function ClassForum({ classId, user, userData }: any) {
   const [newThread, setNewThread] = useState({ title: '', content: '' });
   const [replyContent, setReplyContent] = useState('');
 
+  // 1. Sync Threads for this Class
   useEffect(() => {
     const q = query(
       collection(db, 'artifacts', appId, 'forum_threads'), 
@@ -1019,6 +1036,7 @@ function ClassForum({ classId, user, userData }: any) {
     return () => unsubscribe();
   }, [classId]);
 
+  // 2. Create a New Thread
   const handleCreateThread = async (e: any) => {
     e.preventDefault();
     if (!newThread.title.trim() || !newThread.content.trim()) return;
@@ -1037,6 +1055,7 @@ function ClassForum({ classId, user, userData }: any) {
     setIsCreating(false);
   };
 
+  // 3. Post a Reply
   const handleReply = async (e: any) => {
     e.preventDefault();
     if (!replyContent.trim() || !activeThread) return;
@@ -1054,13 +1073,16 @@ function ClassForum({ classId, user, userData }: any) {
       replies: arrayUnion(reply)
     });
     
+    // Optimistic update
     setActiveThread((prev: any) => ({ ...prev, replies: [...(prev.replies || []), reply] }));
     setReplyContent('');
   }; 
 
+  // --- RENDER: THREAD DETAIL VIEW ---
   if (activeThread) {
     return (
       <div className="flex flex-col h-full bg-slate-50 rounded-2xl overflow-hidden border border-slate-200">
+        {/* Header */}
         <div className="bg-white p-4 border-b border-slate-200 flex items-start gap-3 sticky top-0 z-10">
           <button onClick={() => setActiveThread(null)} className="mt-1 text-slate-400 hover:text-indigo-600">
             <ArrowLeft size={20} />
@@ -1072,10 +1094,13 @@ function ClassForum({ classId, user, userData }: any) {
             </p>
           </div>
         </div>
+
+        {/* Conversation Area */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
           <div className="bg-white p-4 rounded-xl border border-indigo-100 shadow-sm">
               <p className="text-slate-700 whitespace-pre-wrap">{activeThread.content}</p>
           </div>
+
           {activeThread.replies?.map((reply: any) => (
             <div key={reply.id} className={`flex flex-col ${reply.authorRole === 'instructor' ? 'items-end' : 'items-start'}`}>
                <div className={`max-w-[85%] p-3 rounded-xl text-sm ${
@@ -1090,6 +1115,8 @@ function ClassForum({ classId, user, userData }: any) {
             </div>
           ))}
         </div>
+
+        {/* Input Area */}
         <div className="p-4 bg-white border-t border-slate-200">
           <form onSubmit={handleReply} className="flex gap-2">
             <input 
@@ -1107,6 +1134,7 @@ function ClassForum({ classId, user, userData }: any) {
     );
   }
 
+  // --- RENDER: THREAD LIST VIEW ---
   return (
     <div className="h-full flex flex-col">
        <div className="flex justify-between items-center mb-4">
@@ -1117,6 +1145,7 @@ function ClassForum({ classId, user, userData }: any) {
             + New Post
           </button>
        </div>
+
        {isCreating && (
          <div className="bg-white p-4 rounded-xl border-2 border-indigo-100 mb-4 animate-in slide-in-from-top-2">
             <input 
@@ -1139,6 +1168,7 @@ function ClassForum({ classId, user, userData }: any) {
             </div>
          </div>
        )}
+
        <div className="flex-1 overflow-y-auto space-y-3 pb-20 custom-scrollbar">
           {threads.length === 0 ? (
             <div className="text-center py-10 text-slate-400 italic">No discussions yet. Start one!</div>
@@ -1186,11 +1216,16 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
       
       {/* --- JUICY CORNFLOWER HEADER --- */}
       <div className="relative bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 pb-20 pt-12 px-6 rounded-b-[3rem] shadow-2xl z-10 shrink-0">
+          {/* Background Decor */}
           <div className="absolute top-[-50%] left-[-20%] w-[400px] h-[400px] bg-blue-400/30 rounded-full blur-[80px] mix-blend-overlay pointer-events-none"></div>
           <div className="absolute bottom-[-20%] right-[-10%] w-[300px] h-[300px] bg-indigo-300/20 rounded-full blur-[60px] mix-blend-overlay pointer-events-none"></div>
           
+          {/* Top Bar */}
           <div className="relative z-20 flex justify-between items-start mb-6">
-              <button onClick={onBack} className="group flex items-center gap-2 text-white/80 hover:text-white transition-colors bg-white/10 hover:bg-white/20 backdrop-blur-md px-4 py-2 rounded-full text-sm font-bold border border-white/10">
+              <button 
+                onClick={onBack} 
+                className="group flex items-center gap-2 text-white/80 hover:text-white transition-colors bg-white/10 hover:bg-white/20 backdrop-blur-md px-4 py-2 rounded-full text-sm font-bold border border-white/10"
+              >
                   <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform"/> Back
               </button>
               <div className="flex flex-col items-end">
@@ -1201,25 +1236,38 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
               </div>
           </div>
 
+          {/* Class Title & Tabs */}
           <div className="relative z-20 text-center">
               <h1 className="text-3xl md:text-4xl font-serif font-bold text-white mb-6 drop-shadow-md">{classData.name}</h1>
               
+              {/* GLASS TOGGLE SWITCH */}
               <div className="inline-flex bg-black/20 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 shadow-inner">
-                  <button onClick={() => setViewMode('assignments')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${viewMode === 'assignments' ? 'bg-white text-indigo-600 shadow-lg scale-105' : 'text-white/70 hover:text-white hover:bg-white/10'}`}>
+                  <button 
+                    onClick={() => setViewMode('assignments')} 
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${viewMode === 'assignments' ? 'bg-white text-indigo-600 shadow-lg scale-105' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
+                  >
                       <BookOpen size={18} className={viewMode === 'assignments' ? 'fill-current' : ''}/> Assignments
                   </button>
-                  <button onClick={() => setViewMode('forum')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${viewMode === 'forum' ? 'bg-white text-indigo-600 shadow-lg scale-105' : 'text-white/70 hover:text-white hover:bg-white/10'}`}>
+                  <button 
+                    onClick={() => setViewMode('forum')} 
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${viewMode === 'forum' ? 'bg-white text-indigo-600 shadow-lg scale-105' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
+                  >
                       <MessageSquare size={18} className={viewMode === 'forum' ? 'fill-current' : ''}/> Forum
                   </button>
               </div>
           </div>
       </div>
       
+      {/* --- CONTENT AREA --- */}
       <div className="flex-1 overflow-y-auto pb-24 -mt-10 relative z-20 custom-scrollbar">
+        
         {viewMode === 'assignments' ? (
             <div className="px-6 space-y-6">
+                
+                {/* FLOATING PROGRESS CARD */}
                 <div className="bg-white rounded-3xl p-6 shadow-xl border border-blue-100 flex items-center justify-between relative overflow-hidden group">
                     <div className="absolute right-0 top-0 w-32 h-32 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-bl-[100px] -z-0 group-hover:scale-110 transition-transform duration-500"></div>
+                    
                     <div className="relative z-10">
                         <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Your Progress</p>
                         <div className="flex items-baseline gap-2">
@@ -1227,11 +1275,18 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
                             <span className="text-sm font-bold text-indigo-600">Complete</span>
                         </div>
                         <div className="mt-3 flex gap-1">
-                            <div className="h-2 w-12 rounded-full bg-slate-100 overflow-hidden"><div className={`h-full ${progressPercent > 0 ? 'bg-emerald-400' : 'bg-transparent'}`} style={{width: '100%'}}></div></div>
-                            <div className="h-2 w-12 rounded-full bg-slate-100 overflow-hidden"><div className={`h-full ${progressPercent > 33 ? 'bg-emerald-400' : 'bg-transparent'}`} style={{width: '100%'}}></div></div>
-                            <div className="h-2 w-12 rounded-full bg-slate-100 overflow-hidden"><div className={`h-full ${progressPercent > 66 ? 'bg-emerald-400' : 'bg-transparent'}`} style={{width: '100%'}}></div></div>
+                            <div className="h-2 w-12 rounded-full bg-slate-100 overflow-hidden">
+                                <div className={`h-full ${progressPercent > 0 ? 'bg-emerald-400' : 'bg-transparent'}`} style={{width: '100%'}}></div>
+                            </div>
+                            <div className="h-2 w-12 rounded-full bg-slate-100 overflow-hidden">
+                                <div className={`h-full ${progressPercent > 33 ? 'bg-emerald-400' : 'bg-transparent'}`} style={{width: '100%'}}></div>
+                            </div>
+                            <div className="h-2 w-12 rounded-full bg-slate-100 overflow-hidden">
+                                <div className={`h-full ${progressPercent > 66 ? 'bg-emerald-400' : 'bg-transparent'}`} style={{width: '100%'}}></div>
+                            </div>
                         </div>
                     </div>
+
                     <div className="text-right relative z-10">
                         <div className="bg-indigo-50 p-3 rounded-2xl inline-flex flex-col items-center min-w-[80px] border border-indigo-100 group-hover:border-indigo-200 transition-colors">
                             <span className="text-2xl font-bold text-indigo-600">{pendingCount}</span>
@@ -1240,12 +1295,17 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
                     </div>
                 </div>
 
+                {/* ASSIGNMENTS LIST */}
                 <div>
-                    <h3 className="font-bold text-blue-900/70 text-sm uppercase tracking-wider mb-4 ml-1 flex items-center gap-2"><Layers size={16} className="text-blue-500"/> Tasks ({relevantAssignments.length})</h3>
+                    <h3 className="font-bold text-blue-900/70 text-sm uppercase tracking-wider mb-4 ml-1 flex items-center gap-2">
+                        <Layers size={16} className="text-blue-500"/> Tasks ({relevantAssignments.length})
+                    </h3>
                     <div className="space-y-3">
                         {relevantAssignments.length > 0 ? ( relevantAssignments.filter((l: any) => !completedSet.has(l.id)).map((l: any, i: number) => ( 
                             <button key={`${l.id}-${i}`} onClick={() => handleAssignmentClick(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all hover:border-blue-300 hover:shadow-lg group relative overflow-hidden">
+                                {/* Subtle Hover Gradient Background */}
                                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-blue-50/50 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                
                                 <div className="flex items-center space-x-4 relative z-10">
                                     <div className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-all shadow-sm ${l.contentType === 'deck' ? 'bg-gradient-to-br from-orange-100 to-orange-50 text-orange-600 group-hover:from-orange-500 group-hover:to-orange-600 group-hover:text-white' : 'bg-gradient-to-br from-blue-100 to-blue-50 text-blue-600 group-hover:from-blue-500 group-hover:to-indigo-600 group-hover:text-white'}`}>
                                         {l.contentType === 'deck' ? <Layers size={22}/> : <PlayCircle size={22} />}
@@ -1253,18 +1313,24 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
                                     <div className="text-left">
                                         <h4 className="font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{l.title}</h4>
                                         <div className="flex items-center gap-2 mt-0.5">
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>{l.contentType === 'deck' ? 'Deck' : 'Lesson'}</span>
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                                                {l.contentType === 'deck' ? 'Deck' : 'Lesson'}
+                                            </span>
                                             {l.xp && <span className="text-[10px] font-bold text-emerald-600">+{l.xp} XP</span>}
                                         </div>
                                     </div>
                                 </div>
-                                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm relative z-10"><ChevronRight size={16} /></div>
+                                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm relative z-10">
+                                    <ChevronRight size={16} />
+                                </div>
                             </button> 
                         )) ) : ( <div className="p-10 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">No pending assignments.</div> )}
                         
                         {relevantAssignments.every((l: any) => completedSet.has(l.id)) && relevantAssignments.length > 0 && (
                             <div className="p-8 text-center bg-emerald-50 border border-emerald-100 rounded-3xl animate-in zoom-in duration-300">
-                                <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-2"><CheckCircle2 size={24}/></div>
+                                <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-2">
+                                    <CheckCircle2 size={24}/>
+                                </div>
                                 <p className="text-emerald-800 font-bold">All assignments completed!</p>
                                 <p className="text-emerald-600/70 text-xs">Great work, legend.</p>
                             </div>
@@ -1274,6 +1340,7 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
             </div>
         ) : (
             <div className="px-6 h-full pb-20">
+                {/* Forum needs a container to ensure it scrolls correctly within this layout */}
                 <div className="bg-white rounded-t-3xl shadow-xl border-x border-t border-slate-200 min-h-full p-2">
                     <ClassForum classId={classData.id} user={{email: userData.email}} userData={userData} />
                 </div>
@@ -1306,33 +1373,55 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
     {userData?.classSyncError && (<div className="bg-rose-500 text-white p-4 text-center text-sm font-bold relative z-50"><AlertTriangle className="inline-block mr-2" size={16} />System Notice: Database Index Missing.</div>)}
     
     {/* --- HERO WIDGET (Cornflower Blue) --- */}
-    <button onClick={() => setShowLevelModal(true)} className="w-full relative overflow-hidden bg-gradient-to-br from-blue-500 via-indigo-500 to-blue-600 text-white shadow-xl z-10 group text-left rounded-b-[2.5rem] pb-8 pt-10 px-6 transition-all active:scale-[0.99]">
+    <button 
+        onClick={() => setShowLevelModal(true)}
+        className="w-full relative overflow-hidden bg-gradient-to-br from-blue-500 via-indigo-500 to-blue-600 text-white shadow-xl z-10 group text-left rounded-b-[2.5rem] pb-8 pt-10 px-6 transition-all active:scale-[0.99]"
+    >
         <div className="absolute top-[-50%] left-[-20%] w-[500px] h-[500px] bg-blue-400/30 rounded-full blur-[80px] mix-blend-overlay pointer-events-none"></div>
         <div className="absolute bottom-[-20%] right-[-10%] w-[300px] h-[300px] bg-indigo-300/20 rounded-full blur-[60px] mix-blend-overlay pointer-events-none"></div>
-        <div className="absolute top-[-10%] right-[-10%] opacity-10 group-hover:opacity-20 transition-all duration-700 transform group-hover:rotate-12 group-hover:scale-110"><User size={280} strokeWidth={1.5} /></div>
+        <div className="absolute top-[-10%] right-[-10%] opacity-10 group-hover:opacity-20 transition-all duration-700 transform group-hover:rotate-12 group-hover:scale-110">
+            <User size={280} strokeWidth={1.5} />
+        </div>
        
         <div className="relative z-20 flex flex-col gap-4">
-            <div className="flex items-center gap-4">
-                <div className="relative">
-                    <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/40 shadow-[0_8px_32px_rgba(0,0,0,0.1)] group-hover:ring-4 ring-white/20 transition-all overflow-hidden">
-                        {userData?.photoURL ? (<img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />) : (<span className="font-serif font-bold text-2xl text-white drop-shadow-md">{userData?.name?.charAt(0) || 'S'}</span>)}
-                    </div>
-                    <div className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-400 border-4 border-blue-600 rounded-full shadow-sm"></div>
-                </div>
+           <div className="flex items-center gap-4">
+    <div className="relative">
+        {/* UPDATED AVATAR CONTAINER */}
+        <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/40 shadow-[0_8px_32px_rgba(0,0,0,0.1)] group-hover:ring-4 ring-white/20 transition-all overflow-hidden">
+            {userData?.photoURL ? (
+                <img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />
+            ) : (
+                <span className="font-serif font-bold text-2xl text-white drop-shadow-md">{userData?.name?.charAt(0) || 'S'}</span>
+            )}
+        </div>
+        <div className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-400 border-4 border-blue-600 rounded-full shadow-sm"></div>
+    </div>
                 <div>
                     <p className="text-blue-100 text-[10px] font-bold uppercase tracking-widest mb-0.5 opacity-90 drop-shadow-sm">Welcome back,</p>
                     <h1 className="text-3xl font-serif font-bold leading-none tracking-tight drop-shadow-lg filter">{userData?.name || 'Student'}</h1>
-                    <div className="flex items-center gap-2 mt-1.5"><span className="bg-white/20 backdrop-blur-md px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide border border-white/20 shadow-sm">{rank}</span></div>
+                    <div className="flex items-center gap-2 mt-1.5">
+                         <span className="bg-white/20 backdrop-blur-md px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide border border-white/20 shadow-sm">{rank}</span>
+                    </div>
                 </div>
             </div>
 
             <div className="bg-white/10 backdrop-blur-xl rounded-xl p-3 border border-white/30 flex items-center justify-between mt-2 group-hover:bg-white/20 transition-all shadow-[0_8px_32px_rgba(0,0,0,0.1)]">
                 <div className="flex-1 border-r border-white/20 pr-4">
-                     <div className="flex justify-between items-end mb-1"><span className="text-[10px] font-bold text-white tracking-wide">Level {level}</span><span className="text-[9px] font-bold text-blue-100">{Math.round(progress)}%</span></div>
-                     <div className="w-full bg-black/20 rounded-full h-2 overflow-hidden border border-white/10"><div className="bg-gradient-to-r from-yellow-300 to-amber-400 h-full rounded-full shadow-[0_0_15px_rgba(250,204,21,0.6)] relative overflow-hidden" style={{ width: `${progress}%` }}><div className="absolute inset-0 bg-white/40 w-full animate-[shimmer_2s_infinite]"></div></div></div>
+                     <div className="flex justify-between items-end mb-1">
+                        <span className="text-[10px] font-bold text-white tracking-wide">Level {level}</span>
+                        <span className="text-[9px] font-bold text-blue-100">{Math.round(progress)}%</span>
+                     </div>
+                     <div className="w-full bg-black/20 rounded-full h-2 overflow-hidden border border-white/10">
+                        <div className="bg-gradient-to-r from-yellow-300 to-amber-400 h-full rounded-full shadow-[0_0_15px_rgba(250,204,21,0.6)] relative overflow-hidden" style={{ width: `${progress}%` }}>
+                             <div className="absolute inset-0 bg-white/40 w-full animate-[shimmer_2s_infinite]"></div>
+                        </div>
+                     </div>
                 </div>
                 <div className="pl-5 flex flex-col items-center justify-center">
-                    <div className="flex items-center gap-1 text-yellow-300 filter drop-shadow-sm"><Zap size={20} fill="currentColor" /><span className="text-xl font-bold leading-none text-white">{userData?.streak || 1}</span></div>
+                    <div className="flex items-center gap-1 text-yellow-300 filter drop-shadow-sm">
+                        <Zap size={20} fill="currentColor" />
+                        <span className="text-xl font-bold leading-none text-white">{userData?.streak || 1}</span>
+                    </div>
                     <span className="text-[8px] text-blue-100 uppercase font-bold tracking-wider mt-0.5">Day Streak</span>
                 </div>
             </div>
@@ -1345,9 +1434,12 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
       {/* --- THE BIBLICAL CLASS CARDS --- */}
       {classes && classes.length > 0 && (
         <div className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
-            <h3 className="text-sm font-bold text-blue-900/70 uppercase tracking-wider mb-4 ml-1 flex items-center gap-2"><School size={16} className="text-blue-500"/> My Classes</h3>
+            <h3 className="text-sm font-bold text-blue-900/70 uppercase tracking-wider mb-4 ml-1 flex items-center gap-2">
+                <School size={16} className="text-blue-500"/> My Classes
+            </h3>
             <div className="flex gap-4 overflow-x-auto pb-8 custom-scrollbar snap-x">
                 {classes.map((cls: any) => { 
+                    // CALCULATION LOGIC FOR THE CARD
                     const clsTasks = cls.assignments || [];
                     const myPending = clsTasks.filter((l: any) => { 
                         const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); 
@@ -1361,19 +1453,45 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
 
                     return ( 
                         <button key={cls.id} onClick={() => handleSelectClass(cls)} className="snap-start min-w-[280px] bg-white p-5 rounded-3xl border border-blue-100 shadow-lg shadow-blue-900/5 hover:shadow-xl hover:shadow-blue-900/10 hover:border-blue-300 hover:-translate-y-1 transition-all duration-300 group text-left relative overflow-hidden flex flex-col justify-between h-[180px]">
+                            
+                            {/* Decorative Background Blob */}
                             <div className="absolute top-[-40%] right-[-40%] w-40 h-40 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-full blur-3xl group-hover:from-blue-100 group-hover:to-indigo-100 transition-colors"></div>
+                            
                             <div className="relative z-10 w-full">
                                 <div className="flex items-start justify-between mb-3">
-                                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md group-hover:scale-110 transition-transform duration-300">{cls.name.charAt(0)}</div>
-                                    <span className="text-[10px] font-mono text-slate-400 bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg">{cls.code}</span>
+                                    {/* Avatar */}
+                                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md group-hover:scale-110 transition-transform duration-300">
+                                        {cls.name.charAt(0)}
+                                    </div>
+                                    {/* Code Badge */}
+                                    <span className="text-[10px] font-mono text-slate-400 bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg">
+                                        {cls.code}
+                                    </span>
                                 </div>
+                                
                                 <h4 className="font-bold text-slate-800 text-lg truncate pr-2 group-hover:text-indigo-600 transition-colors">{cls.name}</h4>
-                                <div className="flex items-center gap-1.5 mt-1 text-slate-400 text-xs font-medium"><Users size={12} className="text-blue-400" /><span>{studentCount} Students</span></div>
+                                
+                                {/* The Flock Count */}
+                                <div className="flex items-center gap-1.5 mt-1 text-slate-400 text-xs font-medium">
+                                    <Users size={12} className="text-blue-400" />
+                                    <span>{studentCount} Students</span>
+                                </div>
                             </div>
+
+                            {/* Footer: The Path to Salvation (Progress) */}
                             <div className="relative z-10 w-full mt-4 pt-4 border-t border-slate-100">
-                                <div className="flex justify-between items-end mb-2"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Progress</span><span className="text-[10px] font-bold text-indigo-600">{completedTasks}/{totalTasks} Tasks</span></div>
-                                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden"><div className={`h-full rounded-full transition-all duration-1000 ${classProgress === 100 ? 'bg-emerald-400' : 'bg-blue-500'}`} style={{width: `${classProgress}%`}}></div></div>
-                                {myPending > 0 && (<div className="absolute right-0 -top-8 bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm animate-pulse">{myPending} Due</div>)}
+                                <div className="flex justify-between items-end mb-2">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Progress</span>
+                                    <span className="text-[10px] font-bold text-indigo-600">{completedTasks}/{totalTasks} Tasks</span>
+                                </div>
+                                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                    <div className={`h-full rounded-full transition-all duration-1000 ${classProgress === 100 ? 'bg-emerald-400' : 'bg-blue-500'}`} style={{width: `${classProgress}%`}}></div>
+                                </div>
+                                {myPending > 0 && (
+                                    <div className="absolute right-0 -top-8 bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm animate-pulse">
+                                        {myPending} Due
+                                    </div>
+                                )}
                             </div>
                         </button> 
                     ); 
@@ -1390,10 +1508,17 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
                 {activeAssignments.map((l: any, i: number) => ( 
                     <button key={`${l.id}-${i}`} onClick={() => l.contentType === 'deck' ? onSelectDeck(l) : onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all hover:border-blue-300 hover:shadow-md group">
                         <div className="flex items-center space-x-4">
-                            <div className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-colors shadow-sm ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-500 group-hover:text-white'}`}>{l.contentType === 'deck' ? <Layers size={22}/> : <PlayCircle size={22} />}</div>
-                            <div className="text-left"><h4 className="font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{l.title}</h4><p className="text-xs text-slate-500">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Assigned Lesson'}</p></div>
+                            <div className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-colors shadow-sm ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-500 group-hover:text-white'}`}>
+                                {l.contentType === 'deck' ? <Layers size={22}/> : <PlayCircle size={22} />}
+                            </div>
+                            <div className="text-left">
+                                <h4 className="font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{l.title}</h4>
+                                <p className="text-xs text-slate-500">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Assigned Lesson'}</p>
+                            </div>
                         </div>
-                        <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm"><ChevronRight size={16} /></div>
+                        <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                            <ChevronRight size={16} />
+                        </div>
                     </button>
                 ))}
              </div>
@@ -1407,8 +1532,13 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
             {lessons.map((l: any) => (
                 <button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-blue-300 group transition-all hover:shadow-md">
                     <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-500 group-hover:bg-blue-500 group-hover:text-white transition-colors"><BookOpen size={22}/></div>
-                        <div className="text-left"><h4 className="font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div>
+                        <div className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                            <BookOpen size={22}/>
+                        </div>
+                        <div className="text-left">
+                            <h4 className="font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{l.title}</h4>
+                            <p className="text-xs text-slate-500">{l.subtitle}</p>
+                        </div>
                     </div>
                     <ChevronRight className="text-slate-300 group-hover:text-blue-500 transition-colors"/>
                 </button>
@@ -1419,12 +1549,16 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
       {/* QUICK ACTIONS */}
       <div className="grid grid-cols-2 gap-4 pb-8 animate-in slide-in-from-bottom-4 duration-500 delay-500">
         <button onClick={() => setActiveTab('flashcards')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center hover:scale-[1.02] active:scale-95 transition-all group hover:shadow-lg hover:border-orange-200 hover:bg-orange-50/30">
-            <div className="w-14 h-14 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-orange-500 group-hover:text-white transition-colors shadow-sm"><Layers size={28}/></div>
+            <div className="w-14 h-14 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-orange-500 group-hover:text-white transition-colors shadow-sm">
+                <Layers size={28}/>
+            </div>
             <span className="block font-bold text-slate-800 text-lg">Practice</span>
             <span className="text-xs text-slate-400 font-medium">Review Cards</span>
         </button>
         <button onClick={() => setActiveTab('create')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center hover:scale-[1.02] active:scale-95 transition-all group hover:shadow-lg hover:border-emerald-200 hover:bg-emerald-50/30">
-            <div className="w-14 h-14 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-emerald-500 group-hover:text-white transition-colors shadow-sm"><Feather size={28}/></div>
+            <div className="w-14 h-14 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-emerald-500 group-hover:text-white transition-colors shadow-sm">
+                <Feather size={28}/>
+            </div>
             <span className="block font-bold text-slate-800 text-lg">Creator</span>
             <span className="text-xs text-slate-400 font-medium">Build Content</span>
         </button>
@@ -1434,10 +1568,104 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   </div>
   );
 }
+function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard, availableDecks, initialDeckId, initialData, onCancelEdit }: any) {
+  const [formData, setFormData] = useState({ front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '', deckId: initialDeckId || 'custom' });
+  const [isCreatingDeck, setIsCreatingDeck] = useState(false);
+  const [newDeckTitle, setNewDeckTitle] = useState('');
+  const [morphology, setMorphology] = useState<any[]>([]);
+  const [newMorphPart, setNewMorphPart] = useState({ part: '', meaning: '', type: 'root' });
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-// ============================================================================
-// PASTE THIS BLOCK *ABOVE* FUNCTION INSTRUCTORDASHBOARD
-// ============================================================================
+  // Hydrate form if editing
+  useEffect(() => { 
+      if (initialData) {
+          setEditingId(initialData.id);
+          setFormData({ 
+            front: initialData.front, back: initialData.back, type: initialData.type || 'noun', 
+            ipa: initialData.ipa || '', sentence: initialData.usage?.sentence || '', 
+            sentenceTrans: initialData.usage?.translation || '', 
+            grammarTags: initialData.grammar_tags?.join(', ') || '', 
+            deckId: initialData.deckId || initialDeckId || 'custom' 
+          });
+          setMorphology(initialData.morphology || []);
+      }
+  }, [initialData, initialDeckId]);
+
+  const handleChange = (e: any) => { if (e.target.name === 'deckId') { if (e.target.value === 'new') { setIsCreatingDeck(true); setFormData({ ...formData, deckId: 'new' }); } else { setIsCreatingDeck(false); setFormData({ ...formData, deckId: e.target.value }); } } else { setFormData({ ...formData, [e.target.name]: e.target.value }); } };
+  const addMorphology = () => { if (newMorphPart.part && newMorphPart.meaning) { setMorphology([...morphology, newMorphPart]); setNewMorphPart({ part: '', meaning: '', type: 'root' }); } };
+  const removeMorphology = (index: number) => { setMorphology(morphology.filter((_, i) => i !== index)); };
+  
+  const handleClear = () => { 
+      setEditingId(null); 
+      setFormData(prev => ({ ...prev, front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' })); 
+      setMorphology([]);
+      if (onCancelEdit) onCancelEdit();
+  };
+
+  const handleSubmit = (e: any) => { e.preventDefault(); if (!formData.front || !formData.back) return; let finalDeckId = formData.deckId; let finalDeckTitle = null; if (formData.deckId === 'new') { if (!newDeckTitle) return alert("Please name your new deck."); finalDeckId = `custom_${Date.now()}`; finalDeckTitle = newDeckTitle; } const cardData = { front: formData.front, back: formData.back, type: formData.type, deckId: finalDeckId, deckTitle: finalDeckTitle, ipa: formData.ipa || "/.../", mastery: 0, morphology: morphology.length > 0 ? morphology : [{ part: formData.front, meaning: "Root", type: "root" }], usage: { sentence: formData.sentence || "-", translation: formData.sentenceTrans || "-" }, grammar_tags: formData.grammarTags ? formData.grammarTags.split(',').map(t => t.trim()) : ["Custom"] }; if (editingId) { onUpdateCard(editingId, cardData); setToastMsg("Card Updated Successfully"); } else { onSaveCard(cardData); setToastMsg("Card Created Successfully"); } handleClear(); if (isCreatingDeck) { setIsCreatingDeck(false); setNewDeckTitle(''); setFormData(prev => ({ ...prev, deckId: finalDeckId })); } };
+  
+  const validDecks = availableDecks || {}; 
+  const deckOptions = Object.entries(validDecks).map(([key, deck]: any) => ({ id: key, title: deck.title }));
+
+  return (
+    <div className="px-6 mt-4 space-y-6 pb-20 relative">
+      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
+      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800 flex justify-between items-center"><div><p className="font-bold flex items-center gap-2"><Layers size={16}/> {editingId ? 'Editing Card' : 'Card Creator'}</p><p className="opacity-80 text-xs mt-1">{editingId ? 'Update details below.' : 'Define deep linguistic data (X-Ray).'}</p></div>{editingId && <button onClick={handleClear} className="text-xs font-bold bg-white px-3 py-1 rounded-lg shadow-sm hover:text-indigo-600">Cancel Edit</button>}</div>
+      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Core Data</h3>
+        <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Target Deck</label><select name="deckId" value={formData.deckId} onChange={handleChange} disabled={!!editingId} className="w-full p-3 rounded-lg border border-slate-200 bg-indigo-50/50 font-bold text-indigo-900 disabled:opacity-50"><option value="custom">✍️ Scriptorium (My Deck)</option>{deckOptions.filter(d => d.id !== 'custom').map(d => (<option key={d.id} value={d.id}>{d.title}</option>))}<option value="new">✨ + Create New Deck</option></select>{isCreatingDeck && <input value={newDeckTitle} onChange={(e) => setNewDeckTitle(e.target.value)} placeholder="Enter New Deck Name" className="w-full p-3 rounded-lg border-2 border-indigo-500 bg-white font-bold mt-2 animate-in fade-in slide-in-from-top-2" autoFocus />}</div>
+        <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><label className="text-xs font-bold text-slate-400">Latin Word</label><input name="front" value={formData.front} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 font-bold" placeholder="e.g. Bellum" /></div><div className="space-y-2"><label className="text-xs font-bold text-slate-400">English</label><input name="back" value={formData.back} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="e.g. War" /></div></div>
+        <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><label className="text-xs font-bold text-slate-400">Part of Speech</label><select name="type" value={formData.type} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 bg-white"><option value="noun">Noun</option><option value="verb">Verb</option><option value="adjective">Adjective</option><option value="adverb">Adverb</option><option value="phrase">Phrase</option></select></div><div className="space-y-2"><label className="text-xs font-bold text-slate-400">IPA</label><input name="ipa" value={formData.ipa} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 font-mono text-sm" placeholder="/ˈbel.lum/" /></div></div>
+      </section>
+      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Morphology (X-Ray Data)</h3>
+        <div className="flex gap-2 items-end"><div className="flex-1 space-y-1"><label className="text-[10px] font-bold text-slate-400">Part</label><input value={newMorphPart.part} onChange={(e) => setNewMorphPart({...newMorphPart, part: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" placeholder="Bell-" /></div><div className="flex-1 space-y-1"><label className="text-[10px] font-bold text-slate-400">Meaning</label><input value={newMorphPart.meaning} onChange={(e) => setNewMorphPart({...newMorphPart, meaning: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" placeholder="War" /></div><div className="w-24 space-y-1"><label className="text-[10px] font-bold text-slate-400">Type</label><select value={newMorphPart.type} onChange={(e) => setNewMorphPart({...newMorphPart, type: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm bg-white"><option value="root">Root</option><option value="prefix">Prefix</option><option value="suffix">Suffix</option></select></div><button type="button" onClick={addMorphology} className="bg-indigo-100 text-indigo-600 p-2 rounded-lg hover:bg-indigo-200"><Plus size={20}/></button></div>
+        <div className="flex flex-wrap gap-2 mt-2">{morphology.map((m, i) => (<div key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1 rounded-full text-sm"><span className="font-bold text-indigo-700">{m.part}</span><span className="text-slate-500 text-xs">({m.meaning})</span><button type="button" onClick={() => removeMorphology(i)} className="text-slate-300 hover:text-rose-500"><X size={14}/></button></div>))}</div>
+      </section>
+      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Context & Grammar</h3>
+        <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Example Sentence</label><input name="sentence" value={formData.sentence} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 italic" placeholder="Si vis pacem, para bellum." /></div>
+        <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Translation</label><input name="sentenceTrans" value={formData.sentenceTrans} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="If you want peace, prepare for war." /></div>
+        <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Grammar Tags</label><input name="grammarTags" value={formData.grammarTags} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="2nd Declension, Neuter" /></div>
+      </section>
+      <button onClick={handleSubmit} className={`w-full text-white p-4 rounded-xl font-bold shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${editingId ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}>{editingId ? <><Save size={20}/> Update Card</> : <><Plus size={20}/> Create Card</>}</button>
+    </div>
+  );
+}
+
+function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const updateBlock = (index: number, field: string, value: any) => { const newBlocks = [...(data.blocks || [])]; newBlocks[index] = { ...newBlocks[index], [field]: value }; setData({ ...data, blocks: newBlocks }); };
+  const updateDialogueLine = (blockIndex: number, lineIndex: number, field: string, value: any) => { const newBlocks = [...(data.blocks || [])]; newBlocks[blockIndex].lines[lineIndex][field] = value; setData({ ...data, blocks: newBlocks }); };
+  const updateVocabItem = (blockIndex: number, itemIndex: number, field: string, value: any) => { const newBlocks = [...(data.blocks || [])]; newBlocks[blockIndex].items[itemIndex][field] = value; setData({ ...data, blocks: newBlocks }); };
+  const addBlock = (type: string) => { const baseBlock = type === 'dialogue' ? { type: 'dialogue', lines: [{ speaker: 'A', text: '', translation: '', side: 'left' }] } : type === 'quiz' ? { type: 'quiz', question: '', options: [{id:'a',text:''},{id:'b',text:''}], correctId: 'a' } : type === 'vocab-list' ? { type: 'vocab-list', items: [{ term: '', definition: '' }] } : type === 'flashcard' ? { type: 'flashcard', front: '', back: '' } : type === 'image' ? { type: 'image', url: '', caption: '' } : type === 'note' ? { type: 'note', title: '', content: '' } : { type: 'text', title: '', content: '' }; setData({ ...data, blocks: [...(data.blocks || []), baseBlock] }); };
+  const removeBlock = (index: number) => { const newBlocks = [...(data.blocks || [])].filter((_, i) => i !== index); setData({ ...data, blocks: newBlocks }); };
+  const handleSave = () => { if (!data.title) return alert("Title required"); const processedVocab = Array.isArray(data.vocab) ? data.vocab : (typeof data.vocab === 'string' ? data.vocab.split(',').map((s: string) => s.trim()) : []); onSave({ ...data, vocab: processedVocab, xp: 100 }); setToastMsg("Lesson Saved Successfully"); };
+  const deckOptions = availableDecks ? Object.entries(availableDecks).map(([key, deck]: any) => ({ id: key, title: deck.title })) : [];
+
+  return (
+    <div className="px-6 mt-4 space-y-8 pb-20 relative">
+      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
+      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm"><h3 className="font-bold text-slate-800 flex items-center gap-2"><FileText size={18} className="text-indigo-600"/> Lesson Metadata</h3><input className="w-full p-3 rounded-lg border border-slate-200 font-bold" placeholder="Title" value={data.title} onChange={e => setData({...data, title: e.target.value})} /><textarea className="w-full p-3 rounded-lg border border-slate-200 text-sm" placeholder="Description" value={data.description} onChange={e => setData({...data, description: e.target.value})} /><input className="w-full p-3 rounded-lg border border-slate-200 text-sm" placeholder="Vocab (comma separated)" value={data.vocab} onChange={e => setData({...data, vocab: e.target.value})} /><div className="mt-2"><label className="text-xs font-bold text-slate-400 uppercase block mb-1">Linked Flashcard Deck</label><select className="w-full p-3 rounded-lg border border-slate-200 bg-white" value={data.relatedDeckId || ''} onChange={e => setData({...data, relatedDeckId: e.target.value})}><option value="">None (No Deck)</option>{deckOptions.map(d => (<option key={d.id} value={d.id}>{d.title}</option>))}</select></div></section>
+      <div className="space-y-4"><div className="flex items-center justify-between px-1"><h3 className="font-bold text-slate-800 flex items-center gap-2"><Layers size={18} className="text-indigo-600"/> Content Blocks</h3><span className="text-xs text-slate-400">{(data.blocks || []).length} Blocks</span></div>
+        {(data.blocks || []).map((block: any, idx: number) => (
+          <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative group"><div className="absolute right-4 top-4 flex gap-2"><span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-2 py-1 rounded">{block.type}</span><button onClick={() => removeBlock(idx)} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button></div>
+            {block.type === 'text' && (<div className="space-y-3 mt-4"><input className="w-full p-2 border-b border-slate-100 font-bold text-sm focus:outline-none" placeholder="Section Title" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} /><textarea className="w-full p-2 bg-slate-50 rounded-lg text-sm min-h-[80px]" placeholder="Content..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} /></div>)}
+            {block.type === 'note' && (<div className="space-y-3 mt-4"><div className="flex gap-2"><Info size={18} className="text-amber-500"/><input className="flex-1 p-2 border-b border-slate-100 font-bold text-sm focus:outline-none" placeholder="Note Title (e.g. Grammar Tip)" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} /></div><textarea className="w-full p-2 bg-amber-50 border border-amber-100 rounded-lg text-sm min-h-[80px] text-amber-800" placeholder="Tip content..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} /></div>)}
+            {block.type === 'image' && (<div className="space-y-3 mt-4"><div className="flex gap-2 items-center"><Image size={18} className="text-slate-400"/><input className="flex-1 p-2 border-b border-slate-100 text-sm" placeholder="Image URL (e.g., https://placehold.co/400x200)" value={block.url} onChange={e => updateBlock(idx, 'url', e.target.value)} /></div><input className="w-full p-2 bg-slate-50 rounded-lg text-sm" placeholder="Caption" value={block.caption} onChange={e => updateBlock(idx, 'caption', e.target.value)} /></div>)}
+            {block.type === 'vocab-list' && (<div className="space-y-3 mt-6"><p className="text-xs font-bold text-slate-400 uppercase">Vocabulary List</p>{block.items.map((item: any, i: number) => (<div key={i} className="flex gap-2"><input className="flex-1 p-2 bg-slate-50 rounded border border-slate-100 text-sm font-bold" placeholder="Term" value={item.term} onChange={e => updateVocabItem(idx, i, 'term', e.target.value)} /><input className="flex-1 p-2 border-b border-slate-100 text-sm" placeholder="Definition" value={item.definition} onChange={e => updateVocabItem(idx, i, 'definition', e.target.value)} /></div>))}<button onClick={() => { const newItems = [...block.items, { term: '', definition: '' }]; updateBlock(idx, 'items', newItems); }} className="text-xs font-bold text-indigo-600 flex items-center gap-1"><Plus size={14}/> Add Term</button></div>)}
+            {block.type === 'flashcard' && (<div className="space-y-3 mt-4"><div className="flex gap-2"><FlipVertical size={18} className="text-indigo-500"/><span className="text-sm font-bold text-slate-700">Embedded Flashcard</span></div><input className="w-full p-2 border rounded text-sm font-bold" placeholder="Front (Latin)" value={block.front} onChange={e => updateBlock(idx, 'front', e.target.value)} /><input className="w-full p-2 border rounded text-sm" placeholder="Back (English)" value={block.back} onChange={e => updateBlock(idx, 'back', e.target.value)} /></div>)}
+            {block.type === 'dialogue' && (<div className="space-y-3 mt-6">{block.lines.map((line: any, lIdx: number) => (<div key={lIdx} className="flex gap-2 text-sm"><input className="w-16 p-1 bg-slate-50 rounded border border-slate-100 text-xs font-bold" placeholder="Speaker" value={line.speaker} onChange={e => updateDialogueLine(idx, lIdx, 'speaker', e.target.value)} /><div className="flex-1 space-y-1"><input className="w-full p-1 border-b border-slate-100" placeholder="Latin" value={line.text} onChange={e => updateDialogueLine(idx, lIdx, 'text', e.target.value)} /><input className="w-full p-1 text-xs text-slate-500 italic" placeholder="English" value={line.translation} onChange={e => updateDialogueLine(idx, lIdx, 'translation', e.target.value)} /></div></div>))}<button onClick={() => { const newLines = [...block.lines, { speaker: 'B', text: '', translation: '', side: 'right' }]; updateBlock(idx, 'lines', newLines); }} className="text-xs font-bold text-indigo-600 flex items-center gap-1"><Plus size={14}/> Add Line</button></div>)}
+            {block.type === 'quiz' && (<div className="space-y-3 mt-4"><input className="w-full p-2 bg-slate-50 rounded-lg font-bold text-sm" placeholder="Question" value={block.question} onChange={e => updateBlock(idx, 'question', e.target.value)} /><div className="space-y-1"><p className="text-[10px] font-bold text-slate-400 uppercase">Options (ID, Text)</p>{block.options.map((opt: any, oIdx: number) => (<div key={oIdx} className="flex gap-2"><input className="w-8 p-1 bg-slate-50 text-center text-xs" value={opt.id} readOnly /><input className="flex-1 p-1 border-b border-slate-100 text-sm" value={opt.text} onChange={(e) => { const newOpts = [...block.options]; newOpts[oIdx].text = e.target.value; updateBlock(idx, 'options', newOpts); }} /></div>))}</div><div className="flex items-center gap-2 text-sm mt-2"><span className="text-slate-500">Correct ID:</span><input className="w-10 p-1 bg-green-50 border border-green-200 rounded text-center font-bold text-green-700" value={block.correctId} onChange={e => updateBlock(idx, 'correctId', e.target.value)} /></div></div>)}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-3 gap-2"><button onClick={() => addBlock('text')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><AlignLeft size={20}/> <span className="text-[10px] font-bold">Text</span></button><button onClick={() => addBlock('dialogue')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><MessageSquare size={20}/> <span className="text-[10px] font-bold">Dialogue</span></button><button onClick={() => addBlock('quiz')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><HelpCircle size={20}/> <span className="text-[10px] font-bold">Quiz</span></button><button onClick={() => addBlock('vocab-list')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><List size={20}/> <span className="text-[10px] font-bold">Vocab List</span></button><button onClick={() => addBlock('flashcard')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><FlipVertical size={20}/> <span className="text-[10px] font-bold">Flashcard</span></button><button onClick={() => addBlock('image')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><Image size={20}/> <span className="text-[10px] font-bold">Image</span></button></div>
+      <div className="pt-4 border-t border-slate-100"><button onClick={handleSave} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform"><Save size={20} /> Save Lesson to Library</button></div>
+    </div>
+  );
+}
 
 function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allDecks }: any) {
   const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
@@ -1591,108 +1819,7 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
   );
 }
 
-function ClassAnalytics({ classData }: any) {
-  const [logs, setLogs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const q = query(collection(db, 'artifacts', appId, 'activity_logs'), orderBy('timestamp', 'desc'), limit(100));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const allLogs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const classLogs = allLogs.filter((log: any) => classData.studentEmails?.includes(log.studentEmail));
-      setLogs(classLogs);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [classData]);
-
-  const studentStats = useMemo(() => {
-    const stats: any = {};
-    (classData.students || []).forEach((email: string) => {
-        stats[email] = { name: email.split('@')[0], email, xp: 0, completed: 0, avgScore: 0, lastActive: null, scoreCount: 0 };
-    });
-    logs.forEach((log: any) => {
-        if (stats[log.studentEmail]) {
-            stats[log.studentEmail].xp += (log.xp || 0);
-            stats[log.studentEmail].completed += 1;
-            if (!stats[log.studentEmail].lastActive) stats[log.studentEmail].lastActive = log.timestamp;
-            if (log.type === 'quiz_score' && log.scoreDetail) {
-                const pct = (log.scoreDetail.score / log.scoreDetail.total) * 100;
-                const currentTotal = stats[log.studentEmail].avgScore * stats[log.studentEmail].scoreCount;
-                stats[log.studentEmail].scoreCount++;
-                stats[log.studentEmail].avgScore = (currentTotal + pct) / stats[log.studentEmail].scoreCount;
-            }
-        }
-    });
-    return Object.values(stats);
-  }, [logs, classData]);
-
-  return (
-    <div className="h-full flex flex-col bg-slate-50">
-        <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total XP</p>
-                <div className="flex items-center gap-2 text-indigo-600">
-                    <Zap size={20} fill="currentColor"/>
-                    <span className="text-2xl font-black">{logs.reduce((acc, l) => acc + (l.xp || 0), 0)}</span>
-                </div>
-            </div>
-            <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Assignments Done</p>
-                <div className="flex items-center gap-2 text-emerald-600">
-                    <CheckCircle2 size={20}/>
-                    <span className="text-2xl font-black">{logs.filter(l => l.type !== 'login').length}</span>
-                </div>
-            </div>
-            <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Learners</p>
-                <div className="flex items-center gap-2 text-blue-600">
-                    <Users size={20}/>
-                    <span className="text-2xl font-black">{studentStats.filter((s: any) => s.xp > 0).length} / {(classData.students || []).length}</span>
-                </div>
-            </div>
-        </div>
-        <div className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                <h3 className="font-bold text-slate-700 flex items-center gap-2"><BarChart3 size={18} className="text-indigo-600"/> Disciple Performance</h3>
-                <span className="text-xs font-bold text-slate-400 uppercase">Live Data</span>
-            </div>
-            <div className="flex-1 overflow-y-auto custom-scrollbar">
-                <table className="w-full text-left border-collapse">
-                    <thead className="bg-slate-50 sticky top-0 z-10">
-                        <tr>
-                            <th className="p-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Student</th>
-                            <th className="p-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">XP</th>
-                            <th className="p-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">Avg. Score</th>
-                            <th className="p-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Last Active</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {studentStats.length === 0 && (
-                            <tr><td colSpan={4} className="p-8 text-center text-slate-400 italic">No students in roster.</td></tr>
-                        )}
-                        {studentStats.map((s: any, idx: number) => (
-                            <tr key={idx} className="hover:bg-blue-50/50 transition-colors group">
-                                <td className="p-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center font-bold text-xs group-hover:bg-indigo-600 group-hover:text-white transition-colors">{s.name.charAt(0).toUpperCase()}</div>
-                                        <div><p className="text-sm font-bold text-slate-700">{s.name}</p><p className="text-[10px] text-slate-400">{s.email}</p></div>
-                                    </div>
-                                </td>
-                                <td className="p-4 text-center"><span className="inline-block px-2 py-1 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold border border-amber-100">{s.xp} XP</span></td>
-                                <td className="p-4 text-center">{s.scoreCount > 0 ? (<div className="flex flex-col items-center gap-1"><span className={`text-xs font-bold ${s.avgScore >= 80 ? 'text-emerald-600' : s.avgScore >= 60 ? 'text-amber-600' : 'text-rose-600'}`}>{Math.round(s.avgScore)}%</span><div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full rounded-full ${s.avgScore >= 80 ? 'bg-emerald-400' : 'bg-amber-400'}`} style={{width: `${s.avgScore}%`}}></div></div></div>) : (<span className="text-xs text-slate-300">-</span>)}</td>
-                                <td className="p-4 text-right">{s.lastActive ? (<span className="text-xs font-mono text-slate-500">{new Date(s.lastActive).toLocaleDateString()} <br/><span className="text-[9px] opacity-70">{new Date(s.lastActive).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span></span>) : (<span className="text-xs text-slate-300 italic">Never</span>)}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-  );
-}
-
-function ClassManagerView({ user, classes, lessons, allDecks }: any) {
+function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [newClassName, setNewClassName] = useState('');
   const [assignModalOpen, setAssignModalOpen] = useState(false);
@@ -1700,7 +1827,9 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
   const [targetStudentMode, setTargetStudentMode] = useState('all'); 
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [assignType, setAssignType] = useState<'deck' | 'lesson'>('lesson');
-  const [viewTab, setViewTab] = useState<'content' | 'forum' | 'analytics'>('content');
+  const [viewTab, setViewTab] = useState<'content' | 'forum'>('content');
+
+  // -- Student Selector States --
   const [isStudentListOpen, setIsStudentListOpen] = useState(false);
   const [availableStudents, setAvailableStudents] = useState<any[]>([]);
   const [studentSearch, setStudentSearch] = useState('');
@@ -1744,8 +1873,8 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
             <div><h1 className="text-2xl font-bold text-slate-900">{selectedClass.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {selectedClass.code}</p></div>
             <div className="flex gap-2">
                 <button onClick={() => setViewTab('content')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'content' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Manage</button>
-                <button onClick={() => setViewTab('analytics')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'analytics' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Analytics</button>
                 <button onClick={() => setViewTab('forum')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'forum' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Forum</button>
+                
                 {viewTab === 'content' && (
                     <>
                     <button onClick={() => { setAssignType('lesson'); setAssignModalOpen(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-indigo-700 active:scale-95 transition-all uppercase tracking-wider"><BookOpen size={16}/> ASSIGN LESSON</button>
@@ -1756,7 +1885,7 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
           </div>
         </div>
 
-        {viewTab === 'content' && (
+        {viewTab === 'content' ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="space-y-4">
                     <h3 className="font-bold text-slate-800 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3>
@@ -1768,17 +1897,9 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">{(!selectedClass.students || selectedClass.students.length === 0) && <div className="p-4 text-center text-slate-400 text-sm italic">No students joined yet.</div>}{selectedClass.students?.map((s: string, i: number) => (<div key={i} className="p-3 border-b border-slate-50 last:border-0 flex items-center gap-3"><div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs">{s.charAt(0)}</div><span className="text-sm font-medium text-slate-700">{s}</span></div>))}</div>
                 </div>
             </div>
-        )}
-        
-        {viewTab === 'forum' && (
+        ) : (
             <div className="h-full pb-20">
                 <ClassForum classId={selectedClass.id} user={user} userData={{...userData, role: 'instructor'}} />
-            </div>
-        )}
-
-        {viewTab === 'analytics' && (
-            <div className="h-full pb-20">
-                <ClassAnalytics classData={selectedClass} />
             </div>
         )}
 
@@ -1788,7 +1909,29 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
                     <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center"><h3 className="font-bold text-lg">Select Students</h3><button onClick={() => setIsStudentListOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-600"/></button></div>
                     <div className="p-4 border-b border-slate-100"><div className="relative"><Search className="absolute left-3 top-2.5 text-slate-400" size={16} /><input value={studentSearch} onChange={(e) => setStudentSearch(e.target.value)} placeholder="Search by name or email..." className="w-full pl-9 p-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" autoFocus /></div></div>
                     <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
-                        {availableStudents.length === 0 ? (<div className="text-center py-8 text-slate-400">Loading students...</div>) : (availableStudents.filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()) || s.email.toLowerCase().includes(studentSearch.toLowerCase())).map((student, idx) => { const isAdded = selectedClass.students?.includes(student.email); return ( <div key={idx} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors border-b border-slate-50 last:border-0"><div className="flex items-center gap-3"><div className="w-8 h-8 bg-slate-200 text-slate-600 rounded-full flex items-center justify-center font-bold text-xs">{student.name.charAt(0)}</div><div><p className="text-sm font-bold text-slate-800">{student.name}</p><p className="text-xs text-slate-500">{student.email}</p></div></div><button onClick={() => addStudentToClass(student.email)} disabled={isAdded} className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${isAdded ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>{isAdded ? 'Joined' : 'Add'}</button></div> ) }))}
+                        {availableStudents.length === 0 ? (
+                            <div className="text-center py-8 text-slate-400">Loading students...</div>
+                        ) : (
+                            availableStudents
+                            .filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()) || s.email.toLowerCase().includes(studentSearch.toLowerCase()))
+                            .map((student, idx) => { 
+                                const isAdded = selectedClass.students?.includes(student.email); 
+                                return ( 
+                                    <div key={idx} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors border-b border-slate-50 last:border-0">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 bg-slate-200 text-slate-600 rounded-full flex items-center justify-center font-bold text-xs">{student.name.charAt(0)}</div>
+                                            <div>
+                                                <p className="text-sm font-bold text-slate-800">{student.name}</p>
+                                                <p className="text-xs text-slate-500">{student.email}</p>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => addStudentToClass(student.email)} disabled={isAdded} className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${isAdded ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
+                                            {isAdded ? 'Joined' : 'Add'}
+                                        </button>
+                                    </div> 
+                                ) 
+                            })
+                        )}
                     </div>
                 </div>
             </div>
@@ -1804,8 +1947,32 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
                   {targetStudentMode === 'specific' && <p className="text-[10px] text-slate-400 mt-2 text-right">{selectedAssignees.length} selected</p>}
               </div>
               <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                  {assignType === 'deck' && (<div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><Layers size={14}/> Available Decks</h4><div className="space-y-2">{Object.keys(allDecks || {}).length === 0 ? <p className="text-sm text-slate-400 italic">No decks found.</p> : Object.entries(allDecks).map(([key, deck]: any) => (<button key={key} onClick={() => assignContent({ ...deck, id: key }, 'deck')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{deck.title}</h4><p className="text-xs text-slate-500">{deck.cards?.length || 0} Cards</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-orange-500"/></button>))}</div></div>)}
-                  {assignType === 'lesson' && (<div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><BookOpen size={14}/> Available Lessons</h4><div className="space-y-2">{lessons.length === 0 ? <p className="text-sm text-slate-400 italic">No lessons found.</p> : lessons.map((l: any) => (<button key={l.id} onClick={() => assignContent(l, 'lesson')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-indigo-500"/></button>))}</div></div>)}
+                  {assignType === 'deck' && (
+                      <div>
+                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><Layers size={14}/> Available Decks</h4>
+                          <div className="space-y-2">
+                              {Object.keys(allDecks || {}).length === 0 ? <p className="text-sm text-slate-400 italic">No decks found.</p> : Object.entries(allDecks).map(([key, deck]: any) => (
+                                  <button key={key} onClick={() => assignContent({ ...deck, id: key }, 'deck')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all group flex justify-between items-center">
+                                      <div><h4 className="font-bold text-slate-800 text-sm">{deck.title}</h4><p className="text-xs text-slate-500">{deck.cards?.length || 0} Cards</p></div>
+                                      <PlusCircle size={18} className="text-slate-300 group-hover:text-orange-500"/>
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                  )}
+                  {assignType === 'lesson' && (
+                      <div>
+                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><BookOpen size={14}/> Available Lessons</h4>
+                          <div className="space-y-2">
+                              {lessons.length === 0 ? <p className="text-sm text-slate-400 italic">No lessons found.</p> : lessons.map((l: any) => (
+                                  <button key={l.id} onClick={() => assignContent(l, 'lesson')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group flex justify-between items-center">
+                                      <div><h4 className="font-bold text-slate-800 text-sm">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div>
+                                      <PlusCircle size={18} className="text-slate-300 group-hover:text-indigo-500"/>
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                  )}
               </div>
             </div>
           </div>
@@ -1813,7 +1980,7 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
       </div>
     );
   }
-
+  
   return (
     <div className="space-y-6 animate-in fade-in duration-500 relative">
       {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
@@ -1822,17 +1989,18 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
     </div>
   );
 }
+
+// 2. Replace InstructorDashboard
+// Fixes: Passes 'userData' properly to ClassManagerView
 function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, onLogout }: any) {
   const [activeTab, setActiveTab] = useState('dashboard');
   
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden">
-      {/* Sidebar for Desktop */}
       <div className="w-64 bg-slate-900 text-white flex-col hidden md:flex">
-        <div className="p-6 border-b border-slate-800">
-            <h1 className="text-xl font-bold flex items-center gap-2"><GraduationCap className="text-indigo-400"/> Instructor</h1>
-            <p className="text-xs text-slate-400 mt-1">{user.email}</p>
-        </div>
+        <div className="p-6 border-b border-slate-800"><h1 className="text-xl font-bold flex items-center gap-2">
+        <GraduationCap className="text-indigo-400"/> Instructor 
+    </h1><p className="text-xs text-slate-400 mt-1">{user.email}</p></div>
         <div className="flex-1 p-4 space-y-2">
             <button onClick={() => setActiveTab('dashboard')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'}`}><LayoutDashboard size={20} /> Overview</button>
             <button onClick={() => setActiveTab('classes')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'classes' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'}`}><School size={20} /> Classes & Roster</button>
@@ -1841,11 +2009,8 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
         </div>
         <div className="p-4 border-t border-slate-800"><button onClick={onLogout} className="w-full p-3 rounded-xl bg-slate-800 text-rose-400 flex items-center gap-3 hover:bg-slate-700 transition-colors"><LogOut size={20} /> Sign Out</button></div>
       </div>
-
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
          <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center"><span className="font-bold flex items-center gap-2"><GraduationCap/> Magister</span><div className="flex gap-4"><button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'text-indigo-400' : 'text-slate-400'}><LayoutDashboard/></button><button onClick={() => setActiveTab('classes')} className={activeTab === 'classes' ? 'text-indigo-400' : 'text-slate-400'}><School/></button><button onClick={() => setActiveTab('content')} className={activeTab === 'content' ? 'text-indigo-400' : 'text-slate-400'}><Library/></button></div></div>
-         
          <div className="flex-1 overflow-y-auto p-4 md:p-8">
             <div className="max-w-6xl mx-auto h-full">
                 {activeTab === 'dashboard' && (
@@ -1867,7 +2032,6 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
                     </div>
                 )}
                 {activeTab === 'classes' && (<ClassManagerView user={user} userData={userData} classes={userData?.classes || []} lessons={lessons} allDecks={allDecks} />)}
-                {/* THIS IS WHERE BUILDERHUB IS USED */}
                 {activeTab === 'content' && (<div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full overflow-hidden flex flex-col"><div className="flex-1 overflow-y-auto"><BuilderHub onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} onSaveLesson={onSaveLesson} allDecks={allDecks} /></div></div>)}
                 {activeTab === 'profile' && <ProfileView user={user} userData={userData} />}
             </div>
@@ -1876,6 +2040,12 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
     </div>
   );
 }
+
+// ============================================================================
+// PASTE THIS AT THE VERY BOTTOM OF YOUR FILE
+// (Replace your existing RoleToggle and function App)
+// ============================================================================
+
 function RoleToggle({ user, userData }: any) {
   const [switching, setSwitching] = useState(false);
 
@@ -1962,8 +2132,8 @@ function App() {
   // Merge all content for the library
   // (Assuming EMAIL_MODULE_DATA is defined at the top of your file, if not, remove it from this array)
   // If EMAIL_MODULE_DATA is undefined errors, remove it from the array below.
-  const lessons = useMemo(() => [...systemLessons, ...customLessons, ...classLessons.filter(l => l.contentType !== 'deck'), EMAIL_MODULE_DATA], [systemLessons, customLessons, classLessons]);
-  const libraryLessons = useMemo(() => [...systemLessons, ...customLessons, EMAIL_MODULE_DATA], [systemLessons, customLessons]);
+  const lessons = useMemo(() => [...systemLessons, ...customLessons, ...classLessons.filter(l => l.contentType !== 'deck')], [systemLessons, customLessons, classLessons]);
+  const libraryLessons = useMemo(() => [...systemLessons, ...customLessons], [systemLessons, customLessons]);
 
   // --- HANDLERS ---
   const handleContentSelection = (item: any) => { 
