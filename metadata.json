@@ -1,5 +1,9 @@
 {
   "name": "LinguistFlow",
-  "description": "A comprehensive Latin learning platform for students and instructors.",
+  "short_name": "LinguistFlow",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f8fafc", 
+  "theme_color": "#2563EB",
   "requestFramePermissions": []
 }
