@@ -336,170 +336,134 @@ function AuthView() {
 // --- BEEFED UP PROFILE VIEW (FIXED LAYOUT) ---
 function ProfileView({ user, userData }: any) {
   const [deploying, setDeploying] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editName, setEditName] = useState(userData?.name || '');
-
-  // Calculate Stats & Ranks
-  const { level, currentLevelXP, nextLevelXP, progress, rank } = getLevelInfo(userData?.xp || 0);
-  
-  const badges = [
-    { id: '1', icon: Zap, color: 'text-yellow-500', bg: 'bg-yellow-100', label: 'Week Streak', earned: (userData?.streak || 0) >= 7 },
-    { id: '2', icon: BookOpen, color: 'text-indigo-500', bg: 'bg-indigo-100', label: 'Scholar', earned: (userData?.xp || 0) > 500 },
-    { id: '3', icon: Target, color: 'text-rose-500', bg: 'bg-rose-100', label: 'Sharpshooter', earned: (userData?.xp || 0) > 1000 },
-    { id: '4', icon: Trophy, color: 'text-emerald-500', bg: 'bg-emerald-100', label: 'Champion', earned: (userData?.completedAssignments?.length || 0) > 5 },
-  ];
-
   const handleLogout = () => signOut(auth);
   
-  const handleSaveProfile = async () => {
-      if(!editName.trim()) return;
-      await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { name: editName });
-      setIsEditing(false);
-  };
+  // Calculate Level Data for the Stats Tablet
+  const { level, progress, rank } = getLevelInfo(userData?.xp || 0);
 
   const deploySystemContent = async () => { setDeploying(true); const batch = writeBatch(db); Object.entries(INITIAL_SYSTEM_DECKS).forEach(([key, deck]) => batch.set(doc(db, 'artifacts', appId, 'public', 'data', 'system_decks', key), deck)); INITIAL_SYSTEM_LESSONS.forEach((lesson: any) => batch.set(doc(db, 'artifacts', appId, 'public', 'data', 'system_lessons', lesson.id), lesson)); try { await batch.commit(); alert("Deployed!"); } catch (e: any) { alert("Error: " + e.message); } setDeploying(false); };
   const toggleRole = async () => { if (!userData) return; const newRole = userData.role === 'instructor' ? 'student' : 'instructor'; await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole }); };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 overflow-y-auto custom-scrollbar">
-      
-      {/* 1. HERO HEADER (FIXED) */}
-      {/* Removed 'overflow-hidden' from parent so the badge can hang out. Added pb-20 for more space. */}
-      <div className="relative bg-slate-900 text-white pt-10 px-6 pb-20 mb-8 shrink-0 rounded-b-[2.5rem] shadow-xl z-10">
-          
-          {/* Background Decoration Container (This keeps the giant trophy from spilling out) */}
-          <div className="absolute inset-0 overflow-hidden rounded-b-[2.5rem] pointer-events-none">
-             <div className="absolute top-[-20px] right-[-20px] opacity-5 text-indigo-500 rotate-12">
-                <Trophy size={250}/>
-             </div>
-          </div>
+    <div className="h-full flex flex-col bg-slate-50 relative overflow-y-auto overflow-x-hidden">
+        
+        {/* --- THE CROWN OF GLORY (Header) --- */}
+        <div className="relative bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 pb-32 pt-20 px-6 rounded-b-[3.5rem] shadow-2xl z-0 shrink-0 text-center">
+            {/* Background Decor */}
+            <div className="absolute top-[-50%] left-[-20%] w-[500px] h-[500px] bg-blue-400/20 rounded-full blur-[80px] mix-blend-overlay pointer-events-none"></div>
+            <div className="absolute bottom-[0%] right-[-10%] w-[300px] h-[300px] bg-indigo-300/20 rounded-full blur-[60px] mix-blend-overlay pointer-events-none"></div>
+            
+            {/* Avatar Halo */}
+            <div className="relative inline-block mb-4">
+                <div className="w-28 h-28 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border-2 border-white/30 shadow-[0_0_40px_rgba(255,255,255,0.2)] relative z-10">
+                    <span className="font-serif font-bold text-5xl text-white drop-shadow-lg">{userData?.name?.charAt(0) || 'U'}</span>
+                </div>
+                {/* Decorative Rings */}
+                <div className="absolute inset-0 border border-white/10 rounded-full scale-125 animate-pulse"></div>
+                <div className="absolute inset-0 border border-white/5 rounded-full scale-150"></div>
+            </div>
 
-          <div className="relative z-10 flex flex-col items-center">
-              <div className="relative group">
-                  <div className="w-28 h-28 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 p-1 shadow-2xl">
-                      <div className="w-full h-full rounded-full bg-slate-800 flex items-center justify-center text-4xl font-bold">
-                          {userData?.name?.charAt(0)}
-                      </div>
-                  </div>
-                  <button className="absolute bottom-0 right-0 bg-white text-slate-900 p-2 rounded-full shadow-lg hover:scale-110 transition-transform"><Camera size={16}/></button>
-              </div>
-              
-              <div className="mt-4 text-center w-full max-w-xs mx-auto">
-                  {isEditing ? (
-                      <div className="flex gap-2 justify-center animate-in fade-in mb-2">
-                          <input className="text-slate-900 rounded-lg px-2 py-1 text-center font-bold w-full" value={editName} onChange={e => setEditName(e.target.value)} autoFocus />
-                          <button onClick={handleSaveProfile} className="bg-emerald-500 p-2 rounded-lg text-white"><Check size={18}/></button>
-                      </div>
-                  ) : (
-                      <h2 onClick={() => setIsEditing(true)} className="text-3xl font-bold flex items-center justify-center gap-2 cursor-pointer hover:text-indigo-200 transition-colors mb-1">
-                          {userData?.name} <Edit2 size={16} className="opacity-50"/>
-                      </h2>
-                  )}
-                  <p className="text-indigo-300 font-medium uppercase tracking-widest text-xs break-all">{userData?.role} • {user.email}</p>
-              </div>
-          </div>
-          
-          {/* Rank Badge Floating - Moved to stick properly to the curved bottom */}
-          <div className="absolute -bottom-5 left-1/2 transform -translate-x-1/2 z-20">
-              <div className="bg-white text-slate-900 px-6 py-2.5 rounded-full shadow-xl flex items-center gap-3 border border-slate-100 whitespace-nowrap">
-                  <div className="bg-yellow-100 p-1.5 rounded-full">
-                    <Medal size={20} className="text-yellow-600" />
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-bold text-slate-400 uppercase leading-none">Rank</span>
-                    <span className="font-black uppercase tracking-wider text-sm">{rank}</span>
-                  </div>
-              </div>
-          </div>
-      </div>
+            <h1 className="text-4xl font-serif font-bold text-white drop-shadow-md mb-2">{userData?.name}</h1>
+            <p className="text-blue-100 font-medium tracking-wide text-sm opacity-80">{user.email}</p>
+            
+            <div className="mt-4 inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 px-4 py-1.5 rounded-full shadow-inner">
+                <div className={`w-2 h-2 rounded-full ${userData?.role === 'instructor' ? 'bg-amber-400' : 'bg-emerald-400'} shadow-[0_0_10px_currentColor]`}></div>
+                <span className="text-xs font-bold text-white uppercase tracking-widest">{userData?.role} Account</span>
+            </div>
+        </div>
 
-      {/* 2. MAIN BENTO GRID */}
-      <div className="px-6 pb-24 space-y-6 pt-4">
-          
-          {/* XP & Level Progress */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-              <div className="flex justify-between items-end mb-2">
-                  <div>
-                      <p className="text-xs text-slate-400 font-bold uppercase">Current Level</p>
-                      <p className="text-4xl font-black text-slate-800">{level}</p>
-                  </div>
-                  <div className="text-right">
-                      <p className="text-xs text-slate-400 font-bold uppercase">{currentLevelXP} / {nextLevelXP} XP</p>
-                  </div>
-              </div>
-              <div className="h-4 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-1000" style={{ width: `${progress}%` }} />
-              </div>
-              <p className="text-xs text-center mt-3 text-slate-500 italic">You are in the top 10% of students this week!</p>
-          </div>
+        {/* --- THE BODY OF CONTENT --- */}
+        <div className="px-6 -mt-20 relative z-10 pb-24">
+            
+            {/* --- TABLETS OF TESTIMONY (Stats Card) --- */}
+            <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-blue-100 mb-8 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-400 via-indigo-500 to-blue-600"></div>
+                
+                <div className="grid grid-cols-2 gap-y-8 gap-x-4">
+                    {/* Stat 1: Level */}
+                    <div className="text-center border-r border-slate-100">
+                        <span className="block text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">Current Rank</span>
+                        <div className="flex items-center justify-center gap-2 text-indigo-600">
+                            <Award size={24} />
+                            <span className="text-2xl font-black">{level}</span>
+                        </div>
+                        <span className="text-xs font-bold text-indigo-400">{rank}</span>
+                    </div>
 
-          {/* Stats Row */}
-          <div className="grid grid-cols-2 gap-4">
-              <div className="bg-orange-50 p-5 rounded-3xl border border-orange-100 flex flex-col items-center justify-center text-center">
-                  <Zap className="text-orange-500 mb-2" size={32} fill="currentColor" />
-                  <span className="text-3xl font-black text-slate-800">{userData?.streak}</span>
-                  <span className="text-[10px] uppercase font-bold text-orange-400 tracking-wider">Day Streak</span>
-              </div>
-              <div className="bg-blue-50 p-5 rounded-3xl border border-blue-100 flex flex-col items-center justify-center text-center">
-                  <CheckCircle2 className="text-blue-500 mb-2" size={32} />
-                  <span className="text-3xl font-black text-slate-800">{userData?.completedAssignments?.length || 0}</span>
-                  <span className="text-[10px] uppercase font-bold text-blue-400 tracking-wider">Lessons Done</span>
-              </div>
-          </div>
+                    {/* Stat 2: Streak */}
+                    <div className="text-center">
+                        <span className="block text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">Day Streak</span>
+                        <div className="flex items-center justify-center gap-2 text-amber-500">
+                            <Zap size={24} fill="currentColor"/>
+                            <span className="text-2xl font-black">{userData?.streak || 1}</span>
+                        </div>
+                        <span className="text-xs font-bold text-amber-400">On Fire!</span>
+                    </div>
 
-          {/* Badges Section */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-              <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Award className="text-indigo-500"/> Achievements</h3>
-              <div className="grid grid-cols-4 gap-2">
-                  {badges.map((badge) => (
-                      <div key={badge.id} className={`aspect-square rounded-2xl flex flex-col items-center justify-center p-2 text-center transition-all ${badge.earned ? badge.bg : 'bg-slate-100 opacity-50 grayscale'}`}>
-                          <badge.icon size={24} className={`mb-1 ${badge.earned ? badge.color : 'text-slate-400'}`} />
-                      </div>
-                  ))}
-              </div>
-              <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center text-xs text-slate-400">
-                  <span>{badges.filter(b => b.earned).length} / {badges.length} Unlocked</span>
-                  <button className="text-indigo-600 font-bold">View All</button>
-              </div>
-          </div>
+                    {/* Progress Bar (Spanning both cols) */}
+                    <div className="col-span-2 pt-4 border-t border-slate-50">
+                        <div className="flex justify-between items-end mb-2">
+                            <span className="text-xs font-bold text-slate-500">XP Progress</span>
+                            <span className="text-xs font-bold text-indigo-600">{userData?.xp || 0} XP</span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner">
+                            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-full rounded-full transition-all duration-1000 relative" style={{ width: `${progress}%` }}>
+                                <div className="absolute inset-0 bg-white/30 animate-[shimmer_2s_infinite]"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-          {/* Activity Graph (Visual Mockup) */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-              <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Activity className="text-emerald-500"/> Weekly Activity</h3>
-              <div className="flex items-end justify-between h-24 gap-2">
-                  {[30, 45, 20, 60, 80, 50, 90].map((h, i) => (
-                      <div key={i} className="flex-1 flex flex-col justify-end h-full group">
-                          <div 
-                            className={`w-full rounded-t-lg transition-all duration-500 group-hover:opacity-80 ${i === 6 ? 'bg-indigo-600' : 'bg-indigo-200'}`} 
-                            style={{ height: `${h}%` }} 
-                          />
-                      </div>
-                  ))}
-              </div>
-              <div className="flex justify-between text-[10px] text-slate-400 font-bold mt-2 uppercase">
-                  <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
-              </div>
-          </div>
+            {/* --- ACTS OF THE USER (Actions) --- */}
+            <div className="space-y-4">
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider ml-2 mb-2">Account Settings</h3>
+                
+                <button onClick={toggleRole} className="w-full bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between group hover:border-indigo-300 hover:shadow-md transition-all active:scale-[0.98]">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                            <School size={24}/>
+                        </div>
+                        <div className="text-left">
+                            <h4 className="font-bold text-slate-800 text-lg">Switch Role</h4>
+                            <p className="text-xs text-slate-500">Currently: {userData?.role}</p>
+                        </div>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                        <ChevronRight size={16}/>
+                    </div>
+                </button>
 
-          {/* Settings / Actions */}
-          <div className="space-y-3 pt-4">
-              <button onClick={toggleRole} className="w-full bg-white p-4 rounded-xl border border-slate-200 text-slate-600 font-bold flex justify-between items-center hover:bg-slate-50 hover:border-indigo-200 transition-all">
-                  <span className="flex items-center gap-3"><School size={20} className="text-slate-400"/> Switch Role</span>
-                  <div className="bg-slate-100 px-2 py-1 rounded text-xs uppercase">{userData?.role}</div>
-              </button>
-              
-              <button onClick={deploySystemContent} disabled={deploying} className="w-full bg-white p-4 rounded-xl border border-slate-200 text-slate-600 font-bold flex justify-between items-center hover:bg-slate-50 hover:border-indigo-200 transition-all">
-                  <span className="flex items-center gap-3"><UploadCloud size={20} className="text-slate-400"/> {deploying ? 'Deploying...' : 'Reset Content'}</span>
-                  {deploying && <Loader size={16} className="animate-spin"/>}
-              </button>
+                <button onClick={deploySystemContent} disabled={deploying} className="w-full bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between group hover:border-slate-400 hover:shadow-md transition-all active:scale-[0.98]">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center group-hover:bg-slate-800 group-hover:text-white transition-colors">
+                            {deploying ? <Loader className="animate-spin"/> : <UploadCloud size={24}/>}
+                        </div>
+                        <div className="text-left">
+                            <h4 className="font-bold text-slate-800 text-lg">Deploy Content</h4>
+                            <p className="text-xs text-slate-500">Reset system defaults</p>
+                        </div>
+                    </div>
+                </button>
 
-              <button onClick={handleLogout} className="w-full bg-rose-50 p-4 rounded-xl border border-rose-100 text-rose-600 font-bold flex justify-between items-center hover:bg-rose-100 transition-all">
-                  <span className="flex items-center gap-3"><LogOut size={20}/> Sign Out</span>
-              </button>
-          </div>
-          
-          <p className="text-center text-xs text-slate-400 pb-8">LinguistFlow v3.0 • Built with React & Firebase</p>
-      </div>
+                <button onClick={handleLogout} className="w-full bg-rose-50 p-5 rounded-2xl border border-rose-100 shadow-sm flex items-center justify-between group hover:bg-rose-100 hover:border-rose-200 transition-all active:scale-[0.98] mt-6">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-white text-rose-500 rounded-xl flex items-center justify-center shadow-sm">
+                            <LogOut size={24}/>
+                        </div>
+                        <div className="text-left">
+                            <h4 className="font-bold text-rose-700 text-lg">Sign Out</h4>
+                            <p className="text-xs text-rose-500">See you soon!</p>
+                        </div>
+                    </div>
+                </button>
+            </div>
+            
+            <div className="mt-12 text-center">
+                <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">LinguistFlow v3.0 • Cornflower Edition</p>
+            </div>
+
+        </div>
     </div>
   );
 }
