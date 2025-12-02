@@ -2246,7 +2246,7 @@ function App() {
           background-color: #f8fafc; /* slate-50 */
         }
         /* Custom Scrollbar Styling */
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 0px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
       `}</style>
