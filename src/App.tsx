@@ -1929,8 +1929,54 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
 }
 
 // 3. Replace App
-// Fixes: Closing brace syntax errors, properly defines renderStudentView, and fixes handleFinishLesson duration logic.
+// ... [All your other Views: HomeView, ProfileView, ClassManagerView, etc.] ...
+
+// --- PASTE THE ROLE TOGGLE FUNCTION HERE ---
+function RoleToggle({ user, userData }: any) {
+  const [switching, setSwitching] = useState(false);
+
+  const handleToggle = async () => {
+    if (!user || switching) return;
+    setSwitching(true);
+    // The Great Transmutation
+    const newRole = userData?.role === 'instructor' ? 'student' : 'instructor';
+    try {
+        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole });
+    } catch (e) {
+        console.error("The spirits are displeased:", e);
+    } finally {
+        // Add a slight delay for dramatic effect/prevent spam
+        setTimeout(() => setSwitching(false), 500); 
+    }
+  };
+
+  if (!userData) return null;
+
+  return (
+    <button 
+      onClick={handleToggle}
+      disabled={switching}
+      className={`fixed bottom-24 right-4 z-[100] flex items-center gap-2 px-4 py-3 rounded-full shadow-2xl border border-white/20 backdrop-blur-xl transition-all duration-500 active:scale-90 group ${
+        userData.role === 'instructor' 
+          ? 'bg-slate-900/80 text-white hover:bg-slate-800' 
+          : 'bg-blue-600/80 text-white hover:bg-blue-500'
+      }`}
+    >
+      <div className={`transition-transform duration-700 ${switching ? 'rotate-180' : ''}`}>
+        {switching ? <Loader size={20} className="animate-spin"/> : <ArrowRight size={20} className={userData.role === 'instructor' ? "rotate-180" : ""}/>}
+      </div>
+      <div className="flex flex-col items-start">
+          <span className="text-[9px] uppercase font-bold tracking-widest opacity-70 leading-none">View As</span>
+          <span className="text-xs font-bold leading-none">{userData.role === 'instructor' ? 'Magister' : 'Student'}</span>
+      </div>
+    </button>
+  );
+}
+
+// --- MAIN APP COMPONENT ---
 function App() {
+  const [activeTab, setActiveTab] = useState('home');
+  // ... rest of your App codefunction App() {
   const [activeTab, setActiveTab] = useState('home');
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
@@ -2070,6 +2116,7 @@ function App() {
     <div className="bg-slate-100 min-h-screen font-sans text-slate-900 flex justify-center items-center p-0 sm:p-4 relative overflow-hidden">
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-rose-400/30 rounded-full blur-[100px] pointer-events-none mix-blend-multiply animate-pulse" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-400/30 rounded-full blur-[100px] pointer-events-none mix-blend-multiply" />
+      <RoleToggle user={user} userData={userData} />
       <div className={`w-full h-[100dvh] shadow-2xl relative overflow-hidden border-[8px] border-white/40 bg-white/80 backdrop-blur-2xl ${userData?.role === 'instructor' ? 'max-w-full sm:rounded-none border-0' : 'max-w-[400px] sm:rounded-[3rem] sm:h-[800px]'}`}>
         {userData?.role !== 'instructor' && <div className="absolute top-0 left-0 right-0 h-8 bg-white/0 z-50 pointer-events-none" />}
         {renderStudentView()}
