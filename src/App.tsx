@@ -1130,44 +1130,149 @@ function ClassForum({ classId, user, userData }: any) {
   );
 }
 
-// --- STUDENT CLASS VIEW COMPONENT ---
 function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, userData }: any) {
   const [viewMode, setViewMode] = useState<'assignments' | 'forum'>('assignments');
   const completedSet = new Set(userData?.completedAssignments || []);
   const handleAssignmentClick = (assignment: any) => { if (assignment.contentType === 'deck') { onSelectDeck(assignment); } else { onSelectLesson(assignment); } };
   const relevantAssignments = (classData.assignments || []).filter((l: any) => { const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); return isForMe; });
   const pendingCount = relevantAssignments.filter((l: any) => !completedSet.has(l.id)).length;
+  const completedCount = relevantAssignments.length - pendingCount;
+  const progressPercent = relevantAssignments.length > 0 ? (completedCount / relevantAssignments.length) * 100 : 0;
 
   return (
-    <div className="h-full flex flex-col bg-slate-50">
-      <div className="px-6 pt-12 pb-6 bg-white sticky top-0 z-40 border-b border-slate-100">
-        <button onClick={onBack} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Home</button>
-        <div className="flex justify-between items-end">
-            <div>
-                <h1 className="text-2xl font-bold text-slate-900">{classData.name}</h1>
-                <p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {classData.code}</p>
-            </div>
-            <div className="flex bg-slate-100 p-1 rounded-lg">
-                <button onClick={() => setViewMode('assignments')} className={`p-2 rounded-md transition-all ${viewMode === 'assignments' ? 'bg-white shadow text-indigo-600' : 'text-slate-400'}`}><BookOpen size={20}/></button>
-                <button onClick={() => setViewMode('forum')} className={`p-2 rounded-md transition-all ${viewMode === 'forum' ? 'bg-white shadow text-indigo-600' : 'text-slate-400'}`}><MessageSquare size={20}/></button>
-            </div>
-        </div>
+    <div className="h-full flex flex-col bg-slate-50 relative overflow-hidden">
+      
+      {/* --- JUICY CORNFLOWER HEADER --- */}
+      <div className="relative bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 pb-20 pt-12 px-6 rounded-b-[3rem] shadow-2xl z-10 shrink-0">
+          {/* Background Decor */}
+          <div className="absolute top-[-50%] left-[-20%] w-[400px] h-[400px] bg-blue-400/30 rounded-full blur-[80px] mix-blend-overlay pointer-events-none"></div>
+          <div className="absolute bottom-[-20%] right-[-10%] w-[300px] h-[300px] bg-indigo-300/20 rounded-full blur-[60px] mix-blend-overlay pointer-events-none"></div>
+          
+          {/* Top Bar */}
+          <div className="relative z-20 flex justify-between items-start mb-6">
+              <button 
+                onClick={onBack} 
+                className="group flex items-center gap-2 text-white/80 hover:text-white transition-colors bg-white/10 hover:bg-white/20 backdrop-blur-md px-4 py-2 rounded-full text-sm font-bold border border-white/10"
+              >
+                  <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform"/> Back
+              </button>
+              <div className="flex flex-col items-end">
+                  <span className="text-[10px] uppercase font-bold text-blue-200 tracking-widest mb-1">Class Code</span>
+                  <div className="bg-white/20 backdrop-blur-md border border-white/20 text-white font-mono font-bold px-3 py-1 rounded-lg shadow-sm">
+                      {classData.code}
+                  </div>
+              </div>
+          </div>
+
+          {/* Class Title & Tabs */}
+          <div className="relative z-20 text-center">
+              <h1 className="text-3xl md:text-4xl font-serif font-bold text-white mb-6 drop-shadow-md">{classData.name}</h1>
+              
+              {/* GLASS TOGGLE SWITCH */}
+              <div className="inline-flex bg-black/20 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 shadow-inner">
+                  <button 
+                    onClick={() => setViewMode('assignments')} 
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${viewMode === 'assignments' ? 'bg-white text-indigo-600 shadow-lg scale-105' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
+                  >
+                      <BookOpen size={18} className={viewMode === 'assignments' ? 'fill-current' : ''}/> Assignments
+                  </button>
+                  <button 
+                    onClick={() => setViewMode('forum')} 
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${viewMode === 'forum' ? 'bg-white text-indigo-600 shadow-lg scale-105' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
+                  >
+                      <MessageSquare size={18} className={viewMode === 'forum' ? 'fill-current' : ''}/> Forum
+                  </button>
+              </div>
+          </div>
       </div>
       
-      <div className="flex-1 px-6 mt-4 overflow-y-auto pb-24">
+      {/* --- CONTENT AREA --- */}
+      <div className="flex-1 overflow-y-auto pb-24 -mt-10 relative z-20 custom-scrollbar">
+        
         {viewMode === 'assignments' ? (
-            <div className="space-y-6">
-                <div className="bg-indigo-600 rounded-2xl p-6 text-white shadow-lg"><h3 className="text-lg font-bold mb-1">Your Progress</h3><p className="text-indigo-200 text-sm">Keep up the great work!</p><div className="mt-4 flex gap-4"><div><span className="text-2xl font-bold block">{pendingCount}</span><span className="text-xs opacity-70">To Do</span></div><div><span className="text-2xl font-bold block">{classData.students?.length || 0}</span><span className="text-xs opacity-70">Classmates</span></div></div></div>
+            <div className="px-6 space-y-6">
+                
+                {/* FLOATING PROGRESS CARD */}
+                <div className="bg-white rounded-3xl p-6 shadow-xl border border-blue-100 flex items-center justify-between relative overflow-hidden group">
+                    <div className="absolute right-0 top-0 w-32 h-32 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-bl-[100px] -z-0 group-hover:scale-110 transition-transform duration-500"></div>
+                    
+                    <div className="relative z-10">
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Your Progress</p>
+                        <div className="flex items-baseline gap-2">
+                            <span className="text-4xl font-black text-slate-800">{Math.round(progressPercent)}%</span>
+                            <span className="text-sm font-bold text-indigo-600">Complete</span>
+                        </div>
+                        <div className="mt-3 flex gap-1">
+                            <div className="h-2 w-12 rounded-full bg-slate-100 overflow-hidden">
+                                <div className={`h-full ${progressPercent > 0 ? 'bg-emerald-400' : 'bg-transparent'}`} style={{width: '100%'}}></div>
+                            </div>
+                            <div className="h-2 w-12 rounded-full bg-slate-100 overflow-hidden">
+                                <div className={`h-full ${progressPercent > 33 ? 'bg-emerald-400' : 'bg-transparent'}`} style={{width: '100%'}}></div>
+                            </div>
+                            <div className="h-2 w-12 rounded-full bg-slate-100 overflow-hidden">
+                                <div className={`h-full ${progressPercent > 66 ? 'bg-emerald-400' : 'bg-transparent'}`} style={{width: '100%'}}></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="text-right relative z-10">
+                        <div className="bg-indigo-50 p-3 rounded-2xl inline-flex flex-col items-center min-w-[80px] border border-indigo-100 group-hover:border-indigo-200 transition-colors">
+                            <span className="text-2xl font-bold text-indigo-600">{pendingCount}</span>
+                            <span className="text-[10px] text-indigo-400 font-bold uppercase">To Do</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ASSIGNMENTS LIST */}
                 <div>
-                    <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3>
+                    <h3 className="font-bold text-blue-900/70 text-sm uppercase tracking-wider mb-4 ml-1 flex items-center gap-2">
+                        <Layers size={16} className="text-blue-500"/> Tasks ({relevantAssignments.length})
+                    </h3>
                     <div className="space-y-3">
-                        {relevantAssignments.length > 0 ? ( relevantAssignments.filter((l: any) => !completedSet.has(l.id)).map((l: any, i: number) => ( <button key={`${l.id}-${i}`} onClick={() => handleAssignmentClick(l)} className="w-full bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all"><div className="flex items-center space-x-4"><div className={`h-10 w-10 rounded-xl flex items-center justify-center ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600' : 'bg-indigo-50 text-indigo-600'}`}>{l.contentType === 'deck' ? <Layers size={20}/> : <PlayCircle size={20} />}</div><div className="text-left"><h4 className="font-bold text-indigo-900">{l.title}</h4><p className="text-xs text-indigo-600/70">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Assigned Lesson'}</p></div></div><ChevronRight size={20} className="text-slate-300" /></button> )) ) : ( <div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">No pending assignments.</div> )}
-                        {relevantAssignments.every((l: any) => completedSet.has(l.id)) && relevantAssignments.length > 0 && (<div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">All assignments completed! 🎉</div>)}
+                        {relevantAssignments.length > 0 ? ( relevantAssignments.filter((l: any) => !completedSet.has(l.id)).map((l: any, i: number) => ( 
+                            <button key={`${l.id}-${i}`} onClick={() => handleAssignmentClick(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all hover:border-blue-300 hover:shadow-lg group relative overflow-hidden">
+                                {/* Subtle Hover Gradient Background */}
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-blue-50/50 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                
+                                <div className="flex items-center space-x-4 relative z-10">
+                                    <div className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-all shadow-sm ${l.contentType === 'deck' ? 'bg-gradient-to-br from-orange-100 to-orange-50 text-orange-600 group-hover:from-orange-500 group-hover:to-orange-600 group-hover:text-white' : 'bg-gradient-to-br from-blue-100 to-blue-50 text-blue-600 group-hover:from-blue-500 group-hover:to-indigo-600 group-hover:text-white'}`}>
+                                        {l.contentType === 'deck' ? <Layers size={22}/> : <PlayCircle size={22} />}
+                                    </div>
+                                    <div className="text-left">
+                                        <h4 className="font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{l.title}</h4>
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                                                {l.contentType === 'deck' ? 'Deck' : 'Lesson'}
+                                            </span>
+                                            {l.xp && <span className="text-[10px] font-bold text-emerald-600">+{l.xp} XP</span>}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm relative z-10">
+                                    <ChevronRight size={16} />
+                                </div>
+                            </button> 
+                        )) ) : ( <div className="p-10 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">No pending assignments.</div> )}
+                        
+                        {relevantAssignments.every((l: any) => completedSet.has(l.id)) && relevantAssignments.length > 0 && (
+                            <div className="p-8 text-center bg-emerald-50 border border-emerald-100 rounded-3xl animate-in zoom-in duration-300">
+                                <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-2">
+                                    <CheckCircle2 size={24}/>
+                                </div>
+                                <p className="text-emerald-800 font-bold">All assignments completed!</p>
+                                <p className="text-emerald-600/70 text-xs">Great work, legend.</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
         ) : (
-            <ClassForum classId={classData.id} user={{email: userData.email}} userData={userData} />
+            <div className="px-6 h-full pb-20">
+                {/* Forum needs a container to ensure it scrolls correctly within this layout */}
+                <div className="bg-white rounded-t-3xl shadow-xl border-x border-t border-slate-200 min-h-full p-2">
+                    <ClassForum classId={classData.id} user={{email: userData.email}} userData={userData} />
+                </div>
+            </div>
         )}
       </div>
     </div>
