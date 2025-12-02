@@ -1183,122 +1183,171 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   const activeAssignments = relevantAssignments.filter((l: any) => !completedSet.has(l.id));
   const handleSelectClass = (cls: any) => { setActiveStudentClass(cls); };
   
-  // Calculate Level Data for the Widget
+  // Calculate Level Data
   const { level, progress, rank } = getLevelInfo(userData?.xp || 0);
 
   if (activeStudentClass) { return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={onSelectLesson} onSelectDeck={onSelectDeck} userData={userData} />; }
 
   return (
-  <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full relative">
-    {/* --- LEVEL UP MODAL (Updated Prop) --- */}
+  <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full relative bg-slate-50">
+    {/* --- LEVEL UP MODAL --- */}
     {showLevelModal && <LevelUpModal userData={userData} onClose={() => setShowLevelModal(false)} />}
 
-    {userData?.classSyncError && (<div className="bg-rose-500 text-white p-4 text-center text-sm font-bold"><AlertTriangle className="inline-block mr-2" size={16} />System Notice: Database Index Missing.<br/><span className="text-xs font-normal opacity-80">Instructors: Check console for the Firebase setup link.</span></div>)}
+    {userData?.classSyncError && (<div className="bg-rose-500 text-white p-4 text-center text-sm font-bold relative z-50"><AlertTriangle className="inline-block mr-2" size={16} />System Notice: Database Index Missing.</div>)}
     
-    
-    <div className="px-6 space-y-6 mt-4"> 
-      
-   {/* --- JUICED UP RED WIDGET --- */}
-      <button 
+    {/* --- NEW HERO WIDGET (Edge-to-Edge) --- */}
+    <button 
         onClick={() => setShowLevelModal(true)}
-        className="w-full text-left relative overflow-hidden group shadow-2xl hover:scale-[1.02] active:scale-95 transition-all duration-300 rounded-[2.5rem]"
-      >
-        {/* 1. Dynamic Background Layer */}
-        <div className="absolute inset-0 bg-gradient-to-br from-rose-900 via-red-950 to-slate-900 z-0"></div>
-        
-        {/* 2. Decorative Giant Icon (Faded) */}
-        <div className="absolute -right-6 -top-6 text-white opacity-5 rotate-12 z-0">
-            <Trophy size={220} />
+        className="w-full relative overflow-hidden bg-gradient-to-br from-rose-900 via-red-800 to-rose-900 text-white shadow-2xl z-0 group text-left rounded-b-[3rem] pb-12 pt-14 px-8 transition-all active:scale-[0.99]"
+    >
+        {/* Abstract Background Decoration */}
+        <div className="absolute top-[-20%] right-[-10%] opacity-10 group-hover:opacity-20 transition-all duration-700 transform group-hover:rotate-12 group-hover:scale-110">
+            <User size={300} strokeWidth={1.5} />
         </div>
+        <div className="absolute top-[20%] left-[-10%] w-64 h-64 bg-rose-500/20 rounded-full blur-3xl"></div>
 
-        {/* 3. Main Content Container */}
-        <div className="relative z-10 p-8 flex flex-col h-full">
-            
-            {/* Top Row: Identity & Rank */}
-            <div className="flex justify-between items-start mb-8">
-                <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-tr from-yellow-400 to-orange-500 shadow-lg">
-                        <div className="w-full h-full rounded-full bg-rose-950 flex items-center justify-center text-white font-bold text-2xl border-2 border-white/20">
-                            {userData?.name?.charAt(0) || 'S'}
-                        </div>
+        <div className="relative z-10 flex flex-col gap-6">
+            {/* Top Row: Avatar & Greeting */}
+            <div className="flex items-center gap-5">
+                <div className="relative">
+                    <div className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 shadow-inner group-hover:ring-4 ring-white/10 transition-all">
+                        <span className="font-serif font-bold text-3xl text-white">{userData?.name?.charAt(0) || 'S'}</span>
                     </div>
-                    <div>
-                        <p className="text-rose-200 text-[10px] font-bold uppercase tracking-widest mb-1">Welcome Back</p>
-                        <h3 className="text-2xl font-bold text-white leading-none">{userData?.name || 'Student'}</h3>
-                    </div>
+                    {/* Online Status Dot */}
+                    <div className="absolute bottom-1 right-1 w-5 h-5 bg-emerald-400 border-4 border-rose-900 rounded-full"></div>
                 </div>
-                <div className="bg-white/10 backdrop-blur-md border border-white/10 px-4 py-1.5 rounded-full flex items-center gap-2 shadow-sm">
-                    <Medal size={16} className="text-yellow-400" />
-                    <span className="text-xs font-bold text-white uppercase tracking-wider">{rank}</span>
-                </div>
-            </div>
-
-            {/* Middle Row: The Level & Bar */}
-            <div className="mb-8">
-                <div className="flex justify-between items-end mb-2 px-1">
-                    <span className="text-5xl font-serif font-black text-white tracking-tight">
-                        <span className="text-lg font-sans font-bold text-rose-300 mr-1">Lvl</span>
-                        {level}
-                    </span>
-                    <span className="text-xs font-bold text-rose-200 mb-1.5">{Math.round(progress)}% to Level {level + 1}</span>
-                </div>
-                {/* Custom Beveled Progress Bar */}
-                <div className="h-5 w-full bg-slate-900/50 rounded-full p-1 border border-white/5 shadow-inner">
-                    <div 
-                        className="h-full rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 shadow-[0_0_15px_rgba(251,146,60,0.6)] transition-all duration-1000 relative"
-                        style={{ width: `${progress}%` }}
-                    >
-                        <div className="absolute top-0 right-0 bottom-0 w-1 bg-white/50 blur-[2px]"></div>
+                <div>
+                    <p className="text-rose-200 text-xs font-bold uppercase tracking-widest mb-1 opacity-80">Welcome back,</p>
+                    <h1 className="text-4xl font-serif font-bold leading-none tracking-tight">{userData?.name || 'Student'}</h1>
+                    <div className="flex items-center gap-2 mt-2">
+                         <span className="bg-white/20 backdrop-blur-sm px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border border-white/10">{rank}</span>
+                         <span className="text-rose-200 text-xs font-medium">{userData?.email}</span>
                     </div>
                 </div>
             </div>
 
-            {/* Bottom Row: Glassmorphic Stats Grid */}
-            <div className="grid grid-cols-3 gap-3">
-                {/* Stat 1: Streak */}
-                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-3 flex flex-col items-center justify-center text-center group-hover:bg-white/10 transition-colors">
-                    <Zap size={20} className="text-yellow-400 mb-1" fill="currentColor" />
-                    <span className="text-xl font-bold text-white leading-none">{userData?.streak || 1}</span>
-                    <span className="text-[9px] text-rose-200 uppercase font-bold mt-1">Day Streak</span>
-                </div>
+            {/* Bottom Row: Stats Glass Bar */}
+            <div className="bg-black/20 backdrop-blur-md rounded-2xl p-4 border border-white/10 flex items-center justify-between mt-2 group-hover:bg-black/30 transition-colors">
                 
-                {/* Stat 2: Total XP */}
-                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-3 flex flex-col items-center justify-center text-center group-hover:bg-white/10 transition-colors">
-                    <Award size={20} className="text-purple-400 mb-1" />
-                    <span className="text-xl font-bold text-white leading-none">{userData?.xp || 0}</span>
-                    <span className="text-[9px] text-rose-200 uppercase font-bold mt-1">Total XP</span>
+                {/* Level / XP */}
+                <div className="flex-1 border-r border-white/10 pr-4">
+                     <div className="flex justify-between items-end mb-1">
+                        <span className="text-xs font-bold text-rose-100">Level {level}</span>
+                        <span className="text-[10px] text-rose-300">{Math.round(progress)}%</span>
+                     </div>
+                     <div className="w-full bg-black/40 rounded-full h-2 overflow-hidden">
+                        <div className="bg-yellow-400 h-full rounded-full shadow-[0_0_10px_rgba(250,204,21,0.6)] relative overflow-hidden" style={{ width: `${progress}%` }}>
+                             <div className="absolute inset-0 bg-white/30 w-full animate-[shimmer_2s_infinite]"></div>
+                        </div>
+                     </div>
                 </div>
 
-                {/* Stat 3: Assignments (New!) */}
-                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-3 flex flex-col items-center justify-center text-center group-hover:bg-white/10 transition-colors">
-                    <CheckCircle2 size={20} className="text-emerald-400 mb-1" />
-                    <span className="text-xl font-bold text-white leading-none">{userData?.completedAssignments?.length || 0}</span>
-                    <span className="text-[9px] text-rose-200 uppercase font-bold mt-1">Lessons</span>
+                {/* Streak */}
+                <div className="pl-6 flex flex-col items-center justify-center">
+                    <div className="flex items-center gap-1.5 text-yellow-400">
+                        <Zap size={22} fill="currentColor" className="drop-shadow-sm" />
+                        <span className="text-2xl font-bold leading-none">{userData?.streak || 1}</span>
+                    </div>
+                    <span className="text-[9px] text-rose-200 uppercase font-bold tracking-wider mt-0.5">Day Streak</span>
                 </div>
             </div>
         </div>
-      </button>
-
+    </button>
+    
+    {/* --- MAIN CONTENT (Overlapping) --- */}
+    <div className="px-6 space-y-8 -mt-6 relative z-10">
+      
       {/* CLASSES SCROLLER */}
-      {classes && classes.length > 0 && (<div className="mb-6"><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><School size={18} className="text-indigo-600"/> My Classes</h3><div className="flex gap-4 overflow-x-auto pb-4">{classes.map((cls: any) => { const clsPendingCount = (cls.assignments || []).filter((l: any) => { const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); return isForMe && !completedSet.has(l.id); }).length; return ( <button key={cls.id} onClick={() => handleSelectClass(cls)} className="min-w-[200px] bg-white p-4 rounded-2xl border border-slate-200 shadow-sm text-left active:scale-95 transition-transform"><div className="flex items-center justify-between mb-2"><div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">{cls.name.charAt(0)}</div><span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500 font-mono">{cls.code}</span></div><h4 className="font-bold text-slate-900">{cls.name}</h4><p className="text-xs text-slate-500 mt-1">{clsPendingCount} Pending Tasks</p></button> ); })}</div></div>)}
+      {classes && classes.length > 0 && (
+        <div className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
+            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 ml-1">My Classes</h3>
+            <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar snap-x">
+                {classes.map((cls: any) => { 
+                    const clsPendingCount = (cls.assignments || []).filter((l: any) => { 
+                        const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); 
+                        return isForMe && !completedSet.has(l.id); 
+                    }).length; 
+                    return ( 
+                        <button key={cls.id} onClick={() => handleSelectClass(cls)} className="snap-start min-w-[220px] bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-300 text-left active:scale-[0.98] transition-all group">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 font-bold text-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                    {cls.name.charAt(0)}
+                                </div>
+                                {clsPendingCount > 0 && <span className="text-[10px] bg-rose-100 text-rose-600 px-2 py-1 rounded-full font-bold animate-pulse">{clsPendingCount} New</span>}
+                            </div>
+                            <h4 className="font-bold text-slate-900 text-lg truncate">{cls.name}</h4>
+                            <p className="text-xs text-slate-500 font-mono mt-1 bg-slate-50 inline-block px-1.5 rounded">{cls.code}</p>
+                        </button> 
+                    ); 
+                })}
+            </div>
+        </div>
+      )}
       
       {/* ASSIGNMENTS LIST */}
-      {activeAssignments.length > 0 && (<div><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3><div className="space-y-3">{activeAssignments.map((l: any, i: number) => ( <button key={`${l.id}-${i}`} onClick={() => l.contentType === 'deck' ? onSelectDeck(l) : onSelectLesson(l)} className="w-full bg-indigo-50 border border-indigo-100 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all"><div className="flex items-center space-x-4"><div className={`h-10 w-10 rounded-xl flex items-center justify-center ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600' : 'bg-white text-indigo-600'}`}>{l.contentType === 'deck' ? <Layers size={20}/> : <PlayCircle size={20} />}</div><div className="text-left"><h4 className="font-bold text-indigo-900">{l.title}</h4><p className="text-xs text-indigo-600/70">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Assigned Lesson'}</p></div></div><ChevronRight size={20} className="text-indigo-300" /></button>))}</div></div>)}
+      {activeAssignments.length > 0 && (
+          <div className="animate-in slide-in-from-bottom-4 duration-500 delay-200">
+             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 ml-1">Pending Assignments</h3>
+             <div className="space-y-3">
+                {activeAssignments.map((l: any, i: number) => ( 
+                    <button key={`${l.id}-${i}`} onClick={() => l.contentType === 'deck' ? onSelectDeck(l) : onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all hover:border-indigo-300 group">
+                        <div className="flex items-center space-x-4">
+                            <div className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-colors ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600 group-hover:bg-orange-100' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-100'}`}>
+                                {l.contentType === 'deck' ? <Layers size={24}/> : <PlayCircle size={24} />}
+                            </div>
+                            <div className="text-left">
+                                <h4 className="font-bold text-slate-900">{l.title}</h4>
+                                <p className="text-xs text-slate-500">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Assigned Lesson'}</p>
+                            </div>
+                        </div>
+                        <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                            <ChevronRight size={16} />
+                        </div>
+                    </button>
+                ))}
+             </div>
+          </div>
+      )}
       
       {/* STANDARD LIBRARY */}
-      <div><h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Lessons</h3><div className="space-y-3">{lessons.map((l: any) => (<button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between"><div className="flex items-center gap-4"><div className="h-14 w-14 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-700"><PlayCircle size={28}/></div><div className="text-left"><h4 className="font-bold text-slate-900">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div></div><ChevronRight className="text-slate-300"/></button>))}</div></div>
+      <div className="animate-in slide-in-from-bottom-4 duration-500 delay-300">
+         <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 ml-1">Library</h3>
+         <div className="space-y-3">
+            {lessons.map((l: any) => (
+                <button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-amber-300 group transition-all">
+                    <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 group-hover:bg-amber-100 transition-colors">
+                            <BookOpen size={24}/>
+                        </div>
+                        <div className="text-left">
+                            <h4 className="font-bold text-slate-900">{l.title}</h4>
+                            <p className="text-xs text-slate-500">{l.subtitle}</p>
+                        </div>
+                    </div>
+                    <ChevronRight className="text-slate-300 group-hover:text-amber-500 transition-colors"/>
+                </button>
+            ))}
+         </div>
+      </div>
       
       {/* QUICK ACTIONS */}
-      <div className="grid grid-cols-2 gap-4">
-        <button onClick={() => setActiveTab('flashcards')} className="p-5 bg-orange-50 rounded-2xl border border-orange-100 text-center">
-            <Layers className="mx-auto text-orange-500 mb-2"/>
-            <span className="block font-bold text-slate-800">Practice</span>
+      <div className="grid grid-cols-2 gap-4 pb-8 animate-in slide-in-from-bottom-4 duration-500 delay-500">
+        <button onClick={() => setActiveTab('flashcards')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center hover:scale-[1.02] active:scale-95 transition-all group">
+            <div className="w-14 h-14 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-orange-500 group-hover:text-white transition-colors shadow-sm">
+                <Layers size={28}/>
+            </div>
+            <span className="block font-bold text-slate-800 text-lg">Practice</span>
+            <span className="text-xs text-slate-400 font-medium">Review Cards</span>
         </button>
-        <button onClick={() => setActiveTab('create')} className="p-5 bg-emerald-50 rounded-2xl border border-emerald-100 text-center">
-            <Feather className="mx-auto text-emerald-500 mb-2"/>
-            <span className="block font-bold text-slate-800">Creator</span>
+        <button onClick={() => setActiveTab('create')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center hover:scale-[1.02] active:scale-95 transition-all group">
+            <div className="w-14 h-14 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-emerald-500 group-hover:text-white transition-colors shadow-sm">
+                <Feather size={28}/>
+            </div>
+            <span className="block font-bold text-slate-800 text-lg">Creator</span>
+            <span className="text-xs text-slate-400 font-medium">Build Content</span>
         </button>
       </div>
+
     </div>
   </div>
   );
