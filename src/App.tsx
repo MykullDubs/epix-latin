@@ -1695,7 +1695,21 @@ function TestPlayerView({ test, onFinish }: any) {
   const [answers, setAnswers] = useState<any>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [score, setScore] = useState(0);
+  
   const questions = test.questions || [];
+  
+  // --- SAFETY CHECK ---
+  if (questions.length === 0) {
+      return (
+          <div className="h-full flex flex-col bg-slate-50">
+              <div className="bg-white p-4 border-b border-slate-200"><button onClick={() => onFinish(null, 0)}><X/></button></div>
+              <div className="flex-1 flex items-center justify-center p-8 text-center text-slate-400">
+                  <p>This exam has no questions.</p>
+              </div>
+          </div>
+      );
+  }
+
   const currentQ = questions[currentIndex];
   const progress = ((currentIndex + (isSubmitted ? 1 : 0)) / questions.length) * 100;
 
@@ -2364,9 +2378,10 @@ function App() {
   
   const commonHandlers = { onSaveCard: handleCreateCard, onUpdateCard: handleUpdateCard, onDeleteCard: handleDeleteCard, onSaveLesson: handleCreateLesson, };
 
+
 const renderStudentView = () => {
-    // 1. Check for Exam/Test
-    if (activeLesson && activeLesson.type === 'test') {
+    // 1. Check for Test (Expanded check)
+    if (activeLesson && (activeLesson.type === 'test' || activeLesson.contentType === 'test')) {
         // @ts-ignore
         return <TestPlayerView test={activeLesson} onFinish={(id: string, xp: number, title: string, score: any) => { handleFinishLesson(id, xp, title, score); setActiveLesson(null); }} />;
     }
