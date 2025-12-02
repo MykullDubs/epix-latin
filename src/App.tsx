@@ -1198,44 +1198,83 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
     
     <div className="px-6 space-y-6 mt-4"> 
       
-      {/* --- INTERACTIVE RED WIDGET (Updated Layout) --- */}
+   {/* --- JUICED UP RED WIDGET --- */}
       <button 
         onClick={() => setShowLevelModal(true)}
-        className="w-full text-left bg-gradient-to-br from-red-800 to-rose-900 rounded-3xl p-6 text-white shadow-xl hover:scale-[1.02] active:scale-95 transition-all cursor-pointer relative overflow-hidden group"
+        className="w-full text-left relative overflow-hidden group shadow-2xl hover:scale-[1.02] active:scale-95 transition-all duration-300 rounded-[2.5rem]"
       >
-        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <User size={140} />
-        </div>
+        {/* 1. Dynamic Background Layer */}
+        <div className="absolute inset-0 bg-gradient-to-br from-rose-900 via-red-950 to-slate-900 z-0"></div>
         
-        {/* Top Row: Avatar and Name */}
-        <div className="flex items-center gap-4 relative z-10 mb-6">
-             <div className="w-16 h-16 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center border-2 border-white/20 shadow-inner">
-                <span className="font-bold text-2xl">{userData?.name?.charAt(0) || 'S'}</span>
-             </div>
-             <div>
-                <p className="text-rose-200 text-xs font-bold uppercase tracking-widest mb-1">Welcome back,</p>
-                <h3 className="text-3xl font-serif font-bold leading-none">{userData?.name || 'Student'}</h3>
-             </div>
+        {/* 2. Decorative Giant Icon (Faded) */}
+        <div className="absolute -right-6 -top-6 text-white opacity-5 rotate-12 z-0">
+            <Trophy size={220} />
         </div>
 
-        {/* Bottom Row: Level and Stats */}
-        <div className="flex justify-between items-end relative z-10">
-            <div>
-                <div className="flex items-center gap-2 mb-2">
-                    <span className="bg-rose-950/50 px-3 py-1 rounded-lg text-xs font-bold text-rose-100 border border-white/10">{rank}</span>
-                    <span className="text-sm font-bold">Lvl {level}</span>
+        {/* 3. Main Content Container */}
+        <div className="relative z-10 p-8 flex flex-col h-full">
+            
+            {/* Top Row: Identity & Rank */}
+            <div className="flex justify-between items-start mb-8">
+                <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-tr from-yellow-400 to-orange-500 shadow-lg">
+                        <div className="w-full h-full rounded-full bg-rose-950 flex items-center justify-center text-white font-bold text-2xl border-2 border-white/20">
+                            {userData?.name?.charAt(0) || 'S'}
+                        </div>
+                    </div>
+                    <div>
+                        <p className="text-rose-200 text-[10px] font-bold uppercase tracking-widest mb-1">Welcome Back</p>
+                        <h3 className="text-2xl font-bold text-white leading-none">{userData?.name || 'Student'}</h3>
+                    </div>
                 </div>
-                <div className="w-32 bg-black/30 rounded-full h-2 overflow-hidden">
-                    <div className="bg-yellow-400 h-full rounded-full shadow-[0_0_10px_rgba(250,204,21,0.5)]" style={{ width: `${progress}%` }}/>
+                <div className="bg-white/10 backdrop-blur-md border border-white/10 px-4 py-1.5 rounded-full flex items-center gap-2 shadow-sm">
+                    <Medal size={16} className="text-yellow-400" />
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">{rank}</span>
                 </div>
             </div>
 
-            <div className="text-right">
-                <div className="flex items-center gap-1 text-yellow-400 mb-0.5 justify-end">
-                    <Zap size={20} fill="currentColor" />
-                    <span className="font-bold text-xl">{userData?.streak || 1}</span>
+            {/* Middle Row: The Level & Bar */}
+            <div className="mb-8">
+                <div className="flex justify-between items-end mb-2 px-1">
+                    <span className="text-5xl font-serif font-black text-white tracking-tight">
+                        <span className="text-lg font-sans font-bold text-rose-300 mr-1">Lvl</span>
+                        {level}
+                    </span>
+                    <span className="text-xs font-bold text-rose-200 mb-1.5">{Math.round(progress)}% to Level {level + 1}</span>
                 </div>
-                <span className="text-[10px] text-rose-200 uppercase font-bold tracking-wide">Day Streak</span>
+                {/* Custom Beveled Progress Bar */}
+                <div className="h-5 w-full bg-slate-900/50 rounded-full p-1 border border-white/5 shadow-inner">
+                    <div 
+                        className="h-full rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 shadow-[0_0_15px_rgba(251,146,60,0.6)] transition-all duration-1000 relative"
+                        style={{ width: `${progress}%` }}
+                    >
+                        <div className="absolute top-0 right-0 bottom-0 w-1 bg-white/50 blur-[2px]"></div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Bottom Row: Glassmorphic Stats Grid */}
+            <div className="grid grid-cols-3 gap-3">
+                {/* Stat 1: Streak */}
+                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-3 flex flex-col items-center justify-center text-center group-hover:bg-white/10 transition-colors">
+                    <Zap size={20} className="text-yellow-400 mb-1" fill="currentColor" />
+                    <span className="text-xl font-bold text-white leading-none">{userData?.streak || 1}</span>
+                    <span className="text-[9px] text-rose-200 uppercase font-bold mt-1">Day Streak</span>
+                </div>
+                
+                {/* Stat 2: Total XP */}
+                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-3 flex flex-col items-center justify-center text-center group-hover:bg-white/10 transition-colors">
+                    <Award size={20} className="text-purple-400 mb-1" />
+                    <span className="text-xl font-bold text-white leading-none">{userData?.xp || 0}</span>
+                    <span className="text-[9px] text-rose-200 uppercase font-bold mt-1">Total XP</span>
+                </div>
+
+                {/* Stat 3: Assignments (New!) */}
+                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-3 flex flex-col items-center justify-center text-center group-hover:bg-white/10 transition-colors">
+                    <CheckCircle2 size={20} className="text-emerald-400 mb-1" />
+                    <span className="text-xl font-bold text-white leading-none">{userData?.completedAssignments?.length || 0}</span>
+                    <span className="text-[9px] text-rose-200 uppercase font-bold mt-1">Lessons</span>
+                </div>
             </div>
         </div>
       </button>
