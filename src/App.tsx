@@ -2232,8 +2232,7 @@ function App() {
 
   // --- FINAL RENDER ---
   return (
-    <div className="bg-slate-100 min-h-screen font-sans text-slate-900 flex justify-center items-center p-0 sm:p-4 relative overflow-hidden">
-      
+<div className="bg-slate-100 min-h-screen w-full font-sans text-slate-900 flex justify-center sm:items-center p-0 sm:p-4 relative overflow-hidden">      
       {/* Background Blobs */}
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-rose-400/30 rounded-full blur-[100px] pointer-events-none mix-blend-multiply animate-pulse" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-400/30 rounded-full blur-[100px] pointer-events-none mix-blend-multiply" />
