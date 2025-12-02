@@ -1727,48 +1727,39 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
 function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, onLogout }: any) {
   const [activeTab, setActiveTab] = useState('dashboard');
   
-  return (
-    <div className="flex h-screen bg-slate-100 overflow-hidden">
-      <div className="w-64 bg-slate-900 text-white flex-col hidden md:flex">
-        <div className="p-6 border-b border-slate-800"><h1 className="text-xl font-bold flex items-center gap-2">
-        <GraduationCap className="text-indigo-400"/> Instructor 
-    </h1><p className="text-xs text-slate-400 mt-1">{user.email}</p></div>
-        <div className="flex-1 p-4 space-y-2">
-            <button onClick={() => setActiveTab('dashboard')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'}`}><LayoutDashboard size={20} /> Overview</button>
-            <button onClick={() => setActiveTab('classes')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'classes' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'}`}><School size={20} /> Classes & Roster</button>
-            <button onClick={() => setActiveTab('content')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'content' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'}`}><Library size={20} /> Content Library</button>
-            <button onClick={() => setActiveTab('profile')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'profile' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'}`}><User size={20} /> Profile & Settings</button>
-        </div>
-        <div className="p-4 border-t border-slate-800"><button onClick={onLogout} className="w-full p-3 rounded-xl bg-slate-800 text-rose-400 flex items-center gap-3 hover:bg-slate-700 transition-colors"><LogOut size={20} /> Sign Out</button></div>
+return (
+    // 1. OUTER CONTAINER: Changed bg to slate-100 for base, added relative for positioning blobs
+    <div className="bg-slate-100 min-h-screen font-sans text-slate-900 flex justify-center items-center p-0 sm:p-4 relative overflow-hidden">
+      
+      {/* 2. AMBIENT BACKGROUND BLOBS (New) */}
+      {/* Top Left Rose Glow - Ties into the Red Widget */}
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-rose-400/30 rounded-full blur-[100px] pointer-events-none mix-blend-multiply animate-pulse" />
+      
+      {/* Bottom Right Indigo Glow - Ties into the Navigation/Accents */}
+      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-400/30 rounded-full blur-[100px] pointer-events-none mix-blend-multiply" />
+
+      {/* 3. MAIN APP FRAME: Changed bg-slate-50 to bg-white/80 + backdrop-blur (The Glass Effect) */}
+      <div className={`
+          w-full h-[100dvh] shadow-2xl relative overflow-hidden border-[8px] border-white/40 
+          bg-white/80 backdrop-blur-2xl
+          ${userData?.role === 'instructor' ? 'max-w-full sm:rounded-none border-0' : 'max-w-[400px] sm:rounded-[3rem] sm:h-[800px]'}
+      `}>
+        {userData?.role !== 'instructor' && <div className="absolute top-0 left-0 right-0 h-8 bg-white/0 z-50 pointer-events-none" />}
+        
+        {renderStudentView()}
+        
+        <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
       </div>
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
-         <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center"><span className="font-bold flex items-center gap-2"><GraduationCap/> Magister</span><div className="flex gap-4"><button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'text-indigo-400' : 'text-slate-400'}><LayoutDashboard/></button><button onClick={() => setActiveTab('classes')} className={activeTab === 'classes' ? 'text-indigo-400' : 'text-slate-400'}><School/></button><button onClick={() => setActiveTab('content')} className={activeTab === 'content' ? 'text-indigo-400' : 'text-slate-400'}><Library/></button></div></div>
-         <div className="flex-1 overflow-y-auto p-4 md:p-8">
-            <div className="max-w-6xl mx-auto h-full">
-                {activeTab === 'dashboard' && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
-                        <div className="md:col-span-2 space-y-6">
-                            <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 rounded-3xl p-8 text-white shadow-lg">
-                                <h2 className="text-3xl font-bold mb-2">Welcome back, Magister.</h2>
-                                <p className="text-indigo-100 mb-6">Your academy is active.</p>
-                                <div className="flex gap-8">
-                                    <div><span className="text-4xl font-bold block">{userData.classes?.length || 0}</span><span className="text-xs uppercase tracking-wider opacity-70">Active Classes</span></div>
-                                    <div><span className="text-4xl font-bold block">{allDecks.custom?.cards?.length || 0}</span><span className="text-xs uppercase tracking-wider opacity-70">Flashcards</span></div>
-                                    <div><span className="text-4xl font-bold block">{lessons.length}</span><span className="text-xs uppercase tracking-wider opacity-70">Lessons</span></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="h-[500px] md:h-auto">
-                            <LiveActivityFeed />
-                        </div>
-                    </div>
-                )}
-                {activeTab === 'classes' && (<ClassManagerView user={user} userData={userData} classes={userData?.classes || []} lessons={lessons} allDecks={allDecks} />)}
-                {activeTab === 'content' && (<div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full overflow-hidden flex flex-col"><div className="flex-1 overflow-y-auto"><BuilderHub onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} onSaveLesson={onSaveLesson} allDecks={allDecks} /></div></div>)}
-                {activeTab === 'profile' && <ProfileView user={user} userData={userData} />}
-            </div>
-         </div>
-      </div>
+
+      <style>{` 
+        .perspective-1000 { perspective: 1000px; } 
+        .preserve-3d { transform-style: preserve-3d; } 
+        .backface-hidden { backface-visibility: hidden; } 
+        .rotate-y-180 { transform: rotateY(180deg); } 
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; } 
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; } 
+      `}</style>
     </div>
   );
 }
