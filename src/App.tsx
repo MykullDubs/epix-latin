@@ -272,35 +272,113 @@ const getLevelInfo = (xp: number) => {
 
 function LevelUpModal({ userData, onClose }: any) {
   const { level, currentLevelXP, nextLevelXP, progress, rank } = getLevelInfo(userData?.xp || 0);
+  
+  // Calculate remaining XP for motivation
+  const xpNeeded = nextLevelXP - currentLevelXP;
+  
+  // Calculate specific stats
+  const completedCount = (userData?.completedAssignments || []).length;
+  const classCount = (userData?.classes || []).length;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
-      <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden transform scale-100 transition-all" onClick={e => e.stopPropagation()}>
-        <div className="bg-gradient-to-br from-red-800 to-rose-900 p-6 text-white text-center relative">
-            <button onClick={onClose} className="absolute top-4 right-4 text-white/50 hover:text-white"><X /></button>
-            <div className="flex flex-col items-center">
-                <div className="w-20 h-20 bg-white p-1 rounded-full mb-3 shadow-lg">
-                    <div className="w-full h-full bg-slate-100 rounded-full flex items-center justify-center text-slate-400 font-bold text-2xl">{userData?.name?.charAt(0) || "U"}</div>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+      <div 
+        className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden transform scale-100 transition-all relative border border-white/20" 
+        onClick={e => e.stopPropagation()}
+      >
+        
+        {/* --- HEADER: The Cornflower Canopy --- */}
+        <div className="relative bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 p-8 pb-12 text-white text-center overflow-hidden">
+            {/* Background Decor */}
+            <div className="absolute top-[-50%] left-[-50%] w-[400px] h-[400px] bg-blue-400/30 rounded-full blur-[60px] mix-blend-overlay animate-pulse"></div>
+            <div className="absolute bottom-[-10%] right-[-10%] w-[200px] h-[200px] bg-indigo-300/20 rounded-full blur-[40px] mix-blend-overlay"></div>
+            
+            <button onClick={onClose} className="absolute top-5 right-5 text-white/50 hover:text-white bg-black/10 hover:bg-black/20 p-2 rounded-full backdrop-blur-md transition-all">
+                <X size={20} />
+            </button>
+
+            <div className="flex flex-col items-center relative z-10">
+                {/* Avatar with Halo */}
+                <div className="w-24 h-24 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border-2 border-white/40 shadow-[0_0_30px_rgba(255,255,255,0.25)] mb-4">
+                    <span className="font-serif font-bold text-4xl text-white drop-shadow-md">{userData?.name?.charAt(0) || "U"}</span>
                 </div>
-                <h2 className="text-2xl font-serif font-bold">{userData?.name}</h2>
-                <div className="flex items-center gap-2 text-rose-200 text-xs font-bold uppercase tracking-widest mt-1"><span>{userData?.role}</span><span>•</span><span>{userData?.email}</span></div>
+                
+                <h2 className="text-3xl font-serif font-bold tracking-tight">{userData?.name}</h2>
+                <p className="text-blue-100 text-xs font-bold uppercase tracking-widest mt-1 opacity-80">{userData?.email}</p>
+                
+                {/* Rank Badge */}
+                <div className="mt-4 bg-white/10 backdrop-blur-lg border border-white/20 px-4 py-1.5 rounded-full flex items-center gap-2 shadow-inner">
+                    <Award size={14} className="text-yellow-300" />
+                    <span className="text-xs font-bold uppercase tracking-wide">{rank}</span>
+                </div>
             </div>
         </div>
-        <div className="p-6 space-y-6">
-            <div className="space-y-2">
-                <div className="flex justify-between items-end"><span className="text-2xl font-bold text-slate-800">Level {level}</span><span className="text-sm font-bold text-indigo-600">{rank}</span></div>
-                <div className="h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200 relative"><div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div></div>
-                <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase"><span>{currentLevelXP} XP</span><span>{nextLevelXP} XP (Next Lvl)</span></div>
+
+        {/* --- BODY: The Scrolls of Data --- */}
+        <div className="px-6 pb-8 -mt-8 relative z-20">
+            
+            {/* Progress Card */}
+            <div className="bg-white rounded-3xl p-5 shadow-lg border border-slate-100 mb-6">
+                <div className="flex justify-between items-end mb-2">
+                    <div>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Current Status</span>
+                        <span className="text-2xl font-black text-slate-800">Level {level}</span>
+                    </div>
+                    <div className="text-right">
+                        <span className="text-xs font-bold text-indigo-600">{Math.round(progress)}%</span>
+                    </div>
+                </div>
+                
+                {/* Enhanced Progress Bar */}
+                <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden shadow-inner border border-slate-200">
+                    <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-full rounded-full transition-all duration-1000 relative" style={{ width: `${progress}%` }}>
+                        <div className="absolute inset-0 bg-white/30 animate-[shimmer_2s_infinite]"></div>
+                    </div>
+                </div>
+                
+                <p className="text-center text-xs text-slate-500 mt-3 font-medium">
+                    <span className="text-indigo-600 font-bold">{xpNeeded} XP</span> until Level {level + 1}
+                </p>
             </div>
+
+            {/* Stats Grid (The Bento Box of Works) */}
             <div className="grid grid-cols-2 gap-3">
-                <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 flex items-center gap-3"><div className="p-2 bg-white rounded-full text-orange-500 shadow-sm"><Zap size={18}/></div><div><p className="text-lg font-bold text-slate-800 leading-none">{userData?.streak || 1}</p><p className="text-[10px] text-slate-500 uppercase font-bold">Day Streak</p></div></div>
-                <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 flex items-center gap-3"><div className="p-2 bg-white rounded-full text-blue-500 shadow-sm"><CheckCircle2 size={18}/></div><div><p className="text-lg font-bold text-slate-800 leading-none">{(userData?.completedAssignments || []).length}</p><p className="text-[10px] text-slate-500 uppercase font-bold">Completed</p></div></div>
+                {/* Streak */}
+                <div className="bg-gradient-to-br from-orange-50 to-amber-50 p-4 rounded-2xl border border-orange-100 flex flex-col items-center justify-center gap-2 shadow-sm">
+                    <div className="p-2 bg-white rounded-full text-orange-500 shadow-sm"><Zap size={20} fill="currentColor"/></div>
+                    <div className="text-center">
+                        <p className="text-2xl font-black text-slate-800 leading-none">{userData?.streak || 1}</p>
+                        <p className="text-[10px] text-orange-600/70 uppercase font-bold tracking-wider mt-1">Day Streak</p>
+                    </div>
+                </div>
+
+                {/* Total XP */}
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-2xl border border-blue-100 flex flex-col items-center justify-center gap-2 shadow-sm">
+                    <div className="p-2 bg-white rounded-full text-blue-500 shadow-sm"><Award size={20}/></div>
+                    <div className="text-center">
+                        <p className="text-2xl font-black text-slate-800 leading-none">{userData?.xp || 0}</p>
+                        <p className="text-[10px] text-blue-600/70 uppercase font-bold tracking-wider mt-1">Total XP</p>
+                    </div>
+                </div>
+
+                {/* Completed Assignments */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col items-center justify-center gap-1">
+                    <span className="text-2xl font-bold text-slate-700">{completedCount}</span>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase">Assignments Done</span>
+                </div>
+
+                {/* Active Classes */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col items-center justify-center gap-1">
+                    <span className="text-2xl font-bold text-slate-700">{classCount}</span>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase">Active Classes</span>
+                </div>
             </div>
+
         </div>
       </div>
     </div>
   );
 }
-
 // ============================================================================
 //  1. CORE VIEWS & GAMES
 // ============================================================================
