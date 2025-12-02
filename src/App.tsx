@@ -1,3 +1,4 @@
+import './index.css';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
