@@ -1745,7 +1745,8 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
   const [subView, setSubView] = useState('menu'); // menu | library | editor | import
   const [editingItem, setEditingItem] = useState<any>(null);
   const [jsonInput, setJsonInput] = useState('');
-  const [importType, setImportType] = useState('lesson');
+  // UPDATED: Added 'test' to the state type
+  const [importType, setImportType] = useState<'lesson' | 'deck' | 'test'>('lesson');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const handleBulkImport = async () => {
@@ -1760,6 +1761,7 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
         let count = 0;
         data.forEach((item: any) => {
             const id = item.id || `import_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+            
             if (importType === 'deck') {
                 const deckId = `custom_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
                 const deckTitle = item.title || "Imported Deck";
@@ -1770,6 +1772,28 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                         count++;
                     });
                 }
+            } else if (importType === 'test') {
+                 // --- NEW: TEST IMPORT LOGIC ---
+                 const ref = doc(db, 'artifacts', appId, 'users', userId, 'custom_lessons', id);
+                 
+                 // Ensure questions have IDs so the player doesn't crash
+                 const processedQuestions = (item.questions || []).map((q: any, idx: number) => ({
+                     ...q,
+                     id: q.id || `q_${Date.now()}_${idx}`,
+                     options: q.options?.map((opt: any, oIdx: number) => ({
+                         ...opt,
+                         id: opt.id || `opt_${Date.now()}_${idx}_${oIdx}`
+                     })) || []
+                 }));
+
+                 batch.set(ref, { 
+                     ...item, 
+                     type: 'test', // Force type to test
+                     questions: processedQuestions,
+                     xp: item.xp || 100,
+                     created: Date.now()
+                 });
+                 count++;
             } else {
                  const ref = doc(db, 'artifacts', appId, 'users', userId, 'custom_lessons', id);
                  batch.set(ref, { ...item, vocab: Array.isArray(item.vocab) ? item.vocab : [], xp: item.xp || 100 });
@@ -1829,12 +1853,14 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                  <div className="flex gap-2 mb-4">
                      <button onClick={() => setImportType('lesson')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${importType === 'lesson' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Lessons</button>
                      <button onClick={() => setImportType('deck')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${importType === 'deck' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Decks</button>
+                     {/* --- NEW EXAMS BUTTON --- */}
+                     <button onClick={() => setImportType('test')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${importType === 'test' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Exams</button>
                  </div>
                  <textarea 
                    value={jsonInput} 
                    onChange={(e) => setJsonInput(e.target.value)} 
                    className="flex-1 w-full p-4 bg-slate-50 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-                   placeholder={importType === 'lesson' ? '[ { "title": "Lesson 1", "blocks": [...] } ]' : '[ { "title": "My Deck", "cards": [...] } ]'}
+                   placeholder={importType === 'test' ? '[ { "title": "Midterm", "questions": [...] } ]' : importType === 'lesson' ? '[ { "title": "Lesson 1", "blocks": [...] } ]' : '[ { "title": "My Deck", "cards": [...] } ]'}
                  />
                  <div className="mt-4 flex justify-end">
                      <button onClick={handleBulkImport} disabled={!jsonInput} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-slate-800 disabled:opacity-50 flex items-center gap-2">
@@ -1864,7 +1890,7 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                     <button onClick={() => { setMode('card'); setEditingItem(null); setSubView('editor'); }} className={`flex-1 py-2 text-xs font-bold rounded-lg ${mode === 'card' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Flashcard</button>
                     <button onClick={() => { setMode('lesson'); setEditingItem(null); setSubView('editor'); }} className={`flex-1 py-2 text-xs font-bold rounded-lg ${mode === 'lesson' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Lesson</button>
                     
-                    {/* --- NEW EXAM BUTTON --- */}
+                    {/* --- NEW EXAM TOGGLE BUTTON --- */}
                     <button onClick={() => { setMode('test'); setEditingItem(null); setSubView('editor'); }} className={`flex-1 py-2 text-xs font-bold rounded-lg ${mode === 'test' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Exam</button>
                 </div>
             </div>
@@ -1889,8 +1915,7 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                     availableDecks={allDecks} 
                 />
             )}
-            
-            {/* --- NEW TEST BUILDER INTEGRATION --- */}
+            {/* --- RENDER TEST BUILDER --- */}
             {subView === 'editor' && mode === 'test' && (
                 <TestBuilderView 
                     initialData={editingItem}
