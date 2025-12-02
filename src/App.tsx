@@ -1195,56 +1195,53 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
 
     {userData?.classSyncError && (<div className="bg-rose-500 text-white p-4 text-center text-sm font-bold relative z-50"><AlertTriangle className="inline-block mr-2" size={16} />System Notice: Database Index Missing.</div>)}
     
-    {/* --- NEW HERO WIDGET (Vibrant Cornflower Blue) --- */}
+    {/* --- NEW HERO WIDGET (Compact Cornflower Blue) --- */}
     <button 
         onClick={() => setShowLevelModal(true)}
-        // We use a strong, saturated gradient base so it never looks washed out.
-        // The "Glass" feel comes from the inner elements and the lighting effects.
-        className="w-full relative overflow-hidden bg-gradient-to-br from-blue-500 via-indigo-500 to-blue-600 text-white shadow-2xl z-10 group text-left rounded-b-[3rem] pb-12 pt-14 px-8 transition-all active:scale-[0.99]"
+        // UPDATED: Reduced padding (pt-10, pb-8) and curve (rounded-b-[2rem])
+        className="w-full relative overflow-hidden bg-gradient-to-br from-blue-500 via-indigo-500 to-blue-600 text-white shadow-xl z-10 group text-left rounded-b-[2.5rem] pb-8 pt-10 px-6 transition-all active:scale-[0.99]"
     >
-        {/* 1. Background Depth (Orbs within the header) */}
+        {/* Background Depth */}
         <div className="absolute top-[-50%] left-[-20%] w-[500px] h-[500px] bg-blue-400/30 rounded-full blur-[80px] mix-blend-overlay pointer-events-none"></div>
         <div className="absolute bottom-[-20%] right-[-10%] w-[300px] h-[300px] bg-indigo-300/20 rounded-full blur-[60px] mix-blend-overlay pointer-events-none"></div>
 
-        {/* 2. Abstract Icon Background */}
+        {/* Abstract Icon Background */}
         <div className="absolute top-[-10%] right-[-10%] opacity-10 group-hover:opacity-20 transition-all duration-700 transform group-hover:rotate-12 group-hover:scale-110">
-            <User size={320} strokeWidth={1.5} />
+            <User size={280} strokeWidth={1.5} />
         </div>
        
-        <div className="relative z-20 flex flex-col gap-6">
+        <div className="relative z-20 flex flex-col gap-4">
             {/* Top Row: Avatar & Greeting */}
-            <div className="flex items-center gap-5">
+            <div className="flex items-center gap-4">
                 <div className="relative">
-                    {/* FROSTED AVATAR RING: High opacity white + blur */}
-                    <div className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/40 shadow-[0_8px_32px_rgba(0,0,0,0.1)] group-hover:ring-4 ring-white/20 transition-all">
-                        <span className="font-serif font-bold text-3xl text-white drop-shadow-md">{userData?.name?.charAt(0) || 'S'}</span>
+                    {/* UPDATED: Smaller Avatar (w-16 h-16) */}
+                    <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/40 shadow-[0_8px_32px_rgba(0,0,0,0.1)] group-hover:ring-4 ring-white/20 transition-all">
+                        <span className="font-serif font-bold text-2xl text-white drop-shadow-md">{userData?.name?.charAt(0) || 'S'}</span>
                     </div>
                     {/* Online Status Dot */}
-                    <div className="absolute bottom-1 right-1 w-5 h-5 bg-emerald-400 border-4 border-blue-600 rounded-full shadow-sm"></div>
+                    <div className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-400 border-4 border-blue-600 rounded-full shadow-sm"></div>
                 </div>
                 <div>
-                    <p className="text-blue-100 text-xs font-bold uppercase tracking-widest mb-1 opacity-90 drop-shadow-sm">Welcome back,</p>
-                    <h1 className="text-4xl font-serif font-bold leading-none tracking-tight drop-shadow-lg filter">{userData?.name || 'Student'}</h1>
-                    <div className="flex items-center gap-2 mt-2">
-                         <span className="bg-white/20 backdrop-blur-md px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border border-white/20 shadow-sm">{rank}</span>
-                         <span className="text-blue-50 text-xs font-medium opacity-80">{userData?.email}</span>
+                    <p className="text-blue-100 text-[10px] font-bold uppercase tracking-widest mb-0.5 opacity-90 drop-shadow-sm">Welcome back,</p>
+                    {/* UPDATED: Smaller Name Font (text-3xl) */}
+                    <h1 className="text-3xl font-serif font-bold leading-none tracking-tight drop-shadow-lg filter">{userData?.name || 'Student'}</h1>
+                    <div className="flex items-center gap-2 mt-1.5">
+                         <span className="bg-white/20 backdrop-blur-md px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide border border-white/20 shadow-sm">{rank}</span>
                     </div>
                 </div>
             </div>
 
             {/* Bottom Row: THE GLASS BAR */}
-            {/* Stronger borders, higher blur, slight white tint to pop against the blue */}
-            <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 border border-white/30 flex items-center justify-between mt-4 group-hover:bg-white/20 transition-all shadow-[0_8px_32px_rgba(0,0,0,0.1)]">
+            {/* UPDATED: More compact padding (p-3) and margin (mt-2) */}
+            <div className="bg-white/10 backdrop-blur-xl rounded-xl p-3 border border-white/30 flex items-center justify-between mt-2 group-hover:bg-white/20 transition-all shadow-[0_8px_32px_rgba(0,0,0,0.1)]">
                 
                 {/* Level / XP */}
                 <div className="flex-1 border-r border-white/20 pr-4">
                      <div className="flex justify-between items-end mb-1">
-                        <span className="text-xs font-bold text-white tracking-wide">Level {level}</span>
-                        <span className="text-[10px] font-bold text-blue-100">{Math.round(progress)}%</span>
+                        <span className="text-[10px] font-bold text-white tracking-wide">Level {level}</span>
+                        <span className="text-[9px] font-bold text-blue-100">{Math.round(progress)}%</span>
                      </div>
-                     {/* XP Bar Track */}
-                     <div className="w-full bg-black/20 rounded-full h-2.5 overflow-hidden border border-white/10">
-                        {/* XP Bar Fill */}
+                     <div className="w-full bg-black/20 rounded-full h-2 overflow-hidden border border-white/10">
                         <div className="bg-gradient-to-r from-yellow-300 to-amber-400 h-full rounded-full shadow-[0_0_15px_rgba(250,204,21,0.6)] relative overflow-hidden" style={{ width: `${progress}%` }}>
                              <div className="absolute inset-0 bg-white/40 w-full animate-[shimmer_2s_infinite]"></div>
                         </div>
@@ -1252,23 +1249,24 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
                 </div>
 
                 {/* Streak */}
-                <div className="pl-6 flex flex-col items-center justify-center">
-                    <div className="flex items-center gap-1.5 text-yellow-300 filter drop-shadow-sm">
-                        <Zap size={24} fill="currentColor" />
-                        <span className="text-2xl font-bold leading-none text-white">{userData?.streak || 1}</span>
+                <div className="pl-5 flex flex-col items-center justify-center">
+                    <div className="flex items-center gap-1 text-yellow-300 filter drop-shadow-sm">
+                        <Zap size={20} fill="currentColor" />
+                        <span className="text-xl font-bold leading-none text-white">{userData?.streak || 1}</span>
                     </div>
-                    <span className="text-[9px] text-blue-100 uppercase font-bold tracking-wider mt-0.5">Day Streak</span>
+                    <span className="text-[8px] text-blue-100 uppercase font-bold tracking-wider mt-0.5">Day Streak</span>
                 </div>
             </div>
         </div>
     </button>
     
     {/* --- MAIN CONTENT --- */}
-    <div className="px-6 space-y-8 -mt-8 relative z-20">
+    {/* UPDATED: Adjusted negative margin (-mt-4) so "My Classes" text isn't hidden */}
+    <div className="px-6 space-y-8 -mt-4 relative z-20">
       
       {/* CLASSES SCROLLER */}
       {classes && classes.length > 0 && (
-        <div className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
+        <div className="animate-in slide-in-from-bottom-4 duration-500 delay-100 pt-2">
             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 ml-1">My Classes</h3>
             <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar snap-x">
                 {classes.map((cls: any) => { 
@@ -1323,9 +1321,9 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
          <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 ml-1">Library</h3>
          <div className="space-y-3">
             {lessons.map((l: any) => (
-                <button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-blue-300 group transition-all">
+                <button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-amber-300 group transition-all">
                     <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 group-hover:bg-blue-100 transition-colors">
+                        <div className="h-12 w-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 group-hover:bg-amber-100 transition-colors">
                             <BookOpen size={24}/>
                         </div>
                         <div className="text-left">
@@ -1333,7 +1331,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
                             <p className="text-xs text-slate-500">{l.subtitle}</p>
                         </div>
                     </div>
-                    <ChevronRight className="text-slate-300 group-hover:text-blue-500 transition-colors"/>
+                    <ChevronRight className="text-slate-300 group-hover:text-amber-500 transition-colors"/>
                 </button>
             ))}
          </div>
