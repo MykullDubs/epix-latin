@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { 
   getAuth, 
   createUserWithEmailAndPassword, 
@@ -52,6 +53,7 @@ const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 // @ts-ignore
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'epic-latin-prod';
 
@@ -297,11 +299,15 @@ function LevelUpModal({ userData, onClose }: any) {
                 <X size={20} />
             </button>
 
-            <div className="flex flex-col items-center relative z-10">
-                {/* Avatar with Halo */}
-                <div className="w-24 h-24 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border-2 border-white/40 shadow-[0_0_30px_rgba(255,255,255,0.25)] mb-4">
-                    <span className="font-serif font-bold text-4xl text-white drop-shadow-md">{userData?.name?.charAt(0) || "U"}</span>
-                </div>
+           <div className="flex flex-col items-center relative z-10">
+    {/* Avatar with Halo */}
+    <div className="w-24 h-24 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border-2 border-white/40 shadow-[0_0_30px_rgba(255,255,255,0.25)] mb-4 overflow-hidden">
+        {userData?.photoURL ? (
+            <img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />
+        ) : (
+            <span className="font-serif font-bold text-4xl text-white drop-shadow-md">{userData?.name?.charAt(0) || "U"}</span>
+        )}
+    </div>
                 
                 <h2 className="text-3xl font-serif font-bold tracking-tight">{userData?.name}</h2>
                 <p className="text-blue-100 text-xs font-bold uppercase tracking-widest mt-1 opacity-80">{userData?.email}</p>
@@ -414,31 +420,83 @@ function AuthView() {
 // --- BEEFED UP PROFILE VIEW (FIXED LAYOUT) ---
 function ProfileView({ user, userData }: any) {
   const [deploying, setDeploying] = useState(false);
+  const [uploading, setUploading] = useState(false); // New state for upload spinner
+  const fileInputRef = useRef<HTMLInputElement>(null); // Ref for hidden input
+
   const handleLogout = () => signOut(auth);
-  
-  // Calculate Level Data for the Stats Tablet
   const { level, progress, rank } = getLevelInfo(userData?.xp || 0);
 
   const deploySystemContent = async () => { setDeploying(true); const batch = writeBatch(db); Object.entries(INITIAL_SYSTEM_DECKS).forEach(([key, deck]) => batch.set(doc(db, 'artifacts', appId, 'public', 'data', 'system_decks', key), deck)); INITIAL_SYSTEM_LESSONS.forEach((lesson: any) => batch.set(doc(db, 'artifacts', appId, 'public', 'data', 'system_lessons', lesson.id), lesson)); try { await batch.commit(); alert("Deployed!"); } catch (e: any) { alert("Error: " + e.message); } setDeploying(false); };
   const toggleRole = async () => { if (!userData) return; const newRole = userData.role === 'instructor' ? 'student' : 'instructor'; await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole }); };
 
+  // --- NEW: HANDLE IMAGE UPLOAD ---
+  const handleImageUpload = async (e: any) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      // Simple validation
+      if (file.size > 5 * 1024 * 1024) { alert("File is too large (Max 5MB)"); return; }
+      if (!file.type.startsWith('image/')) { alert("Please upload an image file"); return; }
+
+      setUploading(true);
+      try {
+          // 1. Create Reference
+          const storageRef = ref(storage, `avatars/${user.uid}_${Date.now()}`);
+          
+          // 2. Upload
+          await uploadBytes(storageRef, file);
+          
+          // 3. Get URL
+          const photoURL = await getDownloadURL(storageRef);
+          
+          // 4. Update Profile Doc
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { photoURL });
+          
+      } catch (error) {
+          console.error("Upload failed", error);
+          alert("Failed to upload image.");
+      } finally {
+          setUploading(false);
+      }
+  };
+
   return (
     <div className="h-full flex flex-col bg-gradient-to-b from-slate-50 to-blue-50 relative overflow-y-auto overflow-x-hidden">
         
-        {/* --- THE CROWN OF GLORY (Header - Reduced Size) --- */}
+        {/* --- HEADER --- */}
         <div className="relative bg-gradient-to-br from-blue-600/90 via-indigo-600/90 to-blue-700/90 backdrop-blur-md pb-16 pt-10 px-6 rounded-b-[2rem] shadow-2xl z-0 shrink-0 text-center overflow-hidden">
-            {/* Background Decor - More vibrant for a brighter light */}
             <div className="absolute top-[-50%] left-[-20%] w-[500px] h-[500px] bg-blue-400/40 rounded-full blur-[80px] mix-blend-overlay pointer-events-none animate-[pulse_8s_ease-in-out_infinite]"></div>
             <div className="absolute bottom-[-20%] right-[-10%] w-[300px] h-[300px] bg-indigo-300/40 rounded-full blur-[60px] mix-blend-overlay pointer-events-none animate-[pulse_10s_ease-in-out_infinite_reverse]"></div>
             
-            {/* Avatar Halo */}
-            <div className="relative inline-block mb-3">
-                <div className="w-24 h-24 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border-2 border-white/40 shadow-[0_0_50px_rgba(255,255,255,0.3)] relative z-10">
-                    <span className="font-serif font-bold text-4xl text-white drop-shadow-lg">{userData?.name?.charAt(0) || 'U'}</span>
+            {/* --- AVATAR UPLOADER --- */}
+            <div className="relative inline-block mb-3 group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                <div className="w-24 h-24 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border-2 border-white/40 shadow-[0_0_50px_rgba(255,255,255,0.3)] relative z-10 overflow-hidden">
+                    {uploading ? (
+                        <Loader className="animate-spin text-white" />
+                    ) : userData?.photoURL ? (
+                        <img src={userData.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                        <span className="font-serif font-bold text-4xl text-white drop-shadow-lg">{userData?.name?.charAt(0) || 'U'}</span>
+                    )}
+                    
+                    {/* Hover Overlay with Camera Icon */}
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Camera className="text-white" size={24} />
+                    </div>
                 </div>
+                
                 {/* Decorative Rings */}
-                <div className="absolute inset-0 border border-white/20 rounded-full scale-125 animate-pulse"></div>
-                <div className="absolute inset-0 border border-white/10 rounded-full scale-150"></div>
+                <div className="absolute inset-0 border border-white/20 rounded-full scale-125 animate-pulse pointer-events-none"></div>
+                <div className="absolute inset-0 border border-white/10 rounded-full scale-150 pointer-events-none"></div>
+                
+                {/* Hidden Input */}
+                <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/*" 
+                    onChange={handleImageUpload} 
+                />
             </div>
 
             <h1 className="text-3xl font-serif font-bold text-white drop-shadow-md mb-1">{userData?.name}</h1>
@@ -450,15 +508,13 @@ function ProfileView({ user, userData }: any) {
             </div>
         </div>
 
-        {/* --- THE BODY OF CONTENT --- */}
+        {/* --- CONTENT --- */}
         <div className="px-6 -mt-12 relative z-10 pb-24">
             
-            {/* --- TABLETS OF TESTIMONY (Glassmorphic Stats Card) --- */}
+            {/* Stats Card */}
             <div className="bg-white/70 backdrop-blur-xl rounded-[2rem] p-6 shadow-[inset_0_2px_20px_rgba(255,255,255,0.2),_0_15px_35px_rgba(0,0,0,0.1)] border border-white/40 mb-8 relative overflow-hidden ring-1 ring-white/20">
                 <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-400/80 via-indigo-500/80 to-blue-600/80"></div>
-                
                 <div className="grid grid-cols-2 gap-y-6 gap-x-4">
-                    {/* Stat 1: Level */}
                     <div className="text-center border-r border-blue-500/10">
                         <span className="block text-blue-900/60 text-[10px] font-bold uppercase tracking-widest mb-1">Current Rank</span>
                         <div className="flex items-center justify-center gap-2 text-indigo-600 drop-shadow-sm">
@@ -467,8 +523,6 @@ function ProfileView({ user, userData }: any) {
                         </div>
                         <span className="text-xs font-bold text-indigo-500/80">{rank}</span>
                     </div>
-
-                    {/* Stat 2: Streak */}
                     <div className="text-center">
                         <span className="block text-blue-900/60 text-[10px] font-bold uppercase tracking-widest mb-1">Day Streak</span>
                         <div className="flex items-center justify-center gap-2 text-amber-500 drop-shadow-sm">
@@ -477,8 +531,6 @@ function ProfileView({ user, userData }: any) {
                         </div>
                         <span className="text-xs font-bold text-amber-500/80">On Fire!</span>
                     </div>
-
-                    {/* Progress Bar (Spanning both cols) */}
                     <div className="col-span-2 pt-4 border-t border-blue-500/10">
                         <div className="flex justify-between items-end mb-2">
                             <span className="text-xs font-bold text-blue-900/60">XP Progress</span>
@@ -493,59 +545,37 @@ function ProfileView({ user, userData }: any) {
                 </div>
             </div>
 
-            {/* --- ACTS OF THE USER (Actions with Glass Touch) --- */}
+            {/* Actions */}
             <div className="space-y-3">
                 <h3 className="text-xs font-bold text-blue-900/50 uppercase tracking-wider ml-2 mb-2">Account Settings</h3>
-                
                 <button onClick={toggleRole} className="w-full bg-white/80 backdrop-blur-sm p-4 rounded-2xl border border-white/40 shadow-sm flex items-center justify-between group hover:bg-white/95 hover:border-indigo-300 hover:shadow-md transition-all active:scale-[0.98]">
                     <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors shadow-sm">
-                            <School size={20}/>
-                        </div>
-                        <div className="text-left">
-                            <h4 className="font-bold text-slate-800 text-base">Switch Role</h4>
-                            <p className="text-[10px] text-slate-500">Currently: {userData?.role}</p>
-                        </div>
+                        <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors shadow-sm"><School size={20}/></div>
+                        <div className="text-left"><h4 className="font-bold text-slate-800 text-base">Switch Role</h4><p className="text-[10px] text-slate-500">Currently: {userData?.role}</p></div>
                     </div>
-                    <div className="w-8 h-8 rounded-full bg-slate-50/50 flex items-center justify-center text-slate-300 group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                        <ChevronRight size={16}/>
-                    </div>
+                    <div className="w-8 h-8 rounded-full bg-slate-50/50 flex items-center justify-center text-slate-300 group-hover:bg-indigo-600 group-hover:text-white transition-all"><ChevronRight size={16}/></div>
                 </button>
-
                 <button onClick={deploySystemContent} disabled={deploying} className="w-full bg-white/80 backdrop-blur-sm p-4 rounded-2xl border border-white/40 shadow-sm flex items-center justify-between group hover:bg-white/95 hover:border-slate-400 hover:shadow-md transition-all active:scale-[0.98]">
                     <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center group-hover:bg-slate-800 group-hover:text-white transition-colors shadow-sm">
-                            {deploying ? <Loader className="animate-spin" size={20}/> : <UploadCloud size={20}/>}
-                        </div>
-                        <div className="text-left">
-                            <h4 className="font-bold text-slate-800 text-base">Deploy Content</h4>
-                            <p className="text-[10px] text-slate-500">Reset system defaults</p>
-                        </div>
+                        <div className="w-10 h-10 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center group-hover:bg-slate-800 group-hover:text-white transition-colors shadow-sm">{deploying ? <Loader className="animate-spin" size={20}/> : <UploadCloud size={20}/>}</div>
+                        <div className="text-left"><h4 className="font-bold text-slate-800 text-base">Deploy Content</h4><p className="text-[10px] text-slate-500">Reset system defaults</p></div>
                     </div>
                 </button>
-
                 <button onClick={handleLogout} className="w-full bg-rose-50/80 backdrop-blur-sm p-4 rounded-2xl border border-rose-100/60 shadow-sm flex items-center justify-between group hover:bg-rose-100/90 hover:border-rose-200 hover:shadow-md transition-all active:scale-[0.98] mt-5">
                     <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-white/80 text-rose-500 rounded-xl flex items-center justify-center shadow-sm">
-                            <LogOut size={20}/>
-                        </div>
-                        <div className="text-left">
-                            <h4 className="font-bold text-rose-700 text-base">Sign Out</h4>
-                            <p className="text-[10px] text-rose-500/80">See you soon!</p>
-                        </div>
+                        <div className="w-10 h-10 bg-white/80 text-rose-500 rounded-xl flex items-center justify-center shadow-sm"><LogOut size={20}/></div>
+                        <div className="text-left"><h4 className="font-bold text-rose-700 text-base">Sign Out</h4><p className="text-[10px] text-rose-500/80">See you soon!</p></div>
                     </div>
                 </button>
             </div>
             
             <div className="mt-8 text-center">
-                <p className="text-[9px] font-bold text-blue-900/30 uppercase tracking-widest">LinguistFlow v3.1 • Transfigured Edition</p>
+                <p className="text-[9px] font-bold text-blue-900/30 uppercase tracking-widest">LinguistFlow v3.2 • Profile Shine Edition</p>
             </div>
-
         </div>
     </div>
   );
 }
-
 function MatchingGame({ deckCards, onGameEnd }: any) {
     const [terms, setTerms] = useState<any[]>([]);
     const [definitions, setDefinitions] = useState<any[]>([]);
@@ -1354,13 +1384,18 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
         </div>
        
         <div className="relative z-20 flex flex-col gap-4">
-            <div className="flex items-center gap-4">
-                <div className="relative">
-                    <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/40 shadow-[0_8px_32px_rgba(0,0,0,0.1)] group-hover:ring-4 ring-white/20 transition-all">
-                        <span className="font-serif font-bold text-2xl text-white drop-shadow-md">{userData?.name?.charAt(0) || 'S'}</span>
-                    </div>
-                    <div className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-400 border-4 border-blue-600 rounded-full shadow-sm"></div>
-                </div>
+           <div className="flex items-center gap-4">
+    <div className="relative">
+        {/* UPDATED AVATAR CONTAINER */}
+        <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/40 shadow-[0_8px_32px_rgba(0,0,0,0.1)] group-hover:ring-4 ring-white/20 transition-all overflow-hidden">
+            {userData?.photoURL ? (
+                <img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />
+            ) : (
+                <span className="font-serif font-bold text-2xl text-white drop-shadow-md">{userData?.name?.charAt(0) || 'S'}</span>
+            )}
+        </div>
+        <div className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-400 border-4 border-blue-600 rounded-full shadow-sm"></div>
+    </div>
                 <div>
                     <p className="text-blue-100 text-[10px] font-bold uppercase tracking-widest mb-0.5 opacity-90 drop-shadow-sm">Welcome back,</p>
                     <h1 className="text-3xl font-serif font-bold leading-none tracking-tight drop-shadow-lg filter">{userData?.name || 'Student'}</h1>
