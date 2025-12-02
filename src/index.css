@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* THE HOLY RESET */
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+/* Force the body to touch the edges of the simulation */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden; /* Banishes the horizontal scrollbar */
+  background-color: #f8fafc; /* Matches your slate-50 */
+}
+
+/* Ensure the React Root also fills the vessel */
+#root {
+  width: 100%;
+  height: 100%;
+  isolation: isolate;
+}
