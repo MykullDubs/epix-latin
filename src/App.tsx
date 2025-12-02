@@ -333,7 +333,7 @@ function AuthView() {
   );
 }
 
-// --- BEEFED UP PROFILE VIEW ---
+// --- BEEFED UP PROFILE VIEW (FIXED LAYOUT) ---
 function ProfileView({ user, userData }: any) {
   const [deploying, setDeploying] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -342,7 +342,6 @@ function ProfileView({ user, userData }: any) {
   // Calculate Stats & Ranks
   const { level, currentLevelXP, nextLevelXP, progress, rank } = getLevelInfo(userData?.xp || 0);
   
-  // Mock Badges Logic (In a real app, this would be in the DB)
   const badges = [
     { id: '1', icon: Zap, color: 'text-yellow-500', bg: 'bg-yellow-100', label: 'Week Streak', earned: (userData?.streak || 0) >= 7 },
     { id: '2', icon: BookOpen, color: 'text-indigo-500', bg: 'bg-indigo-100', label: 'Scholar', earned: (userData?.xp || 0) > 500 },
@@ -363,9 +362,18 @@ function ProfileView({ user, userData }: any) {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 overflow-y-auto custom-scrollbar">
-      {/* 1. HERO HEADER */}
-      <div className="relative bg-slate-900 text-white p-6 pb-12 mb-10 overflow-hidden shrink-0">
-          <div className="absolute top-0 right-0 p-12 opacity-5 text-indigo-500"><Trophy size={200}/></div>
+      
+      {/* 1. HERO HEADER (FIXED) */}
+      {/* Removed 'overflow-hidden' from parent so the badge can hang out. Added pb-20 for more space. */}
+      <div className="relative bg-slate-900 text-white pt-10 px-6 pb-20 mb-8 shrink-0 rounded-b-[2.5rem] shadow-xl z-10">
+          
+          {/* Background Decoration Container (This keeps the giant trophy from spilling out) */}
+          <div className="absolute inset-0 overflow-hidden rounded-b-[2.5rem] pointer-events-none">
+             <div className="absolute top-[-20px] right-[-20px] opacity-5 text-indigo-500 rotate-12">
+                <Trophy size={250}/>
+             </div>
+          </div>
+
           <div className="relative z-10 flex flex-col items-center">
               <div className="relative group">
                   <div className="w-28 h-28 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 p-1 shadow-2xl">
@@ -376,30 +384,37 @@ function ProfileView({ user, userData }: any) {
                   <button className="absolute bottom-0 right-0 bg-white text-slate-900 p-2 rounded-full shadow-lg hover:scale-110 transition-transform"><Camera size={16}/></button>
               </div>
               
-              <div className="mt-4 text-center">
+              <div className="mt-4 text-center w-full max-w-xs mx-auto">
                   {isEditing ? (
-                      <div className="flex gap-2 justify-center animate-in fade-in">
-                          <input className="text-slate-900 rounded-lg px-2 py-1 text-center font-bold" value={editName} onChange={e => setEditName(e.target.value)} autoFocus />
-                          <button onClick={handleSaveProfile} className="bg-emerald-500 p-1 rounded-md"><Check size={18}/></button>
+                      <div className="flex gap-2 justify-center animate-in fade-in mb-2">
+                          <input className="text-slate-900 rounded-lg px-2 py-1 text-center font-bold w-full" value={editName} onChange={e => setEditName(e.target.value)} autoFocus />
+                          <button onClick={handleSaveProfile} className="bg-emerald-500 p-2 rounded-lg text-white"><Check size={18}/></button>
                       </div>
                   ) : (
-                      <h2 onClick={() => setIsEditing(true)} className="text-3xl font-bold flex items-center justify-center gap-2 cursor-pointer hover:text-indigo-200 transition-colors">
+                      <h2 onClick={() => setIsEditing(true)} className="text-3xl font-bold flex items-center justify-center gap-2 cursor-pointer hover:text-indigo-200 transition-colors mb-1">
                           {userData?.name} <Edit2 size={16} className="opacity-50"/>
                       </h2>
                   )}
-                  <p className="text-indigo-300 font-medium uppercase tracking-widest text-xs mt-1">{userData?.role} • {user.email}</p>
+                  <p className="text-indigo-300 font-medium uppercase tracking-widest text-xs break-all">{userData?.role} • {user.email}</p>
               </div>
           </div>
           
-          {/* Rank Badge Floating */}
-          <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-white text-slate-900 px-6 py-2 rounded-full shadow-xl flex items-center gap-2 border border-slate-100">
-              <Medal size={20} className="text-yellow-500" />
-              <span className="font-black uppercase tracking-wider text-sm">{rank}</span>
+          {/* Rank Badge Floating - Moved to stick properly to the curved bottom */}
+          <div className="absolute -bottom-5 left-1/2 transform -translate-x-1/2 z-20">
+              <div className="bg-white text-slate-900 px-6 py-2.5 rounded-full shadow-xl flex items-center gap-3 border border-slate-100 whitespace-nowrap">
+                  <div className="bg-yellow-100 p-1.5 rounded-full">
+                    <Medal size={20} className="text-yellow-600" />
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase leading-none">Rank</span>
+                    <span className="font-black uppercase tracking-wider text-sm">{rank}</span>
+                  </div>
+              </div>
           </div>
       </div>
 
       {/* 2. MAIN BENTO GRID */}
-      <div className="px-6 pb-24 space-y-6">
+      <div className="px-6 pb-24 space-y-6 pt-4">
           
           {/* XP & Level Progress */}
           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
