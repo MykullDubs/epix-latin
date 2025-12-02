@@ -2231,19 +2231,41 @@ function App() {
     }
   };
 
-  // --- FINAL RENDER ---
+// --- FINAL RENDER ---
   return (
-<div className="bg-slate-100 min-h-screen w-full font-sans text-slate-900 flex justify-center sm:items-center p-0 sm:p-4 relative overflow-hidden">      
-      {/* Background Blobs */}
-      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-rose-400/30 rounded-full blur-[100px] pointer-events-none mix-blend-multiply animate-pulse" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-400/30 rounded-full blur-[100px] pointer-events-none mix-blend-multiply" />
+    <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-center relative overflow-hidden">
+      
+      {/* 1. FORCEFUL CSS RESET (Injects directly into the page) */}
+      <style>{`
+        html, body, #root {
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          height: 100%;
+          overflow: hidden;
+          background-color: #f8fafc; /* slate-50 */
+        }
+        /* Custom Scrollbar Styling */
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+      `}</style>
+
+      {/* Background Blobs (Optional - adds nice glow behind the app) */}
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-rose-400/20 rounded-full blur-[100px] pointer-events-none mix-blend-multiply animate-pulse" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-400/20 rounded-full blur-[100px] pointer-events-none mix-blend-multiply" />
       
       {/* Role Toggle */}
       <RoleToggle user={user} userData={userData} />
 
-      <div className={`bg-slate-50 w-full h-[100dvh] shadow-2xl relative overflow-hidden border-[8px] border-slate-900/5 sm:border-slate-900/10 ${userData?.role === 'instructor' ? 'max-w-full sm:rounded-none border-0' : 'max-w-[400px] sm:rounded-[3rem] sm:h-[800px]'}`}>
+      {/* THE MAIN VESSEL 
+         - Removed: border-[8px], p-4
+         - Added: w-full h-full (Consume everything)
+      */}
+      <div className={`w-full h-[100dvh] relative overflow-hidden bg-slate-50 ${userData?.role === 'instructor' ? 'max-w-full' : 'max-w-full sm:max-w-[400px] sm:h-[850px] sm:rounded-[3rem] sm:shadow-2xl sm:border-[8px] sm:border-slate-900/10'}`}>
         
-        {userData?.role !== 'instructor' && <div className="absolute top-0 left-0 right-0 h-8 bg-white/0 z-50 pointer-events-none" />}
+        {/* Status Bar Spacer (Only for Instructor/Desktop view or strict mobile setups) */}
+        {userData?.role !== 'instructor' && <div className="absolute top-0 left-0 right-0 h-safe-top bg-transparent z-50 pointer-events-none" />}
         
         {userData.role === 'instructor' ? (
              <InstructorDashboard 
@@ -2262,7 +2284,6 @@ function App() {
         )}
 
       </div>
-      <style>{` .perspective-1000 { perspective: 1000px; } .preserve-3d { transform-style: preserve-3d; } .backface-hidden { backface-visibility: hidden; } .rotate-y-180 { transform: rotateY(180deg); } .custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; } `}</style>
     </div>
   );
 }
