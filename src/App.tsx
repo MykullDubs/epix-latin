@@ -345,69 +345,69 @@ function ProfileView({ user, userData }: any) {
   const toggleRole = async () => { if (!userData) return; const newRole = userData.role === 'instructor' ? 'student' : 'instructor'; await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole }); };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 relative overflow-y-auto overflow-x-hidden">
+    <div className="h-full flex flex-col bg-gradient-to-b from-slate-50 to-blue-50 relative overflow-y-auto overflow-x-hidden">
         
-        {/* --- THE CROWN OF GLORY (Header) --- */}
-        <div className="relative bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 pb-32 pt-20 px-6 rounded-b-[3.5rem] shadow-2xl z-0 shrink-0 text-center">
-            {/* Background Decor */}
-            <div className="absolute top-[-50%] left-[-20%] w-[500px] h-[500px] bg-blue-400/20 rounded-full blur-[80px] mix-blend-overlay pointer-events-none"></div>
-            <div className="absolute bottom-[0%] right-[-10%] w-[300px] h-[300px] bg-indigo-300/20 rounded-full blur-[60px] mix-blend-overlay pointer-events-none"></div>
+        {/* --- THE CROWN OF GLORY (Header - Reduced Size) --- */}
+        <div className="relative bg-gradient-to-br from-blue-600/90 via-indigo-600/90 to-blue-700/90 backdrop-blur-md pb-16 pt-10 px-6 rounded-b-[2rem] shadow-2xl z-0 shrink-0 text-center overflow-hidden">
+            {/* Background Decor - More vibrant for a brighter light */}
+            <div className="absolute top-[-50%] left-[-20%] w-[500px] h-[500px] bg-blue-400/40 rounded-full blur-[80px] mix-blend-overlay pointer-events-none animate-[pulse_8s_ease-in-out_infinite]"></div>
+            <div className="absolute bottom-[-20%] right-[-10%] w-[300px] h-[300px] bg-indigo-300/40 rounded-full blur-[60px] mix-blend-overlay pointer-events-none animate-[pulse_10s_ease-in-out_infinite_reverse]"></div>
             
             {/* Avatar Halo */}
-            <div className="relative inline-block mb-4">
-                <div className="w-28 h-28 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border-2 border-white/30 shadow-[0_0_40px_rgba(255,255,255,0.2)] relative z-10">
-                    <span className="font-serif font-bold text-5xl text-white drop-shadow-lg">{userData?.name?.charAt(0) || 'U'}</span>
+            <div className="relative inline-block mb-3">
+                <div className="w-24 h-24 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border-2 border-white/40 shadow-[0_0_50px_rgba(255,255,255,0.3)] relative z-10">
+                    <span className="font-serif font-bold text-4xl text-white drop-shadow-lg">{userData?.name?.charAt(0) || 'U'}</span>
                 </div>
                 {/* Decorative Rings */}
-                <div className="absolute inset-0 border border-white/10 rounded-full scale-125 animate-pulse"></div>
-                <div className="absolute inset-0 border border-white/5 rounded-full scale-150"></div>
+                <div className="absolute inset-0 border border-white/20 rounded-full scale-125 animate-pulse"></div>
+                <div className="absolute inset-0 border border-white/10 rounded-full scale-150"></div>
             </div>
 
-            <h1 className="text-4xl font-serif font-bold text-white drop-shadow-md mb-2">{userData?.name}</h1>
+            <h1 className="text-3xl font-serif font-bold text-white drop-shadow-md mb-1">{userData?.name}</h1>
             <p className="text-blue-100 font-medium tracking-wide text-sm opacity-80">{user.email}</p>
             
-            <div className="mt-4 inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 px-4 py-1.5 rounded-full shadow-inner">
-                <div className={`w-2 h-2 rounded-full ${userData?.role === 'instructor' ? 'bg-amber-400' : 'bg-emerald-400'} shadow-[0_0_10px_currentColor]`}></div>
-                <span className="text-xs font-bold text-white uppercase tracking-widest">{userData?.role} Account</span>
+            <div className="mt-3 inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 px-3 py-1 rounded-full shadow-[inset_0_0_10px_rgba(255,255,255,0.1)]">
+                <div className={`w-1.5 h-1.5 rounded-full ${userData?.role === 'instructor' ? 'bg-amber-400' : 'bg-emerald-400'} shadow-[0_0_10px_currentColor]`}></div>
+                <span className="text-[10px] font-bold text-white uppercase tracking-widest">{userData?.role} Account</span>
             </div>
         </div>
 
         {/* --- THE BODY OF CONTENT --- */}
-        <div className="px-6 -mt-20 relative z-10 pb-24">
+        <div className="px-6 -mt-12 relative z-10 pb-24">
             
-            {/* --- TABLETS OF TESTIMONY (Stats Card) --- */}
-            <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-blue-100 mb-8 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-400 via-indigo-500 to-blue-600"></div>
+            {/* --- TABLETS OF TESTIMONY (Glassmorphic Stats Card) --- */}
+            <div className="bg-white/70 backdrop-blur-xl rounded-[2rem] p-6 shadow-[inset_0_2px_20px_rgba(255,255,255,0.2),_0_15px_35px_rgba(0,0,0,0.1)] border border-white/40 mb-8 relative overflow-hidden ring-1 ring-white/20">
+                <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-400/80 via-indigo-500/80 to-blue-600/80"></div>
                 
-                <div className="grid grid-cols-2 gap-y-8 gap-x-4">
+                <div className="grid grid-cols-2 gap-y-6 gap-x-4">
                     {/* Stat 1: Level */}
-                    <div className="text-center border-r border-slate-100">
-                        <span className="block text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">Current Rank</span>
-                        <div className="flex items-center justify-center gap-2 text-indigo-600">
-                            <Award size={24} />
-                            <span className="text-2xl font-black">{level}</span>
+                    <div className="text-center border-r border-blue-500/10">
+                        <span className="block text-blue-900/60 text-[10px] font-bold uppercase tracking-widest mb-1">Current Rank</span>
+                        <div className="flex items-center justify-center gap-2 text-indigo-600 drop-shadow-sm">
+                            <Award size={22} />
+                            <span className="text-xl font-black">{level}</span>
                         </div>
-                        <span className="text-xs font-bold text-indigo-400">{rank}</span>
+                        <span className="text-xs font-bold text-indigo-500/80">{rank}</span>
                     </div>
 
                     {/* Stat 2: Streak */}
                     <div className="text-center">
-                        <span className="block text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">Day Streak</span>
-                        <div className="flex items-center justify-center gap-2 text-amber-500">
-                            <Zap size={24} fill="currentColor"/>
-                            <span className="text-2xl font-black">{userData?.streak || 1}</span>
+                        <span className="block text-blue-900/60 text-[10px] font-bold uppercase tracking-widest mb-1">Day Streak</span>
+                        <div className="flex items-center justify-center gap-2 text-amber-500 drop-shadow-sm">
+                            <Zap size={22} fill="currentColor"/>
+                            <span className="text-xl font-black">{userData?.streak || 1}</span>
                         </div>
-                        <span className="text-xs font-bold text-amber-400">On Fire!</span>
+                        <span className="text-xs font-bold text-amber-500/80">On Fire!</span>
                     </div>
 
                     {/* Progress Bar (Spanning both cols) */}
-                    <div className="col-span-2 pt-4 border-t border-slate-50">
+                    <div className="col-span-2 pt-4 border-t border-blue-500/10">
                         <div className="flex justify-between items-end mb-2">
-                            <span className="text-xs font-bold text-slate-500">XP Progress</span>
+                            <span className="text-xs font-bold text-blue-900/60">XP Progress</span>
                             <span className="text-xs font-bold text-indigo-600">{userData?.xp || 0} XP</span>
                         </div>
-                        <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner">
-                            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-full rounded-full transition-all duration-1000 relative" style={{ width: `${progress}%` }}>
+                        <div className="w-full bg-blue-900/5 rounded-full h-3 overflow-hidden shadow-inner border border-white/30">
+                            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-full rounded-full transition-all duration-1000 relative shadow-[0_0_10px_rgba(79,70,229,0.4)]" style={{ width: `${progress}%` }}>
                                 <div className="absolute inset-0 bg-white/30 animate-[shimmer_2s_infinite]"></div>
                             </div>
                         </div>
@@ -415,52 +415,52 @@ function ProfileView({ user, userData }: any) {
                 </div>
             </div>
 
-            {/* --- ACTS OF THE USER (Actions) --- */}
-            <div className="space-y-4">
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider ml-2 mb-2">Account Settings</h3>
+            {/* --- ACTS OF THE USER (Actions with Glass Touch) --- */}
+            <div className="space-y-3">
+                <h3 className="text-xs font-bold text-blue-900/50 uppercase tracking-wider ml-2 mb-2">Account Settings</h3>
                 
-                <button onClick={toggleRole} className="w-full bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between group hover:border-indigo-300 hover:shadow-md transition-all active:scale-[0.98]">
+                <button onClick={toggleRole} className="w-full bg-white/80 backdrop-blur-sm p-4 rounded-2xl border border-white/40 shadow-sm flex items-center justify-between group hover:bg-white/95 hover:border-indigo-300 hover:shadow-md transition-all active:scale-[0.98]">
                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                            <School size={24}/>
+                        <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors shadow-sm">
+                            <School size={20}/>
                         </div>
                         <div className="text-left">
-                            <h4 className="font-bold text-slate-800 text-lg">Switch Role</h4>
-                            <p className="text-xs text-slate-500">Currently: {userData?.role}</p>
+                            <h4 className="font-bold text-slate-800 text-base">Switch Role</h4>
+                            <p className="text-[10px] text-slate-500">Currently: {userData?.role}</p>
                         </div>
                     </div>
-                    <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                    <div className="w-8 h-8 rounded-full bg-slate-50/50 flex items-center justify-center text-slate-300 group-hover:bg-indigo-600 group-hover:text-white transition-all">
                         <ChevronRight size={16}/>
                     </div>
                 </button>
 
-                <button onClick={deploySystemContent} disabled={deploying} className="w-full bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between group hover:border-slate-400 hover:shadow-md transition-all active:scale-[0.98]">
+                <button onClick={deploySystemContent} disabled={deploying} className="w-full bg-white/80 backdrop-blur-sm p-4 rounded-2xl border border-white/40 shadow-sm flex items-center justify-between group hover:bg-white/95 hover:border-slate-400 hover:shadow-md transition-all active:scale-[0.98]">
                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center group-hover:bg-slate-800 group-hover:text-white transition-colors">
-                            {deploying ? <Loader className="animate-spin"/> : <UploadCloud size={24}/>}
+                        <div className="w-10 h-10 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center group-hover:bg-slate-800 group-hover:text-white transition-colors shadow-sm">
+                            {deploying ? <Loader className="animate-spin" size={20}/> : <UploadCloud size={20}/>}
                         </div>
                         <div className="text-left">
-                            <h4 className="font-bold text-slate-800 text-lg">Deploy Content</h4>
-                            <p className="text-xs text-slate-500">Reset system defaults</p>
+                            <h4 className="font-bold text-slate-800 text-base">Deploy Content</h4>
+                            <p className="text-[10px] text-slate-500">Reset system defaults</p>
                         </div>
                     </div>
                 </button>
 
-                <button onClick={handleLogout} className="w-full bg-rose-50 p-5 rounded-2xl border border-rose-100 shadow-sm flex items-center justify-between group hover:bg-rose-100 hover:border-rose-200 transition-all active:scale-[0.98] mt-6">
+                <button onClick={handleLogout} className="w-full bg-rose-50/80 backdrop-blur-sm p-4 rounded-2xl border border-rose-100/60 shadow-sm flex items-center justify-between group hover:bg-rose-100/90 hover:border-rose-200 hover:shadow-md transition-all active:scale-[0.98] mt-5">
                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-white text-rose-500 rounded-xl flex items-center justify-center shadow-sm">
-                            <LogOut size={24}/>
+                        <div className="w-10 h-10 bg-white/80 text-rose-500 rounded-xl flex items-center justify-center shadow-sm">
+                            <LogOut size={20}/>
                         </div>
                         <div className="text-left">
-                            <h4 className="font-bold text-rose-700 text-lg">Sign Out</h4>
-                            <p className="text-xs text-rose-500">See you soon!</p>
+                            <h4 className="font-bold text-rose-700 text-base">Sign Out</h4>
+                            <p className="text-[10px] text-rose-500/80">See you soon!</p>
                         </div>
                     </div>
                 </button>
             </div>
             
-            <div className="mt-12 text-center">
-                <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">LinguistFlow v3.0 • Cornflower Edition</p>
+            <div className="mt-8 text-center">
+                <p className="text-[9px] font-bold text-blue-900/30 uppercase tracking-widest">LinguistFlow v3.1 • Transfigured Edition</p>
             </div>
 
         </div>
