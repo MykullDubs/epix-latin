@@ -1844,14 +1844,26 @@ function TestPlayerView({ test, onFinish }: any) {
   // Initialize Interaction States
   useEffect(() => {
       if (!currentQ) return;
-      if (currentQ.type === 'order' && !answers[currentIndex]) {
-          const shuffled = [...currentQ.items].sort(() => Math.random() - 0.5);
-          setDragOrder(shuffled);
-      }
-      if (currentQ.type === 'order' && answers[currentIndex]) setDragOrder(answers[currentIndex]);
       
-      if (currentQ.type === 'match' && answers[currentIndex]) setMatchSelection(answers[currentIndex]);
-      else if (currentQ.type === 'match') setMatchSelection({});
+      // ORDERING INIT
+      if (currentQ.type === 'order') {
+          if (answers[currentIndex]) {
+              setDragOrder(answers[currentIndex]);
+          } else if (currentQ.items) {
+              // Shuffle items so the answer isn't obvious
+              const shuffled = [...currentQ.items].sort(() => Math.random() - 0.5);
+              setDragOrder(shuffled);
+          }
+      }
+      
+      // MATCHING INIT
+      if (currentQ.type === 'match') {
+          if (answers[currentIndex]) {
+              setMatchSelection(answers[currentIndex]);
+          } else {
+              setMatchSelection({});
+          }
+      }
   }, [currentIndex, currentQ]);
 
   const handleMCQ = (val: string) => { if(isSubmitted) return; setAnswers({ ...answers, [currentIndex]: val }); };
@@ -1905,7 +1917,6 @@ function TestPlayerView({ test, onFinish }: any) {
     const percentage = score / questions.length;
     const earnedXP = Math.round(test.xp * percentage);
     
-    // --- GENERATE DETAILED REPORT ---
     const submissionDetails = questions.map((q: any, idx: number) => {
         const ans = answers[idx];
         let isCorrect = false;
@@ -1922,7 +1933,6 @@ function TestPlayerView({ test, onFinish }: any) {
                 correctVal = q.correctAnswer;
             }
         } else if (q.type === 'match') {
-             // Format: "Term -> Definition"
              let allMatch = true;
              const lines: string[] = [];
              if(!ans) allMatch = false;
@@ -1936,11 +1946,9 @@ function TestPlayerView({ test, onFinish }: any) {
              studentVal = lines.join('\n');
              correctVal = q.pairs.map((p:any) => `${p.left} -> ${p.right}`).join('\n');
         } else if (q.type === 'order') {
-            // Format: "1. Item \n 2. Item"
             const cIds = q.items.map((i:any) => i.id).join(',');
             const uIds = ans ? ans.map((i:any) => i.id).join(',') : '';
             isCorrect = cIds === uIds;
-            
             studentVal = ans ? ans.map((i:any, ix:number) => `${ix+1}. ${i.text}`).join('\n') : "No Order Set";
             correctVal = q.items.map((i:any, ix:number) => `${ix+1}. ${i.text}`).join('\n');
         }
@@ -1985,7 +1993,7 @@ function TestPlayerView({ test, onFinish }: any) {
                   {currentQ.type === 'order' && (
                       <div className="space-y-2">
                           <p className="text-xs font-bold text-slate-400 uppercase mb-2">Drag to reorder</p>
-                          {dragOrder.map((item: any, idx: number) => (
+                          {dragOrder.length > 0 ? dragOrder.map((item: any, idx: number) => (
                               <div 
                                 key={item.id} 
                                 draggable={!isSubmitted}
@@ -1997,7 +2005,9 @@ function TestPlayerView({ test, onFinish }: any) {
                                   <div className="text-slate-300"><GripVertical size={20}/></div>
                                   <span className="font-bold text-slate-700">{item.text}</span>
                               </div>
-                          ))}
+                          )) : (
+                             <div className="p-4 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400">No items to order. Check builder.</div>
+                          )}
                       </div>
                   )}
 
@@ -2005,7 +2015,7 @@ function TestPlayerView({ test, onFinish }: any) {
                   {currentQ.type === 'match' && (
                       <div className="grid grid-cols-2 gap-8">
                            <div className="space-y-3">
-                               {currentQ.pairs.map((p: any) => (
+                               {currentQ.pairs?.map((p: any) => (
                                    <button 
                                      key={p.left} 
                                      onClick={() => handleMatchClick('left', p.left)}
@@ -2016,7 +2026,7 @@ function TestPlayerView({ test, onFinish }: any) {
                                ))}
                            </div>
                            <div className="space-y-3">
-                               {[...currentQ.pairs].sort((a:any,b:any) => a.right.localeCompare(b.right)).map((p: any) => {
+                               {currentQ.pairs ? [...currentQ.pairs].sort((a:any,b:any) => a.right.localeCompare(b.right)).map((p: any) => {
                                    const isMatched = Object.values(matchSelection).includes(p.right);
                                    return (
                                        <button 
@@ -2027,7 +2037,7 @@ function TestPlayerView({ test, onFinish }: any) {
                                            {p.right}
                                        </button>
                                    )
-                               })}
+                               }) : <p className="text-xs text-slate-400">No pairs defined.</p>}
                            </div>
                       </div>
                   )}
@@ -2036,7 +2046,7 @@ function TestPlayerView({ test, onFinish }: any) {
               <div className="text-center py-10 animate-in zoom-in duration-300">
                   <div className="w-24 h-24 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl"><Trophy size={48} /></div>
                   <h2 className="text-3xl font-bold text-slate-900 mb-2">Exam Complete!</h2>
-                  <div className="text-6xl font-black text-indigo-600 mb-10">{score}<span className="text-2xl text-slate-300">/{questions.length}</span></div>
+                  <div className="text-6xl font-black text-indigo-600 mb-2">{score}<span className="text-2xl text-slate-300">/{questions.length}</span></div>
                   <div className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-10">{Math.round((score/questions.length)*100)}% Accuracy</div>
                   <button onClick={finishExam} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg hover:scale-[1.02] transition-transform">Collect XP & Finish</button>
               </div>
