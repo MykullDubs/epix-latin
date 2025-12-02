@@ -2595,9 +2595,10 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden">
       <div className="w-64 bg-slate-900 text-white flex-col hidden md:flex">
-        <div className="p-6 border-b border-slate-800"><h1 className="text-xl font-bold flex items-center gap-2">
-        <GraduationCap className="text-indigo-400"/> Instructor 
-    </h1><p className="text-xs text-slate-400 mt-1">{user.email}</p></div>
+        <div className="p-6 border-b border-slate-800">
+            <h1 className="text-xl font-bold flex items-center gap-2"><GraduationCap className="text-indigo-400"/> Instructor</h1>
+            <p className="text-xs text-slate-400 mt-1">{user.email}</p>
+        </div>
         <div className="flex-1 p-4 space-y-2">
             <button onClick={() => setActiveTab('dashboard')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'}`}><LayoutDashboard size={20} /> Overview</button>
             <button onClick={() => setActiveTab('classes')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'classes' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'}`}><School size={20} /> Classes & Roster</button>
@@ -2637,11 +2638,6 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
     </div>
   );
 }
-
-// ============================================================================
-// PASTE THIS AT THE VERY BOTTOM OF YOUR FILE
-// (Replace your existing RoleToggle and function App)
-// ============================================================================
 
 function RoleToggle({ user, userData }: any) {
   const [switching, setSwitching] = useState(false);
@@ -2746,7 +2742,22 @@ function App() {
     setSystemDecks(INITIAL_SYSTEM_DECKS); 
     setSystemLessons(INITIAL_SYSTEM_LESSONS);
     
-    const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (docSnap) => { if (docSnap.exists()) setUserData(docSnap.data()); else setUserData(DEFAULT_USER_DATA); });
+    const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (docSnap) => { 
+        if (docSnap.exists()) {
+            setUserData(docSnap.data()); 
+        } else {
+            const newProfile = { 
+                ...DEFAULT_USER_DATA, 
+                email: user.email, 
+                name: user.displayName || "Student",
+                role: 'student' 
+            };
+            setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), newProfile)
+                .then(() => console.log("Profile Auto-Created"))
+                .catch(err => console.error("Create failed:", err));
+            setUserData(newProfile); 
+        }
+    });
     const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     
@@ -2836,7 +2847,7 @@ function App() {
           padding: 0;
           width: 100%;
           height: 100%;
-          overflow: hidden;
+          overflow: hidden; 
           background-color: #f8fafc;
         }
         *::-webkit-scrollbar { display: none; }
