@@ -37,7 +37,7 @@ import {
   Pencil, Image, Info, Edit3, FileJson, AlertTriangle, FlipVertical, GanttChart, 
   AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle, ArrowDown,
   BarChart3, UserPlus, Briefcase, Coffee, AlertCircle, Target, Calendar, Settings, Edit2, Camera, Medal,
-  ChevronUp,GripVertical, ListOrdered, ArrowRightLeft,CheckSquare
+  ChevronUp,GripVertical, ListOrdered, ArrowRightLeft,CheckSquare,table
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -2252,6 +2252,126 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
     </div>
   );
 }
+function GradebookView({ classData }: any) {
+  const [logs, setLogs] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Fetch a larger batch of logs to ensure we cover the gradebook history
+    const q = query(collection(db, 'artifacts', appId, 'activity_logs'), orderBy('timestamp', 'desc'), limit(500));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
+        // Filter for this class's students
+        const classLogs = data.filter((l: any) => classData.studentEmails?.includes(l.studentEmail));
+        setLogs(classLogs);
+    });
+    return () => unsubscribe();
+  }, [classData]);
+
+  // --- DATA MAPPING ---
+  const assignments = classData.assignments || [];
+  const students = classData.studentEmails || [];
+
+  const getStatus = (studentEmail: string, assignmentId: string, type: string) => {
+      // Find the most recent log for this specific assignment & student
+      // We match by 'itemId' (which we will save) or 'itemTitle' as a fallback
+      const log = logs.find((l: any) => 
+          l.studentEmail === studentEmail && 
+          (l.itemId === assignmentId || l.itemTitle === assignments.find((a:any) => a.id === assignmentId)?.title)
+      );
+
+      if (!log) return { status: 'missing', label: '-', score: 0 };
+
+      if (type === 'test' || log.scoreDetail) {
+          const { score, total } = log.scoreDetail || { score: 0, total: 1 };
+          const pct = Math.round((score / total) * 100);
+          return { status: 'graded', label: `${pct}%`, score: pct };
+      }
+      
+      return { status: 'complete', label: 'Done', score: 100 };
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-slate-50 rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+       {/* Header */}
+       <div className="bg-white p-6 border-b border-slate-200 flex justify-between items-center">
+           <div>
+               <h3 className="font-bold text-slate-800 flex items-center gap-2"><Table size={18} className="text-indigo-600"/> Gradebook</h3>
+               <p className="text-xs text-slate-500">{students.length} Students • {assignments.length} Assignments</p>
+           </div>
+           <div className="flex gap-2">
+               <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase">
+                   <span className="w-2 h-2 rounded-full bg-emerald-400"></span> Excellent
+                   <span className="w-2 h-2 rounded-full bg-amber-400 ml-2"></span> Average
+                   <span className="w-2 h-2 rounded-full bg-rose-400 ml-2"></span> Poor
+               </div>
+           </div>
+       </div>
+
+       {/* The Grid */}
+       <div className="flex-1 overflow-auto custom-scrollbar">
+           <table className="w-full text-left border-collapse">
+               <thead className="bg-slate-50 sticky top-0 z-20 shadow-sm">
+                   <tr>
+                       <th className="p-4 min-w-[200px] font-bold text-slate-500 text-xs uppercase tracking-wider border-b border-r border-slate-200 sticky left-0 bg-slate-50 z-30">
+                           Student
+                       </th>
+                       {assignments.map((a: any) => (
+                           <th key={a.id} className="p-4 min-w-[120px] font-bold text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200 text-center">
+                               <div className="flex flex-col items-center">
+                                   <span className="truncate max-w-[100px]" title={a.title}>{a.title}</span>
+                                   <span className={`text-[9px] px-1.5 py-0.5 rounded mt-1 ${a.contentType === 'test' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                       {a.contentType === 'test' ? 'Exam' : 'Lesson'}
+                                   </span>
+                               </div>
+                           </th>
+                       ))}
+                   </tr>
+               </thead>
+               <tbody className="divide-y divide-slate-100 bg-white">
+                   {students.map((studentEmail: string) => (
+                       <tr key={studentEmail} className="hover:bg-slate-50 transition-colors group">
+                           {/* Sticky Name Column */}
+                           <td className="p-4 border-r border-slate-100 sticky left-0 bg-white group-hover:bg-slate-50 z-10">
+                               <div className="flex items-center gap-3">
+                                   <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-sm">
+                                       {studentEmail.charAt(0).toUpperCase()}
+                                   </div>
+                                   <div className="truncate max-w-[140px]">
+                                       <p className="font-bold text-slate-700 text-sm truncate">{studentEmail.split('@')[0]}</p>
+                                       <p className="text-[10px] text-slate-400 truncate">{studentEmail}</p>
+                                   </div>
+                               </div>
+                           </td>
+                           
+                           {/* Grades */}
+                           {assignments.map((a: any) => {
+                               const { status, label, score } = getStatus(studentEmail, a.id, a.contentType);
+                               let cellClass = "text-slate-300 font-medium"; // Default missing
+                               
+                               if (status === 'graded') {
+                                   if (score >= 80) cellClass = "text-emerald-600 font-black bg-emerald-50 border-emerald-100";
+                                   else if (score >= 60) cellClass = "text-amber-600 font-bold bg-amber-50 border-amber-100";
+                                   else cellClass = "text-rose-600 font-bold bg-rose-50 border-rose-100";
+                               } else if (status === 'complete') {
+                                   cellClass = "text-indigo-600 font-bold bg-indigo-50 border-indigo-100";
+                               }
+
+                               return (
+                                   <td key={a.id} className="p-3 text-center">
+                                       <div className={`mx-auto py-1.5 px-3 rounded-lg border border-transparent ${status !== 'missing' ? cellClass : ''} inline-block min-w-[60px] text-sm`}>
+                                           {status === 'complete' ? <Check size={16} className="mx-auto"/> : label}
+                                       </div>
+                                   </td>
+                               );
+                           })}
+                       </tr>
+                   ))}
+               </tbody>
+           </table>
+       </div>
+    </div>
+  );
+}
 
 function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
@@ -2262,8 +2382,8 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   
   const [assignType, setAssignType] = useState<'deck' | 'lesson' | 'test'>('lesson');
-  // REMOVED 'analytics' from the allowed types here
-  const [viewTab, setViewTab] = useState<'content' | 'forum'>('content');
+  // UPDATED: Added 'gradebook' to tabs
+  const [viewTab, setViewTab] = useState<'content' | 'forum' | 'analytics' | 'gradebook'>('content');
 
   // -- Student Selector States --
   const [isStudentListOpen, setIsStudentListOpen] = useState(false);
@@ -2308,50 +2428,51 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
             <div><h1 className="text-2xl font-bold text-slate-900">{selectedClass.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {selectedClass.code}</p></div>
             <div className="flex gap-2">
-                <button onClick={() => setViewTab('content')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'content' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Manage</button>
-                <button onClick={() => setViewTab('forum')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'forum' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Forum</button>
-                
-                {viewTab === 'content' && (
-                    <>
-                    <button onClick={() => { setAssignType('lesson'); setAssignModalOpen(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-indigo-700 active:scale-95 transition-all uppercase tracking-wider"><BookOpen size={16}/> ASSIGN LESSON</button>
-                    <button onClick={() => { setAssignType('deck'); setAssignModalOpen(true); }} className="bg-orange-500 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-orange-600 active:scale-95 transition-all uppercase tracking-wider"><Layers size={16}/> ASSIGN DECK</button>
-                    {/* Replaced FileQuestion with HelpCircle */}
-                    <button onClick={() => { setAssignType('test'); setAssignModalOpen(true); }} className="bg-rose-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-rose-700 active:scale-95 transition-all uppercase tracking-wider"><HelpCircle size={16}/> ASSIGN EXAM</button>
-                    </>
-                )}
+                <button onClick={() => setViewTab('content')} className={`px-3 py-2 rounded-lg font-bold text-xs transition-all ${viewTab === 'content' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Manage</button>
+                <button onClick={() => setViewTab('analytics')} className={`px-3 py-2 rounded-lg font-bold text-xs transition-all ${viewTab === 'analytics' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Analytics</button>
+                <button onClick={() => setViewTab('gradebook')} className={`px-3 py-2 rounded-lg font-bold text-xs transition-all ${viewTab === 'gradebook' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Grades</button>
+                <button onClick={() => setViewTab('forum')} className={`px-3 py-2 rounded-lg font-bold text-xs transition-all ${viewTab === 'forum' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Forum</button>
             </div>
           </div>
         </div>
 
         {viewTab === 'content' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="space-y-4">
-                    <h3 className="font-bold text-slate-800 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3>
-                    {(!selectedClass.assignments || selectedClass.assignments.length === 0) && <div className="p-6 border-2 border-dashed border-slate-200 rounded-xl text-center text-slate-400 text-sm">No content assigned yet.</div>}
-                    {selectedClass.assignments?.map((l: any, idx: number) => ( 
-                      <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                          {/* Replaced FileQuestion with HelpCircle */}
-                          <div className={`p-2 rounded-lg ${l.contentType === 'deck' ? 'bg-orange-100 text-orange-600' : l.contentType === 'test' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                              {l.contentType === 'deck' ? <Layers size={18} /> : l.contentType === 'test' ? <HelpCircle size={18}/> : <FileText size={18} />}
-                          </div>
-                          <div>
-                              <h4 className="font-bold text-slate-800">{l.title}</h4>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-slate-500 uppercase">
-                                    {l.contentType === 'deck' ? 'Flashcard Deck' : l.contentType === 'test' ? 'Exam' : 'Lesson'}
-                                </span>
-                                {l.targetStudents && l.targetStudents.length > 0 && (<span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold flex items-center gap-1"><Users size={10}/> {l.targetStudents.length} Students</span>)}
+            <div className="flex-1 flex flex-col relative">
+                 {/* Action Buttons */}
+                 <div className="flex gap-2 mb-6">
+                    <button onClick={() => { setAssignType('lesson'); setAssignModalOpen(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-indigo-700 active:scale-95 transition-all uppercase tracking-wider"><BookOpen size={16}/> ASSIGN LESSON</button>
+                    <button onClick={() => { setAssignType('deck'); setAssignModalOpen(true); }} className="bg-orange-500 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-orange-600 active:scale-95 transition-all uppercase tracking-wider"><Layers size={16}/> ASSIGN DECK</button>
+                    <button onClick={() => { setAssignType('test'); setAssignModalOpen(true); }} className="bg-rose-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-rose-700 active:scale-95 transition-all uppercase tracking-wider"><HelpCircle size={16}/> ASSIGN EXAM</button>
+                 </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                        <h3 className="font-bold text-slate-800 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3>
+                        {(!selectedClass.assignments || selectedClass.assignments.length === 0) && <div className="p-6 border-2 border-dashed border-slate-200 rounded-xl text-center text-slate-400 text-sm">No content assigned yet.</div>}
+                        {selectedClass.assignments?.map((l: any, idx: number) => ( 
+                          <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-lg ${l.contentType === 'deck' ? 'bg-orange-100 text-orange-600' : l.contentType === 'test' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                  {l.contentType === 'deck' ? <Layers size={18} /> : l.contentType === 'test' ? <HelpCircle size={18}/> : <FileText size={18} />}
                               </div>
-                          </div>
-                        </div>
-                        <span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded text-xs font-bold">Active</span>
-                      </div> 
-                    ))}
-                </div>
-                <div className="space-y-4">
-                    <div className="flex justify-between items-center"><h3 className="font-bold text-slate-800 flex items-center gap-2"><Users size={18} className="text-indigo-600"/> Roster</h3><button onClick={() => setIsStudentListOpen(true)} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"><UserPlus size={14}/> Add Students</button></div>
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">{(!selectedClass.students || selectedClass.students.length === 0) && <div className="p-4 text-center text-slate-400 text-sm italic">No students joined yet.</div>}{selectedClass.students?.map((s: string, i: number) => (<div key={i} className="p-3 border-b border-slate-50 last:border-0 flex items-center gap-3"><div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs">{s.charAt(0)}</div><span className="text-sm font-medium text-slate-700">{s}</span></div>))}</div>
+                              <div>
+                                  <h4 className="font-bold text-slate-800">{l.title}</h4>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] text-slate-500 uppercase">
+                                        {l.contentType === 'deck' ? 'Flashcard Deck' : l.contentType === 'test' ? 'Exam' : 'Lesson'}
+                                    </span>
+                                    {l.targetStudents && l.targetStudents.length > 0 && (<span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold flex items-center gap-1"><Users size={10}/> {l.targetStudents.length} Students</span>)}
+                                  </div>
+                              </div>
+                            </div>
+                            <span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded text-xs font-bold">Active</span>
+                          </div> 
+                        ))}
+                    </div>
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center"><h3 className="font-bold text-slate-800 flex items-center gap-2"><Users size={18} className="text-indigo-600"/> Roster</h3><button onClick={() => setIsStudentListOpen(true)} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"><UserPlus size={14}/> Add Students</button></div>
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">{(!selectedClass.students || selectedClass.students.length === 0) && <div className="p-4 text-center text-slate-400 text-sm italic">No students joined yet.</div>}{selectedClass.students?.map((s: string, i: number) => (<div key={i} className="p-3 border-b border-slate-50 last:border-0 flex items-center gap-3"><div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs">{s.charAt(0)}</div><span className="text-sm font-medium text-slate-700">{s}</span></div>))}</div>
+                    </div>
                 </div>
             </div>
         )}
@@ -2362,7 +2483,18 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
             </div>
         )}
 
-        {/* REMOVED ANALYTICS TAB CONTENT BLOCK */}
+        {viewTab === 'analytics' && (
+            <div className="h-full pb-20">
+                <ClassAnalytics classData={selectedClass} />
+            </div>
+        )}
+        
+        {/* --- NEW GRADEBOOK TAB --- */}
+        {viewTab === 'gradebook' && (
+            <div className="h-full pb-20">
+                <GradebookView classData={selectedClass} />
+            </div>
+        )}
 
         {isStudentListOpen && (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -2403,7 +2535,6 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
             <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in duration-200">
               <div className="p-4 border-b border-slate-100 bg-slate-50">
                   <div className="flex justify-between items-center mb-4">
-                      {/* Dynamic Header */}
                       <h3 className="font-bold text-lg">Assign {assignType === 'deck' ? 'Flashcard Deck' : assignType === 'test' ? 'Exam' : 'Lesson'}</h3>
                       <button onClick={() => setAssignModalOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-600"/></button>
                   </div>
@@ -2426,7 +2557,6 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                       </div>
                   )}
                   
-                  {/* Filter out 'test' type here so lessons aren't cluttered */}
                   {assignType === 'lesson' && (
                       <div>
                           <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><BookOpen size={14}/> Available Lessons</h4>
@@ -2441,7 +2571,6 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                       </div>
                   )}
                   
-                  {/* --- NEW SECTION: EXAMS --- */}
                   {assignType === 'test' && (
                       <div>
                           <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><HelpCircle size={14}/> Available Exams</h4>
@@ -2462,6 +2591,15 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
       </div>
     );
   }
+  
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500 relative">
+      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
+      <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-slate-800">My Classes</h2><form onSubmit={createClass} className="flex gap-2"><input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="New Class Name" className="p-2 rounded-lg border border-slate-200 text-sm w-64" /><button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2"><Plus size={16}/> Create</button></form></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{classes.map((cls: any) => (<div key={cls.id} onClick={() => setSelectedClassId(cls.id)} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative group"><div className="absolute top-4 right-4 flex gap-2"><button onClick={(e) => {e.stopPropagation(); handleRenameClass(cls.id, cls.name);}} className="text-slate-300 hover:text-indigo-500"><Edit3 size={16}/></button><button onClick={(e) => {e.stopPropagation(); handleDeleteClass(cls.id);}} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button></div><div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4 font-bold text-lg">{cls.name.charAt(0)}</div><h3 className="font-bold text-lg text-slate-900">{cls.name}</h3><p className="text-sm text-slate-500 mb-4">{(cls.students || []).length} Students</p><div className="flex items-center justify-between bg-slate-50 p-2 rounded-lg"><span className="text-xs font-mono font-bold text-slate-600 tracking-wider">{cls.code}</span><button className="text-indigo-600 text-xs font-bold flex items-center gap-1" onClick={(e) => {e.stopPropagation(); navigator.clipboard.writeText(cls.code);}}><Copy size={12}/> Copy</button></div></div>))}</div>
+    </div>
+  );
+}
   
   return (
     <div className="space-y-6 animate-in fade-in duration-500 relative">
@@ -2674,7 +2812,7 @@ function App() {
     if (xp > 0 && user) { 
         try { 
             await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp), completedAssignments: arrayUnion(lessonId) }); 
-            await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { studentName: userData?.name || 'Unknown Student', studentEmail: user.email, itemTitle: title || 'Unknown Activity', xp: xp, timestamp: Date.now(), type: scoreDetail ? 'quiz_score' : 'completion', scoreDetail: scoreDetail || null });
+            await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { studentName: userData?.name || 'Unknown Student', studentEmail: user.email, itemTitle: title || 'Unknown Activity', itemId: lessonId, xp: xp, timestamp: Date.now(), type: scoreDetail ? 'quiz_score' : 'completion', scoreDetail: scoreDetail || null });
             if(userData?.role === 'instructor') alert(`Activity Logged: ${title} (+${xp}XP)`);
         } catch (e: any) { 
             await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { ...DEFAULT_USER_DATA, xp: xp, completedAssignments: [lessonId] }, { merge: true }); 
