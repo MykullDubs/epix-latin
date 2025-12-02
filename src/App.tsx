@@ -1838,59 +1838,102 @@ function App() {
     return () => { unsubProfile(); unsubCards(); unsubLessons(); unsubSysDecks(); unsubSysLessons(); unsubClasses(); };
   }, [user, userData?.role]);
 
+function App() {
+  const [activeTab, setActiveTab] = useState('home');
+  const [user, setUser] = useState<any>(null);
+  const [userData, setUserData] = useState<any>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [systemDecks, setSystemDecks] = useState<any>({});
+  const [systemLessons, setSystemLessons] = useState<any[]>([]);
+  const [customCards, setCustomCards] = useState<any[]>([]);
+  const [customLessons, setCustomLessons] = useState<any[]>([]);
+  const [activeLesson, setActiveLesson] = useState<any>(null);
+  const [selectedDeckKey, setSelectedDeckKey] = useState('salutationes');
+  const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
+  const [classLessons, setClassLessons] = useState<any[]>([]);
+  const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
+
+  // --- MEMOS ---
+  const allDecks = useMemo(() => {
+    const decks: any = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: [] } };
+    
+    // Add Custom User Cards
+    customCards.forEach(card => {
+        const target = card.deckId || 'custom';
+        if (!decks[target]) { decks[target] = { title: card.deckTitle || "Custom Deck", cards: [] }; }
+        if (!decks[target].cards) decks[target].cards = [];
+        decks[target].cards.push(card);
+    });
+
+    // Add Assigned Class Decks
+    classLessons.forEach((assignment: any) => {
+        if (assignment.contentType === 'deck') {
+            decks[assignment.id] = {
+                title: `(Class) ${assignment.title}`,
+                cards: assignment.cards || [],
+                isAssignment: true
+            };
+        }
+    });
+
+    return decks;
+  }, [systemDecks, customCards, classLessons]);
+
+  const lessons = useMemo(() => [...systemLessons, ...customLessons, ...classLessons.filter(l => l.contentType !== 'deck')], [systemLessons, customLessons, classLessons]);
+  const libraryLessons = useMemo(() => [...systemLessons, ...customLessons, EMAIL_MODULE_DATA], [systemLessons, customLessons]);
+
+  const handleContentSelection = (item: any) => { if (item.contentType === 'deck') { setSelectedDeckKey(item.id); setActiveTab('flashcards'); setActiveStudentClass(null); setActiveLesson(null); } else { setActiveLesson(item); } };
+
+  // --- EFFECTS ---
+  useEffect(() => { const unsubscribe = onAuthStateChanged(auth, (u) => { setUser(u); setAuthChecked(true); }); return () => unsubscribe(); }, []);
+  
+  useEffect(() => {
+    if (!user) { setUserData(null); return; }
+    
+    // Load System Data
+    setSystemDecks(INITIAL_SYSTEM_DECKS); 
+    setSystemLessons(INITIAL_SYSTEM_LESSONS);
+    
+    // Load User Data
+    const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (docSnap) => { if (docSnap.exists()) setUserData(docSnap.data()); else setUserData(DEFAULT_USER_DATA); });
+    const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    
+    // Load Public Data
+    const unsubSysDecks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_decks'), (snap) => { const d: any = {}; snap.docs.forEach(doc => { d[doc.id] = doc.data(); }); if (Object.keys(d).length > 0) setSystemDecks(d); });
+    const unsubSysLessons = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_lessons'), (snap) => { const l = snap.docs.map(d => ({ id: d.id, ...d.data() })); if (l.length > 0) setSystemLessons(l); });
+
+    // Load Classes
+    let qClasses;
+    if (userData?.role === 'instructor') {
+         qClasses = query(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'));
+    } else {
+         qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
+    }
+
+    const unsubClasses = onSnapshot(qClasses, (snapshot) => { 
+        const cls = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); 
+        setEnrolledClasses(cls); 
+        const newAssignments: any[] = []; 
+        cls.forEach((c: any) => { 
+            if (c.assignments && Array.isArray(c.assignments)) { 
+                newAssignments.push(...c.assignments); 
+            } 
+        }); 
+        setClassLessons(newAssignments); 
+        setUserData((prev: any) => ({...prev, classes: cls, classAssignments: newAssignments})); 
+    }, (error) => { console.log("Class sync error:", error); setUserData((prev: any) => ({...prev, classSyncError: true})); });
+    
+    return () => { unsubProfile(); unsubCards(); unsubLessons(); unsubSysDecks(); unsubSysLessons(); unsubClasses(); };
+  }, [user, userData?.role]);
+
+  // --- HANDLERS ---
   const handleCreateCard = useCallback(async (c: any) => { if(!user) return; const cardId = doc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards')).id; await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), {...c, id: cardId}); setSelectedDeckKey(c.deckId || 'custom'); setActiveTab('flashcards'); }, [user]);
   const handleUpdateCard = useCallback(async (cardId: string, data: any) => { if (!user) return; try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), data); } catch (e) { console.error(e); alert("Cannot edit card. Check permissions."); } }, [user]);
   const handleDeleteCard = useCallback(async (cardId: string) => { if (!user) return; if (!window.confirm("Are you sure you want to delete this card?")) return; try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId)); } catch (e) { console.error(e); alert("Failed to delete card."); } }, [user]);
   const handleCreateLesson = useCallback(async (l: any, id = null) => { if(!user) return; if (id) { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', id), l); } else { await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), l); } setActiveTab('home'); }, [user]);
-  const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title?: string, scoreDetail?: any) => { 
-    if (userData?.role !== 'instructor') setActiveTab('home'); 
-    
-    if (xp > 0 && user) { 
-        try { 
-            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { 
-              xp: increment(xp), 
-              completedAssignments: arrayUnion(lessonId) 
-            }); 
-
-            await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { 
-                studentName: userData?.name || 'Unknown Student', 
-                studentEmail: user.email, 
-                itemTitle: title || 'Unknown Activity', 
-                xp: xp, 
-                timestamp: Date.now(), 
-                type: scoreDetail ? 'quiz_score' : 'completion',
-                scoreDetail: scoreDetail || null
-            });
-
-            if(userData?.role === 'instructor') alert(`Activity Logged: ${title} (+${xp}XP)`);
-        } catch (e: any) { 
-            console.error("Error logging activity:", e); 
-            await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { 
-              ...DEFAULT_USER_DATA, xp: xp, completedAssignments: [lessonId] 
-            }, { merge: true }); 
-        } 
-    } 
-  }, [user, userData]);
-
-  if (!authChecked) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
-  if (!user) return <AuthView />;
-  if (!userData) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>; 
   
-  const commonHandlers = { onSaveCard: handleCreateCard, onUpdateCard: handleUpdateCard, onDeleteCard: handleDeleteCard, onSaveLesson: handleCreateLesson, };
-  
-  if (userData.role === 'instructor') {
-      return (
-        <InstructorDashboard 
-            user={user} 
-            userData={{...userData, classes: enrolledClasses}} 
-            allDecks={allDecks} 
-            lessons={libraryLessons} 
-            {...commonHandlers} 
-            onLogout={() => signOut(auth)} 
-        />
-      );
-  }
-// PASTE INSIDE App(), BEFORE renderStudentView
+  // --- CORRECTED HANDLE FINISH LESSON (Accepts 5 Arguments) ---
   const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title?: string, scoreDetail?: any, duration?: number) => { 
     if (userData?.role !== 'instructor') setActiveTab('home'); 
     
@@ -1924,22 +1967,48 @@ function App() {
         } 
     } 
   }, [user, userData]);
-  // --- INSERT THIS INSIDE THE APP() FUNCTION, BEFORE THE RETURN STATEMENT ---
 
-// PASTE INSIDE App(), AFTER handleFinishLesson, BUT BEFORE return (
+  // --- CONDITIONAL RENDERS ---
+  if (!authChecked) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
+  if (!user) return <AuthView />;
+  if (!userData) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>; 
+  
+  const commonHandlers = { onSaveCard: handleCreateCard, onUpdateCard: handleUpdateCard, onDeleteCard: handleDeleteCard, onSaveLesson: handleCreateLesson, };
+  
+  // Instructor View
+  if (userData.role === 'instructor') {
+      return (
+        <InstructorDashboard 
+            user={user} 
+            userData={{...userData, classes: enrolledClasses}} 
+            allDecks={allDecks} 
+            lessons={libraryLessons} 
+            {...commonHandlers} 
+            onLogout={() => signOut(auth)} 
+        />
+      );
+  }
+
+  // --- STUDENT VIEW RENDER LOGIC ---
   const renderStudentView = () => {
     // 1. Email Module Check
     if (activeLesson && activeLesson.type === 'email_module') {
         return <EmailSimulatorView module={activeLesson} onFinish={(id: string, xp: number, title: string) => { handleFinishLesson(id, xp, title); setActiveLesson(null); }} />;
     }
-    
-    // 2. Standard Lesson Check (Passes 5 arguments now)
-    if (activeLesson) return <LessonView lesson={activeLesson} onFinish={(id: string, xp: number, title: string, scoreDetail: any, duration: number) => { handleFinishLesson(id, xp, title, scoreDetail, duration); setActiveLesson(null); }} />;
-    
-    // 3. Class Detail View Check
+    // 2. Standard Lesson Check
+    if (activeLesson) {
+        return <LessonView 
+            lesson={activeLesson} 
+            onFinish={(id: string, xp: number, title: string, scoreDetail: any, duration: number) => { 
+                handleFinishLesson(id, xp, title, scoreDetail, duration); 
+                setActiveLesson(null); 
+            }} 
+        />;
+    }
+    // 3. Student Class Detail
     if (activeTab === 'home' && activeStudentClass) return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} />;
     
-    // 4. Main Tab Switcher
+    // 4. Tabs
     switch (activeTab) {
       case 'home': return <HomeView setActiveTab={setActiveTab} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} />;
       case 'flashcards': 
@@ -1951,9 +2020,20 @@ function App() {
       default: return <HomeView />;
     }
   };
+
+  // --- FINAL RENDER ---
   return (
-    <div className="bg-slate-100 min-h-screen font-sans text-slate-900 flex justify-center items-center p-0 sm:p-4">
-      <div className={`bg-slate-50 w-full h-[100dvh] shadow-2xl relative overflow-hidden border-[8px] border-slate-900/5 sm:border-slate-900/10 ${userData?.role === 'instructor' ? 'max-w-full sm:rounded-none border-0' : 'max-w-[400px] sm:rounded-[3rem] sm:h-[800px]'}`}>
+    <div className="bg-slate-100 min-h-screen font-sans text-slate-900 flex justify-center items-center p-0 sm:p-4 relative overflow-hidden">
+      
+      {/* Ambient Background Blobs */}
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-rose-400/30 rounded-full blur-[100px] pointer-events-none mix-blend-multiply animate-pulse" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-400/30 rounded-full blur-[100px] pointer-events-none mix-blend-multiply" />
+
+      <div className={`
+          w-full h-[100dvh] shadow-2xl relative overflow-hidden border-[8px] border-white/40 
+          bg-white/80 backdrop-blur-2xl
+          ${userData?.role === 'instructor' ? 'max-w-full sm:rounded-none border-0' : 'max-w-[400px] sm:rounded-[3rem] sm:h-[800px]'}
+      `}>
         {userData?.role !== 'instructor' && <div className="absolute top-0 left-0 right-0 h-8 bg-white/0 z-50 pointer-events-none" />}
         {renderStudentView()}
         <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
