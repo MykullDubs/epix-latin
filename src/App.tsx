@@ -37,7 +37,7 @@ import {
   Pencil, Image, Info, Edit3, FileJson, AlertTriangle, FlipVertical, GanttChart, 
   AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle, ArrowDown,
   BarChart3, UserPlus, Briefcase, Coffee, AlertCircle, Target, Calendar, Settings, Edit2, Camera, Medal,
-  ChevronUp,GripVertical, ListOrdered, ArrowRightLeft
+  ChevronUp,GripVertical, ListOrdered, ArrowRightLeft,CheckSquare
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
