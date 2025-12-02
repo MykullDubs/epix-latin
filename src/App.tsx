@@ -207,8 +207,6 @@ function Header({ title, subtitle, rightAction, onClickTitle, sticky = true }: a
 }
 function ExamResultModal({ log, onClose }: any) {
     if (!log) return null;
-    
-    // Safely access data, defaulting to empty if missing (handles legacy logs)
     const scoreDetail = log.scoreDetail || {};
     const { score = 0, total = 0, details = [] } = scoreDetail;
     const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
@@ -217,7 +215,6 @@ function ExamResultModal({ log, onClose }: any) {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
             <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
                 
-                {/* Header */}
                 <div className="bg-slate-50 p-6 border-b border-slate-200 flex justify-between items-center">
                     <div>
                         <h2 className="text-xl font-bold text-slate-900">{log.studentName}'s Results</h2>
@@ -229,14 +226,11 @@ function ExamResultModal({ log, onClose }: any) {
                     </div>
                 </div>
 
-                {/* List of Answers */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-                    {/* FALLBACK FOR OLD DATA */}
                     {details.length === 0 ? (
                         <div className="text-center p-8 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
                             <AlertCircle className="mx-auto text-slate-300 mb-2" size={32} />
                             <p className="text-slate-500 font-bold">No Question Details Available</p>
-                            <p className="text-xs text-slate-400 mt-1">This exam was taken before detailed tracking was enabled.</p>
                         </div>
                     ) : (
                         details.map((item: any, i: number) => (
@@ -248,17 +242,17 @@ function ExamResultModal({ log, onClose }: any) {
                                     <div className="flex-1">
                                         <p className="font-bold text-slate-800 mb-2">{item.prompt}</p>
                                         
-                                        <div className="space-y-1 text-sm">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[10px] font-bold uppercase text-slate-400 w-16">Student:</span>
-                                                <span className={`font-medium ${item.isCorrect ? 'text-emerald-700' : 'text-rose-700 line-through opacity-75'}`}>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-[10px] font-bold uppercase text-slate-400 w-16 mt-1">Student:</span>
+                                                <span className={`font-medium whitespace-pre-wrap ${item.isCorrect ? 'text-emerald-700' : 'text-rose-700 opacity-75'}`}>
                                                     {item.studentVal === 'true' ? 'True' : item.studentVal === 'false' ? 'False' : item.studentVal}
                                                 </span>
                                             </div>
                                             {!item.isCorrect && (
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] font-bold uppercase text-slate-400 w-16">Correct:</span>
-                                                    <span className="font-medium text-emerald-700">
+                                                <div className="flex items-start gap-2">
+                                                    <span className="text-[10px] font-bold uppercase text-slate-400 w-16 mt-1">Correct:</span>
+                                                    <span className="font-medium text-emerald-700 whitespace-pre-wrap">
                                                         {item.correctVal === 'true' ? 'True' : item.correctVal === 'false' ? 'False' : item.correctVal}
                                                     </span>
                                                 </div>
@@ -270,12 +264,8 @@ function ExamResultModal({ log, onClose }: any) {
                         ))
                     )}
                 </div>
-
-                {/* Footer */}
                 <div className="p-4 border-t border-slate-200 bg-slate-50">
-                    <button onClick={onClose} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors">
-                        Close Review
-                    </button>
+                    <button onClick={onClose} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors">Close Review</button>
                 </div>
             </div>
         </div>
@@ -1842,7 +1832,7 @@ function TestPlayerView({ test, onFinish }: any) {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [score, setScore] = useState(0);
   
-  // State for Matching/Ordering interactions
+  // Interaction States
   const [dragOrder, setDragOrder] = useState<any[]>([]);
   const [matchSelection, setMatchSelection] = useState<any>({}); 
   const [selectedLeft, setSelectedLeft] = useState<string | null>(null);
@@ -1851,48 +1841,35 @@ function TestPlayerView({ test, onFinish }: any) {
   const currentQ = questions[currentIndex];
   const progress = ((currentIndex + (isSubmitted ? 1 : 0)) / questions.length) * 100;
 
-  // Initialize interaction states when question changes
+  // Initialize Interaction States
   useEffect(() => {
       if (!currentQ) return;
-      // Ordering: Shuffle items initially
       if (currentQ.type === 'order' && !answers[currentIndex]) {
           const shuffled = [...currentQ.items].sort(() => Math.random() - 0.5);
           setDragOrder(shuffled);
       }
-      // Ordering: Load existing answer
-      if (currentQ.type === 'order' && answers[currentIndex]) {
-          setDragOrder(answers[currentIndex]);
-      }
+      if (currentQ.type === 'order' && answers[currentIndex]) setDragOrder(answers[currentIndex]);
       
-      // Matching: Load existing
-      if (currentQ.type === 'match' && answers[currentIndex]) {
-          setMatchSelection(answers[currentIndex]);
-      } else if (currentQ.type === 'match') {
-          setMatchSelection({});
-      }
-  }, [currentIndex, currentQ]); // Removed 'answers' from dependency to prevent loop
+      if (currentQ.type === 'match' && answers[currentIndex]) setMatchSelection(answers[currentIndex]);
+      else if (currentQ.type === 'match') setMatchSelection({});
+  }, [currentIndex, currentQ]);
 
   const handleMCQ = (val: string) => { if(isSubmitted) return; setAnswers({ ...answers, [currentIndex]: val }); };
 
-  // -- Matching Logic --
+  // Matching Logic
   const handleMatchClick = (side: 'left' | 'right', id: string) => {
       if (isSubmitted) return;
-      if (side === 'left') {
-          setSelectedLeft(id);
-      } else {
-          if (selectedLeft) {
-              const newMatches = { ...matchSelection, [selectedLeft]: id };
-              setMatchSelection(newMatches);
-              setAnswers({ ...answers, [currentIndex]: newMatches }); // Save immediately
-              setSelectedLeft(null);
-          }
+      if (side === 'left') setSelectedLeft(id);
+      else if (selectedLeft) {
+          const newMatches = { ...matchSelection, [selectedLeft]: id };
+          setMatchSelection(newMatches);
+          setAnswers({ ...answers, [currentIndex]: newMatches });
+          setSelectedLeft(null);
       }
   };
 
-  // -- Ordering Logic --
-  const handleDragStart = (e: any, index: number) => {
-      e.dataTransfer.setData('dragIndex', index);
-  };
+  // Ordering Logic
+  const handleDragStart = (e: any, index: number) => { e.dataTransfer.setData('dragIndex', index); };
   const handleDrop = (e: any, dropIndex: number) => {
       if (isSubmitted) return;
       const dragIndex = parseInt(e.dataTransfer.getData('dragIndex'));
@@ -1900,32 +1877,21 @@ function TestPlayerView({ test, onFinish }: any) {
       const [removed] = newOrder.splice(dragIndex, 1);
       newOrder.splice(dropIndex, 0, removed);
       setDragOrder(newOrder);
-      setAnswers({ ...answers, [currentIndex]: newOrder }); // Save order
+      setAnswers({ ...answers, [currentIndex]: newOrder });
   };
 
   const handleSubmit = () => {
     let correctCount = 0; 
     questions.forEach((q: any, idx: number) => { 
         const ans = answers[idx];
-        
         if (q.type === 'mcq' || q.type === 'tf') {
             if(ans === q.correctAnswer) correctCount++; 
-        }
-        else if (q.type === 'match') {
-            // Check if all pairs match correctly
+        } else if (q.type === 'match') {
             let allMatch = true;
             if (!ans) allMatch = false;
-            else {
-                q.pairs.forEach((p: any) => {
-                    // Find the ID of the right side that corresponds to this left side in the user's answers
-                    // Note: In a real app, use IDs. Here assuming left text is key.
-                    if (ans[p.left] !== p.right) allMatch = false;
-                });
-            }
+            else q.pairs.forEach((p: any) => { if (ans[p.left] !== p.right) allMatch = false; });
             if (allMatch) correctCount++;
-        }
-        else if (q.type === 'order') {
-            // Compare order of IDs
+        } else if (q.type === 'order') {
             const correctOrderIds = q.items.map((i:any) => i.id).join(',');
             const userOrderIds = ans ? ans.map((i:any) => i.id).join(',') : '';
             if (correctOrderIds === userOrderIds) correctCount++;
@@ -1939,31 +1905,47 @@ function TestPlayerView({ test, onFinish }: any) {
     const percentage = score / questions.length;
     const earnedXP = Math.round(test.xp * percentage);
     
+    // --- GENERATE DETAILED REPORT ---
     const submissionDetails = questions.map((q: any, idx: number) => {
         const ans = answers[idx];
         let isCorrect = false;
-        let studentVal = "Completed"; 
-        
+        let studentVal = "No Answer"; 
+        let correctVal = "See Instructor";
+
         if (q.type === 'mcq' || q.type === 'tf') {
             isCorrect = ans === q.correctAnswer;
-            if(q.type === 'mcq') studentVal = q.options.find((o:any)=>o.id===ans)?.text || "No Answer";
-            else studentVal = ans;
+            if(q.type === 'mcq') {
+                studentVal = q.options.find((o:any)=>o.id===ans)?.text || "No Answer";
+                correctVal = q.options.find((o:any)=>o.id===q.correctAnswer)?.text || "Unknown";
+            } else {
+                studentVal = ans;
+                correctVal = q.correctAnswer;
+            }
         } else if (q.type === 'match') {
-            // Simplified check for report
-             studentVal = "Matching Task";
-             // Recalculate correctness for report
+             // Format: "Term -> Definition"
              let allMatch = true;
-             if(!ans) allMatch=false;
-             else q.pairs.forEach((p:any) => { if(ans[p.left] !== p.right) allMatch = false; });
+             const lines: string[] = [];
+             if(!ans) allMatch = false;
+             else {
+                 q.pairs.forEach((p:any) => { 
+                     if(ans[p.left] !== p.right) allMatch = false; 
+                     lines.push(`${p.left} -> ${ans[p.left] || 'Unmatched'}`);
+                 });
+             }
              isCorrect = allMatch;
+             studentVal = lines.join('\n');
+             correctVal = q.pairs.map((p:any) => `${p.left} -> ${p.right}`).join('\n');
         } else if (q.type === 'order') {
-            studentVal = "Ordering Task";
+            // Format: "1. Item \n 2. Item"
             const cIds = q.items.map((i:any) => i.id).join(',');
             const uIds = ans ? ans.map((i:any) => i.id).join(',') : '';
             isCorrect = cIds === uIds;
+            
+            studentVal = ans ? ans.map((i:any, ix:number) => `${ix+1}. ${i.text}`).join('\n') : "No Order Set";
+            correctVal = q.items.map((i:any, ix:number) => `${ix+1}. ${i.text}`).join('\n');
         }
 
-        return { prompt: q.prompt, type: q.type, isCorrect, studentVal, correctVal: "See Instructor" };
+        return { prompt: q.prompt, type: q.type, isCorrect, studentVal, correctVal };
     });
 
     onFinish(test.id, earnedXP, test.title, { score, total: questions.length, details: submissionDetails }); 
@@ -1984,8 +1966,6 @@ function TestPlayerView({ test, onFinish }: any) {
                   <div className="bg-indigo-50 inline-block px-3 py-1 rounded-lg text-indigo-700 font-bold text-xs mb-4 uppercase">Question {currentIndex + 1}</div>
                   <h3 className="text-2xl font-serif font-bold text-slate-900 mb-8">{currentQ.prompt}</h3>
 
-                  {/* --- INTERACTION AREAS --- */}
-                  
                   {/* MCQ & TF */}
                   {(currentQ.type === 'mcq' || currentQ.type === 'tf') && (
                       <div className="space-y-3">
@@ -2001,7 +1981,7 @@ function TestPlayerView({ test, onFinish }: any) {
                       </div>
                   )}
 
-                  {/* ORDERING (Drag & Drop) */}
+                  {/* ORDERING */}
                   {currentQ.type === 'order' && (
                       <div className="space-y-2">
                           <p className="text-xs font-bold text-slate-400 uppercase mb-2">Drag to reorder</p>
@@ -2021,7 +2001,7 @@ function TestPlayerView({ test, onFinish }: any) {
                       </div>
                   )}
 
-                  {/* MATCHING (Connect) */}
+                  {/* MATCHING */}
                   {currentQ.type === 'match' && (
                       <div className="grid grid-cols-2 gap-8">
                            <div className="space-y-3">
@@ -2036,8 +2016,7 @@ function TestPlayerView({ test, onFinish }: any) {
                                ))}
                            </div>
                            <div className="space-y-3">
-                               {/* Shuffle right side for display so it's not obvious */}
-                               {[...currentQ.pairs].sort((a,b) => a.right.localeCompare(b.right)).map((p: any) => {
+                               {[...currentQ.pairs].sort((a:any,b:any) => a.right.localeCompare(b.right)).map((p: any) => {
                                    const isMatched = Object.values(matchSelection).includes(p.right);
                                    return (
                                        <button 
@@ -2052,13 +2031,12 @@ function TestPlayerView({ test, onFinish }: any) {
                            </div>
                       </div>
                   )}
-
               </div>
           ) : (
               <div className="text-center py-10 animate-in zoom-in duration-300">
                   <div className="w-24 h-24 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl"><Trophy size={48} /></div>
                   <h2 className="text-3xl font-bold text-slate-900 mb-2">Exam Complete!</h2>
-                  <div className="text-6xl font-black text-indigo-600 mb-2">{score}<span className="text-2xl text-slate-300">/{questions.length}</span></div>
+                  <div className="text-6xl font-black text-indigo-600 mb-10">{score}<span className="text-2xl text-slate-300">/{questions.length}</span></div>
                   <div className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-10">{Math.round((score/questions.length)*100)}% Accuracy</div>
                   <button onClick={finishExam} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg hover:scale-[1.02] transition-transform">Collect XP & Finish</button>
               </div>
