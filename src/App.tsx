@@ -2470,12 +2470,15 @@ const renderStudentView = () => {
                 {...commonHandlers} 
                 onLogout={() => signOut(auth)} 
              />
-        ) : (
-             <>
-                {renderStudentView()}
-                <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
-             </>
+) : (
+     <>
+        {renderStudentView()}
+        {/* Hide Navigation if taking a Test/Lesson or viewing a Class */}
+        {!activeLesson && !activeStudentClass && (
+            <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
         )}
+     </>
+)}
 
       </div>
     </div>
