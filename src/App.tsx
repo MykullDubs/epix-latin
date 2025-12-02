@@ -1891,12 +1891,21 @@ function App() {
       );
   }
 
+  // --- INSERT THIS INSIDE THE APP() FUNCTION, BEFORE THE RETURN STATEMENT ---
+
   const renderStudentView = () => {
+    // 1. Email Module Check
     if (activeLesson && activeLesson.type === 'email_module') {
         return <EmailSimulatorView module={activeLesson} onFinish={(id: string, xp: number, title: string) => { handleFinishLesson(id, xp, title); setActiveLesson(null); }} />;
     }
-    if (activeLesson) return <LessonView lesson={activeLesson} onFinish={(id: string, xp: number, title: string) => { handleFinishLesson(id, xp, title); setActiveLesson(null); }} />;
+    
+    // 2. Standard Lesson Check (Now includes duration passing)
+    if (activeLesson) return <LessonView lesson={activeLesson} onFinish={(id: string, xp: number, title: string, scoreDetail: any, duration: number) => { handleFinishLesson(id, xp, title, scoreDetail, duration); setActiveLesson(null); }} />;
+    
+    // 3. Class Detail View Check
     if (activeTab === 'home' && activeStudentClass) return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} />;
+    
+    // 4. Main Tab Switcher
     switch (activeTab) {
       case 'home': return <HomeView setActiveTab={setActiveTab} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} />;
       case 'flashcards': 
