@@ -2704,16 +2704,12 @@ function App() {
   // --- MEMOS ---
   const allDecks = useMemo(() => {
     const decks: any = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: [] } };
-    
-    // User Custom Cards
     customCards.forEach(card => {
         const target = card.deckId || 'custom';
         if (!decks[target]) { decks[target] = { title: card.deckTitle || "Custom Deck", cards: [] }; }
         if (!decks[target].cards) decks[target].cards = [];
         decks[target].cards.push(card);
     });
-
-    // Assigned Class Decks
     classLessons.forEach((assignment: any) => {
         if (assignment.contentType === 'deck') {
             decks[assignment.id] = {
@@ -2726,11 +2722,8 @@ function App() {
     return decks;
   }, [systemDecks, customCards, classLessons]);
 
-  // Merge all content for the library
-  // (Assuming EMAIL_MODULE_DATA is defined at the top of your file, if not, remove it from this array)
-  // If EMAIL_MODULE_DATA is undefined errors, remove it from the array below.
-  const lessons = useMemo(() => [...systemLessons, ...customLessons, ...classLessons.filter(l => l.contentType !== 'deck')], [systemLessons, customLessons, classLessons]);
-  const libraryLessons = useMemo(() => [...systemLessons, ...customLessons], [systemLessons, customLessons]);
+  const lessons = useMemo(() => [...systemLessons, ...customLessons, ...classLessons.filter(l => l.contentType !== 'deck'), EMAIL_MODULE_DATA], [systemLessons, customLessons, classLessons]);
+  const libraryLessons = useMemo(() => [...systemLessons, ...customLessons, EMAIL_MODULE_DATA], [systemLessons, customLessons]);
 
   // --- HANDLERS ---
   const handleContentSelection = (item: any) => { 
@@ -2750,16 +2743,13 @@ function App() {
   useEffect(() => {
     if (!user) { setUserData(null); return; }
     
-    // 1. Initial Data Load
     setSystemDecks(INITIAL_SYSTEM_DECKS); 
     setSystemLessons(INITIAL_SYSTEM_LESSONS);
     
-    // 2. Listeners
     const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (docSnap) => { if (docSnap.exists()) setUserData(docSnap.data()); else setUserData(DEFAULT_USER_DATA); });
     const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     
-    // 3. Class Logic
     let qClasses;
     if (userData?.role === 'instructor') {
          qClasses = query(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'));
@@ -2785,7 +2775,7 @@ function App() {
   const handleDeleteCard = useCallback(async (cardId: string) => { if (!user) return; if (!window.confirm("Are you sure you want to delete this card?")) return; try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId)); } catch (e) { console.error(e); alert("Failed to delete card."); } }, [user]);
   const handleCreateLesson = useCallback(async (l: any, id = null) => { if(!user) return; if (id) { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', id), l); } else { await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), l); } setActiveTab('home'); }, [user]);
   
-const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title?: string, scoreDetail?: any) => { 
+  const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title?: string, scoreDetail?: any) => { 
     if (userData?.role !== 'instructor') setActiveTab('home'); 
     if (xp > 0 && user) { 
         try { 
@@ -2794,7 +2784,7 @@ const handleFinishLesson = useCallback(async (lessonId: string, xp: number, titl
                 studentName: userData?.name || 'Unknown Student', 
                 studentEmail: user.email, 
                 itemTitle: title || 'Unknown Activity',
-                itemId: lessonId, // <--- THIS LINE IS KEY FOR GRADEBOOK
+                itemId: lessonId, // <--- KEY FIX FOR GRADEBOOK
                 xp: xp, 
                 timestamp: Date.now(), 
                 type: scoreDetail ? 'quiz_score' : 'completion', 
@@ -2814,27 +2804,18 @@ const handleFinishLesson = useCallback(async (lessonId: string, xp: number, titl
   
   const commonHandlers = { onSaveCard: handleCreateCard, onUpdateCard: handleUpdateCard, onDeleteCard: handleDeleteCard, onSaveLesson: handleCreateLesson, };
 
-
-const renderStudentView = () => {
-    // 1. Check for Test (Expanded check)
-    if (activeLesson && (activeLesson.type === 'test' || activeLesson.contentType === 'test')) {
+  const renderStudentView = () => {
+    if (activeLesson && activeLesson.type === 'test') {
         // @ts-ignore
         return <TestPlayerView test={activeLesson} onFinish={(id: string, xp: number, title: string, score: any) => { handleFinishLesson(id, xp, title, score); setActiveLesson(null); }} />;
     }
-
-    // 2. Check for Email Module
     if (activeLesson && activeLesson.type === 'email_module') {
         // @ts-ignore
         return <EmailSimulatorView module={activeLesson} onFinish={(id: string, xp: number, title: string) => { handleFinishLesson(id, xp, title); setActiveLesson(null); }} />;
     }
-
-    // 3. Standard Lesson
     if (activeLesson) return <LessonView lesson={activeLesson} onFinish={(id: string, xp: number, title: string) => { handleFinishLesson(id, xp, title); setActiveLesson(null); }} />;
-    
-    // 4. Specific Class View
     if (activeTab === 'home' && activeStudentClass) return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} />;
     
-    // 5. Main Tab Navigation
     switch (activeTab) {
       case 'home': return <HomeView setActiveTab={setActiveTab} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} />;
       case 'flashcards': 
@@ -2847,47 +2828,26 @@ const renderStudentView = () => {
     }
   };
 
-// --- FINAL RENDER ---
   return (
     <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-center relative overflow-hidden">
-      
-{/* 1. FORCEFUL CSS RESET & SCROLLBAR REMOVAL */}
       <style>{`
         html, body, #root {
           margin: 0;
           padding: 0;
           width: 100%;
           height: 100%;
-          overflow: hidden; /* Prevents the main window from scrolling */
+          overflow: hidden;
           background-color: #f8fafc;
         }
-
-        /* Hide scrollbar for Chrome, Safari and Opera */
-        *::-webkit-scrollbar {
-          display: none;
-        }
-
-        /* Hide scrollbar for IE, Edge and Firefox */
-        * {
-          -ms-overflow-style: none;  /* IE and Edge */
-          scrollbar-width: none;  /* Firefox */
-        }
+        *::-webkit-scrollbar { display: none; }
+        * { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
-
-      {/* Background Blobs (Optional - adds nice glow behind the app) */}
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-rose-400/20 rounded-full blur-[100px] pointer-events-none mix-blend-multiply animate-pulse" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-400/20 rounded-full blur-[100px] pointer-events-none mix-blend-multiply" />
       
-      {/* Role Toggle */}
       <RoleToggle user={user} userData={userData} />
 
-      {/* THE MAIN VESSEL 
-         - Removed: border-[8px], p-4
-         - Added: w-full h-full (Consume everything)
-      */}
       <div className={`w-full h-[100dvh] relative overflow-hidden bg-slate-50 ${userData?.role === 'instructor' ? 'max-w-full' : 'max-w-full sm:max-w-[400px] sm:h-[850px] sm:rounded-[3rem] sm:shadow-2xl sm:border-[8px] sm:border-slate-900/10'}`}>
-        
-        {/* Status Bar Spacer (Only for Instructor/Desktop view or strict mobile setups) */}
         {userData?.role !== 'instructor' && <div className="absolute top-0 left-0 right-0 h-safe-top bg-transparent z-50 pointer-events-none" />}
         
         {userData.role === 'instructor' ? (
@@ -2899,16 +2859,12 @@ const renderStudentView = () => {
                 {...commonHandlers} 
                 onLogout={() => signOut(auth)} 
              />
-) : (
-     <>
-        {renderStudentView()}
-        {/* Hide Navigation if taking a Test/Lesson or viewing a Class */}
-        {!activeLesson && !activeStudentClass && (
-            <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
+        ) : (
+             <>
+                {renderStudentView()}
+                {!activeLesson && !activeStudentClass && <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />}
+             </>
         )}
-     </>
-)}
-
       </div>
     </div>
   );
