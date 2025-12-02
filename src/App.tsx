@@ -36,7 +36,8 @@ import {
   School, Users, Copy, List, ArrowRight, LayoutDashboard, ArrowLeft, Library, 
   Pencil, Image, Info, Edit3, FileJson, AlertTriangle, FlipVertical, GanttChart, 
   AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle, ArrowDown,
-  BarChart3, UserPlus, Briefcase, Coffee, AlertCircle, Target, Calendar, Settings, Edit2, Camera, Medal
+  BarChart3, UserPlus, Briefcase, Coffee, AlertCircle, Target, Calendar, Settings, Edit2, Camera, Medal,
+  ChevronUp
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -1355,6 +1356,9 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
 function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck }: any) {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [showLevelModal, setShowLevelModal] = useState(false);
+  
+  // --- NEW STATE: Controls the Accordion ---
+  const [libraryExpanded, setLibraryExpanded] = useState(false);
 
   const completedSet = new Set(userData?.completedAssignments || []);
   const relevantAssignments = (assignments || []).filter((l: any) => { return !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); });
@@ -1363,6 +1367,9 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   
   // Calculate Level Data
   const { level, progress, rank } = getLevelInfo(userData?.xp || 0);
+
+  // --- LOGIC: Slice the lessons based on state ---
+  const visibleLessons = libraryExpanded ? lessons : lessons.slice(0, 2);
 
   if (activeStudentClass) { return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={onSelectLesson} onSelectDeck={onSelectDeck} userData={userData} />; }
 
@@ -1408,14 +1415,12 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
     </button>
     
     {/* --- MAIN CONTENT --- */}
-    {/* UPDATED: Changed space-y-8 to space-y-6 for tighter layout */}
     <div className="px-6 space-y-6 mt-4 relative z-20">
       
       {/* --- MY CLASSES --- */}
       {classes && classes.length > 0 && (
         <div className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
             <h3 className="text-sm font-bold text-blue-900/70 uppercase tracking-wider mb-4 ml-1 flex items-center gap-2"><School size={16} className="text-blue-500"/> My Classes</h3>
-            {/* UPDATED: Reduced pb-8 to pb-5 to tighten gap to next section */}
             <div className="flex gap-4 overflow-x-auto pb-5 custom-scrollbar snap-x">
                 {classes.map((cls: any) => { 
                     const clsTasks = cls.assignments || [];
@@ -1470,15 +1475,22 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
           </div>
       )}
       
-      {/* --- LIBRARY STACK --- */}
+      {/* --- LIBRARY STACK (With Accordion) --- */}
       <div className="animate-in slide-in-from-bottom-4 duration-500 delay-300">
-         {/* UPDATED: Added Icon and styling */}
          <h3 className="text-sm font-bold text-blue-900/70 uppercase tracking-wider mb-3 ml-1 flex items-center gap-2">
             <BookOpen size={16} className="text-blue-500"/> Library
          </h3>
+         
          <div className="space-y-3">
-            {lessons.map((l: any) => (
-                <button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-blue-300 group transition-all hover:shadow-md">
+            {/* Map over visibleLessons instead of all lessons */}
+            {visibleLessons.map((l: any, idx: number) => (
+                <button 
+                    key={l.id} 
+                    onClick={() => onSelectLesson(l)} 
+                    // Add staggered animation delay based on index so they cascade in nicely
+                    style={{ animationDelay: `${idx * 50}ms` }}
+                    className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-blue-300 group transition-all hover:shadow-md animate-in slide-in-from-bottom-2 fade-in fill-mode-forwards"
+                >
                     <div className="flex items-center gap-4">
                         <div className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-500 group-hover:bg-blue-500 group-hover:text-white transition-colors"><BookOpen size={22}/></div>
                         <div className="text-left"><h4 className="font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div>
@@ -1487,6 +1499,20 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
                 </button>
             ))}
          </div>
+
+         {/* --- ACCORDION TOGGLE --- */}
+         {lessons.length > 2 && (
+             <button 
+                onClick={() => setLibraryExpanded(!libraryExpanded)}
+                className="w-full mt-2 py-3 flex items-center justify-center gap-2 text-[10px] font-bold text-blue-400 uppercase tracking-widest hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+             >
+                {libraryExpanded ? (
+                    <>Show Less <ChevronUp size={14}/></>
+                ) : (
+                    <>View All ({lessons.length}) <ChevronDown size={14}/></>
+                )}
+             </button>
+         )}
       </div>
       
       {/* QUICK ACTIONS */}
