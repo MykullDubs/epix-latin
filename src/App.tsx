@@ -2235,20 +2235,27 @@ function App() {
   return (
     <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-center relative overflow-hidden">
       
-      {/* 1. FORCEFUL CSS RESET (Injects directly into the page) */}
+{/* 1. FORCEFUL CSS RESET & SCROLLBAR REMOVAL */}
       <style>{`
         html, body, #root {
           margin: 0;
           padding: 0;
           width: 100%;
           height: 100%;
-          overflow: hidden;
-          background-color: #f8fafc; /* slate-50 */
+          overflow: hidden; /* Prevents the main window from scrolling */
+          background-color: #f8fafc;
         }
-        /* Custom Scrollbar Styling */
-        .custom-scrollbar::-webkit-scrollbar { width: 0px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+        /* Hide scrollbar for Chrome, Safari and Opera */
+        *::-webkit-scrollbar {
+          display: none;
+        }
+
+        /* Hide scrollbar for IE, Edge and Firefox */
+        * {
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;  /* Firefox */
+        }
       `}</style>
 
       {/* Background Blobs (Optional - adds nice glow behind the app) */}
