@@ -1890,16 +1890,50 @@ function App() {
         />
       );
   }
+// PASTE INSIDE App(), BEFORE renderStudentView
+  const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title?: string, scoreDetail?: any, duration?: number) => { 
+    if (userData?.role !== 'instructor') setActiveTab('home'); 
+    
+    if (xp > 0 && user) { 
+        try { 
+            // Update Profile
+            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { 
+              xp: increment(xp), 
+              completedAssignments: arrayUnion(lessonId) 
+            }); 
 
+            // Log Activity with Duration
+            await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { 
+                studentName: userData?.name || 'Unknown Student', 
+                studentEmail: user.email, 
+                itemTitle: title || 'Unknown Activity', 
+                xp: xp, 
+                timestamp: Date.now(), 
+                type: scoreDetail ? 'quiz_score' : 'completion',
+                scoreDetail: scoreDetail || null,
+                duration: duration || 0 
+            });
+
+            if(userData?.role === 'instructor') alert(`Activity Logged: ${title} (+${xp}XP) in ${duration || 0}s`);
+        } catch (e: any) { 
+            console.error("Error logging activity:", e); 
+            // Fallback for missing profile
+            await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { 
+              ...DEFAULT_USER_DATA, xp: xp, completedAssignments: [lessonId] 
+            }, { merge: true }); 
+        } 
+    } 
+  }, [user, userData]);
   // --- INSERT THIS INSIDE THE APP() FUNCTION, BEFORE THE RETURN STATEMENT ---
 
+// PASTE INSIDE App(), AFTER handleFinishLesson, BUT BEFORE return (
   const renderStudentView = () => {
     // 1. Email Module Check
     if (activeLesson && activeLesson.type === 'email_module') {
         return <EmailSimulatorView module={activeLesson} onFinish={(id: string, xp: number, title: string) => { handleFinishLesson(id, xp, title); setActiveLesson(null); }} />;
     }
     
-    // 2. Standard Lesson Check (Now includes duration passing)
+    // 2. Standard Lesson Check (Passes 5 arguments now)
     if (activeLesson) return <LessonView lesson={activeLesson} onFinish={(id: string, xp: number, title: string, scoreDetail: any, duration: number) => { handleFinishLesson(id, xp, title, scoreDetail, duration); setActiveLesson(null); }} />;
     
     // 3. Class Detail View Check
@@ -1917,7 +1951,6 @@ function App() {
       default: return <HomeView />;
     }
   };
-
   return (
     <div className="bg-slate-100 min-h-screen font-sans text-slate-900 flex justify-center items-center p-0 sm:p-4">
       <div className={`bg-slate-50 w-full h-[100dvh] shadow-2xl relative overflow-hidden border-[8px] border-slate-900/5 sm:border-slate-900/10 ${userData?.role === 'instructor' ? 'max-w-full sm:rounded-none border-0' : 'max-w-[400px] sm:rounded-[3rem] sm:h-[800px]'}`}>
