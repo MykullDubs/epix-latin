@@ -37,7 +37,7 @@ import {
   Pencil, Image, Info, Edit3, FileJson, AlertTriangle, FlipVertical, GanttChart, 
   AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle, ArrowDown,
   BarChart3, UserPlus, Briefcase, Coffee, AlertCircle, Target, Calendar, Settings, Edit2, Camera, Medal,
-  ChevronUp
+  ChevronUp,GripVertical, ListOrdered, ArrowRightLeft
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -1722,12 +1722,32 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
 
 function TestBuilderView({ onSave, onCancel, initialData }: any) {
   const [testData, setTestData] = useState(initialData || { title: '', description: '', type: 'test', xp: 100, questions: [] });
-  const addQuestion = (type: 'mcq' | 'tf') => {
-    setTestData({ ...testData, questions: [...testData.questions, { id: Date.now().toString(), type, prompt: '', options: type === 'mcq' ? [{id: 'o1', text: ''}, {id: 'o2', text: ''}] : [], correctAnswer: type === 'tf' ? 'true' : '' }] });
+
+  const addQuestion = (type: 'mcq' | 'tf' | 'match' | 'order') => {
+    let newQ: any = { id: Date.now().toString(), type, prompt: '' };
+    
+    if (type === 'mcq') newQ = { ...newQ, options: [{id: 'o1', text: ''}, {id: 'o2', text: ''}], correctAnswer: '' };
+    if (type === 'tf') newQ = { ...newQ, correctAnswer: 'true' };
+    if (type === 'match') newQ = { ...newQ, pairs: [{left: '', right: ''}, {left: '', right: ''}] };
+    if (type === 'order') newQ = { ...newQ, items: [{id: 'i1', text: ''}, {id: 'i2', text: ''}] };
+
+    setTestData({ ...testData, questions: [...testData.questions, newQ] });
   };
+
   const updateQuestion = (idx: number, field: string, val: any) => { const qs = [...testData.questions]; qs[idx] = { ...qs[idx], [field]: val }; setTestData({ ...testData, questions: qs }); };
+  
+  // MCQ Helpers
   const updateOption = (qIdx: number, oIdx: number, val: string) => { const qs = [...testData.questions]; qs[qIdx].options[oIdx].text = val; setTestData({ ...testData, questions: qs }); };
   const addOption = (qIdx: number) => { const qs = [...testData.questions]; qs[qIdx].options.push({ id: `o${Date.now()}`, text: '' }); setTestData({ ...testData, questions: qs }); };
+  
+  // Matching Helpers
+  const updatePair = (qIdx: number, pIdx: number, field: 'left' | 'right', val: string) => { const qs = [...testData.questions]; qs[qIdx].pairs[pIdx][field] = val; setTestData({ ...testData, questions: qs }); };
+  const addPair = (qIdx: number) => { const qs = [...testData.questions]; qs[qIdx].pairs.push({ left: '', right: '' }); setTestData({ ...testData, questions: qs }); };
+
+  // Ordering Helpers
+  const updateItem = (qIdx: number, iIdx: number, val: string) => { const qs = [...testData.questions]; qs[qIdx].items[iIdx].text = val; setTestData({ ...testData, questions: qs }); };
+  const addItem = (qIdx: number) => { const qs = [...testData.questions]; qs[qIdx].items.push({ id: `i${Date.now()}`, text: '' }); setTestData({ ...testData, questions: qs }); };
+
   const removeQuestion = (idx: number) => { setTestData({ ...testData, questions: testData.questions.filter((_:any, i:number) => i !== idx) }); };
 
   return (
@@ -1737,12 +1757,19 @@ function TestBuilderView({ onSave, onCancel, initialData }: any) {
         <input className="w-full text-2xl font-serif font-bold border-b-2 border-slate-100 pb-2 focus:outline-none" placeholder="Exam Title" value={testData.title} onChange={e => setTestData({...testData, title: e.target.value})}/>
         <textarea className="w-full text-sm bg-slate-50 p-3 rounded-xl mt-2 focus:outline-none" placeholder="Instructions..." value={testData.description} onChange={e => setTestData({...testData, description: e.target.value})}/>
       </div>
+
       <div className="space-y-4">
         {testData.questions.map((q: any, idx: number) => (
             <div key={q.id} className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200 relative">
                 <button onClick={() => removeQuestion(idx)} className="absolute top-4 right-4 text-slate-300 hover:text-rose-500"><Trash2 size={18}/></button>
-                <div className="mb-3"><span className="bg-indigo-100 text-indigo-700 font-bold text-xs px-2 py-1 rounded-lg">Q{idx+1}</span></div>
+                <div className="mb-3">
+                    <span className={`font-bold text-xs px-2 py-1 rounded-lg uppercase tracking-wider ${q.type === 'match' ? 'bg-purple-100 text-purple-700' : q.type === 'order' ? 'bg-orange-100 text-orange-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                        {q.type === 'mcq' ? 'Multiple Choice' : q.type === 'tf' ? 'True/False' : q.type === 'match' ? 'Matching' : 'Ordering'}
+                    </span>
+                </div>
                 <input className="w-full font-bold border-b border-slate-100 pb-2 mb-4 focus:outline-none" placeholder="Question Prompt" value={q.prompt} onChange={e => updateQuestion(idx, 'prompt', e.target.value)}/>
+                
+                {/* MCQ UI */}
                 {q.type === 'mcq' && (
                     <div className="space-y-2 pl-4 border-l-2 border-slate-100">
                         {q.options.map((opt: any, oIdx: number) => (
@@ -1754,18 +1781,51 @@ function TestBuilderView({ onSave, onCancel, initialData }: any) {
                         <button onClick={() => addOption(idx)} className="text-xs font-bold text-indigo-600 hover:underline pl-8">+ Add Option</button>
                     </div>
                 )}
+
+                {/* TF UI */}
                 {q.type === 'tf' && (
                     <div className="flex gap-4 pl-4">
                         {['true', 'false'].map(val => ( <button key={val} onClick={() => updateQuestion(idx, 'correctAnswer', val)} className={`px-6 py-2 rounded-xl font-bold border-2 ${q.correctAnswer === val ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-400'}`}>{val === 'true' ? 'True' : 'False'}</button> )) }
                     </div>
                 )}
+
+                {/* MATCHING UI */}
+                {q.type === 'match' && (
+                    <div className="space-y-2 pl-4">
+                        <div className="grid grid-cols-2 gap-2 text-[10px] uppercase font-bold text-slate-400 mb-1"><span>Term</span><span>Definition</span></div>
+                        {q.pairs.map((pair: any, pIdx: number) => (
+                            <div key={pIdx} className="grid grid-cols-2 gap-2">
+                                <input className="p-2 bg-slate-50 rounded-lg text-sm border border-slate-200" placeholder="Left side" value={pair.left} onChange={e => updatePair(idx, pIdx, 'left', e.target.value)} />
+                                <input className="p-2 bg-slate-50 rounded-lg text-sm border border-slate-200" placeholder="Right side" value={pair.right} onChange={e => updatePair(idx, pIdx, 'right', e.target.value)} />
+                            </div>
+                        ))}
+                        <button onClick={() => addPair(idx)} className="text-xs font-bold text-purple-600 hover:underline">+ Add Pair</button>
+                    </div>
+                )}
+
+                {/* ORDERING UI */}
+                {q.type === 'order' && (
+                    <div className="space-y-2 pl-4">
+                        <p className="text-[10px] text-orange-400 font-bold uppercase">Enter items in the CORRECT order:</p>
+                        {q.items.map((item: any, iIdx: number) => (
+                            <div key={item.id} className="flex items-center gap-2">
+                                <span className="text-slate-300 font-mono text-xs">{iIdx + 1}.</span>
+                                <input className="flex-1 p-2 bg-slate-50 rounded-lg text-sm border border-slate-200" placeholder={`Step ${iIdx + 1}`} value={item.text} onChange={e => updateItem(idx, iIdx, e.target.value)} />
+                            </div>
+                        ))}
+                        <button onClick={() => addItem(idx)} className="text-xs font-bold text-orange-600 hover:underline">+ Add Step</button>
+                    </div>
+                )}
             </div>
         ))}
       </div>
+      
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-xl border-t border-slate-200 flex flex-col gap-2 z-50">
-          <div className="flex gap-2 justify-center pb-2">
-              <button onClick={() => addQuestion('mcq')} className="px-4 py-2 bg-slate-100 rounded-full text-xs font-bold text-slate-600 hover:text-indigo-600">+ Multiple Choice</button>
-              <button onClick={() => addQuestion('tf')} className="px-4 py-2 bg-slate-100 rounded-full text-xs font-bold text-slate-600 hover:text-indigo-600">+ True/False</button>
+          <div className="flex gap-2 justify-center pb-2 overflow-x-auto">
+              <button onClick={() => addQuestion('mcq')} className="px-4 py-2 bg-indigo-50 rounded-full text-xs font-bold text-indigo-600 hover:bg-indigo-100 flex items-center gap-1"><CheckSquare size={14}/> MC</button>
+              <button onClick={() => addQuestion('tf')} className="px-4 py-2 bg-indigo-50 rounded-full text-xs font-bold text-indigo-600 hover:bg-indigo-100 flex items-center gap-1"><CheckCircle2 size={14}/> T/F</button>
+              <button onClick={() => addQuestion('match')} className="px-4 py-2 bg-purple-50 rounded-full text-xs font-bold text-purple-600 hover:bg-purple-100 flex items-center gap-1"><ArrowRightLeft size={14}/> Match</button>
+              <button onClick={() => addQuestion('order')} className="px-4 py-2 bg-orange-50 rounded-full text-xs font-bold text-orange-600 hover:bg-orange-100 flex items-center gap-1"><ListOrdered size={14}/> Order</button>
           </div>
           <div className="flex gap-3 max-w-md mx-auto w-full">
             <button onClick={onCancel} className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold rounded-xl">Cancel</button>
@@ -1782,31 +1842,96 @@ function TestPlayerView({ test, onFinish }: any) {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [score, setScore] = useState(0);
   
-  const questions = test.questions || [];
-  
-  // --- SAFETY CHECK ---
-  if (questions.length === 0) {
-      return (
-          <div className="h-full flex flex-col bg-slate-50">
-              <div className="bg-white p-4 border-b border-slate-200"><button onClick={() => onFinish(null, 0)}><X/></button></div>
-              <div className="flex-1 flex items-center justify-center p-8 text-center text-slate-400">
-                  <p>This exam has no questions.</p>
-              </div>
-          </div>
-      );
-  }
+  // State for Matching/Ordering interactions
+  const [dragOrder, setDragOrder] = useState<any[]>([]);
+  const [matchSelection, setMatchSelection] = useState<any>({}); 
+  const [selectedLeft, setSelectedLeft] = useState<string | null>(null);
 
+  const questions = test.questions || [];
   const currentQ = questions[currentIndex];
   const progress = ((currentIndex + (isSubmitted ? 1 : 0)) / questions.length) * 100;
 
-  const handleSelect = (val: string) => { if(isSubmitted) return; setAnswers({ ...answers, [currentIndex]: val }); };
-  
+  // Initialize interaction states when question changes
+  useEffect(() => {
+      if (!currentQ) return;
+      // Ordering: Shuffle items initially
+      if (currentQ.type === 'order' && !answers[currentIndex]) {
+          const shuffled = [...currentQ.items].sort(() => Math.random() - 0.5);
+          setDragOrder(shuffled);
+      }
+      // Ordering: Load existing answer
+      if (currentQ.type === 'order' && answers[currentIndex]) {
+          setDragOrder(answers[currentIndex]);
+      }
+      
+      // Matching: Load existing
+      if (currentQ.type === 'match' && answers[currentIndex]) {
+          setMatchSelection(answers[currentIndex]);
+      } else if (currentQ.type === 'match') {
+          setMatchSelection({});
+      }
+  }, [currentIndex, currentQ]); // Removed 'answers' from dependency to prevent loop
+
+  const handleMCQ = (val: string) => { if(isSubmitted) return; setAnswers({ ...answers, [currentIndex]: val }); };
+
+  // -- Matching Logic --
+  const handleMatchClick = (side: 'left' | 'right', id: string) => {
+      if (isSubmitted) return;
+      if (side === 'left') {
+          setSelectedLeft(id);
+      } else {
+          if (selectedLeft) {
+              const newMatches = { ...matchSelection, [selectedLeft]: id };
+              setMatchSelection(newMatches);
+              setAnswers({ ...answers, [currentIndex]: newMatches }); // Save immediately
+              setSelectedLeft(null);
+          }
+      }
+  };
+
+  // -- Ordering Logic --
+  const handleDragStart = (e: any, index: number) => {
+      e.dataTransfer.setData('dragIndex', index);
+  };
+  const handleDrop = (e: any, dropIndex: number) => {
+      if (isSubmitted) return;
+      const dragIndex = parseInt(e.dataTransfer.getData('dragIndex'));
+      const newOrder = [...dragOrder];
+      const [removed] = newOrder.splice(dragIndex, 1);
+      newOrder.splice(dropIndex, 0, removed);
+      setDragOrder(newOrder);
+      setAnswers({ ...answers, [currentIndex]: newOrder }); // Save order
+  };
+
   const handleSubmit = () => {
-    let correct = 0; 
+    let correctCount = 0; 
     questions.forEach((q: any, idx: number) => { 
-        if(answers[idx] === q.correctAnswer) correct++; 
+        const ans = answers[idx];
+        
+        if (q.type === 'mcq' || q.type === 'tf') {
+            if(ans === q.correctAnswer) correctCount++; 
+        }
+        else if (q.type === 'match') {
+            // Check if all pairs match correctly
+            let allMatch = true;
+            if (!ans) allMatch = false;
+            else {
+                q.pairs.forEach((p: any) => {
+                    // Find the ID of the right side that corresponds to this left side in the user's answers
+                    // Note: In a real app, use IDs. Here assuming left text is key.
+                    if (ans[p.left] !== p.right) allMatch = false;
+                });
+            }
+            if (allMatch) correctCount++;
+        }
+        else if (q.type === 'order') {
+            // Compare order of IDs
+            const correctOrderIds = q.items.map((i:any) => i.id).join(',');
+            const userOrderIds = ans ? ans.map((i:any) => i.id).join(',') : '';
+            if (correctOrderIds === userOrderIds) correctCount++;
+        }
     });
-    setScore(correct); 
+    setScore(correctCount); 
     setIsSubmitted(true);
   };
 
@@ -1814,127 +1939,137 @@ function TestPlayerView({ test, onFinish }: any) {
     const percentage = score / questions.length;
     const earnedXP = Math.round(test.xp * percentage);
     
-    // --- COMPILE DETAILED REPORT ---
     const submissionDetails = questions.map((q: any, idx: number) => {
-        const studentAnsId = answers[idx];
-        const isCorrect = studentAnsId === q.correctAnswer;
+        const ans = answers[idx];
+        let isCorrect = false;
+        let studentVal = "Completed"; 
         
-        // Resolve text for MCQs so the log is readable
-        let studentAnsText = studentAnsId;
-        let correctAnsText = q.correctAnswer;
-
-        if (q.type === 'mcq') {
-            studentAnsText = q.options.find((o: any) => o.id === studentAnsId)?.text || "No Answer";
-            correctAnsText = q.options.find((o: any) => o.id === q.correctAnswer)?.text;
+        if (q.type === 'mcq' || q.type === 'tf') {
+            isCorrect = ans === q.correctAnswer;
+            if(q.type === 'mcq') studentVal = q.options.find((o:any)=>o.id===ans)?.text || "No Answer";
+            else studentVal = ans;
+        } else if (q.type === 'match') {
+            // Simplified check for report
+             studentVal = "Matching Task";
+             // Recalculate correctness for report
+             let allMatch = true;
+             if(!ans) allMatch=false;
+             else q.pairs.forEach((p:any) => { if(ans[p.left] !== p.right) allMatch = false; });
+             isCorrect = allMatch;
+        } else if (q.type === 'order') {
+            studentVal = "Ordering Task";
+            const cIds = q.items.map((i:any) => i.id).join(',');
+            const uIds = ans ? ans.map((i:any) => i.id).join(',') : '';
+            isCorrect = cIds === uIds;
         }
 
-        return {
-            prompt: q.prompt,
-            type: q.type,
-            isCorrect,
-            studentVal: studentAnsText,
-            correctVal: correctAnsText
-        };
+        return { prompt: q.prompt, type: q.type, isCorrect, studentVal, correctVal: "See Instructor" };
     });
 
-    // Pass the 'submissionDetails' inside the scoreDetail object
-    onFinish(test.id, earnedXP, test.title, { 
-        score, 
-        total: questions.length, 
-        details: submissionDetails 
-    }); 
+    onFinish(test.id, earnedXP, test.title, { score, total: questions.length, details: submissionDetails }); 
   };
+
+  if (questions.length === 0) return <div className="p-8 text-center text-slate-400">Empty Exam</div>;
 
   return (
     <div className="h-full flex flex-col bg-slate-50">
-      {/* Header */}
       <div className="bg-white p-4 border-b border-slate-200 sticky top-0 z-20">
           <div className="flex justify-between items-center mb-2"><h2 className="font-bold text-slate-800 truncate">{test.title}</h2><button onClick={() => onFinish(null, 0)}><X/></button></div>
           <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden"><div className="bg-indigo-500 h-full transition-all duration-500" style={{ width: `${progress}%` }} /></div>
       </div>
 
-      {/* Content Area */}
       <div className="flex-1 overflow-y-auto p-6 pb-6 custom-scrollbar">
           {!isSubmitted ? (
               <div className="animate-in slide-in-from-right-8 duration-300" key={currentIndex}>
-                  <div className="bg-indigo-50 inline-block px-3 py-1 rounded-lg text-indigo-700 font-bold text-xs mb-4 uppercase">Question {currentIndex + 1} of {questions.length}</div>
+                  <div className="bg-indigo-50 inline-block px-3 py-1 rounded-lg text-indigo-700 font-bold text-xs mb-4 uppercase">Question {currentIndex + 1}</div>
                   <h3 className="text-2xl font-serif font-bold text-slate-900 mb-8">{currentQ.prompt}</h3>
 
-                  <div className="space-y-3">
-                      {currentQ.type === 'tf' && (
-                          ['true', 'false'].map(val => ( 
-                              <button 
-                                key={val}
-                                onClick={() => handleSelect(val)}
-                                className={`w-full p-5 rounded-2xl border-2 text-left font-bold text-lg transition-all ${answers[currentIndex] === val ? 'border-indigo-600 bg-indigo-50 text-indigo-900 shadow-md' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                  {/* --- INTERACTION AREAS --- */}
+                  
+                  {/* MCQ & TF */}
+                  {(currentQ.type === 'mcq' || currentQ.type === 'tf') && (
+                      <div className="space-y-3">
+                          {(currentQ.type === 'mcq' ? currentQ.options : ['true', 'false']).map((opt: any) => {
+                              const val = currentQ.type === 'tf' ? opt : opt.id;
+                              const label = currentQ.type === 'tf' ? (opt === 'true' ? 'True' : 'False') : opt.text;
+                              return (
+                                  <button key={val} onClick={() => handleMCQ(val)} className={`w-full p-5 rounded-2xl border-2 text-left font-bold text-lg transition-all ${answers[currentIndex] === val ? 'border-indigo-600 bg-indigo-50 text-indigo-900 shadow-md' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
+                                      {label}
+                                  </button>
+                              )
+                          })}
+                      </div>
+                  )}
+
+                  {/* ORDERING (Drag & Drop) */}
+                  {currentQ.type === 'order' && (
+                      <div className="space-y-2">
+                          <p className="text-xs font-bold text-slate-400 uppercase mb-2">Drag to reorder</p>
+                          {dragOrder.map((item: any, idx: number) => (
+                              <div 
+                                key={item.id} 
+                                draggable={!isSubmitted}
+                                onDragStart={(e) => handleDragStart(e, idx)}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={(e) => handleDrop(e, idx)}
+                                className="bg-white p-4 rounded-xl border-2 border-slate-200 shadow-sm flex items-center gap-4 cursor-grab active:cursor-grabbing hover:border-indigo-300 transition-colors"
                               >
-                                  {val === 'true' ? 'True' : 'False'}
-                              </button> 
-                          ))
-                      )}
-                      
-                      {currentQ.type === 'mcq' && (
-                          currentQ.options.map((opt: any) => ( 
-                              <button 
-                                key={opt.id} 
-                                onClick={() => handleSelect(opt.id)} 
-                                className={`w-full p-5 rounded-2xl border-2 text-left font-bold transition-all ${answers[currentIndex] === opt.id ? 'border-indigo-600 bg-indigo-50 text-indigo-900 shadow-md' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
-                              >
-                                  <div className="flex items-center gap-3">
-                                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${answers[currentIndex] === opt.id ? 'border-indigo-600' : 'border-slate-300'}`}>
-                                          {answers[currentIndex] === opt.id && <div className="w-3 h-3 bg-indigo-600 rounded-full" />}
-                                      </div>
-                                      {opt.text}
-                                  </div>
-                              </button> 
-                          ))
-                      )}
-                  </div>
+                                  <div className="text-slate-300"><GripVertical size={20}/></div>
+                                  <span className="font-bold text-slate-700">{item.text}</span>
+                              </div>
+                          ))}
+                      </div>
+                  )}
+
+                  {/* MATCHING (Connect) */}
+                  {currentQ.type === 'match' && (
+                      <div className="grid grid-cols-2 gap-8">
+                           <div className="space-y-3">
+                               {currentQ.pairs.map((p: any) => (
+                                   <button 
+                                     key={p.left} 
+                                     onClick={() => handleMatchClick('left', p.left)}
+                                     className={`w-full p-4 rounded-xl border-2 text-left font-bold text-sm transition-all ${selectedLeft === p.left ? 'border-indigo-500 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-200' : matchSelection[p.left] ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white'}`}
+                                   >
+                                       {p.left}
+                                   </button>
+                               ))}
+                           </div>
+                           <div className="space-y-3">
+                               {/* Shuffle right side for display so it's not obvious */}
+                               {[...currentQ.pairs].sort((a,b) => a.right.localeCompare(b.right)).map((p: any) => {
+                                   const isMatched = Object.values(matchSelection).includes(p.right);
+                                   return (
+                                       <button 
+                                         key={p.right}
+                                         onClick={() => handleMatchClick('right', p.right)}
+                                         className={`w-full p-4 rounded-xl border-2 text-left font-bold text-sm transition-all ${isMatched ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white hover:border-indigo-200'}`}
+                                       >
+                                           {p.right}
+                                       </button>
+                                   )
+                               })}
+                           </div>
+                      </div>
+                  )}
+
               </div>
           ) : (
               <div className="text-center py-10 animate-in zoom-in duration-300">
-                  <div className="w-24 h-24 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl">
-                      <Trophy size={48} />
-                  </div>
+                  <div className="w-24 h-24 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl"><Trophy size={48} /></div>
                   <h2 className="text-3xl font-bold text-slate-900 mb-2">Exam Complete!</h2>
-                  <p className="text-slate-500 mb-8">You scored</p>
                   <div className="text-6xl font-black text-indigo-600 mb-2">{score}<span className="text-2xl text-slate-300">/{questions.length}</span></div>
-                  <div className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-10">
-                      {Math.round((score/questions.length)*100)}% Accuracy
-                  </div>
-                  <button onClick={finishExam} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg hover:scale-[1.02] transition-transform">
-                      Collect XP & Finish
-                  </button>
+                  <div className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-10">{Math.round((score/questions.length)*100)}% Accuracy</div>
+                  <button onClick={finishExam} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg hover:scale-[1.02] transition-transform">Collect XP & Finish</button>
               </div>
           )}
       </div>
 
-      {/* Footer Navigation - Flexbox Positioned */}
       {!isSubmitted && (
           <div className="p-4 pb-8 bg-white border-t border-slate-200 z-20 shrink-0">
               <div className="flex gap-4 mx-auto w-full">
-                  <button 
-                    disabled={currentIndex === 0} 
-                    onClick={() => setCurrentIndex(prev => prev - 1)} 
-                    className="px-6 py-3 rounded-xl font-bold text-slate-500 disabled:opacity-50 hover:bg-slate-50 bg-slate-100"
-                  >
-                      Prev
-                  </button>
-                  {currentIndex < questions.length - 1 ? ( 
-                      <button 
-                        onClick={() => setCurrentIndex(prev => prev + 1)} 
-                        className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-slate-800"
-                      >
-                          Next Question
-                      </button> 
-                  ) : ( 
-                      <button 
-                        onClick={handleSubmit} 
-                        className="flex-1 bg-emerald-500 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-emerald-600"
-                      >
-                          Submit Exam
-                      </button> 
-                  )}
+                  <button disabled={currentIndex === 0} onClick={() => setCurrentIndex(prev => prev - 1)} className="px-6 py-3 rounded-xl font-bold text-slate-500 disabled:opacity-50 hover:bg-slate-50 bg-slate-100">Prev</button>
+                  {currentIndex < questions.length - 1 ? ( <button onClick={() => setCurrentIndex(prev => prev + 1)} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-slate-800">Next</button> ) : ( <button onClick={handleSubmit} className="flex-1 bg-emerald-500 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-emerald-600">Submit Exam</button> )}
               </div>
           </div>
       )}
