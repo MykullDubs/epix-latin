@@ -1352,46 +1352,69 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
     </button>
     
     {/* --- MAIN CONTENT --- */}
-    {/* UPDATED: Changed -mt-4 to mt-4 to push content DOWN and fix overlap */}
     <div className="px-6 space-y-8 mt-4 relative z-20">
       
-      {/* CLASSES SCROLLER - JUICIFIED */}
+      {/* --- THE BIBLICAL CLASS CARDS --- */}
       {classes && classes.length > 0 && (
         <div className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
             <h3 className="text-sm font-bold text-blue-900/70 uppercase tracking-wider mb-4 ml-1 flex items-center gap-2">
                 <School size={16} className="text-blue-500"/> My Classes
             </h3>
-            <div className="flex gap-4 overflow-x-auto pb-6 custom-scrollbar snap-x">
+            <div className="flex gap-4 overflow-x-auto pb-8 custom-scrollbar snap-x">
                 {classes.map((cls: any) => { 
-                    const clsPendingCount = (cls.assignments || []).filter((l: any) => { 
+                    // CALCULATION LOGIC FOR THE CARD
+                    const clsTasks = cls.assignments || [];
+                    const myPending = clsTasks.filter((l: any) => { 
                         const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); 
                         return isForMe && !completedSet.has(l.id); 
-                    }).length; 
+                    }).length;
+                    
+                    const totalTasks = clsTasks.length;
+                    const completedTasks = totalTasks - myPending;
+                    const classProgress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+                    const studentCount = (cls.students || []).length;
+
                     return ( 
-                        <button key={cls.id} onClick={() => handleSelectClass(cls)} className="snap-start min-w-[240px] bg-white p-5 rounded-3xl border border-blue-100 shadow-lg shadow-blue-900/5 hover:shadow-xl hover:shadow-blue-900/10 hover:border-blue-300 hover:-translate-y-1 transition-all duration-300 group text-left relative overflow-hidden">
-                            {/* Decorative background blob */}
-                            <div className="absolute top-[-50%] right-[-50%] w-32 h-32 bg-blue-50 rounded-full blur-2xl group-hover:bg-blue-100 transition-colors"></div>
+                        <button key={cls.id} onClick={() => handleSelectClass(cls)} className="snap-start min-w-[280px] bg-white p-5 rounded-3xl border border-blue-100 shadow-lg shadow-blue-900/5 hover:shadow-xl hover:shadow-blue-900/10 hover:border-blue-300 hover:-translate-y-1 transition-all duration-300 group text-left relative overflow-hidden flex flex-col justify-between h-[180px]">
                             
-                            <div className="relative z-10">
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="w-12 h-12 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl flex items-center justify-center text-blue-600 font-bold text-xl border border-blue-100 group-hover:from-blue-500 group-hover:to-indigo-600 group-hover:text-white group-hover:border-transparent transition-all shadow-sm">
+                            {/* Decorative Background Blob */}
+                            <div className="absolute top-[-40%] right-[-40%] w-40 h-40 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-full blur-3xl group-hover:from-blue-100 group-hover:to-indigo-100 transition-colors"></div>
+                            
+                            <div className="relative z-10 w-full">
+                                <div className="flex items-start justify-between mb-3">
+                                    {/* Avatar */}
+                                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md group-hover:scale-110 transition-transform duration-300">
                                         {cls.name.charAt(0)}
                                     </div>
-                                    {clsPendingCount > 0 ? (
-                                        <span className="text-[10px] bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-bold shadow-sm animate-pulse border border-amber-200">
-                                            {clsPendingCount} Tasks
-                                        </span>
-                                    ) : (
-                                        <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
-                                    )}
-                                </div>
-                                <h4 className="font-bold text-slate-800 text-lg truncate group-hover:text-blue-700 transition-colors">{cls.name}</h4>
-                                <div className="flex items-center justify-between mt-2">
-                                    <p className="text-[10px] text-slate-400 font-mono bg-slate-50 inline-block px-2 py-1 rounded-lg border border-slate-100">
+                                    {/* Code Badge */}
+                                    <span className="text-[10px] font-mono text-slate-400 bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg">
                                         {cls.code}
-                                    </p>
-                                    <ArrowRight size={16} className="text-blue-300 group-hover:text-blue-600 group-hover:translate-x-1 transition-all"/>
+                                    </span>
                                 </div>
+                                
+                                <h4 className="font-bold text-slate-800 text-lg truncate pr-2 group-hover:text-indigo-600 transition-colors">{cls.name}</h4>
+                                
+                                {/* The Flock Count */}
+                                <div className="flex items-center gap-1.5 mt-1 text-slate-400 text-xs font-medium">
+                                    <Users size={12} className="text-blue-400" />
+                                    <span>{studentCount} Students</span>
+                                </div>
+                            </div>
+
+                            {/* Footer: The Path to Salvation (Progress) */}
+                            <div className="relative z-10 w-full mt-4 pt-4 border-t border-slate-100">
+                                <div className="flex justify-between items-end mb-2">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Progress</span>
+                                    <span className="text-[10px] font-bold text-indigo-600">{completedTasks}/{totalTasks} Tasks</span>
+                                </div>
+                                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                    <div className={`h-full rounded-full transition-all duration-1000 ${classProgress === 100 ? 'bg-emerald-400' : 'bg-blue-500'}`} style={{width: `${classProgress}%`}}></div>
+                                </div>
+                                {myPending > 0 && (
+                                    <div className="absolute right-0 -top-8 bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm animate-pulse">
+                                        {myPending} Due
+                                    </div>
+                                )}
                             </div>
                         </button> 
                     ); 
