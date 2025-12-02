@@ -205,8 +205,73 @@ function Header({ title, subtitle, rightAction, onClickTitle, sticky = true }: a
     </div>
   );
 }
+function ExamResultModal({ log, onClose }: any) {
+    if (!log || !log.scoreDetail?.details) return null;
+    const { score, total, details } = log.scoreDetail;
+    const percentage = Math.round((score / total) * 100);
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+            <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+                
+                {/* Header */}
+                <div className="bg-slate-50 p-6 border-b border-slate-200 flex justify-between items-center">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900">{log.studentName}'s Results</h2>
+                        <p className="text-sm text-slate-500">{log.itemTitle} • {new Date(log.timestamp).toLocaleDateString()}</p>
+                    </div>
+                    <div className="text-right">
+                         <span className={`text-2xl font-black ${percentage >= 70 ? 'text-emerald-600' : 'text-rose-600'}`}>{percentage}%</span>
+                         <p className="text-xs font-bold text-slate-400 uppercase">{score}/{total} Correct</p>
+                    </div>
+                </div>
+
+                {/* List of Answers */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                    {details.map((item: any, i: number) => (
+                        <div key={i} className={`p-4 rounded-2xl border-2 ${item.isCorrect ? 'border-emerald-100 bg-emerald-50/50' : 'border-rose-100 bg-rose-50/50'}`}>
+                            <div className="flex items-start gap-3">
+                                <div className={`mt-1 w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${item.isCorrect ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                                    {item.isCorrect ? <Check size={14} strokeWidth={3}/> : <X size={14} strokeWidth={3}/>}
+                                </div>
+                                <div className="flex-1">
+                                    <p className="font-bold text-slate-800 mb-2">{item.prompt}</p>
+                                    
+                                    <div className="space-y-1 text-sm">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-bold uppercase text-slate-400 w-16">Student:</span>
+                                            <span className={`font-medium ${item.isCorrect ? 'text-emerald-700' : 'text-rose-700 line-through opacity-75'}`}>
+                                                {item.studentVal === 'true' ? 'True' : item.studentVal === 'false' ? 'False' : item.studentVal}
+                                            </span>
+                                        </div>
+                                        {!item.isCorrect && (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] font-bold uppercase text-slate-400 w-16">Correct:</span>
+                                                <span className="font-medium text-emerald-700">
+                                                    {item.correctVal === 'true' ? 'True' : item.correctVal === 'false' ? 'False' : item.correctVal}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Footer */}
+                <div className="p-4 border-t border-slate-200 bg-slate-50">
+                    <button onClick={onClose} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors">
+                        Close Review
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
 function LiveActivityFeed() {
   const [logs, setLogs] = useState<any[]>([]);
+  const [selectedLog, setSelectedLog] = useState<any>(null); // New state for modal
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -218,7 +283,10 @@ function LiveActivityFeed() {
   }, []);
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col overflow-hidden relative">
+        {/* Render Modal if log selected */}
+        {selectedLog && <ExamResultModal log={selectedLog} onClose={() => setSelectedLog(null)} />}
+
         <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
             <h2 className="font-bold text-slate-700 flex items-center gap-2"><Activity size={18} className="text-emerald-500"/> Live Student Activity</h2>
             <div className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full animate-pulse">LIVE</div>
@@ -227,7 +295,11 @@ function LiveActivityFeed() {
             {logs.length === 0 && <div className="text-center text-slate-400 italic mt-10">No recent activity.</div>}
             <div className="space-y-3">
                 {logs.map((log) => (
-                    <div key={log.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-start gap-3 animate-in slide-in-from-top-2">
+                    <div 
+                        key={log.id} 
+                        onClick={() => log.scoreDetail ? setSelectedLog(log) : null} // Click handler added
+                        className={`bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-start gap-3 animate-in slide-in-from-top-2 transition-all ${log.scoreDetail ? 'cursor-pointer hover:border-indigo-300 hover:shadow-md' : ''}`}
+                    >
                         <div className={`p-2 rounded-full mt-1 ${log.type === 'quiz_score' ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'}`}>
                            {log.type === 'quiz_score' ? <BarChart3 size={16}/> : <CheckCircle2 size={16}/>}
                         </div>
@@ -249,6 +321,7 @@ function LiveActivityFeed() {
                             <div className="flex items-center gap-2 mt-2">
                                 <span className="text-[10px] font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 flex items-center gap-1"><Clock size={10}/> {new Date(log.timestamp).toLocaleTimeString()}</span>
                                 <span className="text-[10px] font-bold text-emerald-600">+{log.xp} XP</span>
+                                {log.scoreDetail && <span className="text-[10px] font-bold text-indigo-400 bg-indigo-50 px-1 rounded ml-auto">View Details</span>}
                             </div>
                         </div>
                     </div>
@@ -1698,7 +1771,7 @@ function TestPlayerView({ test, onFinish }: any) {
   
   const questions = test.questions || [];
   
-  // Safety check for empty exams
+  // --- SAFETY CHECK ---
   if (questions.length === 0) {
       return (
           <div className="h-full flex flex-col bg-slate-50">
@@ -1714,11 +1787,50 @@ function TestPlayerView({ test, onFinish }: any) {
   const progress = ((currentIndex + (isSubmitted ? 1 : 0)) / questions.length) * 100;
 
   const handleSelect = (val: string) => { if(isSubmitted) return; setAnswers({ ...answers, [currentIndex]: val }); };
+  
   const handleSubmit = () => {
-    let correct = 0; questions.forEach((q: any, idx: number) => { if(answers[idx] === q.correctAnswer) correct++; });
-    setScore(correct); setIsSubmitted(true);
+    let correct = 0; 
+    questions.forEach((q: any, idx: number) => { 
+        if(answers[idx] === q.correctAnswer) correct++; 
+    });
+    setScore(correct); 
+    setIsSubmitted(true);
   };
-  const finishExam = () => { const xp = Math.round((score / questions.length) * test.xp); onFinish(test.id, xp, test.title, { score, total: questions.length }); };
+
+  const finishExam = () => { 
+    const percentage = score / questions.length;
+    const earnedXP = Math.round(test.xp * percentage);
+    
+    // --- COMPILE DETAILED REPORT ---
+    const submissionDetails = questions.map((q: any, idx: number) => {
+        const studentAnsId = answers[idx];
+        const isCorrect = studentAnsId === q.correctAnswer;
+        
+        // Resolve text for MCQs so the log is readable
+        let studentAnsText = studentAnsId;
+        let correctAnsText = q.correctAnswer;
+
+        if (q.type === 'mcq') {
+            studentAnsText = q.options.find((o: any) => o.id === studentAnsId)?.text || "No Answer";
+            correctAnsText = q.options.find((o: any) => o.id === q.correctAnswer)?.text;
+        }
+
+        return {
+            prompt: q.prompt,
+            type: q.type,
+            isCorrect,
+            studentVal: studentAnsText,
+            correctVal: correctAnsText
+        };
+    });
+
+    // Pass the 'submissionDetails' inside the scoreDetail object
+    onFinish(test.id, earnedXP, test.title, { 
+        score, 
+        total: questions.length, 
+        details: submissionDetails 
+    }); 
+  };
 
   return (
     <div className="h-full flex flex-col bg-slate-50">
@@ -1734,26 +1846,82 @@ function TestPlayerView({ test, onFinish }: any) {
               <div className="animate-in slide-in-from-right-8 duration-300" key={currentIndex}>
                   <div className="bg-indigo-50 inline-block px-3 py-1 rounded-lg text-indigo-700 font-bold text-xs mb-4 uppercase">Question {currentIndex + 1} of {questions.length}</div>
                   <h3 className="text-2xl font-serif font-bold text-slate-900 mb-8">{currentQ.prompt}</h3>
+
                   <div className="space-y-3">
-                      {currentQ.type === 'tf' ? ['true', 'false'].map(val => ( <button key={val} onClick={() => handleSelect(val)} className={`w-full p-5 rounded-2xl border-2 text-left font-bold text-lg transition-all ${answers[currentIndex] === val ? 'border-indigo-600 bg-indigo-50 text-indigo-900' : 'border-slate-200 bg-white'}`}>{val === 'true' ? 'True' : 'False'}</button> )) : currentQ.options.map((opt: any) => ( <button key={opt.id} onClick={() => handleSelect(opt.id)} className={`w-full p-5 rounded-2xl border-2 text-left font-bold transition-all ${answers[currentIndex] === opt.id ? 'border-indigo-600 bg-indigo-50 text-indigo-900' : 'border-slate-200 bg-white'}`}>{opt.text}</button> ))}
+                      {currentQ.type === 'tf' && (
+                          ['true', 'false'].map(val => ( 
+                              <button 
+                                key={val}
+                                onClick={() => handleSelect(val)}
+                                className={`w-full p-5 rounded-2xl border-2 text-left font-bold text-lg transition-all ${answers[currentIndex] === val ? 'border-indigo-600 bg-indigo-50 text-indigo-900 shadow-md' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                              >
+                                  {val === 'true' ? 'True' : 'False'}
+                              </button> 
+                          ))
+                      )}
+                      
+                      {currentQ.type === 'mcq' && (
+                          currentQ.options.map((opt: any) => ( 
+                              <button 
+                                key={opt.id} 
+                                onClick={() => handleSelect(opt.id)} 
+                                className={`w-full p-5 rounded-2xl border-2 text-left font-bold transition-all ${answers[currentIndex] === opt.id ? 'border-indigo-600 bg-indigo-50 text-indigo-900 shadow-md' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                              >
+                                  <div className="flex items-center gap-3">
+                                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${answers[currentIndex] === opt.id ? 'border-indigo-600' : 'border-slate-300'}`}>
+                                          {answers[currentIndex] === opt.id && <div className="w-3 h-3 bg-indigo-600 rounded-full" />}
+                                      </div>
+                                      {opt.text}
+                                  </div>
+                              </button> 
+                          ))
+                      )}
                   </div>
               </div>
           ) : (
-              <div className="text-center py-10 animate-in zoom-in">
-                  <div className="w-24 h-24 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6"><Trophy size={48} /></div>
+              <div className="text-center py-10 animate-in zoom-in duration-300">
+                  <div className="w-24 h-24 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl">
+                      <Trophy size={48} />
+                  </div>
                   <h2 className="text-3xl font-bold text-slate-900 mb-2">Exam Complete!</h2>
-                  <div className="text-6xl font-black text-indigo-600 mb-10">{score}<span className="text-2xl text-slate-300">/{questions.length}</span></div>
-                  <button onClick={finishExam} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg">Collect XP & Finish</button>
+                  <p className="text-slate-500 mb-8">You scored</p>
+                  <div className="text-6xl font-black text-indigo-600 mb-2">{score}<span className="text-2xl text-slate-300">/{questions.length}</span></div>
+                  <div className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-10">
+                      {Math.round((score/questions.length)*100)}% Accuracy
+                  </div>
+                  <button onClick={finishExam} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg hover:scale-[1.02] transition-transform">
+                      Collect XP & Finish
+                  </button>
               </div>
           )}
       </div>
 
-      {/* Footer Navigation - NOW FLEXBOX (Not Fixed) */}
+      {/* Footer Navigation - Flexbox Positioned */}
       {!isSubmitted && (
-          <div className="p-4 bg-white border-t border-slate-200 z-20 shrink-0">
+          <div className="p-4 pb-8 bg-white border-t border-slate-200 z-20 shrink-0">
               <div className="flex gap-4 mx-auto w-full">
-                  <button disabled={currentIndex === 0} onClick={() => setCurrentIndex(prev => prev - 1)} className="px-6 py-3 rounded-xl font-bold text-slate-500 disabled:opacity-50 bg-slate-100">Prev</button>
-                  {currentIndex < questions.length - 1 ? ( <button onClick={() => setCurrentIndex(prev => prev + 1)} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-bold">Next</button> ) : ( <button onClick={handleSubmit} className="flex-1 bg-emerald-500 text-white py-3 rounded-xl font-bold">Submit Exam</button> )}
+                  <button 
+                    disabled={currentIndex === 0} 
+                    onClick={() => setCurrentIndex(prev => prev - 1)} 
+                    className="px-6 py-3 rounded-xl font-bold text-slate-500 disabled:opacity-50 hover:bg-slate-50 bg-slate-100"
+                  >
+                      Prev
+                  </button>
+                  {currentIndex < questions.length - 1 ? ( 
+                      <button 
+                        onClick={() => setCurrentIndex(prev => prev + 1)} 
+                        className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-slate-800"
+                      >
+                          Next Question
+                      </button> 
+                  ) : ( 
+                      <button 
+                        onClick={handleSubmit} 
+                        className="flex-1 bg-emerald-500 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-emerald-600"
+                      >
+                          Submit Exam
+                      </button> 
+                  )}
               </div>
           </div>
       )}
