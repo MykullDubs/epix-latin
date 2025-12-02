@@ -1818,8 +1818,159 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
     </div>
   );
 }
+function ClassAnalytics({ classData }: any) {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
+  // 1. Fetch Activity Logs
+  useEffect(() => {
+    // We fetch logs and filter client-side for the roster to ensure we catch everything
+    // In a massive app, you'd index this by classId, but this is perfect for this scale.
+    const q = query(collection(db, 'artifacts', appId, 'activity_logs'), orderBy('timestamp', 'desc'), limit(100));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const allLogs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Filter logs to only include students in this class
+      const classLogs = allLogs.filter((log: any) => classData.studentEmails?.includes(log.studentEmail));
+      setLogs(classLogs);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, [classData]);
+
+  // 2. Aggregate Data per Student
+  const studentStats = useMemo(() => {
+    const stats: any = {};
+    
+    // Initialize with roster
+    (classData.students || []).forEach((email: string) => {
+        stats[email] = { name: email.split('@')[0], email, xp: 0, completed: 0, avgScore: 0, lastActive: null, scoreCount: 0 };
+    });
+
+    // Process logs
+    logs.forEach((log: any) => {
+        if (stats[log.studentEmail]) {
+            stats[log.studentEmail].xp += (log.xp || 0);
+            stats[log.studentEmail].completed += 1;
+            
+            // Track last active
+            if (!stats[log.studentEmail].lastActive) stats[log.studentEmail].lastActive = log.timestamp;
+            
+            // Track Quiz Scores
+            if (log.type === 'quiz_score' && log.scoreDetail) {
+                const pct = (log.scoreDetail.score / log.scoreDetail.total) * 100;
+                // Running average calculation
+                const currentTotal = stats[log.studentEmail].avgScore * stats[log.studentEmail].scoreCount;
+                stats[log.studentEmail].scoreCount++;
+                stats[log.studentEmail].avgScore = (currentTotal + pct) / stats[log.studentEmail].scoreCount;
+            }
+        }
+    });
+
+    return Object.values(stats);
+  }, [logs, classData]);
+
+  return (
+    <div className="h-full flex flex-col bg-slate-50">
+        
+        {/* --- SUMMARY CARDS --- */}
+        <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total XP</p>
+                <div className="flex items-center gap-2 text-indigo-600">
+                    <Zap size={20} fill="currentColor"/>
+                    <span className="text-2xl font-black">{logs.reduce((acc, l) => acc + (l.xp || 0), 0)}</span>
+                </div>
+            </div>
+            <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Assignments Done</p>
+                <div className="flex items-center gap-2 text-emerald-600">
+                    <CheckCircle2 size={20}/>
+                    <span className="text-2xl font-black">{logs.filter(l => l.type !== 'login').length}</span>
+                </div>
+            </div>
+            <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Learners</p>
+                <div className="flex items-center gap-2 text-blue-600">
+                    <Users size={20}/>
+                    <span className="text-2xl font-black">{studentStats.filter((s: any) => s.xp > 0).length} / {(classData.students || []).length}</span>
+                </div>
+            </div>
+        </div>
+
+        {/* --- STUDENT TABLE --- */}
+        <div className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                <h3 className="font-bold text-slate-700 flex items-center gap-2"><BarChart3 size={18} className="text-indigo-600"/> Disciple Performance</h3>
+                <span className="text-xs font-bold text-slate-400 uppercase">Live Data</span>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                <table className="w-full text-left border-collapse">
+                    <thead className="bg-slate-50 sticky top-0 z-10">
+                        <tr>
+                            <th className="p-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Student</th>
+                            <th className="p-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">XP</th>
+                            <th className="p-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">Avg. Score</th>
+                            <th className="p-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Last Active</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {studentStats.length === 0 && (
+                            <tr><td colSpan={4} className="p-8 text-center text-slate-400 italic">No students in roster.</td></tr>
+                        )}
+                        {studentStats.map((s: any, idx: number) => (
+                            <tr key={idx} className="hover:bg-blue-50/50 transition-colors group">
+                                <td className="p-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center font-bold text-xs group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                            {s.name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-700">{s.name}</p>
+                                            <p className="text-[10px] text-slate-400">{s.email}</p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="p-4 text-center">
+                                    <span className="inline-block px-2 py-1 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold border border-amber-100">
+                                        {s.xp} XP
+                                    </span>
+                                </td>
+                                <td className="p-4 text-center">
+                                    {s.scoreCount > 0 ? (
+                                        <div className="flex flex-col items-center gap-1">
+                                            <span className={`text-xs font-bold ${s.avgScore >= 80 ? 'text-emerald-600' : s.avgScore >= 60 ? 'text-amber-600' : 'text-rose-600'}`}>
+                                                {Math.round(s.avgScore)}%
+                                            </span>
+                                            <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                <div className={`h-full rounded-full ${s.avgScore >= 80 ? 'bg-emerald-400' : 'bg-amber-400'}`} style={{width: `${s.avgScore}%`}}></div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <span className="text-xs text-slate-300">-</span>
+                                    )}
+                                </td>
+                                <td className="p-4 text-right">
+                                    {s.lastActive ? (
+                                        <span className="text-xs font-mono text-slate-500">
+                                            {new Date(s.lastActive).toLocaleDateString()} <br/>
+                                            <span className="text-[9px] opacity-70">{new Date(s.lastActive).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-slate-300 italic">Never</span>
+                                    )}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+  );
+}
+
+function ClassManagerView({ user, classes, lessons, allDecks }: any) {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [newClassName, setNewClassName] = useState('');
   const [assignModalOpen, setAssignModalOpen] = useState(false);
@@ -1827,9 +1978,10 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
   const [targetStudentMode, setTargetStudentMode] = useState('all'); 
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [assignType, setAssignType] = useState<'deck' | 'lesson'>('lesson');
-  const [viewTab, setViewTab] = useState<'content' | 'forum'>('content');
+  
+  // UPDATED: Added 'analytics' to the type
+  const [viewTab, setViewTab] = useState<'content' | 'forum' | 'analytics'>('content');
 
-  // -- Student Selector States --
   const [isStudentListOpen, setIsStudentListOpen] = useState(false);
   const [availableStudents, setAvailableStudents] = useState<any[]>([]);
   const [studentSearch, setStudentSearch] = useState('');
@@ -1873,6 +2025,7 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
             <div><h1 className="text-2xl font-bold text-slate-900">{selectedClass.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {selectedClass.code}</p></div>
             <div className="flex gap-2">
                 <button onClick={() => setViewTab('content')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'content' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Manage</button>
+                <button onClick={() => setViewTab('analytics')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'analytics' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Analytics</button>
                 <button onClick={() => setViewTab('forum')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'forum' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Forum</button>
                 
                 {viewTab === 'content' && (
@@ -1885,7 +2038,7 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
           </div>
         </div>
 
-        {viewTab === 'content' ? (
+        {viewTab === 'content' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="space-y-4">
                     <h3 className="font-bold text-slate-800 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3>
@@ -1897,9 +2050,18 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">{(!selectedClass.students || selectedClass.students.length === 0) && <div className="p-4 text-center text-slate-400 text-sm italic">No students joined yet.</div>}{selectedClass.students?.map((s: string, i: number) => (<div key={i} className="p-3 border-b border-slate-50 last:border-0 flex items-center gap-3"><div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs">{s.charAt(0)}</div><span className="text-sm font-medium text-slate-700">{s}</span></div>))}</div>
                 </div>
             </div>
-        ) : (
+        )}
+        
+        {viewTab === 'forum' && (
             <div className="h-full pb-20">
                 <ClassForum classId={selectedClass.id} user={user} userData={{...userData, role: 'instructor'}} />
+            </div>
+        )}
+
+        {/* --- NEW ANALYTICS TAB --- */}
+        {viewTab === 'analytics' && (
+            <div className="h-full pb-20">
+                <ClassAnalytics classData={selectedClass} />
             </div>
         )}
 
@@ -1909,29 +2071,7 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                     <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center"><h3 className="font-bold text-lg">Select Students</h3><button onClick={() => setIsStudentListOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-600"/></button></div>
                     <div className="p-4 border-b border-slate-100"><div className="relative"><Search className="absolute left-3 top-2.5 text-slate-400" size={16} /><input value={studentSearch} onChange={(e) => setStudentSearch(e.target.value)} placeholder="Search by name or email..." className="w-full pl-9 p-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" autoFocus /></div></div>
                     <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
-                        {availableStudents.length === 0 ? (
-                            <div className="text-center py-8 text-slate-400">Loading students...</div>
-                        ) : (
-                            availableStudents
-                            .filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()) || s.email.toLowerCase().includes(studentSearch.toLowerCase()))
-                            .map((student, idx) => { 
-                                const isAdded = selectedClass.students?.includes(student.email); 
-                                return ( 
-                                    <div key={idx} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors border-b border-slate-50 last:border-0">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 bg-slate-200 text-slate-600 rounded-full flex items-center justify-center font-bold text-xs">{student.name.charAt(0)}</div>
-                                            <div>
-                                                <p className="text-sm font-bold text-slate-800">{student.name}</p>
-                                                <p className="text-xs text-slate-500">{student.email}</p>
-                                            </div>
-                                        </div>
-                                        <button onClick={() => addStudentToClass(student.email)} disabled={isAdded} className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${isAdded ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
-                                            {isAdded ? 'Joined' : 'Add'}
-                                        </button>
-                                    </div> 
-                                ) 
-                            })
-                        )}
+                        {availableStudents.length === 0 ? (<div className="text-center py-8 text-slate-400">Loading students...</div>) : (availableStudents.filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()) || s.email.toLowerCase().includes(studentSearch.toLowerCase())).map((student, idx) => { const isAdded = selectedClass.students?.includes(student.email); return ( <div key={idx} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors border-b border-slate-50 last:border-0"><div className="flex items-center gap-3"><div className="w-8 h-8 bg-slate-200 text-slate-600 rounded-full flex items-center justify-center font-bold text-xs">{student.name.charAt(0)}</div><div><p className="text-sm font-bold text-slate-800">{student.name}</p><p className="text-xs text-slate-500">{student.email}</p></div></div><button onClick={() => addStudentToClass(student.email)} disabled={isAdded} className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${isAdded ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>{isAdded ? 'Joined' : 'Add'}</button></div> ) }))}
                     </div>
                 </div>
             </div>
@@ -1947,32 +2087,8 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                   {targetStudentMode === 'specific' && <p className="text-[10px] text-slate-400 mt-2 text-right">{selectedAssignees.length} selected</p>}
               </div>
               <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                  {assignType === 'deck' && (
-                      <div>
-                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><Layers size={14}/> Available Decks</h4>
-                          <div className="space-y-2">
-                              {Object.keys(allDecks || {}).length === 0 ? <p className="text-sm text-slate-400 italic">No decks found.</p> : Object.entries(allDecks).map(([key, deck]: any) => (
-                                  <button key={key} onClick={() => assignContent({ ...deck, id: key }, 'deck')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all group flex justify-between items-center">
-                                      <div><h4 className="font-bold text-slate-800 text-sm">{deck.title}</h4><p className="text-xs text-slate-500">{deck.cards?.length || 0} Cards</p></div>
-                                      <PlusCircle size={18} className="text-slate-300 group-hover:text-orange-500"/>
-                                  </button>
-                              ))}
-                          </div>
-                      </div>
-                  )}
-                  {assignType === 'lesson' && (
-                      <div>
-                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><BookOpen size={14}/> Available Lessons</h4>
-                          <div className="space-y-2">
-                              {lessons.length === 0 ? <p className="text-sm text-slate-400 italic">No lessons found.</p> : lessons.map((l: any) => (
-                                  <button key={l.id} onClick={() => assignContent(l, 'lesson')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group flex justify-between items-center">
-                                      <div><h4 className="font-bold text-slate-800 text-sm">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div>
-                                      <PlusCircle size={18} className="text-slate-300 group-hover:text-indigo-500"/>
-                                  </button>
-                              ))}
-                          </div>
-                      </div>
-                  )}
+                  {assignType === 'deck' && (<div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><Layers size={14}/> Available Decks</h4><div className="space-y-2">{Object.keys(allDecks || {}).length === 0 ? <p className="text-sm text-slate-400 italic">No decks found.</p> : Object.entries(allDecks).map(([key, deck]: any) => (<button key={key} onClick={() => assignContent({ ...deck, id: key }, 'deck')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{deck.title}</h4><p className="text-xs text-slate-500">{deck.cards?.length || 0} Cards</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-orange-500"/></button>))}</div></div>)}
+                  {assignType === 'lesson' && (<div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><BookOpen size={14}/> Available Lessons</h4><div className="space-y-2">{lessons.length === 0 ? <p className="text-sm text-slate-400 italic">No lessons found.</p> : lessons.map((l: any) => (<button key={l.id} onClick={() => assignContent(l, 'lesson')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-indigo-500"/></button>))}</div></div>)}
               </div>
             </div>
           </div>
@@ -1980,7 +2096,15 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
       </div>
     );
   }
-  
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500 relative">
+      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
+      <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-slate-800">My Classes</h2><form onSubmit={createClass} className="flex gap-2"><input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="New Class Name" className="p-2 rounded-lg border border-slate-200 text-sm w-64" /><button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2"><Plus size={16}/> Create</button></form></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{classes.map((cls: any) => (<div key={cls.id} onClick={() => setSelectedClassId(cls.id)} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative group"><div className="absolute top-4 right-4 flex gap-2"><button onClick={(e) => {e.stopPropagation(); handleRenameClass(cls.id, cls.name);}} className="text-slate-300 hover:text-indigo-500"><Edit3 size={16}/></button><button onClick={(e) => {e.stopPropagation(); handleDeleteClass(cls.id);}} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button></div><div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4 font-bold text-lg">{cls.name.charAt(0)}</div><h3 className="font-bold text-lg text-slate-900">{cls.name}</h3><p className="text-sm text-slate-500 mb-4">{(cls.students || []).length} Students</p><div className="flex items-center justify-between bg-slate-50 p-2 rounded-lg"><span className="text-xs font-mono font-bold text-slate-600 tracking-wider">{cls.code}</span><button className="text-indigo-600 text-xs font-bold flex items-center gap-1" onClick={(e) => {e.stopPropagation(); navigator.clipboard.writeText(cls.code);}}><Copy size={12}/> Copy</button></div></div>))}</div>
+    </div>
+  );
+}
   return (
     <div className="space-y-6 animate-in fade-in duration-500 relative">
       {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
