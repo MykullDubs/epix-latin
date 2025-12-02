@@ -1195,35 +1195,27 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
 
     {userData?.classSyncError && (<div className="bg-rose-500 text-white p-4 text-center text-sm font-bold relative z-50"><AlertTriangle className="inline-block mr-2" size={16} />System Notice: Database Index Missing.</div>)}
     
-    {/* --- NEW HERO WIDGET (Compact Cornflower Blue) --- */}
+    {/* --- HERO WIDGET (Cornflower Blue) --- */}
     <button 
         onClick={() => setShowLevelModal(true)}
-        // UPDATED: Reduced padding (pt-10, pb-8) and curve (rounded-b-[2rem])
         className="w-full relative overflow-hidden bg-gradient-to-br from-blue-500 via-indigo-500 to-blue-600 text-white shadow-xl z-10 group text-left rounded-b-[2.5rem] pb-8 pt-10 px-6 transition-all active:scale-[0.99]"
     >
-        {/* Background Depth */}
         <div className="absolute top-[-50%] left-[-20%] w-[500px] h-[500px] bg-blue-400/30 rounded-full blur-[80px] mix-blend-overlay pointer-events-none"></div>
         <div className="absolute bottom-[-20%] right-[-10%] w-[300px] h-[300px] bg-indigo-300/20 rounded-full blur-[60px] mix-blend-overlay pointer-events-none"></div>
-
-        {/* Abstract Icon Background */}
         <div className="absolute top-[-10%] right-[-10%] opacity-10 group-hover:opacity-20 transition-all duration-700 transform group-hover:rotate-12 group-hover:scale-110">
             <User size={280} strokeWidth={1.5} />
         </div>
        
         <div className="relative z-20 flex flex-col gap-4">
-            {/* Top Row: Avatar & Greeting */}
             <div className="flex items-center gap-4">
                 <div className="relative">
-                    {/* UPDATED: Smaller Avatar (w-16 h-16) */}
                     <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/40 shadow-[0_8px_32px_rgba(0,0,0,0.1)] group-hover:ring-4 ring-white/20 transition-all">
                         <span className="font-serif font-bold text-2xl text-white drop-shadow-md">{userData?.name?.charAt(0) || 'S'}</span>
                     </div>
-                    {/* Online Status Dot */}
                     <div className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-400 border-4 border-blue-600 rounded-full shadow-sm"></div>
                 </div>
                 <div>
                     <p className="text-blue-100 text-[10px] font-bold uppercase tracking-widest mb-0.5 opacity-90 drop-shadow-sm">Welcome back,</p>
-                    {/* UPDATED: Smaller Name Font (text-3xl) */}
                     <h1 className="text-3xl font-serif font-bold leading-none tracking-tight drop-shadow-lg filter">{userData?.name || 'Student'}</h1>
                     <div className="flex items-center gap-2 mt-1.5">
                          <span className="bg-white/20 backdrop-blur-md px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide border border-white/20 shadow-sm">{rank}</span>
@@ -1231,11 +1223,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
                 </div>
             </div>
 
-            {/* Bottom Row: THE GLASS BAR */}
-            {/* UPDATED: More compact padding (p-3) and margin (mt-2) */}
             <div className="bg-white/10 backdrop-blur-xl rounded-xl p-3 border border-white/30 flex items-center justify-between mt-2 group-hover:bg-white/20 transition-all shadow-[0_8px_32px_rgba(0,0,0,0.1)]">
-                
-                {/* Level / XP */}
                 <div className="flex-1 border-r border-white/20 pr-4">
                      <div className="flex justify-between items-end mb-1">
                         <span className="text-[10px] font-bold text-white tracking-wide">Level {level}</span>
@@ -1247,8 +1235,6 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
                         </div>
                      </div>
                 </div>
-
-                {/* Streak */}
                 <div className="pl-5 flex flex-col items-center justify-center">
                     <div className="flex items-center gap-1 text-yellow-300 filter drop-shadow-sm">
                         <Zap size={20} fill="currentColor" />
@@ -1261,29 +1247,47 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
     </button>
     
     {/* --- MAIN CONTENT --- */}
-    {/* UPDATED: Adjusted negative margin (-mt-4) so "My Classes" text isn't hidden */}
-    <div className="px-6 space-y-8 -mt-4 relative z-20">
+    {/* UPDATED: Changed -mt-4 to mt-4 to push content DOWN and fix overlap */}
+    <div className="px-6 space-y-8 mt-4 relative z-20">
       
-      {/* CLASSES SCROLLER */}
+      {/* CLASSES SCROLLER - JUICIFIED */}
       {classes && classes.length > 0 && (
-        <div className="animate-in slide-in-from-bottom-4 duration-500 delay-100 pt-2">
-            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 ml-1">My Classes</h3>
-            <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar snap-x">
+        <div className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
+            <h3 className="text-sm font-bold text-blue-900/70 uppercase tracking-wider mb-4 ml-1 flex items-center gap-2">
+                <School size={16} className="text-blue-500"/> My Classes
+            </h3>
+            <div className="flex gap-4 overflow-x-auto pb-6 custom-scrollbar snap-x">
                 {classes.map((cls: any) => { 
                     const clsPendingCount = (cls.assignments || []).filter((l: any) => { 
                         const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); 
                         return isForMe && !completedSet.has(l.id); 
                     }).length; 
                     return ( 
-                        <button key={cls.id} onClick={() => handleSelectClass(cls)} className="snap-start min-w-[220px] bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg hover:border-blue-300 text-left active:scale-[0.98] transition-all group">
-                            <div className="flex items-center justify-between mb-3">
-                                <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 font-bold text-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                                    {cls.name.charAt(0)}
+                        <button key={cls.id} onClick={() => handleSelectClass(cls)} className="snap-start min-w-[240px] bg-white p-5 rounded-3xl border border-blue-100 shadow-lg shadow-blue-900/5 hover:shadow-xl hover:shadow-blue-900/10 hover:border-blue-300 hover:-translate-y-1 transition-all duration-300 group text-left relative overflow-hidden">
+                            {/* Decorative background blob */}
+                            <div className="absolute top-[-50%] right-[-50%] w-32 h-32 bg-blue-50 rounded-full blur-2xl group-hover:bg-blue-100 transition-colors"></div>
+                            
+                            <div className="relative z-10">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="w-12 h-12 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl flex items-center justify-center text-blue-600 font-bold text-xl border border-blue-100 group-hover:from-blue-500 group-hover:to-indigo-600 group-hover:text-white group-hover:border-transparent transition-all shadow-sm">
+                                        {cls.name.charAt(0)}
+                                    </div>
+                                    {clsPendingCount > 0 ? (
+                                        <span className="text-[10px] bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-bold shadow-sm animate-pulse border border-amber-200">
+                                            {clsPendingCount} Tasks
+                                        </span>
+                                    ) : (
+                                        <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+                                    )}
                                 </div>
-                                {clsPendingCount > 0 && <span className="text-[10px] bg-rose-100 text-rose-600 px-2 py-1 rounded-full font-bold animate-pulse">{clsPendingCount} New</span>}
+                                <h4 className="font-bold text-slate-800 text-lg truncate group-hover:text-blue-700 transition-colors">{cls.name}</h4>
+                                <div className="flex items-center justify-between mt-2">
+                                    <p className="text-[10px] text-slate-400 font-mono bg-slate-50 inline-block px-2 py-1 rounded-lg border border-slate-100">
+                                        {cls.code}
+                                    </p>
+                                    <ArrowRight size={16} className="text-blue-300 group-hover:text-blue-600 group-hover:translate-x-1 transition-all"/>
+                                </div>
                             </div>
-                            <h4 className="font-bold text-slate-900 text-lg truncate">{cls.name}</h4>
-                            <p className="text-xs text-slate-500 font-mono mt-1 bg-slate-50 inline-block px-1.5 rounded">{cls.code}</p>
                         </button> 
                     ); 
                 })}
@@ -1294,20 +1298,20 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
       {/* ASSIGNMENTS LIST */}
       {activeAssignments.length > 0 && (
           <div className="animate-in slide-in-from-bottom-4 duration-500 delay-200">
-             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 ml-1">Pending Assignments</h3>
+             <h3 className="text-sm font-bold text-blue-900/70 uppercase tracking-wider mb-3 ml-1">Pending Assignments</h3>
              <div className="space-y-3">
                 {activeAssignments.map((l: any, i: number) => ( 
-                    <button key={`${l.id}-${i}`} onClick={() => l.contentType === 'deck' ? onSelectDeck(l) : onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all hover:border-indigo-300 group">
+                    <button key={`${l.id}-${i}`} onClick={() => l.contentType === 'deck' ? onSelectDeck(l) : onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all hover:border-blue-300 hover:shadow-md group">
                         <div className="flex items-center space-x-4">
-                            <div className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-colors ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600 group-hover:bg-orange-100' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-100'}`}>
-                                {l.contentType === 'deck' ? <Layers size={24}/> : <PlayCircle size={24} />}
+                            <div className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-colors shadow-sm ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-500 group-hover:text-white'}`}>
+                                {l.contentType === 'deck' ? <Layers size={22}/> : <PlayCircle size={22} />}
                             </div>
                             <div className="text-left">
-                                <h4 className="font-bold text-slate-900">{l.title}</h4>
+                                <h4 className="font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{l.title}</h4>
                                 <p className="text-xs text-slate-500">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Assigned Lesson'}</p>
                             </div>
                         </div>
-                        <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                        <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-blue-600 group-hover:text-white transition-all">
                             <ChevronRight size={16} />
                         </div>
                     </button>
@@ -1318,20 +1322,20 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
       
       {/* STANDARD LIBRARY */}
       <div className="animate-in slide-in-from-bottom-4 duration-500 delay-300">
-         <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 ml-1">Library</h3>
+         <h3 className="text-sm font-bold text-blue-900/70 uppercase tracking-wider mb-3 ml-1">Library</h3>
          <div className="space-y-3">
             {lessons.map((l: any) => (
-                <button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-amber-300 group transition-all">
+                <button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-blue-300 group transition-all hover:shadow-md">
                     <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 group-hover:bg-amber-100 transition-colors">
-                            <BookOpen size={24}/>
+                        <div className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                            <BookOpen size={22}/>
                         </div>
                         <div className="text-left">
-                            <h4 className="font-bold text-slate-900">{l.title}</h4>
+                            <h4 className="font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{l.title}</h4>
                             <p className="text-xs text-slate-500">{l.subtitle}</p>
                         </div>
                     </div>
-                    <ChevronRight className="text-slate-300 group-hover:text-amber-500 transition-colors"/>
+                    <ChevronRight className="text-slate-300 group-hover:text-blue-500 transition-colors"/>
                 </button>
             ))}
          </div>
@@ -1339,14 +1343,14 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
       
       {/* QUICK ACTIONS */}
       <div className="grid grid-cols-2 gap-4 pb-8 animate-in slide-in-from-bottom-4 duration-500 delay-500">
-        <button onClick={() => setActiveTab('flashcards')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center hover:scale-[1.02] active:scale-95 transition-all group hover:shadow-lg hover:border-orange-200">
+        <button onClick={() => setActiveTab('flashcards')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center hover:scale-[1.02] active:scale-95 transition-all group hover:shadow-lg hover:border-orange-200 hover:bg-orange-50/30">
             <div className="w-14 h-14 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-orange-500 group-hover:text-white transition-colors shadow-sm">
                 <Layers size={28}/>
             </div>
             <span className="block font-bold text-slate-800 text-lg">Practice</span>
             <span className="text-xs text-slate-400 font-medium">Review Cards</span>
         </button>
-        <button onClick={() => setActiveTab('create')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center hover:scale-[1.02] active:scale-95 transition-all group hover:shadow-lg hover:border-emerald-200">
+        <button onClick={() => setActiveTab('create')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center hover:scale-[1.02] active:scale-95 transition-all group hover:shadow-lg hover:border-emerald-200 hover:bg-emerald-50/30">
             <div className="w-14 h-14 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-emerald-500 group-hover:text-white transition-colors shadow-sm">
                 <Feather size={28}/>
             </div>
@@ -1359,7 +1363,6 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   </div>
   );
 }
-
 function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard, availableDecks, initialDeckId, initialData, onCancelEdit }: any) {
   const [formData, setFormData] = useState({ front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '', deckId: initialDeckId || 'custom' });
   const [isCreatingDeck, setIsCreatingDeck] = useState(false);
