@@ -1436,9 +1436,392 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
 }
 
 // ============================================================================
-// PASTE THIS AT THE VERY BOTTOM OF YOUR FILE
-// (Replace your existing RoleToggle and function App)
+// PASTE THIS BLOCK *ABOVE* FUNCTION INSTRUCTORDASHBOARD
 // ============================================================================
+
+function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allDecks }: any) {
+  const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
+  const [mode, setMode] = useState('card'); 
+  const [subView, setSubView] = useState('menu'); // menu | library | editor | import
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [jsonInput, setJsonInput] = useState('');
+  const [importType, setImportType] = useState('lesson');
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const handleBulkImport = async () => {
+    try {
+        const data = JSON.parse(jsonInput);
+        if (!Array.isArray(data)) throw new Error("Input must be an array.");
+        const batch = writeBatch(db);
+        // @ts-ignore
+        const userId = auth.currentUser?.uid;
+        if(!userId) return;
+
+        let count = 0;
+        data.forEach((item: any) => {
+            const id = item.id || `import_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+            if (importType === 'deck') {
+                const deckId = `custom_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
+                const deckTitle = item.title || "Imported Deck";
+                if (item.cards && Array.isArray(item.cards)) {
+                    item.cards.forEach((card: any) => {
+                        const cardRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'custom_cards'));
+                        batch.set(cardRef, { ...card, deckId: deckId, deckTitle: deckTitle, type: card.type || 'noun', mastery: 0, grammar_tags: card.grammar_tags || ["Imported"] });
+                        count++;
+                    });
+                }
+            } else {
+                 const ref = doc(db, 'artifacts', appId, 'users', userId, 'custom_lessons', id);
+                 batch.set(ref, { ...item, vocab: Array.isArray(item.vocab) ? item.vocab : [], xp: item.xp || 100 });
+                 count++;
+            }
+        });
+        await batch.commit();
+        setToastMsg(`Successfully imported ${count} items.`);
+        setJsonInput('');
+    } catch (e: any) { alert("Import Failed: " + e.message); }
+  };
+
+  const handleEdit = (item: any, type: string) => {
+      setEditingItem(item);
+      setMode(type);
+      setSubView('editor');
+      if(type === 'lesson') {
+           setLessonData({...item, vocab: Array.isArray(item.vocab) ? item.vocab.join(', ') : item.vocab});
+      }
+  };
+
+  if (subView === 'library') {
+      return (
+          <div className="h-full flex flex-col bg-slate-50">
+              <div className="p-6 border-b border-slate-100 bg-white flex justify-between items-center sticky top-0 z-10">
+                  <h2 className="font-bold text-xl text-slate-800 flex items-center gap-2"><Library className="text-indigo-600"/> Content Library</h2>
+                  <button onClick={() => setSubView('menu')} className="text-sm font-bold text-slate-500 hover:text-indigo-600">Back</button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                  <div>
+                      <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Layers size={18} className="text-orange-500"/> Decks</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                           {Object.entries(allDecks).map(([key, deck]: any) => (
+                              <div key={key} onClick={() => handleEdit({...deck, deckId: key}, 'card')} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-orange-300 cursor-pointer transition-colors group">
+                                  <div className="flex justify-between mb-2">
+                                      <h4 className="font-bold text-slate-900">{deck.title}</h4>
+                                      <Edit3 size={16} className="text-slate-300 group-hover:text-orange-500"/>
+                                  </div>
+                                  <p className="text-xs text-slate-500">{deck.cards?.length || 0} Cards</p>
+                              </div>
+                           ))}
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )
+  }
+
+  if (subView === 'import') {
+      return (
+          <div className="h-full flex flex-col bg-slate-50 p-6">
+             <div className="flex justify-between items-center mb-6">
+                 <h2 className="text-2xl font-bold text-slate-800">AI / JSON Import</h2>
+                 <button onClick={() => setSubView('menu')} className="text-sm font-bold text-slate-500 hover:text-indigo-600">Back</button>
+             </div>
+             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex-1 flex flex-col">
+                 <div className="flex gap-2 mb-4">
+                     <button onClick={() => setImportType('lesson')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${importType === 'lesson' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Lessons</button>
+                     <button onClick={() => setImportType('deck')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${importType === 'deck' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Decks</button>
+                 </div>
+                 <textarea 
+                   value={jsonInput} 
+                   onChange={(e) => setJsonInput(e.target.value)} 
+                   className="flex-1 w-full p-4 bg-slate-50 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                   placeholder={importType === 'lesson' ? '[ { "title": "Lesson 1", "blocks": [...] } ]' : '[ { "title": "My Deck", "cards": [...] } ]'}
+                 />
+                 <div className="mt-4 flex justify-end">
+                     <button onClick={handleBulkImport} disabled={!jsonInput} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-slate-800 disabled:opacity-50 flex items-center gap-2">
+                         <UploadCloud size={18}/> Import JSON
+                     </button>
+                 </div>
+                 {toastMsg && <p className="text-emerald-600 font-bold text-center mt-2">{toastMsg}</p>}
+             </div>
+          </div>
+      )
+  }
+
+  return (
+    <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar relative">
+        <Header title="Scriptorium" subtitle="Content Creator" 
+            rightAction={
+                <div className="flex gap-2">
+                    <button onClick={() => setSubView('import')} className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-indigo-50 hover:text-indigo-600"><FileJson size={20}/></button>
+                    <button onClick={() => setSubView('library')} className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-indigo-50 hover:text-indigo-600"><Library size={20}/></button>
+                </div>
+            } 
+        />
+        
+        {(subView === 'menu' || subView === 'editor') && (
+             <div className="px-6 mt-2">
+                <div className="flex bg-slate-200 p-1 rounded-xl">
+                    <button onClick={() => { setMode('card'); setEditingItem(null); setSubView('editor'); }} className={`flex-1 py-2 text-sm font-bold rounded-lg ${mode === 'card' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Flashcard</button>
+                    <button onClick={() => { setMode('lesson'); setEditingItem(null); setSubView('editor'); }} className={`flex-1 py-2 text-sm font-bold rounded-lg ${mode === 'lesson' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Full Lesson</button>
+                </div>
+            </div>
+        )}
+
+        <div className="mt-4">
+            {subView === 'editor' && mode === 'card' && (
+                <CardBuilderView 
+                    onSaveCard={onSaveCard} 
+                    onUpdateCard={onUpdateCard} 
+                    onDeleteCard={onDeleteCard} 
+                    availableDecks={allDecks} 
+                    initialData={editingItem}
+                    onCancelEdit={() => { setEditingItem(null); }}
+                />
+            )}
+            {subView === 'editor' && mode === 'lesson' && (
+                <LessonBuilderView 
+                    data={lessonData} 
+                    setData={setLessonData} 
+                    onSave={onSaveLesson} 
+                    availableDecks={allDecks} 
+                />
+            )}
+        </div>
+    </div>
+  );
+}
+
+function ClassAnalytics({ classData }: any) {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, 'artifacts', appId, 'activity_logs'), orderBy('timestamp', 'desc'), limit(100));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const allLogs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const classLogs = allLogs.filter((log: any) => classData.studentEmails?.includes(log.studentEmail));
+      setLogs(classLogs);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, [classData]);
+
+  const studentStats = useMemo(() => {
+    const stats: any = {};
+    (classData.students || []).forEach((email: string) => {
+        stats[email] = { name: email.split('@')[0], email, xp: 0, completed: 0, avgScore: 0, lastActive: null, scoreCount: 0 };
+    });
+    logs.forEach((log: any) => {
+        if (stats[log.studentEmail]) {
+            stats[log.studentEmail].xp += (log.xp || 0);
+            stats[log.studentEmail].completed += 1;
+            if (!stats[log.studentEmail].lastActive) stats[log.studentEmail].lastActive = log.timestamp;
+            if (log.type === 'quiz_score' && log.scoreDetail) {
+                const pct = (log.scoreDetail.score / log.scoreDetail.total) * 100;
+                const currentTotal = stats[log.studentEmail].avgScore * stats[log.studentEmail].scoreCount;
+                stats[log.studentEmail].scoreCount++;
+                stats[log.studentEmail].avgScore = (currentTotal + pct) / stats[log.studentEmail].scoreCount;
+            }
+        }
+    });
+    return Object.values(stats);
+  }, [logs, classData]);
+
+  return (
+    <div className="h-full flex flex-col bg-slate-50">
+        <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total XP</p>
+                <div className="flex items-center gap-2 text-indigo-600">
+                    <Zap size={20} fill="currentColor"/>
+                    <span className="text-2xl font-black">{logs.reduce((acc, l) => acc + (l.xp || 0), 0)}</span>
+                </div>
+            </div>
+            <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Assignments Done</p>
+                <div className="flex items-center gap-2 text-emerald-600">
+                    <CheckCircle2 size={20}/>
+                    <span className="text-2xl font-black">{logs.filter(l => l.type !== 'login').length}</span>
+                </div>
+            </div>
+            <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Learners</p>
+                <div className="flex items-center gap-2 text-blue-600">
+                    <Users size={20}/>
+                    <span className="text-2xl font-black">{studentStats.filter((s: any) => s.xp > 0).length} / {(classData.students || []).length}</span>
+                </div>
+            </div>
+        </div>
+        <div className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                <h3 className="font-bold text-slate-700 flex items-center gap-2"><BarChart3 size={18} className="text-indigo-600"/> Disciple Performance</h3>
+                <span className="text-xs font-bold text-slate-400 uppercase">Live Data</span>
+            </div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                <table className="w-full text-left border-collapse">
+                    <thead className="bg-slate-50 sticky top-0 z-10">
+                        <tr>
+                            <th className="p-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Student</th>
+                            <th className="p-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">XP</th>
+                            <th className="p-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">Avg. Score</th>
+                            <th className="p-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Last Active</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {studentStats.length === 0 && (
+                            <tr><td colSpan={4} className="p-8 text-center text-slate-400 italic">No students in roster.</td></tr>
+                        )}
+                        {studentStats.map((s: any, idx: number) => (
+                            <tr key={idx} className="hover:bg-blue-50/50 transition-colors group">
+                                <td className="p-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center font-bold text-xs group-hover:bg-indigo-600 group-hover:text-white transition-colors">{s.name.charAt(0).toUpperCase()}</div>
+                                        <div><p className="text-sm font-bold text-slate-700">{s.name}</p><p className="text-[10px] text-slate-400">{s.email}</p></div>
+                                    </div>
+                                </td>
+                                <td className="p-4 text-center"><span className="inline-block px-2 py-1 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold border border-amber-100">{s.xp} XP</span></td>
+                                <td className="p-4 text-center">{s.scoreCount > 0 ? (<div className="flex flex-col items-center gap-1"><span className={`text-xs font-bold ${s.avgScore >= 80 ? 'text-emerald-600' : s.avgScore >= 60 ? 'text-amber-600' : 'text-rose-600'}`}>{Math.round(s.avgScore)}%</span><div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full rounded-full ${s.avgScore >= 80 ? 'bg-emerald-400' : 'bg-amber-400'}`} style={{width: `${s.avgScore}%`}}></div></div></div>) : (<span className="text-xs text-slate-300">-</span>)}</td>
+                                <td className="p-4 text-right">{s.lastActive ? (<span className="text-xs font-mono text-slate-500">{new Date(s.lastActive).toLocaleDateString()} <br/><span className="text-[9px] opacity-70">{new Date(s.lastActive).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span></span>) : (<span className="text-xs text-slate-300 italic">Never</span>)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+  );
+}
+
+function ClassManagerView({ user, classes, lessons, allDecks }: any) {
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  const [newClassName, setNewClassName] = useState('');
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [targetStudentMode, setTargetStudentMode] = useState('all'); 
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
+  const [assignType, setAssignType] = useState<'deck' | 'lesson'>('lesson');
+  const [viewTab, setViewTab] = useState<'content' | 'forum' | 'analytics'>('content');
+  const [isStudentListOpen, setIsStudentListOpen] = useState(false);
+  const [availableStudents, setAvailableStudents] = useState<any[]>([]);
+  const [studentSearch, setStudentSearch] = useState('');
+  
+  const selectedClass = classes.find((c: any) => c.id === selectedClassId);
+
+  useEffect(() => {
+    if (isStudentListOpen) {
+        const q = query(collectionGroup(db, 'profile'), where('role', '==', 'student'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setAvailableStudents(snapshot.docs.map(doc => ({ ...doc.data() })));
+        });
+        return () => unsubscribe();
+    }
+  }, [isStudentListOpen]);
+
+  const createClass = async (e: any) => { e.preventDefault(); if (!newClassName.trim()) return; try { await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), { name: newClassName, code: Math.random().toString(36).substring(2, 8).toUpperCase(), students: [], studentEmails: [], assignments: [], created: Date.now() }); setNewClassName(''); setToastMsg("Class Created Successfully"); } catch (error) { console.error("Create class failed:", error); alert("Failed to create class."); } };
+  const handleDeleteClass = async (id: string) => { if (window.confirm("Delete this class?")) { try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id)); if (selectedClassId === id) setSelectedClassId(null); } catch (error) { console.error("Delete class failed:", error); alert("Failed to delete class."); } } };
+  const handleRenameClass = async (classId: string, currentName: string) => { const newName = prompt("Enter new class name:", currentName); if (newName && newName.trim() !== "" && newName !== currentName) { try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { name: newName.trim() }); setToastMsg("Class renamed successfully"); } catch (error) { console.error("Rename failed", error); alert("Failed to rename class"); } } };
+  
+  const toggleAssignee = (email: string) => { if (selectedAssignees.includes(email)) { setSelectedAssignees(selectedAssignees.filter(e => e !== email)); } else { setSelectedAssignees([...selectedAssignees, email]); } };
+  const assignContent = async (item: any, type: string) => { if (!selectedClass) return; try { const assignment = JSON.parse(JSON.stringify({ ...item, id: `assign_${Date.now()}_${Math.random().toString(36).substr(2,5)}`, originalId: item.id, contentType: type, targetStudents: targetStudentMode === 'specific' ? selectedAssignees : null })); await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { assignments: arrayUnion(assignment) }); setAssignModalOpen(false); setTargetStudentMode('all'); setSelectedAssignees([]); setToastMsg(`Assigned: ${item.title}`); } catch (error) { console.error("Assign failed:", error); alert("Failed to assign."); } };
+
+  const addStudentToClass = async (email: string) => {
+      if (!selectedClass || !email) return;
+      const normalizedEmail = email.toLowerCase().trim();
+      if (selectedClass.studentEmails?.includes(normalizedEmail)) return;
+      try {
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { students: arrayUnion(normalizedEmail), studentEmails: arrayUnion(normalizedEmail) });
+          setToastMsg(`Added ${normalizedEmail}`);
+      } catch (error) { console.error("Add student failed:", error); alert("Failed to add student."); }
+  };
+
+  if (selectedClass) {
+    return (
+      <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-300 relative">
+        {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
+        <div className="pb-6 border-b border-slate-100 mb-6">
+          <button onClick={() => setSelectedClassId(null)} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Classes</button>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+            <div><h1 className="text-2xl font-bold text-slate-900">{selectedClass.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {selectedClass.code}</p></div>
+            <div className="flex gap-2">
+                <button onClick={() => setViewTab('content')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'content' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Manage</button>
+                <button onClick={() => setViewTab('analytics')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'analytics' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Analytics</button>
+                <button onClick={() => setViewTab('forum')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'forum' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Forum</button>
+                {viewTab === 'content' && (
+                    <>
+                    <button onClick={() => { setAssignType('lesson'); setAssignModalOpen(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-indigo-700 active:scale-95 transition-all uppercase tracking-wider"><BookOpen size={16}/> ASSIGN LESSON</button>
+                    <button onClick={() => { setAssignType('deck'); setAssignModalOpen(true); }} className="bg-orange-500 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-orange-600 active:scale-95 transition-all uppercase tracking-wider"><Layers size={16}/> ASSIGN DECK</button>
+                    </>
+                )}
+            </div>
+          </div>
+        </div>
+
+        {viewTab === 'content' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                    <h3 className="font-bold text-slate-800 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3>
+                    {(!selectedClass.assignments || selectedClass.assignments.length === 0) && <div className="p-6 border-2 border-dashed border-slate-200 rounded-xl text-center text-slate-400 text-sm">No content assigned yet.</div>}
+                    {selectedClass.assignments?.map((l: any, idx: number) => ( <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center"><div className="flex items-center gap-3"><div className={`p-2 rounded-lg ${l.contentType === 'deck' ? 'bg-orange-100 text-orange-600' : 'bg-indigo-100 text-indigo-600'}`}>{l.contentType === 'deck' ? <Layers size={18} /> : <FileText size={18} />}</div><div><h4 className="font-bold text-slate-800">{l.title}</h4><div className="flex items-center gap-2"><span className="text-[10px] text-slate-500 uppercase">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Lesson'}</span>{l.targetStudents && l.targetStudents.length > 0 && (<span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold flex items-center gap-1"><Users size={10}/> {l.targetStudents.length} Students</span>)}</div></div></div><span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded text-xs font-bold">Active</span></div> ))}
+                </div>
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center"><h3 className="font-bold text-slate-800 flex items-center gap-2"><Users size={18} className="text-indigo-600"/> Roster</h3><button onClick={() => setIsStudentListOpen(true)} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"><UserPlus size={14}/> Add Students</button></div>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">{(!selectedClass.students || selectedClass.students.length === 0) && <div className="p-4 text-center text-slate-400 text-sm italic">No students joined yet.</div>}{selectedClass.students?.map((s: string, i: number) => (<div key={i} className="p-3 border-b border-slate-50 last:border-0 flex items-center gap-3"><div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs">{s.charAt(0)}</div><span className="text-sm font-medium text-slate-700">{s}</span></div>))}</div>
+                </div>
+            </div>
+        )}
+        
+        {viewTab === 'forum' && (
+            <div className="h-full pb-20">
+                <ClassForum classId={selectedClass.id} user={user} userData={{...userData, role: 'instructor'}} />
+            </div>
+        )}
+
+        {viewTab === 'analytics' && (
+            <div className="h-full pb-20">
+                <ClassAnalytics classData={selectedClass} />
+            </div>
+        )}
+
+        {isStudentListOpen && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[80vh] flex flex-col animate-in zoom-in duration-200">
+                    <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center"><h3 className="font-bold text-lg">Select Students</h3><button onClick={() => setIsStudentListOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-600"/></button></div>
+                    <div className="p-4 border-b border-slate-100"><div className="relative"><Search className="absolute left-3 top-2.5 text-slate-400" size={16} /><input value={studentSearch} onChange={(e) => setStudentSearch(e.target.value)} placeholder="Search by name or email..." className="w-full pl-9 p-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" autoFocus /></div></div>
+                    <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+                        {availableStudents.length === 0 ? (<div className="text-center py-8 text-slate-400">Loading students...</div>) : (availableStudents.filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()) || s.email.toLowerCase().includes(studentSearch.toLowerCase())).map((student, idx) => { const isAdded = selectedClass.students?.includes(student.email); return ( <div key={idx} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors border-b border-slate-50 last:border-0"><div className="flex items-center gap-3"><div className="w-8 h-8 bg-slate-200 text-slate-600 rounded-full flex items-center justify-center font-bold text-xs">{student.name.charAt(0)}</div><div><p className="text-sm font-bold text-slate-800">{student.name}</p><p className="text-xs text-slate-500">{student.email}</p></div></div><button onClick={() => addStudentToClass(student.email)} disabled={isAdded} className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${isAdded ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>{isAdded ? 'Joined' : 'Add'}</button></div> ) }))}
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {assignModalOpen && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in duration-200">
+              <div className="p-4 border-b border-slate-100 bg-slate-50">
+                  <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">Assign {assignType === 'deck' ? 'Flashcard Deck' : 'Lesson'}</h3><button onClick={() => setAssignModalOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-600"/></button></div>
+                  <div className="bg-white p-1 rounded-lg border border-slate-200 flex mb-2"><button onClick={() => setTargetStudentMode('all')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${targetStudentMode === 'all' ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Entire Class</button><button onClick={() => setTargetStudentMode('specific')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${targetStudentMode === 'specific' ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Specific Students</button></div>
+                  {targetStudentMode === 'specific' && (<div className="mt-2 max-h-32 overflow-y-auto border border-slate-200 rounded-lg bg-white p-2 custom-scrollbar">{(!selectedClass.students || selectedClass.students.length === 0) ? (<p className="text-xs text-slate-400 italic text-center p-2">No students in roster.</p>) : (selectedClass.students.map((studentEmail: string) => (<button key={studentEmail} onClick={() => toggleAssignee(studentEmail)} className="flex items-center gap-2 w-full p-2 hover:bg-slate-50 rounded text-left">{selectedAssignees.includes(studentEmail) ? <CheckCircle2 size={16} className="text-indigo-600"/> : <Circle size={16} className="text-slate-300"/>}<span className="text-xs font-medium text-slate-700 truncate">{studentEmail}</span></button>)))}</div>)}
+                  {targetStudentMode === 'specific' && <p className="text-[10px] text-slate-400 mt-2 text-right">{selectedAssignees.length} selected</p>}
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                  {assignType === 'deck' && (<div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><Layers size={14}/> Available Decks</h4><div className="space-y-2">{Object.keys(allDecks || {}).length === 0 ? <p className="text-sm text-slate-400 italic">No decks found.</p> : Object.entries(allDecks).map(([key, deck]: any) => (<button key={key} onClick={() => assignContent({ ...deck, id: key }, 'deck')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{deck.title}</h4><p className="text-xs text-slate-500">{deck.cards?.length || 0} Cards</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-orange-500"/></button>))}</div></div>)}
+                  {assignType === 'lesson' && (<div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><BookOpen size={14}/> Available Lessons</h4><div className="space-y-2">{lessons.length === 0 ? <p className="text-sm text-slate-400 italic">No lessons found.</p> : lessons.map((l: any) => (<button key={l.id} onClick={() => assignContent(l, 'lesson')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-indigo-500"/></button>))}</div></div>)}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500 relative">
+      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
+      <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-slate-800">My Classes</h2><form onSubmit={createClass} className="flex gap-2"><input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="New Class Name" className="p-2 rounded-lg border border-slate-200 text-sm w-64" /><button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2"><Plus size={16}/> Create</button></form></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{classes.map((cls: any) => (<div key={cls.id} onClick={() => setSelectedClassId(cls.id)} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative group"><div className="absolute top-4 right-4 flex gap-2"><button onClick={(e) => {e.stopPropagation(); handleRenameClass(cls.id, cls.name);}} className="text-slate-300 hover:text-indigo-500"><Edit3 size={16}/></button><button onClick={(e) => {e.stopPropagation(); handleDeleteClass(cls.id);}} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button></div><div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4 font-bold text-lg">{cls.name.charAt(0)}</div><h3 className="font-bold text-lg text-slate-900">{cls.name}</h3><p className="text-sm text-slate-500 mb-4">{(cls.students || []).length} Students</p><div className="flex items-center justify-between bg-slate-50 p-2 rounded-lg"><span className="text-xs font-mono font-bold text-slate-600 tracking-wider">{cls.code}</span><button className="text-indigo-600 text-xs font-bold flex items-center gap-1" onClick={(e) => {e.stopPropagation(); navigator.clipboard.writeText(cls.code);}}><Copy size={12}/> Copy</button></div></div>))}</div>
+    </div>
+  );
+}
 function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, onLogout }: any) {
   const [activeTab, setActiveTab] = useState('dashboard');
   
