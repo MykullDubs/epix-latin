@@ -1936,9 +1936,9 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
   const [targetStudentMode, setTargetStudentMode] = useState('all'); 
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   
-  // UPDATED: Added 'test' to the allowed types
   const [assignType, setAssignType] = useState<'deck' | 'lesson' | 'test'>('lesson');
-  const [viewTab, setViewTab] = useState<'content' | 'forum' | 'analytics'>('content');
+  // REMOVED 'analytics' from the allowed types here
+  const [viewTab, setViewTab] = useState<'content' | 'forum'>('content');
 
   // -- Student Selector States --
   const [isStudentListOpen, setIsStudentListOpen] = useState(false);
@@ -1984,15 +1984,14 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
             <div><h1 className="text-2xl font-bold text-slate-900">{selectedClass.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {selectedClass.code}</p></div>
             <div className="flex gap-2">
                 <button onClick={() => setViewTab('content')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'content' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Manage</button>
-                <button onClick={() => setViewTab('analytics')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'analytics' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Analytics</button>
                 <button onClick={() => setViewTab('forum')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'forum' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Forum</button>
                 
                 {viewTab === 'content' && (
                     <>
                     <button onClick={() => { setAssignType('lesson'); setAssignModalOpen(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-indigo-700 active:scale-95 transition-all uppercase tracking-wider"><BookOpen size={16}/> ASSIGN LESSON</button>
                     <button onClick={() => { setAssignType('deck'); setAssignModalOpen(true); }} className="bg-orange-500 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-orange-600 active:scale-95 transition-all uppercase tracking-wider"><Layers size={16}/> ASSIGN DECK</button>
-                    {/* --- NEW BUTTON: ASSIGN EXAM --- */}
-                    <button onClick={() => { setAssignType('test'); setAssignModalOpen(true); }} className="bg-rose-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-rose-700 active:scale-95 transition-all uppercase tracking-wider"><FileQuestion size={16}/> ASSIGN EXAM</button>
+                    {/* Replaced FileQuestion with HelpCircle */}
+                    <button onClick={() => { setAssignType('test'); setAssignModalOpen(true); }} className="bg-rose-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-rose-700 active:scale-95 transition-all uppercase tracking-wider"><HelpCircle size={16}/> ASSIGN EXAM</button>
                     </>
                 )}
             </div>
@@ -2007,9 +2006,9 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                     {selectedClass.assignments?.map((l: any, idx: number) => ( 
                       <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
                         <div className="flex items-center gap-3">
-                          {/* Dynamic Icon Based on Content Type */}
+                          {/* Replaced FileQuestion with HelpCircle */}
                           <div className={`p-2 rounded-lg ${l.contentType === 'deck' ? 'bg-orange-100 text-orange-600' : l.contentType === 'test' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                              {l.contentType === 'deck' ? <Layers size={18} /> : l.contentType === 'test' ? <FileQuestion size={18}/> : <FileText size={18} />}
+                              {l.contentType === 'deck' ? <Layers size={18} /> : l.contentType === 'test' ? <HelpCircle size={18}/> : <FileText size={18} />}
                           </div>
                           <div>
                               <h4 className="font-bold text-slate-800">{l.title}</h4>
@@ -2038,11 +2037,7 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
             </div>
         )}
 
-        {viewTab === 'analytics' && (
-            <div className="h-full pb-20">
-                <ClassAnalytics classData={selectedClass} />
-            </div>
-        )}
+        {/* REMOVED ANALYTICS TAB CONTENT BLOCK */}
 
         {isStudentListOpen && (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -2050,7 +2045,29 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                     <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center"><h3 className="font-bold text-lg">Select Students</h3><button onClick={() => setIsStudentListOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-600"/></button></div>
                     <div className="p-4 border-b border-slate-100"><div className="relative"><Search className="absolute left-3 top-2.5 text-slate-400" size={16} /><input value={studentSearch} onChange={(e) => setStudentSearch(e.target.value)} placeholder="Search by name or email..." className="w-full pl-9 p-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" autoFocus /></div></div>
                     <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
-                        {availableStudents.length === 0 ? (<div className="text-center py-8 text-slate-400">Loading students...</div>) : (availableStudents.filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()) || s.email.toLowerCase().includes(studentSearch.toLowerCase())).map((student, idx) => { const isAdded = selectedClass.students?.includes(student.email); return ( <div key={idx} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors border-b border-slate-50 last:border-0"><div className="flex items-center gap-3"><div className="w-8 h-8 bg-slate-200 text-slate-600 rounded-full flex items-center justify-center font-bold text-xs">{student.name.charAt(0)}</div><div><p className="text-sm font-bold text-slate-800">{student.name}</p><p className="text-xs text-slate-500">{student.email}</p></div></div><button onClick={() => addStudentToClass(student.email)} disabled={isAdded} className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${isAdded ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>{isAdded ? 'Joined' : 'Add'}</button></div> ) }))}
+                        {availableStudents.length === 0 ? (
+                            <div className="text-center py-8 text-slate-400">Loading students...</div>
+                        ) : (
+                            availableStudents
+                            .filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()) || s.email.toLowerCase().includes(studentSearch.toLowerCase()))
+                            .map((student, idx) => { 
+                                const isAdded = selectedClass.students?.includes(student.email); 
+                                return ( 
+                                    <div key={idx} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors border-b border-slate-50 last:border-0">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 bg-slate-200 text-slate-600 rounded-full flex items-center justify-center font-bold text-xs">{student.name.charAt(0)}</div>
+                                            <div>
+                                                <p className="text-sm font-bold text-slate-800">{student.name}</p>
+                                                <p className="text-xs text-slate-500">{student.email}</p>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => addStudentToClass(student.email)} disabled={isAdded} className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${isAdded ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
+                                            {isAdded ? 'Joined' : 'Add'}
+                                        </button>
+                                    </div> 
+                                ) 
+                            })
+                        )}
                     </div>
                 </div>
             </div>
@@ -2084,7 +2101,7 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                       </div>
                   )}
                   
-                  {/* UPDATED: Filter out 'test' type here so lessons aren't cluttered */}
+                  {/* Filter out 'test' type here so lessons aren't cluttered */}
                   {assignType === 'lesson' && (
                       <div>
                           <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><BookOpen size={14}/> Available Lessons</h4>
@@ -2102,7 +2119,7 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                   {/* --- NEW SECTION: EXAMS --- */}
                   {assignType === 'test' && (
                       <div>
-                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><FileQuestion size={14}/> Available Exams</h4>
+                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><HelpCircle size={14}/> Available Exams</h4>
                           <div className="space-y-2">
                               {lessons.filter((l:any) => l.type === 'test').length === 0 ? <p className="text-sm text-slate-400 italic">No exams found.</p> : lessons.filter((l:any) => l.type === 'test').map((l: any) => (
                                   <button key={l.id} onClick={() => assignContent(l, 'test')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-rose-500 hover:bg-rose-50 transition-all group flex justify-between items-center">
