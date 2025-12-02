@@ -1698,7 +1698,7 @@ function TestPlayerView({ test, onFinish }: any) {
   
   const questions = test.questions || [];
   
-  // --- SAFETY CHECK ---
+  // Safety check for empty exams
   if (questions.length === 0) {
       return (
           <div className="h-full flex flex-col bg-slate-50">
@@ -1722,11 +1722,14 @@ function TestPlayerView({ test, onFinish }: any) {
 
   return (
     <div className="h-full flex flex-col bg-slate-50">
+      {/* Header */}
       <div className="bg-white p-4 border-b border-slate-200 sticky top-0 z-20">
           <div className="flex justify-between items-center mb-2"><h2 className="font-bold text-slate-800 truncate">{test.title}</h2><button onClick={() => onFinish(null, 0)}><X/></button></div>
           <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden"><div className="bg-indigo-500 h-full transition-all duration-500" style={{ width: `${progress}%` }} /></div>
       </div>
-      <div className="flex-1 overflow-y-auto p-6 pb-32">
+
+      {/* Content Area */}
+      <div className="flex-1 overflow-y-auto p-6 pb-6 custom-scrollbar">
           {!isSubmitted ? (
               <div className="animate-in slide-in-from-right-8 duration-300" key={currentIndex}>
                   <div className="bg-indigo-50 inline-block px-3 py-1 rounded-lg text-indigo-700 font-bold text-xs mb-4 uppercase">Question {currentIndex + 1} of {questions.length}</div>
@@ -1744,10 +1747,14 @@ function TestPlayerView({ test, onFinish }: any) {
               </div>
           )}
       </div>
+
+      {/* Footer Navigation - NOW FLEXBOX (Not Fixed) */}
       {!isSubmitted && (
-          <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200 z-20 flex gap-4 max-w-md mx-auto">
-              <button disabled={currentIndex === 0} onClick={() => setCurrentIndex(prev => prev - 1)} className="px-6 py-3 rounded-xl font-bold text-slate-500 disabled:opacity-50">Prev</button>
-              {currentIndex < questions.length - 1 ? ( <button onClick={() => setCurrentIndex(prev => prev + 1)} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-bold">Next</button> ) : ( <button onClick={handleSubmit} className="flex-1 bg-emerald-500 text-white py-3 rounded-xl font-bold">Submit Exam</button> )}
+          <div className="p-4 bg-white border-t border-slate-200 z-20 shrink-0">
+              <div className="flex gap-4 mx-auto w-full">
+                  <button disabled={currentIndex === 0} onClick={() => setCurrentIndex(prev => prev - 1)} className="px-6 py-3 rounded-xl font-bold text-slate-500 disabled:opacity-50 bg-slate-100">Prev</button>
+                  {currentIndex < questions.length - 1 ? ( <button onClick={() => setCurrentIndex(prev => prev + 1)} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-bold">Next</button> ) : ( <button onClick={handleSubmit} className="flex-1 bg-emerald-500 text-white py-3 rounded-xl font-bold">Submit Exam</button> )}
+              </div>
           </div>
       )}
     </div>
