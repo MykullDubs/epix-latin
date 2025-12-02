@@ -1877,7 +1877,7 @@ function TestPlayerView({ test, onFinish }: any) {
 function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allDecks }: any) {
   const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
   const [mode, setMode] = useState('card'); 
-  const [subView, setSubView] = useState('menu'); // menu | library | editor | import
+  const [subView, setSubView] = useState('menu'); 
   const [editingItem, setEditingItem] = useState<any>(null);
   const [jsonInput, setJsonInput] = useState('');
   const [importType, setImportType] = useState('lesson');
@@ -1995,9 +1995,9 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
         
         {(subView === 'menu' || subView === 'editor') && (
              <div className="px-6 mt-2">
-                <div className="flex bg-slate-200 p-1 rounded-xl">
-                    <button onClick={() => { setMode('card'); setEditingItem(null); setSubView('editor'); }} className={`flex-1 py-2 text-sm font-bold rounded-lg ${mode === 'card' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Flashcard</button>
-                    <button onClick={() => { setMode('lesson'); setEditingItem(null); setSubView('editor'); }} className={`flex-1 py-2 text-sm font-bold rounded-lg ${mode === 'lesson' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Full Lesson</button>
+                <div className="flex bg-slate-200 p-1 rounded-xl gap-1">
+                    <button onClick={() => { setMode('card'); setEditingItem(null); setSubView('editor'); }} className={`flex-1 py-2 text-xs font-bold rounded-lg ${mode === 'card' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Flashcard</button>
+                    <button onClick={() => { setMode('lesson'); setEditingItem(null); setSubView('editor'); }} className={`flex-1 py-2 text-xs font-bold rounded-lg ${mode === 'lesson' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Lesson</button>
                     <button onClick={() => { setMode('test'); setEditingItem(null); setSubView('editor'); }} className={`flex-1 py-2 text-xs font-bold rounded-lg ${mode === 'test' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Exam</button>
                 </div>
             </div>
@@ -2022,13 +2022,13 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                     availableDecks={allDecks} 
                 />
             )}
-          {subView === 'editor' && mode === 'test' && (
-    <TestBuilderView 
-        initialData={editingItem}
-        onSave={(data: any) => onSaveLesson({...data, contentType: 'test'}, editingItem?.id)} // Reusing onSaveLesson as it saves to the same collection structure
-        onCancel={() => setSubView('menu')}
-    />
-)}
+            {subView === 'editor' && mode === 'test' && (
+                <TestBuilderView 
+                    initialData={editingItem}
+                    onSave={(data: any) => onSaveLesson({...data, contentType: 'test'}, editingItem?.id)} 
+                    onCancel={() => setSubView('menu')}
+                />
+            )}
         </div>
     </div>
   );
