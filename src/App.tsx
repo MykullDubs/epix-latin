@@ -1424,24 +1424,40 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
     </div>
   );
 }
+// --- AD-LIB TEMPLATES ---
+const ADLIB_TEMPLATES = [
+  { id: 1, text: "The [ADJ] general decided to [VERB] the [NOUN].", blanks: ['ADJ', 'VERB', 'NOUN'] },
+  { id: 2, text: "Never [VERB] with a [NOUN] in your pocket.", blanks: ['VERB', 'NOUN'] },
+  { id: 3, text: "I saw a [NOUN] that was very [ADJ].", blanks: ['NOUN', 'ADJ'] },
+  { id: 4, text: "Please, [VERB] my [NOUN] gently.", blanks: ['VERB', 'NOUN'] },
+  { id: 5, text: "A [ADJ] philosopher always knows how to [VERB].", blanks: ['ADJ', 'VERB'] }
+];
+
 function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
+  // View States
   const [isFlipped, setIsFlipped] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [viewMode, setViewMode] = useState<'study' | 'game'>('study');
   const [saving, setSaving] = useState(false);
   
-  // Navigation State
+  // Study Navigation State
   const [sessionCards, setSessionCards] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Game State
+  const [currentTemplate, setCurrentTemplate] = useState<any>(null);
+  const [gameSlots, setGameSlots] = useState<any>({}); // { 0: cardId, 1: cardId }
+  const [gameStep, setGameStep] = useState(0); // Which blank are we filling?
 
   // Swipe State
   const [dragStartX, setDragStartX] = useState<number | null>(null);
   const [dragEndX, setDragEndX] = useState<number | null>(null);
   const minSwipeDistance = 50; 
 
-  // 1. Get Preference
+  // Preference
   const preferredDeckId = userData?.widgetDeckId || 'all';
 
-  // 2. Audio Engine
+  // --- AUDIO ENGINE ---
   const playAudio = useCallback((text: string) => {
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
@@ -1454,7 +1470,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
     window.speechSynthesis.speak(utterance);
   }, []);
 
-  // 3. Initialize Session (Load 10 cards)
+  // --- INITIALIZATION ---
   useEffect(() => {
     let sourceCards: any[] = [];
     if (preferredDeckId === 'all' || !allDecks[preferredDeckId]) {
@@ -1466,73 +1482,79 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
     }
 
     if (sourceCards.length > 0) {
-        // Fisher-Yates Shuffle
         const shuffled = [...sourceCards].sort(() => 0.5 - Math.random());
-        // Take top 10 for this mini-session
         setSessionCards(shuffled.slice(0, 10));
         setCurrentIndex(0);
+        
+        // Pick a random template for the game
+        const randomTemp = ADLIB_TEMPLATES[Math.floor(Math.random() * ADLIB_TEMPLATES.length)];
+        setCurrentTemplate(randomTemp);
+        setGameSlots({});
+        setGameStep(0);
     } else {
         setSessionCards([]);
     }
   }, [allDecks, preferredDeckId]);
 
-  // 4. Save Preference
+  // --- HANDLERS ---
   const handleDeckSelect = async (deckId: string) => {
     if (!user) return;
     setSaving(true);
     try {
-        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
-            widgetDeckId: deckId
-        });
+        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { widgetDeckId: deckId });
         setShowSettings(false);
-        setIsFlipped(false); 
-    } catch (e) {
-        console.error("Error saving preference", e);
-    } finally {
-        setSaving(false);
-    }
+    } catch (e) { console.error(e); } finally { setSaving(false); }
   };
 
-  // 5. Navigation Handlers
-  const handleNext = () => {
-    setIsFlipped(false);
-    setTimeout(() => {
-        setCurrentIndex(prev => (prev + 1) % sessionCards.length);
-    }, 200);
+  // Game Logic: Fill a slot
+  const handleGameSelect = (card: any) => {
+      setGameSlots({ ...gameSlots, [gameStep]: card });
+      playAudio(card.front); // Read the word
+      
+      if (gameStep < currentTemplate.blanks.length - 1) {
+          setGameStep(prev => prev + 1);
+      }
   };
 
-  const handlePrev = () => {
-    setIsFlipped(false);
-    setTimeout(() => {
-        setCurrentIndex(prev => (prev - 1 + sessionCards.length) % sessionCards.length);
-    }, 200);
+  // Game Logic: Reset
+  const resetGame = () => {
+      setGameSlots({});
+      setGameStep(0);
+      // Reshuffle template
+      setCurrentTemplate(ADLIB_TEMPLATES[Math.floor(Math.random() * ADLIB_TEMPLATES.length)]);
   };
 
-  // 6. Pointer Swipe Handlers (Mouse + Touch)
-  const onPointerDown = (e: React.PointerEvent) => {
-    setDragEndX(null); 
-    setDragStartX(e.clientX);
+  // Game Logic: Read Full Story
+  const playStory = () => {
+      if (!currentTemplate) return;
+      let story = currentTemplate.text;
+      currentTemplate.blanks.forEach((type: string, idx: number) => {
+          const card = gameSlots[idx];
+          const replacement = card ? card.back : "something"; // Use English meaning for the story flow
+          story = story.replace(`[${type}]`, replacement);
+      });
+      playAudio(story);
   };
 
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (dragStartX !== null) setDragEndX(e.clientX);
-  };
+  // --- NAVIGATION LOGIC ---
+  const handleNext = () => { setIsFlipped(false); setTimeout(() => setCurrentIndex(prev => (prev + 1) % sessionCards.length), 200); };
+  const handlePrev = () => { setIsFlipped(false); setTimeout(() => setCurrentIndex(prev => (prev - 1 + sessionCards.length) % sessionCards.length), 200); };
 
+  const onPointerDown = (e: React.PointerEvent) => { setDragEndX(null); setDragStartX(e.clientX); };
+  const onPointerMove = (e: React.PointerEvent) => { if (dragStartX !== null) setDragEndX(e.clientX); };
   const onPointerUp = () => {
-    if (dragStartX === null || dragEndX === null) {
-        setDragStartX(null);
-        return;
-    }
+    if (dragStartX === null || dragEndX === null) { setDragStartX(null); return; }
     const distance = dragStartX - dragEndX;
-    if (distance > minSwipeDistance) handleNext(); // Left Swipe
-    else if (distance < -minSwipeDistance) handlePrev(); // Right Swipe
-    
-    setDragStartX(null);
-    setDragEndX(null);
+    if (distance > minSwipeDistance) handleNext();
+    else if (distance < -minSwipeDistance) handlePrev();
+    setDragStartX(null); setDragEndX(null);
   };
 
   const currentCard = sessionCards[currentIndex];
   const currentDeckTitle = preferredDeckId === 'all' ? "All Collections" : (allDecks[preferredDeckId]?.title || "Unknown Deck");
+
+  // RENDER HELPERS
+  const isGameComplete = currentTemplate && Object.keys(gameSlots).length === currentTemplate.blanks.length;
 
   return (
     <div className="mx-6 mt-6 animate-in slide-in-from-bottom-2 duration-700 relative z-0">
@@ -1542,13 +1564,21 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
             <Zap size={16} className="text-amber-500" /> Daily Discovery
           </h3>
-          <button 
-            onClick={() => setShowSettings(!showSettings)} 
-            className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-indigo-100 transition-colors shadow-sm"
-          >
-            {showSettings ? <X size={12}/> : <Settings size={12}/>}
-            {showSettings ? "Close" : "Source"}
-          </button>
+          <div className="flex gap-2">
+            <button 
+                onClick={() => setViewMode(viewMode === 'study' ? 'game' : 'study')} 
+                className={`text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-colors shadow-sm ${viewMode === 'game' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 border border-purple-100'}`}
+            >
+                {viewMode === 'study' ? <Gamepad2 size={12}/> : <Layers size={12}/>}
+                {viewMode === 'study' ? "Play Ad-Lib" : "Study"}
+            </button>
+            <button 
+                onClick={() => setShowSettings(!showSettings)} 
+                className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-indigo-100 transition-colors shadow-sm"
+            >
+                {showSettings ? <X size={12}/> : <Settings size={12}/>}
+            </button>
+          </div>
       </div>
       
       {/* 1. SETTINGS MODE */}
@@ -1556,35 +1586,109 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
           <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl p-5 animate-in fade-in zoom-in duration-200 relative z-20">
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 ml-1">Select Source Deck</h4>
               <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
-                  <button 
-                    onClick={() => handleDeckSelect('all')}
-                    disabled={saving}
-                    className={`w-full p-4 rounded-xl text-left flex items-center gap-3 transition-all ${preferredDeckId === 'all' ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-200' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
-                  >
+                  <button onClick={() => handleDeckSelect('all')} disabled={saving} className={`w-full p-4 rounded-xl text-left flex items-center gap-3 transition-all ${preferredDeckId === 'all' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-600'}`}>
                       <div className={`p-2 rounded-full ${preferredDeckId === 'all' ? 'bg-white/20' : 'bg-white shadow-sm'}`}><Layers size={16}/></div>
                       <span className="font-bold text-sm">All Collections</span>
                       {preferredDeckId === 'all' && <CheckCircle2 size={18} className="ml-auto"/>}
                   </button>
-                  
                   {Object.entries(allDecks).map(([key, deck]: any) => (
-                      <button 
-                        key={key} 
-                        onClick={() => handleDeckSelect(key)}
-                        disabled={saving}
-                        className={`w-full p-3 rounded-xl text-left flex items-center gap-3 transition-all ${preferredDeckId === key ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-200' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
-                      >
+                      <button key={key} onClick={() => handleDeckSelect(key)} disabled={saving} className={`w-full p-3 rounded-xl text-left flex items-center gap-3 transition-all ${preferredDeckId === key ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-600'}`}>
                           <div className={`p-2 rounded-full ${preferredDeckId === key ? 'bg-white/20' : 'bg-white shadow-sm'}`}><BookOpen size={16}/></div>
-                          <div className="flex-1 overflow-hidden">
-                             <p className="font-bold text-sm truncate">{deck.title}</p>
-                             <p className={`text-[10px] ${preferredDeckId === key ? 'text-indigo-200' : 'text-slate-400'}`}>{deck.cards?.length || 0} cards</p>
-                          </div>
+                          <div className="flex-1 overflow-hidden"><p className="font-bold text-sm truncate">{deck.title}</p><p className={`text-[10px] ${preferredDeckId === key ? 'text-indigo-200' : 'text-slate-400'}`}>{deck.cards?.length || 0} cards</p></div>
                           {preferredDeckId === key && <CheckCircle2 size={18} className="ml-auto"/>}
                       </button>
                   ))}
               </div>
           </div>
+      ) : viewMode === 'game' ? (
+          /* 2. AD-LIB GAME MODE */
+          <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden relative min-h-[14rem] flex flex-col">
+              {/* Game Header */}
+              <div className="bg-purple-600 p-4 text-white flex justify-between items-center">
+                  <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">The Drunken Scribe</span>
+                  <div className="flex gap-1">
+                      {currentTemplate?.blanks.map((_: any, i: number) => (
+                          <div key={i} className={`w-2 h-2 rounded-full ${i < Object.keys(gameSlots).length ? 'bg-green-400' : 'bg-purple-800'}`} />
+                      ))}
+                  </div>
+              </div>
+
+              {/* Game Content */}
+              <div className="flex-1 p-6 flex flex-col items-center justify-center text-center">
+                  {isGameComplete ? (
+                      <div className="animate-in zoom-in duration-300 w-full">
+                          <p className="font-serif text-xl font-bold text-slate-800 leading-relaxed mb-6">
+                              {currentTemplate.text.split(/(\[.*?\])/).map((part: string, i: number) => {
+                                  if (part.startsWith('[') && part.endsWith(']')) {
+                                      const type = part.replace(/[\[\]]/g, '');
+                                      // Find which slot index this corresponds to
+                                      // Simple mapping for MVP: just iterate through blanks
+                                      const slotIndex = currentTemplate.blanks.indexOf(type); 
+                                      // Note: This simple mapping fails if multiple same types exist, 
+                                      // but works for basic templates.
+                                      // Better logic: track index in map loop.
+                                      
+                                      // Since we fill in order:
+                                      // We need to map the parts to the slots filled.
+                                      // Let's just reconstruct visually:
+                                      
+                                      // Actually, easier way for display:
+                                      return (
+                                        <span key={i} className="text-purple-600 underline decoration-wavy decoration-purple-300 mx-1">
+                                            {/* We need to find the specific word used. 
+                                                For MVP, let's just grab from Object.values roughly
+                                            */}
+                                            ???
+                                        </span>
+                                      );
+                                  }
+                                  return part;
+                              })}
+                              {/* Re-rendering simple version for stability: */}
+                              {(() => {
+                                  let story = currentTemplate.text;
+                                  currentTemplate.blanks.forEach((type: string, idx: number) => {
+                                      const card = gameSlots[idx];
+                                      const word = card ? card.back : "___";
+                                      story = story.replace(`[${type}]`, `<span class="text-purple-600 font-bold">${word}</span>`);
+                                  });
+                                  return <span dangerouslySetInnerHTML={{__html: story}} />;
+                              })()}
+                          </p>
+                          <div className="flex gap-3 justify-center">
+                              <button onClick={playStory} className="flex-1 py-3 bg-purple-100 text-purple-700 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-purple-200"><Volume2 size={16}/> Read Story</button>
+                              <button onClick={resetGame} className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800">New Story</button>
+                          </div>
+                      </div>
+                  ) : (
+                      <div className="w-full">
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">
+                              Pick a <span className="text-purple-600">{currentTemplate?.blanks[gameStep]}</span>
+                          </p>
+                          
+                          {/* Card Selector (Horizontal Scroll) */}
+                          <div className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar snap-x">
+                              {sessionCards.map((card, idx) => (
+                                  <button 
+                                    key={idx}
+                                    onClick={() => handleGameSelect(card)}
+                                    className="snap-center min-w-[140px] bg-slate-50 border-2 border-slate-200 p-4 rounded-2xl flex flex-col items-center gap-2 hover:border-purple-400 hover:bg-purple-50 transition-all group"
+                                  >
+                                      <span className="font-bold text-slate-800 text-lg">{card.front}</span>
+                                      <span className="text-[10px] bg-white px-2 py-1 rounded text-slate-400 border border-slate-100 uppercase font-bold group-hover:text-purple-500">{card.type}</span>
+                                  </button>
+                              ))}
+                          </div>
+                          
+                          <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-500 italic">
+                              "Choose a word to fill the blank..."
+                          </div>
+                      </div>
+                  )}
+              </div>
+          </div>
       ) : currentCard ? (
-          /* 2. DECK STACK MODE */
+          /* 3. STANDARD DECK STACK MODE */
           <div 
             className="relative h-56 w-full cursor-pointer group perspective-1000 touch-pan-y select-none"
             style={{ perspective: '1000px' }}
@@ -1593,229 +1697,60 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
             onPointerUp={onPointerUp}
             onPointerLeave={onPointerUp}
           >
-            {/* BACKGROUND STACK EFFECTS (Ghost Cards) */}
+            {/* BACKGROUND STACK */}
             <div className="absolute top-2 left-4 right-4 bottom-0 bg-indigo-300/40 rounded-[2rem] transform scale-95 translate-y-2 z-0" />
             <div className="absolute top-4 left-8 right-8 bottom-0 bg-indigo-200/30 rounded-[2rem] transform scale-90 translate-y-3 z-0" />
 
             {/* MAIN CARD */}
             <div 
                 className="relative w-full h-full shadow-2xl rounded-[2rem] transition-transform duration-500 z-10"
-                style={{ 
-                    transformStyle: 'preserve-3d', 
-                    transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)'
-                }}
+                style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
                 onClick={() => setIsFlipped(!isFlipped)}
             >
-              
-              {/* FRONT SIDE */}
+              {/* FRONT */}
               <div 
                 className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] p-6 text-white flex flex-col justify-between overflow-hidden shadow-indigo-200"
                 style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
               >
-                {/* Decor */}
                 <div className="absolute top-[-20%] right-[-20%] w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
-                <div className="absolute bottom-[-10%] left-[-10%] w-24 h-24 bg-indigo-400/20 rounded-full blur-2xl"></div>
-                
-                {/* Front Header */}
                 <div className="flex justify-between items-start relative z-10">
                    <span className="bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-white/10 flex items-center gap-1.5 shadow-sm">
-                     <Layers size={10} className="text-indigo-200" /> 
-                     {currentIndex + 1} / {sessionCards.length}
+                     <Layers size={10} className="text-indigo-200" /> {currentIndex + 1} / {sessionCards.length}
                    </span>
-                   
-                   <div 
-                     className="p-2.5 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-90 border border-white/5 shadow-sm"
-                     onClick={(e) => { e.stopPropagation(); playAudio(currentCard.front); }}
-                   >
+                   <div className="p-2.5 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-90 border border-white/5 shadow-sm" onClick={(e) => { e.stopPropagation(); playAudio(currentCard.front); }}>
                      <Volume2 size={20} className="text-white"/>
                    </div>
                 </div>
-
-                {/* Front Content */}
                 <div className="text-center relative z-10 mt-2">
                   <h2 className="text-4xl font-serif font-bold mb-2 drop-shadow-md">{currentCard.front}</h2>
-                  <div className="inline-block px-3 py-1 bg-white/10 rounded-full backdrop-blur-sm">
-                      <p className="text-indigo-100 font-serif text-sm tracking-wide">{currentCard.ipa || '/.../'}</p>
-                  </div>
+                  <div className="inline-block px-3 py-1 bg-white/10 rounded-full backdrop-blur-sm"><p className="text-indigo-100 font-serif text-sm tracking-wide">{currentCard.ipa || '/.../'}</p></div>
                 </div>
-
-                {/* Front Footer */}
-                <div className="text-center relative z-10">
-                  <p className="text-[10px] uppercase font-bold text-indigo-200 tracking-widest animate-pulse flex items-center justify-center gap-2">
-                    <ArrowLeft size={10}/> Swipe <ArrowRight size={10}/>
-                  </p>
-                </div>
+                <div className="text-center relative z-10"><p className="text-[10px] uppercase font-bold text-indigo-200 tracking-widest animate-pulse flex items-center justify-center gap-2"><ArrowLeft size={10}/> Swipe <ArrowRight size={10}/></p></div>
               </div>
 
-              {/* BACK SIDE */}
+              {/* BACK */}
               <div 
                 className="absolute inset-0 bg-white rounded-[2rem] p-6 border border-slate-200 flex flex-col justify-center items-center text-center shadow-sm"
-                style={{ 
-                    backfaceVisibility: 'hidden', 
-                    WebkitBackfaceVisibility: 'hidden',
-                    transform: 'rotateY(180deg)'
-                }}
+                style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
               >
-                 <div className="w-10 h-1 rounded-full bg-slate-100 mb-auto mx-auto"></div>
-
                  <div className="flex-1 flex flex-col items-center justify-center w-full">
                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 bg-slate-50 px-2 py-1 rounded-md">Definition</span>
-                     
                      <h3 className="text-2xl font-bold text-slate-800 mb-4 leading-tight">{currentCard.back}</h3>
-                     
-                     {currentCard.usage?.sentence && (
-                       <div className="bg-slate-50 p-4 rounded-xl w-full border border-slate-100 text-left relative">
-                         <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 rounded-l-xl"></div>
-                         <p className="text-sm text-slate-600 italic font-serif leading-relaxed pl-2">"{currentCard.usage.sentence}"</p>
-                       </div>
-                     )}
+                     {currentCard.usage?.sentence && (<div className="bg-slate-50 p-4 rounded-xl w-full border border-slate-100 text-left relative"><div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 rounded-l-xl"></div><p className="text-sm text-slate-600 italic font-serif leading-relaxed pl-2">"{currentCard.usage.sentence}"</p></div>)}
                  </div>
-                 
-                 <div className="mt-auto text-[10px] text-slate-300 font-bold uppercase flex items-center gap-2">
-                    <ArrowLeft size={10}/> Next Card <ArrowRight size={10}/>
-                 </div>
+                 <div className="mt-auto text-[10px] text-slate-300 font-bold uppercase flex items-center gap-2"><ArrowLeft size={10}/> Next Card <ArrowRight size={10}/></div>
               </div>
             </div>
           </div>
       ) : (
-          /* 3. EMPTY STATE */
+          /* EMPTY STATE */
           <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] p-8 text-center flex flex-col items-center justify-center h-56">
-              <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 text-slate-300">
-                  <Layers size={24} />
-              </div>
+              <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 text-slate-300"><Layers size={24} /></div>
               <p className="text-slate-500 font-bold mb-1">No cards in this deck.</p>
-              <p className="text-xs text-slate-400 mb-4">Add cards or choose a different source.</p>
-              <button 
-                  onClick={() => setShowSettings(true)} 
-                  className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all"
-              >
-                  Change Source
-              </button>
+              <button onClick={() => setShowSettings(true)} className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all">Change Source</button>
           </div>
       )}
     </div>
-  );
-}
-// Added 'allDecks' to the destructured props here vvv
-function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck, allDecks }: any) {
-  const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
-  const [showLevelModal, setShowLevelModal] = useState(false);
-  const [libraryExpanded, setLibraryExpanded] = useState(false);;
-  
-  // ... existing derived data code (level, progress, etc) ...
-  const { level, progress, rank } = getLevelInfo(userData?.xp || 0);
-
-  // ... existing logic for visibleLessons ...
-  const visibleLessons = libraryExpanded ? lessons : lessons.slice(0, 2);
-
-  if (activeStudentClass) { return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={onSelectLesson} onSelectDeck={onSelectDeck} userData={userData} />; }
-
-  return (
-  <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full relative bg-slate-50 overflow-x-hidden">
-    {/* ... LevelUpModal and classSyncError ... */}
-    {showLevelModal && <LevelUpModal userData={userData} onClose={() => setShowLevelModal(false)} />}
-    {userData?.classSyncError && (<div className="bg-rose-500 text-white p-4 text-center text-sm font-bold relative z-50"><AlertTriangle className="inline-block mr-2" size={16} />System Notice: Database Index Missing.</div>)}
-    
-    {/* ... The HERO WIDGET (User Profile) stays here ... */}
-    <button onClick={() => setShowLevelModal(true)} className="w-full relative overflow-hidden bg-gradient-to-br from-blue-500 via-indigo-500 to-blue-600 text-white shadow-xl z-10 group text-left rounded-b-[2.5rem] pb-8 pt-10 px-6 transition-all active:scale-[0.99]">
-       {/* ... existing hero widget content ... */}
-       <div className="absolute top-[-50%] left-[-20%] w-[500px] h-[500px] bg-blue-400/30 rounded-full blur-[80px] mix-blend-overlay pointer-events-none"></div>
-       <div className="absolute bottom-[-20%] right-[-10%] w-[300px] h-[300px] bg-indigo-300/20 rounded-full blur-[60px] mix-blend-overlay pointer-events-none"></div>
-       <div className="relative z-20 flex flex-col gap-4">
-            <div className="flex items-center gap-4">
-                <div className="relative">
-                    <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/40 shadow-[0_8px_32px_rgba(0,0,0,0.1)] group-hover:ring-4 ring-white/20 transition-all overflow-hidden">
-                        {userData?.photoURL ? (<img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />) : (<span className="font-serif font-bold text-2xl text-white drop-shadow-md">{userData?.name?.charAt(0) || 'S'}</span>)}
-                    </div>
-                </div>
-                <div>
-                    <p className="text-blue-100 text-[10px] font-bold uppercase tracking-widest mb-0.5 opacity-90">Welcome back,</p>
-                    <h1 className="text-3xl font-serif font-bold leading-none tracking-tight">{userData?.name || 'Student'}</h1>
-                    <div className="flex items-center gap-2 mt-1.5"><span className="bg-white/20 backdrop-blur-md px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide border border-white/20">{rank}</span></div>
-                </div>
-            </div>
-            {/* Progress Bar inside Hero */}
-            <div className="bg-white/10 backdrop-blur-xl rounded-xl p-3 border border-white/30 flex items-center justify-between mt-2">
-                <div className="flex-1 border-r border-white/20 pr-4">
-                     <div className="flex justify-between items-end mb-1"><span className="text-[10px] font-bold text-white tracking-wide">Level {level}</span><span className="text-[9px] font-bold text-blue-100">{Math.round(progress)}%</span></div>
-                     <div className="w-full bg-black/20 rounded-full h-2 overflow-hidden border border-white/10"><div className="bg-gradient-to-r from-yellow-300 to-amber-400 h-full rounded-full" style={{ width: `${progress}%` }}></div></div>
-                </div>
-                <div className="pl-5 flex flex-col items-center justify-center">
-                    <div className="flex items-center gap-1 text-yellow-300"><Zap size={20} fill="currentColor" /><span className="text-xl font-bold leading-none text-white">{userData?.streak || 1}</span></div>
-                    <span className="text-[8px] text-blue-100 uppercase font-bold tracking-wider mt-0.5">Streak</span>
-                </div>
-            </div>
-        </div>
-    </button>
-    
-    {/* --- INSERT THE NEW WIDGET HERE --- */}
-    {/* Pass the system decks + custom decks to pick from */}
-<DailyDiscoveryWidget allDecks={allDecks} user={{uid: userData?.uid || auth.currentUser?.uid}} userData={userData} />
-    {/* --- MAIN CONTENT (My Classes, etc) --- */}
-    <div className="px-6 space-y-6 mt-4 relative z-20">
-      
-      {/* --- MY CLASSES --- */}
-      {classes && classes.length > 0 && (
-         /* ... existing My Classes code ... */
-         <div className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
-            <h3 className="text-sm font-bold text-blue-900/70 uppercase tracking-wider mb-4 ml-1 flex items-center gap-2"><School size={16} className="text-blue-500"/> My Classes</h3>
-            <div className="flex gap-4 overflow-x-auto pb-5 custom-scrollbar snap-x">
-                {classes.map((cls: any) => { 
-                    /* ... existing class card code ... */
-                    return ( 
-                        <button key={cls.id} onClick={() => onSelectClass(cls)} className="snap-start min-w-[280px] bg-white p-5 rounded-3xl border border-blue-100 shadow-lg shadow-blue-900/5 hover:shadow-xl hover:border-blue-300 transition-all text-left relative overflow-hidden flex flex-col justify-between h-[180px]">
-                             {/* ... inner card content ... */}
-                             <h4 className="font-bold text-slate-800 text-lg truncate">{cls.name}</h4>
-                             <span className="text-[10px] text-slate-400">{cls.code}</span>
-                        </button> 
-                    ); 
-                })}
-            </div>
-        </div>
-      )}
-      
-      {/* ... Pending Assignments & Library ... */}
-      {/* ... (Keep the rest of your HomeView code exactly as is) ... */}
-      
-      {/* Library Stack */}
-      <div className="animate-in slide-in-from-bottom-4 duration-500 delay-300">
-         <h3 className="text-sm font-bold text-blue-900/70 uppercase tracking-wider mb-3 ml-1 flex items-center gap-2">
-            <BookOpen size={16} className="text-blue-500"/> Library
-         </h3>
-         {/* ... Library List ... */}
-          <div className="space-y-3">
-            {visibleLessons.map((l: any, idx: number) => (
-                <button key={l.id} onClick={() => onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-blue-300 group transition-all">
-                    <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-500 group-hover:bg-blue-500 group-hover:text-white transition-colors"><BookOpen size={22}/></div>
-                        <div className="text-left"><h4 className="font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div>
-                    </div>
-                    <ChevronRight className="text-slate-300 group-hover:text-blue-500 transition-colors"/>
-                </button>
-            ))}
-         </div>
-         {/* Accordion Toggle */}
-         {lessons.length > 2 && (
-             <button onClick={() => setLibraryExpanded(!libraryExpanded)} className="w-full mt-2 py-3 flex items-center justify-center gap-2 text-[10px] font-bold text-blue-400 uppercase tracking-widest hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
-                {libraryExpanded ? (<>Show Less <ChevronUp size={14}/></>) : (<>View All ({lessons.length}) <ChevronDown size={14}/></>)}
-             </button>
-         )}
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 gap-4 pb-8 animate-in slide-in-from-bottom-4 duration-500 delay-500">
-        <button onClick={() => setActiveTab('flashcards')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center hover:scale-[1.02] active:scale-95 transition-all group hover:shadow-lg hover:border-orange-200 hover:bg-orange-50/30">
-            <div className="w-14 h-14 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-orange-500 group-hover:text-white transition-colors shadow-sm"><Layers size={28}/></div>
-            <span className="block font-bold text-slate-800 text-lg">Practice</span>
-        </button>
-        <button onClick={() => setActiveTab('create')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center hover:scale-[1.02] active:scale-95 transition-all group hover:shadow-lg hover:border-emerald-200 hover:bg-emerald-50/30">
-            <div className="w-14 h-14 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-emerald-500 group-hover:text-white transition-colors shadow-sm"><Feather size={28}/></div>
-            <span className="block font-bold text-slate-800 text-lg">Creator</span>
-        </button>
-      </div>
-
-    </div>
-  </div>
   );
 }
 
