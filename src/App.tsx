@@ -37,7 +37,7 @@ import {
   Pencil, Image, Info, Edit3, FileJson, AlertTriangle, FlipVertical, GanttChart, 
   AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle, ArrowDown,
   BarChart3, UserPlus, Briefcase, Coffee, AlertCircle, Target, Calendar, Settings, Edit2, Camera, Medal,
-  ChevronUp,GripVertical, ListOrdered, ArrowRightLeft,CheckSquare, Table 
+  ChevronUp,GripVertical, ListOrdered, ArrowRightLeft,CheckSquare
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -2253,116 +2253,6 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
   );
 }
 
-function GradebookView({ classData }: any) {
-  const [logs, setLogs] = useState<any[]>([]);
-
-  useEffect(() => {
-    // Fetch activity logs to populate the gradebook
-    const q = query(collection(db, 'artifacts', appId, 'activity_logs'), orderBy('timestamp', 'desc'), limit(500));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        const data = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
-        // Filter logs for students in this specific class
-        const classLogs = data.filter((l: any) => classData.studentEmails?.includes(l.studentEmail));
-        setLogs(classLogs);
-    });
-    return () => unsubscribe();
-  }, [classData]);
-
-  const assignments = classData.assignments || [];
-  const students = classData.studentEmails || [];
-
-  // Helper to determine the status of a specific assignment for a specific student
-  const getStatus = (studentEmail: string, assignmentId: string, type: string) => {
-      const log = logs.find((l: any) => 
-          l.studentEmail === studentEmail && 
-          (l.itemId === assignmentId || l.itemTitle === assignments.find((a:any) => a.id === assignmentId)?.title)
-      );
-
-      if (!log) return { status: 'missing', label: '-', score: 0 };
-
-      if (type === 'test' || log.scoreDetail) {
-          const { score, total } = log.scoreDetail || { score: 0, total: 1 };
-          const pct = Math.round((score / total) * 100);
-          return { status: 'graded', label: `${pct}%`, score: pct };
-      }
-      return { status: 'complete', label: 'Done', score: 100 };
-  };
-
-  return (
-    <div className="h-full flex flex-col bg-slate-50 rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-       {/* Header */}
-       <div className="bg-white p-6 border-b border-slate-200 flex justify-between items-center">
-           <div>
-               <h3 className="font-bold text-slate-800 flex items-center gap-2"><Table size={18} className="text-indigo-600"/> Gradebook</h3>
-               <p className="text-xs text-slate-500">{students.length} Students • {assignments.length} Assignments</p>
-           </div>
-       </div>
-
-       {/* The Grade Grid */}
-       <div className="flex-1 overflow-auto custom-scrollbar">
-           <table className="w-full text-left border-collapse">
-               <thead className="bg-slate-50 sticky top-0 z-20 shadow-sm">
-                   <tr>
-                       <th className="p-4 min-w-[200px] font-bold text-slate-500 text-xs uppercase tracking-wider border-b border-r border-slate-200 sticky left-0 bg-slate-50 z-30">
-                           Student
-                       </th>
-                       {assignments.map((a: any) => (
-                           <th key={a.id} className="p-4 min-w-[120px] font-bold text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200 text-center">
-                               <div className="flex flex-col items-center">
-                                   <span className="truncate max-w-[100px]" title={a.title}>{a.title}</span>
-                                   <span className={`text-[9px] px-1.5 py-0.5 rounded mt-1 ${a.contentType === 'test' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                                       {a.contentType === 'test' ? 'Exam' : 'Lesson'}
-                                   </span>
-                               </div>
-                           </th>
-                       ))}
-                   </tr>
-               </thead>
-               <tbody className="divide-y divide-slate-100 bg-white">
-                   {students.map((studentEmail: string) => (
-                       <tr key={studentEmail} className="hover:bg-slate-50 transition-colors group">
-                           {/* Sticky Name Column */}
-                           <td className="p-4 border-r border-slate-100 sticky left-0 bg-white group-hover:bg-slate-50 z-10">
-                               <div className="flex items-center gap-3">
-                                   <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-sm">
-                                       {studentEmail.charAt(0).toUpperCase()}
-                                   </div>
-                                   <div className="truncate max-w-[140px]">
-                                       <p className="font-bold text-slate-700 text-sm truncate">{studentEmail.split('@')[0]}</p>
-                                   </div>
-                               </div>
-                           </td>
-                           
-                           {/* Assignment Columns */}
-                           {assignments.map((a: any) => {
-                               const { status, label, score } = getStatus(studentEmail, a.id, a.contentType);
-                               let cellClass = "text-slate-300 font-medium";
-                               
-                               if (status === 'graded') {
-                                   if (score >= 80) cellClass = "text-emerald-600 font-black bg-emerald-50 border-emerald-100";
-                                   else if (score >= 60) cellClass = "text-amber-600 font-bold bg-amber-50 border-amber-100";
-                                   else cellClass = "text-rose-600 font-bold bg-rose-50 border-rose-100";
-                               } else if (status === 'complete') {
-                                   cellClass = "text-indigo-600 font-bold bg-indigo-50 border-indigo-100";
-                               }
-
-                               return (
-                                   <td key={a.id} className="p-3 text-center">
-                                       <div className={`mx-auto py-1.5 px-3 rounded-lg border border-transparent ${status !== 'missing' ? cellClass : ''} inline-block min-w-[60px] text-sm`}>
-                                           {status === 'complete' ? <Check size={16} className="mx-auto"/> : label}
-                                       </div>
-                                   </td>
-                               );
-                           })}
-                       </tr>
-                   ))}
-               </tbody>
-           </table>
-       </div>
-    </div>
-  );
-}
-
 function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [newClassName, setNewClassName] = useState('');
@@ -2373,7 +2263,8 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
   
   const [assignType, setAssignType] = useState<'deck' | 'lesson' | 'test'>('lesson');
   // REMOVED 'analytics' from the allowed types here
-const [viewTab, setViewTab] = useState<'content' | 'forum' | 'analytics' | 'gradebook'>('content');
+  const [viewTab, setViewTab] = useState<'content' | 'forum'>('content');
+
   // -- Student Selector States --
   const [isStudentListOpen, setIsStudentListOpen] = useState(false);
   const [availableStudents, setAvailableStudents] = useState<any[]>([]);
@@ -2416,13 +2307,17 @@ const [viewTab, setViewTab] = useState<'content' | 'forum' | 'analytics' | 'grad
           <button onClick={() => setSelectedClassId(null)} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Classes</button>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
             <div><h1 className="text-2xl font-bold text-slate-900">{selectedClass.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {selectedClass.code}</p></div>
-<div className="flex gap-2">
-    <button onClick={() => setViewTab('content')} ... >Manage</button>
-    <button onClick={() => setViewTab('analytics')} ... >Analytics</button>
-    {/* ADD THIS BUTTON */}
-    <button onClick={() => setViewTab('gradebook')} className={`px-3 py-2 rounded-lg font-bold text-xs transition-all ${viewTab === 'gradebook' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Grades</button>
-    <button onClick={() => setViewTab('forum')} ... >Forum</button>
-</div>
+            <div className="flex gap-2">
+                <button onClick={() => setViewTab('content')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'content' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Manage</button>
+                <button onClick={() => setViewTab('forum')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'forum' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Forum</button>
+                
+                {viewTab === 'content' && (
+                    <>
+                    <button onClick={() => { setAssignType('lesson'); setAssignModalOpen(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-indigo-700 active:scale-95 transition-all uppercase tracking-wider"><BookOpen size={16}/> ASSIGN LESSON</button>
+                    <button onClick={() => { setAssignType('deck'); setAssignModalOpen(true); }} className="bg-orange-500 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-orange-600 active:scale-95 transition-all uppercase tracking-wider"><Layers size={16}/> ASSIGN DECK</button>
+                    {/* Replaced FileQuestion with HelpCircle */}
+                    <button onClick={() => { setAssignType('test'); setAssignModalOpen(true); }} className="bg-rose-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-rose-700 active:scale-95 transition-all uppercase tracking-wider"><HelpCircle size={16}/> ASSIGN EXAM</button>
+                    </>
                 )}
             </div>
           </div>
@@ -2466,12 +2361,6 @@ const [viewTab, setViewTab] = useState<'content' | 'forum' | 'analytics' | 'grad
                 <ClassForum classId={selectedClass.id} user={user} userData={{...userData, role: 'instructor'}} />
             </div>
         )}
-
-      {viewTab === 'gradebook' && (
-        <div className="h-full pb-20">
-            <GradebookView classData={selectedClass} />
-        </div>
-    )}
 
         {/* REMOVED ANALYTICS TAB CONTENT BLOCK */}
 
@@ -2785,7 +2674,7 @@ function App() {
     if (xp > 0 && user) { 
         try { 
             await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp), completedAssignments: arrayUnion(lessonId) }); 
-            await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { studentName: userData?.name || 'Unknown Student', studentEmail: user.email, itemTitle: title || 'Unknown Activity', itemId: lessonId, xp: xp, timestamp: Date.now(), type: scoreDetail ? 'quiz_score' : 'completion', scoreDetail: scoreDetail || null });
+            await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { studentName: userData?.name || 'Unknown Student', studentEmail: user.email, itemTitle: title || 'Unknown Activity', xp: xp, timestamp: Date.now(), type: scoreDetail ? 'quiz_score' : 'completion', scoreDetail: scoreDetail || null });
             if(userData?.role === 'instructor') alert(`Activity Logged: ${title} (+${xp}XP)`);
         } catch (e: any) { 
             await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { ...DEFAULT_USER_DATA, xp: xp, completedAssignments: [lessonId] }, { merge: true }); 
