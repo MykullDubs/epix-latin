@@ -844,12 +844,18 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   // --- AUDIO ENGINE ---
   const playAudio = useCallback((text: string, lang = 'en-US') => {
     if (!('speechSynthesis' in window)) return;
+    
     window.speechSynthesis.cancel();
+    
     const utterance = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis.getVoices();
+    
+    // Attempt to find a high-quality voice
     const preferredVoice = voices.find(v => v.lang.includes(lang) && v.name.includes('Google')) || 
                            voices.find(v => v.lang.includes(lang));
+    
     if (preferredVoice) utterance.voice = preferredVoice;
+    
     utterance.rate = 0.85; 
     utterance.pitch = 1;
     window.speechSynthesis.speak(utterance);
@@ -857,73 +863,203 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
 
   // --- HANDLERS ---
   const handleDeckChange = (key: string) => { 
-    onSelectDeck(key); setIsSelectorOpen(false); setCurrentIndex(0); 
-    setIsFlipped(false); setXrayMode(false); setManageMode(false); setGameMode('study'); 
-  };
-  const handleNext = (e?: any) => {
-    e?.stopPropagation(); setXrayMode(false); setIsFlipped(false);
-    setTimeout(() => setCurrentIndex((prev) => (prev + 1) % deckCards.length), 150);
-  };
-  const handlePrev = (e?: any) => {
-    e?.stopPropagation(); setXrayMode(false); setIsFlipped(false);
-    setTimeout(() => setCurrentIndex((prev) => (prev - 1 + deckCards.length) % deckCards.length), 150);
-  };
-  const handleGameEnd = (data: any) => { 
-      const xp = typeof data === 'number' ? data : (Math.round((data.score / data.total) * 50) + 10); 
-      alert(`Complete! You earned ${xp} XP.`); setGameMode('study'); 
-      if (activeDeckOverride && onComplete) onComplete(activeDeckOverride.id, xp, currentDeck.title, data.score !== undefined ? data : null); 
-  };
-  const handleQuickAdd = (e: any) => { 
-    e.preventDefault(); if(!quickAddData.front || !quickAddData.back) return; 
-    onSaveCard({ ...quickAddData, deckId: selectedDeckKey, ipa: "/.../", mastery: 0, morphology: [{ part: quickAddData.front, meaning: "Custom", type: "root" }], usage: { sentence: "-", translation: "-" }, grammar_tags: ["Quick Add"] }); 
-    setQuickAddData({ front: '', back: '', type: 'noun' }); setSearchTerm(''); alert("Card Added!"); 
+    onSelectDeck(key); 
+    setIsSelectorOpen(false); 
+    setCurrentIndex(0); 
+    setIsFlipped(false); 
+    setXrayMode(false); 
+    setManageMode(false); 
+    setGameMode('study'); 
   };
 
-  // Keyboard Navigation
+  const handleNext = (e?: any) => {
+    e?.stopPropagation();
+    setXrayMode(false); 
+    setIsFlipped(false);
+    setTimeout(() => setCurrentIndex((prev) => (prev + 1) % deckCards.length), 150);
+  };
+
+  const handlePrev = (e?: any) => {
+    e?.stopPropagation();
+    setXrayMode(false); 
+    setIsFlipped(false);
+    setTimeout(() => setCurrentIndex((prev) => (prev - 1 + deckCards.length) % deckCards.length), 150);
+  };
+
+  const handleGameEnd = (data: any) => { 
+      const xp = typeof data === 'number' ? data : (Math.round((data.score / data.total) * 50) + 10); 
+      alert(`Complete! You earned ${xp} XP.`); 
+      setGameMode('study'); 
+      if (activeDeckOverride && onComplete) { 
+          onComplete(activeDeckOverride.id, xp, currentDeck.title, data.score !== undefined ? data : null); 
+      } 
+  };
+
+  const handleQuickAdd = (e: any) => { 
+    e.preventDefault(); 
+    if(!quickAddData.front || !quickAddData.back) return; 
+    onSaveCard({ 
+      ...quickAddData, 
+      deckId: selectedDeckKey, 
+      ipa: "/.../", 
+      mastery: 0, 
+      morphology: [{ part: quickAddData.front, meaning: "Custom", type: "root" }], 
+      usage: { sentence: "-", translation: "-" }, 
+      grammar_tags: ["Quick Add"] 
+    }); 
+    setQuickAddData({ front: '', back: '', type: 'noun' }); 
+    setSearchTerm(''); 
+    alert("Card Added!"); 
+  };
+
+  // Keyboard Navigation Support
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (manageMode || gameMode !== 'study') return;
       if (e.key === 'ArrowRight') handleNext();
       if (e.key === 'ArrowLeft') handlePrev();
-      if (e.key === ' ' || e.key === 'Enter') if (!xrayMode) setIsFlipped(prev => !prev);
+      if (e.key === ' ' || e.key === 'Enter') {
+         if (!xrayMode) setIsFlipped(prev => !prev);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [manageMode, gameMode, xrayMode, deckCards.length]);
 
-  if (!card && !manageMode) return (
+  // --- RENDER: EMPTY STATE ---
+  if (!card && !manageMode) {
+    return (
       <div className="h-full flex flex-col bg-slate-50">
-        <Header title={currentDeck?.title || "Empty Deck"} onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} rightAction={<button onClick={() => setManageMode(true)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200"><List size={20} className="text-slate-600" /></button>} />
+        <Header 
+          title={currentDeck?.title || "Empty Deck"} 
+          onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} 
+          rightAction={
+            <button onClick={() => setManageMode(true)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200">
+              <List size={20} className="text-slate-600" />
+            </button>
+          } 
+        />
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400">
-          <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4"><Layers size={32} className="opacity-20" /></div>
-          <p className="font-bold text-lg text-slate-500">This deck is empty.</p><button onClick={() => setManageMode(true)} className="px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg mt-4">Add Cards</button>
+          <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+             <Layers size={32} className="opacity-20" />
+          </div>
+          <p className="font-bold text-lg text-slate-500">This deck is empty.</p>
+          <button onClick={() => setManageMode(true)} className="px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg mt-4">
+            Add Cards
+          </button>
         </div>
       </div>
-  );
+    );
+  }
 
-  const filteredCards = deckCards.filter((c: any) => (c.front || '').toLowerCase().includes(searchTerm.toLowerCase()) || (c.back || '').toLowerCase().includes(searchTerm.toLowerCase()));
+  // --- RENDER: MAIN VIEW ---
+  const filteredCards = deckCards.filter((c: any) => 
+    (c.front || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (c.back || '').toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="h-[calc(100vh-80px)] flex flex-col bg-slate-50 pb-6 relative overflow-hidden">
-      <Header title={currentDeck?.title.split(' ').slice(1).join(' ') || "Deck"} subtitle={`${currentIndex + 1} / ${deckCards.length} Cards`} onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} rightAction={<div className="flex items-center gap-2">{activeDeckOverride && onComplete && (<button onClick={() => onComplete(activeDeckOverride.id, 50, currentDeck.title)} className="bg-emerald-500 text-white px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-sm hover:scale-105 transition-transform"><Check size={14}/> Complete</button>)}<button onClick={() => setManageMode(!manageMode)} className={`p-2 rounded-full transition-colors ${manageMode ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>{manageMode ? <X size={20} /> : <List size={20} />}</button></div>} />
       
-      {isSelectorOpen && (<><div className="absolute top-24 left-6 right-6 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 animate-in fade-in slide-in-from-top-4 max-h-[60vh] overflow-y-auto custom-scrollbar">{Object.entries(allDecks).map(([key, deck]: any) => (<button key={key} onClick={() => handleDeckChange(key)} className={`w-full text-left p-3 rounded-xl font-bold text-sm mb-1 flex justify-between items-center ${selectedDeckKey === key ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'}`}><span>{deck.title}</span><span className="text-xs bg-white px-2 py-1 rounded border border-slate-100 text-slate-400">{deck.cards?.length || 0}</span></button>))}</div><div className="absolute inset-0 z-40 bg-black/5 backdrop-blur-[1px]" onClick={() => setIsSelectorOpen(false)} /></>)}
-      {!manageMode && (<div className="px-6 mt-2 mb-2 z-10"><div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto overflow-x-auto shadow-inner">{['study', 'quiz', 'match'].map((mode) => (<button key={mode} onClick={() => setGameMode(mode)} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg whitespace-nowrap capitalize transition-all ${gameMode === mode ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>{mode}</button>))}</div></div>)}
+      {/* HEADER */}
+      <Header 
+        title={currentDeck?.title.split(' ').slice(1).join(' ') || "Deck"} 
+        subtitle={`${currentIndex + 1} / ${deckCards.length} Cards`} 
+        onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} 
+        rightAction={
+          <div className="flex items-center gap-2">
+            {activeDeckOverride && onComplete && (
+              <button onClick={() => onComplete(activeDeckOverride.id, 50, currentDeck.title)} className="bg-emerald-500 text-white px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-sm hover:scale-105 transition-transform">
+                <Check size={14}/> Complete
+              </button>
+            )}
+            <button onClick={() => setManageMode(!manageMode)} className={`p-2 rounded-full transition-colors ${manageMode ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
+              {manageMode ? <X size={20} /> : <List size={20} />}
+            </button>
+          </div>
+        } 
+      />
+
+      {/* DECK SELECTOR DROPDOWN */}
+      {isSelectorOpen && (
+        <>
+          <div className="absolute top-24 left-6 right-6 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 animate-in fade-in slide-in-from-top-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
+            {Object.entries(allDecks).map(([key, deck]: any) => (
+              <button key={key} onClick={() => handleDeckChange(key)} className={`w-full text-left p-3 rounded-xl font-bold text-sm mb-1 flex justify-between items-center ${selectedDeckKey === key ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'}`}>
+                <span>{deck.title}</span>
+                <span className="text-xs bg-white px-2 py-1 rounded border border-slate-100 text-slate-400">{deck.cards?.length || 0}</span>
+              </button>
+            ))}
+          </div>
+          <div className="absolute inset-0 z-40 bg-black/5 backdrop-blur-[1px]" onClick={() => setIsSelectorOpen(false)} />
+        </>
+      )}
+      
+      {/* GAME MODE TABS */}
+      {!manageMode && (
+        <div className="px-6 mt-2 mb-2 z-10">
+          <div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto overflow-x-auto shadow-inner">
+            {['study', 'quiz', 'match'].map((mode) => (
+                <button 
+                  key={mode} 
+                  onClick={() => setGameMode(mode)} 
+                  className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg whitespace-nowrap capitalize transition-all ${gameMode === mode ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  {mode}
+                </button>
+            ))}
+          </div>
+        </div>
+      )}
       
       <div className="flex-1 overflow-y-auto pt-4 relative">
         {manageMode ? (
+            /* --- MANAGER VIEW --- */
             <div className="p-6 pb-24">
                  <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><List size={18}/> Deck Manager</h3>
-                 <div className="relative mb-6"><Search className="absolute left-3 top-3.5 text-slate-400" size={18} /><input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder={`Search ${deckCards.length} cards...`} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-sm" /></div>
-                 {selectedDeckKey === 'custom' && (<div className="bg-white p-4 rounded-xl border border-indigo-100 shadow-sm mb-6"><h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-3 flex items-center gap-2"><PlusCircle size={14}/> Quick Add</h4><div className="flex gap-2 mb-2"><input placeholder="Word" value={quickAddData.front} onChange={(e) => setQuickAddData({...quickAddData, front: e.target.value})} className="flex-1 p-2 bg-slate-50 rounded border border-slate-200 text-sm font-bold" /><select value={quickAddData.type} onChange={(e) => setQuickAddData({...quickAddData, type: e.target.value})} className="p-2 bg-slate-50 rounded border border-slate-200 text-xs"><option value="noun">Noun</option><option value="verb">Verb</option><option value="phrase">Phrase</option></select></div><div className="flex gap-2"><input placeholder="Meaning" value={quickAddData.back} onChange={(e) => setQuickAddData({...quickAddData, back: e.target.value})} className="flex-1 p-2 bg-slate-50 rounded border border-slate-200 text-sm" /><button onClick={handleQuickAdd} className="bg-indigo-600 text-white p-2 rounded-lg hover:bg-indigo-700"><Plus size={18}/></button></div></div>)}
-                 <div className="space-y-2"><p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cards in Deck</p>{filteredCards.map((c: any, idx: number) => (<button key={idx} onClick={() => { setCurrentIndex(deckCards.indexOf(c)); setManageMode(false); }} className="w-full bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center hover:border-indigo-300 transition-colors text-left group"><div><span className="font-bold text-slate-800">{c.front}</span><span className="text-slate-400 mx-2">•</span><span className="text-sm text-slate-500 group-hover:text-indigo-600 transition-colors">{c.back}</span></div><ArrowRight size={16} className="text-slate-300 group-hover:text-indigo-400" /></button>))}{filteredCards.length === 0 && <p className="text-slate-400 text-sm italic text-center py-4">No cards found matching your search.</p>}</div>
+                 <div className="relative mb-6">
+                    <Search className="absolute left-3 top-3.5 text-slate-400" size={18} />
+                    <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder={`Search ${deckCards.length} cards...`} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-sm" />
+                 </div>
+                 
+                 {selectedDeckKey === 'custom' && (
+                    <div className="bg-white p-4 rounded-xl border border-indigo-100 shadow-sm mb-6">
+                        <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-3 flex items-center gap-2"><PlusCircle size={14}/> Quick Add</h4>
+                        <div className="flex gap-2 mb-2">
+                            <input placeholder="Word" value={quickAddData.front} onChange={(e) => setQuickAddData({...quickAddData, front: e.target.value})} className="flex-1 p-2 bg-slate-50 rounded border border-slate-200 text-sm font-bold" />
+                            <select value={quickAddData.type} onChange={(e) => setQuickAddData({...quickAddData, type: e.target.value})} className="p-2 bg-slate-50 rounded border border-slate-200 text-xs">
+                                <option value="noun">Noun</option><option value="verb">Verb</option><option value="phrase">Phrase</option>
+                            </select>
+                        </div>
+                        <div className="flex gap-2">
+                            <input placeholder="Meaning" value={quickAddData.back} onChange={(e) => setQuickAddData({...quickAddData, back: e.target.value})} className="flex-1 p-2 bg-slate-50 rounded border border-slate-200 text-sm" />
+                            <button onClick={handleQuickAdd} className="bg-indigo-600 text-white p-2 rounded-lg hover:bg-indigo-700"><Plus size={18}/></button>
+                        </div>
+                    </div>
+                 )}
+                 
+                 <div className="space-y-2">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cards in Deck</p>
+                    {filteredCards.map((c: any, idx: number) => (
+                        <button key={idx} onClick={() => { setCurrentIndex(deckCards.indexOf(c)); setManageMode(false); }} className="w-full bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center hover:border-indigo-300 transition-colors text-left group">
+                            <div>
+                                <span className="font-bold text-slate-800">{c.front}</span>
+                                <span className="text-slate-400 mx-2">•</span>
+                                <span className="text-sm text-slate-500 group-hover:text-indigo-600 transition-colors">{c.back}</span>
+                            </div>
+                            <ArrowRight size={16} className="text-slate-300 group-hover:text-indigo-400" />
+                        </button>
+                    ))}
+                    {filteredCards.length === 0 && <p className="text-slate-400 text-sm italic text-center py-4">No cards found matching your search.</p>}
+                 </div>
             </div>
         ) : (
+            /* --- GAME / STUDY VIEWS --- */
             <>
             {gameMode === 'match' && <MatchingGame deckCards={deckCards} onGameEnd={handleGameEnd} />}
             {gameMode === 'quiz' && <QuizGame deckCards={deckCards} onGameEnd={handleGameEnd} />}
             {gameMode === 'study' && card && (
-                  <div className="flex-1 flex flex-col items-center justify-center px-4 py-2 relative z-0" style={{ perspective: '1000px' }}>
+                  <div className="flex-1 flex flex-col items-center justify-center px-4 py-2 perspective-1000 relative z-0" style={{ perspective: '1000px' }}>
                       <div 
                         className="relative w-full h-full max-h-[520px] cursor-pointer shadow-2xl rounded-[2rem]"
                         style={{ 
@@ -973,6 +1109,20 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
             )}
             </>
         )}
+      </div>
+
+      {gameMode === 'study' && !manageMode && card && (
+        <div className="px-6 pb-4 pt-2">
+          <div className="flex items-center justify-between max-w-sm mx-auto">
+            <button onClick={handlePrev} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-rose-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all hover:bg-rose-50"><X size={28} strokeWidth={2.5} /></button>
+            <button onClick={(e) => { e.stopPropagation(); if(isFlipped) setIsFlipped(false); setXrayMode(!xrayMode); }} className={`h-20 w-20 rounded-2xl flex flex-col items-center justify-center shadow-lg transition-all duration-300 border-2 ${xrayMode ? 'bg-indigo-600 border-indigo-600 text-white translate-y-[-8px] shadow-indigo-200' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'}`}><Search size={28} strokeWidth={xrayMode ? 3 : 2} className={xrayMode ? 'animate-pulse' : ''} /><span className="text-[10px] font-black tracking-wider mt-1">X-RAY</span></button>
+            <button onClick={handleNext} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-emerald-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all hover:bg-emerald-50"><Check size={28} strokeWidth={2.5} /></button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
       </div>
 
       {gameMode === 'study' && !manageMode && card && (
