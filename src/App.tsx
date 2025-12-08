@@ -1663,7 +1663,93 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
     </div>
   );
 }
+function DailyDiscoveryWidget({ allDecks }: any) {
+  const [isFlipped, setIsFlipped] = useState(false);
+  
+  // Audio engine (reused from FlashcardView)
+  const playAudio = (text: string) => {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice = voices.find(v => v.lang.includes('en-US')); 
+    if (preferredVoice) utterance.voice = preferredVoice;
+    utterance.rate = 0.85; 
+    window.speechSynthesis.speak(utterance);
+  };
 
+  // Memoize the "Card of the Day" so it stays consistent for 24 hours
+  const dailyCard = useMemo(() => {
+    const allCards: any[] = [];
+    Object.values(allDecks).forEach((deck: any) => {
+      if (deck.cards && Array.isArray(deck.cards)) {
+        allCards.push(...deck.cards);
+      }
+    });
+
+    if (allCards.length === 0) return null;
+
+    // Simple pseudo-random generator based on today's date
+    const today = new Date();
+    const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+    const index = seed % allCards.length;
+    
+    return allCards[index];
+  }, [allDecks]);
+
+  if (!dailyCard) return null;
+
+  return (
+    <div className="mx-6 mt-6 animate-in slide-in-from-bottom-2 duration-700">
+      <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+        <Zap size={16} className="text-amber-500" /> Daily Discovery
+      </h3>
+      
+      <div 
+        className="relative h-48 w-full perspective-1000 group cursor-pointer"
+        onClick={() => setIsFlipped(!isFlipped)}
+      >
+        <div className={`relative w-full h-full transition-all duration-500 transform preserve-3d shadow-xl rounded-3xl ${isFlipped ? 'rotate-y-180' : ''}`}>
+          
+          {/* FRONT (Latin/Question) */}
+          <div className="absolute inset-0 backface-hidden bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl p-6 text-white flex flex-col justify-between overflow-hidden">
+            {/* Background Decor */}
+            <div className="absolute top-[-20%] right-[-20%] w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+            
+            <div className="flex justify-between items-start">
+               <span className="bg-white/20 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-white/10">
+                 {dailyCard.type}
+               </span>
+               <div className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors" onClick={(e) => { e.stopPropagation(); playAudio(dailyCard.front); }}>
+                 <Volume2 size={18} className="text-white"/>
+               </div>
+            </div>
+
+            <div className="text-center">
+              <h2 className="text-3xl font-serif font-bold mb-1">{dailyCard.front}</h2>
+              <p className="text-indigo-200 font-serif text-sm opacity-80">{dailyCard.ipa || '/.../'}</p>
+            </div>
+
+            <div className="text-center">
+              <p className="text-[10px] uppercase font-bold text-indigo-200 tracking-widest animate-pulse">Tap to Reveal</p>
+            </div>
+          </div>
+
+          {/* BACK (English/Answer) */}
+          <div className="absolute inset-0 backface-hidden rotate-y-180 bg-white rounded-3xl p-6 border border-slate-200 flex flex-col justify-center items-center text-center">
+             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Meaning</span>
+             <h3 className="text-2xl font-bold text-slate-800 mb-4">{dailyCard.back}</h3>
+             {dailyCard.usage?.sentence && (
+               <div className="bg-slate-50 p-3 rounded-xl w-full">
+                 <p className="text-xs text-slate-500 italic">"{dailyCard.usage.sentence}"</p>
+               </div>
+             )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck }: any) {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [showLevelModal, setShowLevelModal] = useState(false);
