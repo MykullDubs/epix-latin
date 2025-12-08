@@ -1668,7 +1668,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
   const [showSettings, setShowSettings] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // 1. Get the preferred deck ID from user profile (default to 'all')
+  // 1. Get Preference
   const preferredDeckId = userData?.widgetDeckId || 'all';
 
   // 2. Audio Engine
@@ -1676,14 +1676,16 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
+    // Attempt to pick a good voice
     const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = voices.find(v => v.lang.includes('en-US')); 
+    const preferredVoice = voices.find(v => v.lang.includes('en-US') && v.name.includes('Google')) || 
+                           voices.find(v => v.lang.includes('en-US'));
     if (preferredVoice) utterance.voice = preferredVoice;
     utterance.rate = 0.85; 
     window.speechSynthesis.speak(utterance);
   };
 
-  // 3. Save User Preference
+  // 3. Save Preference
   const handleDeckSelect = async (deckId: string) => {
     if (!user) return;
     setSaving(true);
@@ -1691,7 +1693,6 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
         await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
             widgetDeckId: deckId
         });
-        // Close settings after selection
         setShowSettings(false);
         setIsFlipped(false); 
     } catch (e) {
@@ -1701,74 +1702,59 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
     }
   };
 
-  // 4. Calculate Card based on Preference
+  // 4. Calculate Daily Card
   const dailyCard = useMemo(() => {
     let sourceCards: any[] = [];
-
     if (preferredDeckId === 'all' || !allDecks[preferredDeckId]) {
-        // Flatten ALL decks
         Object.values(allDecks).forEach((deck: any) => {
-            if (deck.cards && Array.isArray(deck.cards)) {
-                sourceCards.push(...deck.cards);
-            }
+            if (deck.cards && Array.isArray(deck.cards)) sourceCards.push(...deck.cards);
         });
     } else {
-        // Use ONLY specific deck
         sourceCards = allDecks[preferredDeckId]?.cards || [];
     }
-
     if (sourceCards.length === 0) return null;
 
-    // Pseudo-random based on date
+    // Daily Seed
     const today = new Date();
     const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
-    const index = seed % sourceCards.length;
-    
-    return sourceCards[index];
+    return sourceCards[seed % sourceCards.length];
   }, [allDecks, preferredDeckId]);
 
-  // Helper to get deck title
+  // Deck Title Helper
   const currentDeckTitle = preferredDeckId === 'all' ? "All Collections" : (allDecks[preferredDeckId]?.title || "Unknown Deck");
 
-  if (!dailyCard && !showSettings && preferredDeckId !== 'all') {
-      return (
-          <div className="mx-6 mt-6 p-6 bg-white rounded-3xl border border-slate-200 text-center">
-              <p className="text-sm text-slate-500 mb-2">Selected deck is empty.</p>
-              <button onClick={() => setShowSettings(true)} className="text-indigo-600 font-bold text-sm">Change Source</button>
-          </div>
-      );
-  }
-
-  if (!dailyCard) return null;
+  // --- RENDERING STATES ---
 
   return (
     <div className="mx-6 mt-6 animate-in slide-in-from-bottom-2 duration-700 relative z-0">
+      
+      {/* HEADER ROW */}
       <div className="flex justify-between items-end mb-3">
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
             <Zap size={16} className="text-amber-500" /> Daily Discovery
           </h3>
           <button 
             onClick={() => setShowSettings(!showSettings)} 
-            className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-1 rounded-full flex items-center gap-1 hover:bg-indigo-100 transition-colors"
+            className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-indigo-100 transition-colors shadow-sm"
           >
             {showSettings ? <X size={12}/> : <Settings size={12}/>}
             {showSettings ? "Close" : "Source"}
           </button>
       </div>
       
-      {/* SETTINGS MODE (Deck Selector) */}
+      {/* 1. SETTINGS MODE */}
       {showSettings ? (
-          <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-4 animate-in fade-in zoom-in duration-200">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 ml-1">Select Widget Source</h4>
-              <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+          <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl p-5 animate-in fade-in zoom-in duration-200 relative z-20">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 ml-1">Select Source Deck</h4>
+              <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
                   <button 
                     onClick={() => handleDeckSelect('all')}
                     disabled={saving}
-                    className={`w-full p-3 rounded-xl text-left flex items-center gap-3 transition-all ${preferredDeckId === 'all' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+                    className={`w-full p-4 rounded-xl text-left flex items-center gap-3 transition-all ${preferredDeckId === 'all' ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-200' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
                   >
-                      <div className={`p-1.5 rounded-full ${preferredDeckId === 'all' ? 'bg-white/20' : 'bg-slate-200'}`}><Layers size={14}/></div>
+                      <div className={`p-2 rounded-full ${preferredDeckId === 'all' ? 'bg-white/20' : 'bg-white shadow-sm'}`}><Layers size={16}/></div>
                       <span className="font-bold text-sm">All Collections</span>
-                      {preferredDeckId === 'all' && <CheckCircle2 size={16} className="ml-auto"/>}
+                      {preferredDeckId === 'all' && <CheckCircle2 size={18} className="ml-auto"/>}
                   </button>
                   
                   {Object.entries(allDecks).map(([key, deck]: any) => (
@@ -1776,60 +1762,115 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                         key={key} 
                         onClick={() => handleDeckSelect(key)}
                         disabled={saving}
-                        className={`w-full p-3 rounded-xl text-left flex items-center gap-3 transition-all ${preferredDeckId === key ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+                        className={`w-full p-3 rounded-xl text-left flex items-center gap-3 transition-all ${preferredDeckId === key ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-200' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
                       >
-                          <div className={`p-1.5 rounded-full ${preferredDeckId === key ? 'bg-white/20' : 'bg-slate-200'}`}><BookOpen size={14}/></div>
+                          <div className={`p-2 rounded-full ${preferredDeckId === key ? 'bg-white/20' : 'bg-white shadow-sm'}`}><BookOpen size={16}/></div>
                           <div className="flex-1 overflow-hidden">
                              <p className="font-bold text-sm truncate">{deck.title}</p>
                              <p className={`text-[10px] ${preferredDeckId === key ? 'text-indigo-200' : 'text-slate-400'}`}>{deck.cards?.length || 0} cards</p>
                           </div>
-                          {preferredDeckId === key && <CheckCircle2 size={16} className="ml-auto"/>}
+                          {preferredDeckId === key && <CheckCircle2 size={18} className="ml-auto"/>}
                       </button>
                   ))}
               </div>
           </div>
-      ) : (
-          /* CARD MODE */
+      ) : dailyCard ? (
+          /* 2. CARD MODE (Using Inline Styles for Perfect 3D Flip) */
           <div 
-            className="relative h-48 w-full perspective-1000 group cursor-pointer"
+            className="relative h-56 w-full cursor-pointer group perspective-1000"
+            style={{ perspective: '1000px' }}
             onClick={() => setIsFlipped(!isFlipped)}
           >
-            <div className={`relative w-full h-full transition-all duration-500 transform preserve-3d shadow-xl rounded-[2rem] ${isFlipped ? 'rotate-y-180' : ''}`}>
+            <div 
+                className="relative w-full h-full shadow-2xl rounded-[2rem] transition-transform duration-700"
+                style={{ 
+                    transformStyle: 'preserve-3d', 
+                    transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)'
+                }}
+            >
               
-              {/* FRONT (Question) */}
-              <div className="absolute inset-0 backface-hidden bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] p-6 text-white flex flex-col justify-between overflow-hidden shadow-indigo-200">
-                <div className="absolute top-[-20%] right-[-20%] w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+              {/* FRONT SIDE */}
+              <div 
+                className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] p-6 text-white flex flex-col justify-between overflow-hidden shadow-indigo-200"
+                style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+              >
+                {/* Decor */}
+                <div className="absolute top-[-20%] right-[-20%] w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+                <div className="absolute bottom-[-10%] left-[-10%] w-24 h-24 bg-indigo-400/20 rounded-full blur-2xl"></div>
                 
+                {/* Front Header */}
                 <div className="flex justify-between items-start relative z-10">
-                   <span className="bg-black/20 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-white/10 flex items-center gap-1">
-                     <Layers size={10} /> {currentDeckTitle.length > 20 ? currentDeckTitle.substring(0, 18) + '...' : currentDeckTitle}
+                   <span className="bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-white/10 flex items-center gap-1.5 shadow-sm">
+                     <Layers size={10} className="text-indigo-200" /> 
+                     <span className="max-w-[150px] truncate">{currentDeckTitle}</span>
                    </span>
-                   <div className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-90" onClick={(e) => { e.stopPropagation(); playAudio(dailyCard.front); }}>
-                     <Volume2 size={18} className="text-white"/>
+                   
+                   <div 
+                     className="p-2.5 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-90 border border-white/5 shadow-sm"
+                     onClick={(e) => { e.stopPropagation(); playAudio(dailyCard.front); }}
+                   >
+                     <Volume2 size={20} className="text-white"/>
                    </div>
                 </div>
 
-                <div className="text-center relative z-10">
-                  <h2 className="text-3xl font-serif font-bold mb-1 drop-shadow-sm">{dailyCard.front}</h2>
-                  <p className="text-indigo-200 font-serif text-sm opacity-80">{dailyCard.ipa || '/.../'}</p>
+                {/* Front Content */}
+                <div className="text-center relative z-10 mt-2">
+                  <h2 className="text-4xl font-serif font-bold mb-2 drop-shadow-md">{dailyCard.front}</h2>
+                  <div className="inline-block px-3 py-1 bg-white/10 rounded-full backdrop-blur-sm">
+                      <p className="text-indigo-100 font-serif text-sm tracking-wide">{dailyCard.ipa || '/.../'}</p>
+                  </div>
                 </div>
 
+                {/* Front Footer */}
                 <div className="text-center relative z-10">
-                  <p className="text-[10px] uppercase font-bold text-indigo-200 tracking-widest animate-pulse">Tap to Reveal</p>
+                  <p className="text-[10px] uppercase font-bold text-indigo-200 tracking-widest animate-pulse flex items-center justify-center gap-2">
+                    Tap to Flip <ArrowRight size={10} />
+                  </p>
                 </div>
               </div>
 
-              {/* BACK (Answer) */}
-              <div className="absolute inset-0 backface-hidden rotate-y-180 bg-white rounded-[2rem] p-6 border border-slate-200 flex flex-col justify-center items-center text-center shadow-sm">
-                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Meaning</span>
-                 <h3 className="text-2xl font-bold text-slate-800 mb-4">{dailyCard.back}</h3>
-                 {dailyCard.usage?.sentence && (
-                   <div className="bg-slate-50 p-3 rounded-xl w-full border border-slate-100">
-                     <p className="text-xs text-slate-500 italic font-serif">"{dailyCard.usage.sentence}"</p>
-                   </div>
-                 )}
+              {/* BACK SIDE */}
+              <div 
+                className="absolute inset-0 bg-white rounded-[2rem] p-6 border border-slate-200 flex flex-col justify-center items-center text-center shadow-sm"
+                style={{ 
+                    backfaceVisibility: 'hidden', 
+                    WebkitBackfaceVisibility: 'hidden',
+                    transform: 'rotateY(180deg)'
+                }}
+              >
+                 <div className="w-10 h-1 rounded-full bg-slate-100 mb-auto mx-auto"></div>
+
+                 <div className="flex-1 flex flex-col items-center justify-center w-full">
+                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 bg-slate-50 px-2 py-1 rounded-md">Definition</span>
+                     
+                     <h3 className="text-2xl font-bold text-slate-800 mb-4 leading-tight">{dailyCard.back}</h3>
+                     
+                     {dailyCard.usage?.sentence && (
+                       <div className="bg-slate-50 p-4 rounded-xl w-full border border-slate-100 text-left relative">
+                         <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 rounded-l-xl"></div>
+                         <p className="text-sm text-slate-600 italic font-serif leading-relaxed pl-2">"{dailyCard.usage.sentence}"</p>
+                       </div>
+                     )}
+                 </div>
+                 
+                 <div className="mt-auto text-[10px] text-slate-300 font-bold uppercase">Back of Card</div>
               </div>
             </div>
+          </div>
+      ) : (
+          /* 3. EMPTY STATE (Visible Fallback) */
+          <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] p-8 text-center flex flex-col items-center justify-center h-56">
+              <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 text-slate-300">
+                  <Layers size={24} />
+              </div>
+              <p className="text-slate-500 font-bold mb-1">No cards in this deck.</p>
+              <p className="text-xs text-slate-400 mb-4">Add cards or choose a different source.</p>
+              <button 
+                  onClick={() => setShowSettings(true)} 
+                  className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all"
+              >
+                  Change Source
+              </button>
           </div>
       )}
     </div>
