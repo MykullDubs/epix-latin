@@ -1446,8 +1446,8 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
 
   // Game State
   const [currentTemplate, setCurrentTemplate] = useState<any>(null);
-  const [gameSlots, setGameSlots] = useState<any>({}); // { 0: cardId, 1: cardId }
-  const [gameStep, setGameStep] = useState(0); // Which blank are we filling?
+  const [gameSlots, setGameSlots] = useState<any>({});
+  const [gameStep, setGameStep] = useState(0);
 
   // Swipe State
   const [dragStartX, setDragStartX] = useState<number | null>(null);
@@ -1486,7 +1486,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
         setSessionCards(shuffled.slice(0, 10));
         setCurrentIndex(0);
         
-        // Pick a random template for the game
+        // Random Template
         const randomTemp = ADLIB_TEMPLATES[Math.floor(Math.random() * ADLIB_TEMPLATES.length)];
         setCurrentTemplate(randomTemp);
         setGameSlots({});
@@ -1498,45 +1498,54 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
 
   // --- HANDLERS ---
   const handleDeckSelect = async (deckId: string) => {
-    if (!user) return;
+    // ROBUST FIX: Check props first, then fall back to global auth
+    const targetUid = user?.uid || auth.currentUser?.uid;
+
+    if (!targetUid) {
+        console.error("Cannot save preference: Missing User ID");
+        alert("Error: Could not identify user to save settings.");
+        return;
+    }
+
     setSaving(true);
     try {
-        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { widgetDeckId: deckId });
+        await updateDoc(doc(db, 'artifacts', appId, 'users', targetUid, 'profile', 'main'), { 
+            widgetDeckId: deckId 
+        });
         setShowSettings(false);
-    } catch (e) { console.error(e); } finally { setSaving(false); }
+        setIsFlipped(false);
+    } catch (e: any) { 
+        console.error("Save failed:", e);
+        alert("Failed to save preference: " + e.message);
+    } finally { 
+        setSaving(false); 
+    }
   };
 
-  // Game Logic: Fill a slot
   const handleGameSelect = (card: any) => {
       setGameSlots({ ...gameSlots, [gameStep]: card });
-      playAudio(card.front); // Read the word
-      
-      if (gameStep < currentTemplate.blanks.length - 1) {
-          setGameStep(prev => prev + 1);
-      }
+      playAudio(card.front); 
+      if (gameStep < currentTemplate.blanks.length - 1) setGameStep(prev => prev + 1);
   };
 
-  // Game Logic: Reset
   const resetGame = () => {
       setGameSlots({});
       setGameStep(0);
-      // Reshuffle template
       setCurrentTemplate(ADLIB_TEMPLATES[Math.floor(Math.random() * ADLIB_TEMPLATES.length)]);
   };
 
-  // Game Logic: Read Full Story
   const playStory = () => {
       if (!currentTemplate) return;
       let story = currentTemplate.text;
       currentTemplate.blanks.forEach((type: string, idx: number) => {
           const card = gameSlots[idx];
-          const replacement = card ? card.back : "something"; // Use English meaning for the story flow
+          const replacement = card ? card.back : "something"; 
           story = story.replace(`[${type}]`, replacement);
       });
       playAudio(story);
   };
 
-  // --- NAVIGATION LOGIC ---
+  // --- NAVIGATION ---
   const handleNext = () => { setIsFlipped(false); setTimeout(() => setCurrentIndex(prev => (prev + 1) % sessionCards.length), 200); };
   const handlePrev = () => { setIsFlipped(false); setTimeout(() => setCurrentIndex(prev => (prev - 1 + sessionCards.length) % sessionCards.length), 200); };
 
@@ -1552,36 +1561,25 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
 
   const currentCard = sessionCards[currentIndex];
   const currentDeckTitle = preferredDeckId === 'all' ? "All Collections" : (allDecks[preferredDeckId]?.title || "Unknown Deck");
-
-  // RENDER HELPERS
   const isGameComplete = currentTemplate && Object.keys(gameSlots).length === currentTemplate.blanks.length;
 
   return (
     <div className="mx-6 mt-6 animate-in slide-in-from-bottom-2 duration-700 relative z-0">
-      
-      {/* HEADER ROW */}
       <div className="flex justify-between items-end mb-3">
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
             <Zap size={16} className="text-amber-500" /> Daily Discovery
           </h3>
           <div className="flex gap-2">
-            <button 
-                onClick={() => setViewMode(viewMode === 'study' ? 'game' : 'study')} 
-                className={`text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-colors shadow-sm ${viewMode === 'game' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 border border-purple-100'}`}
-            >
+            <button onClick={() => setViewMode(viewMode === 'study' ? 'game' : 'study')} className={`text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-colors shadow-sm ${viewMode === 'game' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 border border-purple-100'}`}>
                 {viewMode === 'study' ? <Gamepad2 size={12}/> : <Layers size={12}/>}
                 {viewMode === 'study' ? "Play Ad-Lib" : "Study"}
             </button>
-            <button 
-                onClick={() => setShowSettings(!showSettings)} 
-                className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-indigo-100 transition-colors shadow-sm"
-            >
+            <button onClick={() => setShowSettings(!showSettings)} className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-indigo-100 transition-colors shadow-sm">
                 {showSettings ? <X size={12}/> : <Settings size={12}/>}
             </button>
           </div>
       </div>
       
-      {/* 1. SETTINGS MODE */}
       {showSettings ? (
           <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl p-5 animate-in fade-in zoom-in duration-200 relative z-20">
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 ml-1">Select Source Deck</h4>
@@ -1601,154 +1599,36 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
               </div>
           </div>
       ) : viewMode === 'game' ? (
-          /* 2. AD-LIB GAME MODE */
           <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden relative min-h-[14rem] flex flex-col">
-              {/* Game Header */}
-              <div className="bg-purple-600 p-4 text-white flex justify-between items-center">
-                  <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">The Drunken Scribe</span>
-                  <div className="flex gap-1">
-                      {currentTemplate?.blanks.map((_: any, i: number) => (
-                          <div key={i} className={`w-2 h-2 rounded-full ${i < Object.keys(gameSlots).length ? 'bg-green-400' : 'bg-purple-800'}`} />
-                      ))}
-                  </div>
-              </div>
-
-              {/* Game Content */}
+              <div className="bg-purple-600 p-4 text-white flex justify-between items-center"><span className="text-[10px] font-bold uppercase tracking-widest opacity-80">The Drunken Scribe</span><div className="flex gap-1">{currentTemplate?.blanks.map((_: any, i: number) => (<div key={i} className={`w-2 h-2 rounded-full ${i < Object.keys(gameSlots).length ? 'bg-green-400' : 'bg-purple-800'}`} />))}</div></div>
               <div className="flex-1 p-6 flex flex-col items-center justify-center text-center">
                   {isGameComplete ? (
                       <div className="animate-in zoom-in duration-300 w-full">
                           <p className="font-serif text-xl font-bold text-slate-800 leading-relaxed mb-6">
-                              {currentTemplate.text.split(/(\[.*?\])/).map((part: string, i: number) => {
-                                  if (part.startsWith('[') && part.endsWith(']')) {
-                                      const type = part.replace(/[\[\]]/g, '');
-                                      // Find which slot index this corresponds to
-                                      // Simple mapping for MVP: just iterate through blanks
-                                      const slotIndex = currentTemplate.blanks.indexOf(type); 
-                                      // Note: This simple mapping fails if multiple same types exist, 
-                                      // but works for basic templates.
-                                      // Better logic: track index in map loop.
-                                      
-                                      // Since we fill in order:
-                                      // We need to map the parts to the slots filled.
-                                      // Let's just reconstruct visually:
-                                      
-                                      // Actually, easier way for display:
-                                      return (
-                                        <span key={i} className="text-purple-600 underline decoration-wavy decoration-purple-300 mx-1">
-                                            {/* We need to find the specific word used. 
-                                                For MVP, let's just grab from Object.values roughly
-                                            */}
-                                            ???
-                                        </span>
-                                      );
-                                  }
-                                  return part;
-                              })}
-                              {/* Re-rendering simple version for stability: */}
                               {(() => {
                                   let story = currentTemplate.text;
-                                  currentTemplate.blanks.forEach((type: string, idx: number) => {
-                                      const card = gameSlots[idx];
-                                      const word = card ? card.back : "___";
-                                      story = story.replace(`[${type}]`, `<span class="text-purple-600 font-bold">${word}</span>`);
-                                  });
+                                  currentTemplate.blanks.forEach((type: string, idx: number) => { const card = gameSlots[idx]; const word = card ? card.back : "___"; story = story.replace(`[${type}]`, `<span class="text-purple-600 font-bold">${word}</span>`); });
                                   return <span dangerouslySetInnerHTML={{__html: story}} />;
                               })()}
                           </p>
-                          <div className="flex gap-3 justify-center">
-                              <button onClick={playStory} className="flex-1 py-3 bg-purple-100 text-purple-700 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-purple-200"><Volume2 size={16}/> Read Story</button>
-                              <button onClick={resetGame} className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800">New Story</button>
-                          </div>
+                          <div className="flex gap-3 justify-center"><button onClick={playStory} className="flex-1 py-3 bg-purple-100 text-purple-700 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-purple-200"><Volume2 size={16}/> Read Story</button><button onClick={resetGame} className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800">New Story</button></div>
                       </div>
                   ) : (
-                      <div className="w-full">
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">
-                              Pick a <span className="text-purple-600">{currentTemplate?.blanks[gameStep]}</span>
-                          </p>
-                          
-                          {/* Card Selector (Horizontal Scroll) */}
-                          <div className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar snap-x">
-                              {sessionCards.map((card, idx) => (
-                                  <button 
-                                    key={idx}
-                                    onClick={() => handleGameSelect(card)}
-                                    className="snap-center min-w-[140px] bg-slate-50 border-2 border-slate-200 p-4 rounded-2xl flex flex-col items-center gap-2 hover:border-purple-400 hover:bg-purple-50 transition-all group"
-                                  >
-                                      <span className="font-bold text-slate-800 text-lg">{card.front}</span>
-                                      <span className="text-[10px] bg-white px-2 py-1 rounded text-slate-400 border border-slate-100 uppercase font-bold group-hover:text-purple-500">{card.type}</span>
-                                  </button>
-                              ))}
-                          </div>
-                          
-                          <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-500 italic">
-                              "Choose a word to fill the blank..."
-                          </div>
-                      </div>
+                      <div className="w-full"><p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Pick a <span className="text-purple-600">{currentTemplate?.blanks[gameStep]}</span></p><div className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar snap-x">{sessionCards.map((card, idx) => (<button key={idx} onClick={() => handleGameSelect(card)} className="snap-center min-w-[140px] bg-slate-50 border-2 border-slate-200 p-4 rounded-2xl flex flex-col items-center gap-2 hover:border-purple-400 hover:bg-purple-50 transition-all group"><span className="font-bold text-slate-800 text-lg">{card.front}</span><span className="text-[10px] bg-white px-2 py-1 rounded text-slate-400 border border-slate-100 uppercase font-bold group-hover:text-purple-500">{card.type}</span></button>))}</div></div>
                   )}
               </div>
           </div>
       ) : currentCard ? (
-          /* 3. STANDARD DECK STACK MODE */
-          <div 
-            className="relative h-56 w-full cursor-pointer group perspective-1000 touch-pan-y select-none"
-            style={{ perspective: '1000px' }}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerLeave={onPointerUp}
-          >
-            {/* BACKGROUND STACK */}
+          <div className="relative h-56 w-full cursor-pointer group perspective-1000 touch-pan-y select-none" style={{ perspective: '1000px' }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}>
             <div className="absolute top-2 left-4 right-4 bottom-0 bg-indigo-300/40 rounded-[2rem] transform scale-95 translate-y-2 z-0" />
             <div className="absolute top-4 left-8 right-8 bottom-0 bg-indigo-200/30 rounded-[2rem] transform scale-90 translate-y-3 z-0" />
-
-            {/* MAIN CARD */}
-            <div 
-                className="relative w-full h-full shadow-2xl rounded-[2rem] transition-transform duration-500 z-10"
-                style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
-                onClick={() => setIsFlipped(!isFlipped)}
-            >
-              {/* FRONT */}
-              <div 
-                className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] p-6 text-white flex flex-col justify-between overflow-hidden shadow-indigo-200"
-                style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
-              >
-                <div className="absolute top-[-20%] right-[-20%] w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
-                <div className="flex justify-between items-start relative z-10">
-                   <span className="bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-white/10 flex items-center gap-1.5 shadow-sm">
-                     <Layers size={10} className="text-indigo-200" /> {currentIndex + 1} / {sessionCards.length}
-                   </span>
-                   <div className="p-2.5 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-90 border border-white/5 shadow-sm" onClick={(e) => { e.stopPropagation(); playAudio(currentCard.front); }}>
-                     <Volume2 size={20} className="text-white"/>
-                   </div>
-                </div>
-                <div className="text-center relative z-10 mt-2">
-                  <h2 className="text-4xl font-serif font-bold mb-2 drop-shadow-md">{currentCard.front}</h2>
-                  <div className="inline-block px-3 py-1 bg-white/10 rounded-full backdrop-blur-sm"><p className="text-indigo-100 font-serif text-sm tracking-wide">{currentCard.ipa || '/.../'}</p></div>
-                </div>
-                <div className="text-center relative z-10"><p className="text-[10px] uppercase font-bold text-indigo-200 tracking-widest animate-pulse flex items-center justify-center gap-2"><ArrowLeft size={10}/> Swipe <ArrowRight size={10}/></p></div>
-              </div>
-
-              {/* BACK */}
-              <div 
-                className="absolute inset-0 bg-white rounded-[2rem] p-6 border border-slate-200 flex flex-col justify-center items-center text-center shadow-sm"
-                style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
-              >
-                 <div className="flex-1 flex flex-col items-center justify-center w-full">
-                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 bg-slate-50 px-2 py-1 rounded-md">Definition</span>
-                     <h3 className="text-2xl font-bold text-slate-800 mb-4 leading-tight">{currentCard.back}</h3>
-                     {currentCard.usage?.sentence && (<div className="bg-slate-50 p-4 rounded-xl w-full border border-slate-100 text-left relative"><div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 rounded-l-xl"></div><p className="text-sm text-slate-600 italic font-serif leading-relaxed pl-2">"{currentCard.usage.sentence}"</p></div>)}
-                 </div>
-                 <div className="mt-auto text-[10px] text-slate-300 font-bold uppercase flex items-center gap-2"><ArrowLeft size={10}/> Next Card <ArrowRight size={10}/></div>
-              </div>
+            <div className="relative w-full h-full shadow-2xl rounded-[2rem] transition-transform duration-500 z-10" style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }} onClick={() => setIsFlipped(!isFlipped)}>
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] p-6 text-white flex flex-col justify-between overflow-hidden shadow-indigo-200" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}><div className="absolute top-[-20%] right-[-20%] w-40 h-40 bg-white/10 rounded-full blur-3xl"></div><div className="flex justify-between items-start relative z-10"><span className="bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-white/10 flex items-center gap-1.5 shadow-sm"><Layers size={10} className="text-indigo-200" /> {currentIndex + 1} / {sessionCards.length}</span><div className="p-2.5 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-90 border border-white/5 shadow-sm" onClick={(e) => { e.stopPropagation(); playAudio(currentCard.front); }}><Volume2 size={20} className="text-white"/></div></div><div className="text-center relative z-10 mt-2"><h2 className="text-4xl font-serif font-bold mb-2 drop-shadow-md">{currentCard.front}</h2><div className="inline-block px-3 py-1 bg-white/10 rounded-full backdrop-blur-sm"><p className="text-indigo-100 font-serif text-sm tracking-wide">{currentCard.ipa || '/.../'}</p></div></div><div className="text-center relative z-10"><p className="text-[10px] uppercase font-bold text-indigo-200 tracking-widest animate-pulse flex items-center justify-center gap-2"><ArrowLeft size={10}/> Swipe <ArrowRight size={10}/></p></div></div>
+              <div className="absolute inset-0 bg-white rounded-[2rem] p-6 border border-slate-200 flex flex-col justify-center items-center text-center shadow-sm" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}><div className="flex-1 flex flex-col items-center justify-center w-full"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 bg-slate-50 px-2 py-1 rounded-md">Definition</span><h3 className="text-2xl font-bold text-slate-800 mb-4 leading-tight">{currentCard.back}</h3>{currentCard.usage?.sentence && (<div className="bg-slate-50 p-4 rounded-xl w-full border border-slate-100 text-left relative"><div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 rounded-l-xl"></div><p className="text-sm text-slate-600 italic font-serif leading-relaxed pl-2">"{currentCard.usage.sentence}"</p></div>)}</div><div className="mt-auto text-[10px] text-slate-300 font-bold uppercase flex items-center gap-2"><ArrowLeft size={10}/> Next Card <ArrowRight size={10}/></div></div>
             </div>
           </div>
       ) : (
-          /* EMPTY STATE */
-          <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] p-8 text-center flex flex-col items-center justify-center h-56">
-              <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 text-slate-300"><Layers size={24} /></div>
-              <p className="text-slate-500 font-bold mb-1">No cards in this deck.</p>
-              <button onClick={() => setShowSettings(true)} className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all">Change Source</button>
-          </div>
+          <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] p-8 text-center flex flex-col items-center justify-center h-56"><div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 text-slate-300"><Layers size={24} /></div><p className="text-slate-500 font-bold mb-1">No cards in this deck.</p><button onClick={() => setShowSettings(true)} className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all">Change Source</button></div>
       )}
     </div>
   );
