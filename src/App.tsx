@@ -1641,21 +1641,30 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   // --- DERIVED DATA ---
   const completedSet = new Set(userData?.completedAssignments || []);
   
+  // Smart Name Resolver: Tries to find a real name before defaulting to 'Student'
+  const displayName = useMemo(() => {
+      // 1. Try DB Name (if not generic)
+      if (userData?.name && userData.name !== 'Student' && userData.name !== 'User') return userData.name;
+      // 2. Try Auth Name
+      if (user?.displayName) return user.displayName;
+      // 3. Try Email Username (Capitalized)
+      if (user?.email) {
+          const emailName = user.email.split('@')[0];
+          return emailName.charAt(0).toUpperCase() + emailName.slice(1);
+      }
+      // 4. Fallback
+      return 'Student';
+  }, [userData, user]);
+
   // Filter assignments relevant to this user
   const relevantAssignments = (assignments || []).filter((l: any) => { 
       return !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); 
   });
   
-  // Filter out completed ones
   const activeAssignments = relevantAssignments.filter((l: any) => !completedSet.has(l.id));
-  
-  // Calculate Level Data
   const { level, progress, rank } = getLevelInfo(userData?.xp || 0);
-
-  // Library Slicing (Show 2 items or All based on accordion state)
   const visibleLessons = libraryExpanded ? lessons : lessons.slice(0, 2);
 
-  // If a class is selected, show the specific class view instead of the dashboard
   if (activeStudentClass) { 
       return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={onSelectLesson} onSelectDeck={onSelectDeck} userData={userData} />; 
   }
@@ -1685,13 +1694,14 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
                         {userData?.photoURL ? (
                             <img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />
                         ) : (
-                            <span className="font-serif font-bold text-2xl text-white drop-shadow-md">{userData?.name?.charAt(0) || 'S'}</span>
+                            <span className="font-serif font-bold text-2xl text-white drop-shadow-md">{displayName.charAt(0)}</span>
                         )}
                     </div>
                 </div>
                 <div>
                     <p className="text-blue-100 text-[10px] font-bold uppercase tracking-widest mb-0.5 opacity-90 drop-shadow-sm">Welcome back,</p>
-                    <h1 className="text-3xl font-serif font-bold leading-none tracking-tight drop-shadow-lg filter">{userData?.name || 'Student'}</h1>
+                    {/* UPDATED: Uses smart displayName instead of raw userData.name */}
+                    <h1 className="text-3xl font-serif font-bold leading-none tracking-tight drop-shadow-lg filter truncate max-w-[200px]">{displayName}</h1>
                     <div className="flex items-center gap-2 mt-1.5">
                         <span className="bg-white/20 backdrop-blur-md px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide border border-white/20 shadow-sm">{rank}</span>
                     </div>
@@ -1722,8 +1732,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
         </div>
     </button>
     
-    {/* --- 2. DAILY DISCOVERY (Ad-Lib & Flashcard Widget) --- */}
-    {/* Critical: We pass 'user' so it can save deck preferences */}
+    {/* --- 2. DAILY DISCOVERY --- */}
     <DailyDiscoveryWidget 
         allDecks={allDecks} 
         user={user} 
@@ -1733,7 +1742,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
     {/* --- MAIN SCROLLABLE CONTENT --- */}
     <div className="px-6 space-y-6 mt-4 relative z-20">
       
-      {/* --- 3. MY CLASSES (Horizontal Scroll) --- */}
+      {/* --- 3. MY CLASSES --- */}
       {classes && classes.length > 0 && (
         <div className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
             <h3 className="text-sm font-bold text-blue-900/70 uppercase tracking-wider mb-4 ml-1 flex items-center gap-2">
@@ -1798,7 +1807,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
           </div>
       )}
       
-      {/* --- 5. LIBRARY STACK (Expandable) --- */}
+      {/* --- 5. LIBRARY STACK --- */}
       <div className="animate-in slide-in-from-bottom-4 duration-500 delay-300">
          <h3 className="text-sm font-bold text-blue-900/70 uppercase tracking-wider mb-3 ml-1 flex items-center gap-2">
             <BookOpen size={16} className="text-blue-500"/> Library
@@ -1821,7 +1830,6 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
             ))}
          </div>
 
-         {/* Accordion Toggle */}
          {lessons.length > 2 && (
              <button 
                 onClick={() => setLibraryExpanded(!libraryExpanded)}
