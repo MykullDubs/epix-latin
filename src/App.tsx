@@ -834,9 +834,9 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   const [gameMode, setGameMode] = useState('study'); 
   const [quickAddData, setQuickAddData] = useState({ front: '', back: '', type: 'noun' });
   
-  // --- SWIPE STATE ---
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  // --- POINTER SWIPE STATE ---
+  const [dragStartX, setDragStartX] = useState<number | null>(null);
+  const [dragEndX, setDragEndX] = useState<number | null>(null);
   const minSwipeDistance = 50; 
 
   // --- DERIVED DATA ---
@@ -875,27 +875,39 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
     setTimeout(() => setCurrentIndex((prev) => (prev - 1 + deckCards.length) % deckCards.length), 150);
   }, [deckCards.length]);
 
-  // --- SWIPE LOGIC ---
-  const onTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null); 
-    setTouchStart(e.targetTouches[0].clientX);
+  // --- UNIVERSAL POINTER EVENTS (Mouse + Touch) ---
+  const onPointerDown = (e: React.PointerEvent) => {
+    // We don't stop propagation here to allow clicking buttons inside
+    setDragEndX(null); 
+    setDragStartX(e.clientX);
   };
 
-  const onTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
+  const onPointerMove = (e: React.PointerEvent) => {
+    // Only track move if we have started a drag
+    if (dragStartX !== null) {
+        setDragEndX(e.clientX);
+    }
   };
 
-  const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-    const distance = touchStart - touchEnd;
+  const onPointerUp = () => {
+    if (dragStartX === null || dragEndX === null) {
+        setDragStartX(null);
+        return;
+    }
+
+    const distance = dragStartX - dragEndX;
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
 
     if (isLeftSwipe) {
-        handleNext(); // Swipe Left -> Next Card
+        handleNext(); // Dragged Left -> Next Card
     } else if (isRightSwipe) {
-        handlePrev(); // Swipe Right -> Prev Card
+        handlePrev(); // Dragged Right -> Prev Card
     }
+
+    // Reset
+    setDragStartX(null);
+    setDragEndX(null);
   };
 
   const handleGameEnd = (data: any) => { 
@@ -941,11 +953,6 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
       {isSelectorOpen && (<><div className="absolute top-24 left-6 right-6 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 animate-in fade-in slide-in-from-top-4 max-h-[60vh] overflow-y-auto custom-scrollbar">{Object.entries(allDecks).map(([key, deck]: any) => (<button key={key} onClick={() => handleDeckChange(key)} className={`w-full text-left p-3 rounded-xl font-bold text-sm mb-1 flex justify-between items-center ${selectedDeckKey === key ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'}`}><span>{deck.title}</span><span className="text-xs bg-white px-2 py-1 rounded border border-slate-100 text-slate-400">{deck.cards?.length || 0}</span></button>))}</div><div className="absolute inset-0 z-40 bg-black/5 backdrop-blur-[1px]" onClick={() => setIsSelectorOpen(false)} /></>)}
       {!manageMode && (<div className="px-6 mt-2 mb-2 z-10"><div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto overflow-x-auto shadow-inner">{['study', 'quiz', 'match'].map((mode) => (<button key={mode} onClick={() => setGameMode(mode)} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg whitespace-nowrap capitalize transition-all ${gameMode === mode ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>{mode}</button>))}</div></div>)}
       
-      {/* LAYOUT FIX: 
-         We use `flex-1 relative` to take up remaining space, but inside we use 
-         `absolute inset-0` to guarantee the content fills the height properly 
-         without breaking the flexbox chain on desktop or mobile.
-      */}
       <div className="flex-1 relative w-full">
         {manageMode ? (
             <div className="absolute inset-0 overflow-y-auto p-6 pb-24 custom-scrollbar">
@@ -955,18 +962,18 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                  <div className="space-y-2"><p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cards in Deck</p>{filteredCards.map((c: any, idx: number) => (<button key={idx} onClick={() => { setCurrentIndex(deckCards.indexOf(c)); setManageMode(false); }} className="w-full bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center hover:border-indigo-300 transition-colors text-left group"><div><span className="font-bold text-slate-800">{c.front}</span><span className="text-slate-400 mx-2">•</span><span className="text-sm text-slate-500 group-hover:text-indigo-600 transition-colors">{c.back}</span></div><ArrowRight size={16} className="text-slate-300 group-hover:text-indigo-400" /></button>))}{filteredCards.length === 0 && <p className="text-slate-400 text-sm italic text-center py-4">No cards found matching your search.</p>}</div>
             </div>
         ) : (
-            /* GAME / STUDY AREA */
             <div className="absolute inset-0 flex flex-col">
                 {gameMode === 'match' && <div className="h-full overflow-y-auto"><MatchingGame deckCards={deckCards} onGameEnd={handleGameEnd} /></div>}
                 {gameMode === 'quiz' && <div className="h-full overflow-y-auto"><QuizGame deckCards={deckCards} onGameEnd={handleGameEnd} /></div>}
                 
                 {gameMode === 'study' && card && (
                     <div 
-                        className="flex-1 flex flex-col items-center justify-center px-4 py-2 perspective-1000 relative z-0 touch-pan-y" 
-                        style={{ perspective: '1000px' }}
-                        onTouchStart={onTouchStart}
-                        onTouchMove={onTouchMove}
-                        onTouchEnd={onTouchEnd}
+                        className="flex-1 flex flex-col items-center justify-center px-4 py-2 perspective-1000 relative z-0" 
+                        style={{ perspective: '1000px', touchAction: 'pan-y' }}
+                        onPointerDown={onPointerDown}
+                        onPointerMove={onPointerMove}
+                        onPointerUp={onPointerUp}
+                        onPointerLeave={onPointerUp} // Safety: if mouse leaves card, finish swipe
                     >
                         <div 
                             className="relative w-full h-full max-h-[520px] cursor-pointer shadow-2xl rounded-[2rem]"
@@ -979,7 +986,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                         >
                             {/* FRONT SIDE */}
                             <div 
-                                className="absolute inset-0 bg-white rounded-[2rem] border border-slate-100 overflow-hidden flex flex-col"
+                                className="absolute inset-0 bg-white rounded-[2rem] border border-slate-100 overflow-hidden flex flex-col select-none"
                                 style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
                             >
                                 <div className={`h-3 w-full ${xrayMode ? theme.bg.replace('50', '500') : 'bg-slate-100'} transition-colors duration-500`} />
@@ -1002,7 +1009,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
 
                             {/* BACK SIDE */}
                             <div 
-                                className="absolute inset-0 bg-slate-900 rounded-[2rem] shadow-xl flex flex-col items-center justify-center p-8 text-white relative overflow-hidden"
+                                className="absolute inset-0 bg-slate-900 rounded-[2rem] shadow-xl flex flex-col items-center justify-center p-8 text-white relative overflow-hidden select-none"
                                 style={{ 
                                     backfaceVisibility: 'hidden', 
                                     WebkitBackfaceVisibility: 'hidden',
@@ -1031,7 +1038,6 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
     </div>
   );
 }
-
 function LessonView({ lesson, onFinish }: any) {
   const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
   const [quizAnswers, setQuizAnswers] = useState<any>({});
