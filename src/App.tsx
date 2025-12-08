@@ -831,31 +831,29 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   const [isFlipped, setIsFlipped] = useState(false);
   const [xrayMode, setXrayMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [gameMode, setGameMode] = useState('study'); // study | quiz | match
+  const [gameMode, setGameMode] = useState('study'); 
   const [quickAddData, setQuickAddData] = useState({ front: '', back: '', type: 'noun' });
   
+  // --- SWIPE STATE ---
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const minSwipeDistance = 50; // Minimum px distance to trigger swipe
+
   // --- DERIVED DATA ---
   const currentDeck = activeDeckOverride || allDecks[selectedDeckKey];
   const deckCards = currentDeck?.cards || [];
   const card = deckCards[currentIndex];
-  // Safe fallback for theme colors
   const theme = card ? (TYPE_COLORS[card.type] || TYPE_COLORS.noun) : TYPE_COLORS.noun;
 
   // --- AUDIO ENGINE ---
   const playAudio = useCallback((text: string, lang = 'en-US') => {
     if (!('speechSynthesis' in window)) return;
-    
     window.speechSynthesis.cancel();
-    
     const utterance = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis.getVoices();
-    
-    // Attempt to find a high-quality voice
     const preferredVoice = voices.find(v => v.lang.includes(lang) && v.name.includes('Google')) || 
                            voices.find(v => v.lang.includes(lang));
-    
     if (preferredVoice) utterance.voice = preferredVoice;
-    
     utterance.rate = 0.85; 
     utterance.pitch = 1;
     window.speechSynthesis.speak(utterance);
@@ -863,203 +861,110 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
 
   // --- HANDLERS ---
   const handleDeckChange = (key: string) => { 
-    onSelectDeck(key); 
-    setIsSelectorOpen(false); 
-    setCurrentIndex(0); 
-    setIsFlipped(false); 
-    setXrayMode(false); 
-    setManageMode(false); 
-    setGameMode('study'); 
+    onSelectDeck(key); setIsSelectorOpen(false); setCurrentIndex(0); 
+    setIsFlipped(false); setXrayMode(false); setManageMode(false); setGameMode('study'); 
   };
-
-  const handleNext = (e?: any) => {
-    e?.stopPropagation();
-    setXrayMode(false); 
-    setIsFlipped(false);
+  
+  const handleNext = useCallback(() => {
+    setXrayMode(false); setIsFlipped(false);
+    // Small timeout to allow the flip animation to reset visually if needed
     setTimeout(() => setCurrentIndex((prev) => (prev + 1) % deckCards.length), 150);
+  }, [deckCards.length]);
+
+  const handlePrev = useCallback(() => {
+    setXrayMode(false); setIsFlipped(false);
+    setTimeout(() => setCurrentIndex((prev) => (prev - 1 + deckCards.length) % deckCards.length), 150);
+  }, [deckCards.length]);
+
+  // --- SWIPE LOGIC ---
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null); // Reset
+    setTouchStart(e.targetTouches[0].clientX);
   };
 
-  const handlePrev = (e?: any) => {
-    e?.stopPropagation();
-    setXrayMode(false); 
-    setIsFlipped(false);
-    setTimeout(() => setCurrentIndex((prev) => (prev - 1 + deckCards.length) % deckCards.length), 150);
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+        handleNext();
+    } else if (isRightSwipe) {
+        handlePrev();
+    }
   };
 
   const handleGameEnd = (data: any) => { 
       const xp = typeof data === 'number' ? data : (Math.round((data.score / data.total) * 50) + 10); 
-      alert(`Complete! You earned ${xp} XP.`); 
-      setGameMode('study'); 
-      if (activeDeckOverride && onComplete) { 
-          onComplete(activeDeckOverride.id, xp, currentDeck.title, data.score !== undefined ? data : null); 
-      } 
+      alert(`Complete! You earned ${xp} XP.`); setGameMode('study'); 
+      if (activeDeckOverride && onComplete) onComplete(activeDeckOverride.id, xp, currentDeck.title, data.score !== undefined ? data : null); 
   };
-
+  
   const handleQuickAdd = (e: any) => { 
-    e.preventDefault(); 
-    if(!quickAddData.front || !quickAddData.back) return; 
-    onSaveCard({ 
-      ...quickAddData, 
-      deckId: selectedDeckKey, 
-      ipa: "/.../", 
-      mastery: 0, 
-      morphology: [{ part: quickAddData.front, meaning: "Custom", type: "root" }], 
-      usage: { sentence: "-", translation: "-" }, 
-      grammar_tags: ["Quick Add"] 
-    }); 
-    setQuickAddData({ front: '', back: '', type: 'noun' }); 
-    setSearchTerm(''); 
-    alert("Card Added!"); 
+    e.preventDefault(); if(!quickAddData.front || !quickAddData.back) return; 
+    onSaveCard({ ...quickAddData, deckId: selectedDeckKey, ipa: "/.../", mastery: 0, morphology: [{ part: quickAddData.front, meaning: "Custom", type: "root" }], usage: { sentence: "-", translation: "-" }, grammar_tags: ["Quick Add"] }); 
+    setQuickAddData({ front: '', back: '', type: 'noun' }); setSearchTerm(''); alert("Card Added!"); 
   };
 
-  // Keyboard Navigation Support
+  // Keyboard Navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (manageMode || gameMode !== 'study') return;
       if (e.key === 'ArrowRight') handleNext();
       if (e.key === 'ArrowLeft') handlePrev();
-      if (e.key === ' ' || e.key === 'Enter') {
-         if (!xrayMode) setIsFlipped(prev => !prev);
-      }
+      if (e.key === ' ' || e.key === 'Enter') if (!xrayMode) setIsFlipped(prev => !prev);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [manageMode, gameMode, xrayMode, deckCards.length]);
+  }, [manageMode, gameMode, xrayMode, deckCards.length, handleNext, handlePrev]);
 
-  // --- RENDER: EMPTY STATE ---
-  if (!card && !manageMode) {
-    return (
+  if (!card && !manageMode) return (
       <div className="h-full flex flex-col bg-slate-50">
-        <Header 
-          title={currentDeck?.title || "Empty Deck"} 
-          onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} 
-          rightAction={
-            <button onClick={() => setManageMode(true)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200">
-              <List size={20} className="text-slate-600" />
-            </button>
-          } 
-        />
+        <Header title={currentDeck?.title || "Empty Deck"} onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} rightAction={<button onClick={() => setManageMode(true)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200"><List size={20} className="text-slate-600" /></button>} />
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400">
-          <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-             <Layers size={32} className="opacity-20" />
-          </div>
-          <p className="font-bold text-lg text-slate-500">This deck is empty.</p>
-          <button onClick={() => setManageMode(true)} className="px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg mt-4">
-            Add Cards
-          </button>
+          <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4"><Layers size={32} className="opacity-20" /></div>
+          <p className="font-bold text-lg text-slate-500">This deck is empty.</p><button onClick={() => setManageMode(true)} className="px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg mt-4">Add Cards</button>
         </div>
       </div>
-    );
-  }
-
-  // --- RENDER: MAIN VIEW ---
-  const filteredCards = deckCards.filter((c: any) => 
-    (c.front || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (c.back || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const filteredCards = deckCards.filter((c: any) => (c.front || '').toLowerCase().includes(searchTerm.toLowerCase()) || (c.back || '').toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div className="h-[calc(100vh-80px)] flex flex-col bg-slate-50 pb-6 relative overflow-hidden">
+      <Header title={currentDeck?.title.split(' ').slice(1).join(' ') || "Deck"} subtitle={`${currentIndex + 1} / ${deckCards.length} Cards`} onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} rightAction={<div className="flex items-center gap-2">{activeDeckOverride && onComplete && (<button onClick={() => onComplete(activeDeckOverride.id, 50, currentDeck.title)} className="bg-emerald-500 text-white px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-sm hover:scale-105 transition-transform"><Check size={14}/> Complete</button>)}<button onClick={() => setManageMode(!manageMode)} className={`p-2 rounded-full transition-colors ${manageMode ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>{manageMode ? <X size={20} /> : <List size={20} />}</button></div>} />
       
-      {/* HEADER */}
-      <Header 
-        title={currentDeck?.title.split(' ').slice(1).join(' ') || "Deck"} 
-        subtitle={`${currentIndex + 1} / ${deckCards.length} Cards`} 
-        onClickTitle={() => setIsSelectorOpen(!isSelectorOpen)} 
-        rightAction={
-          <div className="flex items-center gap-2">
-            {activeDeckOverride && onComplete && (
-              <button onClick={() => onComplete(activeDeckOverride.id, 50, currentDeck.title)} className="bg-emerald-500 text-white px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-sm hover:scale-105 transition-transform">
-                <Check size={14}/> Complete
-              </button>
-            )}
-            <button onClick={() => setManageMode(!manageMode)} className={`p-2 rounded-full transition-colors ${manageMode ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
-              {manageMode ? <X size={20} /> : <List size={20} />}
-            </button>
-          </div>
-        } 
-      />
-
-      {/* DECK SELECTOR DROPDOWN */}
-      {isSelectorOpen && (
-        <>
-          <div className="absolute top-24 left-6 right-6 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 animate-in fade-in slide-in-from-top-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
-            {Object.entries(allDecks).map(([key, deck]: any) => (
-              <button key={key} onClick={() => handleDeckChange(key)} className={`w-full text-left p-3 rounded-xl font-bold text-sm mb-1 flex justify-between items-center ${selectedDeckKey === key ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'}`}>
-                <span>{deck.title}</span>
-                <span className="text-xs bg-white px-2 py-1 rounded border border-slate-100 text-slate-400">{deck.cards?.length || 0}</span>
-              </button>
-            ))}
-          </div>
-          <div className="absolute inset-0 z-40 bg-black/5 backdrop-blur-[1px]" onClick={() => setIsSelectorOpen(false)} />
-        </>
-      )}
-      
-      {/* GAME MODE TABS */}
-      {!manageMode && (
-        <div className="px-6 mt-2 mb-2 z-10">
-          <div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto overflow-x-auto shadow-inner">
-            {['study', 'quiz', 'match'].map((mode) => (
-                <button 
-                  key={mode} 
-                  onClick={() => setGameMode(mode)} 
-                  className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg whitespace-nowrap capitalize transition-all ${gameMode === mode ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                  {mode}
-                </button>
-            ))}
-          </div>
-        </div>
-      )}
+      {isSelectorOpen && (<><div className="absolute top-24 left-6 right-6 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 animate-in fade-in slide-in-from-top-4 max-h-[60vh] overflow-y-auto custom-scrollbar">{Object.entries(allDecks).map(([key, deck]: any) => (<button key={key} onClick={() => handleDeckChange(key)} className={`w-full text-left p-3 rounded-xl font-bold text-sm mb-1 flex justify-between items-center ${selectedDeckKey === key ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-600'}`}><span>{deck.title}</span><span className="text-xs bg-white px-2 py-1 rounded border border-slate-100 text-slate-400">{deck.cards?.length || 0}</span></button>))}</div><div className="absolute inset-0 z-40 bg-black/5 backdrop-blur-[1px]" onClick={() => setIsSelectorOpen(false)} /></>)}
+      {!manageMode && (<div className="px-6 mt-2 mb-2 z-10"><div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto overflow-x-auto shadow-inner">{['study', 'quiz', 'match'].map((mode) => (<button key={mode} onClick={() => setGameMode(mode)} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg whitespace-nowrap capitalize transition-all ${gameMode === mode ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>{mode}</button>))}</div></div>)}
       
       <div className="flex-1 overflow-y-auto pt-4 relative">
         {manageMode ? (
-            /* --- MANAGER VIEW --- */
             <div className="p-6 pb-24">
                  <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><List size={18}/> Deck Manager</h3>
-                 <div className="relative mb-6">
-                    <Search className="absolute left-3 top-3.5 text-slate-400" size={18} />
-                    <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder={`Search ${deckCards.length} cards...`} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-sm" />
-                 </div>
-                 
-                 {selectedDeckKey === 'custom' && (
-                    <div className="bg-white p-4 rounded-xl border border-indigo-100 shadow-sm mb-6">
-                        <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-3 flex items-center gap-2"><PlusCircle size={14}/> Quick Add</h4>
-                        <div className="flex gap-2 mb-2">
-                            <input placeholder="Word" value={quickAddData.front} onChange={(e) => setQuickAddData({...quickAddData, front: e.target.value})} className="flex-1 p-2 bg-slate-50 rounded border border-slate-200 text-sm font-bold" />
-                            <select value={quickAddData.type} onChange={(e) => setQuickAddData({...quickAddData, type: e.target.value})} className="p-2 bg-slate-50 rounded border border-slate-200 text-xs">
-                                <option value="noun">Noun</option><option value="verb">Verb</option><option value="phrase">Phrase</option>
-                            </select>
-                        </div>
-                        <div className="flex gap-2">
-                            <input placeholder="Meaning" value={quickAddData.back} onChange={(e) => setQuickAddData({...quickAddData, back: e.target.value})} className="flex-1 p-2 bg-slate-50 rounded border border-slate-200 text-sm" />
-                            <button onClick={handleQuickAdd} className="bg-indigo-600 text-white p-2 rounded-lg hover:bg-indigo-700"><Plus size={18}/></button>
-                        </div>
-                    </div>
-                 )}
-                 
-                 <div className="space-y-2">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cards in Deck</p>
-                    {filteredCards.map((c: any, idx: number) => (
-                        <button key={idx} onClick={() => { setCurrentIndex(deckCards.indexOf(c)); setManageMode(false); }} className="w-full bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center hover:border-indigo-300 transition-colors text-left group">
-                            <div>
-                                <span className="font-bold text-slate-800">{c.front}</span>
-                                <span className="text-slate-400 mx-2">•</span>
-                                <span className="text-sm text-slate-500 group-hover:text-indigo-600 transition-colors">{c.back}</span>
-                            </div>
-                            <ArrowRight size={16} className="text-slate-300 group-hover:text-indigo-400" />
-                        </button>
-                    ))}
-                    {filteredCards.length === 0 && <p className="text-slate-400 text-sm italic text-center py-4">No cards found matching your search.</p>}
-                 </div>
+                 <div className="relative mb-6"><Search className="absolute left-3 top-3.5 text-slate-400" size={18} /><input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder={`Search ${deckCards.length} cards...`} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-sm" /></div>
+                 {selectedDeckKey === 'custom' && (<div className="bg-white p-4 rounded-xl border border-indigo-100 shadow-sm mb-6"><h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-3 flex items-center gap-2"><PlusCircle size={14}/> Quick Add</h4><div className="flex gap-2 mb-2"><input placeholder="Word" value={quickAddData.front} onChange={(e) => setQuickAddData({...quickAddData, front: e.target.value})} className="flex-1 p-2 bg-slate-50 rounded border border-slate-200 text-sm font-bold" /><select value={quickAddData.type} onChange={(e) => setQuickAddData({...quickAddData, type: e.target.value})} className="p-2 bg-slate-50 rounded border border-slate-200 text-xs"><option value="noun">Noun</option><option value="verb">Verb</option><option value="phrase">Phrase</option></select></div><div className="flex gap-2"><input placeholder="Meaning" value={quickAddData.back} onChange={(e) => setQuickAddData({...quickAddData, back: e.target.value})} className="flex-1 p-2 bg-slate-50 rounded border border-slate-200 text-sm" /><button onClick={handleQuickAdd} className="bg-indigo-600 text-white p-2 rounded-lg hover:bg-indigo-700"><Plus size={18}/></button></div></div>)}
+                 <div className="space-y-2"><p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cards in Deck</p>{filteredCards.map((c: any, idx: number) => (<button key={idx} onClick={() => { setCurrentIndex(deckCards.indexOf(c)); setManageMode(false); }} className="w-full bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center hover:border-indigo-300 transition-colors text-left group"><div><span className="font-bold text-slate-800">{c.front}</span><span className="text-slate-400 mx-2">•</span><span className="text-sm text-slate-500 group-hover:text-indigo-600 transition-colors">{c.back}</span></div><ArrowRight size={16} className="text-slate-300 group-hover:text-indigo-400" /></button>))}{filteredCards.length === 0 && <p className="text-slate-400 text-sm italic text-center py-4">No cards found matching your search.</p>}</div>
             </div>
         ) : (
-            /* --- GAME / STUDY VIEWS --- */
             <>
             {gameMode === 'match' && <MatchingGame deckCards={deckCards} onGameEnd={handleGameEnd} />}
             {gameMode === 'quiz' && <QuizGame deckCards={deckCards} onGameEnd={handleGameEnd} />}
             {gameMode === 'study' && card && (
-                  <div className="flex-1 flex flex-col items-center justify-center px-4 py-2 relative z-0" style={{ perspective: '1000px' }}>
+                  /* WRAPPER FOR SWIPE DETECTION
+                    We attach the touch handlers here so the entire card area is swipable.
+                  */
+                  <div 
+                    className="flex-1 flex flex-col items-center justify-center px-4 py-2 perspective-1000 relative z-0" 
+                    style={{ perspective: '1000px' }}
+                    onTouchStart={onTouchStart}
+                    onTouchMove={onTouchMove}
+                    onTouchEnd={onTouchEnd}
+                  >
                       <div 
                         className="relative w-full h-full max-h-[520px] cursor-pointer shadow-2xl rounded-[2rem]"
                         style={{ 
@@ -1088,7 +993,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                                   <div className="flex gap-2">{card.grammar_tags?.map((tag: string, i: number) => (<span key={i} className="px-2 py-1 bg-slate-100 text-slate-500 text-[10px] font-bold uppercase rounded border border-slate-200">{tag}</span>))}</div>
                                 </div>
                               </div>
-                              {!xrayMode && (<div className="mt-auto text-center"><p className="text-xs text-slate-300 font-bold uppercase tracking-widest animate-pulse">Tap to flip</p></div>)}
+                              {!xrayMode && (<div className="mt-auto text-center"><p className="text-xs text-slate-300 font-bold uppercase tracking-widest animate-pulse">Tap to flip • Swipe to navigate</p></div>)}
                             </div>
                           </div>
 
@@ -1120,159 +1025,6 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// --- 3. STUDENT VIEWS (Defined AFTER Flashcard/Quiz/Games) ---
-
-function EmailSimulatorView({ module, onFinish }: any) {
-  const [currentEmailIndex, setCurrentEmailIndex] = useState(0);
-  const [completedIds, setCompletedIds] = useState<string[]>([]);
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [fillState, setFillState] = useState<any>({});
-  const [fixedTargets, setFixedTargets] = useState<string[]>([]);
-
-  const email = module.scenarios[currentEmailIndex];
-  const isLast = currentEmailIndex === module.scenarios.length - 1;
-  const progress = (completedIds.length / module.scenarios.length) * 100;
-
-  const handleNext = () => {
-    setFeedback(null);
-    setFixedTargets([]);
-    setFillState({});
-    if (currentEmailIndex < module.scenarios.length - 1) {
-      setCurrentEmailIndex(prev => prev + 1);
-    } else {
-      onFinish(module.id, module.xp, module.title);
-    }
-  };
-
-  const markComplete = () => {
-    if (!completedIds.includes(email.id)) {
-      setCompletedIds([...completedIds, email.id]);
-    }
-  };
-
-  const handleToneClick = (phrase: string) => {
-    if (email.targets.includes(phrase)) {
-      if (!fixedTargets.includes(phrase)) {
-        const newFixed = [...fixedTargets, phrase];
-        setFixedTargets(newFixed);
-        if (newFixed.length === email.targets.length) {
-            setFeedback("Great job! You softened the tone.");
-            markComplete();
-        }
-      }
-    }
-  };
-
-  const handleSort = (isCorrect: boolean) => {
-    if (isCorrect) {
-      setFeedback("Correct! You identified the tone.");
-      markComplete();
-    } else {
-      setFeedback("Try again. Look at the vocabulary used.");
-    }
-  };
-
-  const handleFill = (index: number, value: string) => {
-    const newState = { ...fillState, [index]: value };
-    setFillState(newState);
-    const allCorrect = email.blanks.every((b: any) => newState[b.index] === b.correct);
-    if (allCorrect) {
-      setFeedback("Perfect! The email is professional and complete.");
-      markComplete();
-    }
-  };
-
-  return (
-    <div className="h-full flex flex-col bg-slate-100">
-      <div className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-md z-10">
-        <div className="flex items-center gap-3">
-            <div className="bg-indigo-500 p-2 rounded-lg"><UploadCloud size={20} /></div>
-            <div>
-                <h1 className="font-bold text-lg">MailFlow</h1>
-                <p className="text-[10px] text-slate-400">Inbox: {module.scenarios.length - completedIds.length} Unread</p>
-            </div>
-        </div>
-        <div className="flex items-center gap-4">
-            <div className="w-32 h-2 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 transition-all duration-500" style={{width: `${progress}%`}} /></div>
-            <button onClick={() => onFinish(module.id, 0, module.title)} className="text-slate-400 hover:text-white"><X size={20}/></button>
-        </div>
-      </div>
-      <div className="flex-1 flex overflow-hidden">
-        <div className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col p-4 space-y-2">
-            <button className="flex items-center gap-3 p-3 bg-indigo-50 text-indigo-700 rounded-xl font-bold text-sm"><span className="w-2 h-2 rounded-full bg-indigo-600"/> Inbox</button>
-            <button className="flex items-center gap-3 p-3 text-slate-500 font-bold text-sm hover:bg-slate-50"><span className="w-2 h-2 rounded-full bg-transparent"/> Sent</button>
-            <button className="flex items-center gap-3 p-3 text-slate-500 font-bold text-sm hover:bg-slate-50"><span className="w-2 h-2 rounded-full bg-transparent"/> Drafts</button>
-        </div>
-        <div className="flex-1 flex flex-col md:p-6 p-2 overflow-y-auto">
-           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col max-w-3xl mx-auto w-full animate-in slide-in-from-bottom-4 duration-500">
-              <div className="p-6 border-b border-slate-100 bg-slate-50/50">
-                  <div className="flex justify-between items-start mb-4"><h2 className="text-xl font-bold text-slate-900">{email.subject}</h2><span className="text-xs font-mono text-slate-400">Today, 10:42 AM</span></div>
-                  <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm">{email.avatar}</div><div><p className="text-sm font-bold text-slate-800">{email.sender}</p><p className="text-xs text-slate-500">To: You</p></div></div>
-              </div>
-              <div className="p-8 min-h-[300px] text-slate-700 leading-relaxed relative">
-                  <div className="absolute top-2 right-2"><div className="bg-indigo-100 text-indigo-700 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 animate-pulse"><Info size={12} /> {email.instruction}</div></div>
-                  {email.type === 'fix_tone' && (
-                      <div className="text-lg font-serif">
-                          {email.content.split(' ').map((word: string, i: number) => {
-                              const isTarget = email.targets.some((t: string) => t.includes(word.replace(/[^a-zA-Z]/g, '')));
-                              const fullPhrase = email.targets.find((t: string) => t.includes(word.replace(/[^a-zA-Z]/g, '')));
-                              const isFixed = fullPhrase && fixedTargets.includes(fullPhrase);
-                              if (isTarget && !isFixed) return <span key={i} onClick={() => handleToneClick(fullPhrase)} className="bg-rose-100 text-rose-700 cursor-pointer hover:bg-rose-200 px-1 rounded mx-0.5 border-b-2 border-rose-300">{word}</span>
-                              if (isFixed) return <span key={i} className="text-emerald-600 font-bold mx-0.5 transition-all">{word}</span>
-                              return <span key={i} className="mx-0.5">{word}</span>
-                          })}
-                          {fixedTargets.length === email.targets.length && (<div className="mt-6 p-4 bg-emerald-50 border border-emerald-100 rounded-xl text-sm text-emerald-800 animate-in fade-in"><span className="font-bold block mb-1">Better Version:</span>"{email.correctContent}"</div>)}
-                      </div>
-                  )}
-                  {email.type === 'sort' && (
-                      <div className="space-y-6">
-                          <p className="font-serif text-lg bg-slate-50 p-6 rounded-xl border border-slate-100 italic">"{email.content}"</p>
-                          <div className="flex gap-4 justify-center">
-                              {email.options.map((opt: any) => (
-                                  <button key={opt.id} onClick={() => handleSort(opt.correct)} disabled={!!feedback} className="px-6 py-3 rounded-xl border-2 border-slate-200 font-bold hover:border-indigo-500 hover:bg-indigo-50 transition-all flex flex-col items-center gap-2 min-w-[120px]">
-                                      {opt.id === 'formal' ? <Briefcase size={24}/> : <Coffee size={24}/>}
-                                      {opt.label}
-                                  </button>
-                              ))}
-                          </div>
-                      </div>
-                  )}
-                  {email.type === 'reply_fill' && (
-                       <div className="space-y-6">
-                            <p className="font-serif text-lg text-slate-400 mb-6 pb-6 border-b border-slate-100">"{email.content}"</p>
-                            <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 font-serif relative">
-                                <div className="absolute top-0 left-0 bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg">Draft</div>
-                                {email.template.split(/\[(\d)\]/).map((part: string, i: number) => {
-                                    if (part.match(/^\d$/)) {
-                                        const blankIndex = parseInt(part);
-                                        const blankData = email.blanks.find((b: any) => b.index === blankIndex);
-                                        const userVal = fillState[blankIndex];
-                                        return (
-                                            <select key={i} value={userVal || ""} onChange={(e) => handleFill(blankIndex, e.target.value)} disabled={!!feedback} className={`mx-1 p-1 rounded border-b-2 font-sans font-bold text-sm focus:outline-none ${userVal === blankData.correct ? 'text-emerald-600 border-emerald-500 bg-emerald-50' : 'text-indigo-600 border-indigo-300 bg-white'}`}>
-                                                <option value="" disabled>___</option>
-                                                {blankData.options.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
-                                            </select>
-                                        );
-                                    }
-                                    return <span key={i}>{part}</span>
-                                })}
-                            </div>
-                       </div>
-                  )}
-              </div>
-              <div className="bg-slate-50 p-6 border-t border-slate-200 flex justify-between items-center min-h-[88px]">
-                  <div className="flex-1">
-                      {feedback && (<div className={`flex items-center gap-2 font-bold ${feedback.includes("Try again") ? 'text-rose-600' : 'text-emerald-600'} animate-in slide-in-from-left-4`}>{feedback.includes("Try again") ? <AlertCircle size={20}/> : <CheckCircle2 size={20}/>}{feedback}</div>)}
-                  </div>
-                  {completedIds.includes(email.id) && (<button onClick={handleNext} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center gap-2">{isLast ? "Finish Inbox" : "Next Email"} <ArrowRight size={18}/></button>)}
-              </div>
-           </div>
-        </div>
-      </div>
     </div>
   );
 }
