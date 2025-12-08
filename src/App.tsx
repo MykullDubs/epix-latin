@@ -1750,10 +1750,11 @@ function DailyDiscoveryWidget({ allDecks }: any) {
     </div>
   );
 }
-function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck }: any) {
+// Added 'allDecks' to the destructured props here vvv
+function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck, allDecks }: any) {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [showLevelModal, setShowLevelModal] = useState(false);
-  const [libraryExpanded, setLibraryExpanded] = useState(false);
+  const [libraryExpanded, setLibraryExpanded] = useState(false);;
   
   // ... existing derived data code (level, progress, etc) ...
   const { level, progress, rank } = getLevelInfo(userData?.xp || 0);
@@ -3078,8 +3079,7 @@ const renderStudentView = () => {
     
     // 5. Main Tab Navigation
     switch (activeTab) {
-      case 'home': return <HomeView setActiveTab={setActiveTab} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} />;
-      case 'flashcards': 
+case 'home': return <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} />;      case 'flashcards': 
           const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
           const deckToLoad = assignedDeck || allDecks[selectedDeckKey];
           return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} activeDeckOverride={deckToLoad} onComplete={handleFinishLesson} />;
