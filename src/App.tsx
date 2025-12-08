@@ -2523,7 +2523,6 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   
   const [assignType, setAssignType] = useState<'deck' | 'lesson' | 'test'>('lesson');
-  // REMOVED 'analytics' from the allowed types here
   const [viewTab, setViewTab] = useState<'content' | 'forum'>('content');
 
   // -- Student Selector States --
@@ -2543,6 +2542,7 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
     }
   }, [isStudentListOpen]);
 
+  // --- ACTIONS ---
   const createClass = async (e: any) => { e.preventDefault(); if (!newClassName.trim()) return; try { await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), { name: newClassName, code: Math.random().toString(36).substring(2, 8).toUpperCase(), students: [], studentEmails: [], assignments: [], created: Date.now() }); setNewClassName(''); setToastMsg("Class Created Successfully"); } catch (error) { console.error("Create class failed:", error); alert("Failed to create class."); } };
   const handleDeleteClass = async (id: string) => { if (window.confirm("Delete this class?")) { try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id)); if (selectedClassId === id) setSelectedClassId(null); } catch (error) { console.error("Delete class failed:", error); alert("Failed to delete class."); } } };
   const handleRenameClass = async (classId: string, currentName: string) => { const newName = prompt("Enter new class name:", currentName); if (newName && newName.trim() !== "" && newName !== currentName) { try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { name: newName.trim() }); setToastMsg("Class renamed successfully"); } catch (error) { console.error("Rename failed", error); alert("Failed to rename class"); } } };
@@ -2558,6 +2558,43 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
           await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { students: arrayUnion(normalizedEmail), studentEmails: arrayUnion(normalizedEmail) });
           setToastMsg(`Added ${normalizedEmail}`);
       } catch (error) { console.error("Add student failed:", error); alert("Failed to add student."); }
+  };
+
+  // --- NEW: REMOVE ACTIONS ---
+  const removeStudent = async (email: string) => {
+      if (!selectedClass || !email) return;
+      if (!window.confirm(`Are you sure you want to remove ${email} from this class?`)) return;
+
+      try {
+          // Filter out the student to remove
+          const newStudents = (selectedClass.students || []).filter((s: string) => s !== email);
+          const newEmails = (selectedClass.studentEmails || []).filter((s: string) => s !== email);
+
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), {
+              students: newStudents,
+              studentEmails: newEmails
+          });
+          setToastMsg(`Removed ${email}`);
+      } catch (e: any) {
+          console.error(e);
+          alert("Error removing student: " + e.message);
+      }
+  };
+
+  const removeAssignment = async (assignmentId: string) => {
+      if (!selectedClass) return;
+      if (!window.confirm("Unassign this content? Student progress logs for this specific task assignment may be lost.")) return;
+
+      try {
+          const newAssignments = (selectedClass.assignments || []).filter((a: any) => a.id !== assignmentId);
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), {
+              assignments: newAssignments
+          });
+          setToastMsg("Assignment removed");
+      } catch (e: any) {
+          console.error(e);
+          alert("Error removing assignment: " + e.message);
+      }
   };
 
   if (selectedClass) {
@@ -2576,7 +2613,6 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                     <>
                     <button onClick={() => { setAssignType('lesson'); setAssignModalOpen(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-indigo-700 active:scale-95 transition-all uppercase tracking-wider"><BookOpen size={16}/> ASSIGN LESSON</button>
                     <button onClick={() => { setAssignType('deck'); setAssignModalOpen(true); }} className="bg-orange-500 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-orange-600 active:scale-95 transition-all uppercase tracking-wider"><Layers size={16}/> ASSIGN DECK</button>
-                    {/* Replaced FileQuestion with HelpCircle */}
                     <button onClick={() => { setAssignType('test'); setAssignModalOpen(true); }} className="bg-rose-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-rose-700 active:scale-95 transition-all uppercase tracking-wider"><HelpCircle size={16}/> ASSIGN EXAM</button>
                     </>
                 )}
@@ -2590,9 +2626,8 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                     <h3 className="font-bold text-slate-800 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3>
                     {(!selectedClass.assignments || selectedClass.assignments.length === 0) && <div className="p-6 border-2 border-dashed border-slate-200 rounded-xl text-center text-slate-400 text-sm">No content assigned yet.</div>}
                     {selectedClass.assignments?.map((l: any, idx: number) => ( 
-                      <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
+                      <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center group">
                         <div className="flex items-center gap-3">
-                          {/* Replaced FileQuestion with HelpCircle */}
                           <div className={`p-2 rounded-lg ${l.contentType === 'deck' ? 'bg-orange-100 text-orange-600' : l.contentType === 'test' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
                               {l.contentType === 'deck' ? <Layers size={18} /> : l.contentType === 'test' ? <HelpCircle size={18}/> : <FileText size={18} />}
                           </div>
@@ -2606,13 +2641,35 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                               </div>
                           </div>
                         </div>
-                        <span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded text-xs font-bold">Active</span>
+                        {/* UNASSIGN BUTTON */}
+                        <button 
+                            onClick={() => removeAssignment(l.id)} 
+                            className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                            title="Unassign Task"
+                        >
+                            <Trash2 size={16} />
+                        </button>
                       </div> 
                     ))}
                 </div>
                 <div className="space-y-4">
                     <div className="flex justify-between items-center"><h3 className="font-bold text-slate-800 flex items-center gap-2"><Users size={18} className="text-indigo-600"/> Roster</h3><button onClick={() => setIsStudentListOpen(true)} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"><UserPlus size={14}/> Add Students</button></div>
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">{(!selectedClass.students || selectedClass.students.length === 0) && <div className="p-4 text-center text-slate-400 text-sm italic">No students joined yet.</div>}{selectedClass.students?.map((s: string, i: number) => (<div key={i} className="p-3 border-b border-slate-50 last:border-0 flex items-center gap-3"><div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs">{s.charAt(0)}</div><span className="text-sm font-medium text-slate-700">{s}</span></div>))}</div>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">{(!selectedClass.students || selectedClass.students.length === 0) && <div className="p-4 text-center text-slate-400 text-sm italic">No students joined yet.</div>}{selectedClass.students?.map((s: string, i: number) => (
+                        <div key={i} className="p-3 border-b border-slate-50 last:border-0 flex items-center justify-between group">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs">{s.charAt(0)}</div>
+                                <span className="text-sm font-medium text-slate-700">{s}</span>
+                            </div>
+                            {/* REMOVE STUDENT BUTTON */}
+                            <button 
+                                onClick={() => removeStudent(s)} 
+                                className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                title="Remove Student"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        </div>))}
+                    </div>
                 </div>
             </div>
         )}
@@ -2622,8 +2679,6 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                 <ClassForum classId={selectedClass.id} user={user} userData={{...userData, role: 'instructor'}} />
             </div>
         )}
-
-        {/* REMOVED ANALYTICS TAB CONTENT BLOCK */}
 
         {isStudentListOpen && (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -2687,7 +2742,6 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                       </div>
                   )}
                   
-                  {/* Filter out 'test' type here so lessons aren't cluttered */}
                   {assignType === 'lesson' && (
                       <div>
                           <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><BookOpen size={14}/> Available Lessons</h4>
@@ -2702,7 +2756,6 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                       </div>
                   )}
                   
-                  {/* --- NEW SECTION: EXAMS --- */}
                   {assignType === 'test' && (
                       <div>
                           <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><HelpCircle size={14}/> Available Exams</h4>
@@ -2732,57 +2785,6 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
     </div>
   );
 }
-// 2. Replace InstructorDashboard
-// Fixes: Passes 'userData' properly to ClassManagerView
-function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, onLogout }: any) {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  
-  return (
-    <div className="flex h-screen bg-slate-100 overflow-hidden">
-      <div className="w-64 bg-slate-900 text-white flex-col hidden md:flex">
-        <div className="p-6 border-b border-slate-800"><h1 className="text-xl font-bold flex items-center gap-2">
-        <GraduationCap className="text-indigo-400"/> Instructor 
-    </h1><p className="text-xs text-slate-400 mt-1">{user.email}</p></div>
-        <div className="flex-1 p-4 space-y-2">
-            <button onClick={() => setActiveTab('dashboard')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'}`}><LayoutDashboard size={20} /> Overview</button>
-            <button onClick={() => setActiveTab('classes')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'classes' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'}`}><School size={20} /> Classes & Roster</button>
-            <button onClick={() => setActiveTab('content')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'content' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'}`}><Library size={20} /> Content Library</button>
-            <button onClick={() => setActiveTab('profile')} className={`w-full p-3 rounded-xl flex items-center gap-3 transition-colors ${activeTab === 'profile' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:bg-slate-800'}`}><User size={20} /> Profile & Settings</button>
-        </div>
-        <div className="p-4 border-t border-slate-800"><button onClick={onLogout} className="w-full p-3 rounded-xl bg-slate-800 text-rose-400 flex items-center gap-3 hover:bg-slate-700 transition-colors"><LogOut size={20} /> Sign Out</button></div>
-      </div>
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
-         <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center"><span className="font-bold flex items-center gap-2"><GraduationCap/> Magister</span><div className="flex gap-4"><button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'text-indigo-400' : 'text-slate-400'}><LayoutDashboard/></button><button onClick={() => setActiveTab('classes')} className={activeTab === 'classes' ? 'text-indigo-400' : 'text-slate-400'}><School/></button><button onClick={() => setActiveTab('content')} className={activeTab === 'content' ? 'text-indigo-400' : 'text-slate-400'}><Library/></button></div></div>
-         <div className="flex-1 overflow-y-auto p-4 md:p-8">
-            <div className="max-w-6xl mx-auto h-full">
-                {activeTab === 'dashboard' && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
-                        <div className="md:col-span-2 space-y-6">
-                            <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 rounded-3xl p-8 text-white shadow-lg">
-                                <h2 className="text-3xl font-bold mb-2">Welcome back, Magister.</h2>
-                                <p className="text-indigo-100 mb-6">Your academy is active.</p>
-                                <div className="flex gap-8">
-                                    <div><span className="text-4xl font-bold block">{userData.classes?.length || 0}</span><span className="text-xs uppercase tracking-wider opacity-70">Active Classes</span></div>
-                                    <div><span className="text-4xl font-bold block">{allDecks.custom?.cards?.length || 0}</span><span className="text-xs uppercase tracking-wider opacity-70">Flashcards</span></div>
-                                    <div><span className="text-4xl font-bold block">{lessons.length}</span><span className="text-xs uppercase tracking-wider opacity-70">Lessons</span></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="h-[500px] md:h-auto">
-                            <LiveActivityFeed />
-                        </div>
-                    </div>
-                )}
-                {activeTab === 'classes' && (<ClassManagerView user={user} userData={userData} classes={userData?.classes || []} lessons={lessons} allDecks={allDecks} />)}
-                {activeTab === 'content' && (<div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full overflow-hidden flex flex-col"><div className="flex-1 overflow-y-auto"><BuilderHub onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} onSaveLesson={onSaveLesson} allDecks={allDecks} /></div></div>)}
-                {activeTab === 'profile' && <ProfileView user={user} userData={userData} />}
-            </div>
-         </div>
-      </div>
-    </div>
-  );
-}
-
 // ============================================================================
 // PASTE THIS AT THE VERY BOTTOM OF YOUR FILE
 // (Replace your existing RoleToggle and function App)
