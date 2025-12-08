@@ -75,9 +75,9 @@ const INITIAL_SYSTEM_DECKS: any = {
   greetings: {
     title: "👋 English Greetings",
     cards: [
-      { id: 'g1', front: "How are you?", back: "A polite question about someone's health or mood.", type: "phrase", mastery: 0 },
-      { id: 'g2', front: "Nice to meet you", back: "Used when meeting someone for the first time.", type: "phrase", mastery: 0 },
-      { id: 'g3', front: "See you later", back: "A casual way to say goodbye.", type: "phrase", mastery: 0 }
+      { id: 'g1', front: "How are you?", back: "A polite question about health.", type: "phrase", mastery: 0, ipa: "/haʊ ɑːr juː/" },
+      { id: 'g2', front: "Nice to meet you", back: "Used when meeting first time.", type: "phrase", mastery: 0, ipa: "/naɪs tuː miːt juː/" },
+      { id: 'g3', front: "See you later", back: "Casual goodbye.", type: "phrase", mastery: 0, ipa: "/siː juː ˈleɪtər/" }
     ]
   },
   phrasal_verbs: {
