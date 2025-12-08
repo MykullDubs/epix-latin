@@ -1428,25 +1428,55 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [saving, setSaving] = useState(false);
+  
+  // Navigation State
+  const [sessionCards, setSessionCards] = useState<any[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Swipe State
+  const [dragStartX, setDragStartX] = useState<number | null>(null);
+  const [dragEndX, setDragEndX] = useState<number | null>(null);
+  const minSwipeDistance = 50; 
 
   // 1. Get Preference
   const preferredDeckId = userData?.widgetDeckId || 'all';
 
   // 2. Audio Engine
-  const playAudio = (text: string) => {
+  const playAudio = useCallback((text: string) => {
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    // Attempt to pick a good voice
     const voices = window.speechSynthesis.getVoices();
     const preferredVoice = voices.find(v => v.lang.includes('en-US') && v.name.includes('Google')) || 
                            voices.find(v => v.lang.includes('en-US'));
     if (preferredVoice) utterance.voice = preferredVoice;
     utterance.rate = 0.85; 
     window.speechSynthesis.speak(utterance);
-  };
+  }, []);
 
-  // 3. Save Preference
+  // 3. Initialize Session (Load 10 cards)
+  useEffect(() => {
+    let sourceCards: any[] = [];
+    if (preferredDeckId === 'all' || !allDecks[preferredDeckId]) {
+        Object.values(allDecks).forEach((deck: any) => {
+            if (deck.cards && Array.isArray(deck.cards)) sourceCards.push(...deck.cards);
+        });
+    } else {
+        sourceCards = allDecks[preferredDeckId]?.cards || [];
+    }
+
+    if (sourceCards.length > 0) {
+        // Fisher-Yates Shuffle
+        const shuffled = [...sourceCards].sort(() => 0.5 - Math.random());
+        // Take top 10 for this mini-session
+        setSessionCards(shuffled.slice(0, 10));
+        setCurrentIndex(0);
+    } else {
+        setSessionCards([]);
+    }
+  }, [allDecks, preferredDeckId]);
+
+  // 4. Save Preference
   const handleDeckSelect = async (deckId: string) => {
     if (!user) return;
     setSaving(true);
@@ -1463,28 +1493,46 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
     }
   };
 
-  // 4. Calculate Daily Card
-  const dailyCard = useMemo(() => {
-    let sourceCards: any[] = [];
-    if (preferredDeckId === 'all' || !allDecks[preferredDeckId]) {
-        Object.values(allDecks).forEach((deck: any) => {
-            if (deck.cards && Array.isArray(deck.cards)) sourceCards.push(...deck.cards);
-        });
-    } else {
-        sourceCards = allDecks[preferredDeckId]?.cards || [];
+  // 5. Navigation Handlers
+  const handleNext = () => {
+    setIsFlipped(false);
+    setTimeout(() => {
+        setCurrentIndex(prev => (prev + 1) % sessionCards.length);
+    }, 200);
+  };
+
+  const handlePrev = () => {
+    setIsFlipped(false);
+    setTimeout(() => {
+        setCurrentIndex(prev => (prev - 1 + sessionCards.length) % sessionCards.length);
+    }, 200);
+  };
+
+  // 6. Pointer Swipe Handlers (Mouse + Touch)
+  const onPointerDown = (e: React.PointerEvent) => {
+    setDragEndX(null); 
+    setDragStartX(e.clientX);
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (dragStartX !== null) setDragEndX(e.clientX);
+  };
+
+  const onPointerUp = () => {
+    if (dragStartX === null || dragEndX === null) {
+        setDragStartX(null);
+        return;
     }
-    if (sourceCards.length === 0) return null;
+    const distance = dragStartX - dragEndX;
+    if (distance > minSwipeDistance) handleNext(); // Left Swipe
+    else if (distance < -minSwipeDistance) handlePrev(); // Right Swipe
+    
+    setDragStartX(null);
+    setDragEndX(null);
+  };
 
-    // Daily Seed
-    const today = new Date();
-    const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
-    return sourceCards[seed % sourceCards.length];
-  }, [allDecks, preferredDeckId]);
-
-  // Deck Title Helper
+  const currentCard = sessionCards[currentIndex];
   const currentDeckTitle = preferredDeckId === 'all' ? "All Collections" : (allDecks[preferredDeckId]?.title || "Unknown Deck");
-
-  // --- RENDERING STATES ---
 
   return (
     <div className="mx-6 mt-6 animate-in slide-in-from-bottom-2 duration-700 relative z-0">
@@ -1535,19 +1583,28 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                   ))}
               </div>
           </div>
-      ) : dailyCard ? (
-          /* 2. CARD MODE (Using Inline Styles for Perfect 3D Flip) */
+      ) : currentCard ? (
+          /* 2. DECK STACK MODE */
           <div 
-            className="relative h-56 w-full cursor-pointer group perspective-1000"
+            className="relative h-56 w-full cursor-pointer group perspective-1000 touch-pan-y select-none"
             style={{ perspective: '1000px' }}
-            onClick={() => setIsFlipped(!isFlipped)}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerLeave={onPointerUp}
           >
+            {/* BACKGROUND STACK EFFECTS (Ghost Cards) */}
+            <div className="absolute top-2 left-4 right-4 bottom-0 bg-indigo-300/40 rounded-[2rem] transform scale-95 translate-y-2 z-0" />
+            <div className="absolute top-4 left-8 right-8 bottom-0 bg-indigo-200/30 rounded-[2rem] transform scale-90 translate-y-3 z-0" />
+
+            {/* MAIN CARD */}
             <div 
-                className="relative w-full h-full shadow-2xl rounded-[2rem] transition-transform duration-700"
+                className="relative w-full h-full shadow-2xl rounded-[2rem] transition-transform duration-500 z-10"
                 style={{ 
                     transformStyle: 'preserve-3d', 
                     transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)'
                 }}
+                onClick={() => setIsFlipped(!isFlipped)}
             >
               
               {/* FRONT SIDE */}
@@ -1563,12 +1620,12 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                 <div className="flex justify-between items-start relative z-10">
                    <span className="bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-white/10 flex items-center gap-1.5 shadow-sm">
                      <Layers size={10} className="text-indigo-200" /> 
-                     <span className="max-w-[150px] truncate">{currentDeckTitle}</span>
+                     {currentIndex + 1} / {sessionCards.length}
                    </span>
                    
                    <div 
                      className="p-2.5 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-90 border border-white/5 shadow-sm"
-                     onClick={(e) => { e.stopPropagation(); playAudio(dailyCard.front); }}
+                     onClick={(e) => { e.stopPropagation(); playAudio(currentCard.front); }}
                    >
                      <Volume2 size={20} className="text-white"/>
                    </div>
@@ -1576,16 +1633,16 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
 
                 {/* Front Content */}
                 <div className="text-center relative z-10 mt-2">
-                  <h2 className="text-4xl font-serif font-bold mb-2 drop-shadow-md">{dailyCard.front}</h2>
+                  <h2 className="text-4xl font-serif font-bold mb-2 drop-shadow-md">{currentCard.front}</h2>
                   <div className="inline-block px-3 py-1 bg-white/10 rounded-full backdrop-blur-sm">
-                      <p className="text-indigo-100 font-serif text-sm tracking-wide">{dailyCard.ipa || '/.../'}</p>
+                      <p className="text-indigo-100 font-serif text-sm tracking-wide">{currentCard.ipa || '/.../'}</p>
                   </div>
                 </div>
 
                 {/* Front Footer */}
                 <div className="text-center relative z-10">
                   <p className="text-[10px] uppercase font-bold text-indigo-200 tracking-widest animate-pulse flex items-center justify-center gap-2">
-                    Tap to Flip <ArrowRight size={10} />
+                    <ArrowLeft size={10}/> Swipe <ArrowRight size={10}/>
                   </p>
                 </div>
               </div>
@@ -1604,22 +1661,24 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                  <div className="flex-1 flex flex-col items-center justify-center w-full">
                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 bg-slate-50 px-2 py-1 rounded-md">Definition</span>
                      
-                     <h3 className="text-2xl font-bold text-slate-800 mb-4 leading-tight">{dailyCard.back}</h3>
+                     <h3 className="text-2xl font-bold text-slate-800 mb-4 leading-tight">{currentCard.back}</h3>
                      
-                     {dailyCard.usage?.sentence && (
+                     {currentCard.usage?.sentence && (
                        <div className="bg-slate-50 p-4 rounded-xl w-full border border-slate-100 text-left relative">
                          <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 rounded-l-xl"></div>
-                         <p className="text-sm text-slate-600 italic font-serif leading-relaxed pl-2">"{dailyCard.usage.sentence}"</p>
+                         <p className="text-sm text-slate-600 italic font-serif leading-relaxed pl-2">"{currentCard.usage.sentence}"</p>
                        </div>
                      )}
                  </div>
                  
-                 <div className="mt-auto text-[10px] text-slate-300 font-bold uppercase">Back of Card</div>
+                 <div className="mt-auto text-[10px] text-slate-300 font-bold uppercase flex items-center gap-2">
+                    <ArrowLeft size={10}/> Next Card <ArrowRight size={10}/>
+                 </div>
               </div>
             </div>
           </div>
       ) : (
-          /* 3. EMPTY STATE (Visible Fallback) */
+          /* 3. EMPTY STATE */
           <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] p-8 text-center flex flex-col items-center justify-center h-56">
               <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 text-slate-300">
                   <Layers size={24} />
