@@ -1776,7 +1776,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
     {showLevelModal && <LevelUpModal userData={userData} onClose={() => setShowLevelModal(false)} />}
 
     {userData?.classSyncError && (<div className="bg-rose-500 text-white p-4 text-center text-sm font-bold relative z-50"><AlertTriangle className="inline-block mr-2" size={16} />System Notice: Database Index Missing.</div>)}
-    
+    <DailyDiscoveryWidget allDecks={{...lessons.filter((l:any) => l.contentType === 'deck'), ...assignments.filter((a:any) => a.contentType === 'deck')}} />
     {/* --- HERO WIDGET --- */}
     <button onClick={() => setShowLevelModal(true)} className="w-full relative overflow-hidden bg-gradient-to-br from-blue-500 via-indigo-500 to-blue-600 text-white shadow-xl z-10 group text-left rounded-b-[2.5rem] pb-8 pt-10 px-6 transition-all active:scale-[0.99]">
         <div className="absolute top-[-50%] left-[-20%] w-[500px] h-[500px] bg-blue-400/30 rounded-full blur-[80px] mix-blend-overlay pointer-events-none"></div>
