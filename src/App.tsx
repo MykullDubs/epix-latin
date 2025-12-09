@@ -1748,29 +1748,21 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
 function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
   // Game Flow
   const [gameState, setGameState] = useState<'intro' | 'playing' | 'gameover'>('intro');
-  const [isPaused, setIsPaused] = useState(false);
-  
-  // Stats
-  const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
+  const [score, setScore] = useState(0);
   const [round, setRound] = useState(1);
   const [timeLeft, setTimeLeft] = useState(15);
-  const [combo, setCombo] = useState(0); // Current streak
   
+  // Slash Engine State
+  const [slashPath, setSlashPath] = useState<{x: number, y: number}[]>([]);
+  const [isSlashing, setIsSlashing] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   // Data
   const [currentCard, setCurrentCard] = useState<any>(null);
-  const [options, setOptions] = useState<any[]>([]);
+  const [options, setOptions] = useState<any[]>([]); // 4 options
   const [pool, setPool] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  // --- NEW: GLADIATOR CLASSES ---
-  const GLADIATORS = [
-      { id: 'murmillo', name: 'The Tank', icon: <Shield size={32}/>, desc: 'Start with 5 Hearts. Low Score.', hpBonus: 2, timeBonus: 0, scoreMult: 0.8 },
-      { id: 'dimachaerus', name: 'The Duelist', icon: <Swords size={32}/>, desc: 'Standard stats. Balanced.', hpBonus: 0, timeBonus: 0, scoreMult: 1.0 },
-      { id: 'sagittarius', name: 'The Sniper', icon: <Target size={32}/>, desc: '2 Hearts. 2x Score. High Risk.', hpBonus: -1, timeBonus: -2, scoreMult: 2.0 },
-      { id: 'philosophus', name: 'The Scholar', icon: <Hourglass size={32}/>, desc: 'Extra time to think.', hpBonus: 0, timeBonus: 5, scoreMult: 0.9 },
-  ];
-  const [selectedClass, setSelectedClass] = useState(GLADIATORS[1]);
 
   // 1. Initialize Pool
   useEffect(() => {
@@ -1781,251 +1773,249 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
     setPool(combined.sort(() => 0.5 - Math.random()));
   }, [allDecks]);
 
-  // 2. Timer Engine
+  // 2. Timer
   useEffect(() => {
-    if (gameState !== 'playing' || isPaused) return;
+    if (gameState !== 'playing' || selectedId) return;
     if (timeLeft <= 0) { handleWrongAnswer(); return; }
-    
     const timer = setInterval(() => setTimeLeft(t => t - 1), 1000);
     return () => clearInterval(timer);
-  }, [timeLeft, gameState, isPaused]);
+  }, [timeLeft, gameState, selectedId]);
 
-  // 3. Game Logic
+  // 3. Logic
   const nextRound = () => {
     if (lives <= 0) {
         setGameState('gameover');
-        const finalXP = Math.ceil(score / 2);
-        if (score > 0) onXPUpdate(finalXP, `Colosseum Run (${selectedClass.name})`);
+        if (score > 0) onXPUpdate(Math.ceil(score / 2), `Colosseum Run`);
         return;
     }
 
-    const isBoss = (round + 1) % 10 === 0; // Boss every 10th round
     const target = pool[Math.floor(Math.random() * pool.length)];
-    
-    // Distractors
     const others = pool.filter(c => c.id !== target.id);
     const distractors = others.sort(() => 0.5 - Math.random()).slice(0, 3);
-    setOptions([target, ...distractors].sort(() => 0.5 - Math.random()));
     
-    setCurrentCard({ ...target, isBoss });
+    // Assign positions: 0:Top, 1:Right, 2:Bottom, 3:Left
+    const newOptions = [target, ...distractors].sort(() => 0.5 - Math.random());
+    
+    setCurrentCard(target);
+    setOptions(newOptions);
     setSelectedId(null);
-    
-    // Time Calculation
-    let baseTime = Math.max(5, 15 - Math.floor(round / 5)); 
-    baseTime += selectedClass.timeBonus;
-    if (isBoss) baseTime = Math.ceil(baseTime / 2); // Boss is fast!
-    
-    setTimeLeft(baseTime);
+    setSlashPath([]);
+    setTimeLeft(Math.max(5, 15 - Math.floor(round / 5)));
   };
 
   const handleStart = () => {
-      setLives(3 + selectedClass.hpBonus);
+      setLives(3);
       setScore(0);
       setRound(1);
-      setCombo(0);
       setGameState('playing');
       nextRound();
   };
 
-  const handleAnswer = (answerId: string) => {
-      if (selectedId) return;
-      setSelectedId(answerId);
-      setIsPaused(true);
+  // --- 4. THE SLASH ENGINE ---
 
+  const handlePointerDown = (e: React.PointerEvent) => {
+      if (selectedId) return;
+      setIsSlashing(true);
+      // Capture relative coordinates
+      if (containerRef.current) {
+          const rect = containerRef.current.getBoundingClientRect();
+          setSlashPath([{ x: e.clientX - rect.left, y: e.clientY - rect.top }]);
+      }
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+      if (!isSlashing || !containerRef.current) return;
+      
+      const rect = containerRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      // Add point to trail
+      setSlashPath(prev => [...prev, { x, y }]);
+
+      // HIT DETECTION: Check if we slashed an option
+      // We look for elements under the cursor with data-answer-id
+      const element = document.elementFromPoint(e.clientX, e.clientY);
+      const answerId = element?.getAttribute('data-answer-id');
+
+      if (answerId) {
+          endSlash(answerId);
+      }
+  };
+
+  const handlePointerUp = () => {
+      setIsSlashing(false);
+      setSlashPath([]);
+  };
+
+  const endSlash = (answerId: string) => {
+      setIsSlashing(false);
+      if (selectedId) return; // Already answered
+      
+      handleAnswer(answerId);
+  };
+
+  const handleAnswer = (answerId: string) => {
+      setSelectedId(answerId);
+      
       const isCorrect = answerId === currentCard.id;
       
-      if (isCorrect) {
-          // Calc Score
-          const speedBonus = timeLeft * 5;
-          const comboMult = combo >= 5 ? 2 : 1; // Frenzy Mode
-          const roundScore = Math.ceil((10 + speedBonus) * selectedClass.scoreMult * comboMult);
-          
-          setTimeout(() => {
-              setScore(s => s + roundScore);
+      setTimeout(() => {
+          if (isCorrect) {
+              setScore(s => s + 10 + timeLeft);
               setRound(r => r + 1);
-              setCombo(c => c + 1);
-              if (currentCard.isBoss) setLives(l => l + 1); // Boss Reward
-              setIsPaused(false);
               nextRound();
-          }, 800);
-      } else {
-          setTimeout(() => {
+          } else {
               setLives(l => l - 1);
-              setCombo(0); // Combo Breaker!
-              setIsPaused(false);
-              if (lives <= 1) { // Will be 0 next render
+              if (lives <= 1) { 
                   setGameState('gameover');
-                  const finalXP = Math.ceil(score / 2);
-                  onXPUpdate(finalXP, `Colosseum Run (${selectedClass.name})`);
+                  onXPUpdate(Math.ceil(score / 2), `Colosseum Run`);
               } else {
                   nextRound();
               }
-          }, 1000);
-      }
+          }
+      }, 500); // Short pause to see result
   };
 
   const handleWrongAnswer = () => {
       setLives(l => l - 1);
-      setCombo(0);
       if (lives <= 1) {
           setGameState('gameover');
-          const finalXP = Math.ceil(score / 2);
-          onXPUpdate(finalXP, `Colosseum Run (${selectedClass.name})`);
+          onXPUpdate(Math.ceil(score / 2), `Colosseum Run`);
       } else {
           nextRound();
       }
   };
 
-  // --- RENDER ---
+  // --- RENDER HELPERS ---
+  const getOptionStyle = (opt: any, index: number) => {
+      // Positioning logic for Cross Layout
+      const positions = [
+          "top-0 left-1/2 -translate-x-1/2", // North
+          "top-1/2 right-0 -translate-y-1/2", // East
+          "bottom-0 left-1/2 -translate-x-1/2", // South
+          "top-1/2 left-0 -translate-y-1/2" // West
+      ];
+      
+      let color = "bg-white text-slate-800 border-slate-200";
+      if (selectedId) {
+          if (opt.id === currentCard.id) color = "bg-emerald-500 text-white border-emerald-600 scale-110 shadow-[0_0_30px_rgba(16,185,129,0.5)]";
+          else if (opt.id === selectedId) color = "bg-rose-500 text-white border-rose-600 scale-90 opacity-50";
+          else color = "bg-slate-200 text-slate-400 opacity-30";
+      }
+
+      return `absolute ${positions[index]} w-40 h-24 p-2 rounded-2xl border-4 shadow-xl flex items-center justify-center text-center font-bold text-sm transition-all duration-300 z-20 select-none ${color}`;
+  };
+
+  // --- SVG PATH GENERATOR ---
+  const getPathString = () => {
+      if (slashPath.length === 0) return "";
+      return `M ${slashPath.map(p => `${p.x},${p.y}`).join(" L ")}`;
+  };
+
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center p-4 animate-in zoom-in duration-300 font-sans">
+    <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center font-sans overflow-hidden touch-none select-none">
         
-        {/* Dynamic Background */}
-        <div className={`absolute inset-0 overflow-hidden pointer-events-none transition-colors duration-1000 ${combo >= 5 ? 'bg-amber-900/40' : 'bg-slate-900'}`}>
-            <div className={`absolute top-[-50%] left-[-50%] w-[800px] h-[800px] rounded-full blur-[120px] animate-pulse ${combo >= 5 ? 'bg-amber-600/30' : 'bg-indigo-900/30'}`}></div>
-            <div className="absolute bottom-[-50%] right-[-50%] w-[600px] h-[600px] bg-rose-900/20 rounded-full blur-[100px] animate-pulse delay-1000"></div>
-        </div>
+        {/* Background Ambience */}
+        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-800 to-slate-950"></div>
 
-        {/* 1. CLASS SELECTION SCREEN */}
         {gameState === 'intro' && (
-            <div className="bg-white max-w-md w-full rounded-[2.5rem] p-6 text-center shadow-2xl relative z-10 flex flex-col h-[85vh]">
-                <div className="mb-4">
-                    <h2 className="text-3xl font-black text-slate-800 uppercase italic tracking-tighter">Choose Fighter</h2>
-                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Select your loadout</p>
+            <div className="bg-white max-w-sm w-full rounded-[2.5rem] p-8 text-center shadow-2xl relative z-10 animate-in zoom-in">
+                <div className="w-24 h-24 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-6 text-rose-600 shadow-inner">
+                    <Swords size={48} />
                 </div>
-                
-                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 px-2">
-                    {GLADIATORS.map((g) => (
-                        <button 
-                            key={g.id} 
-                            onClick={() => setSelectedClass(g)}
-                            className={`w-full p-4 rounded-2xl border-2 flex items-center gap-4 transition-all group ${selectedClass.id === g.id ? 'border-rose-500 bg-rose-50 ring-2 ring-rose-200' : 'border-slate-200 hover:border-indigo-300'}`}
-                        >
-                            <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${selectedClass.id === g.id ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600'}`}>
-                                {g.icon}
-                            </div>
-                            <div className="text-left flex-1">
-                                <h4 className="font-bold text-slate-800 uppercase text-sm">{g.name}</h4>
-                                <p className="text-xs text-slate-500 leading-tight mt-1">{g.desc}</p>
-                            </div>
-                            {selectedClass.id === g.id && <CheckCircle2 className="text-rose-500" size={20}/>}
-                        </button>
-                    ))}
-                </div>
-
-                <div className="mt-6 pt-6 border-t border-slate-100 space-y-3">
-                    <button onClick={handleStart} className="w-full py-4 bg-rose-600 text-white font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-rose-200 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2">
-                        <Swords size={20}/> Enter Arena
+                <h2 className="text-3xl font-black text-slate-800 mb-2 uppercase italic tracking-tighter">Blade Master</h2>
+                <p className="text-slate-500 mb-8 text-sm">
+                    Drag your finger or mouse to <strong>SLASH</strong> through the correct answer.
+                </p>
+                <div className="space-y-3">
+                    <button onClick={handleStart} className="w-full py-4 bg-rose-600 text-white font-black uppercase tracking-widest rounded-2xl shadow-lg hover:scale-[1.02] active:scale-95 transition-all">
+                        Draw Weapon
                     </button>
-                    <button onClick={onExit} className="w-full py-3 text-slate-400 font-bold uppercase tracking-widest text-xs hover:text-slate-600">
-                        Retreat
+                    <button onClick={onExit} className="w-full py-4 text-slate-400 font-bold uppercase tracking-widest text-xs hover:text-slate-600">
+                        Leave
                     </button>
                 </div>
             </div>
         )}
 
-        {/* 2. GAMEPLAY HUD */}
         {gameState === 'playing' && currentCard && (
-            <div className="w-full max-w-md relative z-10 flex flex-col h-full max-h-[850px]">
+            <div className="w-full max-w-lg h-full max-h-[800px] relative flex flex-col p-4">
                 
-                {/* Top Bar */}
-                <div className="flex justify-between items-center mb-4">
+                {/* HUD */}
+                <div className="flex justify-between items-center mb-8 relative z-30 pointer-events-none">
                     <div className="flex gap-1">
-                        {[...Array(Math.max(lives, 3))].map((_, i) => (
-                            i < lives && <Heart key={i} size={24} className="fill-rose-500 text-rose-500 drop-shadow-sm animate-in zoom-in" />
+                        {[...Array(3)].map((_, i) => (
+                            <Heart key={i} size={28} className={`${i < lives ? 'fill-rose-500 text-rose-500' : 'fill-slate-800 text-slate-700'} drop-shadow-md`} />
                         ))}
                     </div>
-                    <div className="text-right">
-                        <div className="font-black text-2xl text-white drop-shadow-md tracking-tight">{score}</div>
-                        {combo >= 2 && <div className="text-amber-400 text-xs font-black uppercase tracking-widest animate-pulse">{combo}x Combo!</div>}
+                    <div className="text-center">
+                        <div className="w-32 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                            <div className="h-full bg-amber-400 transition-all duration-1000 ease-linear" style={{ width: `${(timeLeft / 15) * 100}%` }} />
+                        </div>
                     </div>
+                    <div className="font-black text-3xl text-white drop-shadow-md">{score}</div>
                 </div>
 
-                {/* The Question Card */}
-                <div className="flex-1 flex flex-col justify-center">
-                    {/* BOSS WARNING */}
-                    {currentCard.isBoss && (
-                        <div className="bg-rose-600 text-white text-center py-2 font-black uppercase tracking-widest text-xs rounded-t-2xl animate-pulse">
-                            <Skull className="inline mr-2" size={14}/> Boss Wave • Extra Life Reward
-                        </div>
-                    )}
-                    
-                    <div className={`backdrop-blur-xl border p-8 text-center mb-6 shadow-2xl relative overflow-hidden transition-all ${currentCard.isBoss ? 'bg-rose-900/40 border-rose-500/50 rounded-b-[2.5rem] rounded-t-none' : 'bg-white/10 border-white/20 rounded-[2.5rem]'}`}>
-                        {/* Timer Line */}
-                        <div className="absolute top-0 left-0 w-full h-1.5 bg-white/10">
-                            <div 
-                                className={`h-full transition-all duration-1000 ease-linear ${timeLeft < 5 ? 'bg-rose-500' : 'bg-emerald-400'}`} 
-                                style={{ width: `${(timeLeft / (currentCard.isBoss ? 8 : 15)) * 100}%` }} // Simplified max time logic
-                            />
-                        </div>
+                {/* SLASH ARENA */}
+                <div 
+                    ref={containerRef}
+                    className="flex-1 relative touch-none"
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerLeave={handlePointerUp}
+                >
+                    {/* The Slash Visual Trail */}
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none z-50 overflow-visible">
+                        <path 
+                            d={getPathString()} 
+                            fill="none" 
+                            stroke="#f43f5e" 
+                            strokeWidth="8" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round"
+                            className="drop-shadow-[0_0_10px_rgba(244,63,94,0.8)]"
+                        />
+                        <path 
+                            d={getPathString()} 
+                            fill="none" 
+                            stroke="#ffffff" 
+                            strokeWidth="3" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round"
+                        />
+                    </svg>
 
-                        <span className="text-white/40 text-xs font-bold uppercase tracking-widest mb-4 block">Round {round}</span>
-                        <h2 className="text-3xl sm:text-4xl font-serif font-bold text-white mb-2 drop-shadow-md">{currentCard.front}</h2>
-                        
-                        {combo >= 5 && (
-                            <div className="absolute top-4 right-4 text-amber-400 animate-bounce">
-                                <Flame fill="currentColor" size={24}/>
-                            </div>
-                        )}
+                    {/* Central Question (Anchor) */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-slate-800 rounded-full border-4 border-slate-700 flex flex-col items-center justify-center text-center shadow-2xl z-10 pointer-events-none">
+                        <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-1">Target</span>
+                        <h2 className="text-2xl font-serif font-bold text-white leading-tight px-2">{currentCard.front}</h2>
+                        <div className="mt-2 text-rose-500 animate-pulse"><Swords size={20}/></div>
                     </div>
 
-                    <div className="grid gap-3">
-                        {options.map((opt) => {
-                            let style = "bg-white text-slate-800 hover:bg-slate-50 border-b-4 border-slate-200 active:border-b-0 active:translate-y-1";
-                            if (selectedId) {
-                                if (opt.id === currentCard.id) style = "bg-emerald-500 text-white border-emerald-600";
-                                else if (opt.id === selectedId) style = "bg-rose-500 text-white border-rose-600";
-                                else style = "bg-slate-800 text-slate-500 border-slate-900 opacity-50";
-                            }
-
-                            return (
-                                <button
-                                    key={opt.id}
-                                    disabled={!!selectedId}
-                                    onClick={() => handleAnswer(opt.id)}
-                                    className={`p-4 rounded-2xl font-bold text-lg transition-all shadow-lg ${style}`}
-                                >
-                                    {opt.back}
-                                </button>
-                            );
-                        })}
-                    </div>
+                    {/* Answer Targets (North, East, South, West) */}
+                    {options.map((opt, i) => (
+                        <div 
+                            key={opt.id}
+                            data-answer-id={opt.id} // Critical for hit detection
+                            className={getOptionStyle(opt, i)}
+                        >
+                            {opt.back}
+                        </div>
+                    ))}
                 </div>
             </div>
         )}
 
-        {/* 3. GAME OVER */}
         {gameState === 'gameover' && (
-            <div className="bg-white max-w-sm w-full rounded-[2.5rem] p-8 text-center shadow-2xl relative z-10 animate-in zoom-in duration-300">
-                <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-400 relative">
+            <div className="bg-white max-w-sm w-full rounded-[2.5rem] p-8 text-center shadow-2xl relative z-10 animate-in zoom-in">
+                <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-400">
                     <Skull size={48} />
-                    {round > 10 && <div className="absolute -top-2 -right-2 bg-amber-400 text-white p-2 rounded-full shadow-lg animate-bounce"><Crown size={20} fill="currentColor"/></div>}
                 </div>
-                <h2 className="text-5xl font-black text-slate-800 mb-1 tracking-tighter">{score}</h2>
-                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-8">Final Score • Round {round}</p>
-                
-                <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 mb-2">
-                    <div className="flex justify-between items-center mb-1">
-                        <span className="text-indigo-400 text-xs font-bold uppercase">Base XP</span>
-                        <span className="text-indigo-700 font-bold">{Math.floor(score/2)}</span>
-                    </div>
-                    {round > 10 && (
-                        <div className="flex justify-between items-center">
-                            <span className="text-amber-500 text-xs font-bold uppercase">Veteran Bonus</span>
-                            <span className="text-amber-600 font-bold">+50</span>
-                        </div>
-                    )}
-                </div>
-                <p className="text-xs text-slate-400 mb-6 italic">"Fortune favors the bold."</p>
-
-                <div className="space-y-3">
-                    <button onClick={() => setGameState('intro')} className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-lg hover:bg-indigo-700 transition-all">
-                        Play Again
-                    </button>
-                    <button onClick={onExit} className="w-full py-4 text-slate-400 font-bold text-sm hover:text-slate-600">
-                        Leave Arena
-                    </button>
-                </div>
+                <h2 className="text-5xl font-black text-slate-800 mb-1">{score}</h2>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-8">Final Score</p>
+                <button onClick={onExit} className="w-full py-4 text-slate-400 font-bold text-sm hover:text-slate-600">Leave Arena</button>
             </div>
         )}
     </div>
