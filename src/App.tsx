@@ -2228,8 +2228,7 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
     </div>
   );
 }
-function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck, allDecks, user }: any) {
-  const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
+function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck, allDecks, user, onSaveCard }: any) {  const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [showLevelModal, setShowLevelModal] = useState(false);
   const [libraryExpanded, setLibraryExpanded] = useState(false);
   
@@ -4075,7 +4074,7 @@ case 'home': return <HomeView setActiveTab={setActiveTab} allDecks={allDecks} le
           const deckToLoad = assignedDeck || allDecks[selectedDeckKey];
           return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} activeDeckOverride={deckToLoad} onComplete={handleFinishLesson} />;
       case 'create': return <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} />;
-      case 'profile': return <ProfileView user={user} userData={userData} />;
+      case 'profile': return <ProfileView user={user} userData={userData} onSaveCard={handleSaveCard}/>;
       default: return <HomeView />;
     }
   };
