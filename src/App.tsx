@@ -1545,17 +1545,17 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
   // View States
   const [isFlipped, setIsFlipped] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [viewMode, setViewMode] = useState<'study' | 'game'>('study');
+  const [viewMode, setViewMode] = useState<'study' | 'quiz'>('study');
   const [saving, setSaving] = useState(false);
   
-  // Study Navigation State
+  // Navigation & Data State
   const [sessionCards, setSessionCards] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Game State
-  const [currentTemplate, setCurrentTemplate] = useState<any>(null);
-  const [gameSlots, setGameSlots] = useState<any>({});
-  const [gameStep, setGameStep] = useState(0);
+  // Quiz State
+  const [quizOptions, setQuizOptions] = useState<any[]>([]);
+  const [quizState, setQuizState] = useState<'waiting' | 'correct' | 'wrong'>('waiting');
+  const [score, setScore] = useState(0);
 
   // Swipe State
   const [dragStartX, setDragStartX] = useState<number | null>(null);
@@ -1593,64 +1593,47 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
         const shuffled = [...sourceCards].sort(() => 0.5 - Math.random());
         setSessionCards(shuffled.slice(0, 10));
         setCurrentIndex(0);
-        
-        // Random Template
-        const randomTemp = ADLIB_TEMPLATES[Math.floor(Math.random() * ADLIB_TEMPLATES.length)];
-        setCurrentTemplate(randomTemp);
-        setGameSlots({});
-        setGameStep(0);
+        setScore(0);
     } else {
         setSessionCards([]);
     }
   }, [allDecks, preferredDeckId]);
 
+  // --- QUIZ LOGIC ---
+  useEffect(() => {
+      if (viewMode === 'quiz' && sessionCards.length > 0) {
+          const current = sessionCards[currentIndex];
+          const others = sessionCards.filter(c => c.id !== current.id);
+          const distractors = others.sort(() => 0.5 - Math.random()).slice(0, 2);
+          const options = [current, ...distractors].sort(() => 0.5 - Math.random());
+          setQuizOptions(options);
+          setQuizState('waiting');
+      }
+  }, [currentIndex, viewMode, sessionCards]);
+
+  const handleQuizAnswer = (selectedCard: any) => {
+      if (quizState !== 'waiting') return;
+      const isCorrect = selectedCard.id === sessionCards[currentIndex].id;
+      setQuizState(isCorrect ? 'correct' : 'wrong');
+      if (isCorrect) {
+          setScore(s => s + 1);
+          setTimeout(() => {
+              if (currentIndex < sessionCards.length - 1) setCurrentIndex(prev => prev + 1);
+              else setCurrentIndex(0);
+          }, 800);
+      }
+  };
+
   // --- HANDLERS ---
   const handleDeckSelect = async (deckId: string) => {
-    // ROBUST FIX: Check props first, then fall back to global auth
     const targetUid = user?.uid || auth.currentUser?.uid;
-
-    if (!targetUid) {
-        console.error("Cannot save preference: Missing User ID");
-        alert("Error: Could not identify user to save settings.");
-        return;
-    }
-
+    if (!targetUid) return;
     setSaving(true);
     try {
-        await updateDoc(doc(db, 'artifacts', appId, 'users', targetUid, 'profile', 'main'), { 
-            widgetDeckId: deckId 
-        });
+        await updateDoc(doc(db, 'artifacts', appId, 'users', targetUid, 'profile', 'main'), { widgetDeckId: deckId });
         setShowSettings(false);
         setIsFlipped(false);
-    } catch (e: any) { 
-        console.error("Save failed:", e);
-        alert("Failed to save preference: " + e.message);
-    } finally { 
-        setSaving(false); 
-    }
-  };
-
-  const handleGameSelect = (card: any) => {
-      setGameSlots({ ...gameSlots, [gameStep]: card });
-      playAudio(card.front); 
-      if (gameStep < currentTemplate.blanks.length - 1) setGameStep(prev => prev + 1);
-  };
-
-  const resetGame = () => {
-      setGameSlots({});
-      setGameStep(0);
-      setCurrentTemplate(ADLIB_TEMPLATES[Math.floor(Math.random() * ADLIB_TEMPLATES.length)]);
-  };
-
-  const playStory = () => {
-      if (!currentTemplate) return;
-      let story = currentTemplate.text;
-      currentTemplate.blanks.forEach((type: string, idx: number) => {
-          const card = gameSlots[idx];
-          const replacement = card ? card.back : "something"; 
-          story = story.replace(`[${type}]`, replacement);
-      });
-      playAudio(story);
+    } catch (e) { console.error(e); } finally { setSaving(false); }
   };
 
   // --- NAVIGATION ---
@@ -1668,8 +1651,6 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
   };
 
   const currentCard = sessionCards[currentIndex];
-  const currentDeckTitle = preferredDeckId === 'all' ? "All Collections" : (allDecks[preferredDeckId]?.title || "Unknown Deck");
-  const isGameComplete = currentTemplate && Object.keys(gameSlots).length === currentTemplate.blanks.length;
 
   return (
     <div className="mx-6 mt-6 animate-in slide-in-from-bottom-2 duration-700 relative z-0">
@@ -1678,11 +1659,14 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
             <Zap size={16} className="text-amber-500" /> Daily Discovery
           </h3>
           <div className="flex gap-2">
-            <button onClick={() => setViewMode(viewMode === 'study' ? 'game' : 'study')} className={`text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-colors shadow-sm ${viewMode === 'game' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 border border-purple-100'}`}>
-                {viewMode === 'study' ? <Gamepad2 size={12}/> : <Layers size={12}/>}
-                {viewMode === 'study' ? "Play Ad-Lib" : "Study"}
+            <button 
+                onClick={() => setViewMode(viewMode === 'study' ? 'quiz' : 'study')} 
+                className={`text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-colors shadow-sm ${viewMode === 'quiz' ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 border border-indigo-100'}`}
+            >
+                {viewMode === 'study' ? <BrainCircuit size={12}/> : <Layers size={12}/>}
+                {viewMode === 'study' ? "Speed Quiz" : "Study Mode"}
             </button>
-            <button onClick={() => setShowSettings(!showSettings)} className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-indigo-100 transition-colors shadow-sm">
+            <button onClick={() => setShowSettings(!showSettings)} className="text-[10px] font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-slate-200 transition-colors shadow-sm">
                 {showSettings ? <X size={12}/> : <Settings size={12}/>}
             </button>
           </div>
@@ -1706,33 +1690,79 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                   ))}
               </div>
           </div>
-      ) : viewMode === 'game' ? (
-          <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden relative min-h-[14rem] flex flex-col">
-              <div className="bg-purple-600 p-4 text-white flex justify-between items-center"><span className="text-[10px] font-bold uppercase tracking-widest opacity-80">The Drunken Scribe</span><div className="flex gap-1">{currentTemplate?.blanks.map((_: any, i: number) => (<div key={i} className={`w-2 h-2 rounded-full ${i < Object.keys(gameSlots).length ? 'bg-green-400' : 'bg-purple-800'}`} />))}</div></div>
-              <div className="flex-1 p-6 flex flex-col items-center justify-center text-center">
-                  {isGameComplete ? (
-                      <div className="animate-in zoom-in duration-300 w-full">
-                          <p className="font-serif text-xl font-bold text-slate-800 leading-relaxed mb-6">
-                              {(() => {
-                                  let story = currentTemplate.text;
-                                  currentTemplate.blanks.forEach((type: string, idx: number) => { const card = gameSlots[idx]; const word = card ? card.back : "___"; story = story.replace(`[${type}]`, `<span class="text-purple-600 font-bold">${word}</span>`); });
-                                  return <span dangerouslySetInnerHTML={{__html: story}} />;
-                              })()}
-                          </p>
-                          <div className="flex gap-3 justify-center"><button onClick={playStory} className="flex-1 py-3 bg-purple-100 text-purple-700 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-purple-200"><Volume2 size={16}/> Read Story</button><button onClick={resetGame} className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800">New Story</button></div>
-                      </div>
-                  ) : (
-                      <div className="w-full"><p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Pick a <span className="text-purple-600">{currentTemplate?.blanks[gameStep]}</span></p><div className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar snap-x">{sessionCards.map((card, idx) => (<button key={idx} onClick={() => handleGameSelect(card)} className="snap-center min-w-[140px] bg-slate-50 border-2 border-slate-200 p-4 rounded-2xl flex flex-col items-center gap-2 hover:border-purple-400 hover:bg-purple-50 transition-all group"><span className="font-bold text-slate-800 text-lg">{card.front}</span><span className="text-[10px] bg-white px-2 py-1 rounded text-slate-400 border border-slate-100 uppercase font-bold group-hover:text-purple-500">{card.type}</span></button>))}</div></div>
-                  )}
+      ) : viewMode === 'quiz' ? (
+          <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden relative h-56 flex flex-col">
+              <div className="bg-indigo-50 px-6 py-3 flex justify-between items-center border-b border-indigo-100">
+                  <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Question {currentIndex + 1} / {sessionCards.length}</span>
+                  <span className="text-[10px] font-bold bg-white text-indigo-600 px-2 py-0.5 rounded border border-indigo-100 shadow-sm">Score: {score}</span>
+              </div>
+              <div className="flex-1 p-4 flex flex-col items-center justify-center">
+                  <h3 className="text-2xl font-serif font-bold text-slate-800 mb-6 text-center">{currentCard?.front}</h3>
+                  <div className="grid grid-cols-1 w-full gap-2">
+                      {quizOptions.map((opt) => {
+                          const isSelected = quizState !== 'waiting';
+                          const isCorrect = opt.id === currentCard.id;
+                          let btnClass = "bg-slate-50 border-slate-200 text-slate-600 hover:border-indigo-300";
+                          if (isSelected) {
+                              if (isCorrect) btnClass = "bg-emerald-100 border-emerald-300 text-emerald-700 font-bold";
+                              else btnClass = "opacity-50 border-slate-100 text-slate-300";
+                          }
+                          return ( <button key={opt.id} onClick={() => handleQuizAnswer(opt)} disabled={quizState !== 'waiting'} className={`w-full py-2.5 px-4 rounded-xl border transition-all text-sm font-medium truncate ${btnClass}`}>{opt.back}</button> )
+                      })}
+                  </div>
               </div>
           </div>
       ) : currentCard ? (
+          /* STUDY MODE (Swipeable Stack) */
           <div className="relative h-56 w-full cursor-pointer group perspective-1000 touch-pan-y select-none" style={{ perspective: '1000px' }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}>
             <div className="absolute top-2 left-4 right-4 bottom-0 bg-indigo-300/40 rounded-[2rem] transform scale-95 translate-y-2 z-0" />
             <div className="absolute top-4 left-8 right-8 bottom-0 bg-indigo-200/30 rounded-[2rem] transform scale-90 translate-y-3 z-0" />
             <div className="relative w-full h-full shadow-2xl rounded-[2rem] transition-transform duration-500 z-10" style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }} onClick={() => setIsFlipped(!isFlipped)}>
-              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] p-6 text-white flex flex-col justify-between overflow-hidden shadow-indigo-200" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}><div className="absolute top-[-20%] right-[-20%] w-40 h-40 bg-white/10 rounded-full blur-3xl"></div><div className="flex justify-between items-start relative z-10"><span className="bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-white/10 flex items-center gap-1.5 shadow-sm"><Layers size={10} className="text-indigo-200" /> {currentIndex + 1} / {sessionCards.length}</span><div className="p-2.5 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-90 border border-white/5 shadow-sm" onClick={(e) => { e.stopPropagation(); playAudio(currentCard.front); }}><Volume2 size={20} className="text-white"/></div></div><div className="text-center relative z-10 mt-2"><h2 className="text-4xl font-serif font-bold mb-2 drop-shadow-md">{currentCard.front}</h2><div className="inline-block px-3 py-1 bg-white/10 rounded-full backdrop-blur-sm"><p className="text-indigo-100 font-serif text-sm tracking-wide">{currentCard.ipa || '/.../'}</p></div></div><div className="text-center relative z-10"><p className="text-[10px] uppercase font-bold text-indigo-200 tracking-widest animate-pulse flex items-center justify-center gap-2"><ArrowLeft size={10}/> Swipe <ArrowRight size={10}/></p></div></div>
-              <div className="absolute inset-0 bg-white rounded-[2rem] p-6 border border-slate-200 flex flex-col justify-center items-center text-center shadow-sm" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}><div className="flex-1 flex flex-col items-center justify-center w-full"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 bg-slate-50 px-2 py-1 rounded-md">Definition</span><h3 className="text-2xl font-bold text-slate-800 mb-4 leading-tight">{currentCard.back}</h3>{currentCard.usage?.sentence && (<div className="bg-slate-50 p-4 rounded-xl w-full border border-slate-100 text-left relative"><div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 rounded-l-xl"></div><p className="text-sm text-slate-600 italic font-serif leading-relaxed pl-2">"{currentCard.usage.sentence}"</p></div>)}</div><div className="mt-auto text-[10px] text-slate-300 font-bold uppercase flex items-center gap-2"><ArrowLeft size={10}/> Next Card <ArrowRight size={10}/></div></div>
+              
+              {/* FRONT SIDE */}
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] p-6 text-white flex flex-col justify-between overflow-hidden shadow-indigo-200" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
+                  <div className="absolute top-[-20%] right-[-20%] w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+                  <div className="flex justify-between items-start relative z-10">
+                      <span className="bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-white/10 flex items-center gap-1.5 shadow-sm"><Layers size={10} className="text-indigo-200" /> {currentIndex + 1} / {sessionCards.length}</span>
+                      <div className="p-2.5 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-90 border border-white/5 shadow-sm" onClick={(e) => { e.stopPropagation(); playAudio(currentCard.front); }}><Volume2 size={20} className="text-white"/></div>
+                  </div>
+                  <div className="text-center relative z-10 mt-2">
+                      <h2 className="text-4xl font-serif font-bold mb-2 drop-shadow-md">{currentCard.front}</h2>
+                      <div className="inline-block px-3 py-1 bg-white/10 rounded-full backdrop-blur-sm"><p className="text-indigo-100 font-serif text-sm tracking-wide">{currentCard.ipa || '/.../'}</p></div>
+                  </div>
+                  <div className="text-center relative z-10"><p className="text-[10px] uppercase font-bold text-indigo-200 tracking-widest animate-pulse flex items-center justify-center gap-2"><ArrowLeft size={10}/> Swipe <ArrowRight size={10}/></p></div>
+              </div>
+
+              {/* BACK SIDE (SCROLLABLE FIX) */}
+              <div 
+                className="absolute inset-0 bg-white rounded-[2rem] border border-slate-200 flex flex-col shadow-sm overflow-hidden" 
+                style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+              >
+                 {/* Top Spacer for handle feel */}
+                 <div className="w-10 h-1 rounded-full bg-slate-100 mx-auto mt-4 shrink-0"></div>
+
+                 {/* Scrollable Content Area */}
+                 <div className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar min-h-0 flex flex-col items-center text-center">
+                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 bg-slate-50 px-2 py-1 rounded-md">Definition</span>
+                     
+                     <h3 className="text-xl font-bold text-slate-800 mb-4 leading-tight">{currentCard.back}</h3>
+                     
+                     {currentCard.usage?.sentence && (
+                       <div className="bg-slate-50 p-4 rounded-xl w-full border border-slate-100 text-left relative shrink-0">
+                         <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 rounded-l-xl"></div>
+                         <p className="text-sm text-slate-600 italic font-serif leading-relaxed pl-2">"{currentCard.usage.sentence}"</p>
+                       </div>
+                     )}
+                 </div>
+                 
+                 {/* Fixed Footer */}
+                 <div className="p-3 border-t border-slate-50 text-center shrink-0">
+                    <div className="text-[10px] text-slate-300 font-bold uppercase flex items-center justify-center gap-2">
+                        <ArrowLeft size={10}/> Next Card <ArrowRight size={10}/>
+                    </div>
+                 </div>
+              </div>
+
             </div>
           </div>
       ) : (
