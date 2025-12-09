@@ -1745,6 +1745,10 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
 // Ensure you have these imported from 'lucide-react':
 // Swords, Heart, Skull, Zap, Shield, Hourglass, Flame, Crown
 
+// --- ASSETS ---
+// Import these from 'lucide-react':
+// Swords, Heart, Skull, Zap, Shield, Hourglass, Target, Crown
+
 function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
   // Game Flow
   const [gameState, setGameState] = useState<'intro' | 'playing' | 'gameover'>('intro');
@@ -1816,7 +1820,6 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
   const handlePointerDown = (e: React.PointerEvent) => {
       if (selectedId) return;
       setIsSlashing(true);
-      // Capture relative coordinates
       if (containerRef.current) {
           const rect = containerRef.current.getBoundingClientRect();
           setSlashPath([{ x: e.clientX - rect.left, y: e.clientY - rect.top }]);
@@ -1830,11 +1833,8 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
       
-      // Add point to trail
       setSlashPath(prev => [...prev, { x, y }]);
 
-      // HIT DETECTION: Check if we slashed an option
-      // We look for elements under the cursor with data-answer-id
       const element = document.elementFromPoint(e.clientX, e.clientY);
       const answerId = element?.getAttribute('data-answer-id');
 
@@ -1850,8 +1850,7 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
 
   const endSlash = (answerId: string) => {
       setIsSlashing(false);
-      if (selectedId) return; // Already answered
-      
+      if (selectedId) return;
       handleAnswer(answerId);
   };
 
@@ -1874,7 +1873,7 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
                   nextRound();
               }
           }
-      }, 500); // Short pause to see result
+      }, 500); 
   };
 
   const handleWrongAnswer = () => {
@@ -1889,12 +1888,12 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
 
   // --- RENDER HELPERS ---
   const getOptionStyle = (opt: any, index: number) => {
-      // Positioning logic for Cross Layout
+      // Adjusted positions to ensure they stay on edges and don't overlap center
       const positions = [
-          "top-0 left-1/2 -translate-x-1/2", // North
-          "top-1/2 right-0 -translate-y-1/2", // East
-          "bottom-0 left-1/2 -translate-x-1/2", // South
-          "top-1/2 left-0 -translate-y-1/2" // West
+          "top-4 left-1/2 -translate-x-1/2", // North (Pinned Top)
+          "top-1/2 right-4 -translate-y-1/2", // East (Pinned Right)
+          "bottom-4 left-1/2 -translate-x-1/2", // South (Pinned Bottom)
+          "top-1/2 left-4 -translate-y-1/2" // West (Pinned Left)
       ];
       
       let color = "bg-white text-slate-800 border-slate-200";
@@ -1904,10 +1903,10 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
           else color = "bg-slate-200 text-slate-400 opacity-30";
       }
 
-      return `absolute ${positions[index]} w-40 h-24 p-2 rounded-2xl border-4 shadow-xl flex items-center justify-center text-center font-bold text-sm transition-all duration-300 z-20 select-none ${color}`;
+      // Changed w-40 to w-32 for better fit on mobile
+      return `absolute ${positions[index]} w-32 md:w-40 p-3 rounded-2xl border-4 shadow-lg flex items-center justify-center text-center font-bold text-sm transition-all duration-300 z-20 select-none ${color}`;
   };
 
-  // --- SVG PATH GENERATOR ---
   const getPathString = () => {
       if (slashPath.length === 0) return "";
       return `M ${slashPath.map(p => `${p.x},${p.y}`).join(" L ")}`;
@@ -1987,11 +1986,11 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
                         />
                     </svg>
 
-                    {/* Central Question (Anchor) */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-slate-800 rounded-full border-4 border-slate-700 flex flex-col items-center justify-center text-center shadow-2xl z-10 pointer-events-none">
-                        <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-1">Target</span>
-                        <h2 className="text-2xl font-serif font-bold text-white leading-tight px-2">{currentCard.front}</h2>
-                        <div className="mt-2 text-rose-500 animate-pulse"><Swords size={20}/></div>
+                    {/* Central Question (Shrunk to w-32 h-32 to prevent overlap) */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-slate-800 rounded-full border-4 border-slate-700 flex flex-col items-center justify-center text-center shadow-2xl z-10 pointer-events-none">
+                        <span className="text-slate-500 text-[9px] font-bold uppercase tracking-widest mb-1">Target</span>
+                        {/* Clamped text size */}
+                        <h2 className="text-lg font-serif font-bold text-white leading-tight px-1 line-clamp-2">{currentCard.front}</h2>
                     </div>
 
                     {/* Answer Targets (North, East, South, West) */}
