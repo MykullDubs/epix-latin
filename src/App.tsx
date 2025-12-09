@@ -2749,7 +2749,143 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
     </div>
   );
 }
+function ClassGrades({ classData }: any) {
+  const [students, setStudents] = useState<any[]>([]);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
+  // 1. Subscribe to Data
+  useEffect(() => {
+    if (!classData?.students || classData.students.length === 0) {
+        setLoading(false);
+        return;
+    }
+
+    // A. Fetch Student Profiles (to get names, XP, avatars)
+    const qStudents = query(collectionGroup(db, 'profile'), where('role', '==', 'student'));
+    const unsubStudents = onSnapshot(qStudents, (snapshot) => {
+        const allStudents = snapshot.docs.map(d => d.data());
+        // Filter for students actually in this class
+        // (Note: In a larger app, you'd filter server-side, but this works for class sizes < 100)
+        const classStudents = allStudents.filter((s: any) => classData.studentEmails?.includes(s.email));
+        setStudents(classStudents);
+    });
+
+    // B. Fetch Activity Logs (to get quiz scores)
+    const qLogs = query(collection(db, 'artifacts', appId, 'activity_logs'), orderBy('timestamp', 'desc'));
+    const unsubLogs = onSnapshot(qLogs, (snapshot) => {
+        const allLogs = snapshot.docs.map(d => d.data());
+        // Filter logs for this class roster
+        const classLogs = allLogs.filter((l: any) => classData.studentEmails?.includes(l.studentEmail));
+        setLogs(classLogs);
+        setLoading(false);
+    });
+
+    return () => { unsubStudents(); unsubLogs(); };
+  }, [classData]);
+
+  // 2. Helper to Calc Stats
+  const getStudentStats = (email: string) => {
+      const studentLogs = logs.filter(l => l.studentEmail === email);
+      const completedCount = studentLogs.length;
+      
+      // Calculate Average Quiz Score
+      let totalScore = 0;
+      let totalPossible = 0;
+      
+      studentLogs.forEach((log: any) => {
+          if (log.scoreDetail) {
+              totalScore += (log.scoreDetail.score || 0);
+              totalPossible += (log.scoreDetail.total || 0);
+          }
+      });
+
+      const average = totalPossible > 0 ? Math.round((totalScore / totalPossible) * 100) : 0;
+      
+      return { completedCount, average };
+  };
+
+  if (loading) return <div className="p-12 text-center text-slate-400 flex flex-col items-center gap-2"><Loader className="animate-spin"/><span className="text-xs font-bold uppercase tracking-widest">Calculating Grades...</span></div>;
+
+  return (
+     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4">
+        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+            <div>
+                <h3 className="font-bold text-lg text-slate-800">Gradebook</h3>
+                <p className="text-xs text-slate-500">Live performance tracking for {classData.name}</p>
+            </div>
+            <div className="flex gap-2">
+                <button className="text-xs font-bold bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-slate-600 hover:text-indigo-600 transition-colors">Export CSV</button>
+            </div>
+        </div>
+        
+        <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 border-b border-slate-100">
+                    <tr>
+                        <th className="p-4 pl-6 font-bold text-slate-400 uppercase text-[10px] tracking-wider">Student</th>
+                        <th className="p-4 font-bold text-slate-400 uppercase text-[10px] tracking-wider text-center">Total XP</th>
+                        <th className="p-4 font-bold text-slate-400 uppercase text-[10px] tracking-wider text-center">Assignments</th>
+                        <th className="p-4 font-bold text-slate-400 uppercase text-[10px] tracking-wider text-center">Quiz Avg</th>
+                        <th className="p-4 font-bold text-slate-400 uppercase text-[10px] tracking-wider text-right pr-6">Status</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                    {students.map(s => {
+                        const stats = getStudentStats(s.email);
+                        return (
+                            <tr key={s.email} className="hover:bg-indigo-50/30 transition-colors group">
+                                <td className="p-4 pl-6">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center font-serif font-bold shadow-sm border border-white group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                                            {s.name?.charAt(0) || '?'}
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-slate-800">{s.name || 'Unknown'}</p>
+                                            <p className="text-xs text-slate-400 font-mono">{s.email}</p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="p-4 text-center">
+                                    <span className="font-black text-amber-500 drop-shadow-sm">{s.xp || 0}</span>
+                                    <span className="text-[10px] text-amber-300 ml-0.5">XP</span>
+                                </td>
+                                <td className="p-4 text-center">
+                                    <div className="inline-flex flex-col items-center">
+                                        <span className="font-bold text-slate-700">{stats.completedCount}</span>
+                                        <span className="text-[9px] text-slate-400 uppercase font-bold">Done</span>
+                                    </div>
+                                </td>
+                                <td className="p-4 text-center">
+                                    <span className={`px-2.5 py-1 rounded-full font-bold text-xs border ${stats.average >= 90 ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : stats.average >= 70 ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : stats.average > 0 ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
+                                        {stats.average}%
+                                    </span>
+                                </td>
+                                <td className="p-4 text-right pr-6">
+                                    {stats.completedCount > 0 ? (
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full"><Activity size={12}/> Active</span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-full">Inactive</span>
+                                    )}
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
+            {students.length === 0 && (
+                <div className="p-12 text-center border-t border-slate-100">
+                    <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <Users size={32} />
+                    </div>
+                    <p className="text-slate-500 font-bold">Class roster is empty.</p>
+                    <p className="text-xs text-slate-400">Add students to see their grades here.</p>
+                </div>
+            )}
+        </div>
+     </div>
+  );
+}
 function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [newClassName, setNewClassName] = useState('');
@@ -2759,7 +2895,7 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   
   const [assignType, setAssignType] = useState<'deck' | 'lesson' | 'test'>('lesson');
-  const [viewTab, setViewTab] = useState<'content' | 'forum'>('content');
+  const [viewTab, setViewTab] = useState<'content' | 'forum' | 'grades'>('content'); // Added 'grades'
 
   // -- Student Selector States --
   const [isStudentListOpen, setIsStudentListOpen] = useState(false);
@@ -2796,41 +2932,26 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
       } catch (error) { console.error("Add student failed:", error); alert("Failed to add student."); }
   };
 
-  // --- NEW: REMOVE ACTIONS ---
+  // --- REMOVE ACTIONS ---
   const removeStudent = async (email: string) => {
       if (!selectedClass || !email) return;
       if (!window.confirm(`Are you sure you want to remove ${email} from this class?`)) return;
-
       try {
-          // Filter out the student to remove
           const newStudents = (selectedClass.students || []).filter((s: string) => s !== email);
           const newEmails = (selectedClass.studentEmails || []).filter((s: string) => s !== email);
-
-          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), {
-              students: newStudents,
-              studentEmails: newEmails
-          });
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { students: newStudents, studentEmails: newEmails });
           setToastMsg(`Removed ${email}`);
-      } catch (e: any) {
-          console.error(e);
-          alert("Error removing student: " + e.message);
-      }
+      } catch (e: any) { console.error(e); alert("Error removing student: " + e.message); }
   };
 
   const removeAssignment = async (assignmentId: string) => {
       if (!selectedClass) return;
       if (!window.confirm("Unassign this content? Student progress logs for this specific task assignment may be lost.")) return;
-
       try {
           const newAssignments = (selectedClass.assignments || []).filter((a: any) => a.id !== assignmentId);
-          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), {
-              assignments: newAssignments
-          });
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { assignments: newAssignments });
           setToastMsg("Assignment removed");
-      } catch (e: any) {
-          console.error(e);
-          alert("Error removing assignment: " + e.message);
-      }
+      } catch (e: any) { console.error(e); alert("Error removing assignment: " + e.message); }
   };
 
   if (selectedClass) {
@@ -2842,11 +2963,16 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
             <div><h1 className="text-2xl font-bold text-slate-900">{selectedClass.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {selectedClass.code}</p></div>
             <div className="flex gap-2">
-                <button onClick={() => setViewTab('content')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'content' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Manage</button>
-                <button onClick={() => setViewTab('forum')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'forum' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500'}`}>Forum</button>
+                <button onClick={() => setViewTab('content')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'content' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500 hover:bg-slate-50'}`}>Manage</button>
+                {/* NEW GRADES TOGGLE BUTTON */}
+                <button onClick={() => setViewTab('grades')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${viewTab === 'grades' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500 hover:bg-slate-50'}`}>
+                    <BarChart3 size={16}/> Grades
+                </button>
+                <button onClick={() => setViewTab('forum')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'forum' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500 hover:bg-slate-50'}`}>Forum</button>
                 
                 {viewTab === 'content' && (
                     <>
+                    <div className="w-px h-8 bg-slate-200 mx-2 hidden sm:block"></div>
                     <button onClick={() => { setAssignType('lesson'); setAssignModalOpen(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-indigo-700 active:scale-95 transition-all uppercase tracking-wider"><BookOpen size={16}/> ASSIGN LESSON</button>
                     <button onClick={() => { setAssignType('deck'); setAssignModalOpen(true); }} className="bg-orange-500 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-orange-600 active:scale-95 transition-all uppercase tracking-wider"><Layers size={16}/> ASSIGN DECK</button>
                     <button onClick={() => { setAssignType('test'); setAssignModalOpen(true); }} className="bg-rose-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-rose-700 active:scale-95 transition-all uppercase tracking-wider"><HelpCircle size={16}/> ASSIGN EXAM</button>
@@ -2877,14 +3003,7 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                               </div>
                           </div>
                         </div>
-                        {/* UNASSIGN BUTTON */}
-                        <button 
-                            onClick={() => removeAssignment(l.id)} 
-                            className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
-                            title="Unassign Task"
-                        >
-                            <Trash2 size={16} />
-                        </button>
+                        <button onClick={() => removeAssignment(l.id)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors" title="Unassign Task"><Trash2 size={16} /></button>
                       </div> 
                     ))}
                 </div>
@@ -2896,17 +3015,17 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                                 <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs">{s.charAt(0)}</div>
                                 <span className="text-sm font-medium text-slate-700">{s}</span>
                             </div>
-                            {/* REMOVE STUDENT BUTTON */}
-                            <button 
-                                onClick={() => removeStudent(s)} 
-                                className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                                title="Remove Student"
-                            >
-                                <Trash2 size={14} />
-                            </button>
+                            <button onClick={() => removeStudent(s)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100" title="Remove Student"><Trash2 size={14} /></button>
                         </div>))}
                     </div>
                 </div>
+            </div>
+        )}
+        
+        {/* RENDER GRADES VIEW */}
+        {viewTab === 'grades' && (
+            <div className="h-full pb-20">
+                <ClassGrades classData={selectedClass} />
             </div>
         )}
         
@@ -2922,27 +3041,10 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                     <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center"><h3 className="font-bold text-lg">Select Students</h3><button onClick={() => setIsStudentListOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-600"/></button></div>
                     <div className="p-4 border-b border-slate-100"><div className="relative"><Search className="absolute left-3 top-2.5 text-slate-400" size={16} /><input value={studentSearch} onChange={(e) => setStudentSearch(e.target.value)} placeholder="Search by name or email..." className="w-full pl-9 p-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" autoFocus /></div></div>
                     <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
-                        {availableStudents.length === 0 ? (
-                            <div className="text-center py-8 text-slate-400">Loading students...</div>
-                        ) : (
-                            availableStudents
-                            .filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()) || s.email.toLowerCase().includes(studentSearch.toLowerCase()))
-                            .map((student, idx) => { 
+                        {availableStudents.length === 0 ? ( <div className="text-center py-8 text-slate-400">Loading students...</div> ) : (
+                            availableStudents.filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()) || s.email.toLowerCase().includes(studentSearch.toLowerCase())).map((student, idx) => { 
                                 const isAdded = selectedClass.students?.includes(student.email); 
-                                return ( 
-                                    <div key={idx} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors border-b border-slate-50 last:border-0">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 bg-slate-200 text-slate-600 rounded-full flex items-center justify-center font-bold text-xs">{student.name.charAt(0)}</div>
-                                            <div>
-                                                <p className="text-sm font-bold text-slate-800">{student.name}</p>
-                                                <p className="text-xs text-slate-500">{student.email}</p>
-                                            </div>
-                                        </div>
-                                        <button onClick={() => addStudentToClass(student.email)} disabled={isAdded} className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${isAdded ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
-                                            {isAdded ? 'Joined' : 'Add'}
-                                        </button>
-                                    </div> 
-                                ) 
+                                return ( <div key={idx} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors border-b border-slate-50 last:border-0"><div className="flex items-center gap-3"><div className="w-8 h-8 bg-slate-200 text-slate-600 rounded-full flex items-center justify-center font-bold text-xs">{student.name.charAt(0)}</div><div><p className="text-sm font-bold text-slate-800">{student.name}</p><p className="text-xs text-slate-500">{student.email}</p></div></div><button onClick={() => addStudentToClass(student.email)} disabled={isAdded} className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${isAdded ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>{isAdded ? 'Joined' : 'Add'}</button></div> ) 
                             })
                         )}
                     </div>
@@ -2954,57 +3056,16 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in duration-200">
               <div className="p-4 border-b border-slate-100 bg-slate-50">
-                  <div className="flex justify-between items-center mb-4">
-                      {/* Dynamic Header */}
-                      <h3 className="font-bold text-lg">Assign {assignType === 'deck' ? 'Flashcard Deck' : assignType === 'test' ? 'Exam' : 'Lesson'}</h3>
-                      <button onClick={() => setAssignModalOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-600"/></button>
-                  </div>
+                  <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">Assign {assignType === 'deck' ? 'Flashcard Deck' : assignType === 'test' ? 'Exam' : 'Lesson'}</h3><button onClick={() => setAssignModalOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-600"/></button></div>
                   <div className="bg-white p-1 rounded-lg border border-slate-200 flex mb-2"><button onClick={() => setTargetStudentMode('all')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${targetStudentMode === 'all' ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Entire Class</button><button onClick={() => setTargetStudentMode('specific')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${targetStudentMode === 'specific' ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Specific Students</button></div>
                   {targetStudentMode === 'specific' && (<div className="mt-2 max-h-32 overflow-y-auto border border-slate-200 rounded-lg bg-white p-2 custom-scrollbar">{(!selectedClass.students || selectedClass.students.length === 0) ? (<p className="text-xs text-slate-400 italic text-center p-2">No students in roster.</p>) : (selectedClass.students.map((studentEmail: string) => (<button key={studentEmail} onClick={() => toggleAssignee(studentEmail)} className="flex items-center gap-2 w-full p-2 hover:bg-slate-50 rounded text-left">{selectedAssignees.includes(studentEmail) ? <CheckCircle2 size={16} className="text-indigo-600"/> : <Circle size={16} className="text-slate-300"/>}<span className="text-xs font-medium text-slate-700 truncate">{studentEmail}</span></button>)))}</div>)}
                   {targetStudentMode === 'specific' && <p className="text-[10px] text-slate-400 mt-2 text-right">{selectedAssignees.length} selected</p>}
               </div>
               <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                  {assignType === 'deck' && (
-                      <div>
-                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><Layers size={14}/> Available Decks</h4>
-                          <div className="space-y-2">
-                              {Object.keys(allDecks || {}).length === 0 ? <p className="text-sm text-slate-400 italic">No decks found.</p> : Object.entries(allDecks).map(([key, deck]: any) => (
-                                  <button key={key} onClick={() => assignContent({ ...deck, id: key }, 'deck')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all group flex justify-between items-center">
-                                      <div><h4 className="font-bold text-slate-800 text-sm">{deck.title}</h4><p className="text-xs text-slate-500">{deck.cards?.length || 0} Cards</p></div>
-                                      <PlusCircle size={18} className="text-slate-300 group-hover:text-orange-500"/>
-                                  </button>
-                              ))}
-                          </div>
-                      </div>
-                  )}
-                  
-                  {assignType === 'lesson' && (
-                      <div>
-                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><BookOpen size={14}/> Available Lessons</h4>
-                          <div className="space-y-2">
-                              {lessons.filter((l:any) => l.type !== 'test').length === 0 ? <p className="text-sm text-slate-400 italic">No lessons found.</p> : lessons.filter((l:any) => l.type !== 'test').map((l: any) => (
-                                  <button key={l.id} onClick={() => assignContent(l, 'lesson')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group flex justify-between items-center">
-                                      <div><h4 className="font-bold text-slate-800 text-sm">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div>
-                                      <PlusCircle size={18} className="text-slate-300 group-hover:text-indigo-500"/>
-                                  </button>
-                              ))}
-                          </div>
-                      </div>
-                  )}
-                  
-                  {assignType === 'test' && (
-                      <div>
-                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><HelpCircle size={14}/> Available Exams</h4>
-                          <div className="space-y-2">
-                              {lessons.filter((l:any) => l.type === 'test').length === 0 ? <p className="text-sm text-slate-400 italic">No exams found.</p> : lessons.filter((l:any) => l.type === 'test').map((l: any) => (
-                                  <button key={l.id} onClick={() => assignContent(l, 'test')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-rose-500 hover:bg-rose-50 transition-all group flex justify-between items-center">
-                                      <div><h4 className="font-bold text-slate-800 text-sm">{l.title}</h4><p className="text-xs text-slate-500">{(l.questions || []).length} Questions • {l.xp} XP</p></div>
-                                      <PlusCircle size={18} className="text-slate-300 group-hover:text-rose-500"/>
-                                  </button>
-                              ))}
-                          </div>
-                      </div>
-                  )}
+                  {/* ... (Keep assignment list logic) ... */}
+                  {assignType === 'deck' && (<div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><Layers size={14}/> Available Decks</h4><div className="space-y-2">{Object.keys(allDecks || {}).length === 0 ? <p className="text-sm text-slate-400 italic">No decks found.</p> : Object.entries(allDecks).map(([key, deck]: any) => (<button key={key} onClick={() => assignContent({ ...deck, id: key }, 'deck')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{deck.title}</h4><p className="text-xs text-slate-500">{deck.cards?.length || 0} Cards</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-orange-500"/></button>))}</div></div>)}
+                  {assignType === 'lesson' && (<div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><BookOpen size={14}/> Available Lessons</h4><div className="space-y-2">{lessons.filter((l:any) => l.type !== 'test').length === 0 ? <p className="text-sm text-slate-400 italic">No lessons found.</p> : lessons.filter((l:any) => l.type !== 'test').map((l: any) => (<button key={l.id} onClick={() => assignContent(l, 'lesson')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-indigo-500"/></button>))}</div></div>)}
+                  {assignType === 'test' && (<div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><HelpCircle size={14}/> Available Exams</h4><div className="space-y-2">{lessons.filter((l:any) => l.type === 'test').length === 0 ? <p className="text-sm text-slate-400 italic">No exams found.</p> : lessons.filter((l:any) => l.type === 'test').map((l: any) => (<button key={l.id} onClick={() => assignContent(l, 'test')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-rose-500 hover:bg-rose-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{l.title}</h4><p className="text-xs text-slate-500">{(l.questions || []).length} Questions • {l.xp} XP</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-rose-500"/></button>))}</div></div>)}
               </div>
             </div>
           </div>
