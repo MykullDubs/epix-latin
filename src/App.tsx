@@ -2841,7 +2841,7 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   
   const [assignType, setAssignType] = useState<'deck' | 'lesson' | 'test'>('lesson');
-  const [viewTab, setViewTab] = useState<'content' | 'forum' | 'grades'>('content'); // Added 'grades'
+  const [viewTab, setViewTab] = useState<'content' | 'forum' | 'grades'>('content');
 
   // -- Student Selector States --
   const [isStudentListOpen, setIsStudentListOpen] = useState(false);
@@ -2910,7 +2910,6 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
             <div><h1 className="text-2xl font-bold text-slate-900">{selectedClass.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {selectedClass.code}</p></div>
             <div className="flex gap-2">
                 <button onClick={() => setViewTab('content')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'content' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500 hover:bg-slate-50'}`}>Manage</button>
-                {/* NEW GRADES TOGGLE BUTTON */}
                 <button onClick={() => setViewTab('grades')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${viewTab === 'grades' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500 hover:bg-slate-50'}`}>
                     <BarChart3 size={16}/> Grades
                 </button>
@@ -2968,7 +2967,6 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
             </div>
         )}
         
-        {/* RENDER GRADES VIEW */}
         {viewTab === 'grades' && (
             <div className="h-full pb-20">
                 <ClassGrades classData={selectedClass} />
@@ -2988,9 +2986,12 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                     <div className="p-4 border-b border-slate-100"><div className="relative"><Search className="absolute left-3 top-2.5 text-slate-400" size={16} /><input value={studentSearch} onChange={(e) => setStudentSearch(e.target.value)} placeholder="Search by name or email..." className="w-full pl-9 p-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" autoFocus /></div></div>
                     <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
                         {availableStudents.length === 0 ? ( <div className="text-center py-8 text-slate-400">Loading students...</div> ) : (
-                            availableStudents.filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()) || s.email.toLowerCase().includes(studentSearch.toLowerCase())).map((student, idx) => { 
+                            // --- FIX APPLIED HERE: Added (s.name || "") fallback ---
+                            availableStudents
+                            .filter(s => (s.name || "").toLowerCase().includes(studentSearch.toLowerCase()) || (s.email || "").toLowerCase().includes(studentSearch.toLowerCase()))
+                            .map((student, idx) => { 
                                 const isAdded = selectedClass.students?.includes(student.email); 
-                                return ( <div key={idx} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors border-b border-slate-50 last:border-0"><div className="flex items-center gap-3"><div className="w-8 h-8 bg-slate-200 text-slate-600 rounded-full flex items-center justify-center font-bold text-xs">{student.name.charAt(0)}</div><div><p className="text-sm font-bold text-slate-800">{student.name}</p><p className="text-xs text-slate-500">{student.email}</p></div></div><button onClick={() => addStudentToClass(student.email)} disabled={isAdded} className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${isAdded ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>{isAdded ? 'Joined' : 'Add'}</button></div> ) 
+                                return ( <div key={idx} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors border-b border-slate-50 last:border-0"><div className="flex items-center gap-3"><div className="w-8 h-8 bg-slate-200 text-slate-600 rounded-full flex items-center justify-center font-bold text-xs">{(student.name || "?").charAt(0)}</div><div><p className="text-sm font-bold text-slate-800">{student.name || "Unknown Name"}</p><p className="text-xs text-slate-500">{student.email}</p></div></div><button onClick={() => addStudentToClass(student.email)} disabled={isAdded} className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${isAdded ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>{isAdded ? 'Joined' : 'Add'}</button></div> ) 
                             })
                         )}
                     </div>
@@ -3008,7 +3009,6 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                   {targetStudentMode === 'specific' && <p className="text-[10px] text-slate-400 mt-2 text-right">{selectedAssignees.length} selected</p>}
               </div>
               <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                  {/* ... (Keep assignment list logic) ... */}
                   {assignType === 'deck' && (<div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><Layers size={14}/> Available Decks</h4><div className="space-y-2">{Object.keys(allDecks || {}).length === 0 ? <p className="text-sm text-slate-400 italic">No decks found.</p> : Object.entries(allDecks).map(([key, deck]: any) => (<button key={key} onClick={() => assignContent({ ...deck, id: key }, 'deck')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{deck.title}</h4><p className="text-xs text-slate-500">{deck.cards?.length || 0} Cards</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-orange-500"/></button>))}</div></div>)}
                   {assignType === 'lesson' && (<div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><BookOpen size={14}/> Available Lessons</h4><div className="space-y-2">{lessons.filter((l:any) => l.type !== 'test').length === 0 ? <p className="text-sm text-slate-400 italic">No lessons found.</p> : lessons.filter((l:any) => l.type !== 'test').map((l: any) => (<button key={l.id} onClick={() => assignContent(l, 'lesson')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-indigo-500"/></button>))}</div></div>)}
                   {assignType === 'test' && (<div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><HelpCircle size={14}/> Available Exams</h4><div className="space-y-2">{lessons.filter((l:any) => l.type === 'test').length === 0 ? <p className="text-sm text-slate-400 italic">No exams found.</p> : lessons.filter((l:any) => l.type === 'test').map((l: any) => (<button key={l.id} onClick={() => assignContent(l, 'test')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-rose-500 hover:bg-rose-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{l.title}</h4><p className="text-xs text-slate-500">{(l.questions || []).length} Questions • {l.xp} XP</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-rose-500"/></button>))}</div></div>)}
