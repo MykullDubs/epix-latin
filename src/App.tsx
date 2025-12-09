@@ -1275,9 +1275,136 @@ function ClassForum({ classId, user, userData }: any) {
     </div>
   );
 }
+function StudentGradebook({ classData, user }: any) {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
+  // 1. Fetch User's Activity Logs
+  useEffect(() => {
+    if (!user?.email) return;
+    
+    const q = query(
+      collection(db, 'artifacts', appId, 'activity_logs'), 
+      where('studentEmail', '==', user.email),
+      orderBy('timestamp', 'desc')
+    );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
+    });
+    
+    return () => unsubscribe();
+  }, [user]);
+
+  // 2. Calculate Stats
+  const assignments = classData.assignments || [];
+  
+  const processedData = assignments.map((assign: any) => {
+      // Find the BEST score log for this assignment (if multiple attempts)
+      const attempts = logs.filter(l => l.itemTitle === assign.title); // Matching by title is safer in this mini-LMS structure
+      const bestAttempt = attempts.reduce((prev, current) => {
+          const prevScore = prev?.scoreDetail?.score || 0;
+          const currScore = current?.scoreDetail?.score || 0;
+          return currScore > prevScore ? current : prev;
+      }, null);
+
+      const isCompleted = attempts.length > 0;
+      
+      return {
+          ...assign,
+          isCompleted,
+          bestScore: bestAttempt?.scoreDetail,
+          lastAttemptDate: attempts[0]?.timestamp,
+          attemptsCount: attempts.length
+      };
+  });
+
+  const completedCount = processedData.filter((d: any) => d.isCompleted).length;
+  const totalCount = processedData.length;
+  
+  // Calculate Average Grade (only for Graded items like Quizzes/Exams)
+  const gradedItems = processedData.filter((d: any) => d.bestScore);
+  const totalScore = gradedItems.reduce((acc: number, curr: any) => acc + (curr.bestScore.score / curr.bestScore.total), 0);
+  const averageGrade = gradedItems.length > 0 ? Math.round((totalScore / gradedItems.length) * 100) : 0;
+
+  if (loading) return <div className="p-12 text-center text-slate-400"><Loader className="animate-spin mx-auto mb-2"/>Loading grades...</div>;
+
+  return (
+      <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+          
+          {/* OVERVIEW CARD */}
+          <div className="bg-white rounded-[2rem] p-6 shadow-xl border border-slate-100 flex flex-col md:flex-row gap-6 items-center">
+              {/* Grade Circle */}
+              <div className="relative w-32 h-32 flex-shrink-0">
+                  <svg className="w-full h-full transform -rotate-90">
+                      <circle cx="64" cy="64" r="56" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100" />
+                      <circle cx="64" cy="64" r="56" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={351} strokeDashoffset={351 - (351 * averageGrade) / 100} className={`${averageGrade >= 90 ? 'text-emerald-400' : averageGrade >= 70 ? 'text-indigo-500' : 'text-amber-400'} transition-all duration-1000 ease-out`} strokeLinecap="round" />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-3xl font-black text-slate-800">{averageGrade}%</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400">Avg. Score</span>
+                  </div>
+              </div>
+              
+              {/* Stats Grid */}
+              <div className="flex-1 grid grid-cols-2 gap-4 w-full">
+                  <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 text-center">
+                      <span className="block text-2xl font-black text-indigo-600">{completedCount}/{totalCount}</span>
+                      <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Assignments Done</span>
+                  </div>
+                  <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 text-center">
+                      <span className="block text-2xl font-black text-amber-500">{gradedItems.length}</span>
+                      <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Quizzes Taken</span>
+                  </div>
+              </div>
+          </div>
+
+          {/* DETAILED LIST */}
+          <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2"><BarChart3 size={18} className="text-indigo-500"/> Performance Detail</h3>
+              </div>
+              <div className="divide-y divide-slate-100">
+                  {processedData.map((item: any, idx: number) => (
+                      <div key={idx} className="p-4 flex items-center justify-between group hover:bg-slate-50 transition-colors">
+                          <div className="flex items-center gap-4">
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm ${item.isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-300'}`}>
+                                  {item.contentType === 'test' ? <HelpCircle size={18}/> : item.contentType === 'deck' ? <Layers size={18}/> : <FileText size={18}/>}
+                              </div>
+                              <div>
+                                  <h4 className={`font-bold text-sm ${item.isCompleted ? 'text-slate-800' : 'text-slate-400'}`}>{item.title}</h4>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                      <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-1.5 rounded">{item.contentType || 'Lesson'}</span>
+                                      {item.lastAttemptDate && <span className="text-[10px] text-slate-400 flex items-center gap-1"><Clock size={10}/> {new Date(item.lastAttemptDate).toLocaleDateString()}</span>}
+                                  </div>
+                              </div>
+                          </div>
+                          
+                          <div className="text-right">
+                              {item.bestScore ? (
+                                  <div>
+                                      <span className={`block font-black text-lg ${item.bestScore.score / item.bestScore.total >= 0.7 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                          {Math.round((item.bestScore.score / item.bestScore.total) * 100)}%
+                                      </span>
+                                      <span className="text-[10px] font-bold text-slate-400 uppercase">{item.bestScore.score}/{item.bestScore.total} Correct</span>
+                                  </div>
+                              ) : item.isCompleted ? (
+                                  <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full"><CheckCircle2 size={12}/> Complete</span>
+                              ) : (
+                                  <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">-</span>
+                              )}
+                          </div>
+                      </div>
+                  ))}
+                  {processedData.length === 0 && <div className="p-8 text-center text-slate-400 italic">No assignments to track.</div>}
+              </div>
+          </div>
+      </div>
+  );
+}
 function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, userData, user, displayName }: any) {
-  const [viewMode, setViewMode] = useState<'assignments' | 'forum'>('assignments');
+  const [viewMode, setViewMode] = useState<'assignments' | 'forum' | 'grades'>('assignments');
   const completedSet = new Set(userData?.completedAssignments || []);
   
   const relevantAssignments = (classData.assignments || []).filter((l: any) => !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email));
@@ -1314,12 +1441,16 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
               <h1 className="text-3xl font-serif font-bold text-white mb-2 drop-shadow-md leading-tight">{classData.name}</h1>
               <p className="text-indigo-100 text-sm opacity-80 mb-6">Student Portal • {displayName}</p>
               
+              {/* TAB SWITCHER */}
               <div className="inline-flex bg-white/10 backdrop-blur-xl p-1 rounded-2xl border border-white/10 shadow-inner">
-                  <button onClick={() => setViewMode('assignments')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${viewMode === 'assignments' ? 'bg-white text-indigo-700 shadow-lg scale-105' : 'text-white/70 hover:text-white hover:bg-white/10'}`}>
-                      <BookOpen size={18} className={viewMode === 'assignments' ? 'fill-current' : ''}/> Tasks
+                  <button onClick={() => setViewMode('assignments')} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${viewMode === 'assignments' ? 'bg-white text-indigo-700 shadow-lg scale-105' : 'text-white/70 hover:text-white hover:bg-white/10'}`}>
+                      <BookOpen size={16} className={viewMode === 'assignments' ? 'fill-current' : ''}/> Tasks
                   </button>
-                  <button onClick={() => setViewMode('forum')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${viewMode === 'forum' ? 'bg-white text-indigo-700 shadow-lg scale-105' : 'text-white/70 hover:text-white hover:bg-white/10'}`}>
-                      <MessageSquare size={18} className={viewMode === 'forum' ? 'fill-current' : ''}/> Forum
+                  <button onClick={() => setViewMode('grades')} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${viewMode === 'grades' ? 'bg-white text-indigo-700 shadow-lg scale-105' : 'text-white/70 hover:text-white hover:bg-white/10'}`}>
+                      <BarChart3 size={16} className={viewMode === 'grades' ? 'fill-current' : ''}/> Grades
+                  </button>
+                  <button onClick={() => setViewMode('forum')} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${viewMode === 'forum' ? 'bg-white text-indigo-700 shadow-lg scale-105' : 'text-white/70 hover:text-white hover:bg-white/10'}`}>
+                      <MessageSquare size={16} className={viewMode === 'forum' ? 'fill-current' : ''}/> Forum
                   </button>
               </div>
           </div>
@@ -1328,7 +1459,11 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
       {/* --- CONTENT AREA --- */}
       <div className="flex-1 overflow-y-auto pb-24 -mt-8 relative z-20 px-6 space-y-6">
         
-        {viewMode === 'assignments' ? (
+        {viewMode === 'grades' && (
+            <StudentGradebook classData={classData} user={user} />
+        )}
+
+        {viewMode === 'assignments' && (
             <>
                 {/* Progress Card */}
                 <div className="bg-white rounded-3xl p-6 shadow-xl shadow-indigo-900/5 border border-slate-100 flex items-center justify-between relative overflow-hidden group">
@@ -1385,7 +1520,9 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
                     )}
                 </div>
             </>
-        ) : (
+        )}
+        
+        {viewMode === 'forum' && (
             <div className="h-full bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
                 <ClassForum classId={classData.id} user={user} userData={userData} />
             </div>
