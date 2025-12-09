@@ -2066,28 +2066,22 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   const { level, progress, rank } = getLevelInfo(userData?.xp || 0);
   const visibleLessons = libraryExpanded ? lessons : lessons.slice(0, 2);
 
-  // --- 3. XP HANDLER FOR COLOSSEUM ---
 // --- 3. XP HANDLER FOR COLOSSEUM (FIXED) ---
   const handleColosseumXP = async (xpAmount: number, reason: string) => {
-      // 1. Robust User Check: Try prop first, then global auth
       const targetUser = user || auth.currentUser;
 
       if (!targetUser) {
-          console.error("XP Error: No user found. Cannot save.");
-          alert("Error: You seem to be logged out. XP not saved.");
+          console.error("XP Error: No user found.");
           return;
       }
 
-      console.log(`Attempting to save ${xpAmount} XP for ${targetUser.uid}`);
-
+      // 1. Just save the data in the background
       try {
-          // 2. Update Profile XP
           const profileRef = doc(db, 'artifacts', appId, 'users', targetUser.uid, 'profile', 'main');
           await updateDoc(profileRef, { 
               xp: increment(xpAmount) 
           });
 
-          // 3. Add Activity Log
           await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
               studentName: displayName || "Student",
               studentEmail: targetUser.email,
@@ -2096,14 +2090,12 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
               timestamp: Date.now(),
               type: 'game_reward'
           });
-
-          setShowColosseum(false);
-          // Optional: Add a visual toast here instead of alert
-          // alert(`Victory! You earned ${xpAmount} XP.`); 
+          
+          // REMOVED: setShowColosseum(false);  <-- This was the bug!
+          // We let the user decide when to close the window via the "Leave Arena" button.
+          
       } catch (e: any) {
           console.error("XP Save Failed:", e);
-          alert(`Failed to save XP: ${e.message}`);
-          setShowColosseum(false);
       }
   };
 
