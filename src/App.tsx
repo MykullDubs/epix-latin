@@ -1749,6 +1749,10 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
 // Import these from 'lucide-react':
 // Swords, Heart, Skull, Zap, Shield, Hourglass, Target, Crown
 
+// --- ASSETS ---
+// Import these from 'lucide-react':
+// Swords, Heart, Skull, Zap, Shield, Hourglass, Target, Crown
+
 function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
   // Game Flow
   const [gameState, setGameState] = useState<'intro' | 'playing' | 'gameover'>('intro');
@@ -1764,7 +1768,7 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
 
   // Data
   const [currentCard, setCurrentCard] = useState<any>(null);
-  const [options, setOptions] = useState<any[]>([]); // 4 options
+  const [options, setOptions] = useState<any[]>([]); 
   const [pool, setPool] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -1797,7 +1801,7 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
     const others = pool.filter(c => c.id !== target.id);
     const distractors = others.sort(() => 0.5 - Math.random()).slice(0, 3);
     
-    // Assign positions: 0:Top, 1:Right, 2:Bottom, 3:Left
+    // Shuffle options
     const newOptions = [target, ...distractors].sort(() => 0.5 - Math.random());
     
     setCurrentCard(target);
@@ -1888,23 +1892,25 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
 
   // --- RENDER HELPERS ---
   const getOptionStyle = (opt: any, index: number) => {
-      // Adjusted positions to ensure they stay on edges and don't overlap center
+      // NEW "X" LAYOUT: Pushes cards to the 4 corners to clear the center
+      // Added plenty of padding (top-20/bottom-20) so they don't hit the HUD
       const positions = [
-          "top-4 left-1/2 -translate-x-1/2", // North (Pinned Top)
-          "top-1/2 right-4 -translate-y-1/2", // East (Pinned Right)
-          "bottom-4 left-1/2 -translate-x-1/2", // South (Pinned Bottom)
-          "top-1/2 left-4 -translate-y-1/2" // West (Pinned Left)
+          "top-24 left-4",      // Top Left
+          "top-24 right-4",     // Top Right
+          "bottom-24 left-4",   // Bottom Left
+          "bottom-24 right-4"   // Bottom Right
       ];
       
-      let color = "bg-white text-slate-800 border-slate-200";
+      let color = "bg-white/90 backdrop-blur-md text-slate-800 border-white/50"; // Default Glass
+      
       if (selectedId) {
           if (opt.id === currentCard.id) color = "bg-emerald-500 text-white border-emerald-600 scale-110 shadow-[0_0_30px_rgba(16,185,129,0.5)]";
           else if (opt.id === selectedId) color = "bg-rose-500 text-white border-rose-600 scale-90 opacity-50";
-          else color = "bg-slate-200 text-slate-400 opacity-30";
+          else color = "bg-slate-200/50 text-slate-400 opacity-30";
       }
 
-      // Changed w-40 to w-32 for better fit on mobile
-      return `absolute ${positions[index]} w-32 md:w-40 p-3 rounded-2xl border-4 shadow-lg flex items-center justify-center text-center font-bold text-sm transition-all duration-300 z-20 select-none ${color}`;
+      // Max width ensures they don't grow too wide on tablets
+      return `absolute ${positions[index]} max-w-[45%] min-w-[130px] p-3 rounded-2xl border-2 shadow-lg flex items-center justify-center text-center font-bold text-sm transition-all duration-300 z-20 select-none ${color}`;
   };
 
   const getPathString = () => {
@@ -1986,14 +1992,13 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
                         />
                     </svg>
 
-                    {/* Central Question (Shrunk to w-32 h-32 to prevent overlap) */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-slate-800 rounded-full border-4 border-slate-700 flex flex-col items-center justify-center text-center shadow-2xl z-10 pointer-events-none">
-                        <span className="text-slate-500 text-[9px] font-bold uppercase tracking-widest mb-1">Target</span>
-                        {/* Clamped text size */}
-                        <h2 className="text-lg font-serif font-bold text-white leading-tight px-1 line-clamp-2">{currentCard.front}</h2>
+                    {/* Central Question (Smaller & Glass) */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-slate-900/80 backdrop-blur-md rounded-full border-4 border-slate-700 flex flex-col items-center justify-center text-center shadow-2xl z-10 pointer-events-none">
+                        <span className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mb-1">Target</span>
+                        <h2 className="text-xl font-serif font-bold text-white leading-tight px-1 line-clamp-2">{currentCard.front}</h2>
                     </div>
 
-                    {/* Answer Targets (North, East, South, West) */}
+                    {/* Answer Targets (4 Corners) */}
                     {options.map((opt, i) => (
                         <div 
                             key={opt.id}
