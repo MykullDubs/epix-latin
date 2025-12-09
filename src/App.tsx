@@ -3621,7 +3621,60 @@ function RoleToggle({ user, userData }: any) {
     </button>
   );
 }
+function WidgetView({ allDecks, userData }: any) {
+  // 1. Calculate Daily Card (Reused Logic)
+  const preferredDeckId = userData?.widgetDeckId || 'all';
+  
+  const dailyCard = useMemo(() => {
+    let sourceCards: any[] = [];
+    if (preferredDeckId === 'all' || !allDecks[preferredDeckId]) {
+        Object.values(allDecks).forEach((deck: any) => {
+            if (deck.cards) sourceCards.push(...deck.cards);
+        });
+    } else {
+        sourceCards = allDecks[preferredDeckId]?.cards || [];
+    }
+    if (sourceCards.length === 0) return null;
 
+    const today = new Date();
+    const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+    return sourceCards[seed % sourceCards.length];
+  }, [allDecks, preferredDeckId]);
+
+  if (!dailyCard) return <div className="h-screen w-screen bg-slate-100 flex items-center justify-center text-xs text-slate-400">No Content</div>;
+
+  return (
+    <div className="h-screen w-screen bg-gradient-to-br from-indigo-600 to-purple-700 flex flex-col items-center justify-center p-4 text-white text-center cursor-pointer" onClick={() => window.open('/', '_self')}>
+        
+        {/* Widget Header */}
+        <div className="flex items-center gap-1.5 mb-2 opacity-80">
+            <Zap size={12} className="text-amber-300" fill="currentColor"/>
+            <span className="text-[10px] font-bold uppercase tracking-widest">Daily Discovery</span>
+        </div>
+
+        {/* Main Content */}
+        <h1 className="text-3xl font-serif font-bold mb-1 leading-tight drop-shadow-md">
+            {dailyCard.front}
+        </h1>
+        
+        <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 mb-3">
+            <p className="text-indigo-100 font-serif text-xs tracking-wide">{dailyCard.ipa || '/.../'}</p>
+        </div>
+
+        {/* Divider */}
+        <div className="w-8 h-0.5 bg-white/20 rounded-full mb-3"></div>
+
+        {/* Meaning */}
+        <p className="font-bold text-sm leading-snug max-w-[90%]">
+            {dailyCard.back}
+        </p>
+
+        <div className="mt-auto pt-2 text-[9px] font-bold uppercase tracking-wider opacity-50">
+            Tap to Open App
+        </div>
+    </div>
+  );
+}
 function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [user, setUser] = useState<any>(null);
