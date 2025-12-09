@@ -1641,21 +1641,6 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   // --- DERIVED DATA ---
   const completedSet = new Set(userData?.completedAssignments || []);
   
-  // Smart Name Resolver: Tries to find a real name before defaulting to 'Student'
-  const displayName = useMemo(() => {
-      // 1. Try DB Name (if not generic)
-      if (userData?.name && userData.name !== 'Student' && userData.name !== 'User') return userData.name;
-      // 2. Try Auth Name
-      if (user?.displayName) return user.displayName;
-      // 3. Try Email Username (Capitalized)
-      if (user?.email) {
-          const emailName = user.email.split('@')[0];
-          return emailName.charAt(0).toUpperCase() + emailName.slice(1);
-      }
-      // 4. Fallback
-      return 'Student';
-  }, [userData, user]);
-
   // Filter assignments relevant to this user
   const relevantAssignments = (assignments || []).filter((l: any) => { 
       return !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); 
@@ -1682,51 +1667,54 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
     )}
     
     {/* --- 1. HERO PROFILE WIDGET --- */}
-    <button onClick={() => setShowLevelModal(true)} className="w-full relative overflow-hidden bg-gradient-to-br from-blue-500 via-indigo-500 to-blue-600 text-white shadow-xl z-10 group text-left rounded-b-[2.5rem] pb-8 pt-10 px-6 transition-all active:scale-[0.99]">
+    <button onClick={() => setShowLevelModal(true)} className="w-full relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white shadow-xl z-10 group text-left rounded-b-[3rem] pb-10 pt-12 px-8 transition-all active:scale-[0.99] border-b border-white/10">
         {/* Background Effects */}
-        <div className="absolute top-[-50%] left-[-20%] w-[500px] h-[500px] bg-blue-400/30 rounded-full blur-[80px] mix-blend-overlay pointer-events-none"></div>
-        <div className="absolute bottom-[-20%] right-[-10%] w-[300px] h-[300px] bg-indigo-300/20 rounded-full blur-[60px] mix-blend-overlay pointer-events-none"></div>
+        <div className="absolute top-[-50%] left-[-20%] w-[600px] h-[600px] bg-blue-400/20 rounded-full blur-[80px] mix-blend-overlay pointer-events-none animate-pulse"></div>
+        <div className="absolute bottom-[-20%] right-[-10%] w-[400px] h-[400px] bg-purple-400/20 rounded-full blur-[60px] mix-blend-overlay pointer-events-none"></div>
        
-        <div className="relative z-20 flex flex-col gap-4">
-            <div className="flex items-center gap-4">
+        <div className="relative z-20 flex flex-col gap-5">
+            <div className="flex items-center gap-5">
                 <div className="relative">
-                    <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/40 shadow-[0_8px_32px_rgba(0,0,0,0.1)] group-hover:ring-4 ring-white/20 transition-all overflow-hidden">
+                    <div className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center border-2 border-white/30 shadow-[0_8px_32px_rgba(0,0,0,0.1)] group-hover:scale-105 transition-all overflow-hidden relative">
                         {userData?.photoURL ? (
                             <img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />
                         ) : (
-                            <span className="font-serif font-bold text-2xl text-white drop-shadow-md">{displayName.charAt(0)}</span>
+                            <span className="font-serif font-bold text-3xl text-white drop-shadow-md">{userData?.name?.charAt(0) || 'S'}</span>
                         )}
+                        {/* Status Dot */}
+                        <div className="absolute bottom-1 right-1 w-4 h-4 bg-emerald-400 border-2 border-indigo-600 rounded-full"></div>
                     </div>
                 </div>
                 <div>
-                    <p className="text-blue-100 text-[10px] font-bold uppercase tracking-widest mb-0.5 opacity-90 drop-shadow-sm">Welcome back,</p>
-                    {/* UPDATED: Uses smart displayName instead of raw userData.name */}
-                    <h1 className="text-3xl font-serif font-bold leading-none tracking-tight drop-shadow-lg filter truncate max-w-[200px]">{displayName}</h1>
-                    <div className="flex items-center gap-2 mt-1.5">
-                        <span className="bg-white/20 backdrop-blur-md px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide border border-white/20 shadow-sm">{rank}</span>
+                    <p className="text-indigo-100 text-[10px] font-bold uppercase tracking-widest mb-1 opacity-90 drop-shadow-sm">Salve,</p>
+                    <h1 className="text-4xl font-serif font-bold leading-none tracking-tight drop-shadow-lg filter truncate max-w-[200px]">{userData?.name || 'Student'}</h1>
+                    <div className="flex items-center gap-2 mt-2">
+                        <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border border-white/20 shadow-sm flex items-center gap-1">
+                            <Award size={12} className="text-yellow-300"/> {rank}
+                        </span>
                     </div>
                 </div>
             </div>
 
             {/* XP Bar & Streak */}
-            <div className="bg-white/10 backdrop-blur-xl rounded-xl p-3 border border-white/30 flex items-center justify-between mt-2 group-hover:bg-white/20 transition-all shadow-[0_8px_32px_rgba(0,0,0,0.1)]">
-                <div className="flex-1 border-r border-white/20 pr-4">
-                     <div className="flex justify-between items-end mb-1">
-                         <span className="text-[10px] font-bold text-white tracking-wide">Level {level}</span>
-                         <span className="text-[9px] font-bold text-blue-100">{Math.round(progress)}%</span>
+            <div className="bg-black/20 backdrop-blur-xl rounded-2xl p-4 border border-white/10 flex items-center justify-between mt-2 group-hover:bg-black/30 transition-all shadow-inner">
+                <div className="flex-1 border-r border-white/10 pr-6">
+                     <div className="flex justify-between items-end mb-2">
+                         <span className="text-[10px] font-bold text-indigo-100 tracking-wide uppercase">Level {level} Progress</span>
+                         <span className="text-xs font-bold text-white">{Math.round(progress)}%</span>
                      </div>
-                     <div className="w-full bg-black/20 rounded-full h-2 overflow-hidden border border-white/10">
-                         <div className="bg-gradient-to-r from-yellow-300 to-amber-400 h-full rounded-full shadow-[0_0_15px_rgba(250,204,21,0.6)] relative overflow-hidden" style={{ width: `${progress}%` }}>
+                     <div className="w-full bg-black/30 rounded-full h-2.5 overflow-hidden border border-white/5">
+                         <div className="bg-gradient-to-r from-cyan-300 to-blue-500 h-full rounded-full shadow-[0_0_15px_rgba(34,211,238,0.4)] relative overflow-hidden" style={{ width: `${progress}%` }}>
                              <div className="absolute inset-0 bg-white/40 w-full animate-[shimmer_2s_infinite]"></div>
                          </div>
                      </div>
                 </div>
-                <div className="pl-5 flex flex-col items-center justify-center">
-                    <div className="flex items-center gap-1 text-yellow-300 filter drop-shadow-sm">
-                        <Zap size={20} fill="currentColor" />
-                        <span className="text-xl font-bold leading-none text-white">{userData?.streak || 1}</span>
+                <div className="pl-6 flex flex-col items-center justify-center">
+                    <div className="flex items-center gap-1.5 text-amber-300 filter drop-shadow-sm">
+                        <Zap size={24} fill="currentColor" className="animate-pulse" />
+                        <span className="text-2xl font-black leading-none text-white">{userData?.streak || 1}</span>
                     </div>
-                    <span className="text-[8px] text-blue-100 uppercase font-bold tracking-wider mt-0.5">Day Streak</span>
+                    <span className="text-[9px] text-indigo-200 uppercase font-bold tracking-wider mt-1">Day Streak</span>
                 </div>
             </div>
         </div>
@@ -1740,15 +1728,19 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
     />
     
     {/* --- MAIN SCROLLABLE CONTENT --- */}
-    <div className="px-6 space-y-6 mt-4 relative z-20">
+    <div className="px-6 space-y-8 mt-8 relative z-20">
       
-      {/* --- 3. MY CLASSES --- */}
+      {/* --- 3. MY CLASSES (JUICED UP) --- */}
       {classes && classes.length > 0 && (
         <div className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
-            <h3 className="text-sm font-bold text-blue-900/70 uppercase tracking-wider mb-4 ml-1 flex items-center gap-2">
-                <School size={16} className="text-blue-500"/> My Classes
-            </h3>
-            <div className="flex gap-4 overflow-x-auto pb-5 custom-scrollbar snap-x">
+            <div className="flex justify-between items-end mb-4 ml-1">
+                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                    <School size={16} className="text-indigo-500"/> My Classes
+                </h3>
+                <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md">{classes.length} Active</span>
+            </div>
+            
+            <div className="flex gap-5 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">
                 {classes.map((cls: any) => { 
                     const clsTasks = cls.assignments || [];
                     const myPending = clsTasks.filter((l: any) => { 
@@ -1762,20 +1754,63 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
                     const studentCount = (cls.students || []).length;
 
                     return ( 
-                        <button key={cls.id} onClick={() => onSelectClass(cls)} className="snap-start min-w-[280px] bg-white p-5 rounded-3xl border border-blue-100 shadow-lg shadow-blue-900/5 hover:shadow-xl hover:shadow-blue-900/10 hover:border-blue-300 hover:-translate-y-1 transition-all duration-300 group text-left relative overflow-hidden flex flex-col justify-between h-[180px]">
-                            <div className="absolute top-[-40%] right-[-40%] w-40 h-40 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-full blur-3xl group-hover:from-blue-100 group-hover:to-indigo-100 transition-colors"></div>
-                            <div className="relative z-10 w-full">
-                                <div className="flex items-start justify-between mb-3">
-                                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md group-hover:scale-110 transition-transform duration-300">{cls.name.charAt(0)}</div>
-                                    <span className="text-[10px] font-mono text-slate-400 bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg">{cls.code}</span>
+                        <button 
+                            key={cls.id} 
+                            onClick={() => onSelectClass(cls)} 
+                            className="snap-start min-w-[300px] h-[200px] bg-white rounded-[2rem] shadow-[0_10px_40px_-15px_rgba(0,0,0,0.1)] hover:shadow-[0_20px_50px_-12px_rgba(79,70,229,0.3)] border border-slate-100 transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden flex flex-col text-left"
+                        >
+                            {/* Decorative Top Gradient */}
+                            <div className="h-24 bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-800 relative w-full overflow-hidden">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
+                                <div className="absolute bottom-0 left-0 w-24 h-24 bg-indigo-500/20 rounded-full blur-xl"></div>
+                                
+                                <div className="absolute top-4 left-5 flex items-start gap-3 z-10">
+                                    <div className="w-12 h-12 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                                        {cls.name.charAt(0)}
+                                    </div>
+                                    <div className="mt-1">
+                                        <div className="bg-black/30 backdrop-blur-sm border border-white/10 text-white/90 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md inline-block mb-1">
+                                            {cls.code}
+                                        </div>
+                                    </div>
                                 </div>
-                                <h4 className="font-bold text-slate-800 text-lg truncate pr-2 group-hover:text-indigo-600 transition-colors">{cls.name}</h4>
-                                <div className="flex items-center gap-1.5 mt-1 text-slate-400 text-xs font-medium"><Users size={12} className="text-blue-400" /><span>{studentCount} Students</span></div>
+
+                                {/* Due Badge (Floats top right) */}
+                                {myPending > 0 ? (
+                                    <div className="absolute top-4 right-4 bg-rose-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg border border-white/20 animate-pulse flex items-center gap-1">
+                                        <AlertCircle size={10}/> {myPending} Due
+                                    </div>
+                                ) : (
+                                    <div className="absolute top-4 right-4 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-500/30 backdrop-blur-md flex items-center gap-1">
+                                        <Check size={10}/> All Done
+                                    </div>
+                                )}
                             </div>
-                            <div className="relative z-10 w-full mt-4 pt-4 border-t border-slate-100">
-                                <div className="flex justify-between items-end mb-2"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Progress</span><span className="text-[10px] font-bold text-indigo-600">{completedTasks}/{totalTasks} Tasks</span></div>
-                                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden"><div className={`h-full rounded-full transition-all duration-1000 ${classProgress === 100 ? 'bg-emerald-400' : 'bg-blue-500'}`} style={{width: `${classProgress}%`}}></div></div>
-                                {myPending > 0 && (<div className="absolute right-0 -top-8 bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm animate-pulse">{myPending} Due</div>)}
+
+                            {/* Card Body */}
+                            <div className="p-5 flex-1 flex flex-col justify-between bg-white relative z-10">
+                                <div>
+                                    <h4 className="font-serif font-bold text-slate-800 text-xl truncate pr-2 group-hover:text-indigo-600 transition-colors">{cls.name}</h4>
+                                    <div className="flex items-center gap-2 mt-1 text-slate-400 text-xs font-medium">
+                                        <Users size={12} /> <span>{studentCount} Students</span>
+                                    </div>
+                                </div>
+
+                                {/* Progress Section */}
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-end">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Course Progress</span>
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${classProgress === 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-50 text-indigo-600'}`}>
+                                            {Math.round(classProgress)}%
+                                        </span>
+                                    </div>
+                                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                        <div 
+                                            className={`h-full rounded-full transition-all duration-1000 ${classProgress === 100 ? 'bg-emerald-500' : 'bg-indigo-600'}`} 
+                                            style={{width: `${classProgress}%`}}
+                                        ></div>
+                                    </div>
+                                </div>
                             </div>
                         </button> 
                     ); 
@@ -1787,20 +1822,29 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
       {/* --- 4. PENDING ASSIGNMENTS --- */}
       {activeAssignments.length > 0 && (
           <div className="animate-in slide-in-from-bottom-4 duration-500 delay-200">
-             <h3 className="text-sm font-bold text-blue-900/70 uppercase tracking-wider mb-3 ml-1">Pending Assignments</h3>
+             <div className="flex justify-between items-center mb-3 ml-1">
+                 <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Up Next</h3>
+             </div>
              <div className="space-y-3">
                 {activeAssignments.map((l: any, i: number) => ( 
-                    <button key={`${l.id}-${i}`} onClick={() => l.contentType === 'deck' ? onSelectDeck(l) : onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all hover:border-blue-300 hover:shadow-md group">
+                    <button key={`${l.id}-${i}`} onClick={() => l.contentType === 'deck' ? onSelectDeck(l) : onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all hover:border-indigo-300 hover:shadow-md group">
                         <div className="flex items-center space-x-4">
                             <div className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-colors shadow-sm ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-500 group-hover:text-white'}`}>
                                 {l.contentType === 'deck' ? <Layers size={22}/> : <PlayCircle size={22} />}
                             </div>
                             <div className="text-left">
-                                <h4 className="font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{l.title}</h4>
-                                <p className="text-xs text-slate-500">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Assigned Lesson'}</p>
+                                <h4 className="font-bold text-slate-800 group-hover:text-indigo-700 transition-colors">{l.title}</h4>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                                        {l.contentType === 'deck' ? 'Deck' : 'Lesson'}
+                                    </span>
+                                    {l.xp && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 rounded">+{l.xp} XP</span>}
+                                </div>
                             </div>
                         </div>
-                        <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm"><ChevronRight size={16} /></div>
+                        <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-sm">
+                            <ChevronRight size={16} />
+                        </div>
                     </button>
                 ))}
              </div>
@@ -1809,31 +1853,29 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
       
       {/* --- 5. LIBRARY STACK --- */}
       <div className="animate-in slide-in-from-bottom-4 duration-500 delay-300">
-         <h3 className="text-sm font-bold text-blue-900/70 uppercase tracking-wider mb-3 ml-1 flex items-center gap-2">
-            <BookOpen size={16} className="text-blue-500"/> Library
+         <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 ml-1 flex items-center gap-2">
+            <BookOpen size={16} className="text-indigo-500"/> Library
          </h3>
-         
          <div className="space-y-3">
             {visibleLessons.map((l: any, idx: number) => (
                 <button 
                     key={l.id} 
                     onClick={() => onSelectLesson(l)} 
                     style={{ animationDelay: `${idx * 50}ms` }}
-                    className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-blue-300 group transition-all hover:shadow-md animate-in slide-in-from-bottom-2 fade-in fill-mode-forwards"
+                    className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-indigo-300 group transition-all hover:shadow-md animate-in slide-in-from-bottom-2 fade-in fill-mode-forwards"
                 >
                     <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-500 group-hover:bg-blue-500 group-hover:text-white transition-colors"><BookOpen size={22}/></div>
-                        <div className="text-left"><h4 className="font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div>
+                        <div className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-500 group-hover:bg-indigo-500 group-hover:text-white transition-colors"><BookOpen size={22}/></div>
+                        <div className="text-left"><h4 className="font-bold text-slate-800 group-hover:text-indigo-700 transition-colors">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div>
                     </div>
-                    <ChevronRight className="text-slate-300 group-hover:text-blue-500 transition-colors"/>
+                    <ChevronRight className="text-slate-300 group-hover:text-indigo-500 transition-colors"/>
                 </button>
             ))}
          </div>
-
          {lessons.length > 2 && (
              <button 
                 onClick={() => setLibraryExpanded(!libraryExpanded)}
-                className="w-full mt-2 py-3 flex items-center justify-center gap-2 text-[10px] font-bold text-blue-400 uppercase tracking-widest hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                className="w-full mt-2 py-3 flex items-center justify-center gap-2 text-[10px] font-bold text-indigo-400 uppercase tracking-widest hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
              >
                 {libraryExpanded ? (
                     <>Show Less <ChevronUp size={14}/></>
