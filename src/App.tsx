@@ -2167,14 +2167,18 @@ function TestPlayerView({ test, onFinish }: any) {
       }
   };
 
-  // Ordering Logic
-  const handleDragStart = (e: any, index: number) => { e.dataTransfer.setData('dragIndex', index); };
-  const handleDrop = (e: any, dropIndex: number) => {
+  // --- NEW: SMOOTH REORDERING LOGIC (No Drag) ---
+  const moveItem = (index: number, direction: 'up' | 'down') => {
       if (isSubmitted) return;
-      const dragIndex = parseInt(e.dataTransfer.getData('dragIndex'));
       const newOrder = [...dragOrder];
-      const [removed] = newOrder.splice(dragIndex, 1);
-      newOrder.splice(dropIndex, 0, removed);
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+
+      // Bounds check
+      if (targetIndex < 0 || targetIndex >= newOrder.length) return;
+
+      // Swap
+      [newOrder[index], newOrder[targetIndex]] = [newOrder[targetIndex], newOrder[index]];
+      
       setDragOrder(newOrder);
       setAnswers({ ...answers, [currentIndex]: newOrder });
   };
@@ -2276,21 +2280,33 @@ function TestPlayerView({ test, onFinish }: any) {
                       </div>
                   )}
 
-                  {/* ORDERING */}
+                  {/* ORDERING (Fixed: Replaced Drag with Click-to-Move) */}
                   {currentQ.type === 'order' && (
-                      <div className="space-y-2">
-                          <p className="text-xs font-bold text-slate-400 uppercase mb-2">Drag to reorder</p>
+                      <div className="space-y-3">
+                          <p className="text-xs font-bold text-slate-400 uppercase mb-2">Tap arrows to reorder</p>
                           {dragOrder.length > 0 ? dragOrder.map((item: any, idx: number) => (
                               <div 
                                 key={item.id} 
-                                draggable={!isSubmitted}
-                                onDragStart={(e) => handleDragStart(e, idx)}
-                                onDragOver={(e) => e.preventDefault()}
-                                onDrop={(e) => handleDrop(e, idx)}
-                                className="bg-white p-4 rounded-xl border-2 border-slate-200 shadow-sm flex items-center gap-4 cursor-grab active:cursor-grabbing hover:border-indigo-300 transition-colors"
+                                className="bg-white p-3 rounded-xl border-2 border-slate-200 shadow-sm flex items-center gap-4 transition-all"
                               >
-                                  <div className="text-slate-300"><GripVertical size={20}/></div>
-                                  <span className="font-bold text-slate-700">{item.text}</span>
+                                  <div className="flex flex-col gap-1">
+                                      <button 
+                                        disabled={idx === 0}
+                                        onClick={() => moveItem(idx, 'up')}
+                                        className="p-1 rounded bg-slate-100 hover:bg-indigo-100 hover:text-indigo-600 disabled:opacity-30 disabled:hover:bg-slate-100 disabled:hover:text-slate-400 transition-colors"
+                                      >
+                                          <ChevronUp size={16}/>
+                                      </button>
+                                      <button 
+                                        disabled={idx === dragOrder.length - 1}
+                                        onClick={() => moveItem(idx, 'down')}
+                                        className="p-1 rounded bg-slate-100 hover:bg-indigo-100 hover:text-indigo-600 disabled:opacity-30 disabled:hover:bg-slate-100 disabled:hover:text-slate-400 transition-colors"
+                                      >
+                                          <ChevronDown size={16}/>
+                                      </button>
+                                  </div>
+                                  <span className="font-mono text-indigo-300 font-bold text-lg w-6">{idx + 1}.</span>
+                                  <span className="font-bold text-slate-700 text-lg">{item.text}</span>
                               </div>
                           )) : (
                              <div className="p-4 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400">No items to order. Check builder.</div>
@@ -2300,7 +2316,7 @@ function TestPlayerView({ test, onFinish }: any) {
 
                   {/* MATCHING */}
                   {currentQ.type === 'match' && (
-                      <div className="grid grid-cols-2 gap-8">
+                      <div className="grid grid-cols-2 gap-4 sm:gap-8">
                            <div className="space-y-3">
                                {currentQ.pairs?.map((p: any) => (
                                    <button 
