@@ -2006,25 +2006,42 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   const visibleLessons = libraryExpanded ? lessons : lessons.slice(0, 2);
 
   // --- 3. XP HANDLER FOR COLOSSEUM ---
+// --- 3. XP HANDLER FOR COLOSSEUM (FIXED) ---
   const handleColosseumXP = async (xpAmount: number, reason: string) => {
-      if (!user) return;
+      // 1. Robust User Check: Try prop first, then global auth
+      const targetUser = user || auth.currentUser;
+
+      if (!targetUser) {
+          console.error("XP Error: No user found. Cannot save.");
+          alert("Error: You seem to be logged out. XP not saved.");
+          return;
+      }
+
+      console.log(`Attempting to save ${xpAmount} XP for ${targetUser.uid}`);
+
       try {
-          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { 
+          // 2. Update Profile XP
+          const profileRef = doc(db, 'artifacts', appId, 'users', targetUser.uid, 'profile', 'main');
+          await updateDoc(profileRef, { 
               xp: increment(xpAmount) 
           });
-          // Log it
+
+          // 3. Add Activity Log
           await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
-              studentName: displayName,
-              studentEmail: user.email,
+              studentName: displayName || "Student",
+              studentEmail: targetUser.email,
               itemTitle: reason,
               xp: xpAmount,
               timestamp: Date.now(),
               type: 'game_reward'
           });
+
           setShowColosseum(false);
-          alert(`Victory! You earned ${xpAmount} XP.`);
-      } catch (e) {
-          console.error("XP Error", e);
+          // Optional: Add a visual toast here instead of alert
+          // alert(`Victory! You earned ${xpAmount} XP.`); 
+      } catch (e: any) {
+          console.error("XP Save Failed:", e);
+          alert(`Failed to save XP: ${e.message}`);
           setShowColosseum(false);
       }
   };
