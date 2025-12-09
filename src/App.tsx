@@ -2363,16 +2363,21 @@ function TestPlayerView({ test, onFinish }: any) {
     </div>
   );
 }
-function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allDecks }: any) {
+function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allDecks, lessons }: any) {
+  // State
   const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
   const [mode, setMode] = useState('card'); 
   const [subView, setSubView] = useState('menu'); // menu | library | editor | import
   const [editingItem, setEditingItem] = useState<any>(null);
   const [jsonInput, setJsonInput] = useState('');
-  // UPDATED: Added 'test' to the state type
   const [importType, setImportType] = useState<'lesson' | 'deck' | 'test'>('lesson');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  
+  // Library State
+  const [libSearch, setLibSearch] = useState('');
+  const [libFilter, setLibFilter] = useState('all'); // all | deck | lesson | test
 
+  // --- ACTIONS ---
   const handleBulkImport = async () => {
     try {
         const data = JSON.parse(jsonInput);
@@ -2397,26 +2402,13 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                     });
                 }
             } else if (importType === 'test') {
-                 // --- NEW: TEST IMPORT LOGIC ---
                  const ref = doc(db, 'artifacts', appId, 'users', userId, 'custom_lessons', id);
-                 
-                 // Ensure questions have IDs so the player doesn't crash
                  const processedQuestions = (item.questions || []).map((q: any, idx: number) => ({
                      ...q,
                      id: q.id || `q_${Date.now()}_${idx}`,
-                     options: q.options?.map((opt: any, oIdx: number) => ({
-                         ...opt,
-                         id: opt.id || `opt_${Date.now()}_${idx}_${oIdx}`
-                     })) || []
+                     options: q.options?.map((opt: any, oIdx: number) => ({ ...opt, id: opt.id || `opt_${Date.now()}_${idx}_${oIdx}` })) || []
                  }));
-
-                 batch.set(ref, { 
-                     ...item, 
-                     type: 'test', // Force type to test
-                     questions: processedQuestions,
-                     xp: item.xp || 100,
-                     created: Date.now()
-                 });
+                 batch.set(ref, { ...item, type: 'test', questions: processedQuestions, xp: item.xp || 100, created: Date.now() });
                  count++;
             } else {
                  const ref = doc(db, 'artifacts', appId, 'users', userId, 'custom_lessons', id);
@@ -2439,33 +2431,108 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
       }
   };
 
+  // --- LIBRARY VIEW ---
   if (subView === 'library') {
+      // 1. Flatten Decks into List Format
+      const deckItems = Object.entries(allDecks || {}).map(([key, deck]: any) => ({
+          id: key,
+          ...deck,
+          type: 'deck',
+          subtitle: `${deck.cards?.length || 0} Cards`
+      }));
+
+      // 2. Prepare Lessons & Exams
+      // Note: 'lessons' prop usually contains both. We distinguish by 'type' or 'contentType'.
+      const contentItems = (lessons || []).map((l: any) => ({
+          ...l,
+          type: (l.type === 'test' || l.contentType === 'test') ? 'test' : 'lesson',
+          subtitle: (l.type === 'test' || l.contentType === 'test') 
+            ? `${(l.questions || []).length} Questions` 
+            : `${(l.blocks || []).length} Blocks`
+      }));
+
+      // 3. Merge & Filter
+      const allItems = [...deckItems, ...contentItems].filter(item => {
+          const matchesSearch = item.title.toLowerCase().includes(libSearch.toLowerCase());
+          const matchesType = libFilter === 'all' || item.type === libFilter;
+          return matchesSearch && matchesType;
+      });
+
       return (
           <div className="h-full flex flex-col bg-slate-50">
-              <div className="p-6 border-b border-slate-100 bg-white flex justify-between items-center sticky top-0 z-10">
-                  <h2 className="font-bold text-xl text-slate-800 flex items-center gap-2"><Library className="text-indigo-600"/> Content Library</h2>
-                  <button onClick={() => setSubView('menu')} className="text-sm font-bold text-slate-500 hover:text-indigo-600">Back</button>
+              {/* Header */}
+              <div className="p-6 border-b border-slate-100 bg-white flex flex-col gap-4 sticky top-0 z-10 shadow-sm">
+                  <div className="flex justify-between items-center">
+                      <h2 className="font-bold text-xl text-slate-800 flex items-center gap-2"><Library className="text-indigo-600"/> Content Library</h2>
+                      <button onClick={() => setSubView('menu')} className="text-sm font-bold text-slate-500 hover:text-indigo-600 px-4 py-2 rounded-lg hover:bg-slate-50">Back to Hub</button>
+                  </div>
+                  
+                  {/* Search & Filter Bar */}
+                  <div className="flex gap-2">
+                      <div className="relative flex-1">
+                          <Search className="absolute left-3 top-2.5 text-slate-400" size={16}/>
+                          <input 
+                            value={libSearch} 
+                            onChange={(e) => setLibSearch(e.target.value)} 
+                            placeholder="Search content..." 
+                            className="w-full pl-9 py-2 bg-slate-100 border-none rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500"
+                          />
+                      </div>
+                      <select 
+                        value={libFilter} 
+                        onChange={(e) => setLibFilter(e.target.value)} 
+                        className="p-2 bg-slate-100 rounded-xl text-sm font-bold text-slate-600 border-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                          <option value="all">All Types</option>
+                          <option value="deck">Decks</option>
+                          <option value="lesson">Lessons</option>
+                          <option value="test">Exams</option>
+                      </select>
+                  </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                  <div>
-                      <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Layers size={18} className="text-orange-500"/> Decks</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                           {Object.entries(allDecks).map(([key, deck]: any) => (
-                              <div key={key} onClick={() => handleEdit({...deck, deckId: key}, 'card')} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-orange-300 cursor-pointer transition-colors group">
-                                  <div className="flex justify-between mb-2">
-                                      <h4 className="font-bold text-slate-900">{deck.title}</h4>
-                                      <Edit3 size={16} className="text-slate-300 group-hover:text-orange-500"/>
+
+              {/* Content Grid */}
+              <div className="flex-1 overflow-y-auto p-6">
+                  {allItems.length === 0 ? (
+                      <div className="text-center py-20 text-slate-400 italic">No content found.</div>
+                  ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                           {allItems.map((item: any) => (
+                              <div 
+                                key={item.id} 
+                                onClick={() => handleEdit(item, item.type === 'deck' ? 'card' : item.type === 'test' ? 'test' : 'lesson')} 
+                                className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-indigo-300 hover:shadow-md cursor-pointer transition-all group relative overflow-hidden"
+                              >
+                                  <div className="flex justify-between items-start mb-2 relative z-10">
+                                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md ${
+                                          item.type === 'deck' ? 'bg-orange-100 text-orange-700' : 
+                                          item.type === 'test' ? 'bg-rose-100 text-rose-700' : 
+                                          'bg-indigo-100 text-indigo-700'
+                                      }`}>
+                                          {item.type === 'deck' ? 'Flashcards' : item.type === 'test' ? 'Exam' : 'Lesson'}
+                                      </span>
+                                      <Edit3 size={16} className="text-slate-300 group-hover:text-indigo-500 transition-colors"/>
                                   </div>
-                                  <p className="text-xs text-slate-500">{deck.cards?.length || 0} Cards</p>
+                                  
+                                  <h4 className="font-bold text-slate-800 text-lg mb-1 relative z-10 line-clamp-1">{item.title}</h4>
+                                  <p className="text-xs text-slate-500 relative z-10">{item.subtitle}</p>
+                                  
+                                  {/* Hover Effect BG */}
+                                  <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br opacity-10 rounded-bl-[100px] transition-transform group-hover:scale-150 ${
+                                      item.type === 'deck' ? 'from-orange-400 to-amber-500' : 
+                                      item.type === 'test' ? 'from-rose-400 to-pink-500' : 
+                                      'from-indigo-400 to-blue-500'
+                                  }`}></div>
                               </div>
                            ))}
                       </div>
-                  </div>
+                  )}
               </div>
           </div>
       )
   }
 
+  // --- IMPORT VIEW ---
   if (subView === 'import') {
       return (
           <div className="h-full flex flex-col bg-slate-50 p-6">
@@ -2477,7 +2544,6 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                  <div className="flex gap-2 mb-4">
                      <button onClick={() => setImportType('lesson')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${importType === 'lesson' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Lessons</button>
                      <button onClick={() => setImportType('deck')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${importType === 'deck' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Decks</button>
-                     {/* --- NEW EXAMS BUTTON --- */}
                      <button onClick={() => setImportType('test')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${importType === 'test' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Exams</button>
                  </div>
                  <textarea 
@@ -2497,6 +2563,7 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
       )
   }
 
+  // --- MAIN MENU / EDITOR ---
   return (
     <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar relative">
         <Header title="Scriptorium" subtitle="Content Creator" 
@@ -2513,8 +2580,6 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                 <div className="flex bg-slate-200 p-1 rounded-xl gap-1">
                     <button onClick={() => { setMode('card'); setEditingItem(null); setSubView('editor'); }} className={`flex-1 py-2 text-xs font-bold rounded-lg ${mode === 'card' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Flashcard</button>
                     <button onClick={() => { setMode('lesson'); setEditingItem(null); setSubView('editor'); }} className={`flex-1 py-2 text-xs font-bold rounded-lg ${mode === 'lesson' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Lesson</button>
-                    
-                    {/* --- NEW EXAM TOGGLE BUTTON --- */}
                     <button onClick={() => { setMode('test'); setEditingItem(null); setSubView('editor'); }} className={`flex-1 py-2 text-xs font-bold rounded-lg ${mode === 'test' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Exam</button>
                 </div>
             </div>
@@ -2539,7 +2604,6 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                     availableDecks={allDecks} 
                 />
             )}
-            {/* --- RENDER TEST BUILDER --- */}
             {subView === 'editor' && mode === 'test' && (
                 <TestBuilderView 
                     initialData={editingItem}
@@ -2832,7 +2896,7 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
   
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden">
-      {/* Sidebar */}
+      {/* Sidebar (Desktop) */}
       <div className="w-64 bg-slate-900 text-white flex-col hidden md:flex">
         <div className="p-6 border-b border-slate-800">
             <h1 className="text-xl font-bold flex items-center gap-2">
@@ -2849,13 +2913,15 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
         <div className="p-4 border-t border-slate-800"><button onClick={onLogout} className="w-full p-3 rounded-xl bg-slate-800 text-rose-400 flex items-center gap-3 hover:bg-slate-700 transition-colors"><LogOut size={20} /> Sign Out</button></div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
          {/* Mobile Header */}
          <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center"><span className="font-bold flex items-center gap-2"><GraduationCap/> Magister</span><div className="flex gap-4"><button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'text-indigo-400' : 'text-slate-400'}><LayoutDashboard/></button><button onClick={() => setActiveTab('classes')} className={activeTab === 'classes' ? 'text-indigo-400' : 'text-slate-400'}><School/></button><button onClick={() => setActiveTab('content')} className={activeTab === 'content' ? 'text-indigo-400' : 'text-slate-400'}><Library/></button></div></div>
          
          <div className="flex-1 overflow-y-auto p-4 md:p-8">
             <div className="max-w-6xl mx-auto h-full">
+                
+                {/* 1. DASHBOARD TAB */}
                 {activeTab === 'dashboard' && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
                         <div className="md:col-span-2 space-y-6">
@@ -2874,8 +2940,35 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
                         </div>
                     </div>
                 )}
-                {activeTab === 'classes' && (<ClassManagerView user={user} userData={userData} classes={userData?.classes || []} lessons={lessons} allDecks={allDecks} />)}
-                {activeTab === 'content' && (<div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full overflow-hidden flex flex-col"><div className="flex-1 overflow-y-auto"><BuilderHub onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} onSaveLesson={onSaveLesson} allDecks={allDecks} /></div></div>)}
+
+                {/* 2. CLASS MANAGER TAB */}
+                {activeTab === 'classes' && (
+                    <ClassManagerView 
+                        user={user} 
+                        userData={userData} 
+                        classes={userData?.classes || []} 
+                        lessons={lessons} 
+                        allDecks={allDecks} 
+                    />
+                )}
+
+                {/* 3. CONTENT LIBRARY TAB (Updated) */}
+                {activeTab === 'content' && (
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-full overflow-hidden flex flex-col">
+                        <div className="flex-1 overflow-y-auto">
+                            <BuilderHub 
+                                onSaveCard={onSaveCard} 
+                                onUpdateCard={onUpdateCard} 
+                                onDeleteCard={onDeleteCard} 
+                                onSaveLesson={onSaveLesson} 
+                                allDecks={allDecks} 
+                                lessons={lessons} // <--- Critical: Pass lessons for full library view
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* 4. PROFILE TAB */}
                 {activeTab === 'profile' && <ProfileView user={user} userData={userData} />}
             </div>
          </div>
