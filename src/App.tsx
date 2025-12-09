@@ -38,7 +38,7 @@ import {
   AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle, ArrowDown,
   BarChart3, UserPlus, Briefcase, Coffee, AlertCircle, Target, Calendar, Settings, Edit2, Camera, Medal,
   ChevronUp, GripVertical, ListOrdered, ArrowRightLeft, CheckSquare, Gamepad2, Globe,
-  BrainCircuit, Swords, Heart, Skull, Shield, Hourglass, Flame, Crown, Crosshair, XCircle, OnSaveCard // <--- Added these for the new game modes
+  BrainCircuit, Swords, Heart, Skull, Shield, Hourglass, Flame, Crown, Crosshair, XCircle // <--- Added these for the new game modes
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
