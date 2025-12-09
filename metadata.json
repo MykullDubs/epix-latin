@@ -7,3 +7,22 @@
   "theme_color": "#2563EB",
   "requestFramePermissions": []
 }
+"widgets": [
+    {
+      "name": "Daily Word",
+      "short_name": "Daily",
+      "description": "Your daily word discovery",
+      "tag": "daily-word",
+      "template": "daily-widget",
+      "ms_ac_template": "widgets/daily.json",
+      "data": { "content": "daily-word" },
+      "type": "application/json",
+      "screenshots": [],
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
