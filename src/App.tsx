@@ -3830,26 +3830,39 @@ case 'home': return <HomeView setActiveTab={setActiveTab} allDecks={allDecks} le
     }
   };
 
-// --- FINAL RENDER ---
+// --- ROUTING: CHECK FOR WIDGET MODE ---
+  // If the URL ends in /widget, we show ONLY the WidgetView
+  const isWidgetMode = window.location.pathname === '/widget';
+
+  if (isWidgetMode) {
+      // 1. Loading State for Widget
+      if (!authChecked) return <div className="bg-slate-900 h-screen w-screen flex items-center justify-center text-white"><Loader className="animate-spin"/></div>;
+      
+      // 2. Auth Check for Widget
+      if (!user || !userData) return <div className="h-screen w-screen bg-slate-100 flex items-center justify-center text-xs text-slate-400">Please Log In</div>;
+      
+      // 3. Render Widget View
+      return <WidgetView allDecks={allDecks} userData={userData} />;
+  }
+
+  // --- STANDARD APP RENDER ---
   return (
     <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-center relative overflow-hidden">
       
-{/* 1. FORCEFUL CSS RESET & SCROLLBAR REMOVAL */}
+      {/* 1. GLOBAL STYLES (Scrollbar Hide & Reset) */}
       <style>{`
         html, body, #root {
           margin: 0;
           padding: 0;
           width: 100%;
           height: 100%;
-          overflow: hidden; /* Prevents the main window from scrolling */
+          overflow: hidden;
           background-color: #f8fafc;
         }
-
         /* Hide scrollbar for Chrome, Safari and Opera */
         *::-webkit-scrollbar {
           display: none;
         }
-
         /* Hide scrollbar for IE, Edge and Firefox */
         * {
           -ms-overflow-style: none;  /* IE and Edge */
@@ -3857,22 +3870,20 @@ case 'home': return <HomeView setActiveTab={setActiveTab} allDecks={allDecks} le
         }
       `}</style>
 
-      {/* Background Blobs (Optional - adds nice glow behind the app) */}
+      {/* 2. BACKGROUND BLOBS (Visuals) */}
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-rose-400/20 rounded-full blur-[100px] pointer-events-none mix-blend-multiply animate-pulse" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-400/20 rounded-full blur-[100px] pointer-events-none mix-blend-multiply" />
       
-      {/* Role Toggle */}
+      {/* 3. UTILITIES */}
       <RoleToggle user={user} userData={userData} />
 
-      {/* THE MAIN VESSEL 
-         - Removed: border-[8px], p-4
-         - Added: w-full h-full (Consume everything)
-      */}
+      {/* 4. MAIN VESSEL */}
       <div className={`w-full h-[100dvh] relative overflow-hidden bg-slate-50 ${userData?.role === 'instructor' ? 'max-w-full' : 'max-w-full sm:max-w-[400px] sm:h-[850px] sm:rounded-[3rem] sm:shadow-2xl sm:border-[8px] sm:border-slate-900/10'}`}>
         
-        {/* Status Bar Spacer (Only for Instructor/Desktop view or strict mobile setups) */}
+        {/* Status Bar Spacer (Student Mobile View Only) */}
         {userData?.role !== 'instructor' && <div className="absolute top-0 left-0 right-0 h-safe-top bg-transparent z-50 pointer-events-none" />}
         
+        {/* 5. VIEW ROUTER */}
         {userData.role === 'instructor' ? (
              <InstructorDashboard 
                 user={user} 
@@ -3882,16 +3893,17 @@ case 'home': return <HomeView setActiveTab={setActiveTab} allDecks={allDecks} le
                 {...commonHandlers} 
                 onLogout={() => signOut(auth)} 
              />
-) : (
-     <>
-        {renderStudentView()}
-        {/* Hide Navigation if taking a Test/Lesson or viewing a Class */}
-        {!activeLesson && !activeStudentClass && (
-            <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
+        ) : (
+             <>
+                {/* Main Student View Logic */}
+                {renderStudentView()}
+                
+                {/* Navigation Bar (Hidden if inside Lesson/Class/Exam) */}
+                {!activeLesson && !activeStudentClass && (
+                    <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
+                )}
+             </>
         )}
-     </>
-)}
-
       </div>
     </div>
   );
