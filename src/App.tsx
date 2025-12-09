@@ -38,7 +38,7 @@ import {
   AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle, ArrowDown,
   BarChart3, UserPlus, Briefcase, Coffee, AlertCircle, Target, Calendar, Settings, Edit2, Camera, Medal,
   ChevronUp, GripVertical, ListOrdered, ArrowRightLeft, CheckSquare, Gamepad2, Globe,
-  BrainCircuit, Swords, Heart, Skull, Shield, Hourglass, Flame, Crown // <--- Added these for the new game modes
+  BrainCircuit, Swords, Heart, Skull, Shield, Hourglass, Flame, Crown, Crosshair // <--- Added these for the new game modes
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -1753,6 +1753,10 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
 // Import these from 'lucide-react':
 // Swords, Heart, Skull, Zap, Shield, Hourglass, Target, Crown
 
+// --- ASSETS ---
+// Add 'Crosshair' to your imports
+// import { Swords, Heart, Skull, Zap, Shield, Hourglass, Target, Crown, Crosshair } from 'lucide-react';
+
 function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
   // Game Flow
   const [gameState, setGameState] = useState<'intro' | 'playing' | 'gameover'>('intro');
@@ -1761,9 +1765,13 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
   const [round, setRound] = useState(1);
   const [timeLeft, setTimeLeft] = useState(15);
   
-  // Slash Engine State
+  // MECHANIC STATE
+  const [loadout, setLoadout] = useState<'slash' | 'shoot'>('slash');
+  
+  // Interaction State
   const [slashPath, setSlashPath] = useState<{x: number, y: number}[]>([]);
-  const [isSlashing, setIsSlashing] = useState(false);
+  const [isInputActive, setIsInputActive] = useState(false); // Tracks dragging or readiness
+  const [shotMark, setShotMark] = useState<{x: number, y: number, accuracy: string} | null>(null); // Visual bullet hole
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Data
@@ -1789,29 +1797,32 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
     return () => clearInterval(timer);
   }, [timeLeft, gameState, selectedId]);
 
-  // 3. Logic
+  // 3. Round Logic
   const nextRound = () => {
     if (lives <= 0) {
         setGameState('gameover');
-        if (score > 0) onXPUpdate(Math.ceil(score / 2), `Colosseum Run`);
+        if (score > 0) onXPUpdate(Math.ceil(score / 2), `Colosseum (${loadout})`);
         return;
     }
 
     const target = pool[Math.floor(Math.random() * pool.length)];
     const others = pool.filter(c => c.id !== target.id);
     const distractors = others.sort(() => 0.5 - Math.random()).slice(0, 3);
-    
-    // Shuffle options
     const newOptions = [target, ...distractors].sort(() => 0.5 - Math.random());
     
     setCurrentCard(target);
     setOptions(newOptions);
     setSelectedId(null);
     setSlashPath([]);
-    setTimeLeft(Math.max(5, 15 - Math.floor(round / 5)));
+    setShotMark(null);
+    
+    // Archer gets slightly less time (focus on aim), Gladiator gets speed
+    const maxTime = loadout === 'shoot' ? 10 : 15; 
+    setTimeLeft(Math.max(5, maxTime - Math.floor(round / 5)));
   };
 
-  const handleStart = () => {
+  const handleStart = (selectedLoadout: 'slash' | 'shoot') => {
+      setLoadout(selectedLoadout);
       setLives(3);
       setScore(0);
       setRound(1);
@@ -1819,72 +1830,102 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
       nextRound();
   };
 
-  // --- 4. THE SLASH ENGINE ---
+  // --- 4. INPUT ENGINES ---
 
-  const handlePointerDown = (e: React.PointerEvent) => {
-      if (selectedId) return;
-      setIsSlashing(true);
+  // A. SLASH LOGIC (Drag through)
+  const handleSlashDown = (e: React.PointerEvent) => {
+      if (loadout !== 'slash' || selectedId) return;
+      setIsInputActive(true);
       if (containerRef.current) {
           const rect = containerRef.current.getBoundingClientRect();
           setSlashPath([{ x: e.clientX - rect.left, y: e.clientY - rect.top }]);
       }
   };
 
-  const handlePointerMove = (e: React.PointerEvent) => {
-      if (!isSlashing || !containerRef.current) return;
+  const handleSlashMove = (e: React.PointerEvent) => {
+      if (loadout !== 'slash' || !isInputActive || !containerRef.current) return;
       
       const rect = containerRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      
-      setSlashPath(prev => [...prev, { x, y }]);
+      setSlashPath(prev => [...prev, { x: e.clientX - rect.left, y: e.clientY - rect.top }]);
 
       const element = document.elementFromPoint(e.clientX, e.clientY);
       const answerId = element?.getAttribute('data-answer-id');
+      if (answerId) submitAnswer(answerId, 1); // 1.0 multiplier for slash
+  };
 
-      if (answerId) {
-          endSlash(answerId);
+  const handleSlashUp = () => {
+      if (loadout === 'slash') {
+          setIsInputActive(false);
+          setSlashPath([]);
       }
   };
 
-  const handlePointerUp = () => {
-      setIsSlashing(false);
-      setSlashPath([]);
+  // B. SHOOT LOGIC (Click/Tap with Precision)
+  const handleShoot = (e: React.MouseEvent, answerId: string) => {
+      if (loadout !== 'shoot' || selectedId) return;
+      
+      // 1. Calculate Precision
+      const targetRect = e.currentTarget.getBoundingClientRect();
+      const clickX = e.clientX - targetRect.left;
+      const clickY = e.clientY - targetRect.top;
+      
+      const centerX = targetRect.width / 2;
+      const centerY = targetRect.height / 2;
+      
+      // Pythagorean theorem for distance from center
+      const distance = Math.sqrt(Math.pow(clickX - centerX, 2) + Math.pow(clickY - centerY, 2));
+      
+      // 2. Determine Multiplier
+      let multiplier = 1.0;
+      let label = "Hit";
+      
+      if (distance < 15) { multiplier = 2.0; label = "BULLSEYE!"; }
+      else if (distance < 40) { multiplier = 1.5; label = "Great Shot"; }
+      
+      // 3. Visual Feedback (Global Coordinates for the hole)
+      if (containerRef.current) {
+          const containerRect = containerRef.current.getBoundingClientRect();
+          setShotMark({
+              x: e.clientX - containerRect.left,
+              y: e.clientY - containerRect.top,
+              accuracy: label
+          });
+      }
+
+      submitAnswer(answerId, multiplier);
   };
 
-  const endSlash = (answerId: string) => {
-      setIsSlashing(false);
-      if (selectedId) return;
-      handleAnswer(answerId);
-  };
-
-  const handleAnswer = (answerId: string) => {
+  // C. SHARED SUBMISSION
+  const submitAnswer = (answerId: string, multiplier: number) => {
+      setIsInputActive(false);
+      if (selectedId) return; // Prevent double submit
       setSelectedId(answerId);
       
       const isCorrect = answerId === currentCard.id;
       
       setTimeout(() => {
           if (isCorrect) {
-              setScore(s => s + 10 + timeLeft);
+              const basePoints = 10 + timeLeft;
+              setScore(s => s + Math.floor(basePoints * multiplier));
               setRound(r => r + 1);
               nextRound();
           } else {
               setLives(l => l - 1);
               if (lives <= 1) { 
                   setGameState('gameover');
-                  onXPUpdate(Math.ceil(score / 2), `Colosseum Run`);
+                  onXPUpdate(Math.ceil(score / 2), `Colosseum (${loadout})`);
               } else {
                   nextRound();
               }
           }
-      }, 500); 
+      }, loadout === 'shoot' ? 800 : 500); // Shoot gets longer pause to admire the shot
   };
 
   const handleWrongAnswer = () => {
       setLives(l => l - 1);
       if (lives <= 1) {
           setGameState('gameover');
-          onXPUpdate(Math.ceil(score / 2), `Colosseum Run`);
+          onXPUpdate(Math.ceil(score / 2), `Colosseum (${loadout})`);
       } else {
           nextRound();
       }
@@ -1892,16 +1933,11 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
 
   // --- RENDER HELPERS ---
   const getOptionStyle = (opt: any, index: number) => {
-      // NEW "X" LAYOUT: Pushes cards to the 4 corners to clear the center
-      // Added plenty of padding (top-20/bottom-20) so they don't hit the HUD
       const positions = [
-          "top-24 left-4",      // Top Left
-          "top-24 right-4",     // Top Right
-          "bottom-24 left-4",   // Bottom Left
-          "bottom-24 right-4"   // Bottom Right
+          "top-24 left-4", "top-24 right-4", "bottom-24 left-4", "bottom-24 right-4"
       ];
       
-      let color = "bg-white/90 backdrop-blur-md text-slate-800 border-white/50"; // Default Glass
+      let color = "bg-white/90 backdrop-blur-md text-slate-800 border-white/50";
       
       if (selectedId) {
           if (opt.id === currentCard.id) color = "bg-emerald-500 text-white border-emerald-600 scale-110 shadow-[0_0_30px_rgba(16,185,129,0.5)]";
@@ -1909,8 +1945,10 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
           else color = "bg-slate-200/50 text-slate-400 opacity-30";
       }
 
-      // Max width ensures they don't grow too wide on tablets
-      return `absolute ${positions[index]} max-w-[45%] min-w-[130px] p-3 rounded-2xl border-2 shadow-lg flex items-center justify-center text-center font-bold text-sm transition-all duration-300 z-20 select-none ${color}`;
+      // Add target cursor for shooter mode
+      const cursor = loadout === 'shoot' ? 'cursor-crosshair' : 'cursor-default';
+
+      return `absolute ${positions[index]} max-w-[45%] min-w-[130px] p-6 rounded-3xl border-2 shadow-lg flex items-center justify-center text-center font-bold text-sm transition-all duration-300 z-20 select-none ${color} ${cursor} active:scale-95`;
   };
 
   const getPathString = () => {
@@ -1921,26 +1959,40 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
   return (
     <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center font-sans overflow-hidden touch-none select-none">
         
-        {/* Background Ambience */}
+        {/* Background */}
         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-800 to-slate-950"></div>
 
         {gameState === 'intro' && (
             <div className="bg-white max-w-sm w-full rounded-[2.5rem] p-8 text-center shadow-2xl relative z-10 animate-in zoom-in">
-                <div className="w-24 h-24 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-6 text-rose-600 shadow-inner">
-                    <Swords size={48} />
-                </div>
-                <h2 className="text-3xl font-black text-slate-800 mb-2 uppercase italic tracking-tighter">Blade Master</h2>
-                <p className="text-slate-500 mb-8 text-sm">
-                    Drag your finger or mouse to <strong>SLASH</strong> through the correct answer.
-                </p>
-                <div className="space-y-3">
-                    <button onClick={handleStart} className="w-full py-4 bg-rose-600 text-white font-black uppercase tracking-widest rounded-2xl shadow-lg hover:scale-[1.02] active:scale-95 transition-all">
-                        Draw Weapon
+                <h2 className="text-3xl font-black text-slate-800 mb-6 uppercase italic tracking-tighter">Choose Loadout</h2>
+                
+                <div className="grid grid-cols-1 gap-4 mb-6">
+                    {/* OPTION 1: SLASHER */}
+                    <button onClick={() => handleStart('slash')} className="p-4 rounded-2xl border-2 border-slate-200 hover:border-rose-500 hover:bg-rose-50 transition-all group text-left flex items-center gap-4">
+                        <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Swords size={24} />
+                        </div>
+                        <div>
+                            <h4 className="font-black text-slate-800 text-lg uppercase">Gladiator</h4>
+                            <p className="text-xs text-slate-500">Slash targets. Speed bonus.</p>
+                        </div>
                     </button>
-                    <button onClick={onExit} className="w-full py-4 text-slate-400 font-bold uppercase tracking-widest text-xs hover:text-slate-600">
-                        Leave
+
+                    {/* OPTION 2: SHOOTER */}
+                    <button onClick={() => handleStart('shoot')} className="p-4 rounded-2xl border-2 border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 transition-all group text-left flex items-center gap-4">
+                        <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Crosshair size={24} />
+                        </div>
+                        <div>
+                            <h4 className="font-black text-slate-800 text-lg uppercase">Archer</h4>
+                            <p className="text-xs text-slate-500">Tap targets. Precision bonus.</p>
+                        </div>
                     </button>
                 </div>
+
+                <button onClick={onExit} className="w-full py-4 text-slate-400 font-bold uppercase tracking-widest text-xs hover:text-slate-600">
+                    Retreat
+                </button>
             </div>
         )}
 
@@ -1956,56 +2008,65 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
                     </div>
                     <div className="text-center">
                         <div className="w-32 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
-                            <div className="h-full bg-amber-400 transition-all duration-1000 ease-linear" style={{ width: `${(timeLeft / 15) * 100}%` }} />
+                            <div className="h-full bg-amber-400 transition-all duration-1000 ease-linear" style={{ width: `${(timeLeft / (loadout === 'shoot' ? 10 : 15)) * 100}%` }} />
                         </div>
                     </div>
                     <div className="font-black text-3xl text-white drop-shadow-md">{score}</div>
                 </div>
 
-                {/* SLASH ARENA */}
+                {/* GAME ARENA */}
                 <div 
                     ref={containerRef}
                     className="flex-1 relative touch-none"
-                    onPointerDown={handlePointerDown}
-                    onPointerMove={handlePointerMove}
-                    onPointerUp={handlePointerUp}
-                    onPointerLeave={handlePointerUp}
+                    onPointerDown={handleSlashDown}
+                    onPointerMove={handleSlashMove}
+                    onPointerUp={handleSlashUp}
+                    onPointerLeave={handleSlashUp}
                 >
-                    {/* The Slash Visual Trail */}
-                    <svg className="absolute inset-0 w-full h-full pointer-events-none z-50 overflow-visible">
-                        <path 
-                            d={getPathString()} 
-                            fill="none" 
-                            stroke="#f43f5e" 
-                            strokeWidth="8" 
-                            strokeLinecap="round" 
-                            strokeLinejoin="round"
-                            className="drop-shadow-[0_0_10px_rgba(244,63,94,0.8)]"
-                        />
-                        <path 
-                            d={getPathString()} 
-                            fill="none" 
-                            stroke="#ffffff" 
-                            strokeWidth="3" 
-                            strokeLinecap="round" 
-                            strokeLinejoin="round"
-                        />
-                    </svg>
+                    {/* MECHANIC 1: SLASH TRAIL */}
+                    {loadout === 'slash' && (
+                        <svg className="absolute inset-0 w-full h-full pointer-events-none z-50 overflow-visible">
+                            <path d={getPathString()} fill="none" stroke="#f43f5e" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-[0_0_10px_rgba(244,63,94,0.8)]" />
+                            <path d={getPathString()} fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    )}
 
-                    {/* Central Question (Smaller & Glass) */}
+                    {/* MECHANIC 2: SHOT MARKER */}
+                    {loadout === 'shoot' && shotMark && (
+                        <div 
+                            className="absolute z-50 pointer-events-none"
+                            style={{ left: shotMark.x, top: shotMark.y }}
+                        >
+                            {/* The Bullet Hole */}
+                            <div className="absolute -translate-x-1/2 -translate-y-1/2 w-6 h-6 bg-slate-900 border-2 border-white/50 rounded-full shadow-[inset_0_0_10px_rgba(0,0,0,1)] animate-in zoom-in duration-75"></div>
+                            {/* The Text Pop-up */}
+                            <div className="absolute -top-12 left-0 -translate-x-1/2 whitespace-nowrap text-amber-400 font-black text-xl italic tracking-tighter drop-shadow-lg animate-in slide-in-from-bottom-4 fade-in duration-300">
+                                {shotMark.accuracy}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Central Question */}
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-slate-900/80 backdrop-blur-md rounded-full border-4 border-slate-700 flex flex-col items-center justify-center text-center shadow-2xl z-10 pointer-events-none">
                         <span className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mb-1">Target</span>
                         <h2 className="text-xl font-serif font-bold text-white leading-tight px-1 line-clamp-2">{currentCard.front}</h2>
                     </div>
 
-                    {/* Answer Targets (4 Corners) */}
+                    {/* Answer Options */}
                     {options.map((opt, i) => (
                         <div 
                             key={opt.id}
-                            data-answer-id={opt.id} // Critical for hit detection
+                            data-answer-id={opt.id}
+                            onClick={(e) => handleShoot(e, opt.id)} // ONLY TRIGGERS IN SHOOT MODE
                             className={getOptionStyle(opt, i)}
                         >
                             {opt.back}
+                            {/* Bullseye Visual Guide for Shooters */}
+                            {loadout === 'shoot' && !selectedId && (
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-10 transition-opacity pointer-events-none">
+                                    <Target size={48} className="text-indigo-500"/>
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
