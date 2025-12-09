@@ -1741,6 +1741,235 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
     </div>
   );
 }
+function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
+  // Game State
+  const [gameState, setGameState] = useState<'intro' | 'playing' | 'gameover'>('intro');
+  const [lives, setLives] = useState(3);
+  const [score, setScore] = useState(0);
+  const [round, setRound] = useState(1);
+  const [timeLeft, setTimeLeft] = useState(15);
+  
+  // Question State
+  const [currentCard, setCurrentCard] = useState<any>(null);
+  const [options, setOptions] = useState<any[]>([]);
+  const [pool, setPool] = useState<any[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+
+  // 1. Initialize the "Infinite Pool"
+  useEffect(() => {
+    let combined: any[] = [];
+    Object.values(allDecks).forEach((deck: any) => {
+      if (deck.cards && Array.isArray(deck.cards)) {
+        combined = [...combined, ...deck.cards];
+      }
+    });
+    // Shuffle the entire universe of cards
+    setPool(combined.sort(() => 0.5 - Math.random()));
+  }, [allDecks]);
+
+  // 2. Timer Logic
+  useEffect(() => {
+    if (gameState !== 'playing' || isPaused) return;
+    
+    if (timeLeft <= 0) {
+        handleWrongAnswer();
+        return;
+    }
+
+    const timer = setInterval(() => {
+        setTimeLeft(t => t - 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [timeLeft, gameState, isPaused]);
+
+  // 3. Generate a Round
+  const nextRound = () => {
+    if (lives <= 0) {
+        setGameState('gameover');
+        // Award XP: Score / 2
+        if (score > 0) onXPUpdate(Math.ceil(score / 2), `Colosseum Run (Round ${round})`);
+        return;
+    }
+
+    // Pick a card (Cyclical logic if pool is small, or random pick)
+    const target = pool[Math.floor(Math.random() * pool.length)];
+    if (!target) return; // Safety
+
+    // Generate Distractors
+    const others = pool.filter(c => c.id !== target.id);
+    const distractors = others.sort(() => 0.5 - Math.random()).slice(0, 3);
+    const roundOptions = [target, ...distractors].sort(() => 0.5 - Math.random());
+
+    setCurrentCard(target);
+    setOptions(roundOptions);
+    setSelectedId(null);
+    
+    // Difficulty Scaling: Less time as rounds progress
+    const baseTime = Math.max(5, 15 - Math.floor(round / 5)); 
+    setTimeLeft(baseTime);
+  };
+
+  const handleStart = () => {
+      setLives(3);
+      setScore(0);
+      setRound(1);
+      setGameState('playing');
+      nextRound();
+  };
+
+  const handleAnswer = (answerId: string) => {
+      if (selectedId) return; // Prevent double taps
+      setSelectedId(answerId);
+      setIsPaused(true); // Pause timer while showing result
+
+      if (answerId === currentCard.id) {
+          // Correct
+          setTimeout(() => {
+              setScore(s => s + 10 + (timeLeft * 2)); // Speed bonus
+              setRound(r => r + 1);
+              setIsPaused(false);
+              nextRound();
+          }, 800);
+      } else {
+          // Wrong
+          setTimeout(() => {
+              setLives(l => l - 1);
+              setIsPaused(false);
+              // If that was the last life, nextRound handles gameover
+              if (lives <= 1) {
+                  setGameState('gameover');
+                  onXPUpdate(Math.ceil(score / 2), `Colosseum Run (Round ${round})`);
+              } else {
+                  nextRound();
+              }
+          }, 1000);
+      }
+  };
+
+  // Helper for Time-out
+  const handleWrongAnswer = () => {
+      setLives(l => l - 1);
+      if (lives <= 1) {
+          setGameState('gameover');
+          onXPUpdate(Math.ceil(score / 2), `Colosseum Run (Round ${round})`);
+      } else {
+          nextRound();
+      }
+  };
+
+  // --- RENDER ---
+  return (
+    <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center p-6 animate-in zoom-in duration-300">
+        
+        {/* BACKGROUND ANIMATION */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute top-[-50%] left-[-50%] w-[800px] h-[800px] bg-rose-900/20 rounded-full blur-[100px] animate-pulse"></div>
+            <div className="absolute bottom-[-50%] right-[-50%] w-[600px] h-[600px] bg-indigo-900/20 rounded-full blur-[100px] animate-pulse delay-1000"></div>
+        </div>
+
+        {gameState === 'intro' && (
+            <div className="bg-white max-w-sm w-full rounded-[2.5rem] p-8 text-center shadow-2xl relative z-10">
+                <div className="w-24 h-24 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-6 text-rose-600 shadow-inner">
+                    <Swords size={48} />
+                </div>
+                <h2 className="text-3xl font-black text-slate-800 mb-2 uppercase tracking-tight">The Colosseum</h2>
+                <p className="text-slate-500 mb-8 leading-relaxed">
+                    Endless challenges. <br/>
+                    <strong>3 Lives.</strong> Increasing speed. <br/>
+                    How long can you survive?
+                </p>
+                <div className="space-y-3">
+                    <button onClick={handleStart} className="w-full py-4 bg-rose-600 text-white font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-rose-200 hover:scale-[1.02] active:scale-95 transition-all">
+                        Enter Arena
+                    </button>
+                    <button onClick={onExit} className="w-full py-4 text-slate-400 font-bold uppercase tracking-widest text-xs hover:text-slate-600">
+                        Retreat
+                    </button>
+                </div>
+            </div>
+        )}
+
+        {gameState === 'playing' && currentCard && (
+            <div className="w-full max-w-md relative z-10 flex flex-col h-full max-h-[800px]">
+                {/* HUD */}
+                <div className="flex justify-between items-center mb-6 text-white">
+                    <div className="flex gap-1">
+                        {[...Array(3)].map((_, i) => (
+                            <Heart key={i} size={24} className={`${i < lives ? 'fill-rose-500 text-rose-500' : 'fill-slate-800 text-slate-700'} transition-all`} />
+                        ))}
+                    </div>
+                    <div className="font-mono font-bold text-2xl text-amber-400 drop-shadow-md">{score} pts</div>
+                </div>
+
+                {/* TIMER BAR */}
+                <div className="w-full h-3 bg-white/10 rounded-full mb-8 overflow-hidden backdrop-blur-sm border border-white/5">
+                    <div 
+                        className={`h-full transition-all duration-1000 ease-linear ${timeLeft < 5 ? 'bg-rose-500' : 'bg-emerald-400'}`} 
+                        style={{ width: `${(timeLeft / (Math.max(5, 15 - Math.floor(round / 5)))) * 100}%` }}
+                    />
+                </div>
+
+                {/* QUESTION CARD */}
+                <div className="flex-1 flex flex-col justify-center">
+                    <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-8 rounded-[2.5rem] text-center mb-6 shadow-2xl relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-rose-500 to-indigo-500"></div>
+                        <span className="text-indigo-200 text-xs font-bold uppercase tracking-widest mb-2 block">Round {round}</span>
+                        <h2 className="text-4xl font-serif font-bold text-white mb-2">{currentCard.front}</h2>
+                        <p className="text-white/50 text-sm italic">{currentCard.type}</p>
+                    </div>
+
+                    <div className="grid gap-3">
+                        {options.map((opt) => {
+                            let style = "bg-white text-slate-800 hover:bg-slate-50";
+                            if (selectedId) {
+                                if (opt.id === currentCard.id) style = "bg-emerald-500 text-white border-emerald-500";
+                                else if (opt.id === selectedId) style = "bg-rose-500 text-white border-rose-500";
+                                else style = "bg-slate-800 text-slate-500 opacity-50";
+                            }
+
+                            return (
+                                <button
+                                    key={opt.id}
+                                    disabled={!!selectedId}
+                                    onClick={() => handleAnswer(opt.id)}
+                                    className={`p-5 rounded-2xl font-bold text-lg transition-all shadow-lg active:scale-95 ${style}`}
+                                >
+                                    {opt.back}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {gameState === 'gameover' && (
+            <div className="bg-white max-w-sm w-full rounded-[2.5rem] p-8 text-center shadow-2xl relative z-10 animate-in zoom-in">
+                <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-400">
+                    <Skull size={48} />
+                </div>
+                <h2 className="text-4xl font-black text-slate-800 mb-1">{score}</h2>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-8">Final Score</p>
+                
+                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-6">
+                    <p className="text-indigo-700 font-bold text-sm">+{Math.ceil(score / 2)} XP Earned</p>
+                </div>
+
+                <div className="space-y-3">
+                    <button onClick={handleStart} className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-lg hover:bg-indigo-700">
+                        Try Again
+                    </button>
+                    <button onClick={onExit} className="w-full py-4 text-slate-400 font-bold text-sm hover:text-slate-600">
+                        Leave Arena
+                    </button>
+                </div>
+            </div>
+        )}
+    </div>
+  );
+}
 function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck, allDecks, user }: any) {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [showLevelModal, setShowLevelModal] = useState(false);
