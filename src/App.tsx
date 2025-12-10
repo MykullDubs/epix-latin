@@ -2314,26 +2314,49 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
       }
   };
 
-  // --- STYLE HELPERS ---
+  // --- STYLE HELPERS (UPDATED FOR 3D TILE LOOK) ---
   const isBossRound = round % 5 === 0;
 
   const getOptionStyle = (opt: any, index: number) => {
       const positions = [
-          "top-[20%] left-4", "top-[20%] right-4", "bottom-[20%] left-4", "bottom-[20%] right-4"
+          "top-[18%] left-6", "top-[18%] right-6", "bottom-[18%] left-6", "bottom-[18%] right-6"
       ];
       
-      let baseStyle = "absolute max-w-[45%] min-w-[140px] p-6 rounded-3xl border-4 shadow-xl flex items-center justify-center text-center font-bold text-sm transition-all duration-300 z-20 select-none active:scale-95";
+      // Base: Flex box, transition, z-index, select-none
+      let baseStyle = "absolute max-w-[45%] min-w-[140px] px-4 py-6 rounded-2xl flex items-center justify-center text-center transition-all duration-200 z-20 select-none active:translate-y-1 active:shadow-none";
       
+      // Interaction & Color Logic
+      let visualStyle = "";
+
       if (selectedId) {
-          if (opt.id === currentCard.id) return `${baseStyle} ${positions[index]} bg-emerald-500 text-white border-emerald-600 scale-110 shadow-[0_0_50px_rgba(16,185,129,0.8)] z-30`;
-          else if (opt.id === selectedId) return `${baseStyle} ${positions[index]} bg-rose-500 text-white border-rose-600 scale-90 opacity-50`;
-          else return `${baseStyle} ${positions[index]} bg-slate-200/20 text-slate-400 opacity-20 border-white/10`;
+          // --- REVEAL PHASE ---
+          if (opt.id === currentCard.id) {
+              // CORRECT: Bright Emerald Green
+              visualStyle = "bg-emerald-500 border-b-4 border-emerald-700 text-white shadow-[0_4px_0_#047857] scale-110 z-30";
+          } else if (opt.id === selectedId) {
+              // WRONG: Bright Red
+              visualStyle = "bg-rose-500 border-b-4 border-rose-700 text-white shadow-none translate-y-1 opacity-50";
+          } else {
+              // UNSELECTED: Faded
+              visualStyle = "bg-slate-200 border-b-4 border-slate-300 text-slate-400 opacity-20";
+          }
+      } else {
+          // --- PLAYING PHASE ---
+          // Hover Cursor
+          const cursor = loadout === 'shoot' ? 'cursor-crosshair hover:scale-105' : 'cursor-default';
+          
+          if (isBossRound) {
+              // Boss Style: Red tinted tiles
+              visualStyle = "bg-gradient-to-b from-slate-50 to-rose-50 border-2 border-rose-200 border-b-4 border-b-rose-300 text-rose-900 shadow-[0_4px_0_#fda4af]";
+          } else {
+              // Normal Style: Clean White/Slate 3D Tile
+              visualStyle = "bg-gradient-to-b from-white to-slate-100 border-2 border-slate-200 border-b-4 border-b-slate-300 text-slate-800 shadow-[0_4px_0_#cbd5e1] hover:brightness-105";
+          }
+          
+          visualStyle += ` ${cursor}`;
       }
 
-      const hover = loadout === 'shoot' ? 'cursor-crosshair hover:scale-105' : 'cursor-default';
-      const border = isBossRound ? 'border-rose-500/50 bg-slate-900/90 text-rose-100' : 'border-white/50 bg-white/90 text-slate-800';
-
-      return `${baseStyle} ${positions[index]} ${border} ${hover}`;
+      return `${baseStyle} ${positions[index]} ${visualStyle}`;
   };
 
   return (
@@ -2441,7 +2464,7 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
                             onClick={(e) => handleShoot(e, opt.id)}
                             className={getOptionStyle(opt, i)}
                         >
-                            <span className="text-2xl font-black uppercase tracking-tight">{opt.front}</span>
+                            <span className="text-lg font-extrabold leading-tight">{opt.front}</span>
                             
                             {loadout === 'shoot' && !selectedId && (
                                 <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
