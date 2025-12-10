@@ -3928,8 +3928,7 @@ function App() {
   const [selectedDeckKey, setSelectedDeckKey] = useState('salutationes');
   
   // --- ADD THIS MISSING LINE VVV ---
-  const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
-  // --- MEMOS ---
+const [activeStudentClass, setActiveStudentClass] = useState<any>(null);  // --- MEMOS ---
   const allDecks = useMemo(() => {
     const decks: any = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: [] } };
     
