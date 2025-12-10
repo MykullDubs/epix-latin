@@ -38,7 +38,7 @@ import {
   AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle, ArrowDown,
   BarChart3, UserPlus, Briefcase, Coffee, AlertCircle, Target, Calendar, Settings, Edit2, Camera, Medal,
   ChevronUp, GripVertical, ListOrdered, ArrowRightLeft, CheckSquare, Gamepad2, Globe,
-  BrainCircuit, Swords, Heart, Skull, Shield, Hourglass, Flame, Crown, Crosshair,XCircle, FolderPlus // <--- Added these for the new game modes
+  BrainCircuit, Swords, Heart, Skull, Shield, Hourglass, Flame, Crown, Crosshair // <--- Added these for the new game modes
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -1541,18 +1541,12 @@ const ADLIB_TEMPLATES = [
   { id: 5, text: "A [ADJ] philosopher always knows how to [VERB].", blanks: ['ADJ', 'VERB'] }
 ];
 
-function DailyDiscoveryWidget({ allDecks, user, userData, onSaveCard }: any) {
+function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
   // View States
   const [isFlipped, setIsFlipped] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [viewMode, setViewMode] = useState<'study' | 'quiz'>('study');
   const [saving, setSaving] = useState(false);
-  
-  // New "Builder" States
-  const [showSaveMenu, setShowSaveMenu] = useState(false); 
-  const [showQuickCreate, setShowQuickCreate] = useState(false); 
-  const [newCardFront, setNewCardFront] = useState('');
-  const [newCardBack, setNewCardBack] = useState('');
   
   // Navigation & Data State
   const [sessionCards, setSessionCards] = useState<any[]>([]);
@@ -1642,48 +1636,6 @@ function DailyDiscoveryWidget({ allDecks, user, userData, onSaveCard }: any) {
     } catch (e) { console.error(e); } finally { setSaving(false); }
   };
 
-  // 1. SAVE EXISTING CARD TO A DECK
-  const handleCopyCard = async (targetDeckId: string, targetDeckTitle: string) => {
-      if (!currentCard || !onSaveCard) return;
-      setSaving(true);
-      try {
-          await onSaveCard({
-              ...currentCard,
-              deckId: targetDeckId,
-              deckTitle: targetDeckTitle,
-              mastery: 0,
-              id: null // Ensure new ID
-          });
-          setShowSaveMenu(false);
-          alert(`Saved to ${targetDeckTitle}`);
-      } catch (e) { console.error(e); } finally { setSaving(false); }
-  };
-
-  // 2. QUICK CREATE NEW CARD
-  const handleQuickCreate = async () => {
-      if (!newCardFront || !newCardBack || !onSaveCard) return;
-      setSaving(true);
-      try {
-          // Default to first custom deck found or create a generic one logic in App
-          let targetDeckId = 'custom';
-          const customDeck = Object.entries(allDecks).find(([k, d]: any) => k.startsWith('custom'));
-          if (customDeck) targetDeckId = customDeck[0];
-
-          await onSaveCard({
-              front: newCardFront,
-              back: newCardBack,
-              type: 'noun',
-              deckId: targetDeckId,
-              mastery: 0,
-              grammar_tags: ['Quick Add']
-          });
-          
-          setNewCardFront(''); setNewCardBack('');
-          setShowQuickCreate(false);
-          alert("Card Created!");
-      } catch (e) { console.error(e); } finally { setSaving(false); }
-  };
-
   // --- NAVIGATION ---
   const handleNext = () => { setIsFlipped(false); setTimeout(() => setCurrentIndex(prev => (prev + 1) % sessionCards.length), 200); };
   const handlePrev = () => { setIsFlipped(false); setTimeout(() => setCurrentIndex(prev => (prev - 1 + sessionCards.length) % sessionCards.length), 200); };
@@ -1707,14 +1659,6 @@ function DailyDiscoveryWidget({ allDecks, user, userData, onSaveCard }: any) {
             <Zap size={16} className="text-amber-500" /> Daily Discovery
           </h3>
           <div className="flex gap-2">
-            {/* QUICK CREATE BUTTON */}
-            <button 
-                onClick={() => setShowQuickCreate(!showQuickCreate)} 
-                className={`p-1.5 rounded-full transition-colors ${showQuickCreate ? 'bg-indigo-100 text-indigo-600' : 'text-slate-400 hover:bg-slate-100'}`}
-            >
-                {showQuickCreate ? <XCircle size={14}/> : <Plus size={14}/>}
-            </button>
-
             <button 
                 onClick={() => setViewMode(viewMode === 'study' ? 'quiz' : 'study')} 
                 className={`text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-colors shadow-sm ${viewMode === 'quiz' ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 border border-indigo-100'}`}
@@ -1728,59 +1672,6 @@ function DailyDiscoveryWidget({ allDecks, user, userData, onSaveCard }: any) {
           </div>
       </div>
       
-      {/* --- QUICK CREATE DRAWER --- */}
-      {showQuickCreate && (
-          <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl p-5 animate-in slide-in-from-top-2 duration-200 relative z-30 mb-4">
-              <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-3 flex items-center gap-2">
-                  <PlusCircle size={14}/> Quick Add Card
-              </h4>
-              <div className="space-y-3">
-                  <input 
-                    value={newCardFront}
-                    onChange={(e) => setNewCardFront(e.target.value)}
-                    placeholder="Term (Front)"
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <input 
-                    value={newCardBack}
-                    onChange={(e) => setNewCardBack(e.target.value)}
-                    placeholder="Definition (Back)"
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <button 
-                    onClick={handleQuickCreate}
-                    disabled={!newCardFront || !newCardBack || saving}
-                    className="w-full py-3 bg-slate-900 text-white font-bold rounded-xl text-xs hover:bg-slate-800 disabled:opacity-50"
-                  >
-                      {saving ? "Saving..." : "Create Card"}
-                  </button>
-              </div>
-          </div>
-      )}
-
-      {/* --- SAVE MENU OVERLAY --- */}
-      {showSaveMenu && (
-          <div className="absolute inset-0 z-40 bg-white/95 backdrop-blur-md rounded-[2rem] flex flex-col p-6 animate-in fade-in zoom-in duration-200">
-              <div className="flex justify-between items-center mb-4">
-                  <h4 className="font-bold text-slate-800">Save to Deck</h4>
-                  <button onClick={() => setShowSaveMenu(false)}><X size={20} className="text-slate-400"/></button>
-              </div>
-              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2">
-                  {Object.entries(allDecks).map(([key, deck]: any) => (
-                      <button 
-                        key={key} 
-                        onClick={() => handleCopyCard(key, deck.title)}
-                        className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-left flex items-center gap-3 hover:border-indigo-300 hover:bg-indigo-50 transition-all group"
-                      >
-                          <div className="bg-white p-2 rounded-lg text-slate-400 group-hover:text-indigo-500 shadow-sm"><Layers size={16}/></div>
-                          <span className="text-sm font-bold text-slate-700 group-hover:text-indigo-700">{deck.title}</span>
-                      </button>
-                  ))}
-              </div>
-          </div>
-      )}
-
-      {/* --- SETTINGS OVERLAY --- */}
       {showSettings ? (
           <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl p-5 animate-in fade-in zoom-in duration-200 relative z-20">
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 ml-1">Select Source Deck</h4>
@@ -1800,7 +1691,6 @@ function DailyDiscoveryWidget({ allDecks, user, userData, onSaveCard }: any) {
               </div>
           </div>
       ) : viewMode === 'quiz' ? (
-          /* QUIZ MODE */
           <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden relative h-56 flex flex-col">
               <div className="bg-indigo-50 px-6 py-3 flex justify-between items-center border-b border-indigo-100">
                   <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Question {currentIndex + 1} / {sessionCards.length}</span>
@@ -1834,16 +1724,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData, onSaveCard }: any) {
                   <div className="absolute top-[-20%] right-[-20%] w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
                   <div className="flex justify-between items-start relative z-10">
                       <span className="bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-white/10 flex items-center gap-1.5 shadow-sm"><Layers size={10} className="text-indigo-200" /> {currentIndex + 1} / {sessionCards.length}</span>
-                      
-                      <div className="flex gap-2">
-                          {/* SAVE BUTTON */}
-                          <div className="p-2.5 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-90 border border-white/5 shadow-sm" onClick={(e) => { e.stopPropagation(); setShowSaveMenu(true); }}>
-                             <Save size={18} className="text-white"/>
-                          </div>
-                          <div className="p-2.5 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-90 border border-white/5 shadow-sm" onClick={(e) => { e.stopPropagation(); playAudio(currentCard.front); }}>
-                             <Volume2 size={18} className="text-white"/>
-                          </div>
-                      </div>
+                      <div className="p-2.5 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-90 border border-white/5 shadow-sm" onClick={(e) => { e.stopPropagation(); playAudio(currentCard.front); }}><Volume2 size={20} className="text-white"/></div>
                   </div>
                   <div className="text-center relative z-10 mt-2">
                       <h2 className="text-4xl font-serif font-bold mb-2 drop-shadow-md">{currentCard.front}</h2>
@@ -1852,23 +1733,33 @@ function DailyDiscoveryWidget({ allDecks, user, userData, onSaveCard }: any) {
                   <div className="text-center relative z-10"><p className="text-[10px] uppercase font-bold text-indigo-200 tracking-widest animate-pulse flex items-center justify-center gap-2"><ArrowLeft size={10}/> Swipe <ArrowRight size={10}/></p></div>
               </div>
 
-              {/* BACK SIDE (Scrollable) */}
+              {/* BACK SIDE (SCROLLABLE FIX) */}
               <div 
                 className="absolute inset-0 bg-white rounded-[2rem] border border-slate-200 flex flex-col shadow-sm overflow-hidden" 
                 style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
               >
-                 {/* Top spacer handles centering visually */}
+                 {/* Top Spacer for handle feel */}
                  <div className="w-10 h-1 rounded-full bg-slate-100 mx-auto mt-4 shrink-0"></div>
-                 
-                 {/* Content - SCROLLABLE AREA */}
+
+                 {/* Scrollable Content Area */}
                  <div className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar min-h-0 flex flex-col items-center text-center">
                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 bg-slate-50 px-2 py-1 rounded-md">Definition</span>
+                     
                      <h3 className="text-xl font-bold text-slate-800 mb-4 leading-tight">{currentCard.back}</h3>
-                     {currentCard.usage?.sentence && (<div className="bg-slate-50 p-4 rounded-xl w-full border border-slate-100 text-left relative shrink-0"><div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 rounded-l-xl"></div><p className="text-sm text-slate-600 italic font-serif leading-relaxed pl-2">"{currentCard.usage.sentence}"</p></div>)}
+                     
+                     {currentCard.usage?.sentence && (
+                       <div className="bg-slate-50 p-4 rounded-xl w-full border border-slate-100 text-left relative shrink-0">
+                         <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 rounded-l-xl"></div>
+                         <p className="text-sm text-slate-600 italic font-serif leading-relaxed pl-2">"{currentCard.usage.sentence}"</p>
+                       </div>
+                     )}
                  </div>
                  
+                 {/* Fixed Footer */}
                  <div className="p-3 border-t border-slate-50 text-center shrink-0">
-                    <div className="text-[10px] text-slate-300 font-bold uppercase flex items-center justify-center gap-2"><ArrowLeft size={10}/> Next Card <ArrowRight size={10}/></div>
+                    <div className="text-[10px] text-slate-300 font-bold uppercase flex items-center justify-center gap-2">
+                        <ArrowLeft size={10}/> Next Card <ArrowRight size={10}/>
+                    </div>
                  </div>
               </div>
 
@@ -1880,6 +1771,22 @@ function DailyDiscoveryWidget({ allDecks, user, userData, onSaveCard }: any) {
     </div>
   );
 }
+// --- ASSETS ---
+// Ensure you have these imported from 'lucide-react':
+// Swords, Heart, Skull, Zap, Shield, Hourglass, Flame, Crown
+
+// --- ASSETS ---
+// Import these from 'lucide-react':
+// Swords, Heart, Skull, Zap, Shield, Hourglass, Target, Crown
+
+// --- ASSETS ---
+// Import these from 'lucide-react':
+// Swords, Heart, Skull, Zap, Shield, Hourglass, Target, Crown
+
+// --- ASSETS ---
+// Add 'Crosshair' to your imports
+// import { Swords, Heart, Skull, Zap, Shield, Hourglass, Target, Crown, Crosshair } from 'lucide-react';
+
 function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
   // Game Flow
   const [gameState, setGameState] = useState<'intro' | 'playing' | 'gameover'>('intro');
@@ -2209,7 +2116,8 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
     </div>
   );
 }
-function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck, allDecks, user, onSaveCard }: any) { // <--- Add onSaveCard here  const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
+function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck, allDecks, user }: any) {
+  const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [showLevelModal, setShowLevelModal] = useState(false);
   const [libraryExpanded, setLibraryExpanded] = useState(false);
   
@@ -2356,12 +2264,8 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
     </button>
     
     {/* --- 2. DAILY DISCOVERY --- */}
-<DailyDiscoveryWidget 
-   allDecks={allDecks} 
-   user={user} 
-   userData={userData} 
-   onSaveCard={onSaveCard} // <--- Pass it down here
-/>    
+    <DailyDiscoveryWidget allDecks={allDecks} user={user} userData={userData} />
+    
     {/* --- 3. THE COLOSSEUM BANNER --- */}
     <div className="px-6 mt-6">
         <button onClick={() => setShowColosseum(true)} className="w-full p-1 rounded-[2.5rem] bg-gradient-to-r from-rose-500 via-orange-500 to-rose-600 shadow-xl shadow-rose-200 hover:scale-[1.02] active:scale-95 transition-all group relative overflow-hidden">
@@ -3926,9 +3830,9 @@ function App() {
   // Navigation State
   const [activeLesson, setActiveLesson] = useState<any>(null);
   const [selectedDeckKey, setSelectedDeckKey] = useState('salutationes');
-  
-  // --- ADD THIS MISSING LINE VVV ---
-const [activeStudentClass, setActiveStudentClass] = useState<any>(null);  // --- MEMOS ---
+  const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
+
+  // --- MEMOS ---
   const allDecks = useMemo(() => {
     const decks: any = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: [] } };
     
@@ -4054,7 +3958,7 @@ const renderStudentView = () => {
     
     // 5. Main Tab Navigation
     switch (activeTab) {
-case 'home': return <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} onSaveCard={handleCreateCard} />;      case 'flashcards': 
+case 'home': return <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} />;      case 'flashcards': 
           const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
           const deckToLoad = assignedDeck || allDecks[selectedDeckKey];
           return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} activeDeckOverride={deckToLoad} onComplete={handleFinishLesson} />;
