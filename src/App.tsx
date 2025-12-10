@@ -1545,31 +1545,39 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
   // --- View States ---
   const [isFlipped, setIsFlipped] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [viewMode, setViewMode] = useState<'study' | 'quiz'>('study');
   
   // --- Add/Save States ---
-  const [showAddModal, setShowAddModal] = useState(false); // For the Header "+" button
-  const [showSaveOverlay, setShowSaveOverlay] = useState(false); // For the Card "Heart" button
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showSaveOverlay, setShowSaveOverlay] = useState(false);
   const [newCard, setNewCard] = useState({ front: '', back: '' });
-  const [newDeckName, setNewDeckName] = useState(''); // For creating a deck inside the save view
+  const [newDeckName, setNewDeckName] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // --- NEW: Custom Notification State ---
+  const [notification, setNotification] = useState<{ title: string, subtitle: string } | null>(null);
 
   // --- Navigation & Data State ---
   const [sessionCards, setSessionCards] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // --- Quiz State ---
+  // --- Quiz & Game States ---
+  const [viewMode, setViewMode] = useState<'study' | 'quiz'>('study');
   const [quizOptions, setQuizOptions] = useState<any[]>([]);
   const [quizState, setQuizState] = useState<'waiting' | 'correct' | 'wrong'>('waiting');
   const [score, setScore] = useState(0);
-
-  // --- Swipe State ---
   const [dragStartX, setDragStartX] = useState<number | null>(null);
   const [dragEndX, setDragEndX] = useState<number | null>(null);
   const minSwipeDistance = 50; 
 
-  // --- Preference ---
   const preferredDeckId = userData?.widgetDeckId || 'all';
+
+  // --- AUTO HIDE NOTIFICATION ---
+  useEffect(() => {
+    if (notification) {
+        const timer = setTimeout(() => setNotification(null), 2500); // Disappear after 2.5s
+        return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   // --- AUDIO ENGINE ---
   const playAudio = useCallback((text: string) => {
@@ -1630,7 +1638,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
       }
   };
 
-  // --- NEW: EXECUTE SAVE TO SPECIFIC DECK ---
+  // --- EXECUTE SAVE TO SPECIFIC DECK ---
   const executeSave = async (targetDeckId: string, targetDeckTitle: string) => {
     const currentUser = user || auth.currentUser;
     if (!currentUser || !sessionCards[currentIndex] || saving) return;
@@ -1649,26 +1657,31 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
             savedAt: Date.now()
         });
         
-        setShowSaveOverlay(false); // Close overlay
-        setNewDeckName(''); // Reset input
-        alert(`Saved to ${targetDeckTitle}!`);
+        setShowSaveOverlay(false);
+        setNewDeckName(''); 
+        
+        // --- CUSTOM NOTIFICATION TRIGGER ---
+        setNotification({ 
+            title: "Card Saved Successfully", 
+            subtitle: `Added to ${targetDeckTitle}` 
+        });
+
     } catch (err: any) {
         console.error("Error saving card:", err);
-        alert("Failed to save: " + err.message);
+        setNotification({ title: "Error", subtitle: "Could not save card." });
     } finally {
         setSaving(false);
     }
   };
 
-  // --- NEW: CREATE DECK AND SAVE ---
+  // --- CREATE DECK AND SAVE ---
   const handleCreateAndSave = async () => {
       if(!newDeckName.trim()) return;
-      // Generate a new ID for the custom deck
       const newId = `custom_${Date.now()}`;
       await executeSave(newId, newDeckName);
   };
 
-  // --- EXISTING: QUICK ADD (HEADER BUTTON) ---
+  // --- QUICK ADD (HEADER BUTTON) ---
   const handleQuickAdd = async () => {
     const currentUser = user || auth.currentUser;
     if (!currentUser || !newCard.front || !newCard.back) return;
@@ -1688,9 +1701,15 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
         });
         setNewCard({ front: '', back: '' });
         setShowAddModal(false);
-        alert("New card created!");
+        
+        // --- CUSTOM NOTIFICATION TRIGGER ---
+        setNotification({ 
+            title: "Flashcard Created", 
+            subtitle: "Added to Scriptorium" 
+        });
+
     } catch (err: any) {
-        alert("Failed to add: " + err.message);
+        setNotification({ title: "Error", subtitle: err.message });
     } finally {
         setSaving(false);
     }
@@ -1707,7 +1726,6 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
     } catch (e) { console.error(e); }
   };
 
-  // --- NAVIGATION ---
   const handleNext = () => { setIsFlipped(false); setShowSaveOverlay(false); setTimeout(() => setCurrentIndex(prev => (prev + 1) % sessionCards.length), 200); };
   const handlePrev = () => { setIsFlipped(false); setShowSaveOverlay(false); setTimeout(() => setCurrentIndex(prev => (prev - 1 + sessionCards.length) % sessionCards.length), 200); };
 
@@ -1725,6 +1743,20 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
 
   return (
     <div className="mx-6 mt-6 animate-in slide-in-from-bottom-2 duration-700 relative z-0">
+      
+      {/* --- NEW: FLOATING NOTIFICATION --- */}
+      {notification && (
+          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 px-5 py-3 bg-slate-900/90 text-white rounded-2xl shadow-2xl animate-in slide-in-from-top-4 fade-in duration-300 border border-white/10 backdrop-blur-md min-w-[240px]">
+             <div className="bg-emerald-500 rounded-full p-1.5 shadow-[0_0_15px_rgba(16,185,129,0.5)]">
+                 <Check size={14} strokeWidth={3} className="text-white"/>
+             </div>
+             <div>
+                 <p className="text-sm font-bold leading-none mb-0.5">{notification.title}</p>
+                 <p className="text-[10px] text-slate-300 font-medium">{notification.subtitle}</p>
+             </div>
+          </div>
+      )}
+
       <div className="flex justify-between items-end mb-3">
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
             <Zap size={16} className="text-amber-500" /> Daily Discovery
@@ -1815,7 +1847,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
               {/* FRONT SIDE */}
               <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] p-6 text-white flex flex-col justify-between overflow-hidden shadow-indigo-200" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
                   
-                  {/* --- DECK SELECTOR OVERLAY (ABSOLUTE OVER FRONT) --- */}
+                  {/* --- DECK SELECTOR OVERLAY --- */}
                   {showSaveOverlay ? (
                       <div className="absolute inset-0 bg-slate-900/95 z-50 flex flex-col p-5 rounded-[2rem] text-left animate-in fade-in" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-between items-center mb-4">
@@ -1823,15 +1855,12 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                               <button onClick={() => setShowSaveOverlay(false)} className="text-white/50 hover:text-white"><X size={16}/></button>
                           </div>
                           
-                          {/* Deck List */}
                           <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 mb-4">
-                              {/* 1. Default Option */}
                               <button onClick={() => executeSave('custom', '✍️ Scriptorium')} className="w-full p-3 bg-white/10 rounded-xl flex items-center gap-3 hover:bg-white/20 transition-colors border border-white/5">
                                   <div className="p-1.5 bg-indigo-500 rounded-lg"><Layers size={14} className="text-white"/></div>
                                   <span className="text-sm font-bold text-white">Scriptorium (Default)</span>
                               </button>
                               
-                              {/* 2. Existing Decks */}
                               {Object.entries(allDecks).map(([key, deck]: any) => (
                                   <button key={key} onClick={() => executeSave(key, deck.title)} className="w-full p-3 bg-white/5 rounded-xl flex items-center gap-3 hover:bg-white/10 transition-colors border border-transparent hover:border-white/10">
                                       <div className="p-1.5 bg-white/10 rounded-lg text-white/70"><BookOpen size={14}/></div>
@@ -1842,7 +1871,6 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                               ))}
                           </div>
 
-                          {/* New Deck Input */}
                           <div className="mt-auto">
                               <label className="text-[10px] font-bold text-white/50 uppercase mb-1 block">Or Create New</label>
                               <div className="flex gap-2">
@@ -1866,7 +1894,6 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                             <span className="bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-white/10 flex items-center gap-1.5 shadow-sm"><Layers size={10} className="text-indigo-200" /> {currentIndex + 1} / {sessionCards.length}</span>
                             
                             <div className="flex gap-2">
-                                {/* SAVE BUTTON TOGGLES OVERLAY */}
                                 <button 
                                     className="p-2.5 bg-white/10 rounded-full hover:bg-white/30 transition-colors active:scale-90 border border-white/5 shadow-sm z-40 cursor-pointer" 
                                     onClick={(e) => { e.stopPropagation(); setShowSaveOverlay(true); }}
