@@ -2613,57 +2613,51 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
         </div>
     )}
     
-    {/* --- 1. HERO PROFILE WIDGET --- */}
-    <button onClick={() => setShowLevelModal(true)} className="w-full relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white shadow-xl z-10 group text-left rounded-b-[3rem] pb-10 pt-12 px-8 transition-all active:scale-[0.99] border-b border-white/10">
-        <div className="absolute top-[-50%] left-[-20%] w-[600px] h-[600px] bg-blue-400/20 rounded-full blur-[80px] mix-blend-overlay pointer-events-none animate-pulse"></div>
-        <div className="absolute bottom-[-20%] right-[-10%] w-[400px] h-[400px] bg-purple-400/20 rounded-full blur-[60px] mix-blend-overlay pointer-events-none"></div>
-       
-        <div className="relative z-20 flex flex-col gap-5">
-            <div className="flex items-center gap-5">
-                <div className="relative">
-                    <div className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center border-2 border-white/30 shadow-[0_8px_32px_rgba(0,0,0,0.1)] group-hover:scale-105 transition-all overflow-hidden relative">
-                        {userData?.photoURL ? (
-                            <img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />
-                        ) : (
-                            <span className="font-serif font-bold text-3xl text-white drop-shadow-md">{displayName.charAt(0)}</span>
-                        )}
-                        <div className="absolute bottom-1 right-1 w-4 h-4 bg-emerald-400 border-2 border-indigo-600 rounded-full"></div>
-                    </div>
-                </div>
-                <div>
-                    <p className="text-indigo-100 text-[10px] font-bold uppercase tracking-widest mb-1 opacity-90 drop-shadow-sm">Welcome back,</p>
-                    <h1 className="text-4xl font-serif font-bold leading-none tracking-tight drop-shadow-lg filter truncate max-w-[200px]">{displayName}</h1>
-                    <div className="flex items-center gap-2 mt-2">
-                        <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border border-white/20 shadow-sm flex items-center gap-1">
-                            <Award size={12} className="text-yellow-300"/> {rank}
-                        </span>
-                    </div>
-                </div>
+   {/* --- 1. MINIMALIST HERO WIDGET --- */}
+<button 
+    onClick={() => setShowLevelModal(true)} 
+    className="w-full bg-slate-900 text-white shadow-lg z-10 group text-left rounded-b-[2.5rem] transition-all active:scale-[0.99] relative overflow-hidden"
+>
+    <div className="px-8 pt-12 pb-8 flex items-center justify-between">
+        
+        {/* Left: Identity */}
+        <div className="flex items-center gap-4">
+            {/* Clean Avatar */}
+            <div className="w-14 h-14 bg-slate-800 rounded-2xl flex items-center justify-center text-white border border-slate-700 shadow-inner overflow-hidden">
+                {userData?.photoURL ? (
+                    <img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />
+                ) : (
+                    <span className="font-serif font-bold text-xl">{displayName.charAt(0)}</span>
+                )}
             </div>
 
-            {/* XP Bar & Streak */}
-            <div className="bg-black/20 backdrop-blur-xl rounded-2xl p-4 border border-white/10 flex items-center justify-between mt-2 group-hover:bg-black/30 transition-all shadow-inner">
-                <div className="flex-1 border-r border-white/10 pr-6">
-                     <div className="flex justify-between items-end mb-2">
-                         <span className="text-[10px] font-bold text-indigo-100 tracking-wide uppercase">Level {level} Progress</span>
-                         <span className="text-xs font-bold text-white">{Math.round(progress)}%</span>
-                     </div>
-                     <div className="w-full bg-black/30 rounded-full h-2.5 overflow-hidden border border-white/5">
-                         <div className="bg-gradient-to-r from-cyan-300 to-blue-500 h-full rounded-full shadow-[0_0_15px_rgba(34,211,238,0.4)] relative overflow-hidden" style={{ width: `${progress}%` }}>
-                             <div className="absolute inset-0 bg-white/40 w-full animate-[shimmer_2s_infinite]"></div>
-                         </div>
-                     </div>
-                </div>
-                <div className="pl-6 flex flex-col items-center justify-center">
-                    <div className="flex items-center gap-1.5 text-amber-300 filter drop-shadow-sm">
-                        <Zap size={24} fill="currentColor" className="animate-pulse" />
-                        <span className="text-2xl font-black leading-none text-white">{userData?.streak || 1}</span>
-                    </div>
-                    <span className="text-[9px] text-indigo-200 uppercase font-bold tracking-wider mt-1">Day Streak</span>
+            {/* Typography Focus */}
+            <div>
+                <h1 className="text-2xl font-serif font-bold text-white tracking-tight leading-none mb-1 group-hover:text-indigo-300 transition-colors">
+                    {displayName}
+                </h1>
+                <div className="flex items-center gap-2 text-slate-400 text-xs font-medium font-mono">
+                    <span className="text-indigo-400 font-bold">LVL {level}</span>
+                    <span className="w-1 h-1 rounded-full bg-slate-600"></span>
+                    <span>{userData?.xp || 0} XP</span>
                 </div>
             </div>
         </div>
-    </button>
+
+        {/* Right: Subtle Chevron */}
+        <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-500 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+            <ChevronRight size={16} />
+        </div>
+    </div>
+
+    {/* Surgical XP Line (Bottom Edge) */}
+    <div className="w-full h-1.5 bg-slate-800">
+        <div 
+            className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 shadow-[0_0_10px_rgba(99,102,241,0.5)] transition-all duration-1000"
+            style={{ width: `${progress}%` }}
+        />
+    </div>
+</button>
     
     {/* --- 2. DAILY DISCOVERY --- */}
     <DailyDiscoveryWidget allDecks={allDecks} user={user} userData={userData} />
