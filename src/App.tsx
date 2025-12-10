@@ -1577,7 +1577,6 @@ function DailyDiscoveryWidget({ allDecks, user, userData, onSaveCard }: any) {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis.getVoices();
-    // Try to find a good voice
     const preferredVoice = voices.find(v => v.lang.includes('en-US') && v.name.includes('Google')) || 
                            voices.find(v => v.lang.includes('en-US'));
     if (preferredVoice) utterance.voice = preferredVoice;
@@ -1643,7 +1642,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData, onSaveCard }: any) {
     } catch (e) { console.error(e); } finally { setSaving(false); }
   };
 
-  // 1. SAVE EXISTING CARD
+  // 1. SAVE EXISTING CARD TO A DECK
   const handleCopyCard = async (targetDeckId: string, targetDeckTitle: string) => {
       if (!currentCard || !onSaveCard) return;
       setSaving(true);
@@ -1660,12 +1659,12 @@ function DailyDiscoveryWidget({ allDecks, user, userData, onSaveCard }: any) {
       } catch (e) { console.error(e); } finally { setSaving(false); }
   };
 
-  // 2. QUICK CREATE
+  // 2. QUICK CREATE NEW CARD
   const handleQuickCreate = async () => {
       if (!newCardFront || !newCardBack || !onSaveCard) return;
       setSaving(true);
       try {
-          // Default to first custom deck found
+          // Default to first custom deck found or create a generic one logic in App
           let targetDeckId = 'custom';
           const customDeck = Object.entries(allDecks).find(([k, d]: any) => k.startsWith('custom'));
           if (customDeck) targetDeckId = customDeck[0];
@@ -1782,7 +1781,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData, onSaveCard }: any) {
       )}
 
       {/* --- SETTINGS OVERLAY --- */}
-      {showSettings && (
+      {showSettings ? (
           <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl p-5 animate-in fade-in zoom-in duration-200 relative z-20">
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 ml-1">Select Source Deck</h4>
               <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
@@ -1800,10 +1799,8 @@ function DailyDiscoveryWidget({ allDecks, user, userData, onSaveCard }: any) {
                   ))}
               </div>
           </div>
-      )} 
-      
-      {/* --- MAIN CARD RENDER --- */}
-      {viewMode === 'quiz' ? (
+      ) : viewMode === 'quiz' ? (
+          /* QUIZ MODE */
           <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden relative h-56 flex flex-col">
               <div className="bg-indigo-50 px-6 py-3 flex justify-between items-center border-b border-indigo-100">
                   <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Question {currentIndex + 1} / {sessionCards.length}</span>
@@ -1826,6 +1823,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData, onSaveCard }: any) {
               </div>
           </div>
       ) : currentCard ? (
+          /* STUDY MODE (Swipeable Stack) */
           <div className="relative h-56 w-full cursor-pointer group perspective-1000 touch-pan-y select-none" style={{ perspective: '1000px' }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}>
             <div className="absolute top-2 left-4 right-4 bottom-0 bg-indigo-300/40 rounded-[2rem] transform scale-95 translate-y-2 z-0" />
             <div className="absolute top-4 left-8 right-8 bottom-0 bg-indigo-200/30 rounded-[2rem] transform scale-90 translate-y-3 z-0" />
@@ -1859,12 +1857,16 @@ function DailyDiscoveryWidget({ allDecks, user, userData, onSaveCard }: any) {
                 className="absolute inset-0 bg-white rounded-[2rem] border border-slate-200 flex flex-col shadow-sm overflow-hidden" 
                 style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
               >
+                 {/* Top spacer handles centering visually */}
                  <div className="w-10 h-1 rounded-full bg-slate-100 mx-auto mt-4 shrink-0"></div>
+                 
+                 {/* Content - SCROLLABLE AREA */}
                  <div className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar min-h-0 flex flex-col items-center text-center">
                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 bg-slate-50 px-2 py-1 rounded-md">Definition</span>
                      <h3 className="text-xl font-bold text-slate-800 mb-4 leading-tight">{currentCard.back}</h3>
                      {currentCard.usage?.sentence && (<div className="bg-slate-50 p-4 rounded-xl w-full border border-slate-100 text-left relative shrink-0"><div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 rounded-l-xl"></div><p className="text-sm text-slate-600 italic font-serif leading-relaxed pl-2">"{currentCard.usage.sentence}"</p></div>)}
                  </div>
+                 
                  <div className="p-3 border-t border-slate-50 text-center shrink-0">
                     <div className="text-[10px] text-slate-300 font-bold uppercase flex items-center justify-center gap-2"><ArrowLeft size={10}/> Next Card <ArrowRight size={10}/></div>
                  </div>
@@ -1878,22 +1880,6 @@ function DailyDiscoveryWidget({ allDecks, user, userData, onSaveCard }: any) {
     </div>
   );
 }
-// --- ASSETS ---
-// Ensure you have these imported from 'lucide-react':
-// Swords, Heart, Skull, Zap, Shield, Hourglass, Flame, Crown
-
-// --- ASSETS ---
-// Import these from 'lucide-react':
-// Swords, Heart, Skull, Zap, Shield, Hourglass, Target, Crown
-
-// --- ASSETS ---
-// Import these from 'lucide-react':
-// Swords, Heart, Skull, Zap, Shield, Hourglass, Target, Crown
-
-// --- ASSETS ---
-// Add 'Crosshair' to your imports
-// import { Swords, Heart, Skull, Zap, Shield, Hourglass, Target, Crown, Crosshair } from 'lucide-react';
-
 function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
   // Game Flow
   const [gameState, setGameState] = useState<'intro' | 'playing' | 'gameover'>('intro');
