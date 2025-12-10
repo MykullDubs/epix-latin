@@ -1925,28 +1925,58 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
   );
 }
 
+// --- ENHANCED COLOSSEUM MODE ---
 function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
-  // Game Flow
+  // --- GAME STATE ---
   const [gameState, setGameState] = useState<'intro' | 'playing' | 'gameover'>('intro');
   const [lives, setLives] = useState(3);
   const [score, setScore] = useState(0);
   const [round, setRound] = useState(1);
   const [timeLeft, setTimeLeft] = useState(15);
+  const [combo, setCombo] = useState(0);
+  const [maxCombo, setMaxCombo] = useState(0);
+  const [shake, setShake] = useState(false);
   
-  // MECHANIC STATE
+  // --- MECHANIC STATE ---
   const [loadout, setLoadout] = useState<'slash' | 'shoot'>('slash');
-  
-  // Interaction State
   const [slashPath, setSlashPath] = useState<{x: number, y: number}[]>([]);
-  const [isInputActive, setIsInputActive] = useState(false); // Tracks dragging or readiness
-  const [shotMark, setShotMark] = useState<{x: number, y: number, accuracy: string} | null>(null); // Visual bullet hole
+  const [isInputActive, setIsInputActive] = useState(false);
+  const [particles, setParticles] = useState<{id: number, x: number, y: number, color: string, vx: number, vy: number}[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Data
+  // --- DATA ---
   const [currentCard, setCurrentCard] = useState<any>(null);
   const [options, setOptions] = useState<any[]>([]); 
   const [pool, setPool] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [feedbackText, setFeedbackText] = useState<{text: string, x: number, y: number} | null>(null);
+
+  // --- AUDIO ENGINE (Simple Synth) ---
+  const playSound = (type: 'hit' | 'miss' | 'slash' | 'shoot' | 'boss') => {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    if (type === 'hit') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(440, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+      osc.start(); osc.stop(ctx.currentTime + 0.1);
+    } else if (type === 'miss') {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(150, ctx.currentTime);
+      osc.frequency.linearRampToValueAtTime(50, ctx.currentTime + 0.3);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+      osc.start(); osc.stop(ctx.currentTime + 0.3);
+    }
+  };
 
   // 1. Initialize Pool
   useEffect(() => {
@@ -1965,14 +1995,46 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
     return () => clearInterval(timer);
   }, [timeLeft, gameState, selectedId]);
 
-  // 3. Round Logic
+  // 3. Particle System Loop
+  useEffect(() => {
+    if (particles.length === 0) return;
+    const interval = setInterval(() => {
+      setParticles(prev => prev.map(p => ({
+        ...p, x: p.x + p.vx, y: p.y + p.vy + 2, // Add gravity
+      })).filter(p => p.y < window.innerHeight && p.x > 0 && p.x < window.innerWidth));
+    }, 16);
+    return () => clearInterval(interval);
+  }, [particles]);
+
+  // 4. Helper: Trigger Screen Shake
+  const triggerShake = () => {
+    setShake(true);
+    setTimeout(() => setShake(false), 300);
+  };
+
+  // 5. Helper: Spawn Particles
+  const spawnParticles = (x: number, y: number, color: string, count = 10) => {
+    const newParticles = Array.from({ length: count }).map(() => ({
+      id: Math.random(),
+      x, y,
+      color,
+      vx: (Math.random() - 0.5) * 10,
+      vy: (Math.random() - 0.5) * 10 - 5
+    }));
+    setParticles(prev => [...prev, ...newParticles]);
+  };
+
+  // 6. Round Logic
   const nextRound = () => {
     if (lives <= 0) {
         setGameState('gameover');
-        if (score > 0) onXPUpdate(Math.ceil(score / 2), `Colosseum (${loadout})`);
+        // Bonus XP for streaks
+        const finalXP = Math.ceil(score / 5) + (maxCombo * 5); 
+        onXPUpdate(finalXP, `Colosseum (${loadout} - Wave ${round})`);
         return;
     }
 
+    // Select Card
     const target = pool[Math.floor(Math.random() * pool.length)];
     const others = pool.filter(c => c.id !== target.id);
     const distractors = others.sort(() => 0.5 - Math.random()).slice(0, 3);
@@ -1982,11 +2044,12 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
     setOptions(newOptions);
     setSelectedId(null);
     setSlashPath([]);
-    setShotMark(null);
+    setFeedbackText(null);
     
-    // Archer gets slightly less time (focus on aim), Gladiator gets speed
-    const maxTime = loadout === 'shoot' ? 10 : 15; 
-    setTimeLeft(Math.max(5, maxTime - Math.floor(round / 5)));
+    // Boss Round Logic (Every 5th round)
+    const isBoss = (round + 1) % 5 === 0;
+    const baseTime = loadout === 'shoot' ? 8 : 12;
+    setTimeLeft(isBoss ? 5 : Math.max(4, baseTime - Math.floor(round / 10)));
   };
 
   const handleStart = (selectedLoadout: 'slash' | 'shoot') => {
@@ -1994,13 +2057,13 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
       setLives(3);
       setScore(0);
       setRound(1);
+      setCombo(0);
       setGameState('playing');
       nextRound();
   };
 
-  // --- 4. INPUT ENGINES ---
+  // --- INPUT ENGINES ---
 
-  // A. SLASH LOGIC (Drag through)
   const handleSlashDown = (e: React.PointerEvent) => {
       if (loadout !== 'slash' || selectedId) return;
       setIsInputActive(true);
@@ -2014,11 +2077,19 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
       if (loadout !== 'slash' || !isInputActive || !containerRef.current) return;
       
       const rect = containerRef.current.getBoundingClientRect();
-      setSlashPath(prev => [...prev, { x: e.clientX - rect.left, y: e.clientY - rect.top }]);
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      setSlashPath(prev => [...prev, { x, y }]);
 
+      // Check collision
       const element = document.elementFromPoint(e.clientX, e.clientY);
       const answerId = element?.getAttribute('data-answer-id');
-      if (answerId) submitAnswer(answerId, 1); // 1.0 multiplier for slash
+      
+      if (answerId) {
+        // Visuals
+        spawnParticles(e.clientX, e.clientY, '#f43f5e', 8);
+        submitAnswer(answerId, 1, e.clientX, e.clientY);
+      }
   };
 
   const handleSlashUp = () => {
@@ -2028,158 +2099,193 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
       }
   };
 
-  // B. SHOOT LOGIC (Click/Tap with Precision)
   const handleShoot = (e: React.MouseEvent, answerId: string) => {
       if (loadout !== 'shoot' || selectedId) return;
       
-      // 1. Calculate Precision
       const targetRect = e.currentTarget.getBoundingClientRect();
       const clickX = e.clientX - targetRect.left;
       const clickY = e.clientY - targetRect.top;
-      
       const centerX = targetRect.width / 2;
       const centerY = targetRect.height / 2;
-      
-      // Pythagorean theorem for distance from center
       const distance = Math.sqrt(Math.pow(clickX - centerX, 2) + Math.pow(clickY - centerY, 2));
       
-      // 2. Determine Multiplier
       let multiplier = 1.0;
-      let label = "Hit";
+      if (distance < 15) multiplier = 2.0;
+      else if (distance < 40) multiplier = 1.5;
       
-      if (distance < 15) { multiplier = 2.0; label = "BULLSEYE!"; }
-      else if (distance < 40) { multiplier = 1.5; label = "Great Shot"; }
-      
-      // 3. Visual Feedback (Global Coordinates for the hole)
-      if (containerRef.current) {
-          const containerRect = containerRef.current.getBoundingClientRect();
-          setShotMark({
-              x: e.clientX - containerRect.left,
-              y: e.clientY - containerRect.top,
-              accuracy: label
-          });
-      }
-
-      submitAnswer(answerId, multiplier);
+      spawnParticles(e.clientX, e.clientY, '#fbbf24', 12); // Gold sparks for shooting
+      submitAnswer(answerId, multiplier, e.clientX, e.clientY);
   };
 
-  // C. SHARED SUBMISSION
-  const submitAnswer = (answerId: string, multiplier: number) => {
+  const submitAnswer = (answerId: string, precisionMult: number, inputX: number, inputY: number) => {
       setIsInputActive(false);
-      if (selectedId) return; // Prevent double submit
+      if (selectedId) return; 
       setSelectedId(answerId);
       
       const isCorrect = answerId === currentCard.id;
+      const isBoss = round % 5 === 0;
       
       setTimeout(() => {
           if (isCorrect) {
-              const basePoints = 10 + timeLeft;
-              setScore(s => s + Math.floor(basePoints * multiplier));
+              playSound('hit');
+              
+              // Scoring Math
+              const comboMult = 1 + (combo * 0.1); // 10% bonus per combo
+              const timeBonus = timeLeft * 2;
+              const bossMult = isBoss ? 2 : 1;
+              const points = Math.floor((10 + timeBonus) * precisionMult * comboMult * bossMult);
+              
+              setScore(s => s + points);
+              setCombo(c => {
+                const next = c + 1;
+                if (next > maxCombo) setMaxCombo(next);
+                return next;
+              });
               setRound(r => r + 1);
+
+              // Feedback Text
+              const words = ["HIT", "GOOD", "GREAT", "SUPERB", "DIVINE"];
+              const wordIndex = Math.min(Math.floor(precisionMult * 2) + Math.floor(combo/5), words.length - 1);
+              setFeedbackText({ text: `+${points} (${words[wordIndex]})`, x: inputX, y: inputY - 50 });
+
+              // Screen Shake on crits
+              if (precisionMult > 1.5 || combo > 5) triggerShake();
+
               nextRound();
           } else {
+              playSound('miss');
+              triggerShake();
+              setCombo(0);
               setLives(l => l - 1);
+              setFeedbackText({ text: "MISS!", x: inputX, y: inputY - 50 });
+              
               if (lives <= 1) { 
                   setGameState('gameover');
-                  onXPUpdate(Math.ceil(score / 2), `Colosseum (${loadout})`);
+                  const finalXP = Math.ceil(score / 5); 
+                  onXPUpdate(finalXP, `Colosseum (${loadout})`);
               } else {
                   nextRound();
               }
           }
-      }, loadout === 'shoot' ? 800 : 500); // Shoot gets longer pause to admire the shot
+      }, loadout === 'shoot' ? 600 : 300);
   };
 
   const handleWrongAnswer = () => {
+      playSound('miss');
+      triggerShake();
+      setCombo(0);
       setLives(l => l - 1);
       if (lives <= 1) {
           setGameState('gameover');
-          onXPUpdate(Math.ceil(score / 2), `Colosseum (${loadout})`);
+          onXPUpdate(Math.ceil(score / 5), `Colosseum (${loadout})`);
       } else {
           nextRound();
       }
   };
 
-  // --- RENDER HELPERS ---
+  // --- STYLE HELPERS ---
+  const isBossRound = round % 5 === 0;
+
   const getOptionStyle = (opt: any, index: number) => {
       const positions = [
-          "top-24 left-4", "top-24 right-4", "bottom-24 left-4", "bottom-24 right-4"
+          "top-[20%] left-4", "top-[20%] right-4", "bottom-[20%] left-4", "bottom-[20%] right-4"
       ];
       
-      let color = "bg-white/90 backdrop-blur-md text-slate-800 border-white/50";
+      let baseStyle = "absolute max-w-[45%] min-w-[140px] p-6 rounded-3xl border-4 shadow-xl flex items-center justify-center text-center font-bold text-sm transition-all duration-300 z-20 select-none active:scale-95";
       
       if (selectedId) {
-          if (opt.id === currentCard.id) color = "bg-emerald-500 text-white border-emerald-600 scale-110 shadow-[0_0_30px_rgba(16,185,129,0.5)]";
-          else if (opt.id === selectedId) color = "bg-rose-500 text-white border-rose-600 scale-90 opacity-50";
-          else color = "bg-slate-200/50 text-slate-400 opacity-30";
+          if (opt.id === currentCard.id) return `${baseStyle} ${positions[index]} bg-emerald-500 text-white border-emerald-600 scale-110 shadow-[0_0_50px_rgba(16,185,129,0.8)] z-30`;
+          else if (opt.id === selectedId) return `${baseStyle} ${positions[index]} bg-rose-500 text-white border-rose-600 scale-90 opacity-50`;
+          else return `${baseStyle} ${positions[index]} bg-slate-200/20 text-slate-400 opacity-20 border-white/10`;
       }
 
-      // Add target cursor for shooter mode
-      const cursor = loadout === 'shoot' ? 'cursor-crosshair' : 'cursor-default';
+      const hover = loadout === 'shoot' ? 'cursor-crosshair hover:scale-105' : 'cursor-default';
+      const border = isBossRound ? 'border-rose-500/50 bg-slate-900/90 text-rose-100' : 'border-white/50 bg-white/90 text-slate-800';
 
-      return `absolute ${positions[index]} max-w-[45%] min-w-[130px] p-6 rounded-3xl border-2 shadow-lg flex items-center justify-center text-center font-bold text-sm transition-all duration-300 z-20 select-none ${color} ${cursor} active:scale-95`;
-  };
-
-  const getPathString = () => {
-      if (slashPath.length === 0) return "";
-      return `M ${slashPath.map(p => `${p.x},${p.y}`).join(" L ")}`;
+      return `${baseStyle} ${positions[index]} ${border} ${hover}`;
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center font-sans overflow-hidden touch-none select-none">
+    <div className={`fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center font-sans overflow-hidden touch-none select-none ${shake ? 'animate-[shake_0.3s_ease-in-out]' : ''}`}>
         
-        {/* Background */}
-        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-800 to-slate-950"></div>
+        {/* Dynamic Background */}
+        <div className={`absolute inset-0 pointer-events-none transition-colors duration-1000 ${isBossRound ? 'bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-rose-900 via-slate-900 to-black' : 'bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-800 to-black'}`}></div>
+        {/* Animated Grid */}
+        <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] animate-[pulse_4s_infinite]"></div>
+
+        {/* Particles Layer */}
+        {particles.map(p => (
+            <div key={p.id} className="absolute rounded-full pointer-events-none" style={{
+                left: p.x, top: p.y, width: '6px', height: '6px', backgroundColor: p.color,
+                opacity: 0.8, transform: 'translate(-50%, -50%)', transition: 'opacity 0.5s'
+            }} />
+        ))}
+
+        {/* Feedback Text */}
+        {feedbackText && (
+            <div className="absolute z-50 text-4xl font-black italic text-amber-400 drop-shadow-[0_4px_0_rgba(0,0,0,1)] animate-[bounce_0.5s_ease-out] pointer-events-none whitespace-nowrap" 
+                 style={{ left: feedbackText.x, top: feedbackText.y, transform: 'translateX(-50%)' }}>
+                {feedbackText.text}
+            </div>
+        )}
 
         {gameState === 'intro' && (
-            <div className="bg-white max-w-sm w-full rounded-[2.5rem] p-8 text-center shadow-2xl relative z-10 animate-in zoom-in">
-                <h2 className="text-3xl font-black text-slate-800 mb-6 uppercase italic tracking-tighter">Choose Loadout</h2>
+            <div className="bg-white max-w-sm w-full rounded-[2.5rem] p-8 text-center shadow-[0_0_60px_rgba(255,255,255,0.2)] relative z-10 animate-in zoom-in border-4 border-slate-100">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 bg-slate-900 rounded-full border-4 border-white flex items-center justify-center text-rose-500 shadow-xl">
+                    <Swords size={40} />
+                </div>
+                <h2 className="text-4xl font-black text-slate-800 mb-2 mt-6 uppercase italic tracking-tighter">Colosseum</h2>
+                <p className="text-slate-400 text-sm font-bold uppercase tracking-widest mb-8">Choose Your Destiny</p>
                 
                 <div className="grid grid-cols-1 gap-4 mb-6">
-                    {/* OPTION 1: SLASHER */}
-                    <button onClick={() => handleStart('slash')} className="p-4 rounded-2xl border-2 border-slate-200 hover:border-rose-500 hover:bg-rose-50 transition-all group text-left flex items-center gap-4">
-                        <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <Swords size={24} />
-                        </div>
-                        <div>
-                            <h4 className="font-black text-slate-800 text-lg uppercase">Gladiator</h4>
-                            <p className="text-xs text-slate-500">Slash targets. Speed bonus.</p>
-                        </div>
+                    <button onClick={() => handleStart('slash')} className="p-4 rounded-2xl border-2 border-slate-100 hover:border-rose-500 hover:bg-rose-50 transition-all group text-left flex items-center gap-4 relative overflow-hidden">
+                        <div className="absolute right-0 top-0 bottom-0 w-2 bg-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform"><Swords size={24} /></div>
+                        <div><h4 className="font-black text-slate-800 text-lg uppercase">Gladiator</h4><p className="text-xs text-slate-500">Slash targets. Speed bonus.</p></div>
                     </button>
 
-                    {/* OPTION 2: SHOOTER */}
-                    <button onClick={() => handleStart('shoot')} className="p-4 rounded-2xl border-2 border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 transition-all group text-left flex items-center gap-4">
-                        <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <Crosshair size={24} />
-                        </div>
-                        <div>
-                            <h4 className="font-black text-slate-800 text-lg uppercase">Archer</h4>
-                            <p className="text-xs text-slate-500">Tap targets. Precision bonus.</p>
-                        </div>
+                    <button onClick={() => handleStart('shoot')} className="p-4 rounded-2xl border-2 border-slate-100 hover:border-indigo-500 hover:bg-indigo-50 transition-all group text-left flex items-center gap-4 relative overflow-hidden">
+                        <div className="absolute right-0 top-0 bottom-0 w-2 bg-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform"><Crosshair size={24} /></div>
+                        <div><h4 className="font-black text-slate-800 text-lg uppercase">Archer</h4><p className="text-xs text-slate-500">Tap targets. Precision bonus.</p></div>
                     </button>
                 </div>
 
-                <button onClick={onExit} className="w-full py-4 text-slate-400 font-bold uppercase tracking-widest text-xs hover:text-slate-600">
-                    Retreat
-                </button>
+                <button onClick={onExit} className="w-full py-4 text-slate-400 font-bold uppercase tracking-widest text-xs hover:text-slate-600">Return to Safety</button>
             </div>
         )}
 
         {gameState === 'playing' && currentCard && (
-            <div className="w-full max-w-lg h-full max-h-[800px] relative flex flex-col p-4">
+            <div className="w-full h-full relative flex flex-col p-4 max-w-2xl mx-auto">
                 
                 {/* HUD */}
-                <div className="flex justify-between items-center mb-8 relative z-30 pointer-events-none">
-                    <div className="flex gap-1">
+                <div className="flex justify-between items-start mb-4 relative z-30 pointer-events-none">
+                    {/* Lives */}
+                    <div className="flex gap-1 bg-black/40 backdrop-blur-md p-2 rounded-full border border-white/10">
                         {[...Array(3)].map((_, i) => (
-                            <Heart key={i} size={28} className={`${i < lives ? 'fill-rose-500 text-rose-500' : 'fill-slate-800 text-slate-700'} drop-shadow-md`} />
+                            <Heart key={i} size={24} className={`${i < lives ? 'fill-rose-500 text-rose-500 animate-pulse' : 'fill-slate-800 text-slate-700'}`} />
                         ))}
                     </div>
-                    <div className="text-center">
-                        <div className="w-32 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
-                            <div className="h-full bg-amber-400 transition-all duration-1000 ease-linear" style={{ width: `${(timeLeft / (loadout === 'shoot' ? 10 : 15)) * 100}%` }} />
+
+                    {/* Timer & Round */}
+                    <div className="flex flex-col items-center gap-2">
+                        <div className={`text-4xl font-black italic tracking-tighter drop-shadow-lg ${timeLeft <= 3 ? 'text-rose-500 animate-bounce' : 'text-white'}`}>
+                            {timeLeft}<span className="text-sm align-top opacity-50">s</span>
+                        </div>
+                        <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${isBossRound ? 'bg-rose-600 border-rose-400 text-white animate-pulse' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>
+                            {isBossRound ? '👹 BOSS ROUND' : `Wave ${round}`}
                         </div>
                     </div>
-                    <div className="font-black text-3xl text-white drop-shadow-md">{score}</div>
+
+                    {/* Score & Combo */}
+                    <div className="text-right">
+                        <div className="font-black text-3xl text-white drop-shadow-md leading-none">{score}</div>
+                        {combo > 1 && (
+                            <div className="text-amber-400 font-black italic text-lg animate-[pulse_0.2s_infinite]">
+                                {combo}x COMBO!
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* GAME ARENA */}
@@ -2191,48 +2297,34 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
                     onPointerUp={handleSlashUp}
                     onPointerLeave={handleSlashUp}
                 >
-                    {/* MECHANIC 1: SLASH TRAIL */}
+                    {/* SVG Slash Trail */}
                     {loadout === 'slash' && (
                         <svg className="absolute inset-0 w-full h-full pointer-events-none z-50 overflow-visible">
-                            <path d={getPathString()} fill="none" stroke="#f43f5e" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-[0_0_10px_rgba(244,63,94,0.8)]" />
-                            <path d={getPathString()} fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d={`M ${slashPath.map(p => `${p.x},${p.y}`).join(" L ")}`} fill="none" stroke="#f43f5e" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-[0_0_15px_rgba(244,63,94,1)]" />
+                            <path d={`M ${slashPath.map(p => `${p.x},${p.y}`).join(" L ")}`} fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                     )}
 
-                    {/* MECHANIC 2: SHOT MARKER */}
-                    {loadout === 'shoot' && shotMark && (
-                        <div 
-                            className="absolute z-50 pointer-events-none"
-                            style={{ left: shotMark.x, top: shotMark.y }}
-                        >
-                            {/* The Bullet Hole */}
-                            <div className="absolute -translate-x-1/2 -translate-y-1/2 w-6 h-6 bg-slate-900 border-2 border-white/50 rounded-full shadow-[inset_0_0_10px_rgba(0,0,0,1)] animate-in zoom-in duration-75"></div>
-                            {/* The Text Pop-up */}
-                            <div className="absolute -top-12 left-0 -translate-x-1/2 whitespace-nowrap text-amber-400 font-black text-xl italic tracking-tighter drop-shadow-lg animate-in slide-in-from-bottom-4 fade-in duration-300">
-                                {shotMark.accuracy}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Central Question */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-slate-900/80 backdrop-blur-md rounded-full border-4 border-slate-700 flex flex-col items-center justify-center text-center shadow-2xl z-10 pointer-events-none">
+                    {/* Central Target */}
+                    <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full border-8 flex flex-col items-center justify-center text-center shadow-[0_0_50px_rgba(0,0,0,0.5)] z-10 pointer-events-none transition-all duration-300 ${isBossRound ? 'bg-rose-900 border-rose-600 scale-110' : 'bg-slate-800/90 backdrop-blur-md border-slate-600'}`}>
+                        {isBossRound && <Skull size={40} className="text-rose-500 mb-2 animate-pulse"/>}
                         <span className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mb-1">Target</span>
-                        <h2 className="text-xl font-serif font-bold text-white leading-tight px-1 line-clamp-2">{currentCard.front}</h2>
+                        <h2 className="text-2xl font-serif font-bold text-white leading-tight px-4 line-clamp-3">{currentCard.front}</h2>
                     </div>
 
-                    {/* Answer Options */}
+                    {/* Options */}
                     {options.map((opt, i) => (
                         <div 
                             key={opt.id}
                             data-answer-id={opt.id}
-                            onClick={(e) => handleShoot(e, opt.id)} // ONLY TRIGGERS IN SHOOT MODE
+                            onClick={(e) => handleShoot(e, opt.id)}
                             className={getOptionStyle(opt, i)}
                         >
                             {opt.back}
-                            {/* Bullseye Visual Guide for Shooters */}
+                            {/* Target Reticle for Shooters */}
                             {loadout === 'shoot' && !selectedId && (
-                                <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-10 transition-opacity pointer-events-none">
-                                    <Target size={48} className="text-indigo-500"/>
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
+                                    <Crosshair size={32} className="text-indigo-500 animate-[spin_3s_linear_infinite]"/>
                                 </div>
                             )}
                         </div>
@@ -2242,15 +2334,44 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
         )}
 
         {gameState === 'gameover' && (
-            <div className="bg-white max-w-sm w-full rounded-[2.5rem] p-8 text-center shadow-2xl relative z-10 animate-in zoom-in">
-                <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-400">
+            <div className="bg-white max-w-sm w-full rounded-[2.5rem] p-8 text-center shadow-2xl relative z-10 animate-in zoom-in border-4 border-slate-200">
+                <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-400 border-4 border-white shadow-lg">
                     <Skull size={48} />
                 </div>
-                <h2 className="text-5xl font-black text-slate-800 mb-1">{score}</h2>
-                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-8">Final Score</p>
-                <button onClick={onExit} className="w-full py-4 text-slate-400 font-bold text-sm hover:text-slate-600">Leave Arena</button>
+                <h2 className="text-6xl font-black text-slate-800 mb-1 leading-none">{score}</h2>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-6">Final Score</p>
+                
+                <div className="flex justify-center gap-4 mb-8 text-sm font-bold text-slate-600">
+                    <div className="bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
+                        <span className="block text-[10px] text-slate-400 uppercase">Max Combo</span>
+                        <span className="text-xl text-amber-500">{maxCombo}x</span>
+                    </div>
+                    <div className="bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
+                        <span className="block text-[10px] text-slate-400 uppercase">Wave</span>
+                        <span className="text-xl text-indigo-500">{round}</span>
+                    </div>
+                </div>
+
+                <button onClick={onExit} className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 shadow-lg transition-transform hover:scale-[1.02] active:scale-95">Leave Arena</button>
             </div>
         )}
+        
+        {/* Style for Shake Animation */}
+        <style>{`
+            @keyframes shake {
+                0% { transform: translate(1px, 1px) rotate(0deg); }
+                10% { transform: translate(-1px, -2px) rotate(-1deg); }
+                20% { transform: translate(-3px, 0px) rotate(1deg); }
+                30% { transform: translate(3px, 2px) rotate(0deg); }
+                40% { transform: translate(1px, -1px) rotate(1deg); }
+                50% { transform: translate(-1px, 2px) rotate(-1deg); }
+                60% { transform: translate(-3px, 1px) rotate(0deg); }
+                70% { transform: translate(3px, 1px) rotate(-1deg); }
+                80% { transform: translate(-1px, -1px) rotate(1deg); }
+                90% { transform: translate(1px, 2px) rotate(0deg); }
+                100% { transform: translate(1px, -2px) rotate(-1deg); }
+            }
+        `}</style>
     </div>
   );
 }
