@@ -1545,8 +1545,13 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
   // View States
   const [isFlipped, setIsFlipped] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  
+  // --- NEW: Add Card State ---
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newCard, setNewCard] = useState({ front: '', back: '' });
+  const [saving, setSaving] = useState(false); // Used for both Save and Add actions
+
   const [viewMode, setViewMode] = useState<'study' | 'quiz'>('study');
-  const [saving, setSaving] = useState(false);
   
   // Navigation & Data State
   const [sessionCards, setSessionCards] = useState<any[]>([]);
@@ -1624,16 +1629,70 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
       }
   };
 
+  // --- NEW: HANDLE SAVE CURRENT CARD ---
+  const handleSaveCurrentCard = async (e: any) => {
+    e.stopPropagation(); // Prevent card flip
+    if (!user || !sessionCards[currentIndex] || saving) return;
+    
+    setSaving(true);
+    const cardToSave = sessionCards[currentIndex];
+    
+    try {
+        // Create a copy in the user's custom_cards collection
+        const cardRef = doc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'));
+        await setDoc(cardRef, {
+            ...cardToSave,
+            id: cardRef.id,
+            deckId: 'custom', // Force to custom deck
+            deckTitle: '✍️ Scriptorium',
+            savedFromWidget: true,
+            savedAt: Date.now()
+        });
+        alert("Card saved to your Scriptorium!");
+    } catch (err) {
+        console.error("Error saving card:", err);
+        alert("Failed to save card.");
+    } finally {
+        setSaving(false);
+    }
+  };
+
+  // --- NEW: HANDLE QUICK ADD CARD ---
+  const handleQuickAdd = async () => {
+    if (!user || !newCard.front || !newCard.back) return;
+    setSaving(true);
+    try {
+        const cardRef = doc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'));
+        await setDoc(cardRef, {
+            id: cardRef.id,
+            front: newCard.front,
+            back: newCard.back,
+            type: 'noun', // Default
+            deckId: 'custom',
+            deckTitle: '✍️ Scriptorium',
+            mastery: 0,
+            createdAt: Date.now()
+        });
+        setNewCard({ front: '', back: '' });
+        setShowAddModal(false);
+        alert("New card created!");
+    } catch (err) {
+        console.error("Error adding card:", err);
+        alert("Failed to add card.");
+    } finally {
+        setSaving(false);
+    }
+  };
+
   // --- HANDLERS ---
   const handleDeckSelect = async (deckId: string) => {
     const targetUid = user?.uid || auth.currentUser?.uid;
     if (!targetUid) return;
-    setSaving(true);
     try {
         await updateDoc(doc(db, 'artifacts', appId, 'users', targetUid, 'profile', 'main'), { widgetDeckId: deckId });
         setShowSettings(false);
         setIsFlipped(false);
-    } catch (e) { console.error(e); } finally { setSaving(false); }
+    } catch (e) { console.error(e); }
   };
 
   // --- NAVIGATION ---
@@ -1659,12 +1718,20 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
             <Zap size={16} className="text-amber-500" /> Daily Discovery
           </h3>
           <div className="flex gap-2">
+            {/* NEW: Add Button */}
+            <button 
+                onClick={() => setShowAddModal(true)} 
+                className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-indigo-100 transition-colors shadow-sm"
+            >
+                <Plus size={12}/> Add
+            </button>
+
             <button 
                 onClick={() => setViewMode(viewMode === 'study' ? 'quiz' : 'study')} 
                 className={`text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-colors shadow-sm ${viewMode === 'quiz' ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 border border-indigo-100'}`}
             >
                 {viewMode === 'study' ? <BrainCircuit size={12}/> : <Layers size={12}/>}
-                {viewMode === 'study' ? "Speed Quiz" : "Study Mode"}
+                {viewMode === 'study' ? "Quiz" : "Study"}
             </button>
             <button onClick={() => setShowSettings(!showSettings)} className="text-[10px] font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-slate-200 transition-colors shadow-sm">
                 {showSettings ? <X size={12}/> : <Settings size={12}/>}
@@ -1672,17 +1739,18 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
           </div>
       </div>
       
-      {showSettings ? (
-          <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl p-5 animate-in fade-in zoom-in duration-200 relative z-20">
+      {/* --- SETTINGS MODAL --- */}
+      {showSettings && (
+          <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl p-5 animate-in fade-in zoom-in duration-200 relative z-20 mb-4">
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 ml-1">Select Source Deck</h4>
               <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
-                  <button onClick={() => handleDeckSelect('all')} disabled={saving} className={`w-full p-4 rounded-xl text-left flex items-center gap-3 transition-all ${preferredDeckId === 'all' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-600'}`}>
+                  <button onClick={() => handleDeckSelect('all')} className={`w-full p-4 rounded-xl text-left flex items-center gap-3 transition-all ${preferredDeckId === 'all' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-600'}`}>
                       <div className={`p-2 rounded-full ${preferredDeckId === 'all' ? 'bg-white/20' : 'bg-white shadow-sm'}`}><Layers size={16}/></div>
                       <span className="font-bold text-sm">All Collections</span>
                       {preferredDeckId === 'all' && <CheckCircle2 size={18} className="ml-auto"/>}
                   </button>
                   {Object.entries(allDecks).map(([key, deck]: any) => (
-                      <button key={key} onClick={() => handleDeckSelect(key)} disabled={saving} className={`w-full p-3 rounded-xl text-left flex items-center gap-3 transition-all ${preferredDeckId === key ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-600'}`}>
+                      <button key={key} onClick={() => handleDeckSelect(key)} className={`w-full p-3 rounded-xl text-left flex items-center gap-3 transition-all ${preferredDeckId === key ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-600'}`}>
                           <div className={`p-2 rounded-full ${preferredDeckId === key ? 'bg-white/20' : 'bg-white shadow-sm'}`}><BookOpen size={16}/></div>
                           <div className="flex-1 overflow-hidden"><p className="font-bold text-sm truncate">{deck.title}</p><p className={`text-[10px] ${preferredDeckId === key ? 'text-indigo-200' : 'text-slate-400'}`}>{deck.cards?.length || 0} cards</p></div>
                           {preferredDeckId === key && <CheckCircle2 size={18} className="ml-auto"/>}
@@ -1690,7 +1758,44 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                   ))}
               </div>
           </div>
-      ) : viewMode === 'quiz' ? (
+      )}
+
+      {/* --- NEW: QUICK ADD MODAL --- */}
+      {showAddModal && (
+          <div className="bg-white rounded-[2rem] border-2 border-indigo-100 shadow-xl p-5 animate-in fade-in zoom-in duration-200 relative z-20 mb-4">
+              <div className="flex justify-between items-center mb-4">
+                  <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider ml-1">New Flashcard</h4>
+                  <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-rose-500"><X size={16}/></button>
+              </div>
+              <div className="space-y-3">
+                  <input 
+                    placeholder="Word / Phrase" 
+                    value={newCard.front}
+                    onChange={(e) => setNewCard({...newCard, front: e.target.value})}
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    autoFocus
+                  />
+                  <input 
+                    placeholder="Meaning / Translation" 
+                    value={newCard.back}
+                    onChange={(e) => setNewCard({...newCard, back: e.target.value})}
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <button 
+                    onClick={handleQuickAdd}
+                    disabled={!newCard.front || !newCard.back || saving}
+                    className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex justify-center items-center gap-2"
+                  >
+                    {saving ? <Loader size={16} className="animate-spin"/> : <PlusCircle size={16}/>}
+                    Save to My Deck
+                  </button>
+              </div>
+          </div>
+      )}
+
+      {/* --- CONTENT AREA --- */}
+      {!showSettings && !showAddModal && (
+        viewMode === 'quiz' ? (
           <div className="bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden relative h-56 flex flex-col">
               <div className="bg-indigo-50 px-6 py-3 flex justify-between items-center border-b border-indigo-100">
                   <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Question {currentIndex + 1} / {sessionCards.length}</span>
@@ -1712,7 +1817,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                   </div>
               </div>
           </div>
-      ) : currentCard ? (
+        ) : currentCard ? (
           /* STUDY MODE (Swipeable Stack) */
           <div className="relative h-56 w-full cursor-pointer group perspective-1000 touch-pan-y select-none" style={{ perspective: '1000px' }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}>
             <div className="absolute top-2 left-4 right-4 bottom-0 bg-indigo-300/40 rounded-[2rem] transform scale-95 translate-y-2 z-0" />
@@ -1724,7 +1829,16 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                   <div className="absolute top-[-20%] right-[-20%] w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
                   <div className="flex justify-between items-start relative z-10">
                       <span className="bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-white/10 flex items-center gap-1.5 shadow-sm"><Layers size={10} className="text-indigo-200" /> {currentIndex + 1} / {sessionCards.length}</span>
-                      <div className="p-2.5 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-90 border border-white/5 shadow-sm" onClick={(e) => { e.stopPropagation(); playAudio(currentCard.front); }}><Volume2 size={20} className="text-white"/></div>
+                      
+                      <div className="flex gap-2">
+                        {/* NEW: Save Card Button on Face */}
+                        <div className="p-2.5 bg-white/10 rounded-full hover:bg-white/30 transition-colors active:scale-90 border border-white/5 shadow-sm" onClick={handleSaveCurrentCard}>
+                            {saving ? <Loader size={20} className="animate-spin text-white"/> : <Save size={20} className="text-white"/>}
+                        </div>
+                        <div className="p-2.5 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-90 border border-white/5 shadow-sm" onClick={(e) => { e.stopPropagation(); playAudio(currentCard.front); }}>
+                            <Volume2 size={20} className="text-white"/>
+                        </div>
+                      </div>
                   </div>
                   <div className="text-center relative z-10 mt-2">
                       <h2 className="text-4xl font-serif font-bold mb-2 drop-shadow-md">{currentCard.front}</h2>
@@ -1733,40 +1847,38 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                   <div className="text-center relative z-10"><p className="text-[10px] uppercase font-bold text-indigo-200 tracking-widest animate-pulse flex items-center justify-center gap-2"><ArrowLeft size={10}/> Swipe <ArrowRight size={10}/></p></div>
               </div>
 
-              {/* BACK SIDE (SCROLLABLE FIX) */}
+              {/* BACK SIDE */}
               <div 
                 className="absolute inset-0 bg-white rounded-[2rem] border border-slate-200 flex flex-col shadow-sm overflow-hidden" 
                 style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
               >
-                 {/* Top Spacer for handle feel */}
-                 <div className="w-10 h-1 rounded-full bg-slate-100 mx-auto mt-4 shrink-0"></div>
-
-                 {/* Scrollable Content Area */}
-                 <div className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar min-h-0 flex flex-col items-center text-center">
-                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 bg-slate-50 px-2 py-1 rounded-md">Definition</span>
-                     
-                     <h3 className="text-xl font-bold text-slate-800 mb-4 leading-tight">{currentCard.back}</h3>
-                     
-                     {currentCard.usage?.sentence && (
-                       <div className="bg-slate-50 p-4 rounded-xl w-full border border-slate-100 text-left relative shrink-0">
-                         <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 rounded-l-xl"></div>
-                         <p className="text-sm text-slate-600 italic font-serif leading-relaxed pl-2">"{currentCard.usage.sentence}"</p>
-                       </div>
-                     )}
-                 </div>
-                 
-                 {/* Fixed Footer */}
-                 <div className="p-3 border-t border-slate-50 text-center shrink-0">
-                    <div className="text-[10px] text-slate-300 font-bold uppercase flex items-center justify-center gap-2">
-                        <ArrowLeft size={10}/> Next Card <ArrowRight size={10}/>
-                    </div>
-                 </div>
+                  <div className="w-10 h-1 rounded-full bg-slate-100 mx-auto mt-4 shrink-0"></div>
+                  <div className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar min-h-0 flex flex-col items-center text-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 bg-slate-50 px-2 py-1 rounded-md">Definition</span>
+                      <h3 className="text-xl font-bold text-slate-800 mb-4 leading-tight">{currentCard.back}</h3>
+                      {currentCard.usage?.sentence && (
+                        <div className="bg-slate-50 p-4 rounded-xl w-full border border-slate-100 text-left relative shrink-0">
+                          <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 rounded-l-xl"></div>
+                          <p className="text-sm text-slate-600 italic font-serif leading-relaxed pl-2">"{currentCard.usage.sentence}"</p>
+                        </div>
+                      )}
+                  </div>
+                  <div className="p-3 border-t border-slate-50 text-center shrink-0">
+                     <div className="text-[10px] text-slate-300 font-bold uppercase flex items-center justify-center gap-2">
+                         <ArrowLeft size={10}/> Next Card <ArrowRight size={10}/>
+                     </div>
+                  </div>
               </div>
 
             </div>
           </div>
-      ) : (
-          <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] p-8 text-center flex flex-col items-center justify-center h-56"><div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 text-slate-300"><Layers size={24} /></div><p className="text-slate-500 font-bold mb-1">No cards in this deck.</p><button onClick={() => setShowSettings(true)} className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all">Change Source</button></div>
+        ) : (
+          <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] p-8 text-center flex flex-col items-center justify-center h-56">
+            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 text-slate-300"><Layers size={24} /></div>
+            <p className="text-slate-500 font-bold mb-1">No cards in this deck.</p>
+            <button onClick={() => setShowSettings(true)} className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all">Change Source</button>
+          </div>
+        )
       )}
     </div>
   );
