@@ -2223,8 +2223,7 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
     </div>
   );
 }
-function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck, allDecks, user }: any) {
-  const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
+function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck, allDecks, user, onSaveCard }: any) { // <--- Add onSaveCard here  const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [showLevelModal, setShowLevelModal] = useState(false);
   const [libraryExpanded, setLibraryExpanded] = useState(false);
   
@@ -2371,8 +2370,12 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
     </button>
     
     {/* --- 2. DAILY DISCOVERY --- */}
-    <DailyDiscoveryWidget allDecks={allDecks} user={user} userData={userData} />
-    
+<DailyDiscoveryWidget 
+   allDecks={allDecks} 
+   user={user} 
+   userData={userData} 
+   onSaveCard={onSaveCard} // <--- Pass it down here
+/>    
     {/* --- 3. THE COLOSSEUM BANNER --- */}
     <div className="px-6 mt-6">
         <button onClick={() => setShowColosseum(true)} className="w-full p-1 rounded-[2.5rem] bg-gradient-to-r from-rose-500 via-orange-500 to-rose-600 shadow-xl shadow-rose-200 hover:scale-[1.02] active:scale-95 transition-all group relative overflow-hidden">
@@ -4065,7 +4068,7 @@ const renderStudentView = () => {
     
     // 5. Main Tab Navigation
     switch (activeTab) {
-case 'home': return <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} />;      case 'flashcards': 
+case 'home': return <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} onSaveCard={handleCreateCard} />;      case 'flashcards': 
           const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
           const deckToLoad = assignedDeck || allDecks[selectedDeckKey];
           return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} activeDeckOverride={deckToLoad} onComplete={handleFinishLesson} />;
