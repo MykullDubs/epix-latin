@@ -828,8 +828,11 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   // --- STATE ---
   const [viewState, setViewState] = useState<'browsing' | 'playing'>(activeDeckOverride ? 'playing' : 'browsing');
   
-  // -- NEW: Filter State --
+  // -- Filter State --
   const [filterLang, setFilterLang] = useState('All');
+
+  // -- Notification State --
+  const [completionMsg, setCompletionMsg] = useState<string | null>(null);
 
   // Player State
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -846,28 +849,20 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   // --- DERIVED DATA ---
   const currentDeck = activeDeckOverride || allDecks[selectedDeckKey];
   
-  // 1. Process Decks & Detect Languages
   const processedDecks = useMemo(() => {
       return Object.entries(allDecks)
         .filter(([_, deck]: any) => deck.cards && deck.cards.length > 0)
         .map(([key, deck]: any) => {
-            // Logic: Use deck's explicit language, or fallback to the first card's language, or default to 'General'
             const detectedLang = deck.targetLanguage || deck.cards[0]?.targetLanguage || 'General';
-            return {
-                id: key,
-                ...deck,
-                language: detectedLang
-            };
+            return { id: key, ...deck, language: detectedLang };
         });
   }, [allDecks]);
 
-  // 2. Extract Unique Languages for the Filter Bar
   const availableLanguages = useMemo(() => {
       const langs = new Set(processedDecks.map(d => d.language));
       return ['All', ...Array.from(langs).sort()];
   }, [processedDecks]);
 
-  // 3. Apply Filter
   const filteredDecks = useMemo(() => {
       if (filterLang === 'All') return processedDecks;
       return processedDecks.filter(d => d.language === filterLang);
@@ -875,7 +870,6 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
 
   const totalCardsAvailable = processedDecks.reduce((acc, deck: any) => acc + deck.cards.length, 0);
 
-  // Cards for the active session
   const deckCards = currentDeck?.cards || [];
   const card = deckCards[currentIndex];
   const theme = card ? (TYPE_COLORS[card.type] || TYPE_COLORS.noun) : TYPE_COLORS.noun;
@@ -890,26 +884,48 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
 
   const handleQuickStudy = () => {
     if (processedDecks.length === 0) return;
-    // Sort by size and pick the largest
     const largestDeck = processedDecks.sort((a: any, b: any) => b.cards.length - a.cards.length)[0];
     launchDeck(largestDeck.id);
   };
 
-  // Navigation
+  // --- GAME END HANDLER (UPDATED) ---
+  const handleGameEnd = (data: any) => { 
+      let xp = 0;
+      let message = "";
+
+      // 1. Calculate Score & XP based on game type
+      if (typeof data === 'number') {
+          // Matching Game returns raw XP
+          xp = data;
+          message = `Matching Complete! +${xp} XP`;
+      } else {
+          // Quiz Game returns { score, total }
+          const percentage = Math.round((data.score / data.total) * 100);
+          xp = Math.round((data.score / data.total) * 50) + 10;
+          message = `Score: ${percentage}% (${data.score}/${data.total}) • +${xp} XP`;
+      }
+
+      // 2. Trigger the Toast
+      setCompletionMsg(message);
+
+      // 3. Save Data (if assigned)
+      if (activeDeckOverride && onComplete) {
+          onComplete(activeDeckOverride.id, xp, currentDeck.title, data.score !== undefined ? data : null); 
+      } else {
+          // 4. Return to Hub
+          setViewState('browsing');
+      }
+  };
+
+  // ... (Keep existing Navigation Handlers: handleNext, handlePrev, playAudio, onPointerDown/Move/Up) ...
   const handleNext = useCallback(() => {
     setXrayMode(false); setIsFlipped(false); setSwipeDirection('left');
-    setTimeout(() => {
-        setCurrentIndex((prev) => (prev + 1) % deckCards.length);
-        setSwipeDirection(null);
-    }, 200);
+    setTimeout(() => { setCurrentIndex((prev) => (prev + 1) % deckCards.length); setSwipeDirection(null); }, 200);
   }, [deckCards.length]);
 
   const handlePrev = useCallback(() => {
     setXrayMode(false); setIsFlipped(false); setSwipeDirection('right');
-    setTimeout(() => {
-        setCurrentIndex((prev) => (prev - 1 + deckCards.length) % deckCards.length);
-        setSwipeDirection(null);
-    }, 200);
+    setTimeout(() => { setCurrentIndex((prev) => (prev - 1 + deckCards.length) % deckCards.length); setSwipeDirection(null); }, 200);
   }, [deckCards.length]);
 
   const playAudio = useCallback((text: string) => {
@@ -931,19 +947,13 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
     setDragStartX(null); setDragEndX(null);
   };
 
-  const handleGameEnd = (data: any) => { 
-      const xp = typeof data === 'number' ? data : (Math.round((data.score / data.total) * 50) + 10); 
-      alert(`Complete! You earned ${xp} XP.`); 
-      if (activeDeckOverride && onComplete) {
-          onComplete(activeDeckOverride.id, xp, currentDeck.title, data.score !== undefined ? data : null); 
-      } else {
-          setViewState('browsing');
-      }
-  };
+  // --- RENDER ---
+  return (
+    <>
+      {/* 1. TOAST COMPONENT INJECTION */}
+      {completionMsg && <Toast message={completionMsg} onClose={() => setCompletionMsg(null)} />}
 
-  // --- VIEW 1: THE PRACTICE HUB (Browsing Mode) ---
-  if (viewState === 'browsing') {
-      return (
+      {viewState === 'browsing' ? (
         <div className="h-full bg-slate-50 flex flex-col overflow-y-auto pb-24 animate-in fade-in">
             {/* Header */}
             <div className="bg-white p-6 pb-4 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 relative z-10 sticky top-0">
@@ -954,7 +964,6 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                     </div>
                 </div>
 
-                {/* Quick Action */}
                 <button 
                     onClick={handleQuickStudy}
                     disabled={totalCardsAvailable === 0}
@@ -976,7 +985,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                     </div>
                 </button>
 
-                {/* --- NEW: LANGUAGE FILTER BAR --- */}
+                {/* Filter Bar */}
                 {availableLanguages.length > 1 && (
                     <div className="flex gap-2 overflow-x-auto pb-2 -mx-6 px-6 custom-scrollbar">
                         {availableLanguages.map(lang => (
@@ -1019,7 +1028,6 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                                 onClick={() => launchDeck(deck.id)}
                                 className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all flex items-center gap-4 group text-left relative overflow-hidden"
                             >
-                                {/* Language Stripe Indicator */}
                                 <div className={`absolute left-0 top-0 bottom-0 w-1 ${
                                     deck.language === 'Latin' ? 'bg-purple-500' : 
                                     deck.language === 'Spanish' ? 'bg-orange-500' :
@@ -1052,101 +1060,99 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                 )}
             </div>
         </div>
-      );
-  }
-
-  // --- VIEW 2: THE PLAYER (Active Mode) ---
-  // (Keep the rest of your Player logic exactly as it was in the previous step)
-  return (
-    <div className="h-[calc(100vh-80px)] flex flex-col bg-slate-50 pb-6 relative overflow-hidden">
-      <Header 
-        title={currentDeck?.title || "Deck"} 
-        subtitle={`${currentIndex + 1} / ${deckCards.length} Cards`} 
-        sticky={false}
-        onClickTitle={() => setViewState('browsing')} 
-        rightAction={
-            <div className="flex items-center gap-2">
-                <button onClick={() => setViewState('browsing')} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 text-slate-500">
-                    <X size={20} />
-                </button>
-            </div>
-        } 
-      />
-      
-      <div className="px-6 mt-2 mb-4 z-10">
-          <div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto shadow-inner">
-              {['study', 'quiz', 'match'].map((mode) => (
-                  <button key={mode} onClick={() => setGameMode(mode)} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg capitalize transition-all ${gameMode === mode ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>
-                      {mode}
-                  </button>
-              ))}
-          </div>
-      </div>
-      
-      <div className="flex-1 relative w-full overflow-hidden">
-          {gameMode === 'match' && <div className="h-full overflow-y-auto"><MatchingGame deckCards={deckCards} onGameEnd={handleGameEnd} /></div>}
-          {gameMode === 'quiz' && <div className="h-full overflow-y-auto"><QuizGame deckCards={deckCards} onGameEnd={handleGameEnd} /></div>}
+      ) : (
+        /* PLAYER VIEW */
+        <div className="h-[calc(100vh-80px)] flex flex-col bg-slate-50 pb-6 relative overflow-hidden">
+          <Header 
+            title={currentDeck?.title || "Deck"} 
+            subtitle={`${currentIndex + 1} / ${deckCards.length} Cards`} 
+            sticky={false}
+            onClickTitle={() => setViewState('browsing')} 
+            rightAction={
+                <div className="flex items-center gap-2">
+                    <button onClick={() => setViewState('browsing')} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 text-slate-500">
+                        <X size={20} />
+                    </button>
+                </div>
+            } 
+          />
           
-          {gameMode === 'study' && card && (
-            <div 
-                className="flex-1 flex flex-col items-center justify-center px-4 py-2 perspective-1000 relative z-0 h-full" 
-                style={{ perspective: '1000px', touchAction: 'pan-y' }}
-                onPointerDown={onPointerDown}
-                onPointerMove={onPointerMove}
-                onPointerUp={onPointerUp}
-            >
+          <div className="px-6 mt-2 mb-4 z-10">
+              <div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto shadow-inner">
+                  {['study', 'quiz', 'match'].map((mode) => (
+                      <button key={mode} onClick={() => setGameMode(mode)} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg capitalize transition-all ${gameMode === mode ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>
+                          {mode}
+                      </button>
+                  ))}
+              </div>
+          </div>
+          
+          <div className="flex-1 relative w-full overflow-hidden">
+              {gameMode === 'match' && <div className="h-full overflow-y-auto"><MatchingGame deckCards={deckCards} onGameEnd={handleGameEnd} /></div>}
+              {gameMode === 'quiz' && <div className="h-full overflow-y-auto"><QuizGame deckCards={deckCards} onGameEnd={handleGameEnd} /></div>}
+              
+              {gameMode === 'study' && card && (
                 <div 
-                    className={`relative w-full h-full max-h-[520px] cursor-pointer shadow-2xl rounded-[2rem] transition-transform duration-300 ${swipeDirection === 'left' ? '-translate-x-full opacity-0 rotate-[-10deg]' : swipeDirection === 'right' ? 'translate-x-full opacity-0 rotate-[10deg]' : 'translate-x-0 opacity-100'}`}
-                    style={{ transformStyle: 'preserve-3d', transform: isFlipped && !swipeDirection ? 'rotateY(180deg)' : swipeDirection ? undefined : 'rotateY(0deg)' }}
-                    onClick={() => !xrayMode && setIsFlipped(!isFlipped)}
+                    className="flex-1 flex flex-col items-center justify-center px-4 py-2 perspective-1000 relative z-0 h-full" 
+                    style={{ perspective: '1000px', touchAction: 'pan-y' }}
+                    onPointerDown={onPointerDown}
+                    onPointerMove={onPointerMove}
+                    onPointerUp={onPointerUp}
                 >
-                    <div className="absolute inset-0 bg-white rounded-[2rem] border border-slate-100 overflow-hidden flex flex-col select-none" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
-                        <div className={`h-3 w-full ${xrayMode ? theme.bg.replace('50', '500') : 'bg-slate-100'} transition-colors duration-500`} />
-                        <div className="flex-1 flex flex-col p-6 relative">
-                            <div className="flex justify-between items-start mb-8">
-                                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${theme.bg} ${theme.text} border ${theme.border}`}>{card.type}</span>
-                                <span className="text-xs font-mono text-slate-300">{currentIndex + 1}/{deckCards.length}</span>
-                            </div>
-                            <div className="flex-1 flex flex-col items-center justify-center mt-[-40px]">
-                                <h2 className="text-4xl sm:text-5xl font-serif font-bold text-slate-900 text-center mb-6 leading-tight select-none">{card.front}</h2>
-                                <div onClick={(e) => { e.stopPropagation(); playAudio(card.front); }} className="flex items-center gap-3 bg-slate-50 pl-3 pr-5 py-2 rounded-full border border-slate-200 cursor-pointer hover:bg-indigo-50 hover:border-indigo-200 transition-colors group active:scale-95 shadow-sm">
-                                    <Volume2 size={16} className="text-indigo-400"/>
-                                    <span className="font-serif text-slate-500 text-lg tracking-wide group-hover:text-indigo-800 select-none">{card.ipa || "/.../"}</span>
+                    <div 
+                        className={`relative w-full h-full max-h-[520px] cursor-pointer shadow-2xl rounded-[2rem] transition-transform duration-300 ${swipeDirection === 'left' ? '-translate-x-full opacity-0 rotate-[-10deg]' : swipeDirection === 'right' ? 'translate-x-full opacity-0 rotate-[10deg]' : 'translate-x-0 opacity-100'}`}
+                        style={{ transformStyle: 'preserve-3d', transform: isFlipped && !swipeDirection ? 'rotateY(180deg)' : swipeDirection ? undefined : 'rotateY(0deg)' }}
+                        onClick={() => !xrayMode && setIsFlipped(!isFlipped)}
+                    >
+                        <div className="absolute inset-0 bg-white rounded-[2rem] border border-slate-100 overflow-hidden flex flex-col select-none" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
+                            <div className={`h-3 w-full ${xrayMode ? theme.bg.replace('50', '500') : 'bg-slate-100'} transition-colors duration-500`} />
+                            <div className="flex-1 flex flex-col p-6 relative">
+                                <div className="flex justify-between items-start mb-8">
+                                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${theme.bg} ${theme.text} border ${theme.border}`}>{card.type}</span>
+                                    <span className="text-xs font-mono text-slate-300">{currentIndex + 1}/{deckCards.length}</span>
                                 </div>
-                            </div>
-                            <div className={`absolute inset-x-0 bottom-0 bg-white/95 backdrop-blur-xl border-t border-slate-100 transition-all duration-300 flex flex-col overflow-hidden z-20 ${xrayMode ? 'h-[75%] opacity-100 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)]' : 'h-0 opacity-0'}`} onClick={e => e.stopPropagation()}>
-                                <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
-                                    <div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Puzzle size={14} /> Morphology</h4><div className="flex flex-wrap gap-2">{Array.isArray(card.morphology) && card.morphology.map((m: any, i: number) => (<div key={i} className="flex flex-col items-center bg-slate-50 border border-slate-200 rounded-lg p-2 min-w-[60px]"><span className={`font-bold text-lg ${m.type === 'root' ? 'text-indigo-600' : 'text-slate-700'}`}>{m.part}</span><span className="text-slate-400 text-[9px] font-medium uppercase mt-1 text-center max-w-[80px] leading-tight">{m.meaning}</span></div>))}</div></div>
-                                    <div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><MessageSquare size={14} /> Context</h4><div className={`p-4 rounded-xl border ${theme.border} ${theme.bg}`}><p className="text-slate-800 font-serif font-medium text-lg mb-1">"{card.usage?.sentence || '...'}"</p><p className={`text-sm ${theme.text} opacity-80 italic`}>{card.usage?.translation || '...'}</p></div></div>
-                                    <div className="flex gap-2">{card.grammar_tags?.map((tag: string, i: number) => (<span key={i} className="px-2 py-1 bg-slate-100 text-slate-500 text-[10px] font-bold uppercase rounded border border-slate-200">{tag}</span>))}</div>
+                                <div className="flex-1 flex flex-col items-center justify-center mt-[-40px]">
+                                    <h2 className="text-4xl sm:text-5xl font-serif font-bold text-slate-900 text-center mb-6 leading-tight select-none">{card.front}</h2>
+                                    <div onClick={(e) => { e.stopPropagation(); playAudio(card.front); }} className="flex items-center gap-3 bg-slate-50 pl-3 pr-5 py-2 rounded-full border border-slate-200 cursor-pointer hover:bg-indigo-50 hover:border-indigo-200 transition-colors group active:scale-95 shadow-sm">
+                                        <Volume2 size={16} className="text-indigo-400"/>
+                                        <span className="font-serif text-slate-500 text-lg tracking-wide group-hover:text-indigo-800 select-none">{card.ipa || "/.../"}</span>
+                                    </div>
                                 </div>
+                                <div className={`absolute inset-x-0 bottom-0 bg-white/95 backdrop-blur-xl border-t border-slate-100 transition-all duration-300 flex flex-col overflow-hidden z-20 ${xrayMode ? 'h-[75%] opacity-100 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)]' : 'h-0 opacity-0'}`} onClick={e => e.stopPropagation()}>
+                                    <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
+                                        <div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Puzzle size={14} /> Morphology</h4><div className="flex flex-wrap gap-2">{Array.isArray(card.morphology) && card.morphology.map((m: any, i: number) => (<div key={i} className="flex flex-col items-center bg-slate-50 border border-slate-200 rounded-lg p-2 min-w-[60px]"><span className={`font-bold text-lg ${m.type === 'root' ? 'text-indigo-600' : 'text-slate-700'}`}>{m.part}</span><span className="text-slate-400 text-[9px] font-medium uppercase mt-1 text-center max-w-[80px] leading-tight">{m.meaning}</span></div>))}</div></div>
+                                        <div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><MessageSquare size={14} /> Context</h4><div className={`p-4 rounded-xl border ${theme.border} ${theme.bg}`}><p className="text-slate-800 font-serif font-medium text-lg mb-1">"{card.usage?.sentence || '...'}"</p><p className={`text-sm ${theme.text} opacity-80 italic`}>{card.usage?.translation || '...'}</p></div></div>
+                                        <div className="flex gap-2">{card.grammar_tags?.map((tag: string, i: number) => (<span key={i} className="px-2 py-1 bg-slate-100 text-slate-500 text-[10px] font-bold uppercase rounded border border-slate-200">{tag}</span>))}</div>
+                                    </div>
+                                </div>
+                                {!xrayMode && (<div className="mt-auto text-center"><p className="text-xs text-slate-300 font-bold uppercase tracking-widest animate-pulse flex items-center justify-center gap-2"><ArrowLeft size={10}/> Swipe <ArrowRight size={10}/></p></div>)}
                             </div>
-                            {!xrayMode && (<div className="mt-auto text-center"><p className="text-xs text-slate-300 font-bold uppercase tracking-widest animate-pulse flex items-center justify-center gap-2"><ArrowLeft size={10}/> Swipe <ArrowRight size={10}/></p></div>)}
                         </div>
-                    </div>
 
-                    <div className="absolute inset-0 bg-slate-900 rounded-[2rem] shadow-xl flex flex-col items-center justify-center p-8 text-white relative overflow-hidden select-none" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
-                        <div className="absolute top-[-50%] left-[-50%] w-full h-full bg-indigo-500/20 rounded-full blur-[100px] pointer-events-none"></div>
-                        <div className="relative z-10 flex flex-col items-center">
-                            <span className="text-indigo-300 text-xs font-bold uppercase tracking-widest mb-6 border-b border-indigo-500/30 pb-2">Translation</span>
-                            <h2 className="text-3xl md:text-4xl font-bold text-center mb-8 leading-tight">{card.back}</h2>
+                        <div className="absolute inset-0 bg-slate-900 rounded-[2rem] shadow-xl flex flex-col items-center justify-center p-8 text-white relative overflow-hidden select-none" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
+                            <div className="absolute top-[-50%] left-[-50%] w-full h-full bg-indigo-500/20 rounded-full blur-[100px] pointer-events-none"></div>
+                            <div className="relative z-10 flex flex-col items-center">
+                                <span className="text-indigo-300 text-xs font-bold uppercase tracking-widest mb-6 border-b border-indigo-500/30 pb-2">Translation</span>
+                                <h2 className="text-3xl md:text-4xl font-bold text-center mb-8 leading-tight">{card.back}</h2>
+                            </div>
                         </div>
                     </div>
                 </div>
+              )}
+          </div>
+
+          {gameMode === 'study' && card && (
+            <div className="px-6 pb-4 pt-2">
+              <div className="flex items-center justify-between max-w-sm mx-auto">
+                <button onClick={handlePrev} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-rose-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all hover:bg-rose-50"><X size={28} strokeWidth={2.5} /></button>
+                <button onClick={(e) => { e.stopPropagation(); if(isFlipped) setIsFlipped(false); setXrayMode(!xrayMode); }} className={`h-20 w-20 rounded-2xl flex flex-col items-center justify-center shadow-lg transition-all duration-300 border-2 ${xrayMode ? 'bg-indigo-600 border-indigo-600 text-white translate-y-[-8px] shadow-indigo-200' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'}`}><Search size={28} strokeWidth={xrayMode ? 3 : 2} className={xrayMode ? 'animate-pulse' : ''} /><span className="text-[10px] font-black tracking-wider mt-1">X-RAY</span></button>
+                <button onClick={handleNext} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-emerald-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all hover:bg-emerald-50"><Check size={28} strokeWidth={2.5} /></button>
+              </div>
             </div>
           )}
-      </div>
-
-      {gameMode === 'study' && card && (
-        <div className="px-6 pb-4 pt-2">
-          <div className="flex items-center justify-between max-w-sm mx-auto">
-            <button onClick={handlePrev} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-rose-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all hover:bg-rose-50"><X size={28} strokeWidth={2.5} /></button>
-            <button onClick={(e) => { e.stopPropagation(); if(isFlipped) setIsFlipped(false); setXrayMode(!xrayMode); }} className={`h-20 w-20 rounded-2xl flex flex-col items-center justify-center shadow-lg transition-all duration-300 border-2 ${xrayMode ? 'bg-indigo-600 border-indigo-600 text-white translate-y-[-8px] shadow-indigo-200' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'}`}><Search size={28} strokeWidth={xrayMode ? 3 : 2} className={xrayMode ? 'animate-pulse' : ''} /><span className="text-[10px] font-black tracking-wider mt-1">X-RAY</span></button>
-            <button onClick={handleNext} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-emerald-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all hover:bg-emerald-50"><Check size={28} strokeWidth={2.5} /></button>
-          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 function LessonView({ lesson, onFinish }: any) {
