@@ -1918,21 +1918,6 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
     </div>
   );
 }
-// --- ASSETS ---
-// Ensure you have these imported from 'lucide-react':
-// Swords, Heart, Skull, Zap, Shield, Hourglass, Flame, Crown
-
-// --- ASSETS ---
-// Import these from 'lucide-react':
-// Swords, Heart, Skull, Zap, Shield, Hourglass, Target, Crown
-
-// --- ASSETS ---
-// Import these from 'lucide-react':
-// Swords, Heart, Skull, Zap, Shield, Hourglass, Target, Crown
-
-// --- ASSETS ---
-// Add 'Crosshair' to your imports
-// import { Swords, Heart, Skull, Zap, Shield, Hourglass, Target, Crown, Crosshair } from 'lucide-react';
 
 function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
   // Game Flow
