@@ -1546,10 +1546,10 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   
-  // --- NEW: Add Card State ---
+  // --- Add Card State ---
   const [showAddModal, setShowAddModal] = useState(false);
   const [newCard, setNewCard] = useState({ front: '', back: '' });
-  const [saving, setSaving] = useState(false); // Used for both Save and Add actions
+  const [saving, setSaving] = useState(false);
 
   const [viewMode, setViewMode] = useState<'study' | 'quiz'>('study');
   
@@ -1629,45 +1629,76 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
       }
   };
 
-  // --- NEW: HANDLE SAVE CURRENT CARD ---
+  // --- FIX 1: ROBUST SAVE FUNCTION ---
   const handleSaveCurrentCard = async (e: any) => {
-    e.stopPropagation(); // Prevent card flip
-    if (!user || !sessionCards[currentIndex] || saving) return;
+    e.stopPropagation(); // Stop the card from flipping
+    console.log("Attempting to save card..."); // DEBUG
+
+    // Fallback to auth.currentUser if the prop is stale
+    const currentUser = user || auth.currentUser;
+
+    if (!currentUser) {
+        alert("You must be logged in to save cards.");
+        return;
+    }
+    
+    if (!sessionCards[currentIndex]) {
+        console.error("No card selected");
+        return;
+    }
+
+    if (saving) return;
     
     setSaving(true);
     const cardToSave = sessionCards[currentIndex];
     
     try {
+        console.log("Saving to user:", currentUser.uid); // DEBUG
         // Create a copy in the user's custom_cards collection
-        const cardRef = doc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'));
+        const cardRef = doc(collection(db, 'artifacts', appId, 'users', currentUser.uid, 'custom_cards'));
+        
         await setDoc(cardRef, {
             ...cardToSave,
             id: cardRef.id,
-            deckId: 'custom', // Force to custom deck
+            deckId: 'custom', 
             deckTitle: '✍️ Scriptorium',
             savedFromWidget: true,
             savedAt: Date.now()
         });
+        
+        console.log("Save success!"); // DEBUG
         alert("Card saved to your Scriptorium!");
-    } catch (err) {
+    } catch (err: any) {
         console.error("Error saving card:", err);
-        alert("Failed to save card.");
+        alert("Failed to save: " + err.message);
     } finally {
         setSaving(false);
     }
   };
 
-  // --- NEW: HANDLE QUICK ADD CARD ---
+  // --- FIX 2: ROBUST QUICK ADD FUNCTION ---
   const handleQuickAdd = async () => {
-    if (!user || !newCard.front || !newCard.back) return;
+    console.log("Attempting quick add..."); // DEBUG
+    const currentUser = user || auth.currentUser;
+
+    if (!currentUser) {
+        alert("Error: User not found.");
+        return;
+    }
+
+    if (!newCard.front || !newCard.back) {
+        alert("Please fill in both fields.");
+        return;
+    }
+
     setSaving(true);
     try {
-        const cardRef = doc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'));
+        const cardRef = doc(collection(db, 'artifacts', appId, 'users', currentUser.uid, 'custom_cards'));
         await setDoc(cardRef, {
             id: cardRef.id,
             front: newCard.front,
             back: newCard.back,
-            type: 'noun', // Default
+            type: 'noun', 
             deckId: 'custom',
             deckTitle: '✍️ Scriptorium',
             mastery: 0,
@@ -1675,10 +1706,10 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
         });
         setNewCard({ front: '', back: '' });
         setShowAddModal(false);
-        alert("New card created!");
-    } catch (err) {
+        alert("New card created in Scriptorium!");
+    } catch (err: any) {
         console.error("Error adding card:", err);
-        alert("Failed to add card.");
+        alert("Failed to add: " + err.message);
     } finally {
         setSaving(false);
     }
@@ -1832,10 +1863,14 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                       
                       <div className="flex gap-2">
                         {/* NEW: Save Card Button on Face */}
-                        <div className="p-2.5 bg-white/10 rounded-full hover:bg-white/30 transition-colors active:scale-90 border border-white/5 shadow-sm" onClick={handleSaveCurrentCard}>
+                        <button 
+                            className="p-2.5 bg-white/10 rounded-full hover:bg-white/30 transition-colors active:scale-90 border border-white/5 shadow-sm z-50 cursor-pointer" 
+                            onClick={handleSaveCurrentCard}
+                            title="Save to My Cards"
+                        >
                             {saving ? <Loader size={20} className="animate-spin text-white"/> : <Save size={20} className="text-white"/>}
-                        </div>
-                        <div className="p-2.5 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-90 border border-white/5 shadow-sm" onClick={(e) => { e.stopPropagation(); playAudio(currentCard.front); }}>
+                        </button>
+                        <div className="p-2.5 bg-white/10 rounded-full hover:bg-white/20 transition-colors active:scale-90 border border-white/5 shadow-sm z-50 cursor-pointer" onClick={(e) => { e.stopPropagation(); playAudio(currentCard.front); }}>
                             <Volume2 size={20} className="text-white"/>
                         </div>
                       </div>
