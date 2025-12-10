@@ -826,16 +826,17 @@ function QuizGame({ deckCards, onGameEnd }: any) {
 
 function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, activeDeckOverride, onComplete }: any) {
   // --- STATE ---
-  // We add 'browsing' state. If true, we show the Hub. If false, we show the card player.
-  // We default to 'browsing' unless an override (like a class assignment) is present.
   const [viewState, setViewState] = useState<'browsing' | 'playing'>(activeDeckOverride ? 'playing' : 'browsing');
   
+  // -- NEW: Filter State --
+  const [filterLang, setFilterLang] = useState('All');
+
   // Player State
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [xrayMode, setXrayMode] = useState(false);
   const [gameMode, setGameMode] = useState('study'); 
-  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null); // For animation
+  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
 
   // Pointer/Swipe State
   const [dragStartX, setDragStartX] = useState<number | null>(null);
@@ -844,9 +845,35 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
 
   // --- DERIVED DATA ---
   const currentDeck = activeDeckOverride || allDecks[selectedDeckKey];
-  // Filter out empty decks for the Hub view
-  const availableDecks = Object.entries(allDecks).filter(([_, deck]: any) => deck.cards && deck.cards.length > 0);
-  const totalCardsAvailable = availableDecks.reduce((acc, [_, deck]: any) => acc + deck.cards.length, 0);
+  
+  // 1. Process Decks & Detect Languages
+  const processedDecks = useMemo(() => {
+      return Object.entries(allDecks)
+        .filter(([_, deck]: any) => deck.cards && deck.cards.length > 0)
+        .map(([key, deck]: any) => {
+            // Logic: Use deck's explicit language, or fallback to the first card's language, or default to 'General'
+            const detectedLang = deck.targetLanguage || deck.cards[0]?.targetLanguage || 'General';
+            return {
+                id: key,
+                ...deck,
+                language: detectedLang
+            };
+        });
+  }, [allDecks]);
+
+  // 2. Extract Unique Languages for the Filter Bar
+  const availableLanguages = useMemo(() => {
+      const langs = new Set(processedDecks.map(d => d.language));
+      return ['All', ...Array.from(langs).sort()];
+  }, [processedDecks]);
+
+  // 3. Apply Filter
+  const filteredDecks = useMemo(() => {
+      if (filterLang === 'All') return processedDecks;
+      return processedDecks.filter(d => d.language === filterLang);
+  }, [processedDecks, filterLang]);
+
+  const totalCardsAvailable = processedDecks.reduce((acc, deck: any) => acc + deck.cards.length, 0);
 
   // Cards for the active session
   const deckCards = currentDeck?.cards || [];
@@ -854,8 +881,6 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   const theme = card ? (TYPE_COLORS[card.type] || TYPE_COLORS.noun) : TYPE_COLORS.noun;
 
   // --- ACTIONS ---
-
-  // 1. Start a specific deck
   const launchDeck = (key: string) => {
     onSelectDeck(key);
     setCurrentIndex(0);
@@ -863,15 +888,14 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
     setViewState('playing');
   };
 
-  // 2. "Quick Study" - Find the largest deck and start it
   const handleQuickStudy = () => {
-    if (availableDecks.length === 0) return;
-    // Sort by size (descending) and pick the first one
-    const largestDeck = availableDecks.sort((a: any, b: any) => b[1].cards.length - a[1].cards.length)[0];
-    launchDeck(largestDeck[0]);
+    if (processedDecks.length === 0) return;
+    // Sort by size and pick the largest
+    const largestDeck = processedDecks.sort((a: any, b: any) => b.cards.length - a.cards.length)[0];
+    launchDeck(largestDeck.id);
   };
 
-  // 3. Navigation
+  // Navigation
   const handleNext = useCallback(() => {
     setXrayMode(false); setIsFlipped(false); setSwipeDirection('left');
     setTimeout(() => {
@@ -888,7 +912,6 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
     }, 200);
   }, [deckCards.length]);
 
-  // --- AUDIO & INPUT HANDLERS (Kept from your original code) ---
   const playAudio = useCallback((text: string) => {
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
@@ -914,7 +937,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
       if (activeDeckOverride && onComplete) {
           onComplete(activeDeckOverride.id, xp, currentDeck.title, data.score !== undefined ? data : null); 
       } else {
-          setViewState('browsing'); // Go back to hub after finishing
+          setViewState('browsing');
       }
   };
 
@@ -923,7 +946,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
       return (
         <div className="h-full bg-slate-50 flex flex-col overflow-y-auto pb-24 animate-in fade-in">
             {/* Header */}
-            <div className="bg-white p-6 pb-8 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 relative z-10">
+            <div className="bg-white p-6 pb-4 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 relative z-10 sticky top-0">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-2xl font-bold text-slate-900">Practice Hub</h1>
                     <div className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
@@ -935,7 +958,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                 <button 
                     onClick={handleQuickStudy}
                     disabled={totalCardsAvailable === 0}
-                    className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white p-5 rounded-2xl shadow-lg shadow-indigo-200 active:scale-95 transition-all flex items-center justify-between group disabled:opacity-50 disabled:shadow-none"
+                    className="w-full mb-6 bg-gradient-to-r from-indigo-600 to-violet-600 text-white p-5 rounded-2xl shadow-lg shadow-indigo-200 active:scale-95 transition-all flex items-center justify-between group disabled:opacity-50 disabled:shadow-none"
                 >
                     <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-white backdrop-blur-sm">
@@ -952,36 +975,68 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                         <PlayCircle size={24} fill="currentColor" />
                     </div>
                 </button>
+
+                {/* --- NEW: LANGUAGE FILTER BAR --- */}
+                {availableLanguages.length > 1 && (
+                    <div className="flex gap-2 overflow-x-auto pb-2 -mx-6 px-6 custom-scrollbar">
+                        {availableLanguages.map(lang => (
+                            <button
+                                key={lang}
+                                onClick={() => setFilterLang(lang)}
+                                className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
+                                    filterLang === lang 
+                                    ? 'bg-slate-900 text-white shadow-md' 
+                                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                }`}
+                            >
+                                {lang}
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Deck Grid */}
             <div className="p-6 space-y-6">
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider ml-1">Your Collections</h3>
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider ml-1 flex justify-between">
+                    <span>{filterLang === 'All' ? 'All Collections' : `${filterLang} Decks`}</span>
+                    <span className="text-xs bg-slate-200 px-2 rounded-md text-slate-500">{filteredDecks.length}</span>
+                </h3>
                 
-                {availableDecks.length === 0 ? (
+                {filteredDecks.length === 0 ? (
                     <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-3xl">
                         <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-400">
                             <Layers size={32}/>
                         </div>
-                        <p className="text-slate-500 font-bold mb-2">Library is Empty</p>
-                        <p className="text-xs text-slate-400 max-w-[200px] mx-auto mb-4">You need to create cards or import lessons to start practicing.</p>
+                        <p className="text-slate-500 font-bold mb-2">No decks found</p>
+                        <p className="text-xs text-slate-400 max-w-[200px] mx-auto mb-4">Try changing your filter or add new content.</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-4">
-                        {availableDecks.map(([key, deck]: any) => (
+                        {filteredDecks.map((deck: any) => (
                             <button 
-                                key={key}
-                                onClick={() => launchDeck(key)}
-                                className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all flex items-center gap-4 group text-left"
+                                key={deck.id}
+                                onClick={() => launchDeck(deck.id)}
+                                className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all flex items-center gap-4 group text-left relative overflow-hidden"
                             >
-                                <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold shadow-sm transition-colors ${key === 'custom' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500 group-hover:bg-indigo-50 group-hover:text-indigo-600'}`}>
+                                {/* Language Stripe Indicator */}
+                                <div className={`absolute left-0 top-0 bottom-0 w-1 ${
+                                    deck.language === 'Latin' ? 'bg-purple-500' : 
+                                    deck.language === 'Spanish' ? 'bg-orange-500' :
+                                    deck.language === 'English' ? 'bg-blue-500' : 'bg-slate-300'
+                                }`}></div>
+
+                                <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold shadow-sm transition-colors shrink-0 ${deck.id === 'custom' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500 group-hover:bg-indigo-50 group-hover:text-indigo-600'}`}>
                                     {deck.title.charAt(0)}
                                 </div>
-                                <div className="flex-1">
-                                    <h4 className="font-bold text-slate-800 text-lg group-hover:text-indigo-700 transition-colors line-clamp-1">{deck.title}</h4>
-                                    <div className="flex items-center gap-3 mt-1">
-                                        <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
-                                            <Layers size={12}/> {deck.cards.length} Cards
+                                <div className="flex-1 min-w-0">
+                                    <h4 className="font-bold text-slate-800 text-lg group-hover:text-indigo-700 transition-colors truncate pr-2">{deck.title}</h4>
+                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                        <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                            <Globe size={10}/> {deck.language}
+                                        </span>
+                                        <span className="text-[10px] font-medium text-slate-400 flex items-center gap-1">
+                                            <Layers size={10}/> {deck.cards.length} Cards
                                         </span>
                                         {deck.isAssignment && (
                                             <span className="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded border border-amber-100 font-bold uppercase">Class</span>
@@ -1001,14 +1056,14 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   }
 
   // --- VIEW 2: THE PLAYER (Active Mode) ---
+  // (Keep the rest of your Player logic exactly as it was in the previous step)
   return (
     <div className="h-[calc(100vh-80px)] flex flex-col bg-slate-50 pb-6 relative overflow-hidden">
-      {/* Player Header */}
       <Header 
         title={currentDeck?.title || "Deck"} 
         subtitle={`${currentIndex + 1} / ${deckCards.length} Cards`} 
         sticky={false}
-        onClickTitle={() => setViewState('browsing')} // Allow clicking title to go back
+        onClickTitle={() => setViewState('browsing')} 
         rightAction={
             <div className="flex items-center gap-2">
                 <button onClick={() => setViewState('browsing')} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 text-slate-500">
@@ -1018,7 +1073,6 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
         } 
       />
       
-      {/* Mode Switcher */}
       <div className="px-6 mt-2 mb-4 z-10">
           <div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto shadow-inner">
               {['study', 'quiz', 'match'].map((mode) => (
@@ -1029,7 +1083,6 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
           </div>
       </div>
       
-      {/* Game Content */}
       <div className="flex-1 relative w-full overflow-hidden">
           {gameMode === 'match' && <div className="h-full overflow-y-auto"><MatchingGame deckCards={deckCards} onGameEnd={handleGameEnd} /></div>}
           {gameMode === 'quiz' && <div className="h-full overflow-y-auto"><QuizGame deckCards={deckCards} onGameEnd={handleGameEnd} /></div>}
@@ -1042,13 +1095,11 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}
             >
-                {/* The Card */}
                 <div 
                     className={`relative w-full h-full max-h-[520px] cursor-pointer shadow-2xl rounded-[2rem] transition-transform duration-300 ${swipeDirection === 'left' ? '-translate-x-full opacity-0 rotate-[-10deg]' : swipeDirection === 'right' ? 'translate-x-full opacity-0 rotate-[10deg]' : 'translate-x-0 opacity-100'}`}
                     style={{ transformStyle: 'preserve-3d', transform: isFlipped && !swipeDirection ? 'rotateY(180deg)' : swipeDirection ? undefined : 'rotateY(0deg)' }}
                     onClick={() => !xrayMode && setIsFlipped(!isFlipped)}
                 >
-                    {/* FRONT */}
                     <div className="absolute inset-0 bg-white rounded-[2rem] border border-slate-100 overflow-hidden flex flex-col select-none" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
                         <div className={`h-3 w-full ${xrayMode ? theme.bg.replace('50', '500') : 'bg-slate-100'} transition-colors duration-500`} />
                         <div className="flex-1 flex flex-col p-6 relative">
@@ -1063,7 +1114,6 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                                     <span className="font-serif text-slate-500 text-lg tracking-wide group-hover:text-indigo-800 select-none">{card.ipa || "/.../"}</span>
                                 </div>
                             </div>
-                            {/* X-Ray Panel */}
                             <div className={`absolute inset-x-0 bottom-0 bg-white/95 backdrop-blur-xl border-t border-slate-100 transition-all duration-300 flex flex-col overflow-hidden z-20 ${xrayMode ? 'h-[75%] opacity-100 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)]' : 'h-0 opacity-0'}`} onClick={e => e.stopPropagation()}>
                                 <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
                                     <div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Puzzle size={14} /> Morphology</h4><div className="flex flex-wrap gap-2">{Array.isArray(card.morphology) && card.morphology.map((m: any, i: number) => (<div key={i} className="flex flex-col items-center bg-slate-50 border border-slate-200 rounded-lg p-2 min-w-[60px]"><span className={`font-bold text-lg ${m.type === 'root' ? 'text-indigo-600' : 'text-slate-700'}`}>{m.part}</span><span className="text-slate-400 text-[9px] font-medium uppercase mt-1 text-center max-w-[80px] leading-tight">{m.meaning}</span></div>))}</div></div>
@@ -1075,7 +1125,6 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                         </div>
                     </div>
 
-                    {/* BACK */}
                     <div className="absolute inset-0 bg-slate-900 rounded-[2rem] shadow-xl flex flex-col items-center justify-center p-8 text-white relative overflow-hidden select-none" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
                         <div className="absolute top-[-50%] left-[-50%] w-full h-full bg-indigo-500/20 rounded-full blur-[100px] pointer-events-none"></div>
                         <div className="relative z-10 flex flex-col items-center">
@@ -1088,7 +1137,6 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
           )}
       </div>
 
-      {/* Controls (Study Mode Only) */}
       {gameMode === 'study' && card && (
         <div className="px-6 pb-4 pt-2">
           <div className="flex items-center justify-between max-w-sm mx-auto">
