@@ -2094,8 +2094,8 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [feedbackText, setFeedbackText] = useState<{text: string, x: number, y: number} | null>(null);
 
-  // --- AUDIO ENGINE (Simple Synth) ---
-  const playSound = (type: 'hit' | 'miss' | 'slash' | 'shoot' | 'boss') => {
+  // --- AUDIO ENGINE ---
+  const playSound = (type: 'hit' | 'miss') => {
     const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioContext) return;
     const ctx = new AudioContext();
@@ -2138,29 +2138,26 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
     return () => clearInterval(timer);
   }, [timeLeft, gameState, selectedId]);
 
-  // 3. Particle System Loop
+  // 3. Particles
   useEffect(() => {
     if (particles.length === 0) return;
     const interval = setInterval(() => {
       setParticles(prev => prev.map(p => ({
-        ...p, x: p.x + p.vx, y: p.y + p.vy + 2, // Add gravity
+        ...p, x: p.x + p.vx, y: p.y + p.vy + 2, 
       })).filter(p => p.y < window.innerHeight && p.x > 0 && p.x < window.innerWidth));
     }, 16);
     return () => clearInterval(interval);
   }, [particles]);
 
-  // 4. Helper: Trigger Screen Shake
   const triggerShake = () => {
     setShake(true);
     setTimeout(() => setShake(false), 300);
   };
 
-  // 5. Helper: Spawn Particles
   const spawnParticles = (x: number, y: number, color: string, count = 10) => {
     const newParticles = Array.from({ length: count }).map(() => ({
       id: Math.random(),
-      x, y,
-      color,
+      x, y, color,
       vx: (Math.random() - 0.5) * 10,
       vy: (Math.random() - 0.5) * 10 - 5
     }));
@@ -2171,13 +2168,11 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
   const nextRound = () => {
     if (lives <= 0) {
         setGameState('gameover');
-        // Bonus XP for streaks
         const finalXP = Math.ceil(score / 5) + (maxCombo * 5); 
         onXPUpdate(finalXP, `Colosseum (${loadout} - Wave ${round})`);
         return;
     }
 
-    // Select Card
     const target = pool[Math.floor(Math.random() * pool.length)];
     const others = pool.filter(c => c.id !== target.id);
     const distractors = others.sort(() => 0.5 - Math.random()).slice(0, 3);
@@ -2189,7 +2184,6 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
     setSlashPath([]);
     setFeedbackText(null);
     
-    // Boss Round Logic (Every 5th round)
     const isBoss = (round + 1) % 5 === 0;
     const baseTime = loadout === 'shoot' ? 8 : 12;
     setTimeLeft(isBoss ? 5 : Math.max(4, baseTime - Math.floor(round / 10)));
@@ -2206,7 +2200,6 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
   };
 
   // --- INPUT ENGINES ---
-
   const handleSlashDown = (e: React.PointerEvent) => {
       if (loadout !== 'slash' || selectedId) return;
       setIsInputActive(true);
@@ -2224,12 +2217,10 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
       const y = e.clientY - rect.top;
       setSlashPath(prev => [...prev, { x, y }]);
 
-      // Check collision
       const element = document.elementFromPoint(e.clientX, e.clientY);
       const answerId = element?.getAttribute('data-answer-id');
       
       if (answerId) {
-        // Visuals
         spawnParticles(e.clientX, e.clientY, '#f43f5e', 8);
         submitAnswer(answerId, 1, e.clientX, e.clientY);
       }
@@ -2256,7 +2247,7 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
       if (distance < 15) multiplier = 2.0;
       else if (distance < 40) multiplier = 1.5;
       
-      spawnParticles(e.clientX, e.clientY, '#fbbf24', 12); // Gold sparks for shooting
+      spawnParticles(e.clientX, e.clientY, '#fbbf24', 12); 
       submitAnswer(answerId, multiplier, e.clientX, e.clientY);
   };
 
@@ -2272,8 +2263,7 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
           if (isCorrect) {
               playSound('hit');
               
-              // Scoring Math
-              const comboMult = 1 + (combo * 0.1); // 10% bonus per combo
+              const comboMult = 1 + (combo * 0.1); 
               const timeBonus = timeLeft * 2;
               const bossMult = isBoss ? 2 : 1;
               const points = Math.floor((10 + timeBonus) * precisionMult * comboMult * bossMult);
@@ -2286,12 +2276,10 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
               });
               setRound(r => r + 1);
 
-              // Feedback Text
               const words = ["HIT", "GOOD", "GREAT", "SUPERB", "DIVINE"];
               const wordIndex = Math.min(Math.floor(precisionMult * 2) + Math.floor(combo/5), words.length - 1);
               setFeedbackText({ text: `+${points} (${words[wordIndex]})`, x: inputX, y: inputY - 50 });
 
-              // Screen Shake on crits
               if (precisionMult > 1.5 || combo > 5) triggerShake();
 
               nextRound();
@@ -2351,12 +2339,9 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
   return (
     <div className={`fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center font-sans overflow-hidden touch-none select-none ${shake ? 'animate-[shake_0.3s_ease-in-out]' : ''}`}>
         
-        {/* Dynamic Background */}
         <div className={`absolute inset-0 pointer-events-none transition-colors duration-1000 ${isBossRound ? 'bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-rose-900 via-slate-900 to-black' : 'bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-800 to-black'}`}></div>
-        {/* Animated Grid */}
         <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] animate-[pulse_4s_infinite]"></div>
 
-        {/* Particles Layer */}
         {particles.map(p => (
             <div key={p.id} className="absolute rounded-full pointer-events-none" style={{
                 left: p.x, top: p.y, width: '6px', height: '6px', backgroundColor: p.color,
@@ -2364,7 +2349,6 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
             }} />
         ))}
 
-        {/* Feedback Text */}
         {feedbackText && (
             <div className="absolute z-50 text-4xl font-black italic text-amber-400 drop-shadow-[0_4px_0_rgba(0,0,0,1)] animate-[bounce_0.5s_ease-out] pointer-events-none whitespace-nowrap" 
                  style={{ left: feedbackText.x, top: feedbackText.y, transform: 'translateX(-50%)' }}>
@@ -2403,14 +2387,12 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
                 
                 {/* HUD */}
                 <div className="flex justify-between items-start mb-4 relative z-30 pointer-events-none">
-                    {/* Lives */}
                     <div className="flex gap-1 bg-black/40 backdrop-blur-md p-2 rounded-full border border-white/10">
                         {[...Array(3)].map((_, i) => (
                             <Heart key={i} size={24} className={`${i < lives ? 'fill-rose-500 text-rose-500 animate-pulse' : 'fill-slate-800 text-slate-700'}`} />
                         ))}
                     </div>
 
-                    {/* Timer & Round */}
                     <div className="flex flex-col items-center gap-2">
                         <div className={`text-4xl font-black italic tracking-tighter drop-shadow-lg ${timeLeft <= 3 ? 'text-rose-500 animate-bounce' : 'text-white'}`}>
                             {timeLeft}<span className="text-sm align-top opacity-50">s</span>
@@ -2420,14 +2402,9 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
                         </div>
                     </div>
 
-                    {/* Score & Combo */}
                     <div className="text-right">
                         <div className="font-black text-3xl text-white drop-shadow-md leading-none">{score}</div>
-                        {combo > 1 && (
-                            <div className="text-amber-400 font-black italic text-lg animate-[pulse_0.2s_infinite]">
-                                {combo}x COMBO!
-                            </div>
-                        )}
+                        {combo > 1 && <div className="text-amber-400 font-black italic text-lg animate-[pulse_0.2s_infinite]">{combo}x COMBO!</div>}
                     </div>
                 </div>
 
@@ -2440,7 +2417,6 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
                     onPointerUp={handleSlashUp}
                     onPointerLeave={handleSlashUp}
                 >
-                    {/* SVG Slash Trail */}
                     {loadout === 'slash' && (
                         <svg className="absolute inset-0 w-full h-full pointer-events-none z-50 overflow-visible">
                             <path d={`M ${slashPath.map(p => `${p.x},${p.y}`).join(" L ")}`} fill="none" stroke="#f43f5e" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-[0_0_15px_rgba(244,63,94,1)]" />
@@ -2448,14 +2424,16 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
                         </svg>
                     )}
 
-                    {/* Central Target */}
-                    <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full border-8 flex flex-col items-center justify-center text-center shadow-[0_0_50px_rgba(0,0,0,0.5)] z-10 pointer-events-none transition-all duration-300 ${isBossRound ? 'bg-rose-900 border-rose-600 scale-110' : 'bg-slate-800/90 backdrop-blur-md border-slate-600'}`}>
-                        {isBossRound && <Skull size={40} className="text-rose-500 mb-2 animate-pulse"/>}
-                        <span className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mb-1">Target</span>
-                        <h2 className="text-2xl font-serif font-bold text-white leading-tight px-4 line-clamp-3">{currentCard.front}</h2>
+                    {/* Central Target (Definition) */}
+                    <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 rounded-full border-8 flex flex-col items-center justify-center text-center shadow-[0_0_50px_rgba(0,0,0,0.5)] z-10 pointer-events-none transition-all duration-300 overflow-hidden bg-slate-800/95 backdrop-blur-md border-slate-600 ${isBossRound ? 'border-rose-600 shadow-rose-900/50' : ''}`}>
+                        <div className="p-4 overflow-y-auto max-h-full w-full custom-scrollbar flex flex-col items-center justify-center">
+                            {isBossRound && <Skull size={32} className="text-rose-500 mb-1 animate-pulse shrink-0"/>}
+                            <span className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mb-1 shrink-0">Defend Against</span>
+                            <h2 className="text-sm font-medium text-white leading-snug">{currentCard.back}</h2>
+                        </div>
                     </div>
 
-                    {/* Options */}
+                    {/* Options (Words) */}
                     {options.map((opt, i) => (
                         <div 
                             key={opt.id}
@@ -2463,11 +2441,11 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
                             onClick={(e) => handleShoot(e, opt.id)}
                             className={getOptionStyle(opt, i)}
                         >
-                            {opt.back}
-                            {/* Target Reticle for Shooters */}
+                            <span className="text-2xl font-black uppercase tracking-tight">{opt.front}</span>
+                            
                             {loadout === 'shoot' && !selectedId && (
                                 <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
-                                    <Crosshair size={32} className="text-indigo-500 animate-[spin_3s_linear_infinite]"/>
+                                    <Crosshair size={48} className="text-indigo-500 animate-[spin_3s_linear_infinite]"/>
                                 </div>
                             )}
                         </div>
@@ -2499,7 +2477,6 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
             </div>
         )}
         
-        {/* Style for Shake Animation */}
         <style>{`
             @keyframes shake {
                 0% { transform: translate(1px, 1px) rotate(0deg); }
