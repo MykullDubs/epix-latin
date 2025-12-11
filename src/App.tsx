@@ -1762,8 +1762,13 @@ function StudentGradebook({ classData, user }: any) {
 
   // 1. Fetch User's Activity Logs
   useEffect(() => {
-    if (!user?.email) return;
+    if (!user?.email) {
+        setLoading(false);
+        return;
+    }
     
+    // We fetch ALL logs for this student, then filter in JS to match specific assignments
+    // This ensures we catch everything even if titles vary slightly
     const q = query(
       collection(db, 'artifacts', appId, 'activity_logs'), 
       where('studentEmail', '==', user.email),
@@ -1771,19 +1776,22 @@ function StudentGradebook({ classData, user }: any) {
     );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const fetchedLogs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setLogs(fetchedLogs);
       setLoading(false);
     });
     
     return () => unsubscribe();
   }, [user]);
 
-  // 2. Calculate Stats
+  // 2. Process Assignments vs Logs
   const assignments = classData.assignments || [];
   
   const processedData = assignments.map((assign: any) => {
-      // Find the BEST score log for this assignment (if multiple attempts)
-      const attempts = logs.filter(l => l.itemTitle === assign.title); // Matching by title is safer in this mini-LMS structure
+      // Find ALL attempts for this specific assignment title
+      // We use 'itemTitle' from the log and 'title' from the assignment
+      const attempts = logs.filter(l => l.itemTitle === assign.title); 
+      
       const bestAttempt = attempts.reduce((prev, current) => {
           const prevScore = prev?.scoreDetail?.score || 0;
           const currScore = current?.scoreDetail?.score || 0;
@@ -1812,73 +1820,73 @@ function StudentGradebook({ classData, user }: any) {
   if (loading) return <div className="p-12 text-center text-slate-400"><Loader className="animate-spin mx-auto mb-2"/>Loading grades...</div>;
 
   return (
-      <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+      <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 pb-20">
           
           {/* OVERVIEW CARD */}
-          <div className="bg-white rounded-[2rem] p-6 shadow-xl border border-slate-100 flex flex-col md:flex-row gap-6 items-center">
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex flex-col md:flex-row gap-6 items-center">
               {/* Grade Circle */}
-              <div className="relative w-32 h-32 flex-shrink-0">
+              <div className="relative w-28 h-28 flex-shrink-0">
                   <svg className="w-full h-full transform -rotate-90">
-                      <circle cx="64" cy="64" r="56" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100" />
-                      <circle cx="64" cy="64" r="56" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={351} strokeDashoffset={351 - (351 * averageGrade) / 100} className={`${averageGrade >= 90 ? 'text-emerald-400' : averageGrade >= 70 ? 'text-indigo-500' : 'text-amber-400'} transition-all duration-1000 ease-out`} strokeLinecap="round" />
+                      <circle cx="56" cy="56" r="48" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100" />
+                      <circle cx="56" cy="56" r="48" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={301} strokeDashoffset={301 - (301 * averageGrade) / 100} className={`${averageGrade >= 90 ? 'text-emerald-400' : averageGrade >= 70 ? 'text-indigo-500' : 'text-amber-400'} transition-all duration-1000 ease-out`} strokeLinecap="round" />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-3xl font-black text-slate-800">{averageGrade}%</span>
-                      <span className="text-[10px] uppercase font-bold text-slate-400">Avg. Score</span>
+                      <span className="text-2xl font-black text-slate-800">{averageGrade}%</span>
+                      <span className="text-[9px] uppercase font-bold text-slate-400">Average</span>
                   </div>
               </div>
               
               {/* Stats Grid */}
-              <div className="flex-1 grid grid-cols-2 gap-4 w-full">
-                  <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 text-center">
+              <div className="flex-1 grid grid-cols-2 gap-3 w-full">
+                  <div className="bg-indigo-50 p-3 rounded-2xl border border-indigo-100 text-center flex flex-col justify-center">
                       <span className="block text-2xl font-black text-indigo-600">{completedCount}/{totalCount}</span>
-                      <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Assignments Done</span>
+                      <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wider">Complete</span>
                   </div>
-                  <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 text-center">
+                  <div className="bg-amber-50 p-3 rounded-2xl border border-amber-100 text-center flex flex-col justify-center">
                       <span className="block text-2xl font-black text-amber-500">{gradedItems.length}</span>
-                      <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Quizzes Taken</span>
+                      <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider">Quizzes</span>
                   </div>
               </div>
           </div>
 
           {/* DETAILED LIST */}
-          <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
-              <div className="p-6 border-b border-slate-100 bg-slate-50/50">
-                  <h3 className="font-bold text-slate-800 flex items-center gap-2"><BarChart3 size={18} className="text-indigo-500"/> Performance Detail</h3>
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm"><BarChart3 size={16} className="text-indigo-500"/> Performance Detail</h3>
               </div>
               <div className="divide-y divide-slate-100">
                   {processedData.map((item: any, idx: number) => (
                       <div key={idx} className="p-4 flex items-center justify-between group hover:bg-slate-50 transition-colors">
-                          <div className="flex items-center gap-4">
-                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm ${item.isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-300'}`}>
+                          <div className="flex items-center gap-3 overflow-hidden">
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm shrink-0 ${item.isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-300'}`}>
                                   {item.contentType === 'test' ? <HelpCircle size={18}/> : item.contentType === 'deck' ? <Layers size={18}/> : <FileText size={18}/>}
                               </div>
-                              <div>
-                                  <h4 className={`font-bold text-sm ${item.isCompleted ? 'text-slate-800' : 'text-slate-400'}`}>{item.title}</h4>
+                              <div className="min-w-0">
+                                  <h4 className={`font-bold text-sm truncate ${item.isCompleted ? 'text-slate-800' : 'text-slate-400'}`}>{item.title}</h4>
                                   <div className="flex items-center gap-2 mt-0.5">
-                                      <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-1.5 rounded">{item.contentType || 'Lesson'}</span>
-                                      {item.lastAttemptDate && <span className="text-[10px] text-slate-400 flex items-center gap-1"><Clock size={10}/> {new Date(item.lastAttemptDate).toLocaleDateString()}</span>}
+                                      <span className="text-[9px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-1.5 rounded">{item.contentType === 'deck' ? 'Deck' : item.contentType === 'test' ? 'Exam' : 'Unit'}</span>
+                                      {item.lastAttemptDate && <span className="text-[9px] text-slate-400 flex items-center gap-1"><Clock size={10}/> {new Date(item.lastAttemptDate).toLocaleDateString()}</span>}
                                   </div>
                               </div>
                           </div>
                           
-                          <div className="text-right">
+                          <div className="text-right pl-2">
                               {item.bestScore ? (
                                   <div>
-                                      <span className={`block font-black text-lg ${item.bestScore.score / item.bestScore.total >= 0.7 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                      <span className={`block font-black text-base ${item.bestScore.score / item.bestScore.total >= 0.7 ? 'text-emerald-500' : 'text-amber-500'}`}>
                                           {Math.round((item.bestScore.score / item.bestScore.total) * 100)}%
                                       </span>
-                                      <span className="text-[10px] font-bold text-slate-400 uppercase">{item.bestScore.score}/{item.bestScore.total} Correct</span>
+                                      <span className="text-[9px] font-bold text-slate-400 uppercase">{item.bestScore.score}/{item.bestScore.total}</span>
                                   </div>
                               ) : item.isCompleted ? (
-                                  <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full"><CheckCircle2 size={12}/> Complete</span>
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full"><CheckCircle2 size={10}/> Done</span>
                               ) : (
                                   <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">-</span>
                               )}
                           </div>
                       </div>
                   ))}
-                  {processedData.length === 0 && <div className="p-8 text-center text-slate-400 italic">No assignments to track.</div>}
+                  {processedData.length === 0 && <div className="p-8 text-center text-slate-400 italic text-sm">No assignments to track.</div>}
               </div>
           </div>
       </div>
