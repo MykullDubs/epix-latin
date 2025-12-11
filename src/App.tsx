@@ -1663,37 +1663,31 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
   const [showSettings, setShowSettings] = useState(false);
   
   // --- Add/Save States ---
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showSaveOverlay, setShowSaveOverlay] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false); 
+  const [showSaveOverlay, setShowSaveOverlay] = useState(false); 
   const [newCard, setNewCard] = useState({ front: '', back: '' });
-  const [newDeckName, setNewDeckName] = useState('');
+  const [newDeckName, setNewDeckName] = useState(''); 
   const [saving, setSaving] = useState(false);
-
-  // --- NEW: Custom Notification State ---
-  const [notification, setNotification] = useState<{ title: string, subtitle: string } | null>(null);
 
   // --- Navigation & Data State ---
   const [sessionCards, setSessionCards] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-
-  // --- Quiz & Game States ---
   const [viewMode, setViewMode] = useState<'study' | 'quiz'>('study');
+
+  // --- Quiz State ---
   const [quizOptions, setQuizOptions] = useState<any[]>([]);
   const [quizState, setQuizState] = useState<'waiting' | 'correct' | 'wrong'>('waiting');
   const [score, setScore] = useState(0);
+
+  // --- Swipe State (Enhanced for Scroll Stability) ---
   const [dragStartX, setDragStartX] = useState<number | null>(null);
+  const [dragStartY, setDragStartY] = useState<number | null>(null); // NEW
   const [dragEndX, setDragEndX] = useState<number | null>(null);
+  const [dragEndY, setDragEndY] = useState<number | null>(null); // NEW
   const minSwipeDistance = 50; 
 
+  // --- Preference ---
   const preferredDeckId = userData?.widgetDeckId || 'all';
-
-  // --- AUTO HIDE NOTIFICATION ---
-  useEffect(() => {
-    if (notification) {
-        const timer = setTimeout(() => setNotification(null), 2500); // Disappear after 2.5s
-        return () => clearTimeout(timer);
-    }
-  }, [notification]);
 
   // --- AUDIO ENGINE ---
   const playAudio = useCallback((text: string) => {
@@ -1754,7 +1748,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
       }
   };
 
-  // --- EXECUTE SAVE TO SPECIFIC DECK ---
+  // --- SAVE LOGIC ---
   const executeSave = async (targetDeckId: string, targetDeckTitle: string) => {
     const currentUser = user || auth.currentUser;
     if (!currentUser || !sessionCards[currentIndex] || saving) return;
@@ -1773,31 +1767,23 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
             savedAt: Date.now()
         });
         
-        setShowSaveOverlay(false);
+        setShowSaveOverlay(false); 
         setNewDeckName(''); 
-        
-        // --- CUSTOM NOTIFICATION TRIGGER ---
-        setNotification({ 
-            title: "Card Saved Successfully", 
-            subtitle: `Added to ${targetDeckTitle}` 
-        });
-
+        alert(`Saved to ${targetDeckTitle}!`);
     } catch (err: any) {
         console.error("Error saving card:", err);
-        setNotification({ title: "Error", subtitle: "Could not save card." });
+        alert("Failed to save: " + err.message);
     } finally {
         setSaving(false);
     }
   };
 
-  // --- CREATE DECK AND SAVE ---
   const handleCreateAndSave = async () => {
       if(!newDeckName.trim()) return;
       const newId = `custom_${Date.now()}`;
       await executeSave(newId, newDeckName);
   };
 
-  // --- QUICK ADD (HEADER BUTTON) ---
   const handleQuickAdd = async () => {
     const currentUser = user || auth.currentUser;
     if (!currentUser || !newCard.front || !newCard.back) return;
@@ -1817,15 +1803,9 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
         });
         setNewCard({ front: '', back: '' });
         setShowAddModal(false);
-        
-        // --- CUSTOM NOTIFICATION TRIGGER ---
-        setNotification({ 
-            title: "Flashcard Created", 
-            subtitle: "Added to Scriptorium" 
-        });
-
+        alert("New card created!");
     } catch (err: any) {
-        setNotification({ title: "Error", subtitle: err.message });
+        alert("Failed to add: " + err.message);
     } finally {
         setSaving(false);
     }
@@ -1842,37 +1822,43 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
     } catch (e) { console.error(e); }
   };
 
+  // --- NAVIGATION & GESTURES ---
   const handleNext = () => { setIsFlipped(false); setShowSaveOverlay(false); setTimeout(() => setCurrentIndex(prev => (prev + 1) % sessionCards.length), 200); };
   const handlePrev = () => { setIsFlipped(false); setShowSaveOverlay(false); setTimeout(() => setCurrentIndex(prev => (prev - 1 + sessionCards.length) % sessionCards.length), 200); };
 
-  const onPointerDown = (e: React.PointerEvent) => { setDragEndX(null); setDragStartX(e.clientX); };
-  const onPointerMove = (e: React.PointerEvent) => { if (dragStartX !== null) setDragEndX(e.clientX); };
+  const onPointerDown = (e: React.PointerEvent) => { 
+      setDragEndX(null); setDragEndY(null);
+      setDragStartX(e.clientX); setDragStartY(e.clientY);
+  };
+  
+  const onPointerMove = (e: React.PointerEvent) => { 
+      if (dragStartX !== null) { setDragEndX(e.clientX); setDragEndY(e.clientY); }
+  };
+  
   const onPointerUp = () => {
-    if (dragStartX === null || dragEndX === null) { setDragStartX(null); return; }
-    const distance = dragStartX - dragEndX;
-    if (distance > minSwipeDistance) handleNext();
-    else if (distance < -minSwipeDistance) handlePrev();
-    setDragStartX(null); setDragEndX(null);
+    if (dragStartX === null || dragEndX === null || dragStartY === null || dragEndY === null) { 
+        setDragStartX(null); setDragStartY(null); return; 
+    }
+
+    const distX = dragStartX - dragEndX;
+    const distY = dragStartY - dragEndY;
+
+    // AXIS LOCKING: If vertical movement is greater than horizontal, assume scrolling and cancel swipe
+    if (Math.abs(distY) > Math.abs(distX)) {
+        setDragStartX(null); setDragStartY(null);
+        return;
+    }
+
+    if (distX > minSwipeDistance) handleNext();
+    else if (distX < -minSwipeDistance) handlePrev();
+    
+    setDragStartX(null); setDragStartY(null); setDragEndX(null); setDragEndY(null);
   };
 
   const currentCard = sessionCards[currentIndex];
 
   return (
     <div className="mx-6 mt-6 animate-in slide-in-from-bottom-2 duration-700 relative z-0">
-      
-      {/* --- NEW: FLOATING NOTIFICATION --- */}
-      {notification && (
-          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 px-5 py-3 bg-slate-900/90 text-white rounded-2xl shadow-2xl animate-in slide-in-from-top-4 fade-in duration-300 border border-white/10 backdrop-blur-md min-w-[240px]">
-             <div className="bg-emerald-500 rounded-full p-1.5 shadow-[0_0_15px_rgba(16,185,129,0.5)]">
-                 <Check size={14} strokeWidth={3} className="text-white"/>
-             </div>
-             <div>
-                 <p className="text-sm font-bold leading-none mb-0.5">{notification.title}</p>
-                 <p className="text-[10px] text-slate-300 font-medium">{notification.subtitle}</p>
-             </div>
-          </div>
-      )}
-
       <div className="flex justify-between items-end mb-3">
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
             <Zap size={16} className="text-amber-500" /> Daily Discovery
@@ -1960,7 +1946,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
             <div className="absolute top-4 left-8 right-8 bottom-0 bg-indigo-200/30 rounded-[2rem] transform scale-90 translate-y-3 z-0" />
             <div className="relative w-full h-full shadow-2xl rounded-[2rem] transition-transform duration-500 z-10" style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }} onClick={() => setIsFlipped(!isFlipped)}>
               
-{/* FRONT SIDE (Cornflower Mode) */}
+              {/* FRONT SIDE (Cornflower Mode) */}
               <div className="absolute inset-0 bg-gradient-to-br from-[#6495ED] to-[#4169E1] rounded-[2rem] p-6 text-white flex flex-col justify-between overflow-hidden shadow-blue-200" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
                   
                   {/* --- DECK SELECTOR OVERLAY --- */}
@@ -2037,7 +2023,12 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                 style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
               >
                   <div className="w-10 h-1 rounded-full bg-slate-100 mx-auto mt-4 shrink-0"></div>
-                  <div className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar min-h-0 flex flex-col items-center text-center">
+                  
+                  {/* --- SCROLLABLE CONTENT --- */}
+                  <div 
+                    className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar min-h-0 flex flex-col items-center text-center touch-pan-y"
+                    onPointerDown={(e) => e.stopPropagation()} // BLOCK SWIPE FROM STARTING HERE
+                  >
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 bg-slate-50 px-2 py-1 rounded-md">Definition</span>
                       <h3 className="text-xl font-bold text-slate-800 mb-4 leading-tight">{currentCard.back}</h3>
                       {currentCard.usage?.sentence && (
@@ -2047,6 +2038,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                         </div>
                       )}
                   </div>
+
                   <div className="p-3 border-t border-slate-50 text-center shrink-0">
                      <div className="text-[10px] text-slate-300 font-bold uppercase flex items-center justify-center gap-2">
                          <ArrowLeft size={10}/> Next Card <ArrowRight size={10}/>
