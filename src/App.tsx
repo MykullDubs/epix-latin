@@ -1937,7 +1937,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
 
     try {
         // Explicitly assert targetUid is a string here
-        await updateDoc(doc(db, 'artifacts', appId, 'users', targetUid, 'profile', 'main'), { widgetDeckId: deckId });
+        await updateDoc(doc(db, 'artifacts', appId, 'users', targetUid as string, 'profile', 'main'), { widgetDeckId: deckId });
         setShowSettings(false);
         setIsFlipped(false);
     } catch (e) { console.error(e); }
@@ -2147,7 +2147,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                   {/* --- SCROLLABLE CONTENT --- */}
                   <div 
                     className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar min-h-0 flex flex-col items-center text-center touch-pan-y"
-                    onPointerDown={(e) => e.stopPropagation()} 
+                    onPointerDown={(e) => e.stopPropagation()} // BLOCK SWIPE FROM STARTING HERE
                   >
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 bg-slate-50 px-2 py-1 rounded-md">Definition</span>
                       <h3 className="text-xl font-bold text-slate-800 mb-4 leading-tight">{currentCard.back}</h3>
