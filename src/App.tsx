@@ -1756,7 +1756,7 @@ function ClassForum({ classId, user, userData }: any) {
     </div>
   );
 }
-function StudentGradebook({ classData, user }: any) {
+function StudentGradebook({ classData, user, userData }: any) { // <--- Added userData prop
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -1767,8 +1767,6 @@ function StudentGradebook({ classData, user }: any) {
         return;
     }
     
-    // We fetch ALL logs for this student, then filter in JS to match specific assignments
-    // This ensures we catch everything even if titles vary slightly
     const q = query(
       collection(db, 'artifacts', appId, 'activity_logs'), 
       where('studentEmail', '==', user.email),
@@ -1786,11 +1784,16 @@ function StudentGradebook({ classData, user }: any) {
 
   // 2. Process Assignments vs Logs
   const assignments = classData.assignments || [];
+  const completedIds = new Set(userData?.completedAssignments || []); // Source of truth for completion
   
   const processedData = assignments.map((assign: any) => {
-      // Find ALL attempts for this specific assignment title
-      // We use 'itemTitle' from the log and 'title' from the assignment
-      const attempts = logs.filter(l => l.itemTitle === assign.title); 
+      // Robust Match: Normalize strings to avoid case/whitespace mismatches
+      const targetTitle = (assign.title || '').toLowerCase().trim();
+
+      const attempts = logs.filter(l => 
+          (l.itemTitle || '').toLowerCase().trim() === targetTitle || 
+          l.itemId === assign.id // Future-proofing: if you start saving IDs in logs
+      );
       
       const bestAttempt = attempts.reduce((prev, current) => {
           const prevScore = prev?.scoreDetail?.score || 0;
@@ -1798,7 +1801,8 @@ function StudentGradebook({ classData, user }: any) {
           return currScore > prevScore ? current : prev;
       }, null);
 
-      const isCompleted = attempts.length > 0;
+      // It is complete if it's in your profile ID list OR if we found logs
+      const isCompleted = completedIds.has(assign.id) || attempts.length > 0;
       
       return {
           ...assign,
@@ -1812,7 +1816,7 @@ function StudentGradebook({ classData, user }: any) {
   const completedCount = processedData.filter((d: any) => d.isCompleted).length;
   const totalCount = processedData.length;
   
-  // Calculate Average Grade (only for Graded items like Quizzes/Exams)
+  // Calculate Average Grade (Only count items that actually HAVE a score)
   const gradedItems = processedData.filter((d: any) => d.bestScore);
   const totalScore = gradedItems.reduce((acc: number, curr: any) => acc + (curr.bestScore.score / curr.bestScore.total), 0);
   const averageGrade = gradedItems.length > 0 ? Math.round((totalScore / gradedItems.length) * 100) : 0;
@@ -1859,7 +1863,7 @@ function StudentGradebook({ classData, user }: any) {
                       <div key={idx} className="p-4 flex items-center justify-between group hover:bg-slate-50 transition-colors">
                           <div className="flex items-center gap-3 overflow-hidden">
                               <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm shrink-0 ${item.isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-300'}`}>
-                                  {item.contentType === 'test' ? <HelpCircle size={18}/> : item.contentType === 'deck' ? <Layers size={18}/> : <FileText size={18}/>}
+                                  {item.isCompleted ? <CheckCircle2 size={18}/> : item.contentType === 'test' ? <HelpCircle size={18}/> : item.contentType === 'deck' ? <Layers size={18}/> : <FileText size={18}/>}
                               </div>
                               <div className="min-w-0">
                                   <h4 className={`font-bold text-sm truncate ${item.isCompleted ? 'text-slate-800' : 'text-slate-400'}`}>{item.title}</h4>
@@ -1896,7 +1900,10 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
   const [viewMode, setViewMode] = useState<'assignments' | 'forum' | 'grades'>('assignments');
   const completedSet = new Set(userData?.completedAssignments || []);
   
+  // Filter assignments relevant to this student (if targetStudents is used)
   const relevantAssignments = (classData.assignments || []).filter((l: any) => !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email));
+  
+  // Calculate Progress Stats
   const pendingCount = relevantAssignments.filter((l: any) => !completedSet.has(l.id)).length;
   const completedCount = relevantAssignments.length - pendingCount;
   const progressPercent = relevantAssignments.length > 0 ? (completedCount / relevantAssignments.length) * 100 : 0;
@@ -1909,32 +1916,32 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
   return (
     <div className="h-full flex flex-col bg-slate-50 relative overflow-hidden">
       
-      {/* --- COMPACT HERO HEADER --- */}
+      {/* --- COMPACT HEADER --- */}
       <div className="bg-white p-6 pb-0 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 relative z-20 shrink-0">
           
-          {/* Top Row: Back & Code */}
+          {/* Top Row: Back Button & Class Code */}
           <div className="flex justify-between items-center mb-4">
               <button onClick={onBack} className="group flex items-center gap-1 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-bold uppercase tracking-wider">
                   <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform"/> Back
               </button>
-              <div className="bg-slate-100 text-slate-500 font-mono font-bold px-2 py-1 rounded text-[10px]">
+              <div className="bg-slate-100 text-slate-500 font-mono font-bold px-2 py-1 rounded text-[10px] border border-slate-200">
                   {classData.code}
               </div>
           </div>
 
-          {/* Middle Row: Class Identity */}
+          {/* Middle Row: Class Identity & Icon */}
           <div className="flex items-center gap-4 mb-6">
               <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-indigo-200">
                   {classData.name.charAt(0)}
               </div>
               <div>
-                  <h1 className="text-xl font-bold text-slate-900 leading-tight">{classData.name}</h1>
-                  <p className="text-xs text-slate-500 font-medium">Student Portal • {relevantAssignments.length} Assignments</p>
+                  <h1 className="text-xl font-black text-slate-900 leading-tight">{classData.name}</h1>
+                  <p className="text-xs text-slate-500 font-medium mt-1">Student Portal • {relevantAssignments.length} Assignments</p>
               </div>
           </div>
 
-          {/* Bottom Row: Embedded Tab Switcher */}
-          <div className="flex gap-6 border-b border-slate-100">
+          {/* Bottom Row: Tab Switcher */}
+          <div className="flex gap-8 border-b border-slate-100">
               <button 
                   onClick={() => setViewMode('assignments')} 
                   className={`pb-3 text-sm font-bold transition-all relative ${viewMode === 'assignments' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
@@ -1963,12 +1970,14 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
       <div className="flex-1 overflow-y-auto p-6 relative z-10 custom-scrollbar">
         
         {viewMode === 'grades' && (
-            <StudentGradebook classData={classData} user={user} />
+            // Pass userData here so Gradebook can verify completion status against profile
+            <StudentGradebook classData={classData} user={user} userData={userData} />
         )}
 
         {viewMode === 'assignments' && (
             <div className="space-y-6 pb-20">
-                {/* Progress Card (Compact) */}
+                
+                {/* Progress Card */}
                 <div className="bg-gradient-to-r from-indigo-500 to-blue-600 rounded-2xl p-5 shadow-lg text-white flex items-center justify-between relative overflow-hidden">
                     <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
                     <div className="relative z-10">
