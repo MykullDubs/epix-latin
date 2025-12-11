@@ -1756,7 +1756,7 @@ function ClassForum({ classId, user, userData }: any) {
     </div>
   );
 }
-function StudentGradebook({ classData, user, userData }: any) { // <--- Added userData prop
+function StudentGradebook({ classData, user, userData }: any) {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -1767,14 +1767,19 @@ function StudentGradebook({ classData, user, userData }: any) { // <--- Added us
         return;
     }
     
+    // FIX: Removed 'orderBy' to prevent "Missing Index" errors from Firestore.
+    // We filter by email here and sort in JavaScript below.
     const q = query(
       collection(db, 'artifacts', appId, 'activity_logs'), 
-      where('studentEmail', '==', user.email),
-      orderBy('timestamp', 'desc')
+      where('studentEmail', '==', user.email)
     );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedLogs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const fetchedLogs = snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          // @ts-ignore
+          .sort((a, b) => b.timestamp - a.timestamp); // JS Sort descending
+      
       setLogs(fetchedLogs);
       setLoading(false);
     });
@@ -1787,21 +1792,23 @@ function StudentGradebook({ classData, user, userData }: any) { // <--- Added us
   const completedIds = new Set(userData?.completedAssignments || []); // Source of truth for completion
   
   const processedData = assignments.map((assign: any) => {
-      // Robust Match: Normalize strings to avoid case/whitespace mismatches
+      // Normalize titles for comparison
       const targetTitle = (assign.title || '').toLowerCase().trim();
 
+      // Find logs matching Title OR ID
       const attempts = logs.filter(l => 
           (l.itemTitle || '').toLowerCase().trim() === targetTitle || 
-          l.itemId === assign.id // Future-proofing: if you start saving IDs in logs
+          (l.itemId && l.itemId === assign.id)
       );
       
+      // Find best score among attempts
       const bestAttempt = attempts.reduce((prev, current) => {
           const prevScore = prev?.scoreDetail?.score || 0;
           const currScore = current?.scoreDetail?.score || 0;
           return currScore > prevScore ? current : prev;
       }, null);
 
-      // It is complete if it's in your profile ID list OR if we found logs
+      // Check completion via Profile OR Logs
       const isCompleted = completedIds.has(assign.id) || attempts.length > 0;
       
       return {
@@ -1816,27 +1823,39 @@ function StudentGradebook({ classData, user, userData }: any) { // <--- Added us
   const completedCount = processedData.filter((d: any) => d.isCompleted).length;
   const totalCount = processedData.length;
   
-  // Calculate Average Grade (Only count items that actually HAVE a score)
+  // 3. Calculate Average (Only for items that actually HAVE scores)
   const gradedItems = processedData.filter((d: any) => d.bestScore);
-  const totalScore = gradedItems.reduce((acc: number, curr: any) => acc + (curr.bestScore.score / curr.bestScore.total), 0);
-  const averageGrade = gradedItems.length > 0 ? Math.round((totalScore / gradedItems.length) * 100) : 0;
+  
+  const totalScore = gradedItems.reduce((acc: number, curr: any) => {
+      const max = curr.bestScore.total || 1; 
+      const raw = curr.bestScore.score || 0;
+      return acc + (raw / max);
+  }, 0);
 
-  if (loading) return <div className="p-12 text-center text-slate-400"><Loader className="animate-spin mx-auto mb-2"/>Loading grades...</div>;
+  const hasGrades = gradedItems.length > 0;
+  const averageGrade = hasGrades ? Math.round((totalScore / gradedItems.length) * 100) : 0;
+
+  if (loading) return <div className="p-12 text-center text-slate-400 flex flex-col items-center"><Loader className="animate-spin mb-2"/>Loading grades...</div>;
 
   return (
       <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 pb-20">
           
           {/* OVERVIEW CARD */}
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex flex-col md:flex-row gap-6 items-center">
+              
               {/* Grade Circle */}
               <div className="relative w-28 h-28 flex-shrink-0">
                   <svg className="w-full h-full transform -rotate-90">
                       <circle cx="56" cy="56" r="48" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100" />
-                      <circle cx="56" cy="56" r="48" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={301} strokeDashoffset={301 - (301 * averageGrade) / 100} className={`${averageGrade >= 90 ? 'text-emerald-400' : averageGrade >= 70 ? 'text-indigo-500' : 'text-amber-400'} transition-all duration-1000 ease-out`} strokeLinecap="round" />
+                      {hasGrades && (
+                          <circle cx="56" cy="56" r="48" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={301} strokeDashoffset={301 - (301 * averageGrade) / 100} className={`${averageGrade >= 90 ? 'text-emerald-400' : averageGrade >= 70 ? 'text-indigo-500' : 'text-amber-400'} transition-all duration-1000 ease-out`} strokeLinecap="round" />
+                      )}
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-2xl font-black text-slate-800">{averageGrade}%</span>
-                      <span className="text-[9px] uppercase font-bold text-slate-400">Average</span>
+                      <span className={`text-2xl font-black ${hasGrades ? 'text-slate-800' : 'text-slate-300'}`}>
+                          {hasGrades ? `${averageGrade}%` : 'N/A'}
+                      </span>
+                      <span className="text-[9px] uppercase font-bold text-slate-400">Avg. Score</span>
                   </div>
               </div>
               
@@ -1844,11 +1863,11 @@ function StudentGradebook({ classData, user, userData }: any) { // <--- Added us
               <div className="flex-1 grid grid-cols-2 gap-3 w-full">
                   <div className="bg-indigo-50 p-3 rounded-2xl border border-indigo-100 text-center flex flex-col justify-center">
                       <span className="block text-2xl font-black text-indigo-600">{completedCount}/{totalCount}</span>
-                      <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wider">Complete</span>
+                      <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wider">Tasks Done</span>
                   </div>
                   <div className="bg-amber-50 p-3 rounded-2xl border border-amber-100 text-center flex flex-col justify-center">
                       <span className="block text-2xl font-black text-amber-500">{gradedItems.length}</span>
-                      <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider">Quizzes</span>
+                      <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider">Graded</span>
                   </div>
               </div>
           </div>
@@ -1863,7 +1882,7 @@ function StudentGradebook({ classData, user, userData }: any) { // <--- Added us
                       <div key={idx} className="p-4 flex items-center justify-between group hover:bg-slate-50 transition-colors">
                           <div className="flex items-center gap-3 overflow-hidden">
                               <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm shrink-0 ${item.isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-300'}`}>
-                                  {item.isCompleted ? <CheckCircle2 size={18}/> : item.contentType === 'test' ? <HelpCircle size={18}/> : item.contentType === 'deck' ? <Layers size={18}/> : <FileText size={18}/>}
+                                  {item.contentType === 'test' ? <HelpCircle size={18}/> : item.contentType === 'deck' ? <Layers size={18}/> : <FileText size={18}/>}
                               </div>
                               <div className="min-w-0">
                                   <h4 className={`font-bold text-sm truncate ${item.isCompleted ? 'text-slate-800' : 'text-slate-400'}`}>{item.title}</h4>
@@ -1890,7 +1909,7 @@ function StudentGradebook({ classData, user, userData }: any) { // <--- Added us
                           </div>
                       </div>
                   ))}
-                  {processedData.length === 0 && <div className="p-8 text-center text-slate-400 italic text-sm">No assignments to track.</div>}
+                  {processedData.length === 0 && <div className="p-8 text-center text-slate-400 italic text-sm">No assignments found.</div>}
               </div>
           </div>
       </div>
