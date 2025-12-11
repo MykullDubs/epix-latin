@@ -4428,10 +4428,10 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
 
   if (selectedClass) {
     return (
-      <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-300 relative">
+      <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-300 relative bg-slate-50">
         {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
         
-        {/* --- NEW: ROSTER MANAGER MODAL --- */}
+        {/* --- ROSTER MANAGER MODAL --- */}
         <RosterManagerModal 
             isOpen={isStudentListOpen}
             onClose={() => setIsStudentListOpen(false)}
@@ -4439,102 +4439,146 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
             onSave={handleUpdateRoster}
         />
 
-        <div className="pb-6 border-b border-slate-100 mb-6">
-          <button onClick={() => setSelectedClassId(null)} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Classes</button>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-            <div><h1 className="text-2xl font-bold text-slate-900">{selectedClass.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {selectedClass.code}</p></div>
-            <div className="flex gap-2">
-                <button onClick={() => setViewTab('content')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'content' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500 hover:bg-slate-50'}`}>Manage</button>
-                <button onClick={() => setViewTab('grades')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${viewTab === 'grades' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500 hover:bg-slate-50'}`}>
-                    <BarChart3 size={16}/> Grades
+        {/* --- CLASS HEADER --- */}
+        <div className="pb-4 border-b border-slate-200 mb-4 bg-white p-4 rounded-xl shadow-sm shrink-0">
+          <button onClick={() => setSelectedClassId(null)} className="flex items-center text-slate-400 hover:text-indigo-600 mb-3 text-xs font-bold uppercase tracking-wider">
+              <ArrowLeft size={14} className="mr-1"/> All Classes
+          </button>
+          
+          <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4">
+            <div>
+                <h1 className="text-2xl font-black text-slate-800 leading-none">{selectedClass.name}</h1>
+                <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs font-mono font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200">Code: {selectedClass.code}</span>
+                    <button className="text-indigo-600 hover:text-indigo-800" onClick={() => navigator.clipboard.writeText(selectedClass.code)}><Copy size={14}/></button>
+                </div>
+            </div>
+
+            {/* Navigation Tabs - Scrollable on small screens */}
+            <div className="flex flex-wrap gap-2">
+                <button onClick={() => setViewTab('content')} className={`px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all ${viewTab === 'content' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
+                    Manage
                 </button>
-                <button onClick={() => setViewTab('forum')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${viewTab === 'forum' ? 'bg-slate-800 text-white' : 'bg-white border text-slate-500 hover:bg-slate-50'}`}>Forum</button>
-                
-                {viewTab === 'content' && (
-                    <>
-                    <div className="w-px h-8 bg-slate-200 mx-2 hidden sm:block"></div>
-                    <button onClick={() => { setAssignType('lesson'); setAssignModalOpen(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-indigo-700 active:scale-95 transition-all uppercase tracking-wider"><BookOpen size={16}/> ASSIGN LESSON</button>
-                    <button onClick={() => { setAssignType('deck'); setAssignModalOpen(true); }} className="bg-orange-500 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-orange-600 active:scale-95 transition-all uppercase tracking-wider"><Layers size={16}/> ASSIGN DECK</button>
-                    <button onClick={() => { setAssignType('test'); setAssignModalOpen(true); }} className="bg-rose-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-sm hover:bg-rose-700 active:scale-95 transition-all uppercase tracking-wider"><HelpCircle size={16}/> ASSIGN EXAM</button>
-                    </>
-                )}
+                <button onClick={() => setViewTab('grades')} className={`px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all flex items-center gap-2 ${viewTab === 'grades' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
+                    <BarChart3 size={14}/> Grades
+                </button>
+                <button onClick={() => setViewTab('forum')} className={`px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all ${viewTab === 'forum' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
+                    Forum
+                </button>
             </div>
           </div>
         </div>
 
-        {viewTab === 'content' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="space-y-4">
-                    <h3 className="font-bold text-slate-800 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3>
-                    {(!selectedClass.assignments || selectedClass.assignments.length === 0) && <div className="p-6 border-2 border-dashed border-slate-200 rounded-xl text-center text-slate-400 text-sm">No content assigned yet.</div>}
-                    {selectedClass.assignments?.map((l: any, idx: number) => ( 
-                      <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center group">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${l.contentType === 'deck' ? 'bg-orange-100 text-orange-600' : l.contentType === 'test' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                              {l.contentType === 'deck' ? <Layers size={18} /> : l.contentType === 'test' ? <HelpCircle size={18}/> : <FileText size={18} />}
-                          </div>
-                          <div>
-                              <h4 className="font-bold text-slate-800">{l.title}</h4>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-slate-500 uppercase">
-                                    {l.contentType === 'deck' ? 'Flashcard Deck' : l.contentType === 'test' ? 'Exam' : 'Lesson'}
-                                </span>
-                                {l.targetStudents && l.targetStudents.length > 0 && (<span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold flex items-center gap-1"><Users size={10}/> {l.targetStudents.length} Students</span>)}
-                              </div>
-                          </div>
-                        </div>
-                        <button onClick={() => removeAssignment(l.id)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors" title="Unassign Task"><Trash2 size={16} /></button>
-                      </div> 
-                    ))}
-                </div>
-                
-                <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                        <h3 className="font-bold text-slate-800 flex items-center gap-2"><Users size={18} className="text-indigo-600"/> Roster</h3>
-                        <button onClick={() => setIsStudentListOpen(true)} className="text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition-colors flex items-center gap-2 shadow-sm">
-                            <UserPlus size={16}/> Manage Roster
-                        </button>
-                    </div>
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                        {(!selectedClass.students || selectedClass.students.length === 0) && <div className="p-4 text-center text-slate-400 text-sm italic">No students joined yet.</div>}
-                        {selectedClass.students?.map((s: string, i: number) => (
-                        <div key={i} className="p-3 border-b border-slate-50 last:border-0 flex items-center justify-between group">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs">{s.charAt(0)}</div>
-                                <span className="text-sm font-medium text-slate-700">{s}</span>
+        {/* --- MAIN CONTENT AREA --- */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+            
+            {viewTab === 'content' && (
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 pb-20">
+                    
+                    {/* LEFT COLUMN: ASSIGNMENTS */}
+                    <div className="space-y-4">
+                        <div className="flex flex-wrap gap-2 justify-between items-center bg-white p-3 rounded-xl border border-slate-100 shadow-sm sticky top-0 z-10">
+                            <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm"><BookOpen size={16} className="text-indigo-600"/> Assignments</h3>
+                            <div className="flex gap-1">
+                                <button onClick={() => { setAssignType('lesson'); setAssignModalOpen(true); }} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100" title="Assign Lesson"><BookOpen size={16}/></button>
+                                <button onClick={() => { setAssignType('deck'); setAssignModalOpen(true); }} className="p-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100" title="Assign Deck"><Layers size={16}/></button>
+                                <button onClick={() => { setAssignType('test'); setAssignModalOpen(true); }} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100" title="Assign Exam"><HelpCircle size={16}/></button>
                             </div>
-                            <button onClick={() => removeStudent(s)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100" title="Remove Student"><Trash2 size={14} /></button>
-                        </div>))}
+                        </div>
+
+                        <div className="space-y-3">
+                            {(!selectedClass.assignments || selectedClass.assignments.length === 0) && (
+                                <div className="p-8 border-2 border-dashed border-slate-200 rounded-2xl text-center text-slate-400 text-sm">
+                                    <BookOpen className="mx-auto mb-2 opacity-50" size={32}/>
+                                    No content assigned yet.
+                                </div>
+                            )}
+                            {selectedClass.assignments?.map((l: any, idx: number) => ( 
+                              <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-start group">
+                                <div className="flex items-start gap-3 overflow-hidden">
+                                  <div className={`mt-1 p-2 rounded-lg shrink-0 ${l.contentType === 'deck' ? 'bg-orange-100 text-orange-600' : l.contentType === 'test' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                      {l.contentType === 'deck' ? <Layers size={16} /> : l.contentType === 'test' ? <HelpCircle size={16}/> : <FileText size={16} />}
+                                  </div>
+                                  <div className="min-w-0">
+                                      <h4 className="font-bold text-slate-800 text-sm truncate pr-2">{l.title}</h4>
+                                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-50 px-1.5 py-0.5 rounded">
+                                            {l.contentType === 'deck' ? 'Deck' : l.contentType === 'test' ? 'Exam' : 'Unit'}
+                                        </span>
+                                        {l.targetStudents && l.targetStudents.length > 0 && (
+                                            <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-bold flex items-center gap-1">
+                                                <Users size={10}/> {l.targetStudents.length}
+                                            </span>
+                                        )}
+                                      </div>
+                                  </div>
+                                </div>
+                                <button onClick={() => removeAssignment(l.id)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors shrink-0"><Trash2 size={16} /></button>
+                              </div> 
+                            ))}
+                        </div>
+                    </div>
+                    
+                    {/* RIGHT COLUMN: ROSTER (Now visible on Tablet via stack) */}
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-100 shadow-sm sticky top-0 z-10">
+                            <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm"><Users size={16} className="text-indigo-600"/> Roster</h3>
+                            <button onClick={() => setIsStudentListOpen(true)} className="text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 shadow-sm">
+                                <UserPlus size={12}/> Manage
+                            </button>
+                        </div>
+
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                            {(!selectedClass.students || selectedClass.students.length === 0) && (
+                                <div className="p-8 text-center text-slate-400 text-sm italic">
+                                    <Users className="mx-auto mb-2 opacity-50" size={32}/>
+                                    Class is empty.<br/>Click "Manage" to add students.
+                                </div>
+                            )}
+                            <div className="divide-y divide-slate-50">
+                                {selectedClass.students?.map((s: string, i: number) => (
+                                    <div key={i} className="p-3 flex items-center justify-between group hover:bg-slate-50 transition-colors">
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <div className="w-8 h-8 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center font-bold text-xs border border-slate-200 shrink-0">
+                                                {s.charAt(0).toUpperCase()}
+                                            </div>
+                                            <span className="text-xs font-bold text-slate-700 truncate">{s}</span>
+                                        </div>
+                                        <button onClick={() => removeStudent(s)} className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100" title="Remove"><Trash2 size={14} /></button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        )}
-        
-        {viewTab === 'grades' && (
-            <div className="h-full pb-20">
-                <ClassGrades classData={selectedClass} />
-            </div>
-        )}
-        
-        {viewTab === 'forum' && (
-            <div className="h-full pb-20">
-                <ClassForum classId={selectedClass.id} user={user} userData={{...userData, role: 'instructor'}} />
-            </div>
-        )}
+            )}
+            
+            {viewTab === 'grades' && (
+                <div className="pb-20">
+                    <ClassGrades classData={selectedClass} />
+                </div>
+            )}
+            
+            {viewTab === 'forum' && (
+                <div className="h-[600px] pb-20">
+                    <ClassForum classId={selectedClass.id} user={user} userData={{...userData, role: 'instructor'}} />
+                </div>
+            )}
+        </div>
 
+        {/* --- ASSIGNMENT MODAL --- */}
         {assignModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in duration-200">
               <div className="p-4 border-b border-slate-100 bg-slate-50">
-                  <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">Assign {assignType === 'deck' ? 'Flashcard Deck' : assignType === 'test' ? 'Exam' : 'Lesson'}</h3><button onClick={() => setAssignModalOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-600"/></button></div>
+                  <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">Assign Content</h3><button onClick={() => setAssignModalOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-600"/></button></div>
                   <div className="bg-white p-1 rounded-lg border border-slate-200 flex mb-2"><button onClick={() => setTargetStudentMode('all')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${targetStudentMode === 'all' ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Entire Class</button><button onClick={() => setTargetStudentMode('specific')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${targetStudentMode === 'specific' ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Specific Students</button></div>
                   {targetStudentMode === 'specific' && (<div className="mt-2 max-h-32 overflow-y-auto border border-slate-200 rounded-lg bg-white p-2 custom-scrollbar">{(!selectedClass.students || selectedClass.students.length === 0) ? (<p className="text-xs text-slate-400 italic text-center p-2">No students in roster.</p>) : (selectedClass.students.map((studentEmail: string) => (<button key={studentEmail} onClick={() => toggleAssignee(studentEmail)} className="flex items-center gap-2 w-full p-2 hover:bg-slate-50 rounded text-left">{selectedAssignees.includes(studentEmail) ? <CheckCircle2 size={16} className="text-indigo-600"/> : <Circle size={16} className="text-slate-300"/>}<span className="text-xs font-medium text-slate-700 truncate">{studentEmail}</span></button>)))}</div>)}
-                  {targetStudentMode === 'specific' && <p className="text-[10px] text-slate-400 mt-2 text-right">{selectedAssignees.length} selected</p>}
               </div>
               <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                  {assignType === 'deck' && (<div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><Layers size={14}/> Available Decks</h4><div className="space-y-2">{Object.keys(allDecks || {}).length === 0 ? <p className="text-sm text-slate-400 italic">No decks found.</p> : Object.entries(allDecks).map(([key, deck]: any) => (<button key={key} onClick={() => assignContent({ ...deck, id: key }, 'deck')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{deck.title}</h4><p className="text-xs text-slate-500">{deck.cards?.length || 0} Cards</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-orange-500"/></button>))}</div></div>)}
-                  {assignType === 'lesson' && (<div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><BookOpen size={14}/> Available Lessons</h4><div className="space-y-2">{lessons.filter((l:any) => l.type !== 'test').length === 0 ? <p className="text-sm text-slate-400 italic">No lessons found.</p> : lessons.filter((l:any) => l.type !== 'test').map((l: any) => (<button key={l.id} onClick={() => assignContent(l, 'lesson')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-indigo-500"/></button>))}</div></div>)}
-                  {assignType === 'test' && (<div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><HelpCircle size={14}/> Available Exams</h4><div className="space-y-2">{lessons.filter((l:any) => l.type === 'test').length === 0 ? <p className="text-sm text-slate-400 italic">No exams found.</p> : lessons.filter((l:any) => l.type === 'test').map((l: any) => (<button key={l.id} onClick={() => assignContent(l, 'test')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-rose-500 hover:bg-rose-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{l.title}</h4><p className="text-xs text-slate-500">{(l.questions || []).length} Questions • {l.xp} XP</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-rose-500"/></button>))}</div></div>)}
+                  {assignType === 'deck' && (<div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><Layers size={14}/> Flashcard Decks</h4><div className="space-y-2">{Object.keys(allDecks || {}).length === 0 ? <p className="text-sm text-slate-400 italic">No decks found.</p> : Object.entries(allDecks).map(([key, deck]: any) => (<button key={key} onClick={() => assignContent({ ...deck, id: key }, 'deck')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{deck.title}</h4><p className="text-xs text-slate-500">{deck.cards?.length || 0} Cards</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-orange-500"/></button>))}</div></div>)}
+                  {assignType === 'lesson' && (<div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><BookOpen size={14}/> Learning Units</h4><div className="space-y-2">{lessons.filter((l:any) => l.type !== 'test').length === 0 ? <p className="text-sm text-slate-400 italic">No lessons found.</p> : lessons.filter((l:any) => l.type !== 'test').map((l: any) => (<button key={l.id} onClick={() => assignContent(l, 'lesson')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-indigo-500"/></button>))}</div></div>)}
+                  {assignType === 'test' && (<div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><HelpCircle size={14}/> Exams</h4><div className="space-y-2">{lessons.filter((l:any) => l.type === 'test').length === 0 ? <p className="text-sm text-slate-400 italic">No exams found.</p> : lessons.filter((l:any) => l.type === 'test').map((l: any) => (<button key={l.id} onClick={() => assignContent(l, 'test')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-rose-500 hover:bg-rose-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{l.title}</h4><p className="text-xs text-slate-500">{(l.questions || []).length} Questions • {l.xp} XP</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-rose-500"/></button>))}</div></div>)}
               </div>
             </div>
           </div>
@@ -4544,10 +4588,32 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
   }
   
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 relative">
+    <div className="space-y-6 animate-in fade-in duration-500 relative bg-slate-50 h-full p-6">
       {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
-      <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-slate-800">My Classes</h2><form onSubmit={createClass} className="flex gap-2"><input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="New Class Name" className="p-2 rounded-lg border border-slate-200 text-sm w-64" /><button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2"><Plus size={16}/> Create</button></form></div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{classes.map((cls: any) => (<div key={cls.id} onClick={() => setSelectedClassId(cls.id)} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative group"><div className="absolute top-4 right-4 flex gap-2"><button onClick={(e) => {e.stopPropagation(); handleRenameClass(cls.id, cls.name);}} className="text-slate-300 hover:text-indigo-500"><Edit3 size={16}/></button><button onClick={(e) => {e.stopPropagation(); handleDeleteClass(cls.id);}} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button></div><div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4 font-bold text-lg">{cls.name.charAt(0)}</div><h3 className="font-bold text-lg text-slate-900">{cls.name}</h3><p className="text-sm text-slate-500 mb-4">{(cls.students || []).length} Students</p><div className="flex items-center justify-between bg-slate-50 p-2 rounded-lg"><span className="text-xs font-mono font-bold text-slate-600 tracking-wider">{cls.code}</span><button className="text-indigo-600 text-xs font-bold flex items-center gap-1" onClick={(e) => {e.stopPropagation(); navigator.clipboard.writeText(cls.code);}}><Copy size={12}/> Copy</button></div></div>))}</div>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <h2 className="text-2xl font-bold text-slate-800">My Classes</h2>
+          <form onSubmit={createClass} className="flex gap-2 w-full sm:w-auto">
+              <input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="New Class Name" className="flex-1 p-2 rounded-lg border border-slate-200 text-sm" />
+              <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 whitespace-nowrap"><Plus size={16}/> Create</button>
+          </form>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {classes.map((cls: any) => (
+              <div key={cls.id} onClick={() => setSelectedClassId(cls.id)} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative group">
+                  <div className="absolute top-4 right-4 flex gap-2">
+                      <button onClick={(e) => {e.stopPropagation(); handleRenameClass(cls.id, cls.name);}} className="text-slate-300 hover:text-indigo-500"><Edit3 size={16}/></button>
+                      <button onClick={(e) => {e.stopPropagation(); handleDeleteClass(cls.id);}} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button>
+                  </div>
+                  <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4 font-bold text-lg">{cls.name.charAt(0)}</div>
+                  <h3 className="font-bold text-lg text-slate-900 truncate pr-16">{cls.name}</h3>
+                  <p className="text-sm text-slate-500 mb-4">{(cls.students || []).length} Students</p>
+                  <div className="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
+                      <span className="text-xs font-mono font-bold text-slate-600 tracking-wider">{cls.code}</span>
+                      <button className="text-indigo-600 text-xs font-bold flex items-center gap-1" onClick={(e) => {e.stopPropagation(); navigator.clipboard.writeText(cls.code);}}><Copy size={12}/> Copy</button>
+                  </div>
+              </div>
+          ))}
+      </div>
     </div>
   );
 }
