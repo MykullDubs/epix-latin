@@ -4733,7 +4733,8 @@ function WidgetView({ allDecks, userData }: any) {
         </div>
     </div>
   );
-}function App() {
+}
+function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
@@ -4847,16 +4848,15 @@ function WidgetView({ allDecks, userData }: any) {
     } 
   }, [user, userData]);
 
-  // --- NEW: HANDLE DECK DELETION (Integrated) ---
+  // --- NEW: HANDLE DECK DELETION ---
   const handleDeleteDeck = useCallback(async (deckId: string) => {
       if (!user) return;
       if (!window.confirm("Permanently delete this deck? This cannot be undone.")) return;
       
       try {
           // 1. Delete all cards in this deck
-          // Note: ensure 'getDocs' is imported from firebase/firestore at top of file
           const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), where('deckId', '==', deckId));
-          const snapshot = await getDocs(q);
+          const snapshot = await getDocs(q); // Ensure getDocs is imported
           const batch = writeBatch(db);
           snapshot.docs.forEach((doc) => batch.delete(doc.ref));
           await batch.commit();
@@ -4876,7 +4876,7 @@ function WidgetView({ allDecks, userData }: any) {
       }
   }, [user, userData]);
 
-  // --- NEW: UPDATE USER PREFERENCES (Integrated) ---
+  // --- NEW: UPDATE USER PREFERENCES ---
   const handleUpdatePreferences = useCallback(async (newPrefs: any) => {
       if (!user) return;
       try {
@@ -4927,9 +4927,9 @@ function WidgetView({ allDecks, userData }: any) {
               onSaveCard={handleCreateCard} 
               activeDeckOverride={deckToLoad} 
               onComplete={handleFinishLesson}
-              userData={userData}
-              onUpdatePrefs={handleUpdatePreferences}
-              onDeleteDeck={handleDeleteDeck}
+              userData={userData} // Pass user data for prefs
+              onUpdatePrefs={handleUpdatePreferences} // Pass handler
+              onDeleteDeck={handleDeleteDeck} // Pass handler
           />;
       case 'create': return <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} />;
       case 'profile': return <ProfileView user={user} userData={userData} />;
@@ -5007,69 +5007,4 @@ function WidgetView({ allDecks, userData }: any) {
     </div>
   );
 }
-
-  // --- STANDARD APP RENDER ---
-  return (
-    <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-center relative overflow-hidden">
-      
-      {/* 1. GLOBAL STYLES (Scrollbar Hide & Reset) */}
-      <style>{`
-        html, body, #root {
-          margin: 0;
-          padding: 0;
-          width: 100%;
-          height: 100%;
-          overflow: hidden;
-          background-color: #f8fafc;
-        }
-        /* Hide scrollbar for Chrome, Safari and Opera */
-        *::-webkit-scrollbar {
-          display: none;
-        }
-        /* Hide scrollbar for IE, Edge and Firefox */
-        * {
-          -ms-overflow-style: none;  /* IE and Edge */
-          scrollbar-width: none;  /* Firefox */
-        }
-      `}</style>
-
-      {/* 2. BACKGROUND BLOBS (Visuals) */}
-      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-rose-400/20 rounded-full blur-[100px] pointer-events-none mix-blend-multiply animate-pulse" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-400/20 rounded-full blur-[100px] pointer-events-none mix-blend-multiply" />
-      
-      {/* 3. UTILITIES */}
-      <RoleToggle user={user} userData={userData} />
-
-      {/* 4. MAIN VESSEL */}
-      <div className={`w-full h-[100dvh] relative overflow-hidden bg-slate-50 ${userData?.role === 'instructor' ? 'max-w-full' : 'max-w-full sm:max-w-[400px] sm:h-[850px] sm:rounded-[3rem] sm:shadow-2xl sm:border-[8px] sm:border-slate-900/10'}`}>
-        
-        {/* Status Bar Spacer (Student Mobile View Only) */}
-        {userData?.role !== 'instructor' && <div className="absolute top-0 left-0 right-0 h-safe-top bg-transparent z-50 pointer-events-none" />}
-        
-        {/* 5. VIEW ROUTER */}
-        {userData.role === 'instructor' ? (
-             <InstructorDashboard 
-                user={user} 
-                userData={{...userData, classes: enrolledClasses}} 
-                allDecks={allDecks} 
-                lessons={libraryLessons} 
-                {...commonHandlers} 
-                onLogout={() => signOut(auth)} 
-             />
-        ) : (
-             <>
-                {/* Main Student View Logic */}
-                {renderStudentView()}
-                
-                {/* Navigation Bar (Hidden if inside Lesson/Class/Exam) */}
-                {!activeLesson && !activeStudentClass && (
-                    <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
-                )}
-             </>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default App;
