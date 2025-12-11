@@ -3787,7 +3787,7 @@ function TestPlayerView({ test, onFinish }: any) {
     </div>
   );
 }
-function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allDecks, lessons }: any) {
+function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allDecks, lessons, initialMode, onClearMode }: any) {
   // Editor State
   const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
   const [mode, setMode] = useState('card'); 
@@ -3799,9 +3799,20 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
   
   // Library Filter State
   const [libSearch, setLibSearch] = useState('');
-  const [libFilter, setLibFilter] = useState('all'); // all | deck | lesson | test
+  const [libFilter, setLibFilter] = useState('all'); 
   const [libLang, setLibLang] = useState('all'); 
-  const [libDifficulty, setLibDifficulty] = useState('all'); // NEW: Difficulty Filter
+  const [libDifficulty, setLibDifficulty] = useState('all');
+
+  // --- NEW: LISTEN FOR SHORTCUTS ---
+  useEffect(() => {
+      if (initialMode) {
+          setSubView('editor');
+          setMode(initialMode);
+          setEditingItem(null); // Ensure we are creating fresh
+          // Clear the prop immediately so it doesn't loop
+          if (onClearMode) onClearMode();
+      }
+  }, [initialMode, onClearMode]);
 
   // --- HELPER: Difficulty Colors ---
   const getDiffColor = (diff: string) => {
@@ -3812,7 +3823,6 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
       return 'bg-slate-100 text-slate-600 border-slate-200';
   };
 
-  // --- ACTIONS ---
   const handleBulkImport = async () => {
     try {
         const data = JSON.parse(jsonInput);
@@ -3826,7 +3836,6 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
         data.forEach((item: any) => {
             const id = item.id || `import_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
             
-            // Auto-detect metadata
             const lang = item.targetLanguage || "Latin"; 
             const diff = item.difficulty || "Beginner";
 
@@ -3881,7 +3890,6 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
 
   // --- LIBRARY VIEW ---
   if (subView === 'library') {
-      // 1. Flatten Decks
       const deckItems = Object.entries(allDecks || {}).map(([key, deck]: any) => ({
           id: key,
           ...deck,
@@ -3891,7 +3899,6 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
           difficulty: deck.difficulty || (deck.cards?.[0]?.difficulty) || 'Beginner'
       }));
 
-      // 2. Prepare Lessons & Exams
       const contentItems = (lessons || []).map((l: any) => ({
           ...l,
           type: (l.type === 'test' || l.contentType === 'test') ? 'test' : 'lesson',
@@ -3902,14 +3909,10 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
           difficulty: l.difficulty || 'Beginner'
       }));
 
-      // 3. Merge
       const allItems = [...deckItems, ...contentItems];
-
-      // 4. Extract Unique Options for Dropdowns
       const availableLanguages = Array.from(new Set(allItems.map(i => i.targetLanguage))).sort();
       const availableDifficulties = Array.from(new Set(allItems.map(i => i.difficulty))).sort();
 
-      // 5. Filter
       const filteredItems = allItems.filter(item => {
           const matchesSearch = item.title.toLowerCase().includes(libSearch.toLowerCase());
           const matchesType = libFilter === 'all' || item.type === libFilter;
@@ -3920,14 +3923,12 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
 
       return (
           <div className="h-full flex flex-col bg-slate-50">
-              {/* Header */}
               <div className="p-6 border-b border-slate-100 bg-white flex flex-col gap-4 sticky top-0 z-10 shadow-sm">
                   <div className="flex justify-between items-center">
                       <h2 className="font-bold text-xl text-slate-800 flex items-center gap-2"><Library className="text-indigo-600"/> Content Library</h2>
                       <button onClick={() => setSubView('menu')} className="text-sm font-bold text-slate-500 hover:text-indigo-600 px-4 py-2 rounded-lg hover:bg-slate-50">Back to Hub</button>
                   </div>
                   
-                  {/* Search & Filter Bar */}
                   <div className="flex flex-col gap-3">
                       <div className="relative">
                           <Search className="absolute left-3 top-2.5 text-slate-400" size={16}/>
@@ -3940,7 +3941,6 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                       </div>
                       
                       <div className="grid grid-cols-3 gap-2">
-                          {/* Type Filter */}
                           <div className="relative">
                               <select 
                                 value={libFilter} 
@@ -3955,7 +3955,6 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                               <Layers size={14} className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none"/>
                           </div>
 
-                          {/* Language Filter */}
                           <div className="relative">
                               <select 
                                 value={libLang} 
@@ -3970,7 +3969,6 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                               <Globe size={14} className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none"/>
                           </div>
 
-                          {/* Difficulty Filter */}
                           <div className="relative">
                               <select 
                                 value={libDifficulty} 
@@ -3988,7 +3986,6 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                   </div>
               </div>
 
-              {/* Content Grid */}
               <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
                   {filteredItems.length === 0 ? (
                       <div className="text-center py-20 text-slate-400 italic">No content found matching your filters.</div>
@@ -4000,7 +3997,6 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                                 onClick={() => handleEdit(item, item.type === 'deck' ? 'card' : item.type === 'test' ? 'test' : 'lesson')} 
                                 className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-indigo-300 hover:shadow-md cursor-pointer transition-all group relative overflow-hidden flex flex-col h-full"
                               >
-                                  {/* Header Row */}
                                   <div className="flex justify-between items-start mb-3 relative z-10">
                                       <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-md border ${
                                           item.type === 'deck' ? 'bg-orange-50 text-orange-600 border-orange-100' : 
@@ -4012,7 +4008,6 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                                       <Edit3 size={16} className="text-slate-300 group-hover:text-indigo-500 transition-colors"/>
                                   </div>
                                   
-                                  {/* Body */}
                                   <div className="relative z-10 mb-4 flex-1">
                                       <h4 className="font-bold text-slate-800 text-lg mb-1 line-clamp-2 leading-tight">{item.title}</h4>
                                       <div className="flex items-center gap-2 mt-2">
@@ -4025,7 +4020,6 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                                       </div>
                                   </div>
                                   
-                                  {/* Footer */}
                                   <div className="pt-3 border-t border-slate-100 relative z-10 flex items-center gap-2 text-xs text-slate-400 font-medium">
                                       {item.type === 'deck' && <Layers size={14}/>}
                                       {item.type === 'lesson' && <BookOpen size={14}/>}
@@ -4033,7 +4027,6 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                                       {item.subtitle}
                                   </div>
                                   
-                                  {/* Hover Effect BG */}
                                   <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br opacity-5 rounded-bl-[100px] transition-transform group-hover:scale-125 pointer-events-none ${
                                       item.type === 'deck' ? 'from-orange-400 to-amber-500' : 
                                       item.type === 'test' ? 'from-rose-400 to-pink-500' : 
@@ -4082,7 +4075,7 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
   // --- MAIN MENU / EDITOR ---
   return (
     <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar relative">
-        <Header title="Scriptorium" subtitle="Content Creator" 
+        <Header title="Creator Studio" subtitle="Content Forge" 
             rightAction={
                 <div className="flex gap-2">
                     <button onClick={() => setSubView('import')} className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-indigo-50 hover:text-indigo-600"><FileJson size={20}/></button>
@@ -4108,6 +4101,7 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                     onUpdateCard={onUpdateCard} 
                     onDeleteCard={onDeleteCard} 
                     availableDecks={allDecks} 
+                    initialDeckId={initialMode === 'card' ? 'new' : null} // Hint to start fresh
                     initialData={editingItem}
                     onCancelEdit={() => { setEditingItem(null); }}
                 />
@@ -4803,18 +4797,20 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks, initialC
 // ============================================================================
 function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, onLogout }: any) {
   const [activeTab, setActiveTab] = useState('dashboard');
-  
-  // --- NEW: STATE TO TRACK SPECIFIC CLASS SELECTION ---
   const [viewClassId, setViewClassId] = useState<string | null>(null);
+  
+  // --- NEW: STATE TO TRACK BUILDER INTENT ---
+  const [builderInitMode, setBuilderInitMode] = useState<'card' | 'lesson' | 'test' | null>(null);
 
-  // --- HANDLERS FOR SIDEBAR WIDGETS ---
+  // --- HANDLERS ---
   const handleQuickCreate = (type: 'card' | 'lesson' | 'test') => {
-      setActiveTab('content');
+      setBuilderInitMode(type); // 1. Set the specific tool
+      setActiveTab('content');  // 2. Switch tabs
   };
 
   const handleClassShortcut = (classId: string) => {
-      setViewClassId(classId); // 1. Set the specific class ID
-      setActiveTab('classes'); // 2. Switch to the Classes tab
+      setViewClassId(classId);
+      setActiveTab('classes');
   };
 
   return (
@@ -4879,7 +4875,7 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
                     {userData.classes?.length > 0 ? userData.classes.map((cls: any) => (
                         <button 
                             key={cls.id} 
-                            onClick={() => handleClassShortcut(cls.id)} // <--- CLICK HANDLER
+                            onClick={() => handleClassShortcut(cls.id)} 
                             className="w-full px-3 py-2 rounded-lg flex items-center justify-between group hover:bg-slate-800 transition-colors text-left"
                         >
                             <div className="flex items-center gap-2 overflow-hidden">
@@ -4952,8 +4948,8 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
                         classes={userData?.classes || []} 
                         lessons={lessons} 
                         allDecks={allDecks}
-                        initialClassId={viewClassId} // <--- PASS THE ID
-                        onClearSelection={() => setViewClassId(null)} // <--- RESET HANDLER
+                        initialClassId={viewClassId}
+                        onClearSelection={() => setViewClassId(null)}
                     />
                 </div>
             )}
@@ -4966,7 +4962,10 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
                         onDeleteCard={onDeleteCard} 
                         onSaveLesson={onSaveLesson} 
                         allDecks={allDecks} 
-                        lessons={lessons} 
+                        lessons={lessons}
+                        // --- PASS THE INTENT ---
+                        initialMode={builderInitMode} 
+                        onClearMode={() => setBuilderInitMode(null)}
                     />
                 </div>
             )}
