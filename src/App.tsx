@@ -2067,8 +2067,6 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
     </div>
   );
 }
-
-// --- ENHANCED COLOSSEUM MODE ---
 function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
   // --- GAME STATE ---
   const [gameState, setGameState] = useState<'intro' | 'playing' | 'gameover'>('intro');
@@ -2088,9 +2086,10 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // --- DATA ---
+  const [selectedDeckId, setSelectedDeckId] = useState<string>('all'); // NEW: Track selection
   const [currentCard, setCurrentCard] = useState<any>(null);
   const [options, setOptions] = useState<any[]>([]); 
-  const [pool, setPool] = useState<any[]>([]);
+  const [pool, setPool] = useState<any[]>([]); // The active pool of cards
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [feedbackText, setFeedbackText] = useState<{text: string, x: number, y: number} | null>(null);
 
@@ -2121,14 +2120,31 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
     }
   };
 
-  // 1. Initialize Pool
-  useEffect(() => {
-    let combined: any[] = [];
-    Object.values(allDecks).forEach((deck: any) => {
-      if (deck.cards) combined.push(...deck.cards);
-    });
-    setPool(combined.sort(() => 0.5 - Math.random()));
-  }, [allDecks]);
+  // --- INIT POOL BASED ON SELECTION ---
+  // We don't load the pool immediately on mount anymore. 
+  // We load it when "Start" is clicked based on selectedDeckId.
+  const generatePool = () => {
+      let combined: any[] = [];
+      
+      if (selectedDeckId === 'all') {
+          Object.values(allDecks).forEach((deck: any) => {
+              if (deck.cards) combined.push(...deck.cards);
+          });
+      } else {
+          const deck = allDecks[selectedDeckId];
+          if (deck && deck.cards) combined = [...deck.cards];
+      }
+
+      // Fallback if deck is empty
+      if (combined.length < 4) {
+          alert("This battlefield is too quiet (needs 4+ cards). Switching to All Decks.");
+          Object.values(allDecks).forEach((deck: any) => {
+              if (deck.cards) combined.push(...deck.cards);
+          });
+      }
+
+      return combined.sort(() => 0.5 - Math.random());
+  };
 
   // 2. Timer
   useEffect(() => {
@@ -2165,7 +2181,7 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
   };
 
   // 6. Round Logic
-  const nextRound = () => {
+  const nextRound = (currentPool: any[]) => {
     if (lives <= 0) {
         setGameState('gameover');
         const finalXP = Math.ceil(score / 5) + (maxCombo * 5); 
@@ -2173,8 +2189,8 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
         return;
     }
 
-    const target = pool[Math.floor(Math.random() * pool.length)];
-    const others = pool.filter(c => c.id !== target.id);
+    const target = currentPool[Math.floor(Math.random() * currentPool.length)];
+    const others = currentPool.filter(c => c.id !== target.id);
     const distractors = others.sort(() => 0.5 - Math.random()).slice(0, 3);
     const newOptions = [target, ...distractors].sort(() => 0.5 - Math.random());
     
@@ -2190,13 +2206,17 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
   };
 
   const handleStart = (selectedLoadout: 'slash' | 'shoot') => {
+      const newPool = generatePool();
+      setPool(newPool); // Save pool to state
       setLoadout(selectedLoadout);
       setLives(3);
       setScore(0);
       setRound(1);
       setCombo(0);
       setGameState('playing');
-      nextRound();
+      
+      // Pass the new pool directly to avoid state update lag
+      nextRound(newPool);
   };
 
   // --- INPUT ENGINES ---
@@ -2282,7 +2302,7 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
 
               if (precisionMult > 1.5 || combo > 5) triggerShake();
 
-              nextRound();
+              nextRound(pool);
           } else {
               playSound('miss');
               triggerShake();
@@ -2295,7 +2315,7 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
                   const finalXP = Math.ceil(score / 5); 
                   onXPUpdate(finalXP, `Colosseum (${loadout})`);
               } else {
-                  nextRound();
+                  nextRound(pool);
               }
           }
       }, loadout === 'shoot' ? 600 : 300);
@@ -2310,11 +2330,11 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
           setGameState('gameover');
           onXPUpdate(Math.ceil(score / 5), `Colosseum (${loadout})`);
       } else {
-          nextRound();
+          nextRound(pool);
       }
   };
 
-  // --- STYLE HELPERS (UPDATED FOR 3D TILE LOOK) ---
+  // --- STYLE HELPERS ---
   const isBossRound = round % 5 === 0;
 
   const getOptionStyle = (opt: any, index: number) => {
@@ -2322,37 +2342,25 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
           "top-[18%] left-6", "top-[18%] right-6", "bottom-[18%] left-6", "bottom-[18%] right-6"
       ];
       
-      // Base: Flex box, transition, z-index, select-none
       let baseStyle = "absolute max-w-[45%] min-w-[140px] px-4 py-6 rounded-2xl flex items-center justify-center text-center transition-all duration-200 z-20 select-none active:translate-y-1 active:shadow-none";
       
-      // Interaction & Color Logic
       let visualStyle = "";
 
       if (selectedId) {
-          // --- REVEAL PHASE ---
           if (opt.id === currentCard.id) {
-              // CORRECT: Bright Emerald Green
               visualStyle = "bg-emerald-500 border-b-4 border-emerald-700 text-white shadow-[0_4px_0_#047857] scale-110 z-30";
           } else if (opt.id === selectedId) {
-              // WRONG: Bright Red
               visualStyle = "bg-rose-500 border-b-4 border-rose-700 text-white shadow-none translate-y-1 opacity-50";
           } else {
-              // UNSELECTED: Faded
               visualStyle = "bg-slate-200 border-b-4 border-slate-300 text-slate-400 opacity-20";
           }
       } else {
-          // --- PLAYING PHASE ---
-          // Hover Cursor
           const cursor = loadout === 'shoot' ? 'cursor-crosshair hover:scale-105' : 'cursor-default';
-          
           if (isBossRound) {
-              // Boss Style: Red tinted tiles
               visualStyle = "bg-gradient-to-b from-slate-50 to-rose-50 border-2 border-rose-200 border-b-4 border-b-rose-300 text-rose-900 shadow-[0_4px_0_#fda4af]";
           } else {
-              // Normal Style: Clean White/Slate 3D Tile
               visualStyle = "bg-gradient-to-b from-white to-slate-100 border-2 border-slate-200 border-b-4 border-b-slate-300 text-slate-800 shadow-[0_4px_0_#cbd5e1] hover:brightness-105";
           }
-          
           visualStyle += ` ${cursor}`;
       }
 
@@ -2385,8 +2393,27 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
                     <Swords size={40} />
                 </div>
                 <h2 className="text-4xl font-black text-slate-800 mb-2 mt-6 uppercase italic tracking-tighter">Colosseum</h2>
-                <p className="text-slate-400 text-sm font-bold uppercase tracking-widest mb-8">Choose Your Destiny</p>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-6">Survival Mode</p>
                 
+                {/* --- NEW: BATTLEFIELD SELECTOR --- */}
+                <div className="mb-6">
+                    <label className="block text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">Select Battlefield</label>
+                    <select 
+                        value={selectedDeckId} 
+                        onChange={(e) => setSelectedDeckId(e.target.value)}
+                        className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold text-slate-700 text-sm focus:outline-none focus:border-rose-500"
+                    >
+                        <option value="all">🌍 All Knowledge (Mixed)</option>
+                        {Object.entries(allDecks).map(([key, deck]: any) => (
+                            deck.cards?.length >= 4 && (
+                                <option key={key} value={key}>
+                                    {deck.language === 'Latin' ? '🏛️' : deck.language === 'Spanish' ? '🇪🇸' : '📚'} {deck.title}
+                                </option>
+                            )
+                        ))}
+                    </select>
+                </div>
+
                 <div className="grid grid-cols-1 gap-4 mb-6">
                     <button onClick={() => handleStart('slash')} className="p-4 rounded-2xl border-2 border-slate-100 hover:border-rose-500 hover:bg-rose-50 transition-all group text-left flex items-center gap-4 relative overflow-hidden">
                         <div className="absolute right-0 top-0 bottom-0 w-2 bg-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
