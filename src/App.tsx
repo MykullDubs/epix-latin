@@ -38,7 +38,7 @@ import {
   AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle, ArrowDown,
   BarChart3, UserPlus, Briefcase, Coffee, AlertCircle, Target, Calendar, Settings, Edit2, Camera, Medal,
   ChevronUp, GripVertical, ListOrdered, ArrowRightLeft, CheckSquare, Gamepad2, Globe,
-  BrainCircuit, Swords, Heart, Skull, Shield, Hourglass, Flame, Crown, Crosshair // <--- Added these for the new game modes
+  BrainCircuit, Swords, Heart, Skull, Shield, Hourglass, Flame, Crown, Crosshair,Map, Trendingup, Footprints // <--- Added these for the new game modes
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -350,121 +350,176 @@ const getLevelInfo = (xp: number) => {
   if (level >= 50) rank = "Native-like";
   return { level, currentLevelXP, nextLevelXP, progress, rank };
 };
+// --- HELPER: RANK DEFINITIONS ---
+const RANK_MILESTONES = [
+  { name: "Beginner", minXP: 0, icon: "🌱", color: "text-emerald-500", bg: "bg-emerald-100", border: "border-emerald-200" },
+  { name: "Elementary", minXP: 500, icon: "🔥", color: "text-orange-500", bg: "bg-orange-100", border: "border-orange-200" },
+  { name: "Intermediate", minXP: 1000, icon: "⚔️", color: "text-blue-500", bg: "bg-blue-100", border: "border-blue-200" },
+  { name: "Advanced", minXP: 2000, icon: "🛡️", color: "text-purple-500", bg: "bg-purple-100", border: "border-purple-200" },
+  { name: "Native-like", minXP: 5000, icon: "👑", color: "text-amber-500", bg: "bg-amber-100", border: "border-amber-200" }
+];
 
 function LevelUpModal({ userData, onClose }: any) {
-  const { level, currentLevelXP, nextLevelXP, progress, rank } = getLevelInfo(userData?.xp || 0);
+  const [activeTab, setActiveTab] = useState<'stats' | 'journey'>('stats');
   
-  // Calculate remaining XP for motivation
+  // Calculate Levels
+  const { level, currentLevelXP, nextLevelXP, progress, rank } = getLevelInfo(userData?.xp || 0);
   const xpNeeded = nextLevelXP - currentLevelXP;
   
-  // Calculate specific stats
+  // Counts
   const completedCount = (userData?.completedAssignments || []).length;
   const classCount = (userData?.classes || []).length;
+  const totalXP = userData?.xp || 0;
+
+  // Find current rank index for the Journey Timeline
+  const currentRankIndex = RANK_MILESTONES.findIndex(r => r.name === rank);
+  const nextRank = RANK_MILESTONES[currentRankIndex + 1];
+  const xpToNextRank = nextRank ? nextRank.minXP - totalXP : 0;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
       <div 
-        className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden transform scale-100 transition-all relative border border-white/20" 
+        className="bg-slate-50 w-full max-w-md h-[90vh] sm:h-auto sm:max-h-[85vh] rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col relative" 
         onClick={e => e.stopPropagation()}
       >
         
-        {/* --- HEADER: The Cornflower Canopy --- */}
-        <div className="relative bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 p-8 pb-12 text-white text-center overflow-hidden">
-            {/* Background Decor */}
-            <div className="absolute top-[-50%] left-[-50%] w-[400px] h-[400px] bg-blue-400/30 rounded-full blur-[60px] mix-blend-overlay animate-pulse"></div>
-            <div className="absolute bottom-[-10%] right-[-10%] w-[200px] h-[200px] bg-indigo-300/20 rounded-full blur-[40px] mix-blend-overlay"></div>
+        {/* --- HEADER --- */}
+        <div className="relative bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-800 p-8 pt-12 text-center shrink-0">
+            {/* Background Texture */}
+            <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
             
-            <button onClick={onClose} className="absolute top-5 right-5 text-white/50 hover:text-white bg-black/10 hover:bg-black/20 p-2 rounded-full backdrop-blur-md transition-all">
+            <button onClick={onClose} className="absolute top-6 right-6 text-white/50 hover:text-white bg-black/10 hover:bg-black/20 p-2 rounded-full backdrop-blur-md transition-all z-20">
                 <X size={20} />
             </button>
 
-           <div className="flex flex-col items-center relative z-10">
-    {/* Avatar with Halo */}
-    <div className="w-24 h-24 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border-2 border-white/40 shadow-[0_0_30px_rgba(255,255,255,0.25)] mb-4 overflow-hidden">
-        {userData?.photoURL ? (
-            <img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />
-        ) : (
-            <span className="font-serif font-bold text-4xl text-white drop-shadow-md">{userData?.name?.charAt(0) || "U"}</span>
-        )}
-    </div>
-                
-                <h2 className="text-3xl font-serif font-bold tracking-tight">{userData?.name}</h2>
-                <p className="text-blue-100 text-xs font-bold uppercase tracking-widest mt-1 opacity-80">{userData?.email}</p>
-                
-                {/* Rank Badge */}
-                <div className="mt-4 bg-white/10 backdrop-blur-lg border border-white/20 px-4 py-1.5 rounded-full flex items-center gap-2 shadow-inner">
-                    <Award size={14} className="text-yellow-300" />
-                    <span className="text-xs font-bold uppercase tracking-wide">{rank}</span>
+            {/* Avatar */}
+            <div className="relative inline-block">
+                <div className="w-24 h-24 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/30 shadow-2xl mb-4 overflow-hidden transform rotate-3">
+                    {userData?.photoURL ? (
+                        <img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />
+                    ) : (
+                        <span className="font-serif font-bold text-4xl text-white">{userData?.name?.charAt(0) || "U"}</span>
+                    )}
                 </div>
+                <div className="absolute -bottom-2 -right-2 bg-amber-400 text-amber-900 text-[10px] font-black px-2 py-1 rounded-lg shadow-lg border border-white/50">
+                    LVL {level}
+                </div>
+            </div>
+
+            <h2 className="text-3xl font-serif font-bold text-white tracking-tight drop-shadow-md">{userData?.name}</h2>
+            <div className="flex items-center justify-center gap-2 mt-2">
+                <span className="bg-white/10 text-blue-100 text-xs font-bold px-3 py-1 rounded-full border border-white/10 backdrop-blur-sm flex items-center gap-1">
+                    <Award size={12} /> {rank}
+                </span>
+                <span className="bg-white/10 text-emerald-200 text-xs font-bold px-3 py-1 rounded-full border border-white/10 backdrop-blur-sm flex items-center gap-1">
+                    <TrendingUp size={12} /> Top 10%
+                </span>
             </div>
         </div>
 
-        {/* --- BODY: The Scrolls of Data --- */}
-        <div className="px-6 pb-8 -mt-8 relative z-20">
+        {/* --- TABS --- */}
+        <div className="flex p-2 bg-white border-b border-slate-100">
+            <button onClick={() => setActiveTab('stats')} className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${activeTab === 'stats' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'text-slate-400 hover:bg-slate-50'}`}>
+                <BarChart3 size={16} /> Overview
+            </button>
+            <button onClick={() => setActiveTab('journey')} className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${activeTab === 'journey' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'text-slate-400 hover:bg-slate-50'}`}>
+                <Map size={16} /> Journey
+            </button>
+        </div>
+
+        {/* --- CONTENT --- */}
+        <div className="flex-1 overflow-y-auto p-6 bg-slate-50 relative custom-scrollbar">
             
-            {/* Progress Card */}
-            <div className="bg-white rounded-3xl p-5 shadow-lg border border-slate-100 mb-6">
-                <div className="flex justify-between items-end mb-2">
-                    <div>
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Current Status</span>
-                        <span className="text-2xl font-black text-slate-800">Level {level}</span>
+            {activeTab === 'stats' && (
+                <div className="space-y-4 animate-in slide-in-from-left-4 duration-300">
+                    {/* Level Progress */}
+                    <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+                        <div className="flex justify-between items-end mb-2">
+                            <span className="text-xs font-bold text-slate-400 uppercase">Level Progress</span>
+                            <span className="text-sm font-black text-indigo-600">{Math.round(progress)}%</span>
+                        </div>
+                        <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden mb-2">
+                            <div className="bg-indigo-500 h-full rounded-full transition-all duration-1000" style={{ width: `${progress}%` }}></div>
+                        </div>
+                        <p className="text-xs text-slate-500 text-center"><span className="font-bold text-slate-800">{xpNeeded} XP</span> to Level {level + 1}</p>
                     </div>
-                    <div className="text-right">
-                        <span className="text-xs font-bold text-indigo-600">{Math.round(progress)}%</span>
-                    </div>
-                </div>
-                
-                {/* Enhanced Progress Bar */}
-                <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden shadow-inner border border-slate-200">
-                    <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-full rounded-full transition-all duration-1000 relative" style={{ width: `${progress}%` }}>
-                        <div className="absolute inset-0 bg-white/30 animate-[shimmer_2s_infinite]"></div>
-                    </div>
-                </div>
-                
-                <p className="text-center text-xs text-slate-500 mt-3 font-medium">
-                    <span className="text-indigo-600 font-bold">{xpNeeded} XP</span> until Level {level + 1}
-                </p>
-            </div>
 
-            {/* Stats Grid (The Bento Box of Works) */}
-            <div className="grid grid-cols-2 gap-3">
-                {/* Streak */}
-                <div className="bg-gradient-to-br from-orange-50 to-amber-50 p-4 rounded-2xl border border-orange-100 flex flex-col items-center justify-center gap-2 shadow-sm">
-                    <div className="p-2 bg-white rounded-full text-orange-500 shadow-sm"><Zap size={20} fill="currentColor"/></div>
-                    <div className="text-center">
-                        <p className="text-2xl font-black text-slate-800 leading-none">{userData?.streak || 1}</p>
-                        <p className="text-[10px] text-orange-600/70 uppercase font-bold tracking-wider mt-1">Day Streak</p>
+                    {/* Bento Grid Stats */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-orange-50 p-4 rounded-3xl border border-orange-100 flex flex-col items-center justify-center text-center">
+                            <div className="w-10 h-10 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mb-2"><Zap size={20} fill="currentColor"/></div>
+                            <span className="text-2xl font-black text-slate-800">{userData?.streak || 1}</span>
+                            <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">Day Streak</span>
+                        </div>
+                        <div className="bg-blue-50 p-4 rounded-3xl border border-blue-100 flex flex-col items-center justify-center text-center">
+                            <div className="w-10 h-10 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mb-2"><Award size={20}/></div>
+                            <span className="text-2xl font-black text-slate-800">{userData?.xp || 0}</span>
+                            <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Total XP</span>
+                        </div>
+                        <div className="col-span-2 bg-white p-4 rounded-3xl border border-slate-200 flex items-center justify-between px-6">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl"><CheckCircle2 size={20} /></div>
+                                <div>
+                                    <span className="block text-xl font-black text-slate-800">{completedCount}</span>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Assignments</span>
+                                </div>
+                            </div>
+                            <div className="h-8 w-px bg-slate-100"></div>
+                            <div className="flex items-center gap-4">
+                                <div>
+                                    <span className="block text-xl font-black text-slate-800 text-right">{classCount}</span>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Classes</span>
+                                </div>
+                                <div className="p-3 bg-purple-100 text-purple-600 rounded-xl"><School size={20} /></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
+            )}
 
-                {/* Total XP */}
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-2xl border border-blue-100 flex flex-col items-center justify-center gap-2 shadow-sm">
-                    <div className="p-2 bg-white rounded-full text-blue-500 shadow-sm"><Award size={20}/></div>
-                    <div className="text-center">
-                        <p className="text-2xl font-black text-slate-800 leading-none">{userData?.xp || 0}</p>
-                        <p className="text-[10px] text-blue-600/70 uppercase font-bold tracking-wider mt-1">Total XP</p>
+            {activeTab === 'journey' && (
+                <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 pl-2">
+                    <div className="flex items-start gap-4">
+                        <div className="flex flex-col items-center">
+                            <div className="w-0.5 h-6 bg-slate-200"></div>
+                            <div className="p-2 bg-slate-900 text-white rounded-full shadow-lg z-10"><Footprints size={16}/></div>
+                            <div className="w-0.5 h-full bg-slate-200 min-h-[200px]"></div>
+                        </div>
+                        <div className="pt-4 pb-10 space-y-8 flex-1">
+                            {RANK_MILESTONES.map((r, i) => {
+                                const isPassed = totalXP >= r.minXP;
+                                const isCurrent = i === currentRankIndex;
+                                const isNext = i === currentRankIndex + 1;
+
+                                return (
+                                    <div key={r.name} className={`relative p-4 rounded-2xl border-2 transition-all ${isCurrent ? 'bg-white border-indigo-500 shadow-lg scale-105' : isPassed ? 'bg-slate-50 border-slate-200 opacity-70 grayscale' : 'bg-white border-dashed border-slate-200 opacity-50'}`}>
+                                        {isCurrent && <div className="absolute -left-[45px] top-1/2 -translate-y-1/2 w-4 h-4 bg-indigo-500 rounded-full border-4 border-slate-50"></div>}
+                                        
+                                        <div className="flex justify-between items-center mb-1">
+                                            <h4 className={`font-bold ${isCurrent ? 'text-indigo-900' : 'text-slate-600'}`}>{r.name}</h4>
+                                            <span className="text-xl">{r.icon}</span>
+                                        </div>
+                                        <p className="text-xs text-slate-400 font-mono mb-2">{r.minXP} XP Required</p>
+                                        
+                                        {isNext && (
+                                            <div className="mt-2 bg-indigo-50 text-indigo-600 text-xs font-bold px-3 py-2 rounded-lg inline-block">
+                                                🔒 {xpToNextRank} XP to unlock
+                                            </div>
+                                        )}
+                                        {isPassed && !isCurrent && <div className="text-xs font-bold text-emerald-500 flex items-center gap-1"><CheckCircle2 size={12}/> Completed</div>}
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
-
-                {/* Completed Assignments */}
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col items-center justify-center gap-1">
-                    <span className="text-2xl font-bold text-slate-700">{completedCount}</span>
-                    <span className="text-[9px] text-slate-400 font-bold uppercase">Assignments Done</span>
-                </div>
-
-                {/* Active Classes */}
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col items-center justify-center gap-1">
-                    <span className="text-2xl font-bold text-slate-700">{classCount}</span>
-                    <span className="text-[9px] text-slate-400 font-bold uppercase">Active Classes</span>
-                </div>
-            </div>
+            )}
 
         </div>
       </div>
     </div>
   );
-}
-// ============================================================================
+}// ============================================================================
 //  1. CORE VIEWS & GAMES
 // ============================================================================
 
