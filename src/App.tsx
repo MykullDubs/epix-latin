@@ -39,7 +39,7 @@ import {
   AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle, ArrowDown,
   BarChart3, UserPlus, Briefcase, Coffee, AlertCircle, Target, Calendar, Settings, Edit2, Camera, Medal,
   ChevronUp, GripVertical, ListOrdered, ArrowRightLeft, CheckSquare, Gamepad2, Globe,
-  BrainCircuit, Swords, Heart, Skull, Shield, Hourglass, Flame, Crown, Crosshair,Map, TrendingUp, Footprints // <--- Added these for the new game modes
+  BrainCircuit, Swords, Heart, Skull, Shield, Hourglass, Flame, Crown, Crosshair,Map, TrendingUp, Footprints,ArrowUp, Eye, EyeOff, Settings2 // <--- Added these for the new game modes
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -992,13 +992,14 @@ function QuizGame({ deckCards, onGameEnd }: any) {
     );
 }
 
-function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, activeDeckOverride, onComplete, onLogActivity }: any) {
+function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, activeDeckOverride, onComplete, onLogActivity, userData, onUpdatePrefs, onDeleteDeck }: any) {
   // --- STATE ---
   const [viewState, setViewState] = useState<'browsing' | 'playing'>(activeDeckOverride ? 'playing' : 'browsing');
   const [filterLang, setFilterLang] = useState('All');
+  const [isEditMode, setIsEditMode] = useState(false); // NEW: Toggle reorder/delete mode
   const [completionMsg, setCompletionMsg] = useState<string | null>(null);
 
-  // Accordion State (Default: Assignments & Custom Open, Library Closed)
+  // Accordion State
   const [openSections, setOpenSections] = useState({
     assignments: true,
     custom: true,
@@ -1021,38 +1022,66 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   const [dragEndX, setDragEndX] = useState<number | null>(null);
   const minSwipeDistance = 50; 
 
-  // --- DERIVED DATA ---
+  // --- DERIVED DATA & PREFERENCES ---
   const currentDeck = activeDeckOverride || allDecks[selectedDeckKey];
-  
+  const userPrefs = userData?.deckPreferences || { hiddenDeckIds: [], customOrder: [] };
+
   // 1. Process and Categorize Decks
   const { assignments, customDecks, libraryDecks, allProcessed, languages } = useMemo(() => {
+      // Helper to check if hidden
+      const isHidden = (id: string) => userPrefs.hiddenDeckIds?.includes(id);
+
       const processed = Object.entries(allDecks)
         .filter(([_, deck]: any) => deck.cards && deck.cards.length > 0)
         .map(([key, deck]: any) => {
             const detectedLang = deck.targetLanguage || deck.cards[0]?.targetLanguage || 'General';
-            // Determine Category
             let category = 'library';
             if (deck.isAssignment) category = 'assignment';
             else if (key.startsWith('custom')) category = 'custom';
 
-            return { id: key, ...deck, language: detectedLang, category };
+            return { id: key, ...deck, language: detectedLang, category, isHidden: isHidden(key) };
         });
+
+      // --- SORTING LOGIC ---
+      // We sort based on the index in the customOrder array. 
+      // If an ID isn't in the array, it goes to the bottom.
+      const sortOrder = userPrefs.customOrder || [];
+      const sorter = (a: any, b: any) => {
+          const idxA = sortOrder.indexOf(a.id);
+          const idxB = sortOrder.indexOf(b.id);
+          // If both are in the list, sort by index
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+          // If only A is in list, A comes first
+          if (idxA !== -1) return -1;
+          // If only B is in list, B comes first
+          if (idxB !== -1) return 1;
+          // Otherwise sort alphabetically
+          return a.title.localeCompare(b.title);
+      };
 
       const langs = new Set(processed.map(d => d.language));
 
       return {
-          assignments: processed.filter(d => d.category === 'assignment'),
-          customDecks: processed.filter(d => d.category === 'custom'),
-          libraryDecks: processed.filter(d => d.category === 'library'),
+          assignments: processed.filter(d => d.category === 'assignment').sort(sorter),
+          customDecks: processed.filter(d => d.category === 'custom').sort(sorter),
+          libraryDecks: processed.filter(d => d.category === 'library').sort(sorter),
           allProcessed: processed,
           languages: ['All', ...Array.from(langs).sort()]
       };
-  }, [allDecks]);
+  }, [allDecks, userPrefs]);
 
-  // 2. Apply Language Filter
+  // 2. Apply Language Filter & Visibility Filter
   const filterList = (list: any[]) => {
-      if (filterLang === 'All') return list;
-      return list.filter(d => d.language === filterLang);
+      let filtered = list;
+      // Filter by Language
+      if (filterLang !== 'All') {
+          filtered = filtered.filter(d => d.language === filterLang);
+      }
+      // Filter by Visibility (Unless in Edit Mode)
+      if (!isEditMode) {
+          filtered = filtered.filter(d => !d.isHidden);
+      }
+      return filtered;
   };
 
   const visibleAssignments = filterList(assignments);
@@ -1064,8 +1093,57 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   const card = deckCards[currentIndex];
   const theme = card ? (TYPE_COLORS[card.type] || TYPE_COLORS.noun) : TYPE_COLORS.noun;
 
+  // --- PREFERENCE ACTIONS ---
+  const handleMove = (id: string, direction: 'up' | 'down', list: any[]) => {
+      const currentOrder = list.map(d => d.id);
+      const currentIndex = currentOrder.indexOf(id);
+      if (currentIndex === -1) return;
+
+      const newOrder = [...currentOrder];
+      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+
+      // Bounds check
+      if (targetIndex < 0 || targetIndex >= newOrder.length) return;
+
+      // Swap
+      [newOrder[currentIndex], newOrder[targetIndex]] = [newOrder[targetIndex], newOrder[currentIndex]];
+
+      // We need to merge this specific list's new order with the global preference list
+      // 1. Get existing global order
+      const globalOrder = [...(userPrefs.customOrder || [])];
+      
+      // 2. Ensure all items in current list are in global order (for first time sort)
+      list.forEach(d => { if(!globalOrder.includes(d.id)) globalOrder.push(d.id); });
+
+      // 3. Reconstruct global order based on the swap
+      const id1 = currentOrder[currentIndex];
+      const id2 = currentOrder[targetIndex];
+      
+      // Find their positions in global and swap them there too
+      const gIdx1 = globalOrder.indexOf(id1);
+      const gIdx2 = globalOrder.indexOf(id2);
+      
+      if(gIdx1 !== -1 && gIdx2 !== -1) {
+          [globalOrder[gIdx1], globalOrder[gIdx2]] = [globalOrder[gIdx2], globalOrder[gIdx1]];
+      }
+
+      onUpdatePrefs({ ...userPrefs, customOrder: globalOrder });
+  };
+
+  const handleToggleHide = (id: string) => {
+      const hidden = userPrefs.hiddenDeckIds || [];
+      let newHidden;
+      if (hidden.includes(id)) {
+          newHidden = hidden.filter((h: string) => h !== id);
+      } else {
+          newHidden = [...hidden, id];
+      }
+      onUpdatePrefs({ ...userPrefs, hiddenDeckIds: newHidden });
+  };
+
   // --- ACTIONS ---
   const launchDeck = (key: string) => {
+    if (isEditMode) return; // Disable launching in edit mode
     onSelectDeck(key);
     setCurrentIndex(0);
     setIsFlipped(false);
@@ -1078,7 +1156,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
     launchDeck(largestDeck.id);
   };
 
-  // --- GAME END ---
+  // --- GAME END (Unchanged) ---
   const handleGameEnd = (data: any) => { 
       let xp = 0;
       let message = "";
@@ -1103,7 +1181,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
       }
   };
 
-  // --- NAVIGATION ---
+  // --- NAVIGATION (Unchanged) ---
   const handleNext = useCallback(() => {
     setXrayMode(false); setIsFlipped(false); setSwipeDirection('left');
     setTimeout(() => { setCurrentIndex((prev) => (prev + 1) % deckCards.length); setSwipeDirection(null); }, 200);
@@ -1134,10 +1212,14 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   };
 
   // --- RENDER COMPONENT: DECK CARD ---
-  const DeckCard = ({ deck, icon, colorClass, borderClass }: any) => (
-      <button 
+  const DeckCard = ({ deck, icon, colorClass, borderClass, fullList }: any) => (
+      <div 
           onClick={() => launchDeck(deck.id)}
-          className={`w-full bg-white p-4 rounded-2xl border shadow-sm hover:shadow-md transition-all flex flex-col gap-3 group relative overflow-hidden text-left ${borderClass || 'border-slate-100 hover:border-indigo-200'}`}
+          className={`w-full bg-white p-4 rounded-2xl border shadow-sm transition-all flex flex-col gap-3 group relative overflow-hidden text-left ${
+              isEditMode 
+              ? 'border-slate-300 border-dashed cursor-default' 
+              : `hover:shadow-md cursor-pointer ${borderClass || 'border-slate-100 hover:border-indigo-200'}`
+          } ${deck.isHidden ? 'opacity-60 bg-slate-50' : ''}`}
       >
           {/* Language Stripe */}
           <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
@@ -1148,11 +1230,14 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
 
           <div className="flex justify-between items-start w-full pl-2">
               <div className="flex items-center gap-3">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm transition-colors ${colorClass}`}>
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm transition-colors ${deck.isHidden ? 'bg-slate-200 text-slate-400' : colorClass}`}>
                       {icon}
                   </div>
                   <div>
-                      <h4 className="font-bold text-slate-800 text-base leading-tight group-hover:text-indigo-700 transition-colors line-clamp-1">{deck.title}</h4>
+                      <h4 className="font-bold text-slate-800 text-base leading-tight group-hover:text-indigo-700 transition-colors line-clamp-1 flex items-center gap-2">
+                          {deck.title}
+                          {deck.isHidden && <span className="text-[9px] bg-slate-200 text-slate-500 px-1 rounded uppercase">Hidden</span>}
+                      </h4>
                       <div className="flex items-center gap-2 mt-1">
                           <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded flex items-center gap-1">
                               <Globe size={10}/> {deck.language}
@@ -1163,23 +1248,42 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                       </div>
                   </div>
               </div>
-              <div className="text-slate-300 group-hover:text-indigo-500 transition-colors"><ChevronRight size={18}/></div>
+              
+              {/* EDIT MODE CONTROLS */}
+              {isEditMode ? (
+                  <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => handleMove(deck.id, 'up', fullList)} className="p-2 bg-slate-100 rounded-lg hover:bg-indigo-100 hover:text-indigo-600"><ArrowUp size={16}/></button>
+                      <button onClick={() => handleMove(deck.id, 'down', fullList)} className="p-2 bg-slate-100 rounded-lg hover:bg-indigo-100 hover:text-indigo-600"><ArrowDown size={16}/></button>
+                      <button onClick={() => handleToggleHide(deck.id)} className="p-2 bg-slate-100 rounded-lg hover:bg-amber-100 hover:text-amber-600">
+                          {deck.isHidden ? <EyeOff size={16}/> : <Eye size={16}/>}
+                      </button>
+                      {deck.category === 'custom' && (
+                          <button onClick={() => onDeleteDeck(deck.id)} className="p-2 bg-rose-50 rounded-lg text-rose-500 hover:bg-rose-100 hover:text-rose-700 ml-1">
+                              <Trash2 size={16}/>
+                          </button>
+                      )}
+                  </div>
+              ) : (
+                  <div className="text-slate-300 group-hover:text-indigo-500 transition-colors"><ChevronRight size={18}/></div>
+              )}
           </div>
 
-          {/* Progress Bar (Mocked for visual appeal, can connect to real mastery later) */}
-          <div className="w-full pl-2 pr-1">
-              <div className="flex justify-between text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                  <span>Progress</span>
-                  <span>{deck.mastery || 0}%</span>
+          {/* Progress Bar (Hidden in edit mode) */}
+          {!isEditMode && (
+              <div className="w-full pl-2 pr-1">
+                  <div className="flex justify-between text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      <span>Progress</span>
+                      <span>{deck.mastery || 0}%</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${deck.mastery || 5}%` }}></div>
+                  </div>
               </div>
-              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${deck.mastery || 5}%` }}></div>
-              </div>
-          </div>
-      </button>
+          )}
+      </div>
   );
 
-  // --- RENDER COMPONENT: ACCORDION WRAPPER ---
+  // --- RENDER COMPONENT: ACCORDION WRAPPER (Unchanged) ---
   const SectionAccordion = ({ title, icon, count, isOpen, onToggle, children, colorTheme = "indigo" }: any) => {
     // Theme mapping
     const theme: any = {
@@ -1232,16 +1336,22 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
             <div className="bg-white p-6 pb-2 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 relative z-10">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-2xl font-bold text-slate-900">Practice Hub</h1>
-                    {/* Filter Pills */}
-                    {languages.length > 1 && (
-                        <div className="flex gap-2">
-                            {languages.map((lang: string) => (
-                                <button key={lang} onClick={() => setFilterLang(lang)} className={`px-3 py-1.5 rounded-full text-[10px] font-bold transition-all ${filterLang === lang ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                                    {lang}
-                                </button>
-                            ))}
-                        </div>
-                    )}
+                    <div className="flex gap-2">
+                        {languages.length > 1 && (
+                            <button onClick={() => {
+                                const idx = languages.indexOf(filterLang);
+                                setFilterLang(languages[(idx + 1) % languages.length]);
+                            }} className="px-3 py-1.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">
+                                {filterLang}
+                            </button>
+                        )}
+                        <button 
+                            onClick={() => setIsEditMode(!isEditMode)} 
+                            className={`px-3 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-1 transition-colors ${isEditMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500'}`}
+                        >
+                            <Settings2 size={12}/> {isEditMode ? 'Done' : 'Manage'}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Quick Stats Row */}
@@ -1265,19 +1375,20 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
             <div className="p-6">
                 
                 {/* 1. ASSIGNMENTS */}
-                {visibleAssignments.length > 0 && (
+                {(isEditMode ? assignments : visibleAssignments).length > 0 && (
                     <SectionAccordion 
                         title="Class Assignments" 
                         icon={<School size={20}/>} 
-                        count={visibleAssignments.length}
+                        count={(isEditMode ? assignments : visibleAssignments).length}
                         isOpen={openSections.assignments}
                         onToggle={() => toggleSection('assignments')}
                         colorTheme="amber"
                     >
-                        {visibleAssignments.map((deck: any) => (
+                        {(isEditMode ? assignments : visibleAssignments).map((deck: any) => (
                             <DeckCard 
                                 key={deck.id} 
                                 deck={deck} 
+                                fullList={assignments}
                                 icon={<School size={20}/>} 
                                 colorClass="bg-amber-100 text-amber-600"
                                 borderClass="border-amber-200 hover:border-amber-400"
@@ -1290,16 +1401,17 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                 <SectionAccordion 
                     title="My Collections" 
                     icon={<Feather size={20}/>} 
-                    count={visibleCustom.length}
+                    count={(isEditMode ? customDecks : visibleCustom).length}
                     isOpen={openSections.custom}
                     onToggle={() => toggleSection('custom')}
                     colorTheme="emerald"
                 >
-                    {visibleCustom.length > 0 ? (
-                        visibleCustom.map((deck: any) => (
+                    {(isEditMode ? customDecks : visibleCustom).length > 0 ? (
+                        (isEditMode ? customDecks : visibleCustom).map((deck: any) => (
                             <DeckCard 
                                 key={deck.id} 
                                 deck={deck} 
+                                fullList={customDecks}
                                 icon={<Feather size={20}/>} 
                                 colorClass="bg-emerald-100 text-emerald-600"
                                 borderClass="border-slate-100 hover:border-emerald-300"
@@ -1317,16 +1429,17 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                 <SectionAccordion 
                     title="System Library" 
                     icon={<Library size={20}/>} 
-                    count={visibleLibrary.length}
+                    count={(isEditMode ? libraryDecks : visibleLibrary).length}
                     isOpen={openSections.library}
                     onToggle={() => toggleSection('library')}
                     colorTheme="blue"
                 >
-                    {visibleLibrary.length > 0 ? (
-                        visibleLibrary.map((deck: any) => (
+                    {(isEditMode ? libraryDecks : visibleLibrary).length > 0 ? (
+                        (isEditMode ? libraryDecks : visibleLibrary).map((deck: any) => (
                             <DeckCard 
                                 key={deck.id} 
                                 deck={deck} 
+                                fullList={libraryDecks}
                                 icon={<BookOpen size={20}/>} 
                                 colorClass="bg-blue-100 text-blue-600"
                                 borderClass="border-slate-100 hover:border-blue-300"
@@ -4620,8 +4733,7 @@ function WidgetView({ allDecks, userData }: any) {
         </div>
     </div>
   );
-}
-function App() {
+}function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
@@ -4666,8 +4778,6 @@ function App() {
   }, [systemDecks, customCards, classLessons]);
 
   // Merge all content for the library
-  // (Assuming EMAIL_MODULE_DATA is defined at the top of your file, if not, remove it from this array)
-  // If EMAIL_MODULE_DATA is undefined errors, remove it from the array below.
   const lessons = useMemo(() => [...systemLessons, ...customLessons, ...classLessons.filter(l => l.contentType !== 'deck')], [systemLessons, customLessons, classLessons]);
   const libraryLessons = useMemo(() => [...systemLessons, ...customLessons], [systemLessons, customLessons]);
 
@@ -4737,6 +4847,47 @@ function App() {
     } 
   }, [user, userData]);
 
+  // --- NEW: HANDLE DECK DELETION (Integrated) ---
+  const handleDeleteDeck = useCallback(async (deckId: string) => {
+      if (!user) return;
+      if (!window.confirm("Permanently delete this deck? This cannot be undone.")) return;
+      
+      try {
+          // 1. Delete all cards in this deck
+          // Note: ensure 'getDocs' is imported from firebase/firestore at top of file
+          const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), where('deckId', '==', deckId));
+          const snapshot = await getDocs(q);
+          const batch = writeBatch(db);
+          snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+          await batch.commit();
+
+          // 2. Remove from deck preferences if it exists
+          if (userData?.deckPreferences?.customOrder) {
+              const newOrder = userData.deckPreferences.customOrder.filter((id: string) => id !== deckId);
+              await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
+                  'deckPreferences.customOrder': newOrder
+              });
+          }
+          
+          alert("Deck deleted.");
+      } catch (e: any) {
+          console.error(e);
+          alert("Error deleting deck: " + e.message);
+      }
+  }, [user, userData]);
+
+  // --- NEW: UPDATE USER PREFERENCES (Integrated) ---
+  const handleUpdatePreferences = useCallback(async (newPrefs: any) => {
+      if (!user) return;
+      try {
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
+              deckPreferences: newPrefs
+          });
+      } catch (e) {
+          console.error("Error saving preferences", e);
+      }
+  }, [user]);
+
   // --- RENDER HELPERS ---
   if (!authChecked) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
   if (!user) return <AuthView />;
@@ -4744,9 +4895,8 @@ function App() {
   
   const commonHandlers = { onSaveCard: handleCreateCard, onUpdateCard: handleUpdateCard, onDeleteCard: handleDeleteCard, onSaveLesson: handleCreateLesson, };
 
-
-const renderStudentView = () => {
-    // 1. Check for Test (Expanded check)
+  const renderStudentView = () => {
+    // 1. Check for Test
     if (activeLesson && (activeLesson.type === 'test' || activeLesson.contentType === 'test')) {
         // @ts-ignore
         return <TestPlayerView test={activeLesson} onFinish={(id: string, xp: number, title: string, score: any) => { handleFinishLesson(id, xp, title, score); setActiveLesson(null); }} />;
@@ -4766,30 +4916,97 @@ const renderStudentView = () => {
     
     // 5. Main Tab Navigation
     switch (activeTab) {
-case 'home': return <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} />;      case 'flashcards': 
+      case 'home': return <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} />;
+      case 'flashcards': 
           const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
           const deckToLoad = assignedDeck || allDecks[selectedDeckKey];
-          return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} activeDeckOverride={deckToLoad} onComplete={handleFinishLesson} />;
+          return <FlashcardView 
+              allDecks={allDecks} 
+              selectedDeckKey={selectedDeckKey} 
+              onSelectDeck={setSelectedDeckKey} 
+              onSaveCard={handleCreateCard} 
+              activeDeckOverride={deckToLoad} 
+              onComplete={handleFinishLesson}
+              userData={userData}
+              onUpdatePrefs={handleUpdatePreferences}
+              onDeleteDeck={handleDeleteDeck}
+          />;
       case 'create': return <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} />;
       case 'profile': return <ProfileView user={user} userData={userData} />;
       default: return <HomeView />;
     }
   };
 
-// --- ROUTING: CHECK FOR WIDGET MODE ---
-  // If the URL ends in /widget, we show ONLY the WidgetView
+  // --- ROUTING: CHECK FOR WIDGET MODE ---
   const isWidgetMode = window.location.pathname === '/widget';
 
   if (isWidgetMode) {
-      // 1. Loading State for Widget
       if (!authChecked) return <div className="bg-slate-900 h-screen w-screen flex items-center justify-center text-white"><Loader className="animate-spin"/></div>;
-      
-      // 2. Auth Check for Widget
       if (!user || !userData) return <div className="h-screen w-screen bg-slate-100 flex items-center justify-center text-xs text-slate-400">Please Log In</div>;
-      
-      // 3. Render Widget View
       return <WidgetView allDecks={allDecks} userData={userData} />;
   }
+
+  // --- STANDARD APP RENDER ---
+  return (
+    <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-center relative overflow-hidden">
+      
+      {/* 1. GLOBAL STYLES (Scrollbar Hide & Reset) */}
+      <style>{`
+        html, body, #root {
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          height: 100%;
+          overflow: hidden;
+          background-color: #f8fafc;
+        }
+        *::-webkit-scrollbar {
+          display: none;
+        }
+        * {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
+
+      {/* 2. BACKGROUND BLOBS (Visuals) */}
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-rose-400/20 rounded-full blur-[100px] pointer-events-none mix-blend-multiply animate-pulse" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-400/20 rounded-full blur-[100px] pointer-events-none mix-blend-multiply" />
+      
+      {/* 3. UTILITIES */}
+      <RoleToggle user={user} userData={userData} />
+
+      {/* 4. MAIN VESSEL */}
+      <div className={`w-full h-[100dvh] relative overflow-hidden bg-slate-50 ${userData?.role === 'instructor' ? 'max-w-full' : 'max-w-full sm:max-w-[400px] sm:h-[850px] sm:rounded-[3rem] sm:shadow-2xl sm:border-[8px] sm:border-slate-900/10'}`}>
+        
+        {/* Status Bar Spacer (Student Mobile View Only) */}
+        {userData?.role !== 'instructor' && <div className="absolute top-0 left-0 right-0 h-safe-top bg-transparent z-50 pointer-events-none" />}
+        
+        {/* 5. VIEW ROUTER */}
+        {userData.role === 'instructor' ? (
+             <InstructorDashboard 
+                user={user} 
+                userData={{...userData, classes: enrolledClasses}} 
+                allDecks={allDecks} 
+                lessons={libraryLessons} 
+                {...commonHandlers} 
+                onLogout={() => signOut(auth)} 
+             />
+        ) : (
+             <>
+                {/* Main Student View Logic */}
+                {renderStudentView()}
+                
+                {/* Navigation Bar (Hidden if inside Lesson/Class/Exam) */}
+                {!activeLesson && !activeStudentClass && (
+                    <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
+                )}
+             </>
+        )}
+      </div>
+    </div>
+  );
+}
 
   // --- STANDARD APP RENDER ---
   return (
