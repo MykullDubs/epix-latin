@@ -72,6 +72,27 @@ const DEFAULT_USER_DATA = {
   classes: [], 
   completedAssignments: [] 
 };
+// --- DATE HELPERS ---
+const getDueStatus = (timestamp: number | null) => {
+  if (!timestamp) return null;
+  
+  const now = new Date();
+  const due = new Date(timestamp);
+  
+  // Reset hours to compare pure dates
+  now.setHours(0,0,0,0);
+  due.setHours(0,0,0,0);
+  
+  const diffTime = due.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) return { label: `${Math.abs(diffDays)}d Late`, color: 'bg-rose-100 text-rose-700', urgent: true };
+  if (diffDays === 0) return { label: 'Due Today', color: 'bg-amber-100 text-amber-700', urgent: true };
+  if (diffDays === 1) return { label: 'Tomorrow', color: 'bg-amber-50 text-amber-600', urgent: false };
+  if (diffDays <= 3) return { label: `${diffDays} Days left`, color: 'bg-blue-50 text-blue-600', urgent: false };
+  
+  return { label: new Date(timestamp).toLocaleDateString(undefined, {month:'short', day:'numeric'}), color: 'bg-slate-100 text-slate-500', urgent: false };
+};
 
 const INITIAL_SYSTEM_DECKS: any = {
   greetings: {
@@ -1919,10 +1940,7 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
   const [viewMode, setViewMode] = useState<'assignments' | 'forum' | 'grades'>('assignments');
   const completedSet = new Set(userData?.completedAssignments || []);
   
-  // Filter assignments relevant to this student (if targetStudents is used)
   const relevantAssignments = (classData.assignments || []).filter((l: any) => !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email));
-  
-  // Calculate Progress Stats
   const pendingCount = relevantAssignments.filter((l: any) => !completedSet.has(l.id)).length;
   const completedCount = relevantAssignments.length - pendingCount;
   const progressPercent = relevantAssignments.length > 0 ? (completedCount / relevantAssignments.length) * 100 : 0;
@@ -1937,8 +1955,6 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
       
       {/* --- COMPACT HEADER --- */}
       <div className="bg-white p-6 pb-0 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 relative z-20 shrink-0">
-          
-          {/* Top Row: Back Button & Class Code */}
           <div className="flex justify-between items-center mb-4">
               <button onClick={onBack} className="group flex items-center gap-1 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-bold uppercase tracking-wider">
                   <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform"/> Back
@@ -1947,8 +1963,6 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
                   {classData.code}
               </div>
           </div>
-
-          {/* Middle Row: Class Identity & Icon */}
           <div className="flex items-center gap-4 mb-6">
               <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-indigo-200">
                   {classData.name.charAt(0)}
@@ -1958,45 +1972,27 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
                   <p className="text-xs text-slate-500 font-medium mt-1">Student Portal • {relevantAssignments.length} Assignments</p>
               </div>
           </div>
-
-          {/* Bottom Row: Tab Switcher */}
           <div className="flex gap-8 border-b border-slate-100">
-              <button 
-                  onClick={() => setViewMode('assignments')} 
-                  className={`pb-3 text-sm font-bold transition-all relative ${viewMode === 'assignments' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
-              >
+              <button onClick={() => setViewMode('assignments')} className={`pb-3 text-sm font-bold transition-all relative ${viewMode === 'assignments' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
                   Tasks
                   {viewMode === 'assignments' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-t-full"></div>}
               </button>
-              <button 
-                  onClick={() => setViewMode('grades')} 
-                  className={`pb-3 text-sm font-bold transition-all relative ${viewMode === 'grades' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
-              >
+              <button onClick={() => setViewMode('grades')} className={`pb-3 text-sm font-bold transition-all relative ${viewMode === 'grades' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
                   Grades
                   {viewMode === 'grades' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-t-full"></div>}
               </button>
-              <button 
-                  onClick={() => setViewMode('forum')} 
-                  className={`pb-3 text-sm font-bold transition-all relative ${viewMode === 'forum' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
-              >
+              <button onClick={() => setViewMode('forum')} className={`pb-3 text-sm font-bold transition-all relative ${viewMode === 'forum' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
                   Forum
                   {viewMode === 'forum' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-t-full"></div>}
               </button>
           </div>
       </div>
       
-      {/* --- CONTENT AREA --- */}
       <div className="flex-1 overflow-y-auto p-6 relative z-10 custom-scrollbar">
-        
-        {viewMode === 'grades' && (
-            // Pass userData here so Gradebook can verify completion status against profile
-            <StudentGradebook classData={classData} user={user} userData={userData} />
-        )}
+        {viewMode === 'grades' && <StudentGradebook classData={classData} user={user} userData={userData} />}
 
         {viewMode === 'assignments' && (
             <div className="space-y-6 pb-20">
-                
-                {/* Progress Card */}
                 <div className="bg-gradient-to-r from-indigo-500 to-blue-600 rounded-2xl p-5 shadow-lg text-white flex items-center justify-between relative overflow-hidden">
                     <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
                     <div className="relative z-10">
@@ -2011,10 +2007,11 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
                     </div>
                 </div>
 
-                {/* Assignments List */}
                 <div className="space-y-3">
                     {relevantAssignments.length > 0 ? ( relevantAssignments.map((l: any, i: number) => {
                         const isDone = completedSet.has(l.id);
+                        const dateStatus = !isDone ? getDueStatus(l.dueDate) : null; // Only show due date if incomplete
+
                         return (
                             <button 
                                 key={`${l.id}-${i}`} 
@@ -2023,22 +2020,24 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
                             >
                                 <div className="flex items-center space-x-4 relative z-10">
                                     <div className={`h-10 w-10 rounded-xl flex items-center justify-center transition-all shadow-sm ${
-                                        isDone 
-                                            ? 'bg-emerald-100 text-emerald-600' 
-                                            : l.contentType === 'deck' 
-                                                ? 'bg-orange-100 text-orange-600' 
-                                                : l.contentType === 'test'
-                                                    ? 'bg-rose-100 text-rose-600'
-                                                    : 'bg-indigo-100 text-indigo-600'
+                                        isDone ? 'bg-emerald-100 text-emerald-600' : l.contentType === 'deck' ? 'bg-orange-100 text-orange-600' : l.contentType === 'test' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'
                                     }`}>
                                         {isDone ? <Check size={18} strokeWidth={3}/> : l.contentType === 'deck' ? <Layers size={18}/> : l.contentType === 'test' ? <HelpCircle size={18}/> : <PlayCircle size={18}/>}
                                     </div>
                                     <div className="text-left">
                                         <h4 className={`font-bold text-sm ${isDone ? 'text-slate-500 line-through decoration-slate-300' : 'text-slate-800 group-hover:text-indigo-700'}`}>{l.title}</h4>
-                                        <div className="flex items-center gap-2 mt-0.5">
+                                        <div className="flex flex-wrap items-center gap-2 mt-0.5">
                                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide bg-slate-100 px-1.5 rounded">
                                                 {l.contentType === 'deck' ? 'Deck' : l.contentType === 'test' ? 'Exam' : 'Lesson'}
                                             </span>
+                                            
+                                            {/* --- NEW: DUE DATE BADGE --- */}
+                                            {dateStatus && (
+                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${dateStatus.color} ${dateStatus.urgent ? 'animate-pulse' : ''}`}>
+                                                    <Clock size={10}/> {dateStatus.label}
+                                                </span>
+                                            )}
+
                                             {!isDone && l.xp && <span className="text-[9px] font-bold text-emerald-600">+{l.xp} XP</span>}
                                         </div>
                                     </div>
@@ -4523,14 +4522,10 @@ function RosterManagerModal({ isOpen, onClose, currentRosterEmails, onSave }: an
 
 // --- UPDATED CLASS MANAGER VIEW ---
 function ClassManagerView({ user, userData, classes, lessons, allDecks, initialClassId, onClearSelection }: any) {
-  // Initialize state with prop if it exists
   const [selectedClassId, setSelectedClassId] = useState<string | null>(initialClassId || null);
   
-  // React to prop changes (e.g. if user clicks a different class in sidebar while already on this tab)
   useEffect(() => {
-      if (initialClassId) {
-          setSelectedClassId(initialClassId);
-      }
+      if (initialClassId) setSelectedClassId(initialClassId);
   }, [initialClassId]);
 
   const [newClassName, setNewClassName] = useState('');
@@ -4539,10 +4534,11 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks, initialC
   const [targetStudentMode, setTargetStudentMode] = useState('all'); 
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   
+  // --- NEW: DATE STATE ---
+  const [selectedDueDate, setSelectedDueDate] = useState('');
+
   const [assignType, setAssignType] = useState<'deck' | 'lesson' | 'test'>('lesson');
   const [viewTab, setViewTab] = useState<'content' | 'forum' | 'grades'>('content');
-
-  // -- Student Selector States --
   const [isStudentListOpen, setIsStudentListOpen] = useState(false);
   
   const selectedClass = classes.find((c: any) => c.id === selectedClassId);
@@ -4553,24 +4549,42 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks, initialC
   const handleRenameClass = async (classId: string, currentName: string) => { const newName = prompt("Enter new class name:", currentName); if (newName && newName.trim() !== "" && newName !== currentName) { try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { name: newName.trim() }); setToastMsg("Class renamed successfully"); } catch (error) { console.error("Rename failed", error); alert("Failed to rename class"); } } };
   
   const toggleAssignee = (email: string) => { if (selectedAssignees.includes(email)) { setSelectedAssignees(selectedAssignees.filter(e => e !== email)); } else { setSelectedAssignees([...selectedAssignees, email]); } };
-  const assignContent = async (item: any, type: string) => { if (!selectedClass) return; try { const assignment = JSON.parse(JSON.stringify({ ...item, id: `assign_${Date.now()}_${Math.random().toString(36).substr(2,5)}`, originalId: item.id, contentType: type, targetStudents: targetStudentMode === 'specific' ? selectedAssignees : null })); await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { assignments: arrayUnion(assignment) }); setAssignModalOpen(false); setTargetStudentMode('all'); setSelectedAssignees([]); setToastMsg(`Assigned: ${item.title}`); } catch (error) { console.error("Assign failed:", error); alert("Failed to assign."); } };
+  
+  // --- UPDATED ASSIGN CONTENT ---
+  const assignContent = async (item: any, type: string) => { 
+      if (!selectedClass) return; 
+      try { 
+          const assignment = JSON.parse(JSON.stringify({ 
+              ...item, 
+              id: `assign_${Date.now()}_${Math.random().toString(36).substr(2,5)}`, 
+              originalId: item.id, 
+              contentType: type, 
+              targetStudents: targetStudentMode === 'specific' ? selectedAssignees : null,
+              // Save the date as a timestamp (midnight of that day)
+              dueDate: selectedDueDate ? new Date(selectedDueDate).getTime() : null
+          })); 
+          
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { assignments: arrayUnion(assignment) }); 
+          
+          setAssignModalOpen(false); 
+          setTargetStudentMode('all'); 
+          setSelectedAssignees([]); 
+          setSelectedDueDate(''); // Reset date
+          setToastMsg(`Assigned: ${item.title}`); 
+      } catch (error) { 
+          console.error("Assign failed:", error); 
+          alert("Failed to assign."); 
+      } 
+  };
 
-  // --- NEW: BATCH ROSTER UPDATE ---
   const handleUpdateRoster = async (newEmailList: string[]) => {
       if (!selectedClass) return;
       try {
-          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), {
-              students: newEmailList,
-              studentEmails: newEmailList 
-          });
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { students: newEmailList, studentEmails: newEmailList });
           setToastMsg("Roster updated successfully");
-      } catch (error) {
-          console.error("Roster update failed:", error);
-          alert("Failed to update roster.");
-      }
+      } catch (error) { console.error("Roster update failed:", error); alert("Failed to update roster."); }
   };
 
-  // --- REMOVE SINGLE STUDENT (Backup) ---
   const removeStudent = async (email: string) => {
       if (!selectedClass || !email) return;
       if (!window.confirm(`Are you sure you want to remove ${email} from this class?`)) return;
@@ -4584,7 +4598,7 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks, initialC
 
   const removeAssignment = async (assignmentId: string) => {
       if (!selectedClass) return;
-      if (!window.confirm("Unassign this content? Student progress logs for this specific task assignment may be lost.")) return;
+      if (!window.confirm("Unassign this content?")) return;
       try {
           const newAssignments = (selectedClass.assignments || []).filter((a: any) => a.id !== assignmentId);
           await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { assignments: newAssignments });
@@ -4592,31 +4606,17 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks, initialC
       } catch (e: any) { console.error(e); alert("Error removing assignment: " + e.message); }
   };
 
-  // --- HANDLE BACK BUTTON ---
-  const handleBack = () => {
-      setSelectedClassId(null);
-      if (onClearSelection) onClearSelection();
-  };
+  const handleBack = () => { setSelectedClassId(null); if (onClearSelection) onClearSelection(); };
 
   if (selectedClass) {
     return (
       <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-300 relative bg-slate-50">
         {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
         
-        {/* --- ROSTER MANAGER MODAL --- */}
-        <RosterManagerModal 
-            isOpen={isStudentListOpen}
-            onClose={() => setIsStudentListOpen(false)}
-            currentRosterEmails={selectedClass.studentEmails || []}
-            onSave={handleUpdateRoster}
-        />
+        <RosterManagerModal isOpen={isStudentListOpen} onClose={() => setIsStudentListOpen(false)} currentRosterEmails={selectedClass.studentEmails || []} onSave={handleUpdateRoster} />
 
-        {/* --- CLASS HEADER --- */}
         <div className="pb-4 border-b border-slate-200 mb-4 bg-white p-4 rounded-xl shadow-sm shrink-0">
-          <button onClick={handleBack} className="flex items-center text-slate-400 hover:text-indigo-600 mb-3 text-xs font-bold uppercase tracking-wider">
-              <ArrowLeft size={14} className="mr-1"/> All Classes
-          </button>
-          
+          <button onClick={handleBack} className="flex items-center text-slate-400 hover:text-indigo-600 mb-3 text-xs font-bold uppercase tracking-wider"><ArrowLeft size={14} className="mr-1"/> All Classes</button>
           <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4">
             <div>
                 <h1 className="text-2xl font-black text-slate-800 leading-none">{selectedClass.name}</h1>
@@ -4625,29 +4625,17 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks, initialC
                     <button className="text-indigo-600 hover:text-indigo-800" onClick={() => navigator.clipboard.writeText(selectedClass.code)}><Copy size={14}/></button>
                 </div>
             </div>
-
-            {/* Navigation Tabs */}
             <div className="flex flex-wrap gap-2">
-                <button onClick={() => setViewTab('content')} className={`px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all ${viewTab === 'content' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
-                    Manage
-                </button>
-                <button onClick={() => setViewTab('grades')} className={`px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all flex items-center gap-2 ${viewTab === 'grades' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
-                    <BarChart3 size={14}/> Grades
-                </button>
-                <button onClick={() => setViewTab('forum')} className={`px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all ${viewTab === 'forum' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
-                    Forum
-                </button>
+                <button onClick={() => setViewTab('content')} className={`px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all ${viewTab === 'content' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>Manage</button>
+                <button onClick={() => setViewTab('grades')} className={`px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all flex items-center gap-2 ${viewTab === 'grades' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}><BarChart3 size={14}/> Grades</button>
+                <button onClick={() => setViewTab('forum')} className={`px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all ${viewTab === 'forum' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>Forum</button>
             </div>
           </div>
         </div>
 
-        {/* --- MAIN CONTENT AREA --- */}
         <div className="flex-1 overflow-y-auto custom-scrollbar">
-            
             {viewTab === 'content' && (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 pb-20">
-                    
-                    {/* LEFT COLUMN: ASSIGNMENTS */}
                     <div className="space-y-4">
                         <div className="flex flex-wrap gap-2 justify-between items-center bg-white p-3 rounded-xl border border-slate-100 shadow-sm sticky top-0 z-10">
                             <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm"><BookOpen size={16} className="text-indigo-600"/> Assignments</h3>
@@ -4657,63 +4645,55 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks, initialC
                                 <button onClick={() => { setAssignType('test'); setAssignModalOpen(true); }} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100" title="Assign Exam"><HelpCircle size={16}/></button>
                             </div>
                         </div>
-
                         <div className="space-y-3">
                             {(!selectedClass.assignments || selectedClass.assignments.length === 0) && (
-                                <div className="p-8 border-2 border-dashed border-slate-200 rounded-2xl text-center text-slate-400 text-sm">
-                                    <BookOpen className="mx-auto mb-2 opacity-50" size={32}/>
-                                    No content assigned yet.
-                                </div>
+                                <div className="p-8 border-2 border-dashed border-slate-200 rounded-2xl text-center text-slate-400 text-sm"><BookOpen className="mx-auto mb-2 opacity-50" size={32}/>No content assigned yet.</div>
                             )}
-                            {selectedClass.assignments?.map((l: any, idx: number) => ( 
-                              <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-start group">
-                                <div className="flex items-start gap-3 overflow-hidden">
-                                  <div className={`mt-1 p-2 rounded-lg shrink-0 ${l.contentType === 'deck' ? 'bg-orange-100 text-orange-600' : l.contentType === 'test' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                                      {l.contentType === 'deck' ? <Layers size={16} /> : l.contentType === 'test' ? <HelpCircle size={16}/> : <FileText size={16} />}
-                                  </div>
-                                  <div className="min-w-0">
-                                      <h4 className="font-bold text-slate-800 text-sm truncate pr-2">{l.title}</h4>
-                                      <div className="flex flex-wrap items-center gap-2 mt-1">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-50 px-1.5 py-0.5 rounded">
-                                            {l.contentType === 'deck' ? 'Deck' : l.contentType === 'test' ? 'Exam' : 'Unit'}
-                                        </span>
-                                        {l.targetStudents && l.targetStudents.length > 0 && (
-                                            <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-bold flex items-center gap-1">
-                                                <Users size={10}/> {l.targetStudents.length}
-                                            </span>
-                                        )}
-                                      </div>
-                                  </div>
-                                </div>
-                                <button onClick={() => removeAssignment(l.id)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors shrink-0"><Trash2 size={16} /></button>
-                              </div> 
-                            ))}
+                            {selectedClass.assignments?.map((l: any, idx: number) => {
+                              // Helper for instructor view of dates
+                              const dateStatus = getDueStatus(l.dueDate);
+                              return (
+                                <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-start group">
+                                    <div className="flex items-start gap-3 overflow-hidden">
+                                        <div className={`mt-1 p-2 rounded-lg shrink-0 ${l.contentType === 'deck' ? 'bg-orange-100 text-orange-600' : l.contentType === 'test' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                            {l.contentType === 'deck' ? <Layers size={16} /> : l.contentType === 'test' ? <HelpCircle size={16}/> : <FileText size={16} />}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h4 className="font-bold text-slate-800 text-sm truncate pr-2">{l.title}</h4>
+                                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-50 px-1.5 py-0.5 rounded">
+                                                    {l.contentType === 'deck' ? 'Deck' : l.contentType === 'test' ? 'Exam' : 'Unit'}
+                                                </span>
+                                                {dateStatus && (
+                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${dateStatus.color}`}>
+                                                        <Clock size={10}/> {dateStatus.label}
+                                                    </span>
+                                                )}
+                                                {l.targetStudents && l.targetStudents.length > 0 && (
+                                                    <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-bold flex items-center gap-1"><Users size={10}/> {l.targetStudents.length}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => removeAssignment(l.id)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors shrink-0"><Trash2 size={16} /></button>
+                                </div> 
+                              );
+                            })}
                         </div>
                     </div>
                     
-                    {/* RIGHT COLUMN: ROSTER */}
                     <div className="space-y-4">
                         <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-100 shadow-sm sticky top-0 z-10">
                             <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm"><Users size={16} className="text-indigo-600"/> Roster</h3>
-                            <button onClick={() => setIsStudentListOpen(true)} className="text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 shadow-sm">
-                                <UserPlus size={12}/> Manage
-                            </button>
+                            <button onClick={() => setIsStudentListOpen(true)} className="text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 shadow-sm"><UserPlus size={12}/> Manage</button>
                         </div>
-
                         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                            {(!selectedClass.students || selectedClass.students.length === 0) && (
-                                <div className="p-8 text-center text-slate-400 text-sm italic">
-                                    <Users className="mx-auto mb-2 opacity-50" size={32}/>
-                                    Class is empty.<br/>Click "Manage" to add students.
-                                </div>
-                            )}
+                            {(!selectedClass.students || selectedClass.students.length === 0) && (<div className="p-8 text-center text-slate-400 text-sm italic"><Users className="mx-auto mb-2 opacity-50" size={32}/>Class is empty.<br/>Click "Manage" to add students.</div>)}
                             <div className="divide-y divide-slate-50">
                                 {selectedClass.students?.map((s: string, i: number) => (
                                     <div key={i} className="p-3 flex items-center justify-between group hover:bg-slate-50 transition-colors">
                                         <div className="flex items-center gap-3 overflow-hidden">
-                                            <div className="w-8 h-8 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center font-bold text-xs border border-slate-200 shrink-0">
-                                                {s.charAt(0).toUpperCase()}
-                                            </div>
+                                            <div className="w-8 h-8 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center font-bold text-xs border border-slate-200 shrink-0">{s.charAt(0).toUpperCase()}</div>
                                             <span className="text-xs font-bold text-slate-700 truncate">{s}</span>
                                         </div>
                                         <button onClick={() => removeStudent(s)} className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100" title="Remove"><Trash2 size={14} /></button>
@@ -4725,25 +4705,27 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks, initialC
                 </div>
             )}
             
-            {viewTab === 'grades' && (
-                <div className="pb-20">
-                    <ClassGrades classData={selectedClass} />
-                </div>
-            )}
-            
-            {viewTab === 'forum' && (
-                <div className="h-[600px] pb-20">
-                    <ClassForum classId={selectedClass.id} user={user} userData={{...userData, role: 'instructor'}} />
-                </div>
-            )}
+            {viewTab === 'grades' && <div className="pb-20"><ClassGrades classData={selectedClass} /></div>}
+            {viewTab === 'forum' && <div className="h-[600px] pb-20"><ClassForum classId={selectedClass.id} user={user} userData={{...userData, role: 'instructor'}} /></div>}
         </div>
 
-        {/* --- ASSIGNMENT MODAL --- */}
         {assignModalOpen && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in duration-200">
               <div className="p-4 border-b border-slate-100 bg-slate-50">
                   <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">Assign Content</h3><button onClick={() => setAssignModalOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-600"/></button></div>
+                  
+                  {/* --- NEW: DATE PICKER --- */}
+                  <div className="mb-4">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Due Date (Optional)</label>
+                      <input 
+                        type="date" 
+                        value={selectedDueDate} 
+                        onChange={(e) => setSelectedDueDate(e.target.value)}
+                        className="w-full p-2 rounded-lg border border-slate-200 text-sm text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                  </div>
+
                   <div className="bg-white p-1 rounded-lg border border-slate-200 flex mb-2"><button onClick={() => setTargetStudentMode('all')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${targetStudentMode === 'all' ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Entire Class</button><button onClick={() => setTargetStudentMode('specific')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${targetStudentMode === 'specific' ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Specific Students</button></div>
                   {targetStudentMode === 'specific' && (<div className="mt-2 max-h-32 overflow-y-auto border border-slate-200 rounded-lg bg-white p-2 custom-scrollbar">{(!selectedClass.students || selectedClass.students.length === 0) ? (<p className="text-xs text-slate-400 italic text-center p-2">No students in roster.</p>) : (selectedClass.students.map((studentEmail: string) => (<button key={studentEmail} onClick={() => toggleAssignee(studentEmail)} className="flex items-center gap-2 w-full p-2 hover:bg-slate-50 rounded text-left">{selectedAssignees.includes(studentEmail) ? <CheckCircle2 size={16} className="text-indigo-600"/> : <Circle size={16} className="text-slate-300"/>}<span className="text-xs font-medium text-slate-700 truncate">{studentEmail}</span></button>)))}</div>)}
               </div>
