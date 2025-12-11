@@ -3298,12 +3298,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
 //  BEEFED UP CONTENT CREATION SUITE (10+ Block Types)
 // ============================================================================
 
-import { 
-  Type, Image as ImageIcon, Video, Mic, Layers, List, MessageSquare, 
-  Info, Code, Quote, CheckSquare, CheckCircle2, AlignLeft, 
-  HelpCircle, MoreHorizontal, ArrowDownUp, GripVertical, FileText,
-  Minus, PlayCircle, Eye
-} from 'lucide-react';
+
 
 // 1. FLASHCARD BUILDER (Standard)
 function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard, availableDecks, initialDeckId, initialData, onCancelEdit }: any) {
