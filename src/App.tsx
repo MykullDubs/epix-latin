@@ -38,7 +38,7 @@ import {
   AlignLeft, HelpCircle, Activity, Clock, CheckCircle2, Circle, ArrowDown,
   BarChart3, UserPlus, Briefcase, Coffee, AlertCircle, Target, Calendar, Settings, Edit2, Camera, Medal,
   ChevronUp, GripVertical, ListOrdered, ArrowRightLeft, CheckSquare, Gamepad2, Globe,
-  BrainCircuit, Swords, Heart, Skull, Shield, Hourglass, Flame, Crown, Crosshair, Mail, Star // <--- Added these for the new game modes
+  BrainCircuit, Swords, Heart, Skull, Shield, Hourglass, Flame, Crown, Crosshair // <--- Added these for the new game modes
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -351,189 +351,114 @@ const getLevelInfo = (xp: number) => {
   return { level, currentLevelXP, nextLevelXP, progress, rank };
 };
 
-function ProfileDetailModal({ userData, onClose }: any) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'settings'>('overview');
-  const [isEditing, setIsEditing] = useState(false);
-  const [newName, setNewName] = useState(userData?.name || '');
-  const [uploading, setUploading] = useState(false);
-  
-  // Calculate Level Info
+function LevelUpModal({ userData, onClose }: any) {
   const { level, currentLevelXP, nextLevelXP, progress, rank } = getLevelInfo(userData?.xp || 0);
+  
+  // Calculate remaining XP for motivation
   const xpNeeded = nextLevelXP - currentLevelXP;
   
-  // Stats
-  const stats = [
-    { label: 'Day Streak', value: userData?.streak || 1, icon: Zap, color: 'text-amber-500', bg: 'bg-amber-50' },
-    { label: 'Total XP', value: userData?.xp || 0, icon: Star, color: 'text-indigo-500', bg: 'bg-indigo-50' },
-    { label: 'Assignments', value: (userData?.completedAssignments || []).length, icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-    { label: 'Classes', value: (userData?.classes || []).length, icon: School, color: 'text-blue-500', bg: 'bg-blue-50' },
-  ];
-
-  // Image Upload Handler
-  const handleImageUpload = async (e: any) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      if (file.size > 5 * 1024 * 1024) { alert("File is too large (Max 5MB)"); return; }
-      
-      setUploading(true);
-      try {
-          const storageRef = ref(storage, `avatars/${auth.currentUser?.uid}_${Date.now()}`);
-          await uploadBytes(storageRef, file);
-          const photoURL = await getDownloadURL(storageRef);
-          await updateDoc(doc(db, 'artifacts', appId, 'users', auth.currentUser?.uid, 'profile', 'main'), { photoURL });
-          alert("Avatar updated!");
-      } catch (error) {
-          console.error("Upload failed", error);
-      } finally {
-          setUploading(false);
-      }
-  };
-
-  // Name Update Handler
-  const handleSaveName = async () => {
-      if(!newName.trim()) return;
-      try {
-          await updateDoc(doc(db, 'artifacts', appId, 'users', auth.currentUser?.uid, 'profile', 'main'), { name: newName });
-          setIsEditing(false);
-      } catch(e) { console.error(e); }
-  };
+  // Calculate specific stats
+  const completedCount = (userData?.completedAssignments || []).length;
+  const classCount = (userData?.classes || []).length;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
       <div 
-        className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden relative border border-white/20 flex flex-col max-h-[85vh]" 
+        className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden transform scale-100 transition-all relative border border-white/20" 
         onClick={e => e.stopPropagation()}
       >
         
-        {/* --- HEADER (Cornflower) --- */}
-        <div className="relative bg-gradient-to-br from-[#6495ED] to-[#4169E1] pt-8 pb-12 px-6 text-center shrink-0">
-            {/* Close Button */}
-            <button onClick={onClose} className="absolute top-4 right-4 text-white/50 hover:text-white bg-black/10 hover:bg-black/20 p-2 rounded-full backdrop-blur-md transition-all z-20">
-                <X size={18} />
+        {/* --- HEADER: The Cornflower Canopy --- */}
+        <div className="relative bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 p-8 pb-12 text-white text-center overflow-hidden">
+            {/* Background Decor */}
+            <div className="absolute top-[-50%] left-[-50%] w-[400px] h-[400px] bg-blue-400/30 rounded-full blur-[60px] mix-blend-overlay animate-pulse"></div>
+            <div className="absolute bottom-[-10%] right-[-10%] w-[200px] h-[200px] bg-indigo-300/20 rounded-full blur-[40px] mix-blend-overlay"></div>
+            
+            <button onClick={onClose} className="absolute top-5 right-5 text-white/50 hover:text-white bg-black/10 hover:bg-black/20 p-2 rounded-full backdrop-blur-md transition-all">
+                <X size={20} />
             </button>
 
-            {/* Background Texture */}
-            <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
-            <div className="absolute top-[-50%] left-[-20%] w-[300px] h-[300px] bg-white/10 rounded-full blur-[60px] animate-pulse"></div>
-
-            {/* Avatar & Identity */}
-            <div className="relative z-10 flex flex-col items-center">
-                <div className="relative group">
-                    <div className="w-24 h-24 rounded-full p-[3px] bg-white/30 backdrop-blur-sm shadow-xl">
-                        <div className="w-full h-full rounded-full bg-slate-100 overflow-hidden relative">
-                            {userData?.photoURL ? (
-                                <img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-slate-200 text-slate-400 font-serif font-bold text-4xl">
-                                    {userData?.name?.charAt(0)}
-                                </div>
-                            )}
-                            
-                            {/* Upload Overlay (Only visible in Settings tab) */}
-                            {activeTab === 'settings' && (
-                                <label className="absolute inset-0 bg-black/40 flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">
-                                    {uploading ? <Loader className="animate-spin text-white"/> : <Camera className="text-white"/>}
-                                    <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload}/>
-                                </label>
-                            )}
-                        </div>
-                    </div>
-                    {/* Rank Badge */}
-                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg border border-white/20 whitespace-nowrap flex items-center gap-1">
-                        <Crown size={10} className="text-amber-400"/> {rank}
-                    </div>
+           <div className="flex flex-col items-center relative z-10">
+    {/* Avatar with Halo */}
+    <div className="w-24 h-24 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border-2 border-white/40 shadow-[0_0_30px_rgba(255,255,255,0.25)] mb-4 overflow-hidden">
+        {userData?.photoURL ? (
+            <img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />
+        ) : (
+            <span className="font-serif font-bold text-4xl text-white drop-shadow-md">{userData?.name?.charAt(0) || "U"}</span>
+        )}
+    </div>
+                
+                <h2 className="text-3xl font-serif font-bold tracking-tight">{userData?.name}</h2>
+                <p className="text-blue-100 text-xs font-bold uppercase tracking-widest mt-1 opacity-80">{userData?.email}</p>
+                
+                {/* Rank Badge */}
+                <div className="mt-4 bg-white/10 backdrop-blur-lg border border-white/20 px-4 py-1.5 rounded-full flex items-center gap-2 shadow-inner">
+                    <Award size={14} className="text-yellow-300" />
+                    <span className="text-xs font-bold uppercase tracking-wide">{rank}</span>
                 </div>
-
-                <h2 className="text-2xl font-serif font-bold text-white mt-5 drop-shadow-md">{userData?.name}</h2>
-                <p className="text-blue-100 text-xs font-medium opacity-80">{userData?.email}</p>
             </div>
         </div>
 
-        {/* --- TABS --- */}
-        <div className="flex px-6 -mt-6 relative z-20 gap-2">
-            <button 
-                onClick={() => setActiveTab('overview')} 
-                className={`flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-wider shadow-sm transition-all ${activeTab === 'overview' ? 'bg-white text-slate-800 ring-1 ring-slate-100' : 'bg-slate-900/40 backdrop-blur-md text-white/80 hover:bg-slate-900/60'}`}
-            >
-                Overview
-            </button>
-            <button 
-                onClick={() => setActiveTab('settings')} 
-                className={`flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-wider shadow-sm transition-all ${activeTab === 'settings' ? 'bg-white text-slate-800 ring-1 ring-slate-100' : 'bg-slate-900/40 backdrop-blur-md text-white/80 hover:bg-slate-900/60'}`}
-            >
-                Settings
-            </button>
-        </div>
-
-        {/* --- BODY --- */}
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-50 relative z-10 rounded-b-[2.5rem]">
+        {/* --- BODY: The Scrolls of Data --- */}
+        <div className="px-6 pb-8 -mt-8 relative z-20">
             
-            {activeTab === 'overview' ? (
-                <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-300">
-                    {/* Progress Card */}
-                    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                        <div className="flex justify-between items-end mb-2">
-                            <div>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Level {level}</span>
-                                <div className="text-2xl font-black text-slate-800">{Math.round(progress)}%</div>
-                            </div>
-                            <span className="text-xs font-bold text-[#6495ED]">{xpNeeded} XP to go</span>
-                        </div>
-                        <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
-                            <div className="bg-gradient-to-r from-[#6495ED] to-[#4169E1] h-full rounded-full relative" style={{width: `${progress}%`}}>
-                                <div className="absolute inset-0 bg-white/30 animate-[shimmer_2s_infinite]"></div>
-                            </div>
-                        </div>
+            {/* Progress Card */}
+            <div className="bg-white rounded-3xl p-5 shadow-lg border border-slate-100 mb-6">
+                <div className="flex justify-between items-end mb-2">
+                    <div>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Current Status</span>
+                        <span className="text-2xl font-black text-slate-800">Level {level}</span>
                     </div>
-
-                    {/* Stats Grid (Bento) */}
-                    <div className="grid grid-cols-2 gap-3">
-                        {stats.map((stat, i) => (
-                            <div key={i} className={`p-4 rounded-2xl border ${stat.bg.replace('50', '100/50')} ${stat.bg} flex flex-col justify-center items-center text-center gap-1`}>
-                                <stat.icon size={20} className={stat.color} />
-                                <span className="text-xl font-black text-slate-800">{stat.value}</span>
-                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{stat.label}</span>
-                            </div>
-                        ))}
+                    <div className="text-right">
+                        <span className="text-xs font-bold text-indigo-600">{Math.round(progress)}%</span>
                     </div>
                 </div>
-            ) : (
-                <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                    {/* Settings Form */}
-                    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-4">
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-400 uppercase">Display Name</label>
-                            <div className="flex gap-2">
-                                <input 
-                                    value={newName} 
-                                    onChange={(e) => setNewName(e.target.value)} 
-                                    disabled={!isEditing}
-                                    className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 disabled:opacity-70 focus:outline-none focus:ring-2 focus:ring-[#6495ED]"
-                                />
-                                {isEditing ? (
-                                    <button onClick={handleSaveName} className="p-2 bg-[#6495ED] text-white rounded-lg hover:bg-[#4169E1]"><Check size={18}/></button>
-                                ) : (
-                                    <button onClick={() => setIsEditing(true)} className="p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-slate-200"><Edit2 size={18}/></button>
-                                )}
-                            </div>
-                        </div>
-                        
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-400 uppercase">Account Email</label>
-                            <div className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-500 flex items-center gap-2 cursor-not-allowed">
-                                <Mail size={14}/> {userData?.email}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-center">
-                        <p className="text-xs text-blue-600 font-medium">
-                            Want to update your avatar? <br/>
-                            <span className="font-bold">Hover/Tap your profile picture above!</span>
-                        </p>
+                
+                {/* Enhanced Progress Bar */}
+                <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden shadow-inner border border-slate-200">
+                    <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-full rounded-full transition-all duration-1000 relative" style={{ width: `${progress}%` }}>
+                        <div className="absolute inset-0 bg-white/30 animate-[shimmer_2s_infinite]"></div>
                     </div>
                 </div>
-            )}
+                
+                <p className="text-center text-xs text-slate-500 mt-3 font-medium">
+                    <span className="text-indigo-600 font-bold">{xpNeeded} XP</span> until Level {level + 1}
+                </p>
+            </div>
+
+            {/* Stats Grid (The Bento Box of Works) */}
+            <div className="grid grid-cols-2 gap-3">
+                {/* Streak */}
+                <div className="bg-gradient-to-br from-orange-50 to-amber-50 p-4 rounded-2xl border border-orange-100 flex flex-col items-center justify-center gap-2 shadow-sm">
+                    <div className="p-2 bg-white rounded-full text-orange-500 shadow-sm"><Zap size={20} fill="currentColor"/></div>
+                    <div className="text-center">
+                        <p className="text-2xl font-black text-slate-800 leading-none">{userData?.streak || 1}</p>
+                        <p className="text-[10px] text-orange-600/70 uppercase font-bold tracking-wider mt-1">Day Streak</p>
+                    </div>
+                </div>
+
+                {/* Total XP */}
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-2xl border border-blue-100 flex flex-col items-center justify-center gap-2 shadow-sm">
+                    <div className="p-2 bg-white rounded-full text-blue-500 shadow-sm"><Award size={20}/></div>
+                    <div className="text-center">
+                        <p className="text-2xl font-black text-slate-800 leading-none">{userData?.xp || 0}</p>
+                        <p className="text-[10px] text-blue-600/70 uppercase font-bold tracking-wider mt-1">Total XP</p>
+                    </div>
+                </div>
+
+                {/* Completed Assignments */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col items-center justify-center gap-1">
+                    <span className="text-2xl font-bold text-slate-700">{completedCount}</span>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase">Assignments Done</span>
+                </div>
+
+                {/* Active Classes */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col items-center justify-center gap-1">
+                    <span className="text-2xl font-bold text-slate-700">{classCount}</span>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase">Active Classes</span>
+                </div>
+            </div>
+
         </div>
       </div>
     </div>
@@ -1780,11 +1705,11 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
   const [quizState, setQuizState] = useState<'waiting' | 'correct' | 'wrong'>('waiting');
   const [score, setScore] = useState(0);
 
-  // --- Swipe State ---
+  // --- Swipe State (Enhanced for Scroll Stability) ---
   const [dragStartX, setDragStartX] = useState<number | null>(null);
-  const [dragStartY, setDragStartY] = useState<number | null>(null);
+  const [dragStartY, setDragStartY] = useState<number | null>(null); // NEW
   const [dragEndX, setDragEndX] = useState<number | null>(null);
-  const [dragEndY, setDragEndY] = useState<number | null>(null);
+  const [dragEndY, setDragEndY] = useState<number | null>(null); // NEW
   const minSwipeDistance = 50; 
 
   // --- Preference ---
@@ -1849,24 +1774,16 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
       }
   };
 
-  // --- SAVE LOGIC (FIXED: Strict UID Checks) ---
+  // --- SAVE LOGIC ---
   const executeSave = async (targetDeckId: string, targetDeckTitle: string) => {
     const currentUser = user || auth.currentUser;
-    
-    // STRICT CHECK: Ensure UID is present
-    if (!currentUser || !currentUser.uid) {
-        alert("You must be logged in.");
-        return;
-    }
-    
-    if (!sessionCards[currentIndex] || saving) return;
+    if (!currentUser || !sessionCards[currentIndex] || saving) return;
     
     setSaving(true);
     const cardToSave = sessionCards[currentIndex];
-    const uid = currentUser.uid as string; // Explicit cast for TypeScript
-
+    
     try {
-        const cardRef = doc(collection(db, 'artifacts', appId, 'users', uid, 'custom_cards'));
+        const cardRef = doc(collection(db, 'artifacts', appId, 'users', currentUser.uid, 'custom_cards'));
         await setDoc(cardRef, {
             ...cardToSave,
             id: cardRef.id,
@@ -1895,20 +1812,11 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
 
   const handleQuickAdd = async () => {
     const currentUser = user || auth.currentUser;
-    
-    // STRICT CHECK
-    if (!currentUser || !currentUser.uid) {
-        alert("Error: User not found.");
-        return;
-    }
-
-    if (!newCard.front || !newCard.back) return;
+    if (!currentUser || !newCard.front || !newCard.back) return;
 
     setSaving(true);
-    const uid = currentUser.uid as string; // Explicit cast
-
     try {
-        const cardRef = doc(collection(db, 'artifacts', appId, 'users', uid, 'custom_cards'));
+        const cardRef = doc(collection(db, 'artifacts', appId, 'users', currentUser.uid, 'custom_cards'));
         await setDoc(cardRef, {
             id: cardRef.id,
             front: newCard.front,
@@ -1929,15 +1837,12 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
     }
   };
 
-  // --- HANDLERS (FIXED: Strict UID Check) ---
+  // --- HANDLERS ---
   const handleDeckSelect = async (deckId: string) => {
-    const targetUid = (user?.uid || auth.currentUser?.uid) as string | undefined;
-    
+    const targetUid = user?.uid || auth.currentUser?.uid;
     if (!targetUid) return;
-
     try {
-        // Explicitly assert targetUid is a string here
-        await updateDoc(doc(db, 'artifacts', appId, 'users', targetUid as string, 'profile', 'main'), { widgetDeckId: deckId });
+        await updateDoc(doc(db, 'artifacts', appId, 'users', targetUid, 'profile', 'main'), { widgetDeckId: deckId });
         setShowSettings(false);
         setIsFlipped(false);
     } catch (e) { console.error(e); }
@@ -1964,6 +1869,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
     const distX = dragStartX - dragEndX;
     const distY = dragStartY - dragEndY;
 
+    // AXIS LOCKING: If vertical movement is greater than horizontal, assume scrolling and cancel swipe
     if (Math.abs(distY) > Math.abs(distX)) {
         setDragStartX(null); setDragStartY(null);
         return;
@@ -2734,7 +2640,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full relative bg-slate-50 overflow-x-hidden">
     
     {/* --- OVERLAYS --- */}
-    {showLevelModal && <ProfileDetailModal userData={userData} onClose={() => setShowLevelModal(false)} />}
+    {showLevelModal && <LevelUpModal userData={userData} onClose={() => setShowLevelModal(false)} />}
     
     {showColosseum && (
         <ColosseumMode 
