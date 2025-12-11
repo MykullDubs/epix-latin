@@ -1960,8 +1960,8 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
             <div className="absolute top-4 left-8 right-8 bottom-0 bg-indigo-200/30 rounded-[2rem] transform scale-90 translate-y-3 z-0" />
             <div className="relative w-full h-full shadow-2xl rounded-[2rem] transition-transform duration-500 z-10" style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }} onClick={() => setIsFlipped(!isFlipped)}>
               
-              {/* FRONT SIDE */}
-              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] p-6 text-white flex flex-col justify-between overflow-hidden shadow-indigo-200" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
+{/* FRONT SIDE (Cornflower Mode) */}
+              <div className="absolute inset-0 bg-gradient-to-br from-[#6495ED] to-[#4169E1] rounded-[2rem] p-6 text-white flex flex-col justify-between overflow-hidden shadow-blue-200" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
                   
                   {/* --- DECK SELECTOR OVERLAY --- */}
                   {showSaveOverlay ? (
@@ -1973,7 +1973,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                           
                           <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 mb-4">
                               <button onClick={() => executeSave('custom', '✍️ Scriptorium')} className="w-full p-3 bg-white/10 rounded-xl flex items-center gap-3 hover:bg-white/20 transition-colors border border-white/5">
-                                  <div className="p-1.5 bg-indigo-500 rounded-lg"><Layers size={14} className="text-white"/></div>
+                                  <div className="p-1.5 bg-[#6495ED] rounded-lg"><Layers size={14} className="text-white"/></div>
                                   <span className="text-sm font-bold text-white">Scriptorium (Default)</span>
                               </button>
                               
@@ -1994,9 +1994,9 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                                     value={newDeckName} 
                                     onChange={(e) => setNewDeckName(e.target.value)} 
                                     placeholder="Deck Name..." 
-                                    className="flex-1 bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-indigo-500"
+                                    className="flex-1 bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#6495ED]"
                                   />
-                                  <button onClick={handleCreateAndSave} disabled={!newDeckName} className="bg-indigo-500 text-white px-3 py-2 rounded-lg font-bold disabled:opacity-50 hover:bg-indigo-400">
+                                  <button onClick={handleCreateAndSave} disabled={!newDeckName} className="bg-[#6495ED] text-white px-3 py-2 rounded-lg font-bold disabled:opacity-50 hover:bg-[#4169E1] transition-colors">
                                       <Plus size={18}/>
                                   </button>
                               </div>
@@ -2007,7 +2007,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                       <>
                         <div className="absolute top-[-20%] right-[-20%] w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
                         <div className="flex justify-between items-start relative z-10">
-                            <span className="bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-white/10 flex items-center gap-1.5 shadow-sm"><Layers size={10} className="text-indigo-200" /> {currentIndex + 1} / {sessionCards.length}</span>
+                            <span className="bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-white/10 flex items-center gap-1.5 shadow-sm"><Layers size={10} className="text-blue-200" /> {currentIndex + 1} / {sessionCards.length}</span>
                             
                             <div className="flex gap-2">
                                 <button 
@@ -2024,9 +2024,9 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                         </div>
                         <div className="text-center relative z-10 mt-2">
                             <h2 className="text-4xl font-serif font-bold mb-2 drop-shadow-md">{currentCard.front}</h2>
-                            <div className="inline-block px-3 py-1 bg-white/10 rounded-full backdrop-blur-sm"><p className="text-indigo-100 font-serif text-sm tracking-wide">{currentCard.ipa || '/.../'}</p></div>
+                            <div className="inline-block px-3 py-1 bg-white/10 rounded-full backdrop-blur-sm border border-white/10"><p className="text-blue-100 font-serif text-sm tracking-wide">{currentCard.ipa || '/.../'}</p></div>
                         </div>
-                        <div className="text-center relative z-10"><p className="text-[10px] uppercase font-bold text-indigo-200 tracking-widest animate-pulse flex items-center justify-center gap-2"><ArrowLeft size={10}/> Swipe <ArrowRight size={10}/></p></div>
+                        <div className="text-center relative z-10"><p className="text-[10px] uppercase font-bold text-blue-200 tracking-widest animate-pulse flex items-center justify-center gap-2"><ArrowLeft size={10}/> Swipe <ArrowRight size={10}/></p></div>
                       </>
                   )}
               </div>
@@ -2042,7 +2042,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                       <h3 className="text-xl font-bold text-slate-800 mb-4 leading-tight">{currentCard.back}</h3>
                       {currentCard.usage?.sentence && (
                         <div className="bg-slate-50 p-4 rounded-xl w-full border border-slate-100 text-left relative shrink-0">
-                          <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 rounded-l-xl"></div>
+                          <div className="absolute top-0 left-0 w-1 h-full bg-[#6495ED] rounded-l-xl"></div>
                           <p className="text-sm text-slate-600 italic font-serif leading-relaxed pl-2">"{currentCard.usage.sentence}"</p>
                         </div>
                       )}
@@ -2060,7 +2060,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
           <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] p-8 text-center flex flex-col items-center justify-center h-56">
             <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3 text-slate-300"><Layers size={24} /></div>
             <p className="text-slate-500 font-bold mb-1">No cards in this deck.</p>
-            <button onClick={() => setShowSettings(true)} className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all">Change Source</button>
+            <button onClick={() => setShowSettings(true)} className="px-5 py-2 bg-[#6495ED] text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-200 hover:bg-[#4169E1] transition-all">Change Source</button>
           </div>
         )
       )}
