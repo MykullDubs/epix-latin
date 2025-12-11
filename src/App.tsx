@@ -1849,17 +1849,24 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
       }
   };
 
-  // --- SAVE LOGIC (FIXED TYPES) ---
+  // --- SAVE LOGIC (FIXED: Strict UID Checks) ---
   const executeSave = async (targetDeckId: string, targetDeckTitle: string) => {
     const currentUser = user || auth.currentUser;
-    // Strict check for UID to satisfy TypeScript
-    if (!currentUser || !currentUser.uid || !sessionCards[currentIndex] || saving) return;
+    
+    // STRICT CHECK: Ensure UID is present
+    if (!currentUser || !currentUser.uid) {
+        alert("You must be logged in.");
+        return;
+    }
+    
+    if (!sessionCards[currentIndex] || saving) return;
     
     setSaving(true);
     const cardToSave = sessionCards[currentIndex];
-    
+    const uid = currentUser.uid as string; // Explicit cast for TypeScript
+
     try {
-        const cardRef = doc(collection(db, 'artifacts', appId, 'users', currentUser.uid, 'custom_cards'));
+        const cardRef = doc(collection(db, 'artifacts', appId, 'users', uid, 'custom_cards'));
         await setDoc(cardRef, {
             ...cardToSave,
             id: cardRef.id,
@@ -1888,12 +1895,20 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
 
   const handleQuickAdd = async () => {
     const currentUser = user || auth.currentUser;
-    // Strict check for UID
-    if (!currentUser || !currentUser.uid || !newCard.front || !newCard.back) return;
+    
+    // STRICT CHECK
+    if (!currentUser || !currentUser.uid) {
+        alert("Error: User not found.");
+        return;
+    }
+
+    if (!newCard.front || !newCard.back) return;
 
     setSaving(true);
+    const uid = currentUser.uid as string; // Explicit cast
+
     try {
-        const cardRef = doc(collection(db, 'artifacts', appId, 'users', currentUser.uid, 'custom_cards'));
+        const cardRef = doc(collection(db, 'artifacts', appId, 'users', uid, 'custom_cards'));
         await setDoc(cardRef, {
             id: cardRef.id,
             front: newCard.front,
@@ -1914,15 +1929,15 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
     }
   };
 
-  // --- HANDLERS (FIXED TYPES) ---
+  // --- HANDLERS (FIXED: Strict UID Check) ---
   const handleDeckSelect = async (deckId: string) => {
-    const targetUid = user?.uid || auth.currentUser?.uid;
+    const targetUid = (user?.uid || auth.currentUser?.uid) as string | undefined;
     
     if (!targetUid) return;
 
     try {
-        // ERROR FIX: Cast targetUid to string explicitly
-        await updateDoc(doc(db, 'artifacts', appId, 'users', targetUid as string, 'profile', 'main'), { widgetDeckId: deckId });
+        // Explicitly assert targetUid is a string here
+        await updateDoc(doc(db, 'artifacts', appId, 'users', targetUid, 'profile', 'main'), { widgetDeckId: deckId });
         setShowSettings(false);
         setIsFlipped(false);
     } catch (e) { console.error(e); }
@@ -1949,7 +1964,6 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
     const distX = dragStartX - dragEndX;
     const distY = dragStartY - dragEndY;
 
-    // AXIS LOCKING: If vertical movement is greater than horizontal, assume scrolling
     if (Math.abs(distY) > Math.abs(distX)) {
         setDragStartX(null); setDragStartY(null);
         return;
@@ -2133,7 +2147,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
                   {/* --- SCROLLABLE CONTENT --- */}
                   <div 
                     className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar min-h-0 flex flex-col items-center text-center touch-pan-y"
-                    onPointerDown={(e) => e.stopPropagation()} // BLOCK SWIPE FROM STARTING HERE
+                    onPointerDown={(e) => e.stopPropagation()} 
                   >
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 bg-slate-50 px-2 py-1 rounded-md">Definition</span>
                       <h3 className="text-xl font-bold text-slate-800 mb-4 leading-tight">{currentCard.back}</h3>
