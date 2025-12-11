@@ -824,14 +824,10 @@ function QuizGame({ deckCards, onGameEnd }: any) {
     );
 }
 
-function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, activeDeckOverride, onComplete }: any) {
+function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, activeDeckOverride, onComplete, onLogActivity }: any) {
   // --- STATE ---
   const [viewState, setViewState] = useState<'browsing' | 'playing'>(activeDeckOverride ? 'playing' : 'browsing');
-  
-  // -- Filter State --
   const [filterLang, setFilterLang] = useState('All');
-
-  // -- Notification State --
   const [completionMsg, setCompletionMsg] = useState<string | null>(null);
 
   // Player State
@@ -849,27 +845,42 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   // --- DERIVED DATA ---
   const currentDeck = activeDeckOverride || allDecks[selectedDeckKey];
   
-  const processedDecks = useMemo(() => {
-      return Object.entries(allDecks)
+  // 1. Process and Categorize Decks
+  const { assignments, customDecks, libraryDecks, allProcessed, languages } = useMemo(() => {
+      const processed = Object.entries(allDecks)
         .filter(([_, deck]: any) => deck.cards && deck.cards.length > 0)
         .map(([key, deck]: any) => {
             const detectedLang = deck.targetLanguage || deck.cards[0]?.targetLanguage || 'General';
-            return { id: key, ...deck, language: detectedLang };
+            // Determine Category
+            let category = 'library';
+            if (deck.isAssignment) category = 'assignment';
+            else if (key.startsWith('custom')) category = 'custom';
+
+            return { id: key, ...deck, language: detectedLang, category };
         });
+
+      const langs = new Set(processed.map(d => d.language));
+
+      return {
+          assignments: processed.filter(d => d.category === 'assignment'),
+          customDecks: processed.filter(d => d.category === 'custom'),
+          libraryDecks: processed.filter(d => d.category === 'library'),
+          allProcessed: processed,
+          languages: ['All', ...Array.from(langs).sort()]
+      };
   }, [allDecks]);
 
-  const availableLanguages = useMemo(() => {
-      const langs = new Set(processedDecks.map(d => d.language));
-      return ['All', ...Array.from(langs).sort()];
-  }, [processedDecks]);
+  // 2. Apply Language Filter
+  const filterList = (list: any[]) => {
+      if (filterLang === 'All') return list;
+      return list.filter(d => d.language === filterLang);
+  };
 
-  const filteredDecks = useMemo(() => {
-      if (filterLang === 'All') return processedDecks;
-      return processedDecks.filter(d => d.language === filterLang);
-  }, [processedDecks, filterLang]);
+  const visibleAssignments = filterList(assignments);
+  const visibleCustom = filterList(customDecks);
+  const visibleLibrary = filterList(libraryDecks);
 
-  const totalCardsAvailable = processedDecks.reduce((acc, deck: any) => acc + deck.cards.length, 0);
-
+  const totalCardsAvailable = allProcessed.reduce((acc, deck: any) => acc + deck.cards.length, 0);
   const deckCards = currentDeck?.cards || [];
   const card = deckCards[currentIndex];
   const theme = card ? (TYPE_COLORS[card.type] || TYPE_COLORS.noun) : TYPE_COLORS.noun;
@@ -883,41 +894,37 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   };
 
   const handleQuickStudy = () => {
-    if (processedDecks.length === 0) return;
-    const largestDeck = processedDecks.sort((a: any, b: any) => b.cards.length - a.cards.length)[0];
+    if (allProcessed.length === 0) return;
+    const largestDeck = allProcessed.sort((a: any, b: any) => b.cards.length - a.cards.length)[0];
     launchDeck(largestDeck.id);
   };
 
-  // --- GAME END HANDLER (UPDATED) ---
+  // --- GAME END ---
   const handleGameEnd = (data: any) => { 
       let xp = 0;
       let message = "";
-
-      // 1. Calculate Score & XP based on game type
       if (typeof data === 'number') {
-          // Matching Game returns raw XP
           xp = data;
           message = `Matching Complete! +${xp} XP`;
       } else {
-          // Quiz Game returns { score, total }
           const percentage = Math.round((data.score / data.total) * 100);
           xp = Math.round((data.score / data.total) * 50) + 10;
           message = `Score: ${percentage}% (${data.score}/${data.total}) • +${xp} XP`;
       }
-
-      // 2. Trigger the Toast
       setCompletionMsg(message);
 
-      // 3. Save Data (if assigned)
       if (activeDeckOverride && onComplete) {
           onComplete(activeDeckOverride.id, xp, currentDeck.title, data.score !== undefined ? data : null); 
+      } else if (onLogActivity) {
+          const scoreDetail = data.score !== undefined ? data : null;
+          onLogActivity(selectedDeckKey, xp, `${currentDeck.title} (${gameMode})`, scoreDetail);
+          setViewState('browsing');
       } else {
-          // 4. Return to Hub
           setViewState('browsing');
       }
   };
 
-  // ... (Keep existing Navigation Handlers: handleNext, handlePrev, playAudio, onPointerDown/Move/Up) ...
+  // --- NAVIGATION ---
   const handleNext = useCallback(() => {
     setXrayMode(false); setIsFlipped(false); setSwipeDirection('left');
     setTimeout(() => { setCurrentIndex((prev) => (prev + 1) % deckCards.length); setSwipeDirection(null); }, 200);
@@ -947,142 +954,183 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
     setDragStartX(null); setDragEndX(null);
   };
 
-  // --- RENDER ---
+  // --- RENDER COMPONENT: DECK CARD ---
+  const DeckCard = ({ deck, icon, colorClass, borderClass }: any) => (
+      <button 
+          onClick={() => launchDeck(deck.id)}
+          className={`w-full bg-white p-4 rounded-2xl border shadow-sm hover:shadow-md transition-all flex flex-col gap-3 group relative overflow-hidden text-left ${borderClass || 'border-slate-100 hover:border-indigo-200'}`}
+      >
+          {/* Language Stripe */}
+          <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
+              deck.language === 'Latin' ? 'bg-purple-500' : 
+              deck.language === 'Spanish' ? 'bg-orange-500' :
+              deck.language === 'English' ? 'bg-blue-500' : 'bg-slate-300'
+          }`}></div>
+
+          <div className="flex justify-between items-start w-full pl-2">
+              <div className="flex items-center gap-3">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm transition-colors ${colorClass}`}>
+                      {icon}
+                  </div>
+                  <div>
+                      <h4 className="font-bold text-slate-800 text-base leading-tight group-hover:text-indigo-700 transition-colors line-clamp-1">{deck.title}</h4>
+                      <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded flex items-center gap-1">
+                              <Globe size={10}/> {deck.language}
+                          </span>
+                          <span className="text-[10px] font-medium text-slate-400 flex items-center gap-1">
+                              <Layers size={10}/> {deck.cards.length}
+                          </span>
+                      </div>
+                  </div>
+              </div>
+              <div className="text-slate-300 group-hover:text-indigo-500 transition-colors"><ChevronRight size={18}/></div>
+          </div>
+
+          {/* Progress Bar (Mocked for visual appeal, can connect to real mastery later) */}
+          <div className="w-full pl-2 pr-1">
+              <div className="flex justify-between text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  <span>Progress</span>
+                  <span>{deck.mastery || 0}%</span>
+              </div>
+              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${deck.mastery || 5}%` }}></div>
+              </div>
+          </div>
+      </button>
+  );
+
   return (
     <>
-      {/* 1. TOAST COMPONENT INJECTION */}
       {completionMsg && <Toast message={completionMsg} onClose={() => setCompletionMsg(null)} />}
 
       {viewState === 'browsing' ? (
-        <div className="h-full bg-slate-50 flex flex-col overflow-y-auto pb-24 animate-in fade-in">
-            {/* Header */}
-            <div className="bg-white p-6 pb-4 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 relative z-10 sticky top-0">
+        <div className="h-full bg-slate-50 flex flex-col overflow-y-auto pb-24 animate-in fade-in custom-scrollbar">
+            
+            {/* --- HEADER SECTION --- */}
+            <div className="bg-white p-6 pb-2 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 relative z-10">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-2xl font-bold text-slate-900">Practice Hub</h1>
-                    <div className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                        <Layers size={14}/> {totalCardsAvailable} Cards
-                    </div>
+                    {/* Filter Pills */}
+                    {languages.length > 1 && (
+                        <div className="flex gap-2">
+                            {languages.map((lang: string) => (
+                                <button key={lang} onClick={() => setFilterLang(lang)} className={`px-3 py-1.5 rounded-full text-[10px] font-bold transition-all ${filterLang === lang ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                    {lang}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
-                <button 
-                    onClick={handleQuickStudy}
-                    disabled={totalCardsAvailable === 0}
-                    className="w-full mb-6 bg-gradient-to-r from-indigo-600 to-violet-600 text-white p-5 rounded-2xl shadow-lg shadow-indigo-200 active:scale-95 transition-all flex items-center justify-between group disabled:opacity-50 disabled:shadow-none"
-                >
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-white backdrop-blur-sm">
-                            <Zap size={24} className="fill-current"/>
-                        </div>
-                        <div className="text-left">
-                            <h3 className="font-bold text-lg leading-tight">Quick Review</h3>
-                            <p className="text-indigo-100 text-xs font-medium opacity-80">
-                                {totalCardsAvailable > 0 ? "Jump into your largest deck" : "Add cards to start"}
-                            </p>
-                        </div>
+                {/* Quick Stats Row */}
+                <div className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar">
+                    <div className="flex-1 min-w-[140px] bg-gradient-to-br from-indigo-50 to-blue-50 p-3 rounded-2xl border border-indigo-100 flex flex-col justify-center items-center">
+                        <span className="text-2xl font-black text-indigo-600">{totalCardsAvailable}</span>
+                        <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wide">Total Cards</span>
                     </div>
-                    <div className="bg-white/20 p-2 rounded-full backdrop-blur-sm group-hover:bg-white text-indigo-100 group-hover:text-indigo-600 transition-colors">
-                        <PlayCircle size={24} fill="currentColor" />
+                    <div className="flex-1 min-w-[140px] bg-gradient-to-br from-emerald-50 to-teal-50 p-3 rounded-2xl border border-emerald-100 flex flex-col justify-center items-center">
+                        <span className="text-2xl font-black text-emerald-600">{allProcessed.length}</span>
+                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">Active Decks</span>
                     </div>
-                </button>
-
-                {/* Filter Bar */}
-                {availableLanguages.length > 1 && (
-                    <div className="flex gap-2 overflow-x-auto pb-2 -mx-6 px-6 custom-scrollbar">
-                        {availableLanguages.map(lang => (
-                            <button
-                                key={lang}
-                                onClick={() => setFilterLang(lang)}
-                                className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
-                                    filterLang === lang 
-                                    ? 'bg-slate-900 text-white shadow-md' 
-                                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                                }`}
-                            >
-                                {lang}
-                            </button>
-                        ))}
-                    </div>
-                )}
+                    <button onClick={handleQuickStudy} className="flex-1 min-w-[140px] bg-indigo-600 text-white p-3 rounded-2xl shadow-lg shadow-indigo-200 active:scale-95 transition-all flex flex-col justify-center items-center group">
+                        <PlayCircle size={24} className="mb-1 group-hover:scale-110 transition-transform"/>
+                        <span className="text-[10px] font-bold uppercase tracking-wide">Quick Review</span>
+                    </button>
+                </div>
             </div>
 
-            {/* Deck Grid */}
-            <div className="p-6 space-y-6">
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider ml-1 flex justify-between">
-                    <span>{filterLang === 'All' ? 'All Collections' : `${filterLang} Decks`}</span>
-                    <span className="text-xs bg-slate-200 px-2 rounded-md text-slate-500">{filteredDecks.length}</span>
-                </h3>
+            {/* --- CONTENT SECTIONS --- */}
+            <div className="p-6 space-y-8">
                 
-                {filteredDecks.length === 0 ? (
-                    <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-3xl">
-                        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-400">
-                            <Layers size={32}/>
+                {/* 1. ASSIGNMENTS */}
+                {visibleAssignments.length > 0 && (
+                    <section className="animate-in slide-in-from-bottom-2">
+                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                            <School size={14} className="text-indigo-500"/> Class Assignments
+                        </h3>
+                        <div className="grid grid-cols-1 gap-3">
+                            {visibleAssignments.map((deck: any) => (
+                                <DeckCard 
+                                    key={deck.id} 
+                                    deck={deck} 
+                                    icon={<School size={20}/>} 
+                                    colorClass="bg-amber-100 text-amber-600"
+                                    borderClass="border-amber-200 hover:border-amber-400"
+                                />
+                            ))}
                         </div>
-                        <p className="text-slate-500 font-bold mb-2">No decks found</p>
-                        <p className="text-xs text-slate-400 max-w-[200px] mx-auto mb-4">Try changing your filter or add new content.</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 gap-4">
-                        {filteredDecks.map((deck: any) => (
-                            <button 
-                                key={deck.id}
-                                onClick={() => launchDeck(deck.id)}
-                                className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all flex items-center gap-4 group text-left relative overflow-hidden"
-                            >
-                                <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-                                    deck.language === 'Latin' ? 'bg-purple-500' : 
-                                    deck.language === 'Spanish' ? 'bg-orange-500' :
-                                    deck.language === 'English' ? 'bg-blue-500' : 'bg-slate-300'
-                                }`}></div>
-
-                                <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold shadow-sm transition-colors shrink-0 ${deck.id === 'custom' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500 group-hover:bg-indigo-50 group-hover:text-indigo-600'}`}>
-                                    {deck.title.charAt(0)}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h4 className="font-bold text-slate-800 text-lg group-hover:text-indigo-700 transition-colors truncate pr-2">{deck.title}</h4>
-                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                        <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded flex items-center gap-1">
-                                            <Globe size={10}/> {deck.language}
-                                        </span>
-                                        <span className="text-[10px] font-medium text-slate-400 flex items-center gap-1">
-                                            <Layers size={10}/> {deck.cards.length} Cards
-                                        </span>
-                                        {deck.isAssignment && (
-                                            <span className="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded border border-amber-100 font-bold uppercase">Class</span>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="text-slate-300 group-hover:text-indigo-500 transition-colors">
-                                    <ChevronRight size={20}/>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
+                    </section>
                 )}
+
+                {/* 2. CUSTOM DECKS */}
+                <section className="animate-in slide-in-from-bottom-4 duration-500">
+                    <div className="flex justify-between items-end mb-3">
+                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                            <Feather size={14} className="text-emerald-500"/> My Collections
+                        </h3>
+                    </div>
+                    {visibleCustom.length > 0 ? (
+                        <div className="grid grid-cols-1 gap-3">
+                            {visibleCustom.map((deck: any) => (
+                                <DeckCard 
+                                    key={deck.id} 
+                                    deck={deck} 
+                                    icon={<Feather size={20}/>} 
+                                    colorClass="bg-emerald-100 text-emerald-600"
+                                    borderClass="border-slate-100 hover:border-emerald-300"
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center">
+                            <p className="text-sm text-slate-400 font-bold">No custom decks yet.</p>
+                            <p className="text-xs text-slate-300 mt-1">Use the Creator tab to build one!</p>
+                        </div>
+                    )}
+                </section>
+
+                {/* 3. LIBRARY */}
+                <section className="animate-in slide-in-from-bottom-6 duration-700">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <Library size={14} className="text-blue-500"/> System Library
+                    </h3>
+                    {visibleLibrary.length > 0 ? (
+                        <div className="grid grid-cols-1 gap-3">
+                            {visibleLibrary.map((deck: any) => (
+                                <DeckCard 
+                                    key={deck.id} 
+                                    deck={deck} 
+                                    icon={<BookOpen size={20}/>} 
+                                    colorClass="bg-blue-100 text-blue-600"
+                                    borderClass="border-slate-100 hover:border-blue-300"
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="p-4 text-center text-slate-400 text-xs italic">Library empty for this filter.</div>
+                    )}
+                </section>
+
+                {/* BOTTOM SPACER */}
+                <div className="h-8"></div>
             </div>
         </div>
       ) : (
-        /* PLAYER VIEW */
+        /* PLAYER VIEW (Unchanged) */
         <div className="h-[calc(100vh-80px)] flex flex-col bg-slate-50 pb-6 relative overflow-hidden">
           <Header 
             title={currentDeck?.title || "Deck"} 
             subtitle={`${currentIndex + 1} / ${deckCards.length} Cards`} 
             sticky={false}
             onClickTitle={() => setViewState('browsing')} 
-            rightAction={
-                <div className="flex items-center gap-2">
-                    <button onClick={() => setViewState('browsing')} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 text-slate-500">
-                        <X size={20} />
-                    </button>
-                </div>
-            } 
+            rightAction={<button onClick={() => setViewState('browsing')} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 text-slate-500"><X size={20} /></button>} 
           />
           
           <div className="px-6 mt-2 mb-4 z-10">
               <div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto shadow-inner">
                   {['study', 'quiz', 'match'].map((mode) => (
-                      <button key={mode} onClick={() => setGameMode(mode)} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg capitalize transition-all ${gameMode === mode ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>
-                          {mode}
-                      </button>
+                      <button key={mode} onClick={() => setGameMode(mode)} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg capitalize transition-all ${gameMode === mode ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>{mode}</button>
                   ))}
               </div>
           </div>
@@ -1090,57 +1138,35 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
           <div className="flex-1 relative w-full overflow-hidden">
               {gameMode === 'match' && <div className="h-full overflow-y-auto"><MatchingGame deckCards={deckCards} onGameEnd={handleGameEnd} /></div>}
               {gameMode === 'quiz' && <div className="h-full overflow-y-auto"><QuizGame deckCards={deckCards} onGameEnd={handleGameEnd} /></div>}
-              
               {gameMode === 'study' && card && (
-                <div 
-                    className="flex-1 flex flex-col items-center justify-center px-4 py-2 perspective-1000 relative z-0 h-full" 
-                    style={{ perspective: '1000px', touchAction: 'pan-y' }}
-                    onPointerDown={onPointerDown}
-                    onPointerMove={onPointerMove}
-                    onPointerUp={onPointerUp}
-                >
-                    <div 
-                        className={`relative w-full h-full max-h-[520px] cursor-pointer shadow-2xl rounded-[2rem] transition-transform duration-300 ${swipeDirection === 'left' ? '-translate-x-full opacity-0 rotate-[-10deg]' : swipeDirection === 'right' ? 'translate-x-full opacity-0 rotate-[10deg]' : 'translate-x-0 opacity-100'}`}
-                        style={{ transformStyle: 'preserve-3d', transform: isFlipped && !swipeDirection ? 'rotateY(180deg)' : swipeDirection ? undefined : 'rotateY(0deg)' }}
-                        onClick={() => !xrayMode && setIsFlipped(!isFlipped)}
-                    >
+                <div className="flex-1 flex flex-col items-center justify-center px-4 py-2 perspective-1000 relative z-0 h-full" style={{ perspective: '1000px', touchAction: 'pan-y' }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
+                    <div className={`relative w-full h-full max-h-[520px] cursor-pointer shadow-2xl rounded-[2rem] transition-transform duration-300 ${swipeDirection === 'left' ? '-translate-x-full opacity-0 rotate-[-10deg]' : swipeDirection === 'right' ? 'translate-x-full opacity-0 rotate-[10deg]' : 'translate-x-0 opacity-100'}`} style={{ transformStyle: 'preserve-3d', transform: isFlipped && !swipeDirection ? 'rotateY(180deg)' : swipeDirection ? undefined : 'rotateY(0deg)' }} onClick={() => !xrayMode && setIsFlipped(!isFlipped)}>
                         <div className="absolute inset-0 bg-white rounded-[2rem] border border-slate-100 overflow-hidden flex flex-col select-none" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
                             <div className={`h-3 w-full ${xrayMode ? theme.bg.replace('50', '500') : 'bg-slate-100'} transition-colors duration-500`} />
                             <div className="flex-1 flex flex-col p-6 relative">
-                                <div className="flex justify-between items-start mb-8">
-                                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${theme.bg} ${theme.text} border ${theme.border}`}>{card.type}</span>
-                                    <span className="text-xs font-mono text-slate-300">{currentIndex + 1}/{deckCards.length}</span>
-                                </div>
+                                <div className="flex justify-between items-start mb-8"><span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${theme.bg} ${theme.text} border ${theme.border}`}>{card.type}</span><span className="text-xs font-mono text-slate-300">{currentIndex + 1}/{deckCards.length}</span></div>
                                 <div className="flex-1 flex flex-col items-center justify-center mt-[-40px]">
                                     <h2 className="text-4xl sm:text-5xl font-serif font-bold text-slate-900 text-center mb-6 leading-tight select-none">{card.front}</h2>
-                                    <div onClick={(e) => { e.stopPropagation(); playAudio(card.front); }} className="flex items-center gap-3 bg-slate-50 pl-3 pr-5 py-2 rounded-full border border-slate-200 cursor-pointer hover:bg-indigo-50 hover:border-indigo-200 transition-colors group active:scale-95 shadow-sm">
-                                        <Volume2 size={16} className="text-indigo-400"/>
-                                        <span className="font-serif text-slate-500 text-lg tracking-wide group-hover:text-indigo-800 select-none">{card.ipa || "/.../"}</span>
-                                    </div>
+                                    <div onClick={(e) => { e.stopPropagation(); playAudio(card.front); }} className="flex items-center gap-3 bg-slate-50 pl-3 pr-5 py-2 rounded-full border border-slate-200 cursor-pointer hover:bg-indigo-50 hover:border-indigo-200 transition-colors group active:scale-95 shadow-sm"><Volume2 size={16} className="text-indigo-400"/><span className="font-serif text-slate-500 text-lg tracking-wide group-hover:text-indigo-800 select-none">{card.ipa || "/.../"}</span></div>
                                 </div>
                                 <div className={`absolute inset-x-0 bottom-0 bg-white/95 backdrop-blur-xl border-t border-slate-100 transition-all duration-300 flex flex-col overflow-hidden z-20 ${xrayMode ? 'h-[75%] opacity-100 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)]' : 'h-0 opacity-0'}`} onClick={e => e.stopPropagation()}>
                                     <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
                                         <div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Puzzle size={14} /> Morphology</h4><div className="flex flex-wrap gap-2">{Array.isArray(card.morphology) && card.morphology.map((m: any, i: number) => (<div key={i} className="flex flex-col items-center bg-slate-50 border border-slate-200 rounded-lg p-2 min-w-[60px]"><span className={`font-bold text-lg ${m.type === 'root' ? 'text-indigo-600' : 'text-slate-700'}`}>{m.part}</span><span className="text-slate-400 text-[9px] font-medium uppercase mt-1 text-center max-w-[80px] leading-tight">{m.meaning}</span></div>))}</div></div>
                                         <div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><MessageSquare size={14} /> Context</h4><div className={`p-4 rounded-xl border ${theme.border} ${theme.bg}`}><p className="text-slate-800 font-serif font-medium text-lg mb-1">"{card.usage?.sentence || '...'}"</p><p className={`text-sm ${theme.text} opacity-80 italic`}>{card.usage?.translation || '...'}</p></div></div>
-                                        <div className="flex gap-2">{card.grammar_tags?.map((tag: string, i: number) => (<span key={i} className="px-2 py-1 bg-slate-100 text-slate-500 text-[10px] font-bold uppercase rounded border border-slate-200">{tag}</span>))}</div>
                                     </div>
                                 </div>
                                 {!xrayMode && (<div className="mt-auto text-center"><p className="text-xs text-slate-300 font-bold uppercase tracking-widest animate-pulse flex items-center justify-center gap-2"><ArrowLeft size={10}/> Swipe <ArrowRight size={10}/></p></div>)}
                             </div>
                         </div>
-
                         <div className="absolute inset-0 bg-slate-900 rounded-[2rem] shadow-xl flex flex-col items-center justify-center p-8 text-white relative overflow-hidden select-none" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
                             <div className="absolute top-[-50%] left-[-50%] w-full h-full bg-indigo-500/20 rounded-full blur-[100px] pointer-events-none"></div>
-                            <div className="relative z-10 flex flex-col items-center">
-                                <span className="text-indigo-300 text-xs font-bold uppercase tracking-widest mb-6 border-b border-indigo-500/30 pb-2">Translation</span>
-                                <h2 className="text-3xl md:text-4xl font-bold text-center mb-8 leading-tight">{card.back}</h2>
-                            </div>
+                            <div className="relative z-10 flex flex-col items-center"><span className="text-indigo-300 text-xs font-bold uppercase tracking-widest mb-6 border-b border-indigo-500/30 pb-2">Translation</span><h2 className="text-3xl md:text-4xl font-bold text-center mb-8 leading-tight">{card.back}</h2></div>
                         </div>
                     </div>
                 </div>
               )}
           </div>
-
+          
           {gameMode === 'study' && card && (
             <div className="px-6 pb-4 pt-2">
               <div className="flex items-center justify-between max-w-sm mx-auto">
