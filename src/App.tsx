@@ -4528,8 +4528,17 @@ function RosterManagerModal({ isOpen, onClose, currentRosterEmails, onSave }: an
 }
 
 // --- UPDATED CLASS MANAGER VIEW ---
-function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
-  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+function ClassManagerView({ user, userData, classes, lessons, allDecks, initialClassId, onClearSelection }: any) {
+  // Initialize state with prop if it exists
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(initialClassId || null);
+  
+  // React to prop changes (e.g. if user clicks a different class in sidebar while already on this tab)
+  useEffect(() => {
+      if (initialClassId) {
+          setSelectedClassId(initialClassId);
+      }
+  }, [initialClassId]);
+
   const [newClassName, setNewClassName] = useState('');
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -4589,6 +4598,12 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
       } catch (e: any) { console.error(e); alert("Error removing assignment: " + e.message); }
   };
 
+  // --- HANDLE BACK BUTTON ---
+  const handleBack = () => {
+      setSelectedClassId(null);
+      if (onClearSelection) onClearSelection();
+  };
+
   if (selectedClass) {
     return (
       <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-300 relative bg-slate-50">
@@ -4604,7 +4619,7 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
 
         {/* --- CLASS HEADER --- */}
         <div className="pb-4 border-b border-slate-200 mb-4 bg-white p-4 rounded-xl shadow-sm shrink-0">
-          <button onClick={() => setSelectedClassId(null)} className="flex items-center text-slate-400 hover:text-indigo-600 mb-3 text-xs font-bold uppercase tracking-wider">
+          <button onClick={handleBack} className="flex items-center text-slate-400 hover:text-indigo-600 mb-3 text-xs font-bold uppercase tracking-wider">
               <ArrowLeft size={14} className="mr-1"/> All Classes
           </button>
           
@@ -4617,7 +4632,7 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                 </div>
             </div>
 
-            {/* Navigation Tabs - Scrollable on small screens */}
+            {/* Navigation Tabs */}
             <div className="flex flex-wrap gap-2">
                 <button onClick={() => setViewTab('content')} className={`px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all ${viewTab === 'content' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
                     Manage
@@ -4682,7 +4697,7 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                         </div>
                     </div>
                     
-                    {/* RIGHT COLUMN: ROSTER (Now visible on Tablet via stack) */}
+                    {/* RIGHT COLUMN: ROSTER */}
                     <div className="space-y-4">
                         <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-100 shadow-sm sticky top-0 z-10">
                             <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm"><Users size={16} className="text-indigo-600"/> Roster</h3>
@@ -4788,29 +4803,25 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
 // ============================================================================
 function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, onLogout }: any) {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  
+  // --- NEW: STATE TO TRACK SPECIFIC CLASS SELECTION ---
+  const [viewClassId, setViewClassId] = useState<string | null>(null);
 
   // --- HANDLERS FOR SIDEBAR WIDGETS ---
   const handleQuickCreate = (type: 'card' | 'lesson' | 'test') => {
       setActiveTab('content');
-      // In a real implementation, you might pass a prop to BuilderHub to auto-open the modal
-      // For now, we switch tabs to the creator area
   };
 
   const handleClassShortcut = (classId: string) => {
-      setActiveTab('classes');
-      // We pass this ID down to the ClassManagerView via a prop or context
-      // For this demo, we simulate the selection state in the parent
-      // (You would update ClassManagerView to accept an 'initialClassId' prop)
+      setViewClassId(classId); // 1. Set the specific class ID
+      setActiveTab('classes'); // 2. Switch to the Classes tab
   };
 
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden">
       
-      {/* --- SIDEBAR (Enhanced for Tablet) --- */}
+      {/* --- SIDEBAR --- */}
       <div className="w-72 bg-slate-900 text-white flex-col hidden md:flex shrink-0 border-r border-slate-800 shadow-2xl relative z-20">
-        
-        {/* Identity Header */}
         <div className="p-6 border-b border-slate-800">
             <h1 className="text-xl font-bold flex items-center gap-2 text-white">
                 <GraduationCap className="text-indigo-400" strokeWidth={2.5}/> 
@@ -4828,8 +4839,6 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
-            
-            {/* 1. Main Navigation */}
             <div className="space-y-1">
                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 mb-2">Menu</p>
                 <button onClick={() => setActiveTab('dashboard')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
@@ -4843,7 +4852,6 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
                 </button>
             </div>
 
-            {/* 2. Quick Create Widget */}
             <div className="space-y-2">
                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 mb-1">Quick Create</p>
                 <div className="grid grid-cols-3 gap-2">
@@ -4862,7 +4870,6 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
                 </div>
             </div>
 
-            {/* 3. Class Shortcuts Widget */}
             <div className="space-y-1">
                 <div className="flex justify-between items-center px-2 mb-2">
                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">My Classes</p>
@@ -4872,7 +4879,7 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
                     {userData.classes?.length > 0 ? userData.classes.map((cls: any) => (
                         <button 
                             key={cls.id} 
-                            onClick={() => handleClassShortcut(cls.id)}
+                            onClick={() => handleClassShortcut(cls.id)} // <--- CLICK HANDLER
                             className="w-full px-3 py-2 rounded-lg flex items-center justify-between group hover:bg-slate-800 transition-colors text-left"
                         >
                             <div className="flex items-center gap-2 overflow-hidden">
@@ -4888,10 +4895,8 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
                     )}
                 </div>
             </div>
-
         </div>
 
-        {/* Footer */}
         <div className="p-4 border-t border-slate-800">
             <button onClick={onLogout} className="w-full p-3 rounded-xl bg-slate-800 text-rose-400 flex items-center justify-center gap-2 hover:bg-rose-900/20 hover:text-rose-300 transition-colors font-bold text-xs uppercase tracking-wider">
                 <LogOut size={16} /> Sign Out
@@ -4899,10 +4904,8 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
         </div>
       </div>
 
-      {/* --- MAIN CONTENT AREA --- */}
+      {/* --- MAIN CONTENT --- */}
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50 relative">
-         
-         {/* Mobile Header (Only visible on small phones) */}
          <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center shrink-0 z-50">
             <span className="font-bold flex items-center gap-2"><GraduationCap/> Magister</span>
             <div className="flex gap-4">
@@ -4913,11 +4916,8 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
          </div>
          
          <div className="flex-1 overflow-hidden relative">
-            
-            {/* 1. DASHBOARD TAB (Refocused for Vertical View) */}
             {activeTab === 'dashboard' && (
                 <div className="h-full flex flex-col">
-                    {/* Minimal Stats Header */}
                     <div className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shrink-0">
                         <div>
                             <h2 className="text-lg font-bold text-slate-800">Live Command Center</h2>
@@ -4938,15 +4938,12 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
                             </div>
                         </div>
                     </div>
-
-                    {/* The Main Event: Full Height Live Feed */}
                     <div className="flex-1 overflow-hidden p-4 md:p-6 bg-slate-100/50">
                         <LiveActivityFeed />
                     </div>
                 </div>
             )}
 
-            {/* 2. CLASS MANAGER TAB */}
             {activeTab === 'classes' && (
                 <div className="h-full overflow-y-auto p-4 md:p-8">
                     <ClassManagerView 
@@ -4954,12 +4951,13 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
                         userData={userData} 
                         classes={userData?.classes || []} 
                         lessons={lessons} 
-                        allDecks={allDecks} 
+                        allDecks={allDecks}
+                        initialClassId={viewClassId} // <--- PASS THE ID
+                        onClearSelection={() => setViewClassId(null)} // <--- RESET HANDLER
                     />
                 </div>
             )}
 
-            {/* 3. CONTENT LIBRARY TAB */}
             {activeTab === 'content' && (
                 <div className="h-full overflow-hidden flex flex-col bg-white">
                     <BuilderHub 
@@ -4973,7 +4971,6 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
                 </div>
             )}
 
-            {/* 4. PROFILE TAB */}
             {activeTab === 'profile' && <ProfileView user={user} userData={userData} />}
          </div>
       </div>
