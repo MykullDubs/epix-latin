@@ -361,6 +361,8 @@ const RANK_MILESTONES = [
 
 function LevelUpModal({ userData, onClose }: any) {
   const [activeTab, setActiveTab] = useState<'stats' | 'journey'>('stats');
+  const [history, setHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   
   // Calculate Levels
   const { level, currentLevelXP, nextLevelXP, progress, rank } = getLevelInfo(userData?.xp || 0);
@@ -369,12 +371,45 @@ function LevelUpModal({ userData, onClose }: any) {
   // Counts
   const completedCount = (userData?.completedAssignments || []).length;
   const classCount = (userData?.classes || []).length;
-  const totalXP = userData?.xp || 0;
 
-  // Find current rank index for the Journey Timeline
-  const currentRankIndex = RANK_MILESTONES.findIndex(r => r.name === rank);
-  const nextRank = RANK_MILESTONES[currentRankIndex + 1];
-  const xpToNextRank = nextRank ? nextRank.minXP - totalXP : 0;
+  // --- FETCH HISTORY ---
+  useEffect(() => {
+    if (activeTab === 'journey' && history.length === 0) {
+        const fetchHistory = async () => {
+            setLoadingHistory(true);
+            try {
+                if (!userData?.email) return;
+                const q = query(
+                    collection(db, 'artifacts', appId, 'activity_logs'),
+                    where('studentEmail', '==', userData.email),
+                    orderBy('timestamp', 'desc'),
+                    limit(50) // Limit to last 50 actions for performance
+                );
+                const snapshot = await getDocs(q);
+                const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setHistory(logs);
+            } catch (e) {
+                console.error("Error fetching history:", e);
+            } finally {
+                setLoadingHistory(false);
+            }
+        };
+        fetchHistory();
+    }
+  }, [activeTab, userData]);
+
+  // --- HELPER: GET ICON FOR ACTIVITY ---
+  const getActivityIcon = (type: string) => {
+      if (type === 'game_reward') return <Swords size={16} />;
+      if (type === 'quiz_score') return <Trophy size={16} />;
+      return <BookOpen size={16} />;
+  };
+
+  const getActivityColor = (type: string) => {
+      if (type === 'game_reward') return 'bg-rose-100 text-rose-600 border-rose-200';
+      if (type === 'quiz_score') return 'bg-amber-100 text-amber-600 border-amber-200';
+      return 'bg-blue-100 text-blue-600 border-blue-200';
+  };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
@@ -385,7 +420,6 @@ function LevelUpModal({ userData, onClose }: any) {
         
         {/* --- HEADER --- */}
         <div className="relative bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-800 p-8 pt-12 text-center shrink-0">
-            {/* Background Texture */}
             <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
             
             <button onClick={onClose} className="absolute top-6 right-6 text-white/50 hover:text-white bg-black/10 hover:bg-black/20 p-2 rounded-full backdrop-blur-md transition-all z-20">
@@ -411,9 +445,6 @@ function LevelUpModal({ userData, onClose }: any) {
                 <span className="bg-white/10 text-blue-100 text-xs font-bold px-3 py-1 rounded-full border border-white/10 backdrop-blur-sm flex items-center gap-1">
                     <Award size={12} /> {rank}
                 </span>
-                <span className="bg-white/10 text-emerald-200 text-xs font-bold px-3 py-1 rounded-full border border-white/10 backdrop-blur-sm flex items-center gap-1">
-                    <TrendingUp size={12} /> Top 10%
-                </span>
             </div>
         </div>
 
@@ -423,7 +454,7 @@ function LevelUpModal({ userData, onClose }: any) {
                 <BarChart3 size={16} /> Overview
             </button>
             <button onClick={() => setActiveTab('journey')} className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${activeTab === 'journey' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'text-slate-400 hover:bg-slate-50'}`}>
-                <Map size={16} /> Journey
+                <Footprints size={16} /> History
             </button>
         </div>
 
@@ -479,39 +510,62 @@ function LevelUpModal({ userData, onClose }: any) {
 
             {activeTab === 'journey' && (
                 <div className="space-y-6 animate-in slide-in-from-right-4 duration-300 pl-2">
-                    <div className="flex items-start gap-4">
-                        <div className="flex flex-col items-center">
-                            <div className="w-0.5 h-6 bg-slate-200"></div>
-                            <div className="p-2 bg-slate-900 text-white rounded-full shadow-lg z-10"><Footprints size={16}/></div>
-                            <div className="w-0.5 h-full bg-slate-200 min-h-[200px]"></div>
+                    {loadingHistory ? (
+                        <div className="flex flex-col items-center justify-center py-20 gap-4 opacity-50">
+                            <Loader className="animate-spin text-indigo-600" size={32} />
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Tracing footsteps...</p>
                         </div>
-                        <div className="pt-4 pb-10 space-y-8 flex-1">
-                            {RANK_MILESTONES.map((r, i) => {
-                                const isPassed = totalXP >= r.minXP;
-                                const isCurrent = i === currentRankIndex;
-                                const isNext = i === currentRankIndex + 1;
-
-                                return (
-                                    <div key={r.name} className={`relative p-4 rounded-2xl border-2 transition-all ${isCurrent ? 'bg-white border-indigo-500 shadow-lg scale-105' : isPassed ? 'bg-slate-50 border-slate-200 opacity-70 grayscale' : 'bg-white border-dashed border-slate-200 opacity-50'}`}>
-                                        {isCurrent && <div className="absolute -left-[45px] top-1/2 -translate-y-1/2 w-4 h-4 bg-indigo-500 rounded-full border-4 border-slate-50"></div>}
-                                        
-                                        <div className="flex justify-between items-center mb-1">
-                                            <h4 className={`font-bold ${isCurrent ? 'text-indigo-900' : 'text-slate-600'}`}>{r.name}</h4>
-                                            <span className="text-xl">{r.icon}</span>
+                    ) : history.length === 0 ? (
+                        <div className="text-center py-10 text-slate-400 italic">
+                            <p>No journey data yet.</p>
+                            <p className="text-xs mt-2">Complete a lesson to start your path.</p>
+                        </div>
+                    ) : (
+                        <div className="relative border-l-2 border-slate-200 ml-4 space-y-8">
+                            {history.map((log: any) => (
+                                <div key={log.id} className="relative pl-8">
+                                    {/* Timeline Node */}
+                                    <div className={`absolute -left-[17px] top-0 w-9 h-9 rounded-full border-4 border-slate-50 flex items-center justify-center ${getActivityColor(log.type)}`}>
+                                        {getActivityIcon(log.type)}
+                                    </div>
+                                    
+                                    {/* Content Card */}
+                                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <h4 className="font-bold text-slate-800 text-sm leading-tight">{log.itemTitle}</h4>
+                                            <span className="text-emerald-600 text-xs font-black">+{log.xp} XP</span>
                                         </div>
-                                        <p className="text-xs text-slate-400 font-mono mb-2">{r.minXP} XP Required</p>
-                                        
-                                        {isNext && (
-                                            <div className="mt-2 bg-indigo-50 text-indigo-600 text-xs font-bold px-3 py-2 rounded-lg inline-block">
-                                                🔒 {xpToNextRank} XP to unlock
+                                        <div className="flex items-center gap-2 text-xs text-slate-400">
+                                            <span>{new Date(log.timestamp).toLocaleDateString()}</span>
+                                            <span>•</span>
+                                            <span className="capitalize">{log.type.replace('_', ' ')}</span>
+                                        </div>
+                                        {log.scoreDetail && (
+                                            <div className="mt-3 bg-slate-50 rounded-lg p-2 flex items-center gap-3">
+                                                <div className={`text-lg font-black ${log.scoreDetail.score/log.scoreDetail.total >= 0.7 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                                    {Math.round((log.scoreDetail.score / log.scoreDetail.total) * 100)}%
+                                                </div>
+                                                <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                                    <div 
+                                                        className={`h-full rounded-full ${log.scoreDetail.score/log.scoreDetail.total >= 0.7 ? 'bg-emerald-500' : 'bg-amber-500'}`} 
+                                                        style={{ width: `${(log.scoreDetail.score / log.scoreDetail.total) * 100}%` }}
+                                                    ></div>
+                                                </div>
                                             </div>
                                         )}
-                                        {isPassed && !isCurrent && <div className="text-xs font-bold text-emerald-500 flex items-center gap-1"><CheckCircle2 size={12}/> Completed</div>}
                                     </div>
-                                );
-                            })}
+                                </div>
+                            ))}
+
+                            {/* Start Node */}
+                            <div className="relative pl-8 pb-4">
+                                <div className="absolute -left-[13px] top-0 w-7 h-7 rounded-full bg-slate-200 border-4 border-slate-50 flex items-center justify-center text-slate-400">
+                                    <User size={12} />
+                                </div>
+                                <p className="text-xs font-bold text-slate-300 uppercase tracking-widest pt-1">Joined the Academy</p>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             )}
 
@@ -519,7 +573,8 @@ function LevelUpModal({ userData, onClose }: any) {
       </div>
     </div>
   );
-}// ============================================================================
+}
+// ============================================================================
 //  1. CORE VIEWS & GAMES
 // ============================================================================
 
