@@ -495,42 +495,54 @@ function AuthView() {
     </div>
   );
 }
+// --- PROFILE CONSTANTS ---
+const ACHIEVEMENTS_DATA = [
+  { id: 'novice', label: 'Novice', icon: '🌱', xpThreshold: 0, description: 'Started the journey' },
+  { id: 'scholar', label: 'Scholar', icon: '📚', xpThreshold: 500, description: 'Earned 500 XP' },
+  { id: 'sage', label: 'Sage', icon: '🔮', xpThreshold: 2000, description: 'Earned 2000 XP' },
+  { id: 'streak_fire', label: 'On Fire', icon: '🔥', streakThreshold: 3, description: '3 Day Streak' },
+  { id: 'streak_titan', label: 'Titan', icon: '⚡', streakThreshold: 7, description: '7 Day Streak' },
+  { id: 'social', label: 'Voice', icon: '🗣️', type: 'special', description: 'Participated in Forum' }
+];
 
+const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 // --- BEEFED UP PROFILE VIEW (FIXED LAYOUT) ---
 function ProfileView({ user, userData }: any) {
   const [deploying, setDeploying] = useState(false);
-  const [uploading, setUploading] = useState(false); // New state for upload spinner
-  const fileInputRef = useRef<HTMLInputElement>(null); // Ref for hidden input
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleLogout = () => signOut(auth);
   const { level, progress, rank } = getLevelInfo(userData?.xp || 0);
 
-  const deploySystemContent = async () => { setDeploying(true); const batch = writeBatch(db); Object.entries(INITIAL_SYSTEM_DECKS).forEach(([key, deck]) => batch.set(doc(db, 'artifacts', appId, 'public', 'data', 'system_decks', key), deck)); INITIAL_SYSTEM_LESSONS.forEach((lesson: any) => batch.set(doc(db, 'artifacts', appId, 'public', 'data', 'system_lessons', lesson.id), lesson)); try { await batch.commit(); alert("Deployed!"); } catch (e: any) { alert("Error: " + e.message); } setDeploying(false); };
-  const toggleRole = async () => { if (!userData) return; const newRole = userData.role === 'instructor' ? 'student' : 'instructor'; await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole }); };
+  // --- ACTIONS ---
+  const deploySystemContent = async () => { 
+    setDeploying(true); 
+    const batch = writeBatch(db); 
+    Object.entries(INITIAL_SYSTEM_DECKS).forEach(([key, deck]) => batch.set(doc(db, 'artifacts', appId, 'public', 'data', 'system_decks', key), deck)); 
+    INITIAL_SYSTEM_LESSONS.forEach((lesson: any) => batch.set(doc(db, 'artifacts', appId, 'public', 'data', 'system_lessons', lesson.id), lesson)); 
+    try { await batch.commit(); alert("Deployed!"); } catch (e: any) { alert("Error: " + e.message); } 
+    setDeploying(false); 
+  };
 
-  // --- NEW: HANDLE IMAGE UPLOAD ---
+  const toggleRole = async () => { 
+    if (!userData) return; 
+    const newRole = userData.role === 'instructor' ? 'student' : 'instructor'; 
+    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole }); 
+  };
+
   const handleImageUpload = async (e: any) => {
       const file = e.target.files[0];
       if (!file) return;
-
-      // Simple validation
       if (file.size > 5 * 1024 * 1024) { alert("File is too large (Max 5MB)"); return; }
       if (!file.type.startsWith('image/')) { alert("Please upload an image file"); return; }
 
       setUploading(true);
       try {
-          // 1. Create Reference
           const storageRef = ref(storage, `avatars/${user.uid}_${Date.now()}`);
-          
-          // 2. Upload
           await uploadBytes(storageRef, file);
-          
-          // 3. Get URL
           const photoURL = await getDownloadURL(storageRef);
-          
-          // 4. Update Profile Doc
           await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { photoURL });
-          
       } catch (error) {
           console.error("Upload failed", error);
           alert("Failed to upload image.");
@@ -540,116 +552,161 @@ function ProfileView({ user, userData }: any) {
   };
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-b from-slate-50 to-blue-50 relative overflow-y-auto overflow-x-hidden">
+    <div className="h-full flex flex-col bg-slate-50 relative overflow-y-auto overflow-x-hidden">
         
-        {/* --- HEADER --- */}
-        <div className="relative bg-gradient-to-br from-blue-600/90 via-indigo-600/90 to-blue-700/90 backdrop-blur-md pb-16 pt-10 px-6 rounded-b-[2rem] shadow-2xl z-0 shrink-0 text-center overflow-hidden">
-            <div className="absolute top-[-50%] left-[-20%] w-[500px] h-[500px] bg-blue-400/40 rounded-full blur-[80px] mix-blend-overlay pointer-events-none animate-[pulse_8s_ease-in-out_infinite]"></div>
-            <div className="absolute bottom-[-20%] right-[-10%] w-[300px] h-[300px] bg-indigo-300/40 rounded-full blur-[60px] mix-blend-overlay pointer-events-none animate-[pulse_10s_ease-in-out_infinite_reverse]"></div>
+        {/* --- HEADER BACKGROUND --- */}
+        <div className="absolute top-0 left-0 right-0 h-80 bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-800 rounded-b-[3rem] shadow-2xl z-0 overflow-hidden">
+            <div className="absolute top-[-50%] left-[-20%] w-[500px] h-[500px] bg-white/10 rounded-full blur-[80px] animate-pulse"></div>
+            <div className="absolute bottom-[-20%] right-[-10%] w-[300px] h-[300px] bg-purple-500/20 rounded-full blur-[60px]"></div>
+        </div>
+
+        {/* --- MAIN CONTENT --- */}
+        <div className="relative z-10 px-6 pt-12 pb-24 flex flex-col items-center">
             
-            {/* --- AVATAR UPLOADER --- */}
-            <div className="relative inline-block mb-3 group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                <div className="w-24 h-24 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border-2 border-white/40 shadow-[0_0_50px_rgba(255,255,255,0.3)] relative z-10 overflow-hidden">
+            {/* AVATAR SECTION */}
+            <div className="relative group cursor-pointer mb-4" onClick={() => fileInputRef.current?.click()}>
+                <div className="w-28 h-28 bg-white/20 backdrop-blur-xl rounded-full flex items-center justify-center border-4 border-white/30 shadow-2xl relative z-10 overflow-hidden hover:scale-105 transition-transform duration-300">
                     {uploading ? (
                         <Loader className="animate-spin text-white" />
                     ) : userData?.photoURL ? (
                         <img src={userData.photoURL} alt="Profile" className="w-full h-full object-cover" />
                     ) : (
-                        <span className="font-serif font-bold text-4xl text-white drop-shadow-lg">{userData?.name?.charAt(0) || 'U'}</span>
+                        <span className="font-serif font-bold text-5xl text-white drop-shadow-md">{userData?.name?.charAt(0) || 'U'}</span>
                     )}
-                    
-                    {/* Hover Overlay with Camera Icon */}
+                    {/* Upload Overlay */}
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Camera className="text-white" size={24} />
+                        <Camera className="text-white" size={28} />
                     </div>
                 </div>
-                
-                {/* Decorative Rings */}
-                <div className="absolute inset-0 border border-white/20 rounded-full scale-125 animate-pulse pointer-events-none"></div>
-                <div className="absolute inset-0 border border-white/10 rounded-full scale-150 pointer-events-none"></div>
-                
-                {/* Hidden Input */}
-                <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    className="hidden" 
-                    accept="image/*" 
-                    onChange={handleImageUpload} 
-                />
+                {/* Level Badge */}
+                <div className="absolute -bottom-2 -right-2 bg-amber-400 text-amber-900 border-2 border-white px-2 py-1 rounded-full text-xs font-black shadow-lg z-20">
+                    LVL {level}
+                </div>
+                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
             </div>
 
             <h1 className="text-3xl font-serif font-bold text-white drop-shadow-md mb-1">{userData?.name}</h1>
-            <p className="text-blue-100 font-medium tracking-wide text-sm opacity-80">{user.email}</p>
-            
-            <div className="mt-3 inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 px-3 py-1 rounded-full shadow-[inset_0_0_10px_rgba(255,255,255,0.1)]">
-                <div className={`w-1.5 h-1.5 rounded-full ${userData?.role === 'instructor' ? 'bg-amber-400' : 'bg-emerald-400'} shadow-[0_0_10px_currentColor]`}></div>
-                <span className="text-[10px] font-bold text-white uppercase tracking-widest">{userData?.role} Account</span>
-            </div>
-        </div>
+            <p className="text-indigo-100 font-medium tracking-wide text-sm opacity-80 mb-6">{user.email}</p>
 
-        {/* --- CONTENT --- */}
-        <div className="px-6 -mt-12 relative z-10 pb-24">
-            
-            {/* Stats Card */}
-            <div className="bg-white/70 backdrop-blur-xl rounded-[2rem] p-6 shadow-[inset_0_2px_20px_rgba(255,255,255,0.2),_0_15px_35px_rgba(0,0,0,0.1)] border border-white/40 mb-8 relative overflow-hidden ring-1 ring-white/20">
-                <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-400/80 via-indigo-500/80 to-blue-600/80"></div>
-                <div className="grid grid-cols-2 gap-y-6 gap-x-4">
-                    <div className="text-center border-r border-blue-500/10">
-                        <span className="block text-blue-900/60 text-[10px] font-bold uppercase tracking-widest mb-1">Current Rank</span>
-                        <div className="flex items-center justify-center gap-2 text-indigo-600 drop-shadow-sm">
-                            <Award size={22} />
-                            <span className="text-xl font-black">{level}</span>
-                        </div>
-                        <span className="text-xs font-bold text-indigo-500/80">{rank}</span>
-                    </div>
-                    <div className="text-center">
-                        <span className="block text-blue-900/60 text-[10px] font-bold uppercase tracking-widest mb-1">Day Streak</span>
-                        <div className="flex items-center justify-center gap-2 text-amber-500 drop-shadow-sm">
-                            <Zap size={22} fill="currentColor"/>
-                            <span className="text-xl font-black">{userData?.streak || 1}</span>
-                        </div>
-                        <span className="text-xs font-bold text-amber-500/80">On Fire!</span>
-                    </div>
-                    <div className="col-span-2 pt-4 border-t border-blue-500/10">
-                        <div className="flex justify-between items-end mb-2">
-                            <span className="text-xs font-bold text-blue-900/60">XP Progress</span>
-                            <span className="text-xs font-bold text-indigo-600">{userData?.xp || 0} XP</span>
-                        </div>
-                        <div className="w-full bg-blue-900/5 rounded-full h-3 overflow-hidden shadow-inner border border-white/30">
-                            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-full rounded-full transition-all duration-1000 relative shadow-[0_0_10px_rgba(79,70,229,0.4)]" style={{ width: `${progress}%` }}>
-                                <div className="absolute inset-0 bg-white/30 animate-[shimmer_2s_infinite]"></div>
-                            </div>
-                        </div>
-                    </div>
+            {/* STATS ROW */}
+            <div className="w-full grid grid-cols-3 gap-3 mb-8">
+                <div className="bg-white/10 backdrop-blur-md border border-white/20 p-3 rounded-2xl text-center">
+                    <Award className="text-amber-300 mx-auto mb-1" size={20} />
+                    <span className="block text-xl font-black text-white">{userData?.xp || 0}</span>
+                    <span className="text-[9px] text-indigo-100 uppercase font-bold tracking-wider">Total XP</span>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md border border-white/20 p-3 rounded-2xl text-center">
+                    <Zap className="text-blue-300 mx-auto mb-1" size={20} fill="currentColor" />
+                    <span className="block text-xl font-black text-white">{userData?.streak || 1}</span>
+                    <span className="text-[9px] text-indigo-100 uppercase font-bold tracking-wider">Day Streak</span>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md border border-white/20 p-3 rounded-2xl text-center">
+                    <Target className="text-emerald-300 mx-auto mb-1" size={20} />
+                    <span className="block text-xl font-black text-white">{rank}</span>
+                    <span className="text-[9px] text-indigo-100 uppercase font-bold tracking-wider">Rank</span>
                 </div>
             </div>
 
-            {/* Actions */}
-            <div className="space-y-3">
-                <h3 className="text-xs font-bold text-blue-900/50 uppercase tracking-wider ml-2 mb-2">Account Settings</h3>
-                <button onClick={toggleRole} className="w-full bg-white/80 backdrop-blur-sm p-4 rounded-2xl border border-white/40 shadow-sm flex items-center justify-between group hover:bg-white/95 hover:border-indigo-300 hover:shadow-md transition-all active:scale-[0.98]">
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors shadow-sm"><School size={20}/></div>
-                        <div className="text-left"><h4 className="font-bold text-slate-800 text-base">Switch Role</h4><p className="text-[10px] text-slate-500">Currently: {userData?.role}</p></div>
+            {/* --- BODY CARDS --- */}
+            <div className="w-full space-y-6">
+                
+                {/* 1. WEEKLY ACTIVITY (Mocked Logic) */}
+                <div className="bg-white p-5 rounded-3xl shadow-lg border border-slate-100">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                            <Activity size={18} className="text-indigo-500"/> Activity
+                        </h3>
+                        <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-bold">This Week</span>
                     </div>
-                    <div className="w-8 h-8 rounded-full bg-slate-50/50 flex items-center justify-center text-slate-300 group-hover:bg-indigo-600 group-hover:text-white transition-all"><ChevronRight size={16}/></div>
-                </button>
-                <button onClick={deploySystemContent} disabled={deploying} className="w-full bg-white/80 backdrop-blur-sm p-4 rounded-2xl border border-white/40 shadow-sm flex items-center justify-between group hover:bg-white/95 hover:border-slate-400 hover:shadow-md transition-all active:scale-[0.98]">
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center group-hover:bg-slate-800 group-hover:text-white transition-colors shadow-sm">{deploying ? <Loader className="animate-spin" size={20}/> : <UploadCloud size={20}/>}</div>
-                        <div className="text-left"><h4 className="font-bold text-slate-800 text-base">Deploy Content</h4><p className="text-[10px] text-slate-500">Reset system defaults</p></div>
+                    <div className="flex justify-between">
+                        {WEEK_DAYS.map((day, i) => {
+                            // Mocking: If day index < current date % 7, it's active
+                            const isActive = i <= (new Date().getDay() - 1 + 7) % 7; 
+                            return (
+                                <div key={i} className="flex flex-col items-center gap-2">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                                        isActive ? 'bg-indigo-600 text-white shadow-md scale-110' : 'bg-slate-100 text-slate-400'
+                                    }`}>
+                                        {isActive && <Check size={12} strokeWidth={4}/>}
+                                    </div>
+                                    <span className="text-[9px] font-bold text-slate-400">{day}</span>
+                                </div>
+                            );
+                        })}
                     </div>
-                </button>
-                <button onClick={handleLogout} className="w-full bg-rose-50/80 backdrop-blur-sm p-4 rounded-2xl border border-rose-100/60 shadow-sm flex items-center justify-between group hover:bg-rose-100/90 hover:border-rose-200 hover:shadow-md transition-all active:scale-[0.98] mt-5">
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-white/80 text-rose-500 rounded-xl flex items-center justify-center shadow-sm"><LogOut size={20}/></div>
-                        <div className="text-left"><h4 className="font-bold text-rose-700 text-base">Sign Out</h4><p className="text-[10px] text-rose-500/80">See you soon!</p></div>
+                </div>
+
+                {/* 2. ACHIEVEMENTS */}
+                <div className="bg-white p-5 rounded-3xl shadow-lg border border-slate-100">
+                    <h3 className="font-bold text-slate-700 flex items-center gap-2 mb-4">
+                        <Medal size={18} className="text-amber-500"/> Achievements
+                    </h3>
+                    <div className="grid grid-cols-3 gap-3">
+                        {ACHIEVEMENTS_DATA.map((badge) => {
+                            let unlocked = false;
+                            if (badge.xpThreshold !== undefined && (userData?.xp || 0) >= badge.xpThreshold) unlocked = true;
+                            if (badge.streakThreshold !== undefined && (userData?.streak || 0) >= badge.streakThreshold) unlocked = true;
+                            if (badge.id === 'social' && userData?.role === 'instructor') unlocked = true; // Example logic
+
+                            return (
+                                <div key={badge.id} className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all ${
+                                    unlocked 
+                                    ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200 shadow-sm' 
+                                    : 'bg-slate-50 border-slate-100 opacity-60 grayscale'
+                                }`}>
+                                    <span className="text-2xl mb-1 filter drop-shadow-sm">{badge.icon}</span>
+                                    <span className={`text-[9px] font-bold uppercase tracking-wide ${unlocked ? 'text-amber-800' : 'text-slate-400'}`}>{badge.label}</span>
+                                </div>
+                            );
+                        })}
                     </div>
-                </button>
-            </div>
-            
-            <div className="mt-8 text-center">
-                <p className="text-[9px] font-bold text-blue-900/30 uppercase tracking-widest">LinguistFlow v3.2 • Profile Shine Edition</p>
+                </div>
+
+                {/* 3. SETTINGS & ACCOUNT */}
+                <div className="bg-white rounded-3xl shadow-lg border border-slate-100 overflow-hidden">
+                    <div className="p-4 border-b border-slate-50 bg-slate-50/50">
+                        <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                            <Settings size={18} className="text-slate-400"/> Settings
+                        </h3>
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                        <button onClick={toggleRole} className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center"><ArrowRightLeft size={16}/></div>
+                                <div className="text-left">
+                                    <span className="block text-sm font-bold text-slate-700">Switch Role</span>
+                                    <span className="text-xs text-slate-400">Current: {userData?.role}</span>
+                                </div>
+                            </div>
+                            <ChevronRight size={16} className="text-slate-300 group-hover:text-indigo-600"/>
+                        </button>
+
+                        <button onClick={deploySystemContent} disabled={deploying} className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                                    {deploying ? <Loader className="animate-spin" size={16}/> : <UploadCloud size={16}/>}
+                                </div>
+                                <div className="text-left">
+                                    <span className="block text-sm font-bold text-slate-700">Reset Content</span>
+                                    <span className="text-xs text-slate-400">Re-deploy system defaults</span>
+                                </div>
+                            </div>
+                        </button>
+
+                        <button onClick={handleLogout} className="w-full p-4 flex items-center justify-between hover:bg-rose-50 transition-colors group">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center"><LogOut size={16}/></div>
+                                <div className="text-left">
+                                    <span className="block text-sm font-bold text-rose-600">Sign Out</span>
+                                </div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <div className="text-center pb-8">
+                    <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">LinguistFlow v3.2</p>
+                </div>
             </div>
         </div>
     </div>
