@@ -2616,14 +2616,17 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
    {/* --- 1. MINIMALIST HERO WIDGET --- */}
 <button 
     onClick={() => setShowLevelModal(true)} 
-    className="w-full bg-slate-900 text-white shadow-lg z-10 group text-left rounded-b-[2.5rem] transition-all active:scale-[0.99] relative overflow-hidden"
+    className="w-full bg-gradient-to-br from-[#6495ED] to-[#4169E1] text-white shadow-xl shadow-blue-200 z-10 group text-left rounded-b-[2.5rem] transition-all active:scale-[0.99] relative overflow-hidden"
 >
-    <div className="px-8 pt-12 pb-8 flex items-center justify-between">
+    {/* Subtle Texture Overlay */}
+    <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
+
+    <div className="px-8 pt-12 pb-8 flex items-center justify-between relative z-10">
         
         {/* Left: Identity */}
         <div className="flex items-center gap-4">
-            {/* Clean Avatar */}
-            <div className="w-14 h-14 bg-slate-800 rounded-2xl flex items-center justify-center text-white border border-slate-700 shadow-inner overflow-hidden">
+            {/* Cornflower Avatar */}
+            <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-white border border-white/20 shadow-inner overflow-hidden">
                 {userData?.photoURL ? (
                     <img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />
                 ) : (
@@ -2633,27 +2636,27 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
 
             {/* Typography Focus */}
             <div>
-                <h1 className="text-2xl font-serif font-bold text-white tracking-tight leading-none mb-1 group-hover:text-indigo-300 transition-colors">
+                <h1 className="text-2xl font-serif font-bold text-white tracking-tight leading-none mb-1 group-hover:text-blue-100 transition-colors drop-shadow-sm">
                     {displayName}
                 </h1>
-                <div className="flex items-center gap-2 text-slate-400 text-xs font-medium font-mono">
-                    <span className="text-indigo-400 font-bold">LVL {level}</span>
-                    <span className="w-1 h-1 rounded-full bg-slate-600"></span>
+                <div className="flex items-center gap-2 text-blue-100 text-xs font-medium font-mono">
+                    <span className="bg-white/20 px-1.5 rounded text-white font-bold">LVL {level}</span>
+                    <span className="w-1 h-1 rounded-full bg-blue-200"></span>
                     <span>{userData?.xp || 0} XP</span>
                 </div>
             </div>
         </div>
 
         {/* Right: Subtle Chevron */}
-        <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-500 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+        <div className="w-8 h-8 rounded-full bg-black/10 flex items-center justify-center text-blue-100 group-hover:bg-white group-hover:text-[#6495ED] transition-all">
             <ChevronRight size={16} />
         </div>
     </div>
 
-    {/* Surgical XP Line (Bottom Edge) */}
-    <div className="w-full h-1.5 bg-slate-800">
+    {/* Surgical XP Line (Bottom Edge) - Pure White */}
+    <div className="w-full h-1.5 bg-black/10 relative">
         <div 
-            className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 shadow-[0_0_10px_rgba(99,102,241,0.5)] transition-all duration-1000"
+            className="h-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.6)] transition-all duration-1000"
             style={{ width: `${progress}%` }}
         />
     </div>
