@@ -4085,6 +4085,9 @@ function ClassGrades({ classData }: any) {
   const [students, setStudents] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // --- NEW: SELECTED STUDENT STATE ---
+  const [selectedStudentEmail, setSelectedStudentEmail] = useState<string | null>(null);
 
   // 1. Subscribe to Data
   useEffect(() => {
@@ -4093,21 +4096,18 @@ function ClassGrades({ classData }: any) {
         return;
     }
 
-    // A. Fetch Student Profiles (to get names, XP, avatars)
+    // A. Fetch Student Profiles
     const qStudents = query(collectionGroup(db, 'profile'), where('role', '==', 'student'));
     const unsubStudents = onSnapshot(qStudents, (snapshot) => {
         const allStudents = snapshot.docs.map(d => d.data());
-        // Filter for students actually in this class
-        // (Note: In a larger app, you'd filter server-side, but this works for class sizes < 100)
         const classStudents = allStudents.filter((s: any) => classData.studentEmails?.includes(s.email));
         setStudents(classStudents);
     });
 
-    // B. Fetch Activity Logs (to get quiz scores)
+    // B. Fetch Activity Logs
     const qLogs = query(collection(db, 'artifacts', appId, 'activity_logs'), orderBy('timestamp', 'desc'));
     const unsubLogs = onSnapshot(qLogs, (snapshot) => {
         const allLogs = snapshot.docs.map(d => d.data());
-        // Filter logs for this class roster
         const classLogs = allLogs.filter((l: any) => classData.studentEmails?.includes(l.studentEmail));
         setLogs(classLogs);
         setLoading(false);
@@ -4121,7 +4121,6 @@ function ClassGrades({ classData }: any) {
       const studentLogs = logs.filter(l => l.studentEmail === email);
       const completedCount = studentLogs.length;
       
-      // Calculate Average Quiz Score
       let totalScore = 0;
       let totalPossible = 0;
       
@@ -4133,14 +4132,121 @@ function ClassGrades({ classData }: any) {
       });
 
       const average = totalPossible > 0 ? Math.round((totalScore / totalPossible) * 100) : 0;
-      
       return { completedCount, average };
+  };
+
+  // --- NEW: STUDENT DETAIL MODAL COMPONENT ---
+  const StudentDetailModal = () => {
+      if (!selectedStudentEmail) return null;
+
+      const student = students.find(s => s.email === selectedStudentEmail) || { name: 'Unknown', email: selectedStudentEmail };
+      const studentLogs = logs.filter(l => l.studentEmail === selectedStudentEmail);
+      const stats = getStudentStats(selectedStudentEmail);
+
+      return (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setSelectedStudentEmail(null)}>
+              <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+                  
+                  {/* Modal Header */}
+                  <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-start">
+                      <div className="flex items-center gap-4">
+                          <div className="w-16 h-16 bg-white border-2 border-white shadow-md rounded-full overflow-hidden">
+                              {student.photoURL ? (
+                                  <img src={student.photoURL} alt={student.name} className="w-full h-full object-cover"/>
+                              ) : (
+                                  <div className="w-full h-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-2xl">
+                                      {student.name?.charAt(0)}
+                                  </div>
+                              )}
+                          </div>
+                          <div>
+                              <h2 className="text-xl font-bold text-slate-900">{student.name}</h2>
+                              <p className="text-sm text-slate-500 font-mono">{student.email}</p>
+                              <div className="flex gap-2 mt-2">
+                                  <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded border border-amber-200">
+                                      {student.xp || 0} Total XP
+                                  </span>
+                                  <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded border border-indigo-200">
+                                      {stats.average}% Quiz Avg
+                                  </span>
+                              </div>
+                          </div>
+                      </div>
+                      <button onClick={() => setSelectedStudentEmail(null)} className="p-2 bg-white rounded-full hover:bg-rose-50 hover:text-rose-500 transition-colors shadow-sm text-slate-400">
+                          <X size={20} />
+                      </button>
+                  </div>
+
+                  {/* Modal Body: Assignment List */}
+                  <div className="flex-1 overflow-y-auto p-0 custom-scrollbar">
+                      {studentLogs.length === 0 ? (
+                          <div className="p-12 text-center text-slate-400 italic">No activity recorded for this student yet.</div>
+                      ) : (
+                          <table className="w-full text-left text-sm">
+                              <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
+                                  <tr>
+                                      <th className="p-4 font-bold text-slate-400 uppercase text-[10px] tracking-wider">Assignment</th>
+                                      <th className="p-4 font-bold text-slate-400 uppercase text-[10px] tracking-wider">Date</th>
+                                      <th className="p-4 font-bold text-slate-400 uppercase text-[10px] tracking-wider text-right">Score</th>
+                                  </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-50">
+                                  {studentLogs.map((log: any) => {
+                                      const scorePct = log.scoreDetail ? Math.round((log.scoreDetail.score / log.scoreDetail.total) * 100) : null;
+                                      return (
+                                          <tr key={log.id} className="hover:bg-slate-50/50">
+                                              <td className="p-4">
+                                                  <p className="font-bold text-slate-700">{log.itemTitle}</p>
+                                                  <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${log.type === 'quiz_score' ? 'bg-indigo-50 text-indigo-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                                      {log.type === 'quiz_score' ? 'Quiz' : 'Lesson'}
+                                                  </span>
+                                              </td>
+                                              <td className="p-4 text-slate-500 text-xs">
+                                                  <div className="flex items-center gap-1">
+                                                      <Calendar size={12}/>
+                                                      {new Date(log.timestamp).toLocaleDateString()}
+                                                  </div>
+                                                  <div className="text-[10px] opacity-60 pl-4">
+                                                      {new Date(log.timestamp).toLocaleTimeString()}
+                                                  </div>
+                                              </td>
+                                              <td className="p-4 text-right">
+                                                  {log.scoreDetail ? (
+                                                      <div>
+                                                          <span className={`text-lg font-black ${scorePct! >= 70 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                                              {scorePct}%
+                                                          </span>
+                                                          <p className="text-[10px] text-slate-400 font-bold uppercase">
+                                                              {log.scoreDetail.score}/{log.scoreDetail.total} Correct
+                                                          </p>
+                                                      </div>
+                                                  ) : (
+                                                      <div className="flex items-center justify-end gap-1 text-emerald-600 font-bold text-xs">
+                                                          <CheckCircle2 size={14}/> Complete
+                                                      </div>
+                                                  )}
+                                                  <div className="text-[10px] text-indigo-400 font-bold mt-1">+{log.xp} XP</div>
+                                              </td>
+                                          </tr>
+                                      );
+                                  })}
+                              </tbody>
+                          </table>
+                      )}
+                  </div>
+              </div>
+          </div>
+      );
   };
 
   if (loading) return <div className="p-12 text-center text-slate-400 flex flex-col items-center gap-2"><Loader className="animate-spin"/><span className="text-xs font-bold uppercase tracking-widest">Calculating Grades...</span></div>;
 
   return (
-     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4">
+     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 relative">
+        
+        {/* Render the modal if a student is selected */}
+        <StudentDetailModal />
+
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
             <div>
                 <h3 className="font-bold text-lg text-slate-800">Gradebook</h3>
@@ -4166,14 +4272,18 @@ function ClassGrades({ classData }: any) {
                     {students.map(s => {
                         const stats = getStudentStats(s.email);
                         return (
-                            <tr key={s.email} className="hover:bg-indigo-50/30 transition-colors group">
+                            <tr 
+                                key={s.email} 
+                                onClick={() => setSelectedStudentEmail(s.email)} // <--- CLICK HANDLER
+                                className="hover:bg-indigo-50/50 transition-colors group cursor-pointer" // <--- CURSOR POINTER
+                            >
                                 <td className="p-4 pl-6">
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center font-serif font-bold shadow-sm border border-white group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
                                             {s.name?.charAt(0) || '?'}
                                         </div>
                                         <div>
-                                            <p className="font-bold text-slate-800">{s.name || 'Unknown'}</p>
+                                            <p className="font-bold text-slate-800 group-hover:text-indigo-700 transition-colors">{s.name || 'Unknown'}</p>
                                             <p className="text-xs text-slate-400 font-mono">{s.email}</p>
                                         </div>
                                     </div>
@@ -4195,7 +4305,10 @@ function ClassGrades({ classData }: any) {
                                 </td>
                                 <td className="p-4 text-right pr-6">
                                     {stats.completedCount > 0 ? (
-                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full"><Activity size={12}/> Active</span>
+                                        <div className="flex items-center justify-end gap-2">
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full"><Activity size={12}/> Active</span>
+                                            <ChevronRight size={16} className="text-slate-300 group-hover:text-indigo-400 transition-colors"/>
+                                        </div>
                                     ) : (
                                         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-full">Inactive</span>
                                     )}
