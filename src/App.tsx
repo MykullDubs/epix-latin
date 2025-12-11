@@ -3880,6 +3880,171 @@ function ClassGrades({ classData }: any) {
      </div>
   );
 }
+function RosterManagerModal({ isOpen, onClose, currentRosterEmails, onSave }: any) {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [allStudents, setAllStudents] = useState<any[]>([]);
+    const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set(currentRosterEmails));
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    // 1. Fetch all students when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            setLoading(true);
+            // Initialize selection with who is currently in the class
+            setSelectedEmails(new Set(currentRosterEmails));
+            
+            const q = query(collectionGroup(db, 'profile'), where('role', '==', 'student'));
+            const unsubscribe = onSnapshot(q, (snapshot) => {
+                const students = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setAllStudents(students);
+                setLoading(false);
+            });
+            return () => unsubscribe();
+        }
+    }, [isOpen, currentRosterEmails]);
+
+    // 2. Toggle Selection
+    const toggleStudent = (email: string) => {
+        const newSet = new Set(selectedEmails);
+        if (newSet.has(email)) {
+            newSet.delete(email);
+        } else {
+            newSet.add(email);
+        }
+        setSelectedEmails(newSet);
+    };
+
+    // 3. Batch Save
+    const handleSave = async () => {
+        setSaving(true);
+        await onSave(Array.from(selectedEmails));
+        setSaving(false);
+        onClose();
+    };
+
+    // 4. Search Filter
+    const filteredStudents = allStudents.filter(s => 
+        (s.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+        (s.email?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+    );
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden border border-slate-200">
+                
+                {/* Header */}
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <Users size={20} className="text-indigo-600"/> Manage Roster
+                        </h2>
+                        <p className="text-xs text-slate-500 mt-1">Select students to enroll in this class</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-400">
+                        <X size={20}/>
+                    </button>
+                </div>
+
+                {/* Search Bar */}
+                <div className="p-4 border-b border-slate-100 bg-white sticky top-0 z-10">
+                    <div className="relative">
+                        <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
+                        <input 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Search students by name or email..." 
+                            className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+                            autoFocus
+                        />
+                    </div>
+                </div>
+
+                {/* Student List */}
+                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-slate-50/50">
+                    {loading ? (
+                        <div className="py-20 text-center flex flex-col items-center gap-3 text-slate-400">
+                            <Loader size={24} className="animate-spin"/>
+                            <span className="text-xs font-bold uppercase tracking-widest">Loading Scholars...</span>
+                        </div>
+                    ) : filteredStudents.length === 0 ? (
+                        <div className="py-20 text-center text-slate-400 italic">No students found matching "{searchTerm}".</div>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-2">
+                            {filteredStudents.map((student) => {
+                                const isSelected = selectedEmails.has(student.email);
+                                return (
+                                    <div 
+                                        key={student.email} 
+                                        onClick={() => toggleStudent(student.email)}
+                                        className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all cursor-pointer select-none group ${
+                                            isSelected 
+                                            ? 'bg-indigo-50 border-indigo-500 shadow-sm' 
+                                            : 'bg-white border-transparent hover:border-slate-200 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            {/* Avatar */}
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-colors ${
+                                                isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'
+                                            }`}>
+                                                {student.photoURL ? (
+                                                    <img src={student.photoURL} alt={student.name} className="w-full h-full object-cover rounded-full" />
+                                                ) : (
+                                                    student.name?.charAt(0) || '?'
+                                                )}
+                                            </div>
+                                            
+                                            {/* Info */}
+                                            <div>
+                                                <h4 className={`font-bold text-sm ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>
+                                                    {student.name || "Unknown Student"}
+                                                </h4>
+                                                <p className={`text-xs ${isSelected ? 'text-indigo-600/70' : 'text-slate-400'}`}>
+                                                    {student.email}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Checkbox Visual */}
+                                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                                            isSelected ? 'bg-indigo-500 border-indigo-500 text-white scale-110' : 'border-slate-300 bg-white group-hover:border-slate-400'
+                                        }`}>
+                                            {isSelected && <Check size={14} strokeWidth={3} />}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer Actions */}
+                <div className="p-4 border-t border-slate-100 bg-white flex justify-between items-center">
+                    <div className="text-xs font-bold text-slate-500">
+                        <span className="text-indigo-600 text-lg mr-1">{selectedEmails.size}</span> 
+                        Selected
+                    </div>
+                    <div className="flex gap-3">
+                        <button onClick={onClose} className="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 text-sm transition-colors">
+                            Cancel
+                        </button>
+                        <button 
+                            onClick={handleSave} 
+                            disabled={saving}
+                            className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
+                        >
+                            {saving ? <Loader size={16} className="animate-spin"/> : <Save size={16}/>}
+                            Save Roster
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
 function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [newClassName, setNewClassName] = useState('');
@@ -3893,20 +4058,8 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
 
   // -- Student Selector States --
   const [isStudentListOpen, setIsStudentListOpen] = useState(false);
-  const [availableStudents, setAvailableStudents] = useState<any[]>([]);
-  const [studentSearch, setStudentSearch] = useState('');
   
   const selectedClass = classes.find((c: any) => c.id === selectedClassId);
-
-  useEffect(() => {
-    if (isStudentListOpen) {
-        const q = query(collectionGroup(db, 'profile'), where('role', '==', 'student'));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            setAvailableStudents(snapshot.docs.map(doc => ({ ...doc.data() })));
-        });
-        return () => unsubscribe();
-    }
-  }, [isStudentListOpen]);
 
   // --- ACTIONS ---
   const createClass = async (e: any) => { e.preventDefault(); if (!newClassName.trim()) return; try { await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), { name: newClassName, code: Math.random().toString(36).substring(2, 8).toUpperCase(), students: [], studentEmails: [], assignments: [], created: Date.now() }); setNewClassName(''); setToastMsg("Class Created Successfully"); } catch (error) { console.error("Create class failed:", error); alert("Failed to create class."); } };
@@ -3916,17 +4069,22 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
   const toggleAssignee = (email: string) => { if (selectedAssignees.includes(email)) { setSelectedAssignees(selectedAssignees.filter(e => e !== email)); } else { setSelectedAssignees([...selectedAssignees, email]); } };
   const assignContent = async (item: any, type: string) => { if (!selectedClass) return; try { const assignment = JSON.parse(JSON.stringify({ ...item, id: `assign_${Date.now()}_${Math.random().toString(36).substr(2,5)}`, originalId: item.id, contentType: type, targetStudents: targetStudentMode === 'specific' ? selectedAssignees : null })); await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { assignments: arrayUnion(assignment) }); setAssignModalOpen(false); setTargetStudentMode('all'); setSelectedAssignees([]); setToastMsg(`Assigned: ${item.title}`); } catch (error) { console.error("Assign failed:", error); alert("Failed to assign."); } };
 
-  const addStudentToClass = async (email: string) => {
-      if (!selectedClass || !email) return;
-      const normalizedEmail = email.toLowerCase().trim();
-      if (selectedClass.studentEmails?.includes(normalizedEmail)) return;
+  // --- NEW: BATCH ROSTER UPDATE ---
+  const handleUpdateRoster = async (newEmailList: string[]) => {
+      if (!selectedClass) return;
       try {
-          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { students: arrayUnion(normalizedEmail), studentEmails: arrayUnion(normalizedEmail) });
-          setToastMsg(`Added ${normalizedEmail}`);
-      } catch (error) { console.error("Add student failed:", error); alert("Failed to add student."); }
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), {
+              students: newEmailList,
+              studentEmails: newEmailList 
+          });
+          setToastMsg("Roster updated successfully");
+      } catch (error) {
+          console.error("Roster update failed:", error);
+          alert("Failed to update roster.");
+      }
   };
 
-  // --- REMOVE ACTIONS ---
+  // --- REMOVE SINGLE STUDENT (Backup) ---
   const removeStudent = async (email: string) => {
       if (!selectedClass || !email) return;
       if (!window.confirm(`Are you sure you want to remove ${email} from this class?`)) return;
@@ -3952,6 +4110,15 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
     return (
       <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-300 relative">
         {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
+        
+        {/* --- NEW: ROSTER MANAGER MODAL --- */}
+        <RosterManagerModal 
+            isOpen={isStudentListOpen}
+            onClose={() => setIsStudentListOpen(false)}
+            currentRosterEmails={selectedClass.studentEmails || []}
+            onSave={handleUpdateRoster}
+        />
+
         <div className="pb-6 border-b border-slate-100 mb-6">
           <button onClick={() => setSelectedClassId(null)} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Classes</button>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
@@ -4000,9 +4167,18 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                       </div> 
                     ))}
                 </div>
+                
+                {/* --- UPDATED ROSTER SECTION --- */}
                 <div className="space-y-4">
-                    <div className="flex justify-between items-center"><h3 className="font-bold text-slate-800 flex items-center gap-2"><Users size={18} className="text-indigo-600"/> Roster</h3><button onClick={() => setIsStudentListOpen(true)} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"><UserPlus size={14}/> Add Students</button></div>
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">{(!selectedClass.students || selectedClass.students.length === 0) && <div className="p-4 text-center text-slate-400 text-sm italic">No students joined yet.</div>}{selectedClass.students?.map((s: string, i: number) => (
+                    <div className="flex justify-between items-center">
+                        <h3 className="font-bold text-slate-800 flex items-center gap-2"><Users size={18} className="text-indigo-600"/> Roster</h3>
+                        <button onClick={() => setIsStudentListOpen(true)} className="text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition-colors flex items-center gap-2 shadow-sm">
+                            <UserPlus size={16}/> Manage Roster
+                        </button>
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        {(!selectedClass.students || selectedClass.students.length === 0) && <div className="p-4 text-center text-slate-400 text-sm italic">No students joined yet.</div>}
+                        {selectedClass.students?.map((s: string, i: number) => (
                         <div key={i} className="p-3 border-b border-slate-50 last:border-0 flex items-center justify-between group">
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs">{s.charAt(0)}</div>
@@ -4027,26 +4203,7 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
             </div>
         )}
 
-        {isStudentListOpen && (
-            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[80vh] flex flex-col animate-in zoom-in duration-200">
-                    <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center"><h3 className="font-bold text-lg">Select Students</h3><button onClick={() => setIsStudentListOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-600"/></button></div>
-                    <div className="p-4 border-b border-slate-100"><div className="relative"><Search className="absolute left-3 top-2.5 text-slate-400" size={16} /><input value={studentSearch} onChange={(e) => setStudentSearch(e.target.value)} placeholder="Search by name or email..." className="w-full pl-9 p-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" autoFocus /></div></div>
-                    <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
-                        {availableStudents.length === 0 ? ( <div className="text-center py-8 text-slate-400">Loading students...</div> ) : (
-                            // --- FIX APPLIED HERE: Added (s.name || "") fallback ---
-                            availableStudents
-                            .filter(s => (s.name || "").toLowerCase().includes(studentSearch.toLowerCase()) || (s.email || "").toLowerCase().includes(studentSearch.toLowerCase()))
-                            .map((student, idx) => { 
-                                const isAdded = selectedClass.students?.includes(student.email); 
-                                return ( <div key={idx} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-colors border-b border-slate-50 last:border-0"><div className="flex items-center gap-3"><div className="w-8 h-8 bg-slate-200 text-slate-600 rounded-full flex items-center justify-center font-bold text-xs">{(student.name || "?").charAt(0)}</div><div><p className="text-sm font-bold text-slate-800">{student.name || "Unknown Name"}</p><p className="text-xs text-slate-500">{student.email}</p></div></div><button onClick={() => addStudentToClass(student.email)} disabled={isAdded} className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${isAdded ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>{isAdded ? 'Joined' : 'Add'}</button></div> ) 
-                            })
-                        )}
-                    </div>
-                </div>
-            </div>
-        )}
-
+        {/* --- ASSIGN MODAL (UNCHANGED) --- */}
         {assignModalOpen && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in duration-200">
@@ -4067,6 +4224,15 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
       </div>
     );
   }
+  
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500 relative">
+      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
+      <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-slate-800">My Classes</h2><form onSubmit={createClass} className="flex gap-2"><input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="New Class Name" className="p-2 rounded-lg border border-slate-200 text-sm w-64" /><button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2"><Plus size={16}/> Create</button></form></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{classes.map((cls: any) => (<div key={cls.id} onClick={() => setSelectedClassId(cls.id)} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative group"><div className="absolute top-4 right-4 flex gap-2"><button onClick={(e) => {e.stopPropagation(); handleRenameClass(cls.id, cls.name);}} className="text-slate-300 hover:text-indigo-500"><Edit3 size={16}/></button><button onClick={(e) => {e.stopPropagation(); handleDeleteClass(cls.id);}} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button></div><div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4 font-bold text-lg">{cls.name.charAt(0)}</div><h3 className="font-bold text-lg text-slate-900">{cls.name}</h3><p className="text-sm text-slate-500 mb-4">{(cls.students || []).length} Students</p><div className="flex items-center justify-between bg-slate-50 p-2 rounded-lg"><span className="text-xs font-mono font-bold text-slate-600 tracking-wider">{cls.code}</span><button className="text-indigo-600 text-xs font-bold flex items-center gap-1" onClick={(e) => {e.stopPropagation(); navigator.clipboard.writeText(cls.code);}}><Copy size={12}/> Copy</button></div></div>))}</div>
+    </div>
+  );
+}
   
   return (
     <div className="space-y-6 animate-in fade-in duration-500 relative">
