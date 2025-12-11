@@ -1781,6 +1781,12 @@ function StudentGradebook({ classData, user, userData }: any) {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // --- HELPER: Normalize strings for fuzzy matching ---
+  // Removes punctuation, extra spaces, and casing (e.g., "Exam 1!" -> "exam1")
+  const normalize = (str: string) => {
+      return (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  };
+
   // 1. Fetch User's Activity Logs
   useEffect(() => {
     if (!user?.email) {
@@ -1788,8 +1794,7 @@ function StudentGradebook({ classData, user, userData }: any) {
         return;
     }
     
-    // FIX: Removed 'orderBy' to prevent "Missing Index" errors from Firestore.
-    // We filter by email here and sort in JavaScript below.
+    // Fetch logs for this student
     const q = query(
       collection(db, 'artifacts', appId, 'activity_logs'), 
       where('studentEmail', '==', user.email)
@@ -1799,7 +1804,7 @@ function StudentGradebook({ classData, user, userData }: any) {
       const fetchedLogs = snapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() }))
           // @ts-ignore
-          .sort((a, b) => b.timestamp - a.timestamp); // JS Sort descending
+          .sort((a, b) => b.timestamp - a.timestamp);
       
       setLogs(fetchedLogs);
       setLoading(false);
@@ -1810,32 +1815,41 @@ function StudentGradebook({ classData, user, userData }: any) {
 
   // 2. Process Assignments vs Logs
   const assignments = classData.assignments || [];
-  const completedIds = new Set(userData?.completedAssignments || []); // Source of truth for completion
+  const completedIds = new Set(userData?.completedAssignments || []); 
   
   const processedData = assignments.map((assign: any) => {
-      // Normalize titles for comparison
-      const targetTitle = (assign.title || '').toLowerCase().trim();
+      const targetSimple = normalize(assign.title);
 
-      // Find logs matching Title OR ID
-      const attempts = logs.filter(l => 
-          (l.itemTitle || '').toLowerCase().trim() === targetTitle || 
-          (l.itemId && l.itemId === assign.id)
-      );
+      // --- ROBUST MATCHING LOGIC ---
+      const attempts = logs.filter(l => {
+          const logSimple = normalize(l.itemTitle);
+          // 1. Check ID match (if available)
+          if (l.itemId && l.itemId === assign.id) return true;
+          // 2. Check Exact Title match (Simplified)
+          if (logSimple === targetSimple) return true;
+          // 3. Check fuzzy containment (if titles are long enough to avoid false positives)
+          if (targetSimple.length > 3 && logSimple.includes(targetSimple)) return true;
+          
+          return false;
+      });
       
-      // Find best score among attempts
+      // Find best score
       const bestAttempt = attempts.reduce((prev, current) => {
           const prevScore = prev?.scoreDetail?.score || 0;
           const currScore = current?.scoreDetail?.score || 0;
+          // Prefer the one with a score detail over one without
+          if (!prev?.scoreDetail && current?.scoreDetail) return current;
+          if (prev?.scoreDetail && !current?.scoreDetail) return prev;
+          // If both have scores, take higher
           return currScore > prevScore ? current : prev;
       }, null);
 
-      // Check completion via Profile OR Logs
       const isCompleted = completedIds.has(assign.id) || attempts.length > 0;
       
       return {
           ...assign,
           isCompleted,
-          bestScore: bestAttempt?.scoreDetail,
+          bestScore: bestAttempt?.scoreDetail, // Extract score object
           lastAttemptDate: attempts[0]?.timestamp,
           attemptsCount: attempts.length
       };
@@ -1844,8 +1858,9 @@ function StudentGradebook({ classData, user, userData }: any) {
   const completedCount = processedData.filter((d: any) => d.isCompleted).length;
   const totalCount = processedData.length;
   
-  // 3. Calculate Average (Only for items that actually HAVE scores)
-  const gradedItems = processedData.filter((d: any) => d.bestScore);
+  // 3. Calculate Average
+  // Filter for items that actually have a score recorded
+  const gradedItems = processedData.filter((d: any) => d.bestScore && d.bestScore.total > 0);
   
   const totalScore = gradedItems.reduce((acc: number, curr: any) => {
       const max = curr.bestScore.total || 1; 
@@ -1868,9 +1883,15 @@ function StudentGradebook({ classData, user, userData }: any) {
               <div className="relative w-28 h-28 flex-shrink-0">
                   <svg className="w-full h-full transform -rotate-90">
                       <circle cx="56" cy="56" r="48" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100" />
-                      {hasGrades && (
-                          <circle cx="56" cy="56" r="48" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={301} strokeDashoffset={301 - (301 * averageGrade) / 100} className={`${averageGrade >= 90 ? 'text-emerald-400' : averageGrade >= 70 ? 'text-indigo-500' : 'text-amber-400'} transition-all duration-1000 ease-out`} strokeLinecap="round" />
-                      )}
+                      {/* Only show progress ring if there is a grade > 0 or if items are graded */}
+                      <circle 
+                        cx="56" cy="56" r="48" 
+                        stroke="currentColor" strokeWidth="8" fill="transparent" 
+                        strokeDasharray={301} 
+                        strokeDashoffset={301 - (301 * (hasGrades ? averageGrade : 0)) / 100} 
+                        className={`${averageGrade >= 90 ? 'text-emerald-400' : averageGrade >= 70 ? 'text-indigo-500' : 'text-amber-400'} transition-all duration-1000 ease-out`} 
+                        strokeLinecap="round" 
+                      />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <span className={`text-2xl font-black ${hasGrades ? 'text-slate-800' : 'text-slate-300'}`}>
@@ -1903,7 +1924,7 @@ function StudentGradebook({ classData, user, userData }: any) {
                       <div key={idx} className="p-4 flex items-center justify-between group hover:bg-slate-50 transition-colors">
                           <div className="flex items-center gap-3 overflow-hidden">
                               <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm shrink-0 ${item.isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-300'}`}>
-                                  {item.contentType === 'test' ? <HelpCircle size={18}/> : item.contentType === 'deck' ? <Layers size={18}/> : <FileText size={18}/>}
+                                  {item.isCompleted ? <CheckCircle2 size={18}/> : item.contentType === 'test' ? <HelpCircle size={18}/> : item.contentType === 'deck' ? <Layers size={18}/> : <FileText size={18}/>}
                               </div>
                               <div className="min-w-0">
                                   <h4 className={`font-bold text-sm truncate ${item.isCompleted ? 'text-slate-800' : 'text-slate-400'}`}>{item.title}</h4>
@@ -1930,7 +1951,7 @@ function StudentGradebook({ classData, user, userData }: any) {
                           </div>
                       </div>
                   ))}
-                  {processedData.length === 0 && <div className="p-8 text-center text-slate-400 italic text-sm">No assignments found.</div>}
+                  {processedData.length === 0 && <div className="p-8 text-center text-slate-400 italic text-sm">No assignments to track.</div>}
               </div>
           </div>
       </div>
