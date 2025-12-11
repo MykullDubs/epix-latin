@@ -2493,159 +2493,247 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
     </div>
   );
 }
+// --- AUDIO ENGINE (Synthesizer) ---
+// Generates sounds on the fly so no assets are needed
+const playSynthSound = (type: 'hit' | 'miss' | 'frenzy' | 'tick', comboPitch = 0) => {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    const now = ctx.currentTime;
+
+    if (type === 'hit') {
+        // Pitch rises with combo (pentatonic scale ish)
+        const baseFreq = 440; 
+        const freq = baseFreq + (comboPitch * 50); 
+        
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now);
+        osc.frequency.exponentialRampToValueAtTime(freq * 2, now + 0.1);
+        
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+        
+        osc.start(now);
+        osc.stop(now + 0.15);
+    } else if (type === 'miss') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(100, now);
+        osc.frequency.linearRampToValueAtTime(50, now + 0.3);
+        
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+        
+        osc.start(now);
+        osc.stop(now + 0.3);
+    } else if (type === 'frenzy') {
+        // Power up sound
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.linearRampToValueAtTime(800, now + 0.5);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.5);
+        osc.start(now);
+        osc.stop(now + 0.5);
+    }
+};
+
 function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
-  // --- GAME STATE ---
+  // --- STATE ---
   const [gameState, setGameState] = useState<'intro' | 'playing' | 'gameover'>('intro');
   const [lives, setLives] = useState(3);
   const [score, setScore] = useState(0);
   const [round, setRound] = useState(1);
   const [timeLeft, setTimeLeft] = useState(15);
   const [combo, setCombo] = useState(0);
-  const [maxCombo, setMaxCombo] = useState(0);
-  const [shake, setShake] = useState(false);
   
-  // --- MECHANIC STATE ---
+  // JUICE STATES
+  const [fever, setFever] = useState(0); // 0 to 100
+  const [isFeverMode, setIsFeverMode] = useState(false);
+  const [shake, setShake] = useState(0); // Shake intensity
+  const [flash, setFlash] = useState<string | null>(null); // 'red' | 'white' | 'blue'
+  const [floatingText, setFloatingText] = useState<{id: number, x: number, y: number, text: string, color: string}[]>([]);
+  const [particles, setParticles] = useState<{id: number, x: number, y: number, color: string, vx: number, vy: number, life: number}[]>([]);
+
+  // MECHANICS
   const [loadout, setLoadout] = useState<'slash' | 'shoot'>('slash');
   const [slashPath, setSlashPath] = useState<{x: number, y: number}[]>([]);
   const [isInputActive, setIsInputActive] = useState(false);
-  const [particles, setParticles] = useState<{id: number, x: number, y: number, color: string, vx: number, vy: number}[]>([]);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // --- DATA ---
-  const [selectedDeckId, setSelectedDeckId] = useState<string>('all'); // NEW: Track selection
+  const [pool, setPool] = useState<any[]>([]);
   const [currentCard, setCurrentCard] = useState<any>(null);
-  const [options, setOptions] = useState<any[]>([]); 
-  const [pool, setPool] = useState<any[]>([]); // The active pool of cards
+  const [options, setOptions] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [feedbackText, setFeedbackText] = useState<{text: string, x: number, y: number} | null>(null);
+  
+  const containerRef = useRef<HTMLDivElement>(null);
+  const requestRef = useRef<number>();
 
-  // --- AUDIO ENGINE ---
-  const playSound = (type: 'hit' | 'miss') => {
-    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    if (type === 'hit') {
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(440, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1);
-      gain.gain.setValueAtTime(0.1, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-      osc.start(); osc.stop(ctx.currentTime + 0.1);
-    } else if (type === 'miss') {
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(150, ctx.currentTime);
-      osc.frequency.linearRampToValueAtTime(50, ctx.currentTime + 0.3);
-      gain.gain.setValueAtTime(0.1, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-      osc.start(); osc.stop(ctx.currentTime + 0.3);
-    }
-  };
-
-  // --- INIT POOL BASED ON SELECTION ---
-  // We don't load the pool immediately on mount anymore. 
-  // We load it when "Start" is clicked based on selectedDeckId.
-  const generatePool = () => {
-      let combined: any[] = [];
-      
-      if (selectedDeckId === 'all') {
-          Object.values(allDecks).forEach((deck: any) => {
-              if (deck.cards) combined.push(...deck.cards);
-          });
-      } else {
-          const deck = allDecks[selectedDeckId];
-          if (deck && deck.cards) combined = [...deck.cards];
-      }
-
-      // Fallback if deck is empty
-      if (combined.length < 4) {
-          alert("This battlefield is too quiet (needs 4+ cards). Switching to All Decks.");
-          Object.values(allDecks).forEach((deck: any) => {
-              if (deck.cards) combined.push(...deck.cards);
-          });
-      }
-
-      return combined.sort(() => 0.5 - Math.random());
-  };
-
-  // 2. Timer
-  useEffect(() => {
-    if (gameState !== 'playing' || selectedId) return;
-    if (timeLeft <= 0) { handleWrongAnswer(); return; }
-    const timer = setInterval(() => setTimeLeft(t => t - 1), 1000);
-    return () => clearInterval(timer);
-  }, [timeLeft, gameState, selectedId]);
-
-  // 3. Particles
-  useEffect(() => {
-    if (particles.length === 0) return;
-    const interval = setInterval(() => {
+  // --- GAME LOOP (High Performance) ---
+  const animate = () => {
+      // 1. Particle Physics
       setParticles(prev => prev.map(p => ({
-        ...p, x: p.x + p.vx, y: p.y + p.vy + 2, 
-      })).filter(p => p.y < window.innerHeight && p.x > 0 && p.x < window.innerWidth));
-    }, 16);
-    return () => clearInterval(interval);
-  }, [particles]);
+          ...p, x: p.x + p.vx, y: p.y + p.vy, vy: p.vy + 0.5, life: p.life - 0.05
+      })).filter(p => p.life > 0));
 
-  const triggerShake = () => {
-    setShake(true);
-    setTimeout(() => setShake(false), 300);
+      // 2. Floating Text Physics
+      setFloatingText(prev => prev.map(t => ({
+          ...t, y: t.y - 2 
+      })).filter(t => t.y > 0)); // Simple cleanup based on position, ideally use lifetime
+
+      requestRef.current = requestAnimationFrame(animate);
   };
 
-  const spawnParticles = (x: number, y: number, color: string, count = 10) => {
-    const newParticles = Array.from({ length: count }).map(() => ({
-      id: Math.random(),
-      x, y, color,
-      vx: (Math.random() - 0.5) * 10,
-      vy: (Math.random() - 0.5) * 10 - 5
-    }));
-    setParticles(prev => [...prev, ...newParticles]);
+  useEffect(() => {
+      requestRef.current = requestAnimationFrame(animate);
+      return () => cancelAnimationFrame(requestRef.current!);
+  }, []);
+
+  // --- TIMER LOGIC ---
+  useEffect(() => {
+      if (gameState !== 'playing' || selectedId) return;
+      // In Fever mode, time stops or slows down? Let's make it slow down
+      const intervalSpeed = isFeverMode ? 2000 : 1000;
+      
+      const timer = setInterval(() => {
+          setTimeLeft(t => {
+              if (t <= 1) { handleWrongAnswer(); return 0; }
+              return t - 1;
+          });
+      }, intervalSpeed);
+      return () => clearInterval(timer);
+  }, [timeLeft, gameState, selectedId, isFeverMode]);
+
+  // --- JUICE HELPERS ---
+  const triggerShake = (intensity = 1) => {
+      setShake(intensity);
+      setTimeout(() => setShake(0), 300);
   };
 
-  // 6. Round Logic
+  const spawnParticles = (x: number, y: number, color: string, count = 15) => {
+      const newP = Array.from({ length: count }).map(() => ({
+          id: Math.random(), x, y, color,
+          vx: (Math.random() - 0.5) * 15,
+          vy: (Math.random() - 0.5) * 15,
+          life: 1.0
+      }));
+      setParticles(prev => [...prev, ...newP]);
+  };
+
+  const spawnText = (x: number, y: number, text: string, color: string) => {
+      setFloatingText(prev => [...prev, { id: Math.random(), x, y, text, color }]);
+      setTimeout(() => setFloatingText(prev => prev.slice(1)), 1000); // Cleanup
+  };
+
+  // --- GAMEPLAY LOGIC ---
+  const generatePool = () => {
+      // (Simplified: Grab all cards for now)
+      let combined: any[] = [];
+      Object.values(allDecks).forEach((deck: any) => { if (deck.cards) combined.push(...deck.cards); });
+      return combined.length < 4 ? combined : combined.sort(() => 0.5 - Math.random());
+  };
+
   const nextRound = (currentPool: any[]) => {
-    if (lives <= 0) {
-        setGameState('gameover');
-        const finalXP = Math.ceil(score / 5) + (maxCombo * 5); 
-        onXPUpdate(finalXP, `Colosseum (${loadout} - Wave ${round})`);
-        return;
-    }
+      if (lives <= 0) {
+          setGameState('gameover');
+          onXPUpdate(Math.ceil(score / 5), `Colosseum (${loadout})`);
+          return;
+      }
 
-    const target = currentPool[Math.floor(Math.random() * currentPool.length)];
-    const others = currentPool.filter(c => c.id !== target.id);
-    const distractors = others.sort(() => 0.5 - Math.random()).slice(0, 3);
-    const newOptions = [target, ...distractors].sort(() => 0.5 - Math.random());
-    
-    setCurrentCard(target);
-    setOptions(newOptions);
-    setSelectedId(null);
-    setSlashPath([]);
-    setFeedbackText(null);
-    
-    const isBoss = (round + 1) % 5 === 0;
-    const baseTime = loadout === 'shoot' ? 8 : 12;
-    setTimeLeft(isBoss ? 5 : Math.max(4, baseTime - Math.floor(round / 10)));
+      // Logic to pick question
+      const target = currentPool[Math.floor(Math.random() * currentPool.length)];
+      const others = currentPool.filter(c => c.id !== target.id);
+      const distractors = others.sort(() => 0.5 - Math.random()).slice(0, 3);
+      const newOptions = [target, ...distractors].sort(() => 0.5 - Math.random());
+      
+      setCurrentCard(target);
+      setOptions(newOptions);
+      setSelectedId(null);
+      setSlashPath([]);
+      
+      // Fever mode grants infinite time? Or just bonus time
+      setTimeLeft(isFeverMode ? 10 : 8); 
   };
 
-  const handleStart = (selectedLoadout: 'slash' | 'shoot') => {
-      const newPool = generatePool();
-      setPool(newPool); // Save pool to state
-      setLoadout(selectedLoadout);
+  const handleStart = (mode: 'slash' | 'shoot') => {
+      const p = generatePool();
+      setPool(p);
+      setLoadout(mode);
       setLives(3);
       setScore(0);
+      setFever(0);
+      setIsFeverMode(false);
       setRound(1);
-      setCombo(0);
       setGameState('playing');
-      
-      // Pass the new pool directly to avoid state update lag
-      nextRound(newPool);
+      nextRound(p);
   };
 
-  // --- INPUT ENGINES ---
+  const handleCorrect = (x: number, y: number, multiplier = 1) => {
+      // 1. HIT STOP (Freeze frame for impact)
+      // We simulate this by delaying the UI update slightly
+      
+      // 2. Audio
+      playSynthSound('hit', combo);
+
+      // 3. Visuals
+      triggerShake(1);
+      setFlash('white');
+      setTimeout(() => setFlash(null), 50);
+      spawnParticles(x, y, isFeverMode ? '#FCD34D' : '#34D399'); // Gold or Green
+      
+      // 4. Calculations
+      const feverMult = isFeverMode ? 2 : 1;
+      const points = Math.round(100 * multiplier * (1 + (combo*0.1)) * feverMult);
+      setScore(s => s + points);
+      setCombo(c => c + 1);
+      spawnText(x, y - 50, `+${points}`, isFeverMode ? '#FCD34D' : '#fff');
+
+      // 5. Fever Logic
+      if (!isFeverMode) {
+          setFever(f => {
+              const next = f + 20;
+              if (next >= 100) {
+                  setIsFeverMode(true);
+                  playSynthSound('frenzy');
+                  setFlash('blue');
+                  return 100;
+              }
+              return next;
+          });
+      }
+
+      // 6. Next Round (Delayed for impact)
+      setTimeout(() => {
+          setRound(r => r + 1);
+          nextRound(pool);
+      }, isFeverMode ? 400 : 600); // Faster in fever mode
+  };
+
+  const handleWrongAnswer = (x = window.innerWidth/2, y = window.innerHeight/2) => {
+      playSynthSound('miss');
+      triggerShake(2);
+      setFlash('red');
+      setTimeout(() => setFlash(null), 100);
+      spawnParticles(x, y, '#F87171', 20); // Red explosion
+      spawnText(x, y - 50, "MISS", '#F87171');
+      
+      setCombo(0);
+      setIsFeverMode(false);
+      setFever(0);
+      setLives(l => l - 1);
+
+      if (lives <= 1) {
+          setGameState('gameover');
+          onXPUpdate(Math.ceil(score / 5), `Colosseum (${loadout})`);
+      } else {
+          setTimeout(() => nextRound(pool), 800);
+      }
+  };
+
+  // --- INPUT HANDLERS ---
   const handleSlashDown = (e: React.PointerEvent) => {
       if (loadout !== 'slash' || selectedId) return;
       setIsInputActive(true);
@@ -2657,317 +2745,175 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
 
   const handleSlashMove = (e: React.PointerEvent) => {
       if (loadout !== 'slash' || !isInputActive || !containerRef.current) return;
-      
       const rect = containerRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
       setSlashPath(prev => [...prev, { x, y }]);
 
+      // Check collision
       const element = document.elementFromPoint(e.clientX, e.clientY);
       const answerId = element?.getAttribute('data-answer-id');
       
-      if (answerId) {
-        spawnParticles(e.clientX, e.clientY, '#f43f5e', 8);
-        submitAnswer(answerId, 1, e.clientX, e.clientY);
-      }
-  };
-
-  const handleSlashUp = () => {
-      if (loadout === 'slash') {
+      if (answerId && !selectedId) {
+          setSelectedId(answerId);
           setIsInputActive(false);
-          setSlashPath([]);
+          if (answerId === currentCard.id) handleCorrect(e.clientX, e.clientY);
+          else handleWrongAnswer(e.clientX, e.clientY);
       }
   };
 
   const handleShoot = (e: React.MouseEvent, answerId: string) => {
       if (loadout !== 'shoot' || selectedId) return;
-      
-      const targetRect = e.currentTarget.getBoundingClientRect();
-      const clickX = e.clientX - targetRect.left;
-      const clickY = e.clientY - targetRect.top;
-      const centerX = targetRect.width / 2;
-      const centerY = targetRect.height / 2;
-      const distance = Math.sqrt(Math.pow(clickX - centerX, 2) + Math.pow(clickY - centerY, 2));
-      
-      let multiplier = 1.0;
-      if (distance < 15) multiplier = 2.0;
-      else if (distance < 40) multiplier = 1.5;
-      
-      spawnParticles(e.clientX, e.clientY, '#fbbf24', 12); 
-      submitAnswer(answerId, multiplier, e.clientX, e.clientY);
-  };
-
-  const submitAnswer = (answerId: string, precisionMult: number, inputX: number, inputY: number) => {
-      setIsInputActive(false);
-      if (selectedId) return; 
       setSelectedId(answerId);
-      
-      const isCorrect = answerId === currentCard.id;
-      const isBoss = round % 5 === 0;
-      
-      setTimeout(() => {
-          if (isCorrect) {
-              playSound('hit');
-              
-              const comboMult = 1 + (combo * 0.1); 
-              const timeBonus = timeLeft * 2;
-              const bossMult = isBoss ? 2 : 1;
-              const points = Math.floor((10 + timeBonus) * precisionMult * comboMult * bossMult);
-              
-              setScore(s => s + points);
-              setCombo(c => {
-                const next = c + 1;
-                if (next > maxCombo) setMaxCombo(next);
-                return next;
-              });
-              setRound(r => r + 1);
-
-              const words = ["HIT", "GOOD", "GREAT", "SUPERB", "DIVINE"];
-              const wordIndex = Math.min(Math.floor(precisionMult * 2) + Math.floor(combo/5), words.length - 1);
-              setFeedbackText({ text: `+${points} (${words[wordIndex]})`, x: inputX, y: inputY - 50 });
-
-              if (precisionMult > 1.5 || combo > 5) triggerShake();
-
-              nextRound(pool);
-          } else {
-              playSound('miss');
-              triggerShake();
-              setCombo(0);
-              setLives(l => l - 1);
-              setFeedbackText({ text: "MISS!", x: inputX, y: inputY - 50 });
-              
-              if (lives <= 1) { 
-                  setGameState('gameover');
-                  const finalXP = Math.ceil(score / 5); 
-                  onXPUpdate(finalXP, `Colosseum (${loadout})`);
-              } else {
-                  nextRound(pool);
-              }
-          }
-      }, loadout === 'shoot' ? 600 : 300);
-  };
-
-  const handleWrongAnswer = () => {
-      playSound('miss');
-      triggerShake();
-      setCombo(0);
-      setLives(l => l - 1);
-      if (lives <= 1) {
-          setGameState('gameover');
-          onXPUpdate(Math.ceil(score / 5), `Colosseum (${loadout})`);
-      } else {
-          nextRound(pool);
-      }
-  };
-
-  // --- STYLE HELPERS ---
-  const isBossRound = round % 5 === 0;
-
-  const getOptionStyle = (opt: any, index: number) => {
-      const positions = [
-          "top-[18%] left-6", "top-[18%] right-6", "bottom-[18%] left-6", "bottom-[18%] right-6"
-      ];
-      
-      let baseStyle = "absolute max-w-[45%] min-w-[140px] px-4 py-6 rounded-2xl flex items-center justify-center text-center transition-all duration-200 z-20 select-none active:translate-y-1 active:shadow-none";
-      
-      let visualStyle = "";
-
-      if (selectedId) {
-          if (opt.id === currentCard.id) {
-              visualStyle = "bg-emerald-500 border-b-4 border-emerald-700 text-white shadow-[0_4px_0_#047857] scale-110 z-30";
-          } else if (opt.id === selectedId) {
-              visualStyle = "bg-rose-500 border-b-4 border-rose-700 text-white shadow-none translate-y-1 opacity-50";
-          } else {
-              visualStyle = "bg-slate-200 border-b-4 border-slate-300 text-slate-400 opacity-20";
-          }
-      } else {
-          const cursor = loadout === 'shoot' ? 'cursor-crosshair hover:scale-105' : 'cursor-default';
-          if (isBossRound) {
-              visualStyle = "bg-gradient-to-b from-slate-50 to-rose-50 border-2 border-rose-200 border-b-4 border-b-rose-300 text-rose-900 shadow-[0_4px_0_#fda4af]";
-          } else {
-              visualStyle = "bg-gradient-to-b from-white to-slate-100 border-2 border-slate-200 border-b-4 border-b-slate-300 text-slate-800 shadow-[0_4px_0_#cbd5e1] hover:brightness-105";
-          }
-          visualStyle += ` ${cursor}`;
-      }
-
-      return `${baseStyle} ${positions[index]} ${visualStyle}`;
+      if (answerId === currentCard.id) handleCorrect(e.clientX, e.clientY);
+      else handleWrongAnswer(e.clientX, e.clientY);
   };
 
   return (
-    <div className={`fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center font-sans overflow-hidden touch-none select-none ${shake ? 'animate-[shake_0.3s_ease-in-out]' : ''}`}>
+    <div className={`fixed inset-0 z-[100] flex flex-col items-center justify-center font-sans overflow-hidden touch-none select-none bg-slate-900`}>
         
-        <div className={`absolute inset-0 pointer-events-none transition-colors duration-1000 ${isBossRound ? 'bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-rose-900 via-slate-900 to-black' : 'bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-800 to-black'}`}></div>
-        <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] animate-[pulse_4s_infinite]"></div>
-
+        {/* --- DYNAMIC BACKGROUND --- */}
+        <div className={`absolute inset-0 transition-colors duration-500 ${flash === 'red' ? 'bg-rose-900' : flash === 'white' ? 'bg-white' : flash === 'blue' ? 'bg-indigo-600' : isFeverMode ? 'bg-amber-900' : 'bg-slate-900'}`}></div>
+        <div className={`absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] ${isFeverMode ? 'animate-[ping_1s_infinite]' : ''}`}></div>
+        
+        {/* --- PARTICLES CANVAS LAYER (DOM for simplicity here) --- */}
         {particles.map(p => (
             <div key={p.id} className="absolute rounded-full pointer-events-none" style={{
-                left: p.x, top: p.y, width: '6px', height: '6px', backgroundColor: p.color,
-                opacity: 0.8, transform: 'translate(-50%, -50%)', transition: 'opacity 0.5s'
+                left: p.x, top: p.y, width: `${p.life * 8}px`, height: `${p.life * 8}px`, backgroundColor: p.color,
+                opacity: p.life, transform: `translate(-50%, -50%)`
             }} />
         ))}
 
-        {feedbackText && (
-            <div className="absolute z-50 text-4xl font-black italic text-amber-400 drop-shadow-[0_4px_0_rgba(0,0,0,1)] animate-[bounce_0.5s_ease-out] pointer-events-none whitespace-nowrap" 
-                 style={{ left: feedbackText.x, top: feedbackText.y, transform: 'translateX(-50%)' }}>
-                {feedbackText.text}
+        {/* --- FLOATING TEXT --- */}
+        {floatingText.map(t => (
+            <div key={t.id} className="absolute z-50 text-4xl font-black italic drop-shadow-[0_4px_0_rgba(0,0,0,0.5)] whitespace-nowrap" 
+                 style={{ left: t.x, top: t.y, color: t.color, transform: 'translate(-50%, -50%) scale(1.5)', textShadow: '0 0 10px currentColor' }}>
+                {t.text}
             </div>
-        )}
+        ))}
 
-        {gameState === 'intro' && (
-            <div className="bg-white max-w-sm w-full rounded-[2.5rem] p-8 text-center shadow-[0_0_60px_rgba(255,255,255,0.2)] relative z-10 animate-in zoom-in border-4 border-slate-100">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 bg-slate-900 rounded-full border-4 border-white flex items-center justify-center text-rose-500 shadow-xl">
-                    <Swords size={40} />
-                </div>
-                <h2 className="text-4xl font-black text-slate-800 mb-2 mt-6 uppercase italic tracking-tighter">Colosseum</h2>
-                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-6">Survival Mode</p>
-                
-                {/* --- NEW: BATTLEFIELD SELECTOR --- */}
-                <div className="mb-6">
-                    <label className="block text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 ml-1">Select Battlefield</label>
-                    <select 
-                        value={selectedDeckId} 
-                        onChange={(e) => setSelectedDeckId(e.target.value)}
-                        className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl font-bold text-slate-700 text-sm focus:outline-none focus:border-rose-500"
-                    >
-                        <option value="all">🌍 All Knowledge (Mixed)</option>
-                        {Object.entries(allDecks).map(([key, deck]: any) => (
-                            deck.cards?.length >= 4 && (
-                                <option key={key} value={key}>
-                                    {deck.language === 'Latin' ? '🏛️' : deck.language === 'Spanish' ? '🇪🇸' : '📚'} {deck.title}
-                                </option>
-                            )
-                        ))}
-                    </select>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 mb-6">
-                    <button onClick={() => handleStart('slash')} className="p-4 rounded-2xl border-2 border-slate-100 hover:border-rose-500 hover:bg-rose-50 transition-all group text-left flex items-center gap-4 relative overflow-hidden">
-                        <div className="absolute right-0 top-0 bottom-0 w-2 bg-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform"><Swords size={24} /></div>
-                        <div><h4 className="font-black text-slate-800 text-lg uppercase">Gladiator</h4><p className="text-xs text-slate-500">Slash targets. Speed bonus.</p></div>
-                    </button>
-
-                    <button onClick={() => handleStart('shoot')} className="p-4 rounded-2xl border-2 border-slate-100 hover:border-indigo-500 hover:bg-indigo-50 transition-all group text-left flex items-center gap-4 relative overflow-hidden">
-                        <div className="absolute right-0 top-0 bottom-0 w-2 bg-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform"><Crosshair size={24} /></div>
-                        <div><h4 className="font-black text-slate-800 text-lg uppercase">Archer</h4><p className="text-xs text-slate-500">Tap targets. Precision bonus.</p></div>
-                    </button>
-                </div>
-
-                <button onClick={onExit} className="w-full py-4 text-slate-400 font-bold uppercase tracking-widest text-xs hover:text-slate-600">Return to Safety</button>
-            </div>
-        )}
-
-        {gameState === 'playing' && currentCard && (
-            <div className="w-full h-full relative flex flex-col p-4 max-w-2xl mx-auto">
-                
-                {/* HUD */}
-                <div className="flex justify-between items-start mb-4 relative z-30 pointer-events-none">
-                    <div className="flex gap-1 bg-black/40 backdrop-blur-md p-2 rounded-full border border-white/10">
-                        {[...Array(3)].map((_, i) => (
-                            <Heart key={i} size={24} className={`${i < lives ? 'fill-rose-500 text-rose-500 animate-pulse' : 'fill-slate-800 text-slate-700'}`} />
-                        ))}
-                    </div>
-
-                    <div className="flex flex-col items-center gap-2">
-                        <div className={`text-4xl font-black italic tracking-tighter drop-shadow-lg ${timeLeft <= 3 ? 'text-rose-500 animate-bounce' : 'text-white'}`}>
-                            {timeLeft}<span className="text-sm align-top opacity-50">s</span>
+        {/* --- SHAKE CONTAINER --- */}
+        <div className="w-full h-full flex flex-col relative z-10" style={{ transform: `translate(${Math.random()*shake*10}px, ${Math.random()*shake*10}px)` }}>
+            
+            {/* HUD */}
+            {gameState === 'playing' && (
+                <div className="p-4 flex justify-between items-start">
+                    
+                    {/* Lives & Fever Bar */}
+                    <div className="flex flex-col gap-2">
+                        <div className="flex gap-1">
+                            {[...Array(3)].map((_, i) => (
+                                <Heart key={i} size={32} className={`${i < lives ? 'fill-rose-500 text-rose-500 drop-shadow-lg' : 'fill-slate-800 text-slate-700'}`} />
+                            ))}
                         </div>
-                        <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${isBossRound ? 'bg-rose-600 border-rose-400 text-white animate-pulse' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>
-                            {isBossRound ? '👹 BOSS ROUND' : `Wave ${round}`}
+                        {/* FEVER BAR */}
+                        <div className="w-32 h-4 bg-slate-800 rounded-full border border-slate-700 overflow-hidden relative">
+                            <div className={`h-full transition-all duration-300 ${isFeverMode ? 'bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 animate-pulse' : 'bg-blue-500'}`} style={{ width: `${isFeverMode ? 100 : fever}%` }}></div>
+                            <span className="absolute inset-0 text-[9px] font-black text-white/80 flex items-center justify-center uppercase tracking-widest">{isFeverMode ? 'FRENZY!' : 'Fever'}</span>
                         </div>
                     </div>
 
+                    {/* Timer */}
+                    <div className={`text-6xl font-black italic tracking-tighter drop-shadow-2xl ${timeLeft <= 3 ? 'text-rose-500 scale-110 animate-pulse' : 'text-white'}`}>
+                        {timeLeft}
+                    </div>
+
+                    {/* Score */}
                     <div className="text-right">
-                        <div className="font-black text-3xl text-white drop-shadow-md leading-none">{score}</div>
-                        {combo > 1 && <div className="text-amber-400 font-black italic text-lg animate-[pulse_0.2s_infinite]">{combo}x COMBO!</div>}
+                        <div className="text-4xl font-black text-white drop-shadow-lg">{score}</div>
+                        {combo > 1 && <div className="text-amber-400 font-black italic text-xl animate-bounce">{combo}x COMBO</div>}
                     </div>
                 </div>
+            )}
 
-                {/* GAME ARENA */}
-                <div 
-                    ref={containerRef}
-                    className="flex-1 relative touch-none"
-                    onPointerDown={handleSlashDown}
-                    onPointerMove={handleSlashMove}
-                    onPointerUp={handleSlashUp}
-                    onPointerLeave={handleSlashUp}
-                >
+            {/* GAMEPLAY LAYER */}
+            {gameState === 'playing' && currentCard && (
+                <div ref={containerRef} className="flex-1 relative touch-none" onPointerDown={handleSlashDown} onPointerMove={handleSlashMove} onPointerUp={() => setIsInputActive(false)}>
+                    
+                    {/* Slash Trail */}
                     {loadout === 'slash' && (
                         <svg className="absolute inset-0 w-full h-full pointer-events-none z-50 overflow-visible">
-                            <path d={`M ${slashPath.map(p => `${p.x},${p.y}`).join(" L ")}`} fill="none" stroke="#f43f5e" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-[0_0_15px_rgba(244,63,94,1)]" />
-                            <path d={`M ${slashPath.map(p => `${p.x},${p.y}`).join(" L ")}`} fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d={`M ${slashPath.map(p => `${p.x},${p.y}`).join(" L ")}`} fill="none" stroke={isFeverMode ? "#FBBF24" : "#F43F5E"} strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 10px currentColor)' }}/>
+                            <path d={`M ${slashPath.map(p => `${p.x},${p.y}`).join(" L ")}`} fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                     )}
 
-                    {/* Central Target (Definition) */}
-                    <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 rounded-full border-8 flex flex-col items-center justify-center text-center shadow-[0_0_50px_rgba(0,0,0,0.5)] z-10 pointer-events-none transition-all duration-300 overflow-hidden bg-slate-800/95 backdrop-blur-md border-slate-600 ${isBossRound ? 'border-rose-600 shadow-rose-900/50' : ''}`}>
-                        <div className="p-4 overflow-y-auto max-h-full w-full custom-scrollbar flex flex-col items-center justify-center">
-                            {isBossRound && <Skull size={32} className="text-rose-500 mb-1 animate-pulse shrink-0"/>}
-                            <span className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mb-1 shrink-0">Defend Against</span>
-                            <h2 className="text-sm font-medium text-white leading-snug">{currentCard.back}</h2>
+                    {/* TARGET (Boss Enemy Visual) */}
+                    <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 flex flex-col items-center justify-center text-center z-10 transition-transform duration-200 ${selectedId === currentCard.id ? 'scale-0 opacity-0' : 'scale-100'}`}>
+                        {/* Glowing Orb Background */}
+                        <div className={`absolute inset-0 rounded-full blur-xl opacity-50 animate-pulse ${isFeverMode ? 'bg-amber-500' : 'bg-indigo-500'}`}></div>
+                        <div className="relative bg-slate-900/90 backdrop-blur-xl border-4 border-slate-700 w-full h-full rounded-full flex flex-col items-center justify-center p-6 shadow-2xl">
+                            {isFeverMode && <Flame size={32} className="text-amber-500 mb-2 animate-bounce"/>}
+                            <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Target</span>
+                            <h2 className="text-2xl font-black text-white leading-tight">{currentCard.back}</h2>
                         </div>
                     </div>
 
-                    {/* Options (Words) */}
-                    {options.map((opt, i) => (
-                        <div 
-                            key={opt.id}
-                            data-answer-id={opt.id}
-                            onClick={(e) => handleShoot(e, opt.id)}
-                            className={getOptionStyle(opt, i)}
-                        >
-                            <span className="text-lg font-extrabold leading-tight">{opt.front}</span>
-                            
-                            {loadout === 'shoot' && !selectedId && (
-                                <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
-                                    <Crosshair size={48} className="text-indigo-500 animate-[spin_3s_linear_infinite]"/>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            </div>
-        )}
+                    {/* OPTIONS (Satellites) */}
+                    {options.map((opt, i) => {
+                        // Positions: Corners
+                        const posStyles = [
+                            "top-[15%] left-[10%]", "top-[15%] right-[10%]", 
+                            "bottom-[15%] left-[10%]", "bottom-[15%] right-[10%]"
+                        ];
+                        
+                        const isCorrect = opt.id === currentCard.id;
+                        const isSelected = opt.id === selectedId;
+                        let stateStyles = "bg-white border-b-4 border-slate-300 text-slate-900";
+                        
+                        if (selectedId) {
+                            if (isCorrect) stateStyles = "bg-emerald-500 border-emerald-700 text-white scale-110 shadow-[0_0_30px_rgba(16,185,129,0.6)]";
+                            else if (isSelected) stateStyles = "bg-rose-500 border-rose-700 text-white opacity-50";
+                            else stateStyles = "opacity-20 bg-slate-200";
+                        }
 
-        {gameState === 'gameover' && (
-            <div className="bg-white max-w-sm w-full rounded-[2.5rem] p-8 text-center shadow-2xl relative z-10 animate-in zoom-in border-4 border-slate-200">
-                <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-400 border-4 border-white shadow-lg">
-                    <Skull size={48} />
+                        return (
+                            <div 
+                                key={opt.id}
+                                data-answer-id={opt.id}
+                                onClick={(e) => handleShoot(e, opt.id)}
+                                className={`absolute ${posStyles[i]} w-40 h-24 rounded-2xl flex items-center justify-center text-center p-2 font-black text-lg shadow-xl cursor-pointer transition-all duration-200 active:scale-95 select-none ${stateStyles} ${isInputActive ? 'pointer-events-none' : ''}`}
+                            >
+                                {opt.front}
+                            </div>
+                        );
+                    })}
                 </div>
-                <h2 className="text-6xl font-black text-slate-800 mb-1 leading-none">{score}</h2>
-                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-6">Final Score</p>
-                
-                <div className="flex justify-center gap-4 mb-8 text-sm font-bold text-slate-600">
-                    <div className="bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
-                        <span className="block text-[10px] text-slate-400 uppercase">Max Combo</span>
-                        <span className="text-xl text-amber-500">{maxCombo}x</span>
-                    </div>
-                    <div className="bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
-                        <span className="block text-[10px] text-slate-400 uppercase">Wave</span>
-                        <span className="text-xl text-indigo-500">{round}</span>
-                    </div>
-                </div>
+            )}
 
-                <button onClick={onExit} className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 shadow-lg transition-transform hover:scale-[1.02] active:scale-95">Leave Arena</button>
-            </div>
-        )}
-        
-        <style>{`
-            @keyframes shake {
-                0% { transform: translate(1px, 1px) rotate(0deg); }
-                10% { transform: translate(-1px, -2px) rotate(-1deg); }
-                20% { transform: translate(-3px, 0px) rotate(1deg); }
-                30% { transform: translate(3px, 2px) rotate(0deg); }
-                40% { transform: translate(1px, -1px) rotate(1deg); }
-                50% { transform: translate(-1px, 2px) rotate(-1deg); }
-                60% { transform: translate(-3px, 1px) rotate(0deg); }
-                70% { transform: translate(3px, 1px) rotate(-1deg); }
-                80% { transform: translate(-1px, -1px) rotate(1deg); }
-                90% { transform: translate(1px, 2px) rotate(0deg); }
-                100% { transform: translate(1px, -2px) rotate(-1deg); }
-            }
-        `}</style>
+            {/* INTRO SCREEN */}
+            {gameState === 'intro' && (
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-900/80 backdrop-blur-md">
+                    <Swords size={64} className="text-rose-500 mb-4 animate-pulse" />
+                    <h1 className="text-5xl font-black text-white italic tracking-tighter mb-2">COLOSSEUM</h1>
+                    <p className="text-slate-400 font-bold uppercase tracking-widest mb-8">Endless Survival Mode</p>
+                    
+                    <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
+                        <button onClick={() => handleStart('slash')} className="p-6 bg-rose-600 rounded-3xl border-b-8 border-rose-800 text-white font-black text-xl hover:translate-y-1 hover:border-b-4 transition-all">
+                            SLASH
+                            <span className="block text-[10px] font-normal opacity-80 mt-1">Swipe targets</span>
+                        </button>
+                        <button onClick={() => handleStart('shoot')} className="p-6 bg-indigo-600 rounded-3xl border-b-8 border-indigo-800 text-white font-black text-xl hover:translate-y-1 hover:border-b-4 transition-all">
+                            SHOOT
+                            <span className="block text-[10px] font-normal opacity-80 mt-1">Tap targets</span>
+                        </button>
+                    </div>
+                    <button onClick={onExit} className="mt-8 text-slate-500 font-bold hover:text-white">Exit Arena</button>
+                </div>
+            )}
+
+            {/* GAME OVER */}
+            {gameState === 'gameover' && (
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-black/90 backdrop-blur-xl animate-in zoom-in">
+                    <Skull size={64} className="text-slate-700 mb-4" />
+                    <h2 className="text-6xl font-black text-white mb-2">{score}</h2>
+                    <p className="text-slate-500 font-bold uppercase tracking-widest mb-8">Final Score</p>
+                    <button onClick={onExit} className="w-full max-w-xs py-4 bg-white text-slate-900 rounded-2xl font-black text-xl hover:bg-slate-200 transition-colors">
+                        Claim XP & Exit
+                    </button>
+                </div>
+            )}
+        </div>
     </div>
   );
 }
