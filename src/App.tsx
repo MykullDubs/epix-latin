@@ -1780,11 +1780,11 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
   const [quizState, setQuizState] = useState<'waiting' | 'correct' | 'wrong'>('waiting');
   const [score, setScore] = useState(0);
 
-  // --- Swipe State (Enhanced for Scroll Stability) ---
+  // --- Swipe State ---
   const [dragStartX, setDragStartX] = useState<number | null>(null);
-  const [dragStartY, setDragStartY] = useState<number | null>(null); // NEW
+  const [dragStartY, setDragStartY] = useState<number | null>(null);
   const [dragEndX, setDragEndX] = useState<number | null>(null);
-  const [dragEndY, setDragEndY] = useState<number | null>(null); // NEW
+  const [dragEndY, setDragEndY] = useState<number | null>(null);
   const minSwipeDistance = 50; 
 
   // --- Preference ---
@@ -1849,10 +1849,11 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
       }
   };
 
-  // --- SAVE LOGIC ---
+  // --- SAVE LOGIC (FIXED TYPES) ---
   const executeSave = async (targetDeckId: string, targetDeckTitle: string) => {
     const currentUser = user || auth.currentUser;
-    if (!currentUser || !sessionCards[currentIndex] || saving) return;
+    // Strict check for UID to satisfy TypeScript
+    if (!currentUser || !currentUser.uid || !sessionCards[currentIndex] || saving) return;
     
     setSaving(true);
     const cardToSave = sessionCards[currentIndex];
@@ -1887,7 +1888,8 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
 
   const handleQuickAdd = async () => {
     const currentUser = user || auth.currentUser;
-    if (!currentUser || !newCard.front || !newCard.back) return;
+    // Strict check for UID
+    if (!currentUser || !currentUser.uid || !newCard.front || !newCard.back) return;
 
     setSaving(true);
     try {
@@ -1912,12 +1914,15 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
     }
   };
 
-  // --- HANDLERS ---
+  // --- HANDLERS (FIXED TYPES) ---
   const handleDeckSelect = async (deckId: string) => {
     const targetUid = user?.uid || auth.currentUser?.uid;
+    
     if (!targetUid) return;
+
     try {
-        await updateDoc(doc(db, 'artifacts', appId, 'users', targetUid, 'profile', 'main'), { widgetDeckId: deckId });
+        // ERROR FIX: Cast targetUid to string explicitly
+        await updateDoc(doc(db, 'artifacts', appId, 'users', targetUid as string, 'profile', 'main'), { widgetDeckId: deckId });
         setShowSettings(false);
         setIsFlipped(false);
     } catch (e) { console.error(e); }
@@ -1944,7 +1949,7 @@ function DailyDiscoveryWidget({ allDecks, user, userData }: any) {
     const distX = dragStartX - dragEndX;
     const distY = dragStartY - dragEndY;
 
-    // AXIS LOCKING: If vertical movement is greater than horizontal, assume scrolling and cancel swipe
+    // AXIS LOCKING: If vertical movement is greater than horizontal, assume scrolling
     if (Math.abs(distY) > Math.abs(distX)) {
         setDragStartX(null); setDragStartY(null);
         return;
