@@ -1909,95 +1909,109 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
   return (
     <div className="h-full flex flex-col bg-slate-50 relative overflow-hidden">
       
-      {/* --- JUICY HEADER --- */}
-      <div className="relative bg-gradient-to-br from-indigo-700 via-purple-700 to-indigo-800 pb-20 pt-10 px-6 rounded-b-[3rem] shadow-2xl z-10 shrink-0">
-          <div className="absolute top-[-50%] left-[-20%] w-[400px] h-[400px] bg-indigo-400/30 rounded-full blur-[80px] mix-blend-overlay pointer-events-none animate-pulse"></div>
-          <div className="absolute bottom-[-20%] right-[-10%] w-[300px] h-[300px] bg-purple-300/20 rounded-full blur-[60px] mix-blend-overlay pointer-events-none"></div>
+      {/* --- COMPACT HERO HEADER --- */}
+      <div className="bg-white p-6 pb-0 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 relative z-20 shrink-0">
           
-          <div className="relative z-20 flex justify-between items-start mb-6">
-              <button onClick={onBack} className="group flex items-center gap-2 text-white/80 hover:text-white transition-colors bg-white/10 hover:bg-white/20 backdrop-blur-md px-4 py-2 rounded-full text-sm font-bold border border-white/10">
-                  <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform"/> Back
+          {/* Top Row: Back & Code */}
+          <div className="flex justify-between items-center mb-4">
+              <button onClick={onBack} className="group flex items-center gap-1 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-bold uppercase tracking-wider">
+                  <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform"/> Back
               </button>
-              <div className="bg-black/20 backdrop-blur-md border border-white/10 text-white font-mono font-bold px-3 py-1 rounded-lg shadow-sm text-xs">
+              <div className="bg-slate-100 text-slate-500 font-mono font-bold px-2 py-1 rounded text-[10px]">
                   {classData.code}
               </div>
           </div>
 
-          <div className="relative z-20 text-center">
-              <div className="w-16 h-16 bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl flex items-center justify-center text-white font-bold text-3xl shadow-lg mx-auto mb-4">
+          {/* Middle Row: Class Identity */}
+          <div className="flex items-center gap-4 mb-6">
+              <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-indigo-200">
                   {classData.name.charAt(0)}
               </div>
-              <h1 className="text-3xl font-serif font-bold text-white mb-2 drop-shadow-md leading-tight">{classData.name}</h1>
-              <p className="text-indigo-100 text-sm opacity-80 mb-6">Student Portal • {displayName}</p>
-              
-              {/* TAB SWITCHER */}
-              <div className="inline-flex bg-white/10 backdrop-blur-xl p-1 rounded-2xl border border-white/10 shadow-inner">
-                  <button onClick={() => setViewMode('assignments')} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${viewMode === 'assignments' ? 'bg-white text-indigo-700 shadow-lg scale-105' : 'text-white/70 hover:text-white hover:bg-white/10'}`}>
-                      <BookOpen size={16} className={viewMode === 'assignments' ? 'fill-current' : ''}/> Tasks
-                  </button>
-                  <button onClick={() => setViewMode('grades')} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${viewMode === 'grades' ? 'bg-white text-indigo-700 shadow-lg scale-105' : 'text-white/70 hover:text-white hover:bg-white/10'}`}>
-                      <BarChart3 size={16} className={viewMode === 'grades' ? 'fill-current' : ''}/> Grades
-                  </button>
-                  <button onClick={() => setViewMode('forum')} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${viewMode === 'forum' ? 'bg-white text-indigo-700 shadow-lg scale-105' : 'text-white/70 hover:text-white hover:bg-white/10'}`}>
-                      <MessageSquare size={16} className={viewMode === 'forum' ? 'fill-current' : ''}/> Forum
-                  </button>
+              <div>
+                  <h1 className="text-xl font-bold text-slate-900 leading-tight">{classData.name}</h1>
+                  <p className="text-xs text-slate-500 font-medium">Student Portal • {relevantAssignments.length} Assignments</p>
               </div>
+          </div>
+
+          {/* Bottom Row: Embedded Tab Switcher */}
+          <div className="flex gap-6 border-b border-slate-100">
+              <button 
+                  onClick={() => setViewMode('assignments')} 
+                  className={`pb-3 text-sm font-bold transition-all relative ${viewMode === 'assignments' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                  Tasks
+                  {viewMode === 'assignments' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-t-full"></div>}
+              </button>
+              <button 
+                  onClick={() => setViewMode('grades')} 
+                  className={`pb-3 text-sm font-bold transition-all relative ${viewMode === 'grades' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                  Grades
+                  {viewMode === 'grades' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-t-full"></div>}
+              </button>
+              <button 
+                  onClick={() => setViewMode('forum')} 
+                  className={`pb-3 text-sm font-bold transition-all relative ${viewMode === 'forum' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                  Forum
+                  {viewMode === 'forum' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-t-full"></div>}
+              </button>
           </div>
       </div>
       
       {/* --- CONTENT AREA --- */}
-      <div className="flex-1 overflow-y-auto pb-24 -mt-8 relative z-20 px-6 space-y-6">
+      <div className="flex-1 overflow-y-auto p-6 relative z-10 custom-scrollbar">
         
         {viewMode === 'grades' && (
             <StudentGradebook classData={classData} user={user} />
         )}
 
         {viewMode === 'assignments' && (
-            <>
-                {/* Progress Card */}
-                <div className="bg-white rounded-3xl p-6 shadow-xl shadow-indigo-900/5 border border-slate-100 flex items-center justify-between relative overflow-hidden group">
+            <div className="space-y-6 pb-20">
+                {/* Progress Card (Compact) */}
+                <div className="bg-gradient-to-r from-indigo-500 to-blue-600 rounded-2xl p-5 shadow-lg text-white flex items-center justify-between relative overflow-hidden">
+                    <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
                     <div className="relative z-10">
-                        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Your Progress</p>
-                        <div className="flex items-baseline gap-2"><span className="text-4xl font-black text-slate-800">{Math.round(progressPercent)}%</span><span className="text-sm font-bold text-indigo-600">Complete</span></div>
-                        <div className="mt-3 flex gap-1 h-2 w-32 bg-slate-100 rounded-full overflow-hidden"><div className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full transition-all duration-1000" style={{width: `${progressPercent}%`}}></div></div>
+                        <p className="text-indigo-100 text-[10px] font-bold uppercase tracking-wider mb-1">Current Progress</p>
+                        <div className="flex items-baseline gap-2"><span className="text-3xl font-black">{Math.round(progressPercent)}%</span></div>
                     </div>
-                    <div className="text-right relative z-10">
-                        <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 group-hover:border-indigo-200 transition-colors text-center min-w-[90px]">
-                            <span className={`text-3xl font-black ${pendingCount > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{pendingCount}</span>
-                            <span className="block text-[10px] text-indigo-400 font-bold uppercase mt-1">To Do</span>
+                    <div className="relative z-10 text-right">
+                        <div className="bg-white/20 backdrop-blur-md px-4 py-2 rounded-xl border border-white/20">
+                            <span className="block text-xl font-bold">{pendingCount}</span>
+                            <span className="text-[9px] uppercase font-bold opacity-80">Remaining</span>
                         </div>
                     </div>
                 </div>
 
                 {/* Assignments List */}
-                <div className="space-y-4">
+                <div className="space-y-3">
                     {relevantAssignments.length > 0 ? ( relevantAssignments.map((l: any, i: number) => {
                         const isDone = completedSet.has(l.id);
                         return (
                             <button 
                                 key={`${l.id}-${i}`} 
                                 onClick={() => handleAssignmentClick(l)} 
-                                className={`w-full p-4 rounded-2xl border flex items-center justify-between active:scale-[0.98] transition-all group relative overflow-hidden ${isDone ? 'bg-slate-50 border-slate-200 opacity-80 hover:opacity-100' : 'bg-white border-slate-200 shadow-sm hover:border-indigo-300 hover:shadow-lg'}`}
+                                className={`w-full p-4 rounded-2xl border flex items-center justify-between active:scale-[0.98] transition-all group relative overflow-hidden ${isDone ? 'bg-slate-50 border-slate-100 opacity-60 hover:opacity-100' : 'bg-white border-slate-200 shadow-sm hover:border-indigo-300 hover:shadow-md'}`}
                             >
                                 <div className="flex items-center space-x-4 relative z-10">
-                                    <div className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-all shadow-sm ${
+                                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center transition-all shadow-sm ${
                                         isDone 
                                             ? 'bg-emerald-100 text-emerald-600' 
                                             : l.contentType === 'deck' 
-                                                ? 'bg-orange-100 text-orange-600 group-hover:bg-orange-500 group-hover:text-white' 
+                                                ? 'bg-orange-100 text-orange-600' 
                                                 : l.contentType === 'test'
-                                                    ? 'bg-rose-100 text-rose-600 group-hover:bg-rose-500 group-hover:text-white'
-                                                    : 'bg-indigo-100 text-indigo-600 group-hover:bg-indigo-500 group-hover:text-white'
+                                                    ? 'bg-rose-100 text-rose-600'
+                                                    : 'bg-indigo-100 text-indigo-600'
                                     }`}>
-                                        {isDone ? <Check size={20} strokeWidth={3}/> : l.contentType === 'deck' ? <Layers size={20}/> : l.contentType === 'test' ? <HelpCircle size={20}/> : <PlayCircle size={20}/>}
+                                        {isDone ? <Check size={18} strokeWidth={3}/> : l.contentType === 'deck' ? <Layers size={18}/> : l.contentType === 'test' ? <HelpCircle size={18}/> : <PlayCircle size={18}/>}
                                     </div>
                                     <div className="text-left">
                                         <h4 className={`font-bold text-sm ${isDone ? 'text-slate-500 line-through decoration-slate-300' : 'text-slate-800 group-hover:text-indigo-700'}`}>{l.title}</h4>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide bg-slate-100 px-2 py-0.5 rounded">
-                                                {l.contentType === 'deck' ? 'Flashcards' : l.contentType === 'test' ? 'Exam' : 'Lesson'}
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide bg-slate-100 px-1.5 rounded">
+                                                {l.contentType === 'deck' ? 'Deck' : l.contentType === 'test' ? 'Exam' : 'Lesson'}
                                             </span>
-                                            {!isDone && l.xp && <span className="text-[10px] font-bold text-emerald-600">+{l.xp} XP</span>}
+                                            {!isDone && l.xp && <span className="text-[9px] font-bold text-emerald-600">+{l.xp} XP</span>}
                                         </div>
                                     </div>
                                 </div>
@@ -2005,14 +2019,14 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
                             </button> 
                         );
                     })) : ( 
-                        <div className="p-10 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">No assignments yet.</div> 
+                        <div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50 text-sm">No assignments active.</div> 
                     )}
                 </div>
-            </>
+            </div>
         )}
         
         {viewMode === 'forum' && (
-            <div className="h-full bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+            <div className="h-full bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden pb-20">
                 <ClassForum classId={classData.id} user={user} userData={userData} />
             </div>
         )}
