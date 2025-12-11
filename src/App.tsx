@@ -3880,6 +3880,7 @@ function ClassGrades({ classData }: any) {
      </div>
   );
 }
+// --- NEW COMPONENT: ROSTER MANAGER MODAL ---
 function RosterManagerModal({ isOpen, onClose, currentRosterEmails, onSave }: any) {
     const [searchTerm, setSearchTerm] = useState('');
     const [allStudents, setAllStudents] = useState<any[]>([]);
@@ -3887,11 +3888,9 @@ function RosterManagerModal({ isOpen, onClose, currentRosterEmails, onSave }: an
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
-    // 1. Fetch all students when modal opens
     useEffect(() => {
         if (isOpen) {
             setLoading(true);
-            // Initialize selection with who is currently in the class
             setSelectedEmails(new Set(currentRosterEmails));
             
             const q = query(collectionGroup(db, 'profile'), where('role', '==', 'student'));
@@ -3904,18 +3903,13 @@ function RosterManagerModal({ isOpen, onClose, currentRosterEmails, onSave }: an
         }
     }, [isOpen, currentRosterEmails]);
 
-    // 2. Toggle Selection
     const toggleStudent = (email: string) => {
         const newSet = new Set(selectedEmails);
-        if (newSet.has(email)) {
-            newSet.delete(email);
-        } else {
-            newSet.add(email);
-        }
+        if (newSet.has(email)) newSet.delete(email);
+        else newSet.add(email);
         setSelectedEmails(newSet);
     };
 
-    // 3. Batch Save
     const handleSave = async () => {
         setSaving(true);
         await onSave(Array.from(selectedEmails));
@@ -3923,7 +3917,6 @@ function RosterManagerModal({ isOpen, onClose, currentRosterEmails, onSave }: an
         onClose();
     };
 
-    // 4. Search Filter
     const filteredStudents = allStudents.filter(s => 
         (s.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
         (s.email?.toLowerCase() || '').includes(searchTerm.toLowerCase())
@@ -3934,8 +3927,6 @@ function RosterManagerModal({ isOpen, onClose, currentRosterEmails, onSave }: an
     return (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
             <div className="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden border border-slate-200">
-                
-                {/* Header */}
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                     <div>
                         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
@@ -3947,8 +3938,6 @@ function RosterManagerModal({ isOpen, onClose, currentRosterEmails, onSave }: an
                         <X size={20}/>
                     </button>
                 </div>
-
-                {/* Search Bar */}
                 <div className="p-4 border-b border-slate-100 bg-white sticky top-0 z-10">
                     <div className="relative">
                         <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
@@ -3961,8 +3950,6 @@ function RosterManagerModal({ isOpen, onClose, currentRosterEmails, onSave }: an
                         />
                     </div>
                 </div>
-
-                {/* Student List */}
                 <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-slate-50/50">
                     {loading ? (
                         <div className="py-20 text-center flex flex-col items-center gap-3 text-slate-400">
@@ -3986,7 +3973,6 @@ function RosterManagerModal({ isOpen, onClose, currentRosterEmails, onSave }: an
                                         }`}
                                     >
                                         <div className="flex items-center gap-4">
-                                            {/* Avatar */}
                                             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-colors ${
                                                 isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'
                                             }`}>
@@ -3996,8 +3982,6 @@ function RosterManagerModal({ isOpen, onClose, currentRosterEmails, onSave }: an
                                                     student.name?.charAt(0) || '?'
                                                 )}
                                             </div>
-                                            
-                                            {/* Info */}
                                             <div>
                                                 <h4 className={`font-bold text-sm ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>
                                                     {student.name || "Unknown Student"}
@@ -4007,8 +3991,6 @@ function RosterManagerModal({ isOpen, onClose, currentRosterEmails, onSave }: an
                                                 </p>
                                             </div>
                                         </div>
-
-                                        {/* Checkbox Visual */}
                                         <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
                                             isSelected ? 'bg-indigo-500 border-indigo-500 text-white scale-110' : 'border-slate-300 bg-white group-hover:border-slate-400'
                                         }`}>
@@ -4020,8 +4002,6 @@ function RosterManagerModal({ isOpen, onClose, currentRosterEmails, onSave }: an
                         </div>
                     )}
                 </div>
-
-                {/* Footer Actions */}
                 <div className="p-4 border-t border-slate-100 bg-white flex justify-between items-center">
                     <div className="text-xs font-bold text-slate-500">
                         <span className="text-indigo-600 text-lg mr-1">{selectedEmails.size}</span> 
@@ -4045,6 +4025,8 @@ function RosterManagerModal({ isOpen, onClose, currentRosterEmails, onSave }: an
         </div>
     );
 }
+
+// --- UPDATED CLASS MANAGER VIEW ---
 function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [newClassName, setNewClassName] = useState('');
@@ -4168,7 +4150,6 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
                     ))}
                 </div>
                 
-                {/* --- UPDATED ROSTER SECTION --- */}
                 <div className="space-y-4">
                     <div className="flex justify-between items-center">
                         <h3 className="font-bold text-slate-800 flex items-center gap-2"><Users size={18} className="text-indigo-600"/> Roster</h3>
@@ -4203,7 +4184,6 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
             </div>
         )}
 
-        {/* --- ASSIGN MODAL (UNCHANGED) --- */}
         {assignModalOpen && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in duration-200">
@@ -4234,14 +4214,7 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks }: any) {
   );
 }
   
-  return (
-    <div className="space-y-6 animate-in fade-in duration-500 relative">
-      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
-      <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-slate-800">My Classes</h2><form onSubmit={createClass} className="flex gap-2"><input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="New Class Name" className="p-2 rounded-lg border border-slate-200 text-sm w-64" /><button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2"><Plus size={16}/> Create</button></form></div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{classes.map((cls: any) => (<div key={cls.id} onClick={() => setSelectedClassId(cls.id)} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative group"><div className="absolute top-4 right-4 flex gap-2"><button onClick={(e) => {e.stopPropagation(); handleRenameClass(cls.id, cls.name);}} className="text-slate-300 hover:text-indigo-500"><Edit3 size={16}/></button><button onClick={(e) => {e.stopPropagation(); handleDeleteClass(cls.id);}} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button></div><div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4 font-bold text-lg">{cls.name.charAt(0)}</div><h3 className="font-bold text-lg text-slate-900">{cls.name}</h3><p className="text-sm text-slate-500 mb-4">{(cls.students || []).length} Students</p><div className="flex items-center justify-between bg-slate-50 p-2 rounded-lg"><span className="text-xs font-mono font-bold text-slate-600 tracking-wider">{cls.code}</span><button className="text-indigo-600 text-xs font-bold flex items-center gap-1" onClick={(e) => {e.stopPropagation(); navigator.clipboard.writeText(cls.code);}}><Copy size={12}/> Copy</button></div></div>))}</div>
-    </div>
-  );
-}
+
 // ============================================================================
 // PASTE THIS AT THE VERY BOTTOM OF YOUR FILE
 // (Replace your existing RoleToggle and function App)
