@@ -2715,7 +2715,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full relative bg-slate-50 overflow-x-hidden">
     
     {/* --- OVERLAYS --- */}
-    {showLevelModal && <LevelUpModal userData={userData} onClose={() => setShowLevelModal(false)} />}
+    {showLevelModal && <ProfileDetailModal userData={userData} onClose={() => setShowLevelModal(false)} />}
     
     {showColosseum && (
         <ColosseumMode 
