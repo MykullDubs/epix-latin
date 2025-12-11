@@ -942,6 +942,17 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   const [filterLang, setFilterLang] = useState('All');
   const [completionMsg, setCompletionMsg] = useState<string | null>(null);
 
+  // Accordion State (Default: Assignments & Custom Open, Library Closed)
+  const [openSections, setOpenSections] = useState({
+    assignments: true,
+    custom: true,
+    library: false
+  });
+
+  const toggleSection = (section: string) => {
+    setOpenSections(prev => ({ ...prev, [section]: !prev[section as keyof typeof prev] }));
+  };
+
   // Player State
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -1112,6 +1123,48 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
       </button>
   );
 
+  // --- RENDER COMPONENT: ACCORDION WRAPPER ---
+  const SectionAccordion = ({ title, icon, count, isOpen, onToggle, children, colorTheme = "indigo" }: any) => {
+    // Theme mapping
+    const theme: any = {
+        indigo: { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-200' },
+        emerald: { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' },
+        amber: { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' },
+        blue: { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' },
+    };
+    const t = theme[colorTheme] || theme.indigo;
+
+    return (
+        <div className={`mb-4 rounded-2xl bg-white border ${isOpen ? t.border : 'border-slate-200'} shadow-sm overflow-hidden transition-all duration-300`}>
+            <button 
+                onClick={onToggle}
+                className="w-full p-4 flex items-center justify-between active:bg-slate-50 transition-colors"
+            >
+                <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-xl ${t.bg} ${t.text}`}>
+                        {icon}
+                    </div>
+                    <div className="text-left">
+                        <h3 className="font-bold text-slate-800 text-sm">{title}</h3>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{count} Decks</p>
+                    </div>
+                </div>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center bg-slate-50 text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180 bg-slate-100' : ''}`}>
+                    <ChevronDown size={16} />
+                </div>
+            </button>
+            
+            <div className={`transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                <div className="p-4 pt-0 border-t border-slate-50">
+                    <div className="pt-4 grid grid-cols-1 gap-3">
+                        {children}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+  };
+
   return (
     <>
       {completionMsg && <Toast message={completionMsg} onClose={() => setCompletionMsg(null)} />}
@@ -1152,77 +1205,81 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                 </div>
             </div>
 
-            {/* --- CONTENT SECTIONS --- */}
-            <div className="p-6 space-y-8">
+            {/* --- CONTENT SECTIONS (ACCORDIONS) --- */}
+            <div className="p-6">
                 
                 {/* 1. ASSIGNMENTS */}
                 {visibleAssignments.length > 0 && (
-                    <section className="animate-in slide-in-from-bottom-2">
-                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                            <School size={14} className="text-indigo-500"/> Class Assignments
-                        </h3>
-                        <div className="grid grid-cols-1 gap-3">
-                            {visibleAssignments.map((deck: any) => (
-                                <DeckCard 
-                                    key={deck.id} 
-                                    deck={deck} 
-                                    icon={<School size={20}/>} 
-                                    colorClass="bg-amber-100 text-amber-600"
-                                    borderClass="border-amber-200 hover:border-amber-400"
-                                />
-                            ))}
-                        </div>
-                    </section>
+                    <SectionAccordion 
+                        title="Class Assignments" 
+                        icon={<School size={20}/>} 
+                        count={visibleAssignments.length}
+                        isOpen={openSections.assignments}
+                        onToggle={() => toggleSection('assignments')}
+                        colorTheme="amber"
+                    >
+                        {visibleAssignments.map((deck: any) => (
+                            <DeckCard 
+                                key={deck.id} 
+                                deck={deck} 
+                                icon={<School size={20}/>} 
+                                colorClass="bg-amber-100 text-amber-600"
+                                borderClass="border-amber-200 hover:border-amber-400"
+                            />
+                        ))}
+                    </SectionAccordion>
                 )}
 
                 {/* 2. CUSTOM DECKS */}
-                <section className="animate-in slide-in-from-bottom-4 duration-500">
-                    <div className="flex justify-between items-end mb-3">
-                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                            <Feather size={14} className="text-emerald-500"/> My Collections
-                        </h3>
-                    </div>
+                <SectionAccordion 
+                    title="My Collections" 
+                    icon={<Feather size={20}/>} 
+                    count={visibleCustom.length}
+                    isOpen={openSections.custom}
+                    onToggle={() => toggleSection('custom')}
+                    colorTheme="emerald"
+                >
                     {visibleCustom.length > 0 ? (
-                        <div className="grid grid-cols-1 gap-3">
-                            {visibleCustom.map((deck: any) => (
-                                <DeckCard 
-                                    key={deck.id} 
-                                    deck={deck} 
-                                    icon={<Feather size={20}/>} 
-                                    colorClass="bg-emerald-100 text-emerald-600"
-                                    borderClass="border-slate-100 hover:border-emerald-300"
-                                />
-                            ))}
-                        </div>
+                        visibleCustom.map((deck: any) => (
+                            <DeckCard 
+                                key={deck.id} 
+                                deck={deck} 
+                                icon={<Feather size={20}/>} 
+                                colorClass="bg-emerald-100 text-emerald-600"
+                                borderClass="border-slate-100 hover:border-emerald-300"
+                            />
+                        ))
                     ) : (
                         <div className="p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center">
                             <p className="text-sm text-slate-400 font-bold">No custom decks yet.</p>
                             <p className="text-xs text-slate-300 mt-1">Use the Creator tab to build one!</p>
                         </div>
                     )}
-                </section>
+                </SectionAccordion>
 
                 {/* 3. LIBRARY */}
-                <section className="animate-in slide-in-from-bottom-6 duration-700">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                        <Library size={14} className="text-blue-500"/> System Library
-                    </h3>
+                <SectionAccordion 
+                    title="System Library" 
+                    icon={<Library size={20}/>} 
+                    count={visibleLibrary.length}
+                    isOpen={openSections.library}
+                    onToggle={() => toggleSection('library')}
+                    colorTheme="blue"
+                >
                     {visibleLibrary.length > 0 ? (
-                        <div className="grid grid-cols-1 gap-3">
-                            {visibleLibrary.map((deck: any) => (
-                                <DeckCard 
-                                    key={deck.id} 
-                                    deck={deck} 
-                                    icon={<BookOpen size={20}/>} 
-                                    colorClass="bg-blue-100 text-blue-600"
-                                    borderClass="border-slate-100 hover:border-blue-300"
-                                />
-                            ))}
-                        </div>
+                        visibleLibrary.map((deck: any) => (
+                            <DeckCard 
+                                key={deck.id} 
+                                deck={deck} 
+                                icon={<BookOpen size={20}/>} 
+                                colorClass="bg-blue-100 text-blue-600"
+                                borderClass="border-slate-100 hover:border-blue-300"
+                            />
+                        ))
                     ) : (
                         <div className="p-4 text-center text-slate-400 text-xs italic">Library empty for this filter.</div>
                     )}
-                </section>
+                </SectionAccordion>
 
                 {/* BOTTOM SPACER */}
                 <div className="h-8"></div>
@@ -1263,8 +1320,8 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                                 </div>
                                 <div className={`absolute inset-x-0 bottom-0 bg-white/95 backdrop-blur-xl border-t border-slate-100 transition-all duration-300 flex flex-col overflow-hidden z-20 ${xrayMode ? 'h-[75%] opacity-100 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)]' : 'h-0 opacity-0'}`} onClick={e => e.stopPropagation()}>
                                     <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
-                                        <div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Puzzle size={14} /> Morphology</h4><div className="flex flex-wrap gap-2">{Array.isArray(card.morphology) && card.morphology.map((m: any, i: number) => (<div key={i} className="flex flex-col items-center bg-slate-50 border border-slate-200 rounded-lg p-2 min-w-[60px]"><span className={`font-bold text-lg ${m.type === 'root' ? 'text-indigo-600' : 'text-slate-700'}`}>{m.part}</span><span className="text-slate-400 text-[9px] font-medium uppercase mt-1 text-center max-w-[80px] leading-tight">{m.meaning}</span></div>))}</div></div>
-                                        <div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><MessageSquare size={14} /> Context</h4><div className={`p-4 rounded-xl border ${theme.border} ${theme.bg}`}><p className="text-slate-800 font-serif font-medium text-lg mb-1">"{card.usage?.sentence || '...'}"</p><p className={`text-sm ${theme.text} opacity-80 italic`}>{card.usage?.translation || '...'}</p></div></div>
+                                            <div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Puzzle size={14} /> Morphology</h4><div className="flex flex-wrap gap-2">{Array.isArray(card.morphology) && card.morphology.map((m: any, i: number) => (<div key={i} className="flex flex-col items-center bg-slate-50 border border-slate-200 rounded-lg p-2 min-w-[60px]"><span className={`font-bold text-lg ${m.type === 'root' ? 'text-indigo-600' : 'text-slate-700'}`}>{m.part}</span><span className="text-slate-400 text-[9px] font-medium uppercase mt-1 text-center max-w-[80px] leading-tight">{m.meaning}</span></div>))}</div></div>
+                                            <div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><MessageSquare size={14} /> Context</h4><div className={`p-4 rounded-xl border ${theme.border} ${theme.bg}`}><p className="text-slate-800 font-serif font-medium text-lg mb-1">"{card.usage?.sentence || '...'}"</p><p className={`text-sm ${theme.text} opacity-80 italic`}>{card.usage?.translation || '...'}</p></div></div>
                                     </div>
                                 </div>
                                 {!xrayMode && (<div className="mt-auto text-center"><p className="text-xs text-slate-300 font-bold uppercase tracking-widest animate-pulse flex items-center justify-center gap-2"><ArrowLeft size={10}/> Swipe <ArrowRight size={10}/></p></div>)}
