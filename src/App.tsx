@@ -3248,18 +3248,23 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
 
 // 1. FLASHCARD BUILDER (Standard)
 function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard, availableDecks, initialDeckId, initialData, onCancelEdit }: any) {
-  const [formData, setFormData] = useState({ 
-      front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '', 
-      deckId: initialData?.deckId || initialDeckId || 'custom' 
-  });
+  const [formData, setFormData] = useState({ front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '', deckId: initialDeckId || 'custom' });
   const [isCreatingDeck, setIsCreatingDeck] = useState(false);
   const [newDeckTitle, setNewDeckTitle] = useState('');
   const [morphology, setMorphology] = useState<any[]>([]);
   const [newMorphPart, setNewMorphPart] = useState({ part: '', meaning: '', type: 'root' });
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  
+  // New Visibility State
+  const [visibility, setVisibility] = useState('private');
+  const [sharedWith, setSharedWith] = useState<string[]>([]);
 
   const IPA_KEYS = ['ə', 'æ', 'θ', 'ð', 'ŋ', 'ʃ', 'ʒ', 'tʃ', 'dʒ', 'ɑ', 'ɛ', 'ɪ', 'ɔ', 'ʊ', 'ʌ', 'ː', 'ˈ', 'ˌ'];
-  const insertIPA = (char: string) => setFormData(prev => ({ ...prev, ipa: prev.ipa + char }));
+
+  const insertIPA = (char: string) => {
+    setFormData(prev => ({ ...prev, ipa: prev.ipa + char }));
+  };
 
   useEffect(() => { 
       if (initialData) {
@@ -3269,24 +3274,33 @@ function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard, availableDeck
             ipa: initialData.ipa || '', sentence: initialData.usage?.sentence || '', 
             sentenceTrans: initialData.usage?.translation || '', 
             grammarTags: initialData.grammar_tags?.join(', ') || '', 
-            deckId: initialData.deckId || 'custom' 
+            deckId: initialData.deckId || initialDeckId || 'custom' 
           });
           setMorphology(initialData.morphology || []);
+          setVisibility(initialData.visibility || 'private');
+          setSharedWith(initialData.sharedWith || []);
       }
-  }, [initialData]);
+  }, [initialData, initialDeckId]);
 
   const handleChange = (e: any) => { 
       if (e.target.name === 'deckId') { 
           if (e.target.value === 'new') { setIsCreatingDeck(true); setFormData({ ...formData, deckId: 'new' }); } 
           else { setIsCreatingDeck(false); setFormData({ ...formData, deckId: e.target.value }); } 
-      } else { setFormData({ ...formData, [e.target.name]: e.target.value }); } 
+      } else { 
+          setFormData({ ...formData, [e.target.name]: e.target.value }); 
+      } 
   };
 
-  const addMorphology = () => { 
-      if (newMorphPart.part && newMorphPart.meaning) { 
-          setMorphology([...morphology, newMorphPart]); 
-          setNewMorphPart({ part: '', meaning: '', type: 'root' }); 
-      } 
+  const addMorphology = () => { if (newMorphPart.part && newMorphPart.meaning) { setMorphology([...morphology, newMorphPart]); setNewMorphPart({ part: '', meaning: '', type: 'root' }); } };
+  const removeMorphology = (index: number) => { setMorphology(morphology.filter((_, i) => i !== index)); };
+  
+  const handleClear = () => { 
+      setEditingId(null); 
+      setFormData(prev => ({ ...prev, front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' })); 
+      setMorphology([]);
+      setVisibility('private');
+      setSharedWith([]);
+      if (onCancelEdit) onCancelEdit();
   };
 
   const handleSubmit = (e: any) => { 
@@ -3307,239 +3321,173 @@ function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard, availableDeck
           deckId: finalDeckId, deckTitle: finalDeckTitle, ipa: formData.ipa || "", mastery: 0, 
           morphology: morphology.length > 0 ? morphology : [{ part: formData.front, meaning: "Root", type: "root" }], 
           usage: { sentence: formData.sentence || "-", translation: formData.sentenceTrans || "-" }, 
-          grammar_tags: formData.grammarTags ? formData.grammarTags.split(',').map(t => t.trim()) : ["Custom"] 
+          grammar_tags: formData.grammarTags ? formData.grammarTags.split(',').map(t => t.trim()) : ["Custom"],
+          visibility,
+          sharedWith,
+          authorName: auth.currentUser?.displayName || "Anonymous",
+          authorId: auth.currentUser?.uid
       }; 
       
-      if (editingId) { onUpdateCard(editingId, cardData); } else { onSaveCard(cardData); } 
+      if (editingId) { onUpdateCard(editingId, cardData); setToastMsg("Card Updated Successfully"); } 
+      else { onSaveCard(cardData); setToastMsg("Card Created Successfully"); } 
       
-      setFormData({ ...formData, front: '', back: '', ipa: '', sentence: '', sentenceTrans: '' });
-      setMorphology([]);
-      setEditingId(null);
-      if (isCreatingDeck) { setIsCreatingDeck(false); setNewDeckTitle(''); setFormData(prev => ({ ...prev, deckId: finalDeckId })); }
-      if (onCancelEdit) onCancelEdit();
+      handleClear(); 
+      if (isCreatingDeck) { setIsCreatingDeck(false); setNewDeckTitle(''); setFormData(prev => ({ ...prev, deckId: finalDeckId })); } 
   };
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 flex justify-between items-center text-indigo-900">
-          <div><h3 className="font-bold flex items-center gap-2"><Layers size={18}/> {editingId ? 'Edit Flashcard' : 'New Flashcard'}</h3></div>
-          {editingId && <button onClick={onCancelEdit} className="text-xs bg-white px-3 py-1 rounded border shadow-sm">Cancel</button>}
-      </div>
-
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-          <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase">Deck</label>
-              <select name="deckId" value={formData.deckId} onChange={handleChange} disabled={!!editingId} className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-700">
-                  <option value="custom">✍️ Scriptorium (Default)</option>
-                  {availableDecks && Object.entries(availableDecks).filter(([k]:any) => k !== 'custom').map(([k, d]: any) => <option key={k} value={k}>{d.title}</option>)}
-                  <option value="new">✨ Create New Deck...</option>
-              </select>
-              {isCreatingDeck && <input value={newDeckTitle} onChange={(e) => setNewDeckTitle(e.target.value)} placeholder="Enter New Deck Name" className="w-full p-3 rounded-xl border-2 border-indigo-500 bg-white font-bold animate-in fade-in" autoFocus />}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1"><label className="text-xs font-bold text-slate-400">Front (Word)</label><input name="front" value={formData.front} onChange={handleChange} className="w-full p-3 rounded-xl border border-slate-200 font-bold text-lg" placeholder="e.g. Bellum" /></div>
-              <div className="space-y-1"><label className="text-xs font-bold text-slate-400">Back (Meaning)</label><input name="back" value={formData.back} onChange={handleChange} className="w-full p-3 rounded-xl border border-slate-200 text-lg" placeholder="e.g. War" /></div>
-          </div>
-
-          <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 flex justify-between"><span>Phonetics (IPA)</span><span className="text-[10px] bg-slate-100 px-1 rounded text-slate-500">Tap to insert</span></label>
-              <div className="flex flex-wrap gap-1 mb-2">
-                  {IPA_KEYS.map(char => <button key={char} type="button" onClick={() => insertIPA(char)} className="w-8 h-8 flex items-center justify-center bg-slate-50 border border-slate-200 rounded hover:bg-indigo-50 hover:text-indigo-600 transition-colors font-serif">{char}</button>)}
-              </div>
-              <input name="ipa" value={formData.ipa} onChange={handleChange} className="w-full p-3 rounded-xl border border-slate-200 font-serif text-slate-600" placeholder="/.../" />
-          </div>
-      </div>
-
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Context & Details</h4>
-          <div className="space-y-2"><input name="sentence" value={formData.sentence} onChange={handleChange} className="w-full p-3 rounded-xl border border-slate-200 italic" placeholder="Example sentence..." /></div>
-          <div className="space-y-2"><input name="sentenceTrans" value={formData.sentenceTrans} onChange={handleChange} className="w-full p-3 rounded-xl border border-slate-200 text-sm" placeholder="Sentence translation..." /></div>
-          <div className="pt-2 border-t border-slate-100">
-              <div className="flex gap-2 items-end">
-                  <input value={newMorphPart.part} onChange={(e) => setNewMorphPart({...newMorphPart, part: e.target.value})} className="flex-1 p-2 rounded-lg border border-slate-200 text-sm" placeholder="Root/Part" />
-                  <input value={newMorphPart.meaning} onChange={(e) => setNewMorphPart({...newMorphPart, meaning: e.target.value})} className="flex-1 p-2 rounded-lg border border-slate-200 text-sm" placeholder="Meaning" />
-                  <button type="button" onClick={addMorphology} className="bg-indigo-100 text-indigo-600 p-2 rounded-lg"><Plus size={20}/></button>
-              </div>
-              <div className="flex flex-wrap gap-2 mt-3">{morphology.map((m, i) => (<div key={i} className="flex items-center gap-2 bg-slate-100 px-3 py-1 rounded-full text-xs"><span className="font-bold text-slate-700">{m.part}</span><span className="text-slate-500">({m.meaning})</span><button type="button" onClick={() => setMorphology(morphology.filter((_, idx) => idx !== i))}><X size={12}/></button></div>))}</div>
-          </div>
-      </div>
-
-      <button onClick={handleSubmit} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-all flex items-center justify-center gap-2">
-          {editingId ? <><Save size={20}/> Update Card</> : <><PlusCircle size={20}/> Create Card</>}
-      </button>
-    </div>
-  );
-}
-
-// 2. LESSON BUILDER (10 BLOCK TYPES)
-function LessonBuilderView({ data, setData, onSave }: any) {
   
-  // 10 Lesson Block Types
-  const BLOCK_TYPES = [
-      { type: 'text', label: 'Text', icon: <Type size={18}/> },
-      { type: 'image', label: 'Image', icon: <ImageIcon size={18}/> },
-      { type: 'video', label: 'Video', icon: <Video size={18}/> },
-      { type: 'audio', label: 'Audio', icon: <Mic size={18}/> },
-      { type: 'flashcard', label: 'Card', icon: <Layers size={18}/> },
-      { type: 'vocab-list', label: 'Vocab', icon: <List size={18}/> },
-      { type: 'dialogue', label: 'Dialogue', icon: <MessageSquare size={18}/> },
-      { type: 'note', label: 'Note/Tip', icon: <Info size={18}/> },
-      { type: 'code', label: 'Grammar', icon: <Code size={18}/> },
-      { type: 'quote', label: 'Quote', icon: <Quote size={18}/> },
-  ];
-
-  const addBlock = (type: string) => { 
-      let base = { title: '', content: '' };
-      if(type === 'dialogue') base = { ...base, lines: [{ speaker: 'A', text: '', translation: '' }] } as any;
-      if(type === 'vocab-list') base = { ...base, items: [{ term: '', definition: '' }] } as any;
-      if(type === 'flashcard') base = { ...base, front: '', back: '' } as any;
-      if(type === 'video') base = { ...base, url: '', caption: '' } as any;
-      if(type === 'audio') base = { ...base, url: '', caption: '' } as any;
-      if(type === 'image') base = { ...base, url: '', caption: '' } as any;
-      if(type === 'note') base = { ...base, variant: 'info' } as any; // info, warning, tip
-      
-      setData({ ...data, blocks: [...(data.blocks || []), { type, ...base }] }); 
-  };
-
-  const updateBlock = (idx: number, field: string, val: any) => {
-      const newBlocks = [...data.blocks];
-      newBlocks[idx] = { ...newBlocks[idx], [field]: val };
-      setData({ ...data, blocks: newBlocks });
-  };
-
-  // Helper for Nested Arrays (Dialogue/Vocab)
-  const updateNested = (bIdx: number, arrField: string, itemIdx: number, field: string, val: any) => {
-      const newBlocks = [...data.blocks];
-      newBlocks[bIdx][arrField][itemIdx][field] = val;
-      setData({ ...data, blocks: newBlocks });
-  };
+  const validDecks = availableDecks || {}; 
+  const deckOptions = Object.entries(validDecks).map(([key, deck]: any) => ({ id: key, title: deck.title }));
 
   return (
-    <div className="space-y-6">
-       <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 flex justify-between items-center text-emerald-900">
-          <h3 className="font-bold flex items-center gap-2"><BookOpen size={18}/> Lesson Builder</h3>
-          <span className="text-xs font-bold bg-white px-2 py-1 rounded shadow-sm opacity-70">{(data.blocks || []).length} Blocks</span>
+    <div className="px-6 mt-4 space-y-6 pb-20 relative">
+      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
+      
+      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800 flex justify-between items-center">
+          <div>
+              <p className="font-bold flex items-center gap-2"><Layers size={16}/> {editingId ? 'Editing Card' : 'Card Creator'}</p>
+              <p className="opacity-80 text-xs mt-1">{editingId ? 'Update details below.' : 'Define deep linguistic data (X-Ray).'}</p>
+          </div>
+          {editingId && <button onClick={handleClear} className="text-xs font-bold bg-white px-3 py-1 rounded-lg shadow-sm hover:text-indigo-600">Cancel Edit</button>}
       </div>
+      
+      {/* CORE DATA SECTION */}
+      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Core Data</h3>
+        
+        <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-400">Target Deck</label>
+            <select name="deckId" value={formData.deckId} onChange={handleChange} disabled={!!editingId} className="w-full p-3 rounded-lg border border-slate-200 bg-indigo-50/50 font-bold text-indigo-900 disabled:opacity-50">
+                <option value="custom">✍️ Scriptorium (My Deck)</option>
+                {deckOptions.filter(d => d.id !== 'custom').map(d => (<option key={d.id} value={d.id}>{d.title}</option>))}
+                <option value="new">✨ + Create New Deck</option>
+            </select>
+            {isCreatingDeck && <input value={newDeckTitle} onChange={(e) => setNewDeckTitle(e.target.value)} placeholder="Enter New Deck Name" className="w-full p-3 rounded-lg border-2 border-indigo-500 bg-white font-bold mt-2 animate-in fade-in slide-in-from-top-2" autoFocus />}
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Word</label><input name="front" value={formData.front} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 font-bold" placeholder="e.g. Bellum" /></div>
+            <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Meaning</label><input name="back" value={formData.back} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="e.g. War" /></div>
+        </div>
+        
+        <div className="grid grid-cols-1 gap-4">
+           <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Part of Speech</label><select name="type" value={formData.type} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 bg-white"><option value="noun">Noun</option><option value="verb">Verb</option><option value="adjective">Adjective</option><option value="adverb">Adverb</option><option value="phrase">Phrase</option></select></div>
+           
+           <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 flex justify-between"><span>Phonetics (IPA)</span><span className="text-[10px] bg-slate-100 px-1 rounded text-slate-500">Tap to Insert</span></label>
+                <div className="flex flex-wrap gap-1 mb-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
+                    {IPA_KEYS.map(char => (
+                        <button key={char} type="button" onClick={() => insertIPA(char)} className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 font-serif shadow-sm transition-all active:scale-90">{char}</button>
+                    ))}
+                </div>
+                <input name="ipa" value={formData.ipa} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 font-serif text-sm text-slate-600" placeholder="/.../" />
+           </div>
+        </div>
+      </section>
 
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-          <input className="w-full text-xl font-bold border-b border-slate-100 pb-2 focus:outline-none" placeholder="Lesson Title" value={data.title} onChange={e => setData({...data, title: e.target.value})} />
-          <textarea className="w-full text-sm text-slate-600 resize-none h-20 focus:outline-none" placeholder="Short description..." value={data.description} onChange={e => setData({...data, description: e.target.value})} />
-      </div>
+      {/* MORPHOLOGY SECTION */}
+      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Morphology (X-Ray Data)</h3>
+        <div className="flex gap-2 items-end">
+            <div className="flex-1 space-y-1"><label className="text-[10px] font-bold text-slate-400">Part</label><input value={newMorphPart.part} onChange={(e) => setNewMorphPart({...newMorphPart, part: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" placeholder="Bell-" /></div>
+            <div className="flex-1 space-y-1"><label className="text-[10px] font-bold text-slate-400">Meaning</label><input value={newMorphPart.meaning} onChange={(e) => setNewMorphPart({...newMorphPart, meaning: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm" placeholder="War" /></div>
+            <div className="w-24 space-y-1"><label className="text-[10px] font-bold text-slate-400">Type</label><select value={newMorphPart.type} onChange={(e) => setNewMorphPart({...newMorphPart, type: e.target.value})} className="w-full p-2 rounded-lg border border-slate-200 text-sm bg-white"><option value="root">Root</option><option value="prefix">Prefix</option><option value="suffix">Suffix</option></select></div>
+            <button type="button" onClick={addMorphology} className="bg-indigo-100 text-indigo-600 p-2 rounded-lg hover:bg-indigo-200"><Plus size={20}/></button>
+        </div>
+        <div className="flex flex-wrap gap-2 mt-2">{morphology.map((m, i) => (<div key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1 rounded-full text-sm"><span className="font-bold text-indigo-700">{m.part}</span><span className="text-slate-500 text-xs">({m.meaning})</span><button type="button" onClick={() => removeMorphology(i)} className="text-slate-300 hover:text-rose-500"><X size={14}/></button></div>))}</div>
+      </section>
 
-      {/* BLOCK EDITOR LIST */}
-      <div className="space-y-4">
-          {data.blocks?.map((block: any, idx: number) => (
-              <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative group transition-all hover:border-indigo-200">
-                  <div className="absolute top-4 right-4 flex gap-2">
-                      <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded uppercase tracking-wider">{block.type}</span>
-                      <button onClick={() => setData({...data, blocks: data.blocks.filter((_:any, i:number) => i !== idx)})} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button>
-                  </div>
-                  
-                  {/* 1. TEXT */}
-                  {block.type === 'text' && (
-                      <div className="mt-2 space-y-2">
-                          <input className="w-full font-bold text-sm focus:outline-none" placeholder="Header (Optional)" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)}/>
-                          <textarea className="w-full text-sm bg-slate-50 p-3 rounded-lg min-h-[100px]" placeholder="Body text..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)}/>
-                      </div>
-                  )}
+      {/* CONTEXT SECTION */}
+      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+        <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Context & Grammar</h3>
+        <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Example Sentence</label><input name="sentence" value={formData.sentence} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200 italic" placeholder="Si vis pacem, para bellum." /></div>
+        <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Translation</label><input name="sentenceTrans" value={formData.sentenceTrans} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="If you want peace, prepare for war." /></div>
+        <div className="space-y-2"><label className="text-xs font-bold text-slate-400">Grammar Tags</label><input name="grammarTags" value={formData.grammarTags} onChange={handleChange} className="w-full p-3 rounded-lg border border-slate-200" placeholder="2nd Declension, Neuter" /></div>
+      </section>
 
-                  {/* 2. IMAGE / 3. VIDEO / 4. AUDIO */}
-                  {['image', 'video', 'audio'].includes(block.type) && (
-                      <div className="mt-2 space-y-2">
-                          <div className="flex gap-2 items-center">
-                              {block.type === 'image' ? <ImageIcon size={16} className="text-slate-400"/> : block.type === 'video' ? <Video size={16} className="text-slate-400"/> : <Mic size={16} className="text-slate-400"/>}
-                              <input className="flex-1 p-2 border-b border-slate-100 text-sm" placeholder="Media URL (https://...)" value={block.url} onChange={e => updateBlock(idx, 'url', e.target.value)}/>
-                          </div>
-                          <input className="w-full p-2 bg-slate-50 rounded-lg text-sm italic" placeholder="Caption / Description" value={block.caption} onChange={e => updateBlock(idx, 'caption', e.target.value)}/>
-                      </div>
-                  )}
+      {/* VISIBILITY SECTION */}
+      <VisibilitySelector 
+          visibility={visibility} 
+          setVisibility={setVisibility} 
+          sharedWith={sharedWith} 
+          setSharedWith={setSharedWith} 
+      />
 
-                  {/* 5. FLASHCARD */}
-                  {block.type === 'flashcard' && (
-                      <div className="mt-2 flex gap-4">
-                          <div className="flex-1"><label className="text-[10px] uppercase font-bold text-slate-400">Front</label><input className="w-full p-2 border rounded-lg font-bold" value={block.front} onChange={e => updateBlock(idx, 'front', e.target.value)}/></div>
-                          <div className="flex-1"><label className="text-[10px] uppercase font-bold text-slate-400">Back</label><input className="w-full p-2 border rounded-lg" value={block.back} onChange={e => updateBlock(idx, 'back', e.target.value)}/></div>
-                      </div>
-                  )}
-
-                  {/* 6. VOCAB LIST */}
-                  {block.type === 'vocab-list' && (
-                      <div className="mt-4 space-y-2">
-                          {block.items.map((item: any, i: number) => (
-                              <div key={i} className="flex gap-2">
-                                  <input className="w-1/3 p-2 bg-slate-50 rounded font-bold text-sm" placeholder="Term" value={item.term} onChange={e => updateNested(idx, 'items', i, 'term', e.target.value)}/>
-                                  <input className="flex-1 p-2 border-b border-slate-100 text-sm" placeholder="Definition" value={item.definition} onChange={e => updateNested(idx, 'items', i, 'definition', e.target.value)}/>
-                              </div>
-                          ))}
-                          <button onClick={() => updateBlock(idx, 'items', [...block.items, {term:'', definition:''}])} className="text-xs font-bold text-indigo-600">+ Add Term</button>
-                      </div>
-                  )}
-
-                  {/* 7. DIALOGUE */}
-                  {block.type === 'dialogue' && (
-                      <div className="mt-4 space-y-2">
-                          {block.lines.map((line: any, i: number) => (
-                              <div key={i} className="flex gap-2 items-start">
-                                  <input className="w-12 p-1 bg-slate-100 text-center text-xs font-bold rounded" placeholder="Spk" value={line.speaker} onChange={e => updateNested(idx, 'lines', i, 'speaker', e.target.value)}/>
-                                  <div className="flex-1 space-y-1">
-                                      <input className="w-full p-1 border-b border-slate-100 text-sm" placeholder="Line" value={line.text} onChange={e => updateNested(idx, 'lines', i, 'text', e.target.value)}/>
-                                      <input className="w-full p-1 text-xs text-slate-400 italic" placeholder="Translation" value={line.translation} onChange={e => updateNested(idx, 'lines', i, 'translation', e.target.value)}/>
-                                  </div>
-                              </div>
-                          ))}
-                          <button onClick={() => updateBlock(idx, 'lines', [...block.lines, {speaker:'B', text:'', translation:''}])} className="text-xs font-bold text-indigo-600">+ Add Line</button>
-                      </div>
-                  )}
-
-                  {/* 8. NOTE/TIP */}
-                  {block.type === 'note' && (
-                      <div className="mt-2 space-y-2">
-                          <div className="flex gap-2">
-                              <select className="bg-slate-100 text-xs font-bold p-2 rounded" value={block.variant} onChange={e => updateBlock(idx, 'variant', e.target.value)}>
-                                  <option value="info">Info</option><option value="tip">Tip</option><option value="warning">Warning</option>
-                              </select>
-                              <input className="flex-1 p-2 font-bold text-sm border-b border-slate-100" placeholder="Title" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)}/>
-                          </div>
-                          <textarea className="w-full p-2 bg-amber-50 rounded text-sm text-amber-900" placeholder="Note content..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)}/>
-                      </div>
-                  )}
-
-                  {/* 9. CODE/GRAMMAR */}
-                  {block.type === 'code' && (
-                      <div className="mt-2">
-                          <textarea className="w-full p-3 bg-slate-900 text-green-400 font-mono text-xs rounded-xl" placeholder="Grammar rule or code snippet..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)}/>
-                      </div>
-                  )}
-
-                  {/* 10. QUOTE */}
-                  {block.type === 'quote' && (
-                      <div className="mt-2 space-y-2">
-                          <textarea className="w-full p-3 border-l-4 border-slate-300 text-lg font-serif italic" placeholder="Quote..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)}/>
-                          <input className="w-full text-right text-xs text-slate-500" placeholder="- Author" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)}/>
-                      </div>
-                  )}
-              </div>
-          ))}
-      </div>
-
-      {/* BLOCK PICKER GRID */}
-      <div className="grid grid-cols-5 gap-2">
-          {BLOCK_TYPES.map(t => (
-              <button key={t.type} onClick={() => addBlock(t.type)} className="flex flex-col items-center justify-center p-3 bg-slate-50 border border-slate-200 rounded-xl hover:bg-white hover:shadow-md hover:border-indigo-200 transition-all group">
-                  <div className="text-slate-400 group-hover:text-indigo-600 mb-1">{t.icon}</div>
-                  <span className="text-[9px] font-bold text-slate-500 uppercase">{t.label}</span>
-              </button>
-          ))}
-      </div>
-
-      <button onClick={() => onSave({ ...data, xp: 100 })} className="w-full bg-emerald-600 text-white p-4 rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
-          <Save size={20}/> Save Lesson
-      </button>
+      <button onClick={handleSubmit} className={`w-full text-white p-4 rounded-xl font-bold shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${editingId ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}>{editingId ? <><Save size={20}/> Update Card</> : <><Plus size={20}/> Create Card</>}</button>
     </div>
   );
 }
+// 2. LESSON BUILDER (10 BLOCK TYPES)
+function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  
+  const updateBlock = (index: number, field: string, value: any) => { const newBlocks = [...(data.blocks || [])]; newBlocks[index] = { ...newBlocks[index], [field]: value }; setData({ ...data, blocks: newBlocks }); };
+  const updateDialogueLine = (blockIndex: number, lineIndex: number, field: string, value: any) => { const newBlocks = [...(data.blocks || [])]; newBlocks[blockIndex].lines[lineIndex][field] = value; setData({ ...data, blocks: newBlocks }); };
+  const updateVocabItem = (blockIndex: number, itemIndex: number, field: string, value: any) => { const newBlocks = [...(data.blocks || [])]; newBlocks[blockIndex].items[itemIndex][field] = value; setData({ ...data, blocks: newBlocks }); };
+  const addBlock = (type: string) => { const baseBlock = type === 'dialogue' ? { type: 'dialogue', lines: [{ speaker: 'A', text: '', translation: '', side: 'left' }] } : type === 'quiz' ? { type: 'quiz', question: '', options: [{id:'a',text:''},{id:'b',text:''}], correctId: 'a' } : type === 'vocab-list' ? { type: 'vocab-list', items: [{ term: '', definition: '' }] } : type === 'flashcard' ? { type: 'flashcard', front: '', back: '' } : type === 'image' ? { type: 'image', url: '', caption: '' } : type === 'note' ? { type: 'note', title: '', content: '' } : { type: 'text', title: '', content: '' }; setData({ ...data, blocks: [...(data.blocks || []), baseBlock] }); };
+  const removeBlock = (index: number) => { const newBlocks = [...(data.blocks || [])].filter((_, i) => i !== index); setData({ ...data, blocks: newBlocks }); };
+  
+  const handleSave = () => { 
+      if (!data.title) return alert("Title required"); 
+      const processedVocab = Array.isArray(data.vocab) ? data.vocab : (typeof data.vocab === 'string' ? data.vocab.split(',').map((s: string) => s.trim()) : []); 
+      
+      // onSave wrapper will handle the global publishing logic if visibility is public
+      onSave({ 
+          ...data, 
+          vocab: processedVocab, 
+          xp: 100,
+          authorName: auth.currentUser?.displayName || "Anonymous",
+          authorId: auth.currentUser?.uid 
+      }); 
+      setToastMsg("Lesson Saved Successfully"); 
+  };
+  
+  const deckOptions = availableDecks ? Object.entries(availableDecks).map(([key, deck]: any) => ({ id: key, title: deck.title })) : [];
 
+  return (
+    <div className="px-6 mt-4 space-y-8 pb-20 relative">
+      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
+      
+      <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+          <h3 className="font-bold text-slate-800 flex items-center gap-2"><FileText size={18} className="text-indigo-600"/> Lesson Metadata</h3>
+          <input className="w-full p-3 rounded-lg border border-slate-200 font-bold" placeholder="Title" value={data.title} onChange={e => setData({...data, title: e.target.value})} />
+          <textarea className="w-full p-3 rounded-lg border border-slate-200 text-sm" placeholder="Description" value={data.description} onChange={e => setData({...data, description: e.target.value})} />
+          <input className="w-full p-3 rounded-lg border border-slate-200 text-sm" placeholder="Vocab (comma separated)" value={data.vocab} onChange={e => setData({...data, vocab: e.target.value})} />
+          <div className="mt-2">
+              <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Linked Flashcard Deck</label>
+              <select className="w-full p-3 rounded-lg border border-slate-200 bg-white" value={data.relatedDeckId || ''} onChange={e => setData({...data, relatedDeckId: e.target.value})}>
+                  <option value="">None (No Deck)</option>
+                  {deckOptions.map(d => (<option key={d.id} value={d.id}>{d.title}</option>))}
+              </select>
+          </div>
+      </section>
+
+      <VisibilitySelector 
+          visibility={data.visibility || 'private'} 
+          setVisibility={(v: string) => setData({...data, visibility: v})} 
+          sharedWith={data.sharedWith || []} 
+          setSharedWith={(s: string[]) => setData({...data, sharedWith: s})} 
+      />
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between px-1"><h3 className="font-bold text-slate-800 flex items-center gap-2"><Layers size={18} className="text-indigo-600"/> Content Blocks</h3><span className="text-xs text-slate-400">{(data.blocks || []).length} Blocks</span></div>
+        {(data.blocks || []).map((block: any, idx: number) => (
+          <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative group"><div className="absolute right-4 top-4 flex gap-2"><span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-2 py-1 rounded">{block.type}</span><button onClick={() => removeBlock(idx)} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button></div>
+            {block.type === 'text' && (<div className="space-y-3 mt-4"><input className="w-full p-2 border-b border-slate-100 font-bold text-sm focus:outline-none" placeholder="Section Title" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} /><textarea className="w-full p-2 bg-slate-50 rounded-lg text-sm min-h-[80px]" placeholder="Content..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} /></div>)}
+            {block.type === 'note' && (<div className="space-y-3 mt-4"><div className="flex gap-2"><Info size={18} className="text-amber-500"/><input className="flex-1 p-2 border-b border-slate-100 font-bold text-sm focus:outline-none" placeholder="Note Title (e.g. Grammar Tip)" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} /></div><textarea className="w-full p-2 bg-amber-50 border border-amber-100 rounded-lg text-sm min-h-[80px] text-amber-800" placeholder="Tip content..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} /></div>)}
+            {block.type === 'image' && (<div className="space-y-3 mt-4"><div className="flex gap-2 items-center"><Image size={18} className="text-slate-400"/><input className="flex-1 p-2 border-b border-slate-100 text-sm" placeholder="Image URL (e.g., https://placehold.co/400x200)" value={block.url} onChange={e => updateBlock(idx, 'url', e.target.value)} /></div><input className="w-full p-2 bg-slate-50 rounded-lg text-sm" placeholder="Caption" value={block.caption} onChange={e => updateBlock(idx, 'caption', e.target.value)} /></div>)}
+            {block.type === 'vocab-list' && (<div className="space-y-3 mt-6"><p className="text-xs font-bold text-slate-400 uppercase">Vocabulary List</p>{block.items.map((item: any, i: number) => (<div key={i} className="flex gap-2"><input className="flex-1 p-2 bg-slate-50 rounded border border-slate-100 text-sm font-bold" placeholder="Term" value={item.term} onChange={e => updateVocabItem(idx, i, 'term', e.target.value)} /><input className="flex-1 p-2 border-b border-slate-100 text-sm" placeholder="Definition" value={item.definition} onChange={e => updateVocabItem(idx, i, 'definition', e.target.value)} /></div>))}<button onClick={() => { const newItems = [...block.items, { term: '', definition: '' }]; updateBlock(idx, 'items', newItems); }} className="text-xs font-bold text-indigo-600 flex items-center gap-1"><Plus size={14}/> Add Term</button></div>)}
+            {block.type === 'flashcard' && (<div className="space-y-3 mt-4"><div className="flex gap-2"><FlipVertical size={18} className="text-indigo-500"/><span className="text-sm font-bold text-slate-700">Embedded Flashcard</span></div><input className="w-full p-2 border rounded text-sm font-bold" placeholder="Front (Latin)" value={block.front} onChange={e => updateBlock(idx, 'front', e.target.value)} /><input className="w-full p-2 border rounded text-sm" placeholder="Back (English)" value={block.back} onChange={e => updateBlock(idx, 'back', e.target.value)} /></div>)}
+            {block.type === 'dialogue' && (<div className="space-y-3 mt-6">{block.lines.map((line: any, lIdx: number) => (<div key={lIdx} className="flex gap-2 text-sm"><input className="w-16 p-1 bg-slate-50 rounded border border-slate-100 text-xs font-bold" placeholder="Speaker" value={line.speaker} onChange={e => updateDialogueLine(idx, lIdx, 'speaker', e.target.value)} /><div className="flex-1 space-y-1"><input className="w-full p-1 border-b border-slate-100" placeholder="Latin" value={line.text} onChange={e => updateDialogueLine(idx, lIdx, 'text', e.target.value)} /><input className="w-full p-1 text-xs text-slate-500 italic" placeholder="English" value={line.translation} onChange={e => updateDialogueLine(idx, lIdx, 'translation', e.target.value)} /></div></div>))}<button onClick={() => { const newLines = [...block.lines, { speaker: 'B', text: '', translation: '', side: 'right' }]; updateBlock(idx, 'lines', newLines); }} className="text-xs font-bold text-indigo-600 flex items-center gap-1"><Plus size={14}/> Add Line</button></div>)}
+            {block.type === 'quiz' && (<div className="space-y-3 mt-4"><input className="w-full p-2 bg-slate-50 rounded-lg font-bold text-sm" placeholder="Question" value={block.question} onChange={e => updateBlock(idx, 'question', e.target.value)} /><div className="space-y-1"><p className="text-[10px] font-bold text-slate-400 uppercase">Options (ID, Text)</p>{block.options.map((opt: any, oIdx: number) => (<div key={oIdx} className="flex gap-2"><input className="w-8 p-1 bg-slate-50 text-center text-xs" value={opt.id} readOnly /><input className="flex-1 p-1 border-b border-slate-100 text-sm" value={opt.text} onChange={(e) => { const newOpts = [...block.options]; newOpts[oIdx].text = e.target.value; updateBlock(idx, 'options', newOpts); }} /></div>))}</div><div className="flex items-center gap-2 text-sm mt-2"><span className="text-slate-500">Correct ID:</span><input className="w-10 p-1 bg-green-50 border border-green-200 rounded text-center font-bold text-green-700" value={block.correctId} onChange={e => updateBlock(idx, 'correctId', e.target.value)} /></div></div>)}
+          </div>
+        ))}
+      </div>
+      
+      <div className="grid grid-cols-3 gap-2"><button onClick={() => addBlock('text')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><AlignLeft size={20}/> <span className="text-[10px] font-bold">Text</span></button><button onClick={() => addBlock('dialogue')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><MessageSquare size={20}/> <span className="text-[10px] font-bold">Dialogue</span></button><button onClick={() => addBlock('quiz')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><HelpCircle size={20}/> <span className="text-[10px] font-bold">Quiz</span></button><button onClick={() => addBlock('vocab-list')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><List size={20}/> <span className="text-[10px] font-bold">Vocab List</span></button><button onClick={() => addBlock('flashcard')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><FlipVertical size={20}/> <span className="text-[10px] font-bold">Flashcard</span></button><button onClick={() => addBlock('image')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><Image size={20}/> <span className="text-[10px] font-bold">Image</span></button></div>
+      <div className="pt-4 border-t border-slate-100"><button onClick={handleSave} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform"><Save size={20} /> Save Lesson to Library</button></div>
+    </div>
+  );
+}
 // 3. EXAM BUILDER (10 QUESTION TYPES)
 function TestBuilderView({ onSave, onCancel, initialData }: any) {
   const [testData, setTestData] = useState(initialData || { title: '', description: '', type: 'test', xp: 100, questions: [] });
@@ -3708,72 +3656,389 @@ function TestBuilderView({ onSave, onCancel, initialData }: any) {
     </div>
   );
 }
+// --- NEW COMPONENT: VISIBILITY SELECTOR ---
+function VisibilitySelector({ visibility, setVisibility, sharedWith, setSharedWith }: any) {
+    const [emailInput, setEmailInput] = useState('');
 
+    const addEmail = (e: any) => {
+        e.preventDefault();
+        if (emailInput && !sharedWith.includes(emailInput)) {
+            setSharedWith([...sharedWith, emailInput]);
+            setEmailInput('');
+        }
+    };
+
+    const removeEmail = (email: string) => {
+        setSharedWith(sharedWith.filter((e: string) => e !== email));
+    };
+
+    return (
+        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-4">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                <Globe size={14}/> Visibility Settings
+            </h4>
+            
+            <div className="grid grid-cols-3 gap-2">
+                <button 
+                    onClick={() => setVisibility('private')}
+                    className={`p-3 rounded-xl border text-sm font-bold flex flex-col items-center gap-2 transition-all ${visibility === 'private' ? 'bg-white border-indigo-500 text-indigo-600 shadow-sm ring-1 ring-indigo-200' : 'bg-slate-100 border-transparent text-slate-400 hover:bg-white hover:border-slate-200'}`}
+                >
+                    <Lock size={18}/> Private
+                </button>
+                <button 
+                    onClick={() => setVisibility('shared')}
+                    className={`p-3 rounded-xl border text-sm font-bold flex flex-col items-center gap-2 transition-all ${visibility === 'shared' ? 'bg-white border-amber-500 text-amber-600 shadow-sm ring-1 ring-amber-200' : 'bg-slate-100 border-transparent text-slate-400 hover:bg-white hover:border-slate-200'}`}
+                >
+                    <Users size={18}/> Shared
+                </button>
+                <button 
+                    onClick={() => setVisibility('public')}
+                    className={`p-3 rounded-xl border text-sm font-bold flex flex-col items-center gap-2 transition-all ${visibility === 'public' ? 'bg-white border-emerald-500 text-emerald-600 shadow-sm ring-1 ring-emerald-200' : 'bg-slate-100 border-transparent text-slate-400 hover:bg-white hover:border-slate-200'}`}
+                >
+                    <Globe size={18}/> Public
+                </button>
+            </div>
+
+            {/* Description Text */}
+            <div className="text-xs text-slate-500 text-center">
+                {visibility === 'private' && "Only you can see and use this content."}
+                {visibility === 'public' && "Visible to ALL users in the Community Library."}
+                {visibility === 'shared' && "Visible only to specific users you add below."}
+            </div>
+
+            {/* Shared Email Input */}
+            {visibility === 'shared' && (
+                <div className="animate-in fade-in slide-in-from-top-2">
+                    <div className="flex gap-2 mb-2">
+                        <input 
+                            value={emailInput}
+                            onChange={(e) => setEmailInput(e.target.value)}
+                            placeholder="Enter user email..."
+                            className="flex-1 p-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:border-amber-500"
+                        />
+                        <button onClick={addEmail} className="bg-amber-500 text-white p-2 rounded-lg font-bold text-xs">Add</button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {sharedWith.map((email: string) => (
+                            <span key={email} className="bg-amber-100 text-amber-700 px-2 py-1 rounded-md text-xs font-bold flex items-center gap-1">
+                                {email} <button onClick={() => removeEmail(email)}><X size={12}/></button>
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
 // 4. MAIN BUILDER HUB CONTAINER
-function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allDecks, lessons, initialMode, onClearMode }: any) {
-  const [subView, setSubView] = useState('menu'); 
-  const [mode, setMode] = useState('card'); 
+function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allDecks, lessons }: any) {
+  // --- STATE ---
+  // Editor State
+  const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [], visibility: 'private', sharedWith: [] });
+  const [mode, setMode] = useState('card'); // 'card' | 'lesson' | 'test'
+  const [subView, setSubView] = useState('menu'); // 'menu' | 'library' | 'editor' | 'import'
   const [editingItem, setEditingItem] = useState<any>(null);
+  
+  // Import State
   const [jsonInput, setJsonInput] = useState('');
   const [importType, setImportType] = useState<'lesson' | 'deck' | 'test'>('lesson');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [lessonData, setLessonData] = useState({ title: '', description: '', vocab: '', blocks: [] });
-  const [libSearch, setLibSearch] = useState('');
-  const [libFilter, setLibFilter] = useState('all'); 
-
-  useEffect(() => {
-      if (initialMode) {
-          setSubView('editor');
-          setMode(initialMode);
-          setEditingItem(null); 
-          if(initialMode === 'lesson') setLessonData({ title: '', description: '', vocab: '', blocks: [] });
-          if (onClearMode) onClearMode();
-      }
-  }, [initialMode, onClearMode]);
-
-  // (Bulk Import and Library View Logic omitted for brevity - assumes same logic as previous, 
-  // keeping the structure clean. The key update is the 3 Builder Views above.)
   
-  // Reuse existing helpers like getDiffColor, handleBulkImport, handleEdit from previous implementation if needed here.
-  // For the sake of the block requested, I will render the standard Menu/Editor switching logic.
+  // Library Filter State
+  const [libSearch, setLibSearch] = useState('');
+  const [libFilter, setLibFilter] = useState('all'); // 'all' | 'deck' | 'lesson' | 'test'
+  const [libLang, setLibLang] = useState('all'); 
+  const [libDifficulty, setLibDifficulty] = useState('all');
+
+  // --- HELPER: Difficulty Colors ---
+  const getDiffColor = (diff: string) => {
+      const d = (diff || '').toLowerCase();
+      if (d.includes('begin') || d.includes('easy')) return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+      if (d.includes('inter') || d.includes('med')) return 'bg-amber-100 text-amber-700 border-amber-200';
+      if (d.includes('advan') || d.includes('hard')) return 'bg-rose-100 text-rose-700 border-rose-200';
+      return 'bg-slate-100 text-slate-600 border-slate-200';
+  };
+
+  // --- LOGIC: PUBLISH TO GLOBAL ---
+  const publishContent = async (collectionName: string, itemData: any) => {
+      // If Public, save copy to global 'public_library'
+      if (itemData.visibility === 'public') {
+          try {
+              // We create a new doc in public_library with the same ID if possible, or new one
+              const globalRef = doc(collection(db, 'artifacts', appId, 'public_library'));
+              await setDoc(globalRef, {
+                  ...itemData,
+                  originalAuthorId: auth.currentUser?.uid,
+                  originalAuthorName: auth.currentUser?.displayName || "Unknown",
+                  publishedAt: Date.now(),
+                  type: collectionName === 'custom_cards' ? 'deck' : 'lesson' // normalize type
+              });
+              console.log("Published to global library");
+          } catch (e) {
+              console.error("Error publishing global:", e);
+          }
+      }
+  };
+
+  // --- WRAPPED SAVE HANDLERS ---
+  const handleSaveCardWrapper = async (data: any) => {
+      await onSaveCard(data); // Save to user's private DB
+      // Note: Single cards usually aren't published individually to the global library 
+      // in this architecture, but you could add that logic here if desired.
+  };
+
+  const handleSaveLessonWrapper = async (data: any) => {
+      await onSaveLesson(data); // Save to user's private DB
+      // If public, push to global library
+      if (data.visibility === 'public') {
+          await publishContent('custom_lessons', data);
+      }
+  };
+
+  const handleSaveTestWrapper = async (data: any) => {
+      // Ensure type is test
+      const testData = { ...data, contentType: 'test' };
+      // Save Private
+      await onSaveLesson(testData, editingItem?.id); 
+      // Publish if public
+      if (testData.visibility === 'public') {
+          await publishContent('custom_lessons', testData);
+      }
+  };
+
+  // --- BULK IMPORT ---
+  const handleBulkImport = async () => {
+    try {
+        const data = JSON.parse(jsonInput);
+        if (!Array.isArray(data)) throw new Error("Input must be an array.");
+        const batch = writeBatch(db);
+        // @ts-ignore
+        const userId = auth.currentUser?.uid;
+        if(!userId) return;
+
+        let count = 0;
+        data.forEach((item: any) => {
+            const id = item.id || `import_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+            
+            // Auto-detect metadata
+            const lang = item.targetLanguage || "Latin"; 
+            const diff = item.difficulty || "Beginner";
+
+            if (importType === 'deck') {
+                const deckId = `custom_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
+                const deckTitle = item.title || "Imported Deck";
+                if (item.cards && Array.isArray(item.cards)) {
+                    item.cards.forEach((card: any) => {
+                        const cardRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'custom_cards'));
+                        batch.set(cardRef, { 
+                            ...card, 
+                            deckId: deckId, 
+                            deckTitle: deckTitle, 
+                            type: card.type || 'noun', 
+                            mastery: 0, 
+                            grammar_tags: card.grammar_tags || ["Imported"],
+                            targetLanguage: lang,
+                            difficulty: diff
+                        });
+                        count++;
+                    });
+                }
+            } else if (importType === 'test') {
+                 const ref = doc(db, 'artifacts', appId, 'users', userId, 'custom_lessons', id);
+                 const processedQuestions = (item.questions || []).map((q: any, idx: number) => ({
+                     ...q,
+                     id: q.id || `q_${Date.now()}_${idx}`,
+                     options: q.options?.map((opt: any, oIdx: number) => ({ ...opt, id: opt.id || `opt_${Date.now()}_${idx}_${oIdx}` })) || []
+                 }));
+                 batch.set(ref, { ...item, type: 'test', questions: processedQuestions, xp: item.xp || 100, created: Date.now(), targetLanguage: lang, difficulty: diff });
+                 count++;
+            } else {
+                 const ref = doc(db, 'artifacts', appId, 'users', userId, 'custom_lessons', id);
+                 batch.set(ref, { ...item, vocab: Array.isArray(item.vocab) ? item.vocab : [], xp: item.xp || 100, targetLanguage: lang, difficulty: diff });
+                 count++;
+            }
+        });
+        await batch.commit();
+        setToastMsg(`Successfully imported ${count} items.`);
+        setJsonInput('');
+    } catch (e: any) { alert("Import Failed: " + e.message); }
+  };
 
   const handleEdit = (item: any, type: string) => {
       setEditingItem(item);
       setMode(type);
       setSubView('editor');
-      if(type === 'lesson') setLessonData(item);
+      if(type === 'lesson') {
+           setLessonData({...item, vocab: Array.isArray(item.vocab) ? item.vocab.join(', ') : item.vocab});
+      }
   };
 
-  // --- LIBRARY RENDER ---
+  // --- RENDER: LIBRARY VIEW LOGIC ---
   if (subView === 'library') {
-      const allItems = [...(lessons || [])].filter(l => l.title.toLowerCase().includes(libSearch.toLowerCase()));
+      // 1. Flatten Decks
+      const deckItems = Object.entries(allDecks || {}).map(([key, deck]: any) => ({
+          id: key,
+          ...deck,
+          type: 'deck',
+          subtitle: `${deck.cards?.length || 0} Cards`,
+          targetLanguage: deck.targetLanguage || (deck.cards?.[0]?.targetLanguage) || 'Latin',
+          difficulty: deck.difficulty || (deck.cards?.[0]?.difficulty) || 'Beginner'
+      }));
+
+      // 2. Prepare Lessons & Exams
+      const contentItems = (lessons || []).map((l: any) => ({
+          ...l,
+          type: (l.type === 'test' || l.contentType === 'test') ? 'test' : 'lesson',
+          subtitle: (l.type === 'test' || l.contentType === 'test') 
+            ? `${(l.questions || []).length} Questions` 
+            : `${(l.blocks || []).length} Blocks`,
+          targetLanguage: l.targetLanguage || 'Latin',
+          difficulty: l.difficulty || 'Beginner'
+      }));
+
+      // 3. Merge
+      const allItems = [...deckItems, ...contentItems];
+
+      // 4. Extract Unique Options
+      const availableLanguages = Array.from(new Set(allItems.map(i => i.targetLanguage))).sort();
+      const availableDifficulties = Array.from(new Set(allItems.map(i => i.difficulty))).sort();
+
+      // 5. Filter
+      const filteredItems = allItems.filter(item => {
+          const matchesSearch = item.title.toLowerCase().includes(libSearch.toLowerCase());
+          const matchesType = libFilter === 'all' || item.type === libFilter;
+          const matchesLang = libLang === 'all' || item.targetLanguage === libLang;
+          const matchesDiff = libDifficulty === 'all' || item.difficulty === libDifficulty;
+          return matchesSearch && matchesType && matchesLang && matchesDiff;
+      });
+
       return (
-          <div className="h-full bg-slate-50 flex flex-col">
-              <div className="p-4 bg-white border-b border-slate-100 flex justify-between items-center">
-                  <h2 className="font-bold flex items-center gap-2"><Library size={20}/> Content Library</h2>
-                  <button onClick={() => setSubView('menu')} className="text-sm font-bold text-slate-500">Back</button>
-              </div>
-              <div className="p-4"><input value={libSearch} onChange={e => setLibSearch(e.target.value)} placeholder="Search..." className="w-full p-3 rounded-xl bg-white border border-slate-200 text-sm"/></div>
-              <div className="flex-1 overflow-y-auto p-4 pt-0">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {allItems.map((item: any) => (
-                          <div key={item.id} onClick={() => handleEdit(item, item.type === 'test' ? 'test' : 'lesson')} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:border-indigo-300">
-                              <h4 className="font-bold text-slate-800">{item.title}</h4>
-                              <p className="text-xs text-slate-500">{item.type === 'test' ? 'Exam' : 'Lesson'}</p>
+          <div className="h-full flex flex-col bg-slate-50">
+              <div className="p-6 border-b border-slate-100 bg-white flex flex-col gap-4 sticky top-0 z-10 shadow-sm">
+                  <div className="flex justify-between items-center">
+                      <h2 className="font-bold text-xl text-slate-800 flex items-center gap-2"><Library className="text-indigo-600"/> Content Library</h2>
+                      <button onClick={() => setSubView('menu')} className="text-sm font-bold text-slate-500 hover:text-indigo-600 px-4 py-2 rounded-lg hover:bg-slate-50">Back to Hub</button>
+                  </div>
+                  
+                  <div className="flex flex-col gap-3">
+                      <div className="relative">
+                          <Search className="absolute left-3 top-2.5 text-slate-400" size={16}/>
+                          <input 
+                            value={libSearch} onChange={(e) => setLibSearch(e.target.value)} placeholder="Search content..." 
+                            className="w-full pl-9 py-2 bg-slate-100 border-none rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500"
+                          />
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                          <div className="relative">
+                              <select value={libFilter} onChange={(e) => setLibFilter(e.target.value)} className="w-full p-2 pl-8 bg-slate-100 rounded-xl text-xs font-bold text-slate-600 border-none focus:ring-2 focus:ring-indigo-500 appearance-none">
+                                  <option value="all">All Types</option><option value="deck">Decks</option><option value="lesson">Lessons</option><option value="test">Exams</option>
+                              </select>
+                              <Layers size={14} className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none"/>
                           </div>
-                      ))}
+                          <div className="relative">
+                              <select value={libLang} onChange={(e) => setLibLang(e.target.value)} className="w-full p-2 pl-8 bg-slate-100 rounded-xl text-xs font-bold text-slate-600 border-none focus:ring-2 focus:ring-indigo-500 appearance-none">
+                                  <option value="all">All Langs</option>
+                                  {availableLanguages.map(lang => (<option key={lang} value={lang}>{lang}</option>))}
+                              </select>
+                              <Globe size={14} className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none"/>
+                          </div>
+                          <div className="relative">
+                              <select value={libDifficulty} onChange={(e) => setLibDifficulty(e.target.value)} className="w-full p-2 pl-8 bg-slate-100 rounded-xl text-xs font-bold text-slate-600 border-none focus:ring-2 focus:ring-indigo-500 appearance-none">
+                                  <option value="all">All Levels</option>
+                                  {availableDifficulties.map(diff => (<option key={diff} value={diff}>{diff}</option>))}
+                              </select>
+                              <BarChart3 size={14} className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none"/>
+                          </div>
+                      </div>
                   </div>
               </div>
+
+              <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
+                  {filteredItems.length === 0 ? (
+                      <div className="text-center py-20 text-slate-400 italic">No content found matching your filters.</div>
+                  ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                           {filteredItems.map((item: any) => (
+                              <div 
+                                key={item.id} 
+                                onClick={() => handleEdit(item, item.type === 'deck' ? 'card' : item.type === 'test' ? 'test' : 'lesson')} 
+                                className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-indigo-300 hover:shadow-md cursor-pointer transition-all group relative overflow-hidden flex flex-col h-full"
+                              >
+                                  {/* Public Badge */}
+                                  {item.isPublic && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[9px] font-bold px-2 py-1 rounded-bl-lg z-20">PUBLIC</div>}
+
+                                  <div className="flex justify-between items-start mb-3 relative z-10">
+                                      <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-md border ${
+                                          item.type === 'deck' ? 'bg-orange-50 text-orange-600 border-orange-100' : 
+                                          item.type === 'test' ? 'bg-rose-50 text-rose-600 border-rose-100' : 
+                                          'bg-indigo-50 text-indigo-600 border-indigo-100'
+                                      }`}>
+                                          {item.type === 'deck' ? 'Flashcards' : item.type === 'test' ? 'Exam' : 'Lesson'}
+                                      </span>
+                                      <Edit3 size={16} className="text-slate-300 group-hover:text-indigo-500 transition-colors"/>
+                                  </div>
+                                  
+                                  <div className="relative z-10 mb-4 flex-1">
+                                      <h4 className="font-bold text-slate-800 text-lg mb-1 line-clamp-2 leading-tight">{item.title}</h4>
+                                      <div className="flex items-center gap-2 mt-2">
+                                          <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-bold uppercase tracking-wider flex items-center gap-1">
+                                              <Globe size={10}/> {item.targetLanguage.substring(0, 3).toUpperCase()}
+                                          </span>
+                                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider border ${getDiffColor(item.difficulty)}`}>
+                                              {item.difficulty}
+                                          </span>
+                                      </div>
+                                  </div>
+                                  
+                                  <div className="pt-3 border-t border-slate-100 relative z-10 flex items-center gap-2 text-xs text-slate-400 font-medium">
+                                      {item.type === 'deck' && <Layers size={14}/>}
+                                      {item.type === 'lesson' && <BookOpen size={14}/>}
+                                      {item.type === 'test' && <HelpCircle size={14}/>}
+                                      {item.subtitle}
+                                  </div>
+                                  
+                                  <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br opacity-5 rounded-bl-[100px] transition-transform group-hover:scale-125 pointer-events-none ${
+                                      item.type === 'deck' ? 'from-orange-400 to-amber-500' : 
+                                      item.type === 'test' ? 'from-rose-400 to-pink-500' : 
+                                      'from-indigo-400 to-blue-500'
+                                  }`}></div>
+                              </div>
+                           ))}
+                      </div>
+                  )}
+              </div>
           </div>
-      );
+      )
   }
 
-  // --- MAIN RENDER ---
+  // --- RENDER: IMPORT VIEW ---
+  if (subView === 'import') {
+      return (
+          <div className="h-full flex flex-col bg-slate-50 p-6">
+             <div className="flex justify-between items-center mb-6">
+                 <h2 className="text-2xl font-bold text-slate-800">AI / JSON Import</h2>
+                 <button onClick={() => setSubView('menu')} className="text-sm font-bold text-slate-500 hover:text-indigo-600">Back</button>
+             </div>
+             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex-1 flex flex-col">
+                 <div className="flex gap-2 mb-4">
+                     <button onClick={() => setImportType('lesson')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${importType === 'lesson' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Lessons</button>
+                     <button onClick={() => setImportType('deck')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${importType === 'deck' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Decks</button>
+                     <button onClick={() => setImportType('test')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${importType === 'test' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Exams</button>
+                 </div>
+                 <textarea value={jsonInput} onChange={(e) => setJsonInput(e.target.value)} className="flex-1 w-full p-4 bg-slate-50 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" placeholder={importType === 'test' ? '[ { "title": "Midterm", "questions": [...] } ]' : importType === 'lesson' ? '[ { "title": "Lesson 1", "blocks": [...] } ]' : '[ { "title": "My Deck", "cards": [...] } ]'} />
+                 <div className="mt-4 flex justify-end">
+                     <button onClick={handleBulkImport} disabled={!jsonInput} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-slate-800 disabled:opacity-50 flex items-center gap-2"><UploadCloud size={18}/> Import JSON</button>
+                 </div>
+                 {toastMsg && <p className="text-emerald-600 font-bold text-center mt-2">{toastMsg}</p>}
+             </div>
+          </div>
+      )
+  }
+
+  // --- RENDER: MAIN MENU / EDITOR ---
   return (
     <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar relative">
-        {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
-        
-        <Header title="Creator Studio" subtitle="Content Forge" 
+        <Header title="Scriptorium" subtitle="Content Creator" 
             rightAction={
                 <div className="flex gap-2">
                     <button onClick={() => setSubView('import')} className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-indigo-50 hover:text-indigo-600"><FileJson size={20}/></button>
@@ -3792,48 +4057,37 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
             </div>
         )}
 
-        <div className="mt-4 px-6">
-            {subView === 'import' && (
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                    <h3 className="font-bold mb-4">JSON Import</h3>
-                    <textarea value={jsonInput} onChange={e => setJsonInput(e.target.value)} className="w-full p-4 bg-slate-50 rounded-xl font-mono text-xs h-40 border border-slate-200 mb-4" placeholder='[{"title": "..."}]' />
-                    {/* ...Import buttons logic... */}
-                </div>
-            )}
-
+        <div className="mt-4">
             {subView === 'editor' && mode === 'card' && (
                 <CardBuilderView 
-                    key="card-builder" 
-                    onSaveCard={onSaveCard} 
+                    onSaveCard={handleSaveCardWrapper} 
                     onUpdateCard={onUpdateCard} 
                     onDeleteCard={onDeleteCard} 
                     availableDecks={allDecks} 
-                    initialDeckId={initialMode === 'card' ? 'new' : null} 
                     initialData={editingItem}
                     onCancelEdit={() => { setEditingItem(null); }}
                 />
             )}
             {subView === 'editor' && mode === 'lesson' && (
                 <LessonBuilderView 
-                    key="lesson-builder" 
                     data={lessonData} 
                     setData={setLessonData} 
-                    onSave={onSaveLesson} 
+                    onSave={handleSaveLessonWrapper} 
                     availableDecks={allDecks} 
                 />
             )}
             {subView === 'editor' && mode === 'test' && (
                 <TestBuilderView 
-                    key="test-builder" 
                     initialData={editingItem}
-                    onSave={(data: any) => onSaveLesson({...data, contentType: 'test'}, editingItem?.id)} 
+                    onSave={handleSaveTestWrapper}
                     onCancel={() => setSubView('menu')}
                 />
             )}
         </div>
     </div>
   );
-}function TestPlayerView({ test, onFinish }: any) {
+}
+function TestPlayerView({ test, onFinish }: any) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<any>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -5027,6 +5281,7 @@ function App() {
   const [customLessons, setCustomLessons] = useState<any[]>([]);
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [classLessons, setClassLessons] = useState<any[]>([]);
+  const [publicContent, setPublicContent] = useState<any[]>([]); // New: Public Library Content
   
   // Navigation State
   const [activeLesson, setActiveLesson] = useState<any>(null);
@@ -5059,8 +5314,14 @@ function App() {
   }, [systemDecks, customCards, classLessons]);
 
   // Merge all content for the library
-  const lessons = useMemo(() => [...systemLessons, ...customLessons, ...classLessons.filter(l => l.contentType !== 'deck')], [systemLessons, customLessons, classLessons]);
-  const libraryLessons = useMemo(() => [...systemLessons, ...customLessons], [systemLessons, customLessons]);
+  const lessons = useMemo(() => [
+      ...systemLessons, 
+      ...customLessons, 
+      ...publicContent, 
+      ...classLessons.filter(l => l.contentType !== 'deck')
+  ], [systemLessons, customLessons, classLessons, publicContent]);
+  
+  const libraryLessons = useMemo(() => [...systemLessons, ...customLessons, ...publicContent], [systemLessons, customLessons, publicContent]);
 
   // --- HANDLERS ---
   const handleContentSelection = (item: any) => { 
@@ -5106,7 +5367,14 @@ function App() {
         setUserData((prev: any) => ({...prev, classes: cls, classAssignments: newAssignments})); 
     }, (error) => { console.log("Class sync error:", error); setUserData((prev: any) => ({...prev, classSyncError: true})); });
     
-    return () => { unsubProfile(); unsubCards(); unsubLessons(); unsubClasses(); };
+    // 4. Public Content Listener
+    const qPublic = query(collection(db, 'artifacts', appId, 'public_library'), limit(50));
+    const unsubPublic = onSnapshot(qPublic, (snap) => {
+        const items = snap.docs.map(d => ({ id: d.id, ...d.data(), isPublic: true }));
+        setPublicContent(items);
+    });
+
+    return () => { unsubProfile(); unsubCards(); unsubLessons(); unsubClasses(); unsubPublic(); };
   }, [user, userData?.role]);
 
   // --- ACTIONS ---
@@ -5128,27 +5396,45 @@ function App() {
     } 
   }, [user, userData]);
 
-  // --- NEW: HANDLE DECK DELETION ---
+  // --- NEW: LOG SELF STUDY (For Practice Hub) ---
+  const handleLogSelfStudy = useCallback(async (itemId: string, xp: number, title: string, scoreDetail?: any) => {
+    if (!user) return;
+    try {
+        await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
+            studentName: userData?.name || 'Unknown Student',
+            studentEmail: user.email,
+            itemTitle: title || 'Self Study Session',
+            xp: xp,
+            timestamp: Date.now(),
+            type: scoreDetail ? 'quiz_score' : 'practice',
+            scoreDetail: scoreDetail || null,
+            isSelfStudy: true
+        });
+        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp) });
+    } catch (e) {
+        console.error("Error logging self-study:", e);
+    }
+  }, [user, userData]);
+
+  // --- NEW: DECK MANAGEMENT ---
   const handleDeleteDeck = useCallback(async (deckId: string) => {
       if (!user) return;
       if (!window.confirm("Permanently delete this deck? This cannot be undone.")) return;
       
       try {
-          // 1. Delete all cards in this deck
           const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), where('deckId', '==', deckId));
-          const snapshot = await getDocs(q); // Ensure getDocs is imported
+          // IMPORTANT: Import getDocs at top of file
+          const snapshot = await getDocs(q); 
           const batch = writeBatch(db);
           snapshot.docs.forEach((doc) => batch.delete(doc.ref));
           await batch.commit();
 
-          // 2. Remove from deck preferences if it exists
           if (userData?.deckPreferences?.customOrder) {
               const newOrder = userData.deckPreferences.customOrder.filter((id: string) => id !== deckId);
               await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
                   'deckPreferences.customOrder': newOrder
               });
           }
-          
           alert("Deck deleted.");
       } catch (e: any) {
           console.error(e);
@@ -5156,7 +5442,6 @@ function App() {
       }
   }, [user, userData]);
 
-  // --- NEW: UPDATE USER PREFERENCES ---
   const handleUpdatePreferences = useCallback(async (newPrefs: any) => {
       if (!user) return;
       try {
@@ -5176,25 +5461,20 @@ function App() {
   const commonHandlers = { onSaveCard: handleCreateCard, onUpdateCard: handleUpdateCard, onDeleteCard: handleDeleteCard, onSaveLesson: handleCreateLesson, };
 
   const renderStudentView = () => {
-    // 1. Check for Test
     if (activeLesson && (activeLesson.type === 'test' || activeLesson.contentType === 'test')) {
         // @ts-ignore
         return <TestPlayerView test={activeLesson} onFinish={(id: string, xp: number, title: string, score: any) => { handleFinishLesson(id, xp, title, score); setActiveLesson(null); }} />;
     }
 
-    // 2. Check for Email Module
     if (activeLesson && activeLesson.type === 'email_module') {
         // @ts-ignore
         return <EmailSimulatorView module={activeLesson} onFinish={(id: string, xp: number, title: string) => { handleFinishLesson(id, xp, title); setActiveLesson(null); }} />;
     }
 
-    // 3. Standard Lesson
     if (activeLesson) return <LessonView lesson={activeLesson} onFinish={(id: string, xp: number, title: string) => { handleFinishLesson(id, xp, title); setActiveLesson(null); }} />;
     
-    // 4. Specific Class View
     if (activeTab === 'home' && activeStudentClass) return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} />;
     
-    // 5. Main Tab Navigation
     switch (activeTab) {
       case 'home': return <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} />;
       case 'flashcards': 
@@ -5207,17 +5487,17 @@ function App() {
               onSaveCard={handleCreateCard} 
               activeDeckOverride={deckToLoad} 
               onComplete={handleFinishLesson}
-              userData={userData} // Pass user data for prefs
-              onUpdatePrefs={handleUpdatePreferences} // Pass handler
-              onDeleteDeck={handleDeleteDeck} // Pass handler
+              onLogActivity={handleLogSelfStudy} // <-- Passes logger to Practice Hub
+              userData={userData} 
+              onUpdatePrefs={handleUpdatePreferences} 
+              onDeleteDeck={handleDeleteDeck} 
           />;
-      case 'create': return <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} />;
+      case 'create': return <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />;
       case 'profile': return <ProfileView user={user} userData={userData} />;
       default: return <HomeView />;
     }
   };
 
-  // --- ROUTING: CHECK FOR WIDGET MODE ---
   const isWidgetMode = window.location.pathname === '/widget';
 
   if (isWidgetMode) {
@@ -5226,43 +5506,23 @@ function App() {
       return <WidgetView allDecks={allDecks} userData={userData} />;
   }
 
-  // --- STANDARD APP RENDER ---
   return (
     <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-center relative overflow-hidden">
-      
-      {/* 1. GLOBAL STYLES (Scrollbar Hide & Reset) */}
       <style>{`
-        html, body, #root {
-          margin: 0;
-          padding: 0;
-          width: 100%;
-          height: 100%;
-          overflow: hidden;
-          background-color: #f8fafc;
-        }
-        *::-webkit-scrollbar {
-          display: none;
-        }
-        * {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
+        html, body, #root { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #f8fafc; }
+        *::-webkit-scrollbar { display: none; }
+        * { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* 2. BACKGROUND BLOBS (Visuals) */}
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-rose-400/20 rounded-full blur-[100px] pointer-events-none mix-blend-multiply animate-pulse" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-400/20 rounded-full blur-[100px] pointer-events-none mix-blend-multiply" />
       
-      {/* 3. UTILITIES */}
       <RoleToggle user={user} userData={userData} />
 
-      {/* 4. MAIN VESSEL */}
       <div className={`w-full h-[100dvh] relative overflow-hidden bg-slate-50 ${userData?.role === 'instructor' ? 'max-w-full' : 'max-w-full sm:max-w-[400px] sm:h-[850px] sm:rounded-[3rem] sm:shadow-2xl sm:border-[8px] sm:border-slate-900/10'}`}>
         
-        {/* Status Bar Spacer (Student Mobile View Only) */}
         {userData?.role !== 'instructor' && <div className="absolute top-0 left-0 right-0 h-safe-top bg-transparent z-50 pointer-events-none" />}
         
-        {/* 5. VIEW ROUTER */}
         {userData.role === 'instructor' ? (
              <InstructorDashboard 
                 user={user} 
@@ -5274,10 +5534,7 @@ function App() {
              />
         ) : (
              <>
-                {/* Main Student View Logic */}
                 {renderStudentView()}
-                
-                {/* Navigation Bar (Hidden if inside Lesson/Class/Exam) */}
                 {!activeLesson && !activeStudentClass && (
                     <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
                 )}
@@ -5287,4 +5544,3 @@ function App() {
     </div>
   );
 }
-export default App;
