@@ -3744,9 +3744,13 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
   const [importType, setImportType] = useState<'lesson' | 'deck' | 'test'>('lesson');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   
+  // -- NEW: Import Visibility State --
+  const [importVisibility, setImportVisibility] = useState('private');
+  const [importSharedWith, setImportSharedWith] = useState<string[]>([]);
+  
   // Library Filter State
   const [libSearch, setLibSearch] = useState('');
-  const [libFilter, setLibFilter] = useState('all'); // 'all' | 'deck' | 'lesson' | 'test'
+  const [libFilter, setLibFilter] = useState('all'); 
   const [libLang, setLibLang] = useState('all'); 
   const [libDifficulty, setLibDifficulty] = useState('all');
 
@@ -3761,17 +3765,15 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
 
   // --- LOGIC: PUBLISH TO GLOBAL ---
   const publishContent = async (collectionName: string, itemData: any) => {
-      // If Public, save copy to global 'public_library'
       if (itemData.visibility === 'public') {
           try {
-              // We create a new doc in public_library with the same ID if possible, or new one
               const globalRef = doc(collection(db, 'artifacts', appId, 'public_library'));
               await setDoc(globalRef, {
                   ...itemData,
                   originalAuthorId: auth.currentUser?.uid,
                   originalAuthorName: auth.currentUser?.displayName || "Unknown",
                   publishedAt: Date.now(),
-                  type: collectionName === 'custom_cards' ? 'deck' : 'lesson' // normalize type
+                  type: collectionName === 'custom_cards' ? 'deck' : 'lesson' 
               });
               console.log("Published to global library");
           } catch (e) {
@@ -3782,31 +3784,25 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
 
   // --- WRAPPED SAVE HANDLERS ---
   const handleSaveCardWrapper = async (data: any) => {
-      await onSaveCard(data); // Save to user's private DB
-      // Note: Single cards usually aren't published individually to the global library 
-      // in this architecture, but you could add that logic here if desired.
+      await onSaveCard(data); 
   };
 
   const handleSaveLessonWrapper = async (data: any) => {
-      await onSaveLesson(data); // Save to user's private DB
-      // If public, push to global library
+      await onSaveLesson(data); 
       if (data.visibility === 'public') {
           await publishContent('custom_lessons', data);
       }
   };
 
   const handleSaveTestWrapper = async (data: any) => {
-      // Ensure type is test
       const testData = { ...data, contentType: 'test' };
-      // Save Private
       await onSaveLesson(testData, editingItem?.id); 
-      // Publish if public
       if (testData.visibility === 'public') {
           await publishContent('custom_lessons', testData);
       }
   };
 
-  // --- BULK IMPORT ---
+  // --- BULK IMPORT (UPDATED) ---
   const handleBulkImport = async () => {
     try {
         const data = JSON.parse(jsonInput);
@@ -3814,15 +3810,29 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
         const batch = writeBatch(db);
         // @ts-ignore
         const userId = auth.currentUser?.uid;
+        // @ts-ignore
+        const userName = auth.currentUser?.displayName || "Unknown";
         if(!userId) return;
 
         let count = 0;
         data.forEach((item: any) => {
             const id = item.id || `import_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-            
-            // Auto-detect metadata
             const lang = item.targetLanguage || "Latin"; 
             const diff = item.difficulty || "Beginner";
+
+            // Common Metadata including Visibility
+            const baseMeta = {
+                targetLanguage: lang,
+                difficulty: diff,
+                visibility: importVisibility,
+                sharedWith: importSharedWith,
+                authorId: userId,
+                authorName: userName,
+                createdAt: Date.now()
+            };
+
+            let itemRef;
+            let finalData;
 
             if (importType === 'deck') {
                 const deckId = `custom_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
@@ -3832,30 +3842,46 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                         const cardRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'custom_cards'));
                         batch.set(cardRef, { 
                             ...card, 
+                            ...baseMeta,
                             deckId: deckId, 
                             deckTitle: deckTitle, 
                             type: card.type || 'noun', 
                             mastery: 0, 
                             grammar_tags: card.grammar_tags || ["Imported"],
-                            targetLanguage: lang,
-                            difficulty: diff
                         });
                         count++;
                     });
                 }
-            } else if (importType === 'test') {
-                 const ref = doc(db, 'artifacts', appId, 'users', userId, 'custom_lessons', id);
-                 const processedQuestions = (item.questions || []).map((q: any, idx: number) => ({
-                     ...q,
-                     id: q.id || `q_${Date.now()}_${idx}`,
-                     options: q.options?.map((opt: any, oIdx: number) => ({ ...opt, id: opt.id || `opt_${Date.now()}_${idx}_${oIdx}` })) || []
-                 }));
-                 batch.set(ref, { ...item, type: 'test', questions: processedQuestions, xp: item.xp || 100, created: Date.now(), targetLanguage: lang, difficulty: diff });
-                 count++;
             } else {
-                 const ref = doc(db, 'artifacts', appId, 'users', userId, 'custom_lessons', id);
-                 batch.set(ref, { ...item, vocab: Array.isArray(item.vocab) ? item.vocab : [], xp: item.xp || 100, targetLanguage: lang, difficulty: diff });
+                 // Lessons & Exams
+                 itemRef = doc(db, 'artifacts', appId, 'users', userId, 'custom_lessons', id);
+                 
+                 if (importType === 'test') {
+                     const processedQuestions = (item.questions || []).map((q: any, idx: number) => ({
+                         ...q,
+                         id: q.id || `q_${Date.now()}_${idx}`,
+                         options: q.options?.map((opt: any, oIdx: number) => ({ ...opt, id: opt.id || `opt_${Date.now()}_${idx}_${oIdx}` })) || []
+                     }));
+                     finalData = { ...item, ...baseMeta, type: 'test', questions: processedQuestions, xp: item.xp || 100 };
+                 } else {
+                     finalData = { ...item, ...baseMeta, vocab: Array.isArray(item.vocab) ? item.vocab : [], xp: item.xp || 100 };
+                 }
+                 
+                 // 1. Write to Private
+                 batch.set(itemRef, finalData);
                  count++;
+
+                 // 2. Write to Public (If Selected)
+                 if (importVisibility === 'public') {
+                     const publicRef = doc(collection(db, 'artifacts', appId, 'public_library'));
+                     batch.set(publicRef, {
+                         ...finalData,
+                         originalAuthorId: userId,
+                         originalAuthorName: userName,
+                         publishedAt: Date.now(),
+                         type: 'lesson' // normalize type for search
+                     });
+                 }
             }
         });
         await batch.commit();
@@ -3873,37 +3899,24 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
       }
   };
 
-  // --- RENDER: LIBRARY VIEW LOGIC ---
+  // --- RENDER: LIBRARY VIEW ---
   if (subView === 'library') {
-      // 1. Flatten Decks
       const deckItems = Object.entries(allDecks || {}).map(([key, deck]: any) => ({
-          id: key,
-          ...deck,
-          type: 'deck',
-          subtitle: `${deck.cards?.length || 0} Cards`,
+          id: key, ...deck, type: 'deck', subtitle: `${deck.cards?.length || 0} Cards`,
           targetLanguage: deck.targetLanguage || (deck.cards?.[0]?.targetLanguage) || 'Latin',
           difficulty: deck.difficulty || (deck.cards?.[0]?.difficulty) || 'Beginner'
       }));
 
-      // 2. Prepare Lessons & Exams
       const contentItems = (lessons || []).map((l: any) => ({
-          ...l,
-          type: (l.type === 'test' || l.contentType === 'test') ? 'test' : 'lesson',
-          subtitle: (l.type === 'test' || l.contentType === 'test') 
-            ? `${(l.questions || []).length} Questions` 
-            : `${(l.blocks || []).length} Blocks`,
-          targetLanguage: l.targetLanguage || 'Latin',
-          difficulty: l.difficulty || 'Beginner'
+          ...l, type: (l.type === 'test' || l.contentType === 'test') ? 'test' : 'lesson',
+          subtitle: (l.type === 'test' || l.contentType === 'test') ? `${(l.questions || []).length} Questions` : `${(l.blocks || []).length} Blocks`,
+          targetLanguage: l.targetLanguage || 'Latin', difficulty: l.difficulty || 'Beginner'
       }));
 
-      // 3. Merge
       const allItems = [...deckItems, ...contentItems];
-
-      // 4. Extract Unique Options
       const availableLanguages = Array.from(new Set(allItems.map(i => i.targetLanguage))).sort();
       const availableDifficulties = Array.from(new Set(allItems.map(i => i.difficulty))).sort();
 
-      // 5. Filter
       const filteredItems = allItems.filter(item => {
           const matchesSearch = item.title.toLowerCase().includes(libSearch.toLowerCase());
           const matchesType = libFilter === 'all' || item.type === libFilter;
@@ -3919,89 +3932,38 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                       <h2 className="font-bold text-xl text-slate-800 flex items-center gap-2"><Library className="text-indigo-600"/> Content Library</h2>
                       <button onClick={() => setSubView('menu')} className="text-sm font-bold text-slate-500 hover:text-indigo-600 px-4 py-2 rounded-lg hover:bg-slate-50">Back to Hub</button>
                   </div>
-                  
                   <div className="flex flex-col gap-3">
-                      <div className="relative">
-                          <Search className="absolute left-3 top-2.5 text-slate-400" size={16}/>
-                          <input 
-                            value={libSearch} onChange={(e) => setLibSearch(e.target.value)} placeholder="Search content..." 
-                            className="w-full pl-9 py-2 bg-slate-100 border-none rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500"
-                          />
+                      <div className="relative"><Search className="absolute left-3 top-2.5 text-slate-400" size={16}/>
+                          <input value={libSearch} onChange={(e) => setLibSearch(e.target.value)} placeholder="Search content..." className="w-full pl-9 py-2 bg-slate-100 border-none rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500" />
                       </div>
                       <div className="grid grid-cols-3 gap-2">
-                          <div className="relative">
-                              <select value={libFilter} onChange={(e) => setLibFilter(e.target.value)} className="w-full p-2 pl-8 bg-slate-100 rounded-xl text-xs font-bold text-slate-600 border-none focus:ring-2 focus:ring-indigo-500 appearance-none">
-                                  <option value="all">All Types</option><option value="deck">Decks</option><option value="lesson">Lessons</option><option value="test">Exams</option>
-                              </select>
-                              <Layers size={14} className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none"/>
-                          </div>
-                          <div className="relative">
-                              <select value={libLang} onChange={(e) => setLibLang(e.target.value)} className="w-full p-2 pl-8 bg-slate-100 rounded-xl text-xs font-bold text-slate-600 border-none focus:ring-2 focus:ring-indigo-500 appearance-none">
-                                  <option value="all">All Langs</option>
-                                  {availableLanguages.map(lang => (<option key={lang} value={lang}>{lang}</option>))}
-                              </select>
-                              <Globe size={14} className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none"/>
-                          </div>
-                          <div className="relative">
-                              <select value={libDifficulty} onChange={(e) => setLibDifficulty(e.target.value)} className="w-full p-2 pl-8 bg-slate-100 rounded-xl text-xs font-bold text-slate-600 border-none focus:ring-2 focus:ring-indigo-500 appearance-none">
-                                  <option value="all">All Levels</option>
-                                  {availableDifficulties.map(diff => (<option key={diff} value={diff}>{diff}</option>))}
-                              </select>
-                              <BarChart3 size={14} className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none"/>
-                          </div>
+                          <div className="relative"><select value={libFilter} onChange={(e) => setLibFilter(e.target.value)} className="w-full p-2 pl-8 bg-slate-100 rounded-xl text-xs font-bold text-slate-600 border-none focus:ring-2 focus:ring-indigo-500 appearance-none"><option value="all">All Types</option><option value="deck">Decks</option><option value="lesson">Lessons</option><option value="test">Exams</option></select><Layers size={14} className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none"/></div>
+                          <div className="relative"><select value={libLang} onChange={(e) => setLibLang(e.target.value)} className="w-full p-2 pl-8 bg-slate-100 rounded-xl text-xs font-bold text-slate-600 border-none focus:ring-2 focus:ring-indigo-500 appearance-none"><option value="all">All Langs</option>{availableLanguages.map(lang => (<option key={lang} value={lang}>{lang}</option>))}</select><Globe size={14} className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none"/></div>
+                          <div className="relative"><select value={libDifficulty} onChange={(e) => setLibDifficulty(e.target.value)} className="w-full p-2 pl-8 bg-slate-100 rounded-xl text-xs font-bold text-slate-600 border-none focus:ring-2 focus:ring-indigo-500 appearance-none"><option value="all">All Levels</option>{availableDifficulties.map(diff => (<option key={diff} value={diff}>{diff}</option>))}</select><BarChart3 size={14} className="absolute left-2.5 top-2.5 text-slate-400 pointer-events-none"/></div>
                       </div>
                   </div>
               </div>
-
               <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
-                  {filteredItems.length === 0 ? (
-                      <div className="text-center py-20 text-slate-400 italic">No content found matching your filters.</div>
-                  ) : (
+                  {filteredItems.length === 0 ? (<div className="text-center py-20 text-slate-400 italic">No content found matching your filters.</div>) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                            {filteredItems.map((item: any) => (
-                              <div 
-                                key={item.id} 
-                                onClick={() => handleEdit(item, item.type === 'deck' ? 'card' : item.type === 'test' ? 'test' : 'lesson')} 
-                                className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-indigo-300 hover:shadow-md cursor-pointer transition-all group relative overflow-hidden flex flex-col h-full"
-                              >
-                                  {/* Public Badge */}
+                              <div key={item.id} onClick={() => handleEdit(item, item.type === 'deck' ? 'card' : item.type === 'test' ? 'test' : 'lesson')} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-indigo-300 hover:shadow-md cursor-pointer transition-all group relative overflow-hidden flex flex-col h-full">
                                   {item.isPublic && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[9px] font-bold px-2 py-1 rounded-bl-lg z-20">PUBLIC</div>}
-
                                   <div className="flex justify-between items-start mb-3 relative z-10">
-                                      <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-md border ${
-                                          item.type === 'deck' ? 'bg-orange-50 text-orange-600 border-orange-100' : 
-                                          item.type === 'test' ? 'bg-rose-50 text-rose-600 border-rose-100' : 
-                                          'bg-indigo-50 text-indigo-600 border-indigo-100'
-                                      }`}>
-                                          {item.type === 'deck' ? 'Flashcards' : item.type === 'test' ? 'Exam' : 'Lesson'}
-                                      </span>
+                                      <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-md border ${item.type === 'deck' ? 'bg-orange-50 text-orange-600 border-orange-100' : item.type === 'test' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>{item.type === 'deck' ? 'Flashcards' : item.type === 'test' ? 'Exam' : 'Lesson'}</span>
                                       <Edit3 size={16} className="text-slate-300 group-hover:text-indigo-500 transition-colors"/>
                                   </div>
-                                  
                                   <div className="relative z-10 mb-4 flex-1">
                                       <h4 className="font-bold text-slate-800 text-lg mb-1 line-clamp-2 leading-tight">{item.title}</h4>
                                       <div className="flex items-center gap-2 mt-2">
-                                          <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-bold uppercase tracking-wider flex items-center gap-1">
-                                              <Globe size={10}/> {item.targetLanguage.substring(0, 3).toUpperCase()}
-                                          </span>
-                                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider border ${getDiffColor(item.difficulty)}`}>
-                                              {item.difficulty}
-                                          </span>
+                                          <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-bold uppercase tracking-wider flex items-center gap-1"><Globe size={10}/> {item.targetLanguage.substring(0, 3).toUpperCase()}</span>
+                                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider border ${getDiffColor(item.difficulty)}`}>{item.difficulty}</span>
                                       </div>
                                   </div>
-                                  
                                   <div className="pt-3 border-t border-slate-100 relative z-10 flex items-center gap-2 text-xs text-slate-400 font-medium">
-                                      {item.type === 'deck' && <Layers size={14}/>}
-                                      {item.type === 'lesson' && <BookOpen size={14}/>}
-                                      {item.type === 'test' && <HelpCircle size={14}/>}
-                                      {item.subtitle}
+                                      {item.type === 'deck' && <Layers size={14}/>} {item.type === 'lesson' && <BookOpen size={14}/>} {item.type === 'test' && <HelpCircle size={14}/>} {item.subtitle}
                                   </div>
-                                  
-                                  <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br opacity-5 rounded-bl-[100px] transition-transform group-hover:scale-125 pointer-events-none ${
-                                      item.type === 'deck' ? 'from-orange-400 to-amber-500' : 
-                                      item.type === 'test' ? 'from-rose-400 to-pink-500' : 
-                                      'from-indigo-400 to-blue-500'
-                                  }`}></div>
+                                  <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br opacity-5 rounded-bl-[100px] transition-transform group-hover:scale-125 pointer-events-none ${item.type === 'deck' ? 'from-orange-400 to-amber-500' : item.type === 'test' ? 'from-rose-400 to-pink-500' : 'from-indigo-400 to-blue-500'}`}></div>
                               </div>
                            ))}
                       </div>
@@ -4011,22 +3973,37 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
       )
   }
 
-  // --- RENDER: IMPORT VIEW ---
+  // --- RENDER: IMPORT VIEW (UPDATED) ---
   if (subView === 'import') {
       return (
-          <div className="h-full flex flex-col bg-slate-50 p-6">
+          <div className="h-full flex flex-col bg-slate-50 p-6 overflow-y-auto">
              <div className="flex justify-between items-center mb-6">
                  <h2 className="text-2xl font-bold text-slate-800">AI / JSON Import</h2>
                  <button onClick={() => setSubView('menu')} className="text-sm font-bold text-slate-500 hover:text-indigo-600">Back</button>
              </div>
-             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex-1 flex flex-col">
-                 <div className="flex gap-2 mb-4">
+             
+             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex-1 flex flex-col gap-4">
+                 
+                 {/* 1. Type Selector */}
+                 <div className="flex gap-2">
                      <button onClick={() => setImportType('lesson')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${importType === 'lesson' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Lessons</button>
                      <button onClick={() => setImportType('deck')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${importType === 'deck' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Decks</button>
                      <button onClick={() => setImportType('test')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${importType === 'test' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>Exams</button>
                  </div>
-                 <textarea value={jsonInput} onChange={(e) => setJsonInput(e.target.value)} className="flex-1 w-full p-4 bg-slate-50 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" placeholder={importType === 'test' ? '[ { "title": "Midterm", "questions": [...] } ]' : importType === 'lesson' ? '[ { "title": "Lesson 1", "blocks": [...] } ]' : '[ { "title": "My Deck", "cards": [...] } ]'} />
-                 <div className="mt-4 flex justify-end">
+
+                 {/* 2. Visibility Selector */}
+                 <VisibilitySelector 
+                    visibility={importVisibility} 
+                    setVisibility={setImportVisibility} 
+                    sharedWith={importSharedWith} 
+                    setSharedWith={setImportSharedWith} 
+                 />
+
+                 {/* 3. Text Area */}
+                 <textarea value={jsonInput} onChange={(e) => setJsonInput(e.target.value)} className="flex-1 w-full p-4 bg-slate-50 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none min-h-[300px]" placeholder={importType === 'test' ? '[ { "title": "Midterm", "questions": [...] } ]' : importType === 'lesson' ? '[ { "title": "Lesson 1", "blocks": [...] } ]' : '[ { "title": "My Deck", "cards": [...] } ]'} />
+                 
+                 {/* 4. Action */}
+                 <div className="flex justify-end">
                      <button onClick={handleBulkImport} disabled={!jsonInput} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-slate-800 disabled:opacity-50 flex items-center gap-2"><UploadCloud size={18}/> Import JSON</button>
                  </div>
                  {toastMsg && <p className="text-emerald-600 font-bold text-center mt-2">{toastMsg}</p>}
