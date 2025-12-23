@@ -5332,8 +5332,7 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks, initialC
   );
 }
 // ============================================================================
-//  1. INSTRUCTOR INBOX COMPONENT
-//  (Place this immediately before InstructorDashboard)
+//  1. INSTRUCTOR INBOX (Manual Grading Interface)
 // ============================================================================
 function InstructorInbox({ onGradeSubmission }: any) {
   const [submissions, setSubmissions] = useState<any[]>([]);
@@ -5345,11 +5344,11 @@ function InstructorInbox({ onGradeSubmission }: any) {
   const [manualScore, setManualScore] = useState(0); // 0 to 100
 
   useEffect(() => {
-      // Fetch only Pending logs
+      // Fetch only Pending logs (Manual Review Needed)
       const q = query(
           collection(db, 'artifacts', appId, 'activity_logs'),
           where('scoreDetail.status', '==', 'pending_review'),
-          orderBy('timestamp', 'asc') // Oldest first
+          orderBy('timestamp', 'asc') // Oldest submissions first
       );
       
       const unsub = onSnapshot(q, (snapshot) => {
@@ -5364,9 +5363,8 @@ function InstructorInbox({ onGradeSubmission }: any) {
   const handleSubmitGrade = async () => {
       if(!selectedItem) return;
       
-      // Calculate final XP based on the manual score slider (0-100%)
-      // If the lesson was worth 100 XP, and I give 80%, they get 80 XP.
-      const baseXP = 100; 
+      // Calculate final XP. Assuming base lesson XP is 100 if not found.
+      const baseXP = selectedItem.xp > 0 ? selectedItem.xp : 100; 
       const finalXP = Math.round(baseXP * (manualScore / 100));
 
       await onGradeSubmission(selectedItem.id, finalXP, feedback, manualScore);
@@ -5379,7 +5377,7 @@ function InstructorInbox({ onGradeSubmission }: any) {
   return (
     <div className="flex h-full bg-slate-50 relative overflow-hidden">
         
-        {/* --- LEFT: INBOX LIST --- */}
+        {/* --- LEFT: SUBMISSION LIST --- */}
         <div className={`${selectedId ? 'hidden md:flex' : 'flex'} w-full md:w-80 flex-col border-r border-slate-200 bg-white z-10`}>
             <div className="p-4 border-b border-slate-100 flex justify-between items-center">
                 <h2 className="font-bold text-slate-800 flex items-center gap-2"><Inbox size={18} className="text-indigo-600"/> Inbox</h2>
@@ -5431,14 +5429,13 @@ function InstructorInbox({ onGradeSubmission }: any) {
                         </div>
                     </div>
 
-                    {/* Content View */}
+                    {/* Student Responses View */}
                     <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
                         <div className="max-w-3xl mx-auto space-y-6">
                             {selectedItem.scoreDetail.details.map((q: any, idx: number) => (
-                                <div key={idx} className={`bg-white p-6 rounded-2xl border-2 shadow-sm ${q.type === 'essay' || q.type === 'short-answer' ? 'border-indigo-100 ring-4 ring-indigo-50' : 'border-slate-100 opacity-70'}`}>
+                                <div key={idx} className={`bg-white p-6 rounded-2xl border-2 shadow-sm ${['essay', 'short-answer'].includes(q.type) ? 'border-indigo-100 ring-4 ring-indigo-50' : 'border-slate-100 opacity-70'}`}>
                                     <div className="flex justify-between items-start mb-4">
                                         <span className="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-100 px-2 py-1 rounded">{q.type}</span>
-                                        {/* Status Badge */}
                                         {['essay', 'short-answer'].includes(q.type) ? (
                                             <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded flex items-center gap-1"><AlertCircle size={12}/> Needs Grading</span>
                                         ) : (
@@ -5448,7 +5445,7 @@ function InstructorInbox({ onGradeSubmission }: any) {
                                     
                                     <h3 className="font-bold text-slate-800 text-lg mb-4">{q.prompt}</h3>
                                     
-                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-slate-700 font-medium whitespace-pre-wrap">
+                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-slate-700 font-medium whitespace-pre-wrap font-serif">
                                         {q.studentVal}
                                     </div>
                                     
@@ -5480,7 +5477,7 @@ function InstructorInbox({ onGradeSubmission }: any) {
                                 <div>
                                     <div className="flex justify-between text-xs font-bold text-slate-500 mb-2">
                                         <span>FINAL SCORE</span>
-                                        <span className={`text-lg ${manualScore >= 70 ? 'text-emerald-600' : 'text-rose-600'}`}>{manualScore}%</span>
+                                        <span className={`text-lg font-black ${manualScore >= 70 ? 'text-emerald-600' : 'text-rose-600'}`}>{manualScore}%</span>
                                     </div>
                                     <input 
                                         type="range" 
@@ -5517,7 +5514,7 @@ function InstructorInbox({ onGradeSubmission }: any) {
 }
 
 // ============================================================================
-//  2. INSTRUCTOR DASHBOARD
+//  2. MAIN INSTRUCTOR DASHBOARD (The Command Center)
 // ============================================================================
 function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, onLogout }: any) {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -5547,6 +5544,9 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
               'scoreDetail.instructorFeedback': feedback,
               xp: finalXP
           });
+          
+          // Optionally: Find the user and add XP to their main profile here
+          // For now, the log update is sufficient for the gradebook display.
           alert("Grade released!");
       } catch (e) {
           console.error(e);
@@ -5679,6 +5679,7 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
             <span className="font-bold flex items-center gap-2"><GraduationCap/> Magister</span>
             <div className="flex gap-4">
                 <button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'text-indigo-400' : 'text-slate-400'}><LayoutDashboard/></button>
+                <button onClick={() => setActiveTab('inbox')} className={activeTab === 'inbox' ? 'text-indigo-400' : 'text-slate-400'}><Inbox/></button>
                 <button onClick={() => setActiveTab('classes')} className={activeTab === 'classes' ? 'text-indigo-400' : 'text-slate-400'}><School/></button>
                 <button onClick={() => setActiveTab('content')} className={activeTab === 'content' ? 'text-indigo-400' : 'text-slate-400'}><Library/></button>
             </div>
