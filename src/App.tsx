@@ -40,7 +40,7 @@ import {
   BarChart3, UserPlus, Briefcase, Coffee, AlertCircle, Target, Calendar, Settings, Edit2, Camera, Medal,
   ChevronUp, GripVertical, ListOrdered, ArrowRightLeft, CheckSquare, Gamepad2, Globe,
   BrainCircuit, Swords, Heart, Skull, Shield, Hourglass, Flame, Crown, Crosshair,Map, TrendingUp, Footprints,ArrowUp, Eye, EyeOff, Settings2,Type,ImageIcon,Video,Code,Quote,ArrowDownUp,Minus,MoreHorizontal, Mic, Lock, GitFork, RotateCcw,
-  Inbox, MessageCircle, Send// <--- Added these for the new game modes
+  Inbox, MessageCircle, Send, Bell, Megaphone, Xcircle // <--- Added these for the new game modes
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -3097,17 +3097,12 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [showLevelModal, setShowLevelModal] = useState(false);
   const [libraryExpanded, setLibraryExpanded] = useState(false);
-  
-  // --- NEW: COLOSSEUM STATE ---
   const [showColosseum, setShowColosseum] = useState(false);
 
-  // --- 1. SMART NAME RESOLVER ---
+  // 1. SMART NAME RESOLVER
   const displayName = useMemo(() => {
-      // Priority 1: Custom Profile Name (if not default)
       if (userData?.name && userData.name !== 'Student' && userData.name !== 'User') return userData.name;
-      // Priority 2: Google/Auth Display Name
       if (user?.displayName) return user.displayName;
-      // Priority 3: Email Username (Capitalized)
       if (user?.email) {
           const namePart = user.email.split('@')[0];
           const cleanName = namePart.replace(/[0-9]/g, ''); 
@@ -3116,7 +3111,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
       return 'Student';
   }, [userData, user]);
 
-  // --- 2. DATA PROCESSING ---
+  // 2. DATA PROCESSING
   const completedSet = new Set(userData?.completedAssignments || []);
   
   const relevantAssignments = (assignments || []).filter((l: any) => { 
@@ -3124,41 +3119,26 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   });
   
   const activeAssignments = relevantAssignments.filter((l: any) => !completedSet.has(l.id));
-  
-  const { level, progress, rank } = getLevelInfo(userData?.xp || 0);
+  const { level, progress } = getLevelInfo(userData?.xp || 0);
   const visibleLessons = libraryExpanded ? lessons : lessons.slice(0, 2);
+  const enrolledIds = classes.map((c: any) => c.id);
 
-// --- 3. XP HANDLER FOR COLOSSEUM (FIXED) ---
+  // 3. XP HANDLER FOR COLOSSEUM
   const handleColosseumXP = async (xpAmount: number, reason: string) => {
-      const targetUser = user || auth.currentUser;
-
-      if (!targetUser) {
-          console.error("XP Error: No user found.");
-          return;
-      }
-
-      // 1. Just save the data in the background
+      if (!user) return;
       try {
-          const profileRef = doc(db, 'artifacts', appId, 'users', targetUser.uid, 'profile', 'main');
-          await updateDoc(profileRef, { 
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { 
               xp: increment(xpAmount) 
           });
-
           await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
               studentName: displayName || "Student",
-              studentEmail: targetUser.email,
+              studentEmail: user.email,
               itemTitle: reason,
               xp: xpAmount,
               timestamp: Date.now(),
               type: 'game_reward'
           });
-          
-          // REMOVED: setShowColosseum(false);  <-- This was the bug!
-          // We let the user decide when to close the window via the "Leave Arena" button.
-          
-      } catch (e: any) {
-          console.error("XP Save Failed:", e);
-      }
+      } catch (e: any) { console.error("XP Save Failed:", e); }
   };
 
   // --- VIEW ROUTING ---
@@ -3181,66 +3161,47 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
         />
     )}
 
-    {userData?.classSyncError && (
-        <div className="bg-rose-500 text-white p-4 text-center text-sm font-bold relative z-50">
-            <AlertTriangle className="inline-block mr-2" size={16} />
-            System Notice: Database Index Missing.
-        </div>
-    )}
-    
-   {/* --- 1. MINIMALIST HERO WIDGET --- */}
-<button 
-    onClick={() => setShowLevelModal(true)} 
-    className="w-full bg-gradient-to-br from-[#6495ED] to-[#4169E1] text-white shadow-xl shadow-blue-200 z-10 group text-left rounded-b-[2.5rem] transition-all active:scale-[0.99] relative overflow-hidden"
->
-    {/* Subtle Texture Overlay */}
-    <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
+    {/* --- 1. HERO WIDGET --- */}
+    <div className="w-full bg-gradient-to-br from-[#6495ED] to-[#4169E1] text-white shadow-xl shadow-blue-200 z-10 text-left rounded-b-[2.5rem] relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
 
-    <div className="px-8 pt-12 pb-8 flex items-center justify-between relative z-10">
-        
-        {/* Left: Identity */}
-        <div className="flex items-center gap-4">
-            {/* Cornflower Avatar */}
-            <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-white border border-white/20 shadow-inner overflow-hidden">
-                {userData?.photoURL ? (
-                    <img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />
-                ) : (
-                    <span className="font-serif font-bold text-xl">{displayName.charAt(0)}</span>
-                )}
-            </div>
-
-            {/* Typography Focus */}
-            <div>
-                <h1 className="text-2xl font-serif font-bold text-white tracking-tight leading-none mb-1 group-hover:text-blue-100 transition-colors drop-shadow-sm">
-                    {displayName}
-                </h1>
-                <div className="flex items-center gap-2 text-blue-100 text-xs font-medium font-mono">
-                    <span className="bg-white/20 px-1.5 rounded text-white font-bold">LVL {level}</span>
-                    <span className="w-1 h-1 rounded-full bg-blue-200"></span>
-                    <span>{userData?.xp || 0} XP</span>
+        <div className="px-8 pt-12 pb-8 flex items-center justify-between relative z-10">
+            <div className="flex items-center gap-4 cursor-pointer group" onClick={() => setShowLevelModal(true)}>
+                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-white border border-white/20 shadow-inner overflow-hidden">
+                    {userData?.photoURL ? (
+                        <img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />
+                    ) : (
+                        <span className="font-serif font-bold text-xl">{displayName.charAt(0)}</span>
+                    )}
+                </div>
+                <div>
+                    <h1 className="text-2xl font-serif font-bold text-white tracking-tight leading-none mb-1 group-hover:text-blue-100 transition-colors drop-shadow-sm">
+                        {displayName}
+                    </h1>
+                    <div className="flex items-center gap-2 text-blue-100 text-xs font-medium font-mono">
+                        <span className="bg-white/20 px-1.5 rounded text-white font-bold">LVL {level}</span>
+                        <span className="w-1 h-1 rounded-full bg-blue-200"></span>
+                        <span>{userData?.xp || 0} XP</span>
+                    </div>
                 </div>
             </div>
+
+            {/* NOTIFICATION BELL */}
+            <div className="bg-white/20 backdrop-blur-md rounded-full">
+               <NotificationBell user={user} enrolledClassIds={enrolledIds} />
+            </div>
         </div>
 
-        {/* Right: Subtle Chevron */}
-        <div className="w-8 h-8 rounded-full bg-black/10 flex items-center justify-center text-blue-100 group-hover:bg-white group-hover:text-[#6495ED] transition-all">
-            <ChevronRight size={16} />
+        {/* Surgical XP Line */}
+        <div className="w-full h-1.5 bg-black/10 relative">
+            <div className="h-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.6)] transition-all duration-1000" style={{ width: `${progress}%` }} />
         </div>
     </div>
-
-    {/* Surgical XP Line (Bottom Edge) - Pure White */}
-    <div className="w-full h-1.5 bg-black/10 relative">
-        <div 
-            className="h-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.6)] transition-all duration-1000"
-            style={{ width: `${progress}%` }}
-        />
-    </div>
-</button>
     
     {/* --- 2. DAILY DISCOVERY --- */}
     <DailyDiscoveryWidget allDecks={allDecks} user={user} userData={userData} />
     
-    {/* --- 3. THE COLOSSEUM BANNER --- */}
+    {/* --- 3. THE COLOSSEUM --- */}
     <div className="px-6 mt-6">
         <button onClick={() => setShowColosseum(true)} className="w-full p-1 rounded-[2.5rem] bg-gradient-to-r from-rose-500 via-orange-500 to-rose-600 shadow-xl shadow-rose-200 hover:scale-[1.02] active:scale-95 transition-all group relative overflow-hidden">
             <div className="bg-slate-900 rounded-[2.3rem] p-6 relative overflow-hidden flex items-center justify-between">
@@ -3264,7 +3225,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
     {/* --- MAIN SCROLLABLE CONTENT --- */}
     <div className="px-6 space-y-8 mt-8 relative z-20">
       
-      {/* --- 4. MY CLASSES --- */}
+      {/* 4. MY CLASSES */}
       {classes && classes.length > 0 && (
         <div className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
             <div className="flex justify-between items-end mb-4 ml-1">
@@ -3288,7 +3249,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
                     const studentCount = (cls.students || []).length;
 
                     return ( 
-                        <button key={cls.id} onClick={() => onSelectClass(cls)} className="snap-start min-w-[300px] h-[200px] bg-white rounded-[2rem] shadow-[0_10px_40px_-15px_rgba(0,0,0,0.1)] hover:shadow-[0_20px_50px_-12px_rgba(79,70,229,0.3)] border border-slate-100 transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden flex flex-col text-left">
+                        <button key={cls.id} onClick={() => setActiveStudentClass(cls)} className="snap-start min-w-[300px] h-[200px] bg-white rounded-[2rem] shadow-[0_10px_40px_-15px_rgba(0,0,0,0.1)] hover:shadow-[0_20px_50px_-12px_rgba(79,70,229,0.3)] border border-slate-100 transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden flex flex-col text-left">
                             <div className="h-24 bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-800 relative w-full overflow-hidden">
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
                                 <div className="absolute top-4 left-5 flex items-start gap-3 z-10">
@@ -3331,14 +3292,16 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
         </div>
       )}
       
-      {/* --- 5. UP NEXT --- */}
+      {/* 5. UP NEXT */}
       {activeAssignments.length > 0 && (
           <div className="animate-in slide-in-from-bottom-4 duration-500 delay-200">
              <div className="flex justify-between items-center mb-3 ml-1">
                  <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Up Next</h3>
              </div>
              <div className="space-y-3">
-                {activeAssignments.map((l: any, i: number) => ( 
+                {activeAssignments.map((l: any, i: number) => {
+                    const dateStatus = getDueStatus(l.dueDate); // Use global helper
+                    return ( 
                     <button key={`${l.id}-${i}`} onClick={() => l.contentType === 'deck' ? onSelectDeck(l) : onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all hover:border-indigo-300 hover:shadow-md group">
                         <div className="flex items-center space-x-4">
                             <div className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-colors shadow-sm ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white' : l.contentType === 'test' ? 'bg-rose-50 text-rose-600 group-hover:bg-rose-500 group-hover:text-white' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-500 group-hover:text-white'}`}>
@@ -3350,6 +3313,11 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide bg-slate-100 px-2 py-0.5 rounded">
                                         {l.contentType === 'deck' ? 'Flashcards' : l.contentType === 'test' ? 'Exam' : 'Lesson'}
                                     </span>
+                                    {dateStatus && (
+                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${dateStatus.color} ${dateStatus.urgent ? 'animate-pulse' : ''}`}>
+                                            <Clock size={10}/> {dateStatus.label}
+                                        </span>
+                                    )}
                                     {l.xp && <span className="text-[10px] font-bold text-emerald-600">+{l.xp} XP</span>}
                                 </div>
                             </div>
@@ -3358,12 +3326,12 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
                             <ChevronRight size={16} />
                         </div>
                     </button>
-                ))}
+                )})}
              </div>
           </div>
       )}
       
-      {/* --- 6. LIBRARY STACK --- */}
+      {/* 6. LIBRARY */}
       <div className="animate-in slide-in-from-bottom-4 duration-500 delay-300">
          <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 ml-1 flex items-center gap-2">
             <BookOpen size={16} className="text-indigo-500"/> Library
@@ -3394,7 +3362,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
          )}
       </div>
       
-      {/* --- 7. QUICK ACTIONS --- */}
+      {/* 7. QUICK ACTIONS */}
       <div className="grid grid-cols-2 gap-4 pb-8 animate-in slide-in-from-bottom-4 duration-500 delay-500">
         <button onClick={() => setActiveTab('flashcards')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center hover:scale-[1.02] active:scale-95 transition-all group hover:shadow-lg hover:border-orange-200 hover:bg-orange-50/30">
             <div className="w-14 h-14 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-orange-500 group-hover:text-white transition-colors shadow-sm"><Layers size={28}/></div>
@@ -5555,16 +5523,17 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
   // --- STATE TO TRACK SPECIFIC SELECTIONS ---
   const [viewClassId, setViewClassId] = useState<string | null>(null);
   const [builderInitMode, setBuilderInitMode] = useState<'card' | 'lesson' | 'test' | null>(null);
+  const [showBroadcast, setShowBroadcast] = useState(false);
 
-  // --- HANDLERS FOR SIDEBAR WIDGETS ---
+  // --- HANDLERS ---
   const handleQuickCreate = (type: 'card' | 'lesson' | 'test') => {
-      setBuilderInitMode(type); // Set intent
-      setActiveTab('content');  // Switch tab
+      setBuilderInitMode(type); 
+      setActiveTab('content');  
   };
 
   const handleClassShortcut = (classId: string) => {
-      setViewClassId(classId); // Set specific class
-      setActiveTab('classes'); // Switch tab
+      setViewClassId(classId); 
+      setActiveTab('classes'); 
   };
 
   const handleGradeSubmission = async (logId: string, finalXP: number, feedback: string, scorePct: number) => {
@@ -5576,7 +5545,6 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
               'scoreDetail.instructorFeedback': feedback,
               xp: finalXP
           });
-          // Note: In a real production app, you would also query the user's profile and increment their XP here.
           alert("Grade released!");
       } catch (e) {
           console.error(e);
@@ -5587,7 +5555,16 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden">
       
-      {/* --- SIDEBAR --- */}
+      {/* --- BROADCAST MODAL --- */}
+      {showBroadcast && (
+          <BroadcastModal 
+              classes={userData.classes || []} 
+              user={user} 
+              onClose={() => setShowBroadcast(false)} 
+          />
+      )}
+
+      {/* --- SIDEBAR (Desktop/Tablet) --- */}
       <div className="w-72 bg-slate-900 text-white flex-col hidden md:flex shrink-0 border-r border-slate-800 shadow-2xl relative z-20">
         
         {/* Identity Header */}
@@ -5615,17 +5592,17 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
                 <button onClick={() => setActiveTab('dashboard')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
                     <Activity size={18} /> Live Feed
                 </button>
-                
-                {/* NEW INBOX BUTTON */}
                 <button onClick={() => setActiveTab('inbox')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'inbox' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
                     <Inbox size={18} /> Inbox
                 </button>
-
                 <button onClick={() => setActiveTab('classes')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'classes' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
                     <School size={18} /> Class Manager
                 </button>
                 <button onClick={() => setActiveTab('content')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'content' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
                     <Library size={18} /> Library
+                </button>
+                <button onClick={() => setActiveTab('profile')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'profile' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+                    <User size={18} /> Settings
                 </button>
             </div>
 
@@ -5648,7 +5625,14 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
                 </div>
             </div>
 
-            {/* 3. Class Shortcuts Widget */}
+            {/* 3. Broadcast Button */}
+            <div className="px-1">
+                 <button onClick={() => setShowBroadcast(true)} className="w-full py-3 bg-gradient-to-r from-rose-600 to-orange-600 text-white rounded-xl font-bold shadow-lg hover:shadow-rose-900/50 active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
+                     <Megaphone size={16}/> Broadcast Alert
+                 </button>
+            </div>
+
+            {/* 4. Class Shortcuts Widget */}
             <div className="space-y-1">
                 <div className="flex justify-between items-center px-2 mb-2">
                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">My Classes</p>
@@ -5693,7 +5677,6 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
             <span className="font-bold flex items-center gap-2"><GraduationCap/> Magister</span>
             <div className="flex gap-4">
                 <button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'text-indigo-400' : 'text-slate-400'}><LayoutDashboard/></button>
-                <button onClick={() => setActiveTab('inbox')} className={activeTab === 'inbox' ? 'text-indigo-400' : 'text-slate-400'}><Inbox/></button>
                 <button onClick={() => setActiveTab('classes')} className={activeTab === 'classes' ? 'text-indigo-400' : 'text-slate-400'}><School/></button>
                 <button onClick={() => setActiveTab('content')} className={activeTab === 'content' ? 'text-indigo-400' : 'text-slate-400'}><Library/></button>
             </div>
@@ -5866,6 +5849,173 @@ function WidgetView({ allDecks, userData }: any) {
         </div>
     </div>
   );
+}
+// ============================================================================
+//  NOTIFICATION SYSTEM
+// ============================================================================
+
+// 1. INSTRUCTOR: BROADCAST MODAL
+function BroadcastModal({ classes, user, onClose }: any) {
+    const [selectedClassId, setSelectedClassId] = useState(classes[0]?.id || '');
+    const [message, setMessage] = useState('');
+    const [sending, setSending] = useState(false);
+
+    const handleSend = async () => {
+        if (!message.trim() || !selectedClassId) return;
+        setSending(true);
+        try {
+            const targetClass = classes.find((c: any) => c.id === selectedClassId);
+            await addDoc(collection(db, 'artifacts', appId, 'announcements'), {
+                classId: selectedClassId,
+                className: targetClass?.name || 'Class',
+                instructorName: user.email.split('@')[0], // Or use profile name
+                content: message,
+                timestamp: Date.now(),
+                readBy: [] // Array of student emails who have seen it
+            });
+            alert("Announcement Sent!");
+            onClose();
+        } catch (e) {
+            console.error(e);
+            alert("Failed to send.");
+        } finally {
+            setSending(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 relative">
+                <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-rose-500"><XCircle size={24}/></button>
+                
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="p-3 bg-rose-100 text-rose-600 rounded-full"><Megaphone size={24}/></div>
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900">Broadcast</h2>
+                        <p className="text-xs text-slate-500">Send a push alert to students</p>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Target Class</label>
+                        <select 
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-rose-500"
+                            value={selectedClassId}
+                            onChange={(e) => setSelectedClassId(e.target.value)}
+                        >
+                            {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Message</label>
+                        <textarea 
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm min-h-[100px] outline-none focus:ring-2 focus:ring-rose-500 resize-none"
+                            placeholder="e.g. Don't forget, the midterm is tomorrow!"
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
+                        />
+                    </div>
+                    <button 
+                        onClick={handleSend} 
+                        disabled={sending || !message}
+                        className="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-lg shadow-rose-200 flex justify-center items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+                    >
+                        {sending ? <Loader className="animate-spin"/> : <Send size={18}/>} Send Blast
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// 2. STUDENT: NOTIFICATION BELL
+function NotificationBell({ user, enrolledClassIds }: any) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [alerts, setAlerts] = useState<any[]>([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    // Listen for Announcements
+    useEffect(() => {
+        if (!user || enrolledClassIds.length === 0) return;
+
+        // Query: Announcements for my classes, ordered by newest
+        const q = query(
+            collection(db, 'artifacts', appId, 'announcements'),
+            where('classId', 'in', enrolledClassIds), // Requires Firestore Index maybe? If so, remove orderBy momentarily
+            orderBy('timestamp', 'desc'),
+            limit(10)
+        );
+
+        const unsub = onSnapshot(q, (snapshot) => {
+            const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setAlerts(fetched);
+            
+            // Calc unread
+            const unread = fetched.filter((a: any) => !a.readBy?.includes(user.email)).length;
+            setUnreadCount(unread);
+        });
+
+        return () => unsub();
+    }, [user, enrolledClassIds]);
+
+    const markAllRead = async () => {
+        const batch = writeBatch(db);
+        alerts.forEach((alert) => {
+            if (!alert.readBy?.includes(user.email)) {
+                const ref = doc(db, 'artifacts', appId, 'announcements', alert.id);
+                batch.update(ref, { readBy: arrayUnion(user.email) });
+            }
+        });
+        try {
+            await batch.commit();
+            setUnreadCount(0); // Optimistic update
+        } catch (e) { console.error(e); }
+    };
+
+    return (
+        <div className="relative z-50">
+            <button 
+                onClick={() => { setIsOpen(!isOpen); if(!isOpen && unreadCount > 0) markAllRead(); }} 
+                className="relative p-2 text-slate-400 hover:text-indigo-600 transition-colors"
+            >
+                <Bell size={24} className={unreadCount > 0 ? 'animate-[swing_1s_ease-in-out_infinite]' : ''} />
+                {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center rounded-full border-2 border-white">
+                        {unreadCount}
+                    </span>
+                )}
+            </button>
+
+            {isOpen && (
+                <>
+                    <div className="fixed inset-0 cursor-default" onClick={() => setIsOpen(false)}></div>
+                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in slide-in-from-top-2">
+                        <div className="p-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Notifications</span>
+                            <span className="text-[10px] bg-slate-200 px-2 py-0.5 rounded-full text-slate-600">{alerts.length}</span>
+                        </div>
+                        <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                            {alerts.length === 0 ? (
+                                <div className="p-8 text-center text-slate-400 text-xs italic">No announcements.</div>
+                            ) : (
+                                alerts.map(alert => (
+                                    <div key={alert.id} className="p-4 border-b border-slate-50 hover:bg-indigo-50/30 transition-colors">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <span className="font-bold text-indigo-700 text-xs bg-indigo-50 px-1.5 py-0.5 rounded">{alert.className}</span>
+                                            <span className="text-[10px] text-slate-400">{new Date(alert.timestamp).toLocaleDateString()}</span>
+                                        </div>
+                                        <p className="text-sm text-slate-700 leading-snug">{alert.content}</p>
+                                        <p className="text-[10px] text-slate-400 mt-2 font-medium">- {alert.instructorName}</p>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
+        </div>
+    );
 }
 function App() {
   const [activeTab, setActiveTab] = useState('home');
