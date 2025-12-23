@@ -1546,56 +1546,105 @@ function LessonView({ lesson, onFinish }: any) {
   const [isComplete, setIsComplete] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [currentBlockIndex]);
+  // Auto-scroll to bottom when block changes
+  useEffect(() => { 
+      if (bottomRef.current) {
+          bottomRef.current.scrollIntoView({ behavior: 'smooth' }); 
+      }
+  }, [currentBlockIndex]);
 
-  const handleNext = () => { if (currentBlockIndex < (lesson.blocks?.length || 0) - 1) { setCurrentBlockIndex(prev => prev + 1); } else { setIsComplete(true); } };
-  const handleQuizOption = (blockIdx: number, optionId: string) => { setQuizAnswers({ ...quizAnswers, [blockIdx]: optionId }); };
+  const handleNext = () => { 
+      if (currentBlockIndex < (lesson.blocks?.length || 0) - 1) { 
+          setCurrentBlockIndex(prev => prev + 1); 
+      } else { 
+          setIsComplete(true); 
+      } 
+  };
+
+  const handleQuizOption = (blockIdx: number, optionId: string) => { 
+      setQuizAnswers({ ...quizAnswers, [blockIdx]: optionId }); 
+  };
+
+  const currentBlock = lesson.blocks ? lesson.blocks[currentBlockIndex] : null;
+  
+  // Check if we should hide the main "Continue" button
+  // We hide it for Scenarios because they have their own internal "Continue" logic
+  const isInteractiveBlock = currentBlock?.type === 'scenario';
 
   // --- SUB-COMPONENT: SCENARIO PLAYER ---
-  const ScenarioPlayer = ({ block }: any) => {
-      const [currentNodeId, setCurrentNodeId] = useState(block.nodes && block.nodes[0] ? block.nodes[0].id : null);
+  const ScenarioPlayer = ({ block, onScenarioComplete }: any) => {
+      // Initialize with the first node (usually index 0 or id 'start')
+      const [currentNodeId, setCurrentNodeId] = useState(
+          block.nodes && block.nodes.length > 0 ? block.nodes[0].id : null
+      );
       const [history, setHistory] = useState<string[]>([]);
 
+      // Find the full node object from the ID
       const currentNode = block.nodes?.find((n:any) => n.id === currentNodeId);
-      const isEnd = !currentNode || currentNode.options.length === 0;
+      
+      // If no options, we reached an end state
+      const isEnd = !currentNode || !currentNode.options || currentNode.options.length === 0;
 
       const handleChoice = (nextNodeId: string) => {
           if (nextNodeId === 'end') {
-              setIsComplete(true); // Treat scenario end as lesson end (optional)
+              // Scenario is over, trigger parent next
+              onScenarioComplete();
           } else {
+              // Advance to next node
               setHistory([...history, currentNode.text]);
               setCurrentNodeId(nextNodeId);
           }
       };
 
-      if (!currentNode) return <div className="p-4 text-center italic text-slate-400">Scenario Ended</div>;
+      if (!currentNodeId) return <div className="p-4 bg-rose-50 text-rose-500 rounded-xl border border-rose-200">Error: Scenario has no start node.</div>;
+      if (!currentNode) return <div className="p-4 bg-slate-50 text-slate-500 rounded-xl italic">Scene "{currentNodeId}" not found.</div>;
 
       return (
-          <div className="bg-slate-900 text-white rounded-2xl overflow-hidden shadow-xl border border-slate-700">
-              <div className="p-6">
-                  <div className="flex gap-2 mb-4">
-                      {history.length > 0 && <button onClick={() => { setCurrentNodeId(block.nodes[0].id); setHistory([]); }} className="text-xs text-indigo-300 hover:text-white flex items-center gap-1"><RotateCcw size={12}/> Restart</button>}
-                      <span className="text-xs text-slate-500 uppercase font-bold tracking-wider ml-auto">Interactive Scene</span>
-                  </div>
-                  
-                  <div className="min-h-[100px] flex items-center justify-center text-center">
-                      <p className="text-lg font-serif leading-relaxed animate-in fade-in slide-in-from-bottom-2">{currentNode.text}</p>
+          <div className="bg-slate-900 text-white rounded-2xl overflow-hidden shadow-xl border border-slate-700 my-6">
+              {/* Scene Header */}
+              <div className="bg-black/20 p-4 flex justify-between items-center border-b border-white/10">
+                  <span className="text-xs font-bold uppercase tracking-widest text-indigo-400 flex items-center gap-2">
+                      <GitFork size={14}/> Interactive Scene
+                  </span>
+                  {history.length > 0 && (
+                      <button 
+                          onClick={() => { setCurrentNodeId(block.nodes[0].id); setHistory([]); }} 
+                          className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition-colors"
+                      >
+                          <RotateCcw size={12}/> Restart
+                      </button>
+                  )}
+              </div>
+
+              {/* Scene Content */}
+              <div className="p-6 md:p-8">
+                  <div className="min-h-[80px] flex items-center justify-center">
+                      <p className="text-lg md:text-xl font-serif leading-relaxed text-center animate-in fade-in slide-in-from-bottom-2 duration-500">
+                          "{currentNode.text}"
+                      </p>
                   </div>
               </div>
               
+              {/* Choices Area */}
               <div className="bg-slate-800 p-2 grid gap-2">
-                  {currentNode.options.map((opt:any, i:number) => (
+                  {!isEnd ? (
+                      currentNode.options.map((opt:any, i:number) => (
+                          <button 
+                              key={i} 
+                              onClick={() => handleChoice(opt.nextNodeId)}
+                              className="w-full p-4 text-left bg-slate-700/50 hover:bg-indigo-600 rounded-xl transition-all font-bold text-sm flex justify-between items-center group border border-white/5 hover:border-indigo-400 active:scale-[0.99]"
+                          >
+                              <span>{opt.text}</span>
+                              <ChevronRight size={16} className="text-slate-500 group-hover:text-white transition-colors"/>
+                          </button>
+                      ))
+                  ) : (
                       <button 
-                          key={i} 
-                          onClick={() => handleChoice(opt.nextNodeId)}
-                          className="w-full p-4 text-left bg-slate-700/50 hover:bg-indigo-600 rounded-xl transition-all font-bold text-sm flex justify-between items-center group"
+                          onClick={onScenarioComplete} 
+                          className="w-full p-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 animate-pulse"
                       >
-                          {opt.text}
-                          <ChevronRight size={16} className="text-slate-500 group-hover:text-white"/>
+                          Complete Scene <ArrowRight size={16}/>
                       </button>
-                  ))}
-                  {isEnd && (
-                      <button onClick={handleNext} className="w-full p-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold">Continue Lesson</button>
                   )}
               </div>
           </div>
@@ -1604,16 +1653,39 @@ function LessonView({ lesson, onFinish }: any) {
 
   return (
     <div className="h-full flex flex-col bg-white">
-      <Header title={lesson.title} subtitle={lesson.subtitle} rightAction={<button onClick={() => onFinish(lesson.id, 0, lesson.title)} className="text-slate-400 hover:text-rose-500"><X /></button>}/>
-      <div className="flex-1 overflow-y-auto p-6 space-y-8 pb-32">
-        <div className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 text-center animate-in fade-in slide-in-from-bottom-4"><h2 className="text-2xl font-serif font-bold text-indigo-900 mb-2">{lesson.title}</h2><p className="text-indigo-800 opacity-80">{lesson.description}</p></div>
+      <Header 
+        title={lesson.title} 
+        subtitle={lesson.subtitle} 
+        rightAction={<button onClick={() => onFinish(lesson.id, 0, lesson.title)} className="text-slate-400 hover:text-rose-500"><X /></button>}
+      />
+      
+      <div className="flex-1 overflow-y-auto p-6 space-y-8 pb-32 custom-scrollbar">
+        {/* Lesson Intro Card */}
+        <div className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 text-center animate-in fade-in slide-in-from-bottom-4">
+            <h2 className="text-2xl font-serif font-bold text-indigo-900 mb-2">{lesson.title}</h2>
+            <p className="text-indigo-800 opacity-80">{lesson.description}</p>
+        </div>
         
+        {/* Render Blocks up to current index */}
         {lesson.blocks?.slice(0, currentBlockIndex + 1).map((block: any, idx: number) => (
           <div key={idx} className="animate-in slide-in-from-bottom-8 fade-in duration-500">
-            {block.type === 'text' && (<div className="prose prose-slate max-w-none"><h3 className="font-bold text-lg text-slate-800">{block.title}</h3><p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{block.content}</p></div>)}
             
-            {/* --- NEW: SCENARIO RENDERER --- */}
-            {block.type === 'scenario' && <ScenarioPlayer block={block} />}
+            {block.type === 'text' && (
+                <div className="prose prose-slate max-w-none">
+                    <h3 className="font-bold text-lg text-slate-800">{block.title}</h3>
+                    <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{block.content}</p>
+                </div>
+            )}
+            
+            {block.type === 'scenario' && (
+                <ScenarioPlayer 
+                    block={block} 
+                    onScenarioComplete={() => {
+                        // If this is the active block, advance the lesson
+                        if (idx === currentBlockIndex) handleNext();
+                    }} 
+                />
+            )}
 
             {block.type === 'note' && (
                 <div className={`p-4 rounded-xl border-l-4 ${block.variant === 'warning' ? 'bg-rose-50 border-rose-400 text-rose-900' : block.variant === 'tip' ? 'bg-emerald-50 border-emerald-400 text-emerald-900' : 'bg-blue-50 border-blue-400 text-blue-900'}`}>
@@ -1659,10 +1731,8 @@ function LessonView({ lesson, onFinish }: any) {
 
             {block.type === 'image' && (<div className="rounded-xl overflow-hidden shadow-sm border border-slate-200"><img src={block.url} alt="Lesson illustration" className="w-full h-auto object-cover" />{block.caption && <div className="p-2 bg-slate-50 text-xs text-center text-slate-500 italic">{block.caption}</div>}</div>)}
             
-            {/* Audio/Video Blocks */}
             {(block.type === 'video' || block.type === 'audio') && (
                 <div className="rounded-xl overflow-hidden shadow-sm border border-slate-200 bg-black">
-                    {/* Placeholder for actual media embed logic. In a real app, use <video> or <iframe> */}
                     <div className="aspect-video flex items-center justify-center text-white/50 bg-slate-900">
                         {block.type === 'video' ? <Video size={48}/> : <Mic size={48}/>}
                         <span className="ml-2 text-sm font-bold">Media Placeholder: {block.url}</span>
@@ -1673,7 +1743,25 @@ function LessonView({ lesson, onFinish }: any) {
 
           </div>
         ))}
-        <div ref={bottomRef} className="pt-8">{!isComplete ? (<button onClick={handleNext} className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 active:scale-95 transition-all flex items-center justify-center gap-2"><span>Continue</span> <ChevronDown /></button>) : (<button onClick={() => onFinish(lesson.id, lesson.xp || 50, lesson.title)} className="w-full py-4 bg-emerald-500 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-emerald-600 active:scale-95 transition-all animate-bounce">Complete Lesson (+{lesson.xp || 50} XP)</button>)}</div>
+        
+        {/* FOOTER: Only show Continue if NOT in interactive mode */}
+        <div ref={bottomRef} className="pt-8">
+            {isComplete ? (
+                <button 
+                    onClick={() => onFinish(lesson.id, lesson.xp || 50, lesson.title)} 
+                    className="w-full py-4 bg-emerald-500 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-emerald-600 active:scale-95 transition-all animate-bounce"
+                >
+                    Complete Lesson (+{lesson.xp || 50} XP)
+                </button>
+            ) : !isInteractiveBlock && (
+                <button 
+                    onClick={handleNext} 
+                    className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                    <span>Continue</span> <ChevronDown />
+                </button>
+            )}
+        </div>
       </div>
     </div>
   );
