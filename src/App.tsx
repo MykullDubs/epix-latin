@@ -3141,7 +3141,6 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
       } catch (e: any) { console.error("XP Save Failed:", e); }
   };
 
-  // --- VIEW ROUTING ---
   if (activeStudentClass) { 
       return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={onSelectLesson} onSelectDeck={onSelectDeck} userData={userData} user={user} displayName={displayName} />; 
   }
@@ -3161,11 +3160,21 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
         />
     )}
 
-    {/* --- 1. HERO WIDGET --- */}
-    <div className="w-full bg-gradient-to-br from-[#6495ED] to-[#4169E1] text-white shadow-xl shadow-blue-200 z-10 text-left rounded-b-[2.5rem] relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
+    {/* --- 1. HERO WIDGET (Fixed Overflow) --- */}
+    {/* Note: We removed 'overflow-hidden' from this parent so the dropdown can escape */}
+    <div className="w-full relative z-10 text-left rounded-b-[2.5rem] mb-6">
+        
+        {/* Background Layer (Handles the clipping and color) */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#6495ED] to-[#4169E1] rounded-b-[2.5rem] overflow-hidden shadow-xl shadow-blue-200 z-0">
+            <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
+            {/* Surgical XP Line */}
+            <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/10">
+                <div className="h-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.6)] transition-all duration-1000" style={{ width: `${progress}%` }} />
+            </div>
+        </div>
 
-        <div className="px-8 pt-12 pb-8 flex items-center justify-between relative z-10">
+        {/* Content Layer (Sits on top, no overflow hidden) */}
+        <div className="relative z-10 px-8 pt-12 pb-10 flex items-center justify-between text-white">
             <div className="flex items-center gap-4 cursor-pointer group" onClick={() => setShowLevelModal(true)}>
                 <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-white border border-white/20 shadow-inner overflow-hidden">
                     {userData?.photoURL ? (
@@ -3175,7 +3184,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
                     )}
                 </div>
                 <div>
-                    <h1 className="text-2xl font-serif font-bold text-white tracking-tight leading-none mb-1 group-hover:text-blue-100 transition-colors drop-shadow-sm">
+                    <h1 className="text-2xl font-serif font-bold tracking-tight leading-none mb-1 group-hover:text-blue-100 transition-colors drop-shadow-sm">
                         {displayName}
                     </h1>
                     <div className="flex items-center gap-2 text-blue-100 text-xs font-medium font-mono">
@@ -3186,15 +3195,8 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
                 </div>
             </div>
 
-            {/* NOTIFICATION BELL */}
-            <div className="bg-white/20 backdrop-blur-md rounded-full">
-               <NotificationBell user={user} enrolledClassIds={enrolledIds} />
-            </div>
-        </div>
-
-        {/* Surgical XP Line */}
-        <div className="w-full h-1.5 bg-black/10 relative">
-            <div className="h-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.6)] transition-all duration-1000" style={{ width: `${progress}%` }} />
+            {/* NOTIFICATION BELL (Positioned here so it flows correctly) */}
+            <NotificationBell user={user} enrolledClassIds={enrolledIds} />
         </div>
     </div>
     
@@ -5935,23 +5937,23 @@ function NotificationBell({ user, enrolledClassIds }: any) {
     const [alerts, setAlerts] = useState<any[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
 
-    // Listen for Announcements
     useEffect(() => {
         if (!user || enrolledClassIds.length === 0) return;
-
-        // Query: Announcements for my classes, ordered by newest
+        
+        // Removed 'orderBy' to prevent index errors, sorting in JS
         const q = query(
             collection(db, 'artifacts', appId, 'announcements'),
-            where('classId', 'in', enrolledClassIds), // Requires Firestore Index maybe? If so, remove orderBy momentarily
-            orderBy('timestamp', 'desc'),
+            where('classId', 'in', enrolledClassIds),
             limit(10)
         );
 
         const unsub = onSnapshot(q, (snapshot) => {
-            const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const fetched = snapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() }))
+                // @ts-ignore
+                .sort((a, b) => b.timestamp - a.timestamp); // Sort by new
+
             setAlerts(fetched);
-            
-            // Calc unread
             const unread = fetched.filter((a: any) => !a.readBy?.includes(user.email)).length;
             setUnreadCount(unread);
         });
@@ -5969,19 +5971,19 @@ function NotificationBell({ user, enrolledClassIds }: any) {
         });
         try {
             await batch.commit();
-            setUnreadCount(0); // Optimistic update
+            setUnreadCount(0);
         } catch (e) { console.error(e); }
     };
 
     return (
-        <div className="relative z-50">
+        <div className="relative">
             <button 
                 onClick={() => { setIsOpen(!isOpen); if(!isOpen && unreadCount > 0) markAllRead(); }} 
-                className="relative p-2 text-slate-400 hover:text-indigo-600 transition-colors"
+                className="relative p-2 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all active:scale-90"
             >
-                <Bell size={24} className={unreadCount > 0 ? 'animate-[swing_1s_ease-in-out_infinite]' : ''} />
+                <Bell size={20} className={`text-white ${unreadCount > 0 ? 'animate-[swing_1s_ease-in-out_infinite]' : ''}`} />
                 {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center rounded-full border-2 border-white">
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center rounded-full border-2 border-indigo-600 shadow-sm">
                         {unreadCount}
                     </span>
                 )}
@@ -5989,24 +5991,32 @@ function NotificationBell({ user, enrolledClassIds }: any) {
 
             {isOpen && (
                 <>
-                    <div className="fixed inset-0 cursor-default" onClick={() => setIsOpen(false)}></div>
-                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in slide-in-from-top-2">
+                    <div className="fixed inset-0 cursor-default z-40" onClick={() => setIsOpen(false)}></div>
+                    <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in slide-in-from-top-4 zoom-in-95 z-50 origin-top-right ring-4 ring-black/5">
                         <div className="p-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Notifications</span>
-                            <span className="text-[10px] bg-slate-200 px-2 py-0.5 rounded-full text-slate-600">{alerts.length}</span>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Recent Alerts</span>
+                            <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">{alerts.length}</span>
                         </div>
                         <div className="max-h-80 overflow-y-auto custom-scrollbar">
                             {alerts.length === 0 ? (
-                                <div className="p-8 text-center text-slate-400 text-xs italic">No announcements.</div>
+                                <div className="p-8 text-center text-slate-400 text-xs italic flex flex-col items-center">
+                                    <Bell size={24} className="mb-2 opacity-20"/>
+                                    All caught up!
+                                </div>
                             ) : (
                                 alerts.map(alert => (
-                                    <div key={alert.id} className="p-4 border-b border-slate-50 hover:bg-indigo-50/30 transition-colors">
+                                    <div key={alert.id} className="p-4 border-b border-slate-50 hover:bg-indigo-50/30 transition-colors relative group">
                                         <div className="flex justify-between items-start mb-1">
-                                            <span className="font-bold text-indigo-700 text-xs bg-indigo-50 px-1.5 py-0.5 rounded">{alert.className}</span>
+                                            <span className="font-bold text-indigo-600 text-[10px] bg-indigo-50 px-1.5 py-0.5 rounded uppercase tracking-wide">{alert.className}</span>
                                             <span className="text-[10px] text-slate-400">{new Date(alert.timestamp).toLocaleDateString()}</span>
                                         </div>
-                                        <p className="text-sm text-slate-700 leading-snug">{alert.content}</p>
-                                        <p className="text-[10px] text-slate-400 mt-2 font-medium">- {alert.instructorName}</p>
+                                        <p className="text-sm text-slate-700 leading-snug font-medium">{alert.content}</p>
+                                        <div className="flex items-center gap-1 mt-2">
+                                            <div className="w-4 h-4 bg-slate-200 rounded-full flex items-center justify-center text-[8px] font-bold text-slate-500">
+                                                {alert.instructorName?.charAt(0)}
+                                            </div>
+                                            <p className="text-[10px] text-slate-400">{alert.instructorName}</p>
+                                        </div>
                                     </div>
                                 ))
                             )}
