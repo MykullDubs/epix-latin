@@ -5937,29 +5937,42 @@ function NotificationBell({ user, enrolledClassIds }: any) {
     const [alerts, setAlerts] = useState<any[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
 
+    // Listen for Announcements
     useEffect(() => {
-        if (!user || enrolledClassIds.length === 0) return;
-        
-        // Removed 'orderBy' to prevent index errors, sorting in JS
-        const q = query(
-            collection(db, 'artifacts', appId, 'announcements'),
-            where('classId', 'in', enrolledClassIds),
-            limit(10)
-        );
+        // SAFETY CHECK: Do not run query if user is missing OR if class list is empty
+        if (!user || !enrolledClassIds || enrolledClassIds.length === 0) {
+            return;
+        }
 
-        const unsub = onSnapshot(q, (snapshot) => {
-            const fetched = snapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() }))
-                // @ts-ignore
-                .sort((a, b) => b.timestamp - a.timestamp); // Sort by new
+        try {
+            // Note: We removed 'orderBy' because 'in' queries + 'orderBy' require a complex composite index
+            // We sort the results in JavaScript instead to avoid index errors.
+            const q = query(
+                collection(db, 'artifacts', appId, 'announcements'),
+                where('classId', 'in', enrolledClassIds),
+                limit(10)
+            );
 
-            setAlerts(fetched);
-            const unread = fetched.filter((a: any) => !a.readBy?.includes(user.email)).length;
-            setUnreadCount(unread);
-        });
+            const unsub = onSnapshot(q, (snapshot) => {
+                const fetched = snapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    // @ts-ignore
+                    .sort((a, b) => b.timestamp - a.timestamp); // Sort Newest First
 
-        return () => unsub();
-    }, [user, enrolledClassIds]);
+                setAlerts(fetched);
+                
+                // Calc unread
+                const unread = fetched.filter((a: any) => !a.readBy?.includes(user.email)).length;
+                setUnreadCount(unread);
+            }, (error) => {
+                console.log("Notification Sync Error (Ignore if just loading):", error);
+            });
+
+            return () => unsub();
+        } catch (e) {
+            console.error("Query Setup Error:", e);
+        }
+    }, [user, enrolledClassIds]); // Re-run when class list loads
 
     const markAllRead = async () => {
         const batch = writeBatch(db);
@@ -5971,7 +5984,7 @@ function NotificationBell({ user, enrolledClassIds }: any) {
         });
         try {
             await batch.commit();
-            setUnreadCount(0);
+            setUnreadCount(0); // Optimistic update
         } catch (e) { console.error(e); }
     };
 
@@ -6005,7 +6018,7 @@ function NotificationBell({ user, enrolledClassIds }: any) {
                                 </div>
                             ) : (
                                 alerts.map(alert => (
-                                    <div key={alert.id} className="p-4 border-b border-slate-50 hover:bg-indigo-50/30 transition-colors relative group">
+                                    <div key={alert.id} className="p-4 border-b border-slate-50 hover:bg-indigo-50/30 transition-colors relative group text-left">
                                         <div className="flex justify-between items-start mb-1">
                                             <span className="font-bold text-indigo-600 text-[10px] bg-indigo-50 px-1.5 py-0.5 rounded uppercase tracking-wide">{alert.className}</span>
                                             <span className="text-[10px] text-slate-400">{new Date(alert.timestamp).toLocaleDateString()}</span>
