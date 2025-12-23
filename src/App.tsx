@@ -4462,7 +4462,7 @@ function TestPlayerView({ test, onFinish }: any) {
       }
   };
 
-  // --- NEW: SMOOTH REORDERING LOGIC (No Drag) ---
+  // Smooth Reordering Logic
   const moveItem = (index: number, direction: 'up' | 'down') => {
       if (isSubmitted) return;
       const newOrder = [...dragOrder];
@@ -4482,6 +4482,7 @@ function TestPlayerView({ test, onFinish }: any) {
     let correctCount = 0; 
     questions.forEach((q: any, idx: number) => { 
         const ans = answers[idx];
+        // Only calculate score for auto-gradable types
         if (q.type === 'mcq' || q.type === 'tf') {
             if(ans === q.correctAnswer) correctCount++; 
         } else if (q.type === 'match') {
@@ -4500,24 +4501,30 @@ function TestPlayerView({ test, onFinish }: any) {
   };
 
   const finishExam = () => { 
-    const percentage = score / questions.length;
-    const earnedXP = Math.round(test.xp * percentage);
+    // Check if manual grading is needed
+    const hasManualQuestions = questions.some((q:any) => ['essay', 'short-answer', 'fill-blank', 'audio-res'].includes(q.type));
+    
+    // Calculate Score (only for auto-graded stuff)
+    const percentage = questions.length > 0 ? score / questions.length : 0;
+    // If manual, we give 0 XP for now, instructor awards it later
+    const earnedXP = hasManualQuestions ? 0 : Math.round(test.xp * percentage);
     
     const submissionDetails = questions.map((q: any, idx: number) => {
         const ans = answers[idx];
         let isCorrect = false;
-        let studentVal = "No Answer"; 
-        let correctVal = "See Instructor";
+        let studentVal = ans || "No Answer"; 
+        let correctVal = q.correctAnswer || "Manual Review";
 
+        // Auto-grade logic for simple types
         if (q.type === 'mcq' || q.type === 'tf') {
-            isCorrect = ans === q.correctAnswer;
-            if(q.type === 'mcq') {
+             isCorrect = ans === q.correctAnswer;
+             if(q.type === 'mcq') {
                 studentVal = q.options.find((o:any)=>o.id===ans)?.text || "No Answer";
                 correctVal = q.options.find((o:any)=>o.id===q.correctAnswer)?.text || "Unknown";
-            } else {
+             } else {
                 studentVal = ans;
                 correctVal = q.correctAnswer;
-            }
+             }
         } else if (q.type === 'match') {
              let allMatch = true;
              const lines: string[] = [];
@@ -4538,12 +4545,29 @@ function TestPlayerView({ test, onFinish }: any) {
             studentVal = ans ? ans.map((i:any, ix:number) => `${ix+1}. ${i.text}`).join('\n') : "No Order Set";
             correctVal = q.items.map((i:any, ix:number) => `${ix+1}. ${i.text}`).join('\n');
         }
+        
+        // Manual types are NEVER automatically correct
+        if(['essay', 'short-answer', 'fill-blank'].includes(q.type)) {
+            isCorrect = false; 
+        }
 
         return { prompt: q.prompt, type: q.type, isCorrect, studentVal, correctVal };
     });
 
-    onFinish(test.id, earnedXP, test.title, { score, total: questions.length, details: submissionDetails }); 
+    onFinish(
+        test.id, 
+        earnedXP, 
+        test.title, 
+        { 
+            score, 
+            total: questions.length, 
+            details: submissionDetails,
+            status: hasManualQuestions ? 'pending_review' : 'graded' 
+        }
+    ); 
   };
+
+  const hasManualQuestions = questions.some((q:any) => ['essay', 'short-answer', 'fill-blank'].includes(q.type));
 
   if (questions.length === 0) return <div className="p-8 text-center text-slate-400">Empty Exam</div>;
 
@@ -4575,28 +4599,17 @@ function TestPlayerView({ test, onFinish }: any) {
                       </div>
                   )}
 
-                  {/* ORDERING (Fixed: Replaced Drag with Click-to-Move) */}
+                  {/* ORDERING */}
                   {currentQ.type === 'order' && (
                       <div className="space-y-3">
                           <p className="text-xs font-bold text-slate-400 uppercase mb-2">Tap arrows to reorder</p>
                           {dragOrder.length > 0 ? dragOrder.map((item: any, idx: number) => (
-                              <div 
-                                key={item.id} 
-                                className="bg-white p-3 rounded-xl border-2 border-slate-200 shadow-sm flex items-center gap-4 transition-all"
-                              >
+                              <div key={item.id} className="bg-white p-3 rounded-xl border-2 border-slate-200 shadow-sm flex items-center gap-4 transition-all">
                                   <div className="flex flex-col gap-1">
-                                      <button 
-                                        disabled={idx === 0}
-                                        onClick={() => moveItem(idx, 'up')}
-                                        className="p-1 rounded bg-slate-100 hover:bg-indigo-100 hover:text-indigo-600 disabled:opacity-30 disabled:hover:bg-slate-100 disabled:hover:text-slate-400 transition-colors"
-                                      >
+                                      <button disabled={idx === 0} onClick={() => moveItem(idx, 'up')} className="p-1 rounded bg-slate-100 hover:bg-indigo-100 hover:text-indigo-600 disabled:opacity-30 disabled:hover:bg-slate-100 disabled:hover:text-slate-400 transition-colors">
                                           <ChevronUp size={16}/>
                                       </button>
-                                      <button 
-                                        disabled={idx === dragOrder.length - 1}
-                                        onClick={() => moveItem(idx, 'down')}
-                                        className="p-1 rounded bg-slate-100 hover:bg-indigo-100 hover:text-indigo-600 disabled:opacity-30 disabled:hover:bg-slate-100 disabled:hover:text-slate-400 transition-colors"
-                                      >
+                                      <button disabled={idx === dragOrder.length - 1} onClick={() => moveItem(idx, 'down')} className="p-1 rounded bg-slate-100 hover:bg-indigo-100 hover:text-indigo-600 disabled:opacity-30 disabled:hover:bg-slate-100 disabled:hover:text-slate-400 transition-colors">
                                           <ChevronDown size={16}/>
                                       </button>
                                   </div>
@@ -4619,7 +4632,7 @@ function TestPlayerView({ test, onFinish }: any) {
                                      onClick={() => handleMatchClick('left', p.left)}
                                      className={`w-full p-4 rounded-xl border-2 text-left font-bold text-sm transition-all ${selectedLeft === p.left ? 'border-indigo-500 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-200' : matchSelection[p.left] ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white'}`}
                                    >
-                                       {p.left}
+                                        {p.left}
                                    </button>
                                ))}
                            </div>
@@ -4627,26 +4640,63 @@ function TestPlayerView({ test, onFinish }: any) {
                                {currentQ.pairs ? [...currentQ.pairs].sort((a:any,b:any) => a.right.localeCompare(b.right)).map((p: any) => {
                                    const isMatched = Object.values(matchSelection).includes(p.right);
                                    return (
-                                       <button 
-                                         key={p.right}
-                                         onClick={() => handleMatchClick('right', p.right)}
-                                         className={`w-full p-4 rounded-xl border-2 text-left font-bold text-sm transition-all ${isMatched ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white hover:border-indigo-200'}`}
-                                       >
-                                           {p.right}
-                                       </button>
+                                     <button 
+                                      key={p.right} 
+                                      onClick={() => handleMatchClick('right', p.right)}
+                                      className={`w-full p-4 rounded-xl border-2 text-left font-bold text-sm transition-all ${isMatched ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white hover:border-indigo-200'}`}
+                                     >
+                                         {p.right}
+                                     </button>
                                    )
                                }) : <p className="text-xs text-slate-400">No pairs defined.</p>}
                            </div>
+                      </div>
+                  )}
+
+                  {/* TEXT INPUTS (Essay, Short Answer, Fill Blank) */}
+                  {['essay', 'short-answer', 'fill-blank'].includes(currentQ.type) && (
+                      <div className="space-y-4">
+                          {currentQ.type === 'essay' ? (
+                              <textarea 
+                                  className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-serif text-lg leading-relaxed h-64 resize-none"
+                                  placeholder="Type your answer here..."
+                                  value={answers[currentIndex] || ''}
+                                  onChange={(e) => setAnswers({ ...answers, [currentIndex]: e.target.value })}
+                              />
+                          ) : (
+                              <input 
+                                  className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-bold text-lg"
+                                  placeholder="Type your answer..."
+                                  value={answers[currentIndex] || ''}
+                                  onChange={(e) => setAnswers({ ...answers, [currentIndex]: e.target.value })}
+                              />
+                          )}
+                          <p className="text-xs text-slate-400 font-bold uppercase tracking-wider text-right">
+                              {answers[currentIndex]?.length || 0} Characters
+                          </p>
                       </div>
                   )}
               </div>
           ) : (
               <div className="text-center py-10 animate-in zoom-in duration-300">
                   <div className="w-24 h-24 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl"><Trophy size={48} /></div>
-                  <h2 className="text-3xl font-bold text-slate-900 mb-2">Exam Complete!</h2>
-                  <div className="text-6xl font-black text-indigo-600 mb-2">{score}<span className="text-2xl text-slate-300">/{questions.length}</span></div>
-                  <div className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-10">{Math.round((score/questions.length)*100)}% Accuracy</div>
-                  <button onClick={finishExam} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg hover:scale-[1.02] transition-transform">Collect XP & Finish</button>
+                  <h2 className="text-3xl font-bold text-slate-900 mb-2">Exam Submitted!</h2>
+                  
+                  {hasManualQuestions ? (
+                      <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100 mb-8 max-w-sm mx-auto">
+                          <p className="text-amber-800 font-bold mb-1">Score Pending</p>
+                          <p className="text-sm text-amber-600">This exam contains questions that require manual review by your instructor.</p>
+                      </div>
+                  ) : (
+                      <>
+                          <div className="text-6xl font-black text-indigo-600 mb-2">{score}<span className="text-2xl text-slate-300">/{questions.length}</span></div>
+                          <div className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-10">{Math.round((score/questions.length)*100)}% Accuracy</div>
+                      </>
+                  )}
+                  
+                  <button onClick={finishExam} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg hover:scale-[1.02] transition-transform">
+                      {hasManualQuestions ? "Return to Menu" : "Collect XP & Finish"}
+                  </button>
               </div>
           )}
       </div>
@@ -5310,7 +5360,22 @@ function ClassManagerView({ user, userData, classes, lessons, allDecks, initialC
     </div>
   );
 }
+function InstructorInbox({ onGradeSubmission }: any) {
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   
+  // Grading State
+  const [feedback, setFeedback] = useState('');
+  const [manualScore, setManualScore] = useState(0); // 0 to 100
+
+  // ... rest of the InstructorInbox code ...
+  
+  return (
+     // ... JSX ...
+  );
+}
+
 
 // ============================================================================
 // PASTE THIS AT THE VERY BOTTOM OF YOUR FILE
