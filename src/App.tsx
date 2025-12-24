@@ -3221,15 +3221,25 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   const [libraryExpanded, setLibraryExpanded] = useState(false);
   const [showColosseum, setShowColosseum] = useState(false);
   
-  // 1. SCROLL RESET REF (The Fix)
+  // 1. SCROLL RESET REF
   const mainScrollRef = useRef<HTMLDivElement>(null);
 
-  // 2. FORCE SCROLL TO TOP ON MOUNT
-  useEffect(() => {
-      if (mainScrollRef.current) {
-          mainScrollRef.current.scrollTo({ top: 0, behavior: 'auto' });
+  // 2. AGGRESSIVE SCROLL FIX (The Update)
+  // useLayoutEffect runs BEFORE the browser paints the screen.
+  useLayoutEffect(() => {
+      const scrollContainer = mainScrollRef.current;
+      if (scrollContainer) {
+          // Force immediate reset
+          scrollContainer.scrollTop = 0;
       }
-  }, []); // Empty dependency array = runs once when Home opens
+
+      // Double-check 10ms later to override any browser "scroll restoration"
+      const timer = setTimeout(() => {
+          if (scrollContainer) scrollContainer.scrollTop = 0;
+      }, 10);
+
+      return () => clearTimeout(timer);
+  }, []); // Runs once on mount
 
   // 3. SMART NAME RESOLVER
   const displayName = useMemo(() => {
@@ -3278,7 +3288,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
 
   return (
   <div 
-    ref={mainScrollRef} // <--- ATTACH THE REF HERE
+    ref={mainScrollRef} // <--- IMPORTANT: This attaches the ref to the scroll container
     className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full relative bg-slate-50 overflow-x-hidden"
   >
     
