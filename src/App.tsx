@@ -3220,8 +3220,18 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   const [showLevelModal, setShowLevelModal] = useState(false);
   const [libraryExpanded, setLibraryExpanded] = useState(false);
   const [showColosseum, setShowColosseum] = useState(false);
+  
+  // 1. SCROLL RESET REF (The Fix)
+  const mainScrollRef = useRef<HTMLDivElement>(null);
 
-  // 1. SMART NAME RESOLVER
+  // 2. FORCE SCROLL TO TOP ON MOUNT
+  useEffect(() => {
+      if (mainScrollRef.current) {
+          mainScrollRef.current.scrollTo({ top: 0, behavior: 'auto' });
+      }
+  }, []); // Empty dependency array = runs once when Home opens
+
+  // 3. SMART NAME RESOLVER
   const displayName = useMemo(() => {
       if (userData?.name && userData.name !== 'Student' && userData.name !== 'User') return userData.name;
       if (user?.displayName) return user.displayName;
@@ -3233,7 +3243,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
       return 'Student';
   }, [userData, user]);
 
-  // 2. DATA PROCESSING
+  // 4. DATA PROCESSING
   const completedSet = new Set(userData?.completedAssignments || []);
   
   const relevantAssignments = (assignments || []).filter((l: any) => { 
@@ -3244,7 +3254,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   const { level, progress } = getLevelInfo(userData?.xp || 0);
   const visibleLessons = libraryExpanded ? lessons : lessons.slice(0, 2);
 
-  // 3. XP HANDLER FOR COLOSSEUM
+  // 5. XP HANDLER FOR COLOSSEUM
   const handleColosseumXP = async (xpAmount: number, reason: string) => {
       if (!user) return;
       try {
@@ -3267,7 +3277,10 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   }
 
   return (
-  <div className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full relative bg-slate-50 overflow-x-hidden">
+  <div 
+    ref={mainScrollRef} // <--- ATTACH THE REF HERE
+    className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full relative bg-slate-50 overflow-x-hidden"
+  >
     
     {/* --- OVERLAYS --- */}
     {showLevelModal && <LevelUpModal userData={userData} onClose={() => setShowLevelModal(false)} />}
