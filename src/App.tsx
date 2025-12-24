@@ -6126,8 +6126,7 @@ const commonHandlers = {
               onUpdatePrefs={handleUpdatePreferences} 
               onDeleteDeck={handleDeleteDeck} 
           />;
-      case 'create': return <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />;
-      case 'profile': return <ProfileView user={user} userData={userData} />;
+case 'create': return <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={onSaveLesson} allDecks={allDecks} lessons={lessons} />;      case 'profile': return <ProfileView user={user} userData={userData} />;
       default: return <HomeView />;
     }
   };
