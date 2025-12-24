@@ -40,8 +40,8 @@ import {
   BarChart3, UserPlus, Briefcase, Coffee, AlertCircle, Target, Calendar, Settings, Edit2, Camera, Medal,
   ChevronUp, GripVertical, ListOrdered, ArrowRightLeft, CheckSquare, Gamepad2, Globe,
   BrainCircuit, Swords, Heart, Skull, Shield, Hourglass, Flame, Crown, Crosshair,Map, TrendingUp, Footprints,ArrowUp, Eye, EyeOff, Settings2,Type,ImageIcon,Video,Code,Quote,ArrowDownUp,Minus,MoreHorizontal, Mic, Lock, GitFork, RotateCcw,
-  Inbox, MessageCircle, Send, Bell, Megaphone, XCircle, Palette, User, Image as ImageIcon, Link as LinkIcon, 
-  MapPin, Flag, AlertTriangle // <--- Added these for the new game modes
+  Inbox, MessageCircle, Send, Bell, Megaphone, XCircle, Palette, Image as ImageIcon, Link as LinkIcon, 
+  MapPin, Flag // <--- Added these for the new game modes
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
