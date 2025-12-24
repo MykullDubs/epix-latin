@@ -5974,8 +5974,45 @@ function App() {
   const handleCreateCard = useCallback(async (c: any) => { if(!user) return; const cardId = doc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards')).id; await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), {...c, id: cardId}); setSelectedDeckKey(c.deckId || 'custom'); setActiveTab('flashcards'); }, [user]);
   const handleUpdateCard = useCallback(async (cardId: string, data: any) => { if (!user) return; try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), data); } catch (e) { console.error(e); alert("Cannot edit card. Check permissions."); } }, [user]);
   const handleDeleteCard = useCallback(async (cardId: string) => { if (!user) return; if (!window.confirm("Are you sure you want to delete this card?")) return; try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId)); } catch (e) { console.error(e); alert("Failed to delete card."); } }, [user]);
-  const handleCreateLesson = useCallback(async (l: any, id = null) => { if(!user) return; if (id) { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', id), l); } else { await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), l); } setActiveTab('home'); }, [user]);
-  
+// --- REPLACEMENT HANDLER ---
+  const onSaveLesson = async (lessonData: any, editingId?: string) => {
+    if (!user) return;
+    
+    // 1. Generate ID if new
+    const docId = editingId || `lesson_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    
+    // 2. Clean Data (Deep Copy + Default Values)
+    // This prevents "FirebaseError: Function document() cannot be called with an undefined path."
+    const cleanData = JSON.parse(JSON.stringify({
+      ...lessonData,
+      id: docId,
+      authorId: user.uid,
+      authorName: userData?.name || "Instructor",
+      lastUpdated: Date.now(),
+      title: lessonData.title || "Untitled",
+      type: lessonData.type || "lesson", 
+      blocks: lessonData.blocks || [],
+      questions: lessonData.questions || [], 
+      visibility: lessonData.visibility || 'private'
+    }));
+
+    try {
+      // 3. Save to Firebase (Using setDoc to control the ID)
+      await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', docId), cleanData);
+      
+      alert("Saved Successfully!");
+      
+      // 4. Update Local State to reflect changes immediately
+      setCustomLessons(prev => {
+          const others = prev.filter(l => l.id !== docId);
+          return [...others, cleanData];
+      });
+      
+    } catch (error: any) {
+      console.error("Save Error:", error);
+      alert(`Failed to save: ${error.message}`);
+    }
+  };  
   const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title?: string, scoreDetail?: any) => { 
     if (userData?.role !== 'instructor') setActiveTab('home'); 
     if (xp > 0 && user) { 
@@ -6051,7 +6088,7 @@ function App() {
   if (!user) return <AuthView />;
   if (!userData) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>; 
   
-  const commonHandlers = { onSaveCard: handleCreateCard, onUpdateCard: handleUpdateCard, onDeleteCard: handleDeleteCard, onSaveLesson: handleCreateLesson, };
+  const commonHandlers = { onSaveCard: handleCreateCard, onUpdateCard: handleUpdateCard, onDeleteCard: handleDeleteCard, onSaveLesson: onSaveLesson, };
 
   const renderStudentView = () => {
     if (activeLesson && (activeLesson.type === 'test' || activeLesson.contentType === 'test')) {
