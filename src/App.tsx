@@ -3173,7 +3173,9 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   >
     {/* INNER CONTAINER: STRICTLY FOR ANIMATION */}
     <div className="pb-24 animate-in fade-in slide-in-from-bottom-2 duration-500">
-        
+
+    <div className="h-1 w-full"></div>
+      
         {/* --- OVERLAYS --- */}
         {showLevelModal && <LevelUpModal userData={userData} onClose={() => setShowLevelModal(false)} />}
         
@@ -6383,8 +6385,8 @@ const commonHandlers = {
   }
 
   return (
-    <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-center relative overflow-hidden">
-      <style>{`
+<div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-start relative overflow-hidden">
+  <style>{`
         html, body, #root { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #f8fafc; }
         *::-webkit-scrollbar { display: none; }
         * { -ms-overflow-style: none; scrollbar-width: none; }
