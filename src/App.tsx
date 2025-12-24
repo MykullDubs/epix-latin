@@ -6013,15 +6013,38 @@ function App() {
       alert(`Failed to save: ${error.message}`);
     }
   };  
-  const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title?: string, scoreDetail?: any) => { 
+ const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title?: string, scoreDetail?: any) => { 
     if (userData?.role !== 'instructor') setActiveTab('home'); 
-    if (xp > 0 && user) { 
+    
+    // FIX: Allow saving if XP is > 0 OR if there is a scoreDetail (even if XP is 0 for pending essays)
+    if (user && (xp > 0 || scoreDetail)) { 
         try { 
-            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp), completedAssignments: arrayUnion(lessonId) }); 
-            await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { studentName: userData?.name || 'Unknown Student', studentEmail: user.email, itemTitle: title || 'Unknown Activity', xp: xp, timestamp: Date.now(), type: scoreDetail ? 'quiz_score' : 'completion', scoreDetail: scoreDetail || null });
-            if(userData?.role === 'instructor') alert(`Activity Logged: ${title} (+${xp}XP)`);
+            // Only update Profile XP if > 0
+            if (xp > 0) {
+                await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { 
+                    xp: increment(xp), 
+                    completedAssignments: arrayUnion(lessonId) 
+                }); 
+            }
+
+            // Always save the log (This is what the Inbox listens for)
+            await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { 
+                studentName: userData?.name || 'Unknown Student', 
+                studentEmail: user.email, 
+                itemTitle: title || 'Unknown Activity', 
+                xp: xp, 
+                timestamp: Date.now(), 
+                type: scoreDetail ? 'quiz_score' : 'completion', 
+                scoreDetail: scoreDetail || null 
+            });
+
+            if(userData?.role === 'instructor') alert(`Activity Logged: ${title}`);
         } catch (e: any) { 
-            await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { ...DEFAULT_USER_DATA, xp: xp, completedAssignments: [lessonId] }, { merge: true }); 
+            console.error("Error logging activity:", e);
+            // Fallback for new users
+            if (xp > 0) {
+                await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { ...DEFAULT_USER_DATA, xp: xp, completedAssignments: [lessonId] }, { merge: true }); 
+            }
         } 
     } 
   }, [user, userData]);
