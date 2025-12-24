@@ -3243,7 +3243,6 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   const activeAssignments = relevantAssignments.filter((l: any) => !completedSet.has(l.id));
   const { level, progress } = getLevelInfo(userData?.xp || 0);
   const visibleLessons = libraryExpanded ? lessons : lessons.slice(0, 2);
-  const enrolledIds = classes.map((c: any) => c.id);
 
   // 3. XP HANDLER FOR COLOSSEUM
   const handleColosseumXP = async (xpAmount: number, reason: string) => {
@@ -3282,40 +3281,15 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
         />
     )}
 
-<HeroProfileWidget 
-    user={user} 
-    userData={userData} 
-    displayName={displayName} 
-    level={level} 
-    progress={progress} 
-    classes={classes} 
-/>
-        {/* Content Layer (Sits on top, no overflow hidden) */}
-        <div className="relative z-10 px-8 pt-12 pb-10 flex items-center justify-between text-white">
-            <div className="flex items-center gap-4 cursor-pointer group" onClick={() => setShowLevelModal(true)}>
-                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-white border border-white/20 shadow-inner overflow-hidden">
-                    {userData?.photoURL ? (
-                        <img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />
-                    ) : (
-                        <span className="font-serif font-bold text-xl">{displayName.charAt(0)}</span>
-                    )}
-                </div>
-                <div>
-                    <h1 className="text-2xl font-serif font-bold tracking-tight leading-none mb-1 group-hover:text-blue-100 transition-colors drop-shadow-sm">
-                        {displayName}
-                    </h1>
-                    <div className="flex items-center gap-2 text-blue-100 text-xs font-medium font-mono">
-                        <span className="bg-white/20 px-1.5 rounded text-white font-bold">LVL {level}</span>
-                        <span className="w-1 h-1 rounded-full bg-blue-200"></span>
-                        <span>{userData?.xp || 0} XP</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* NOTIFICATION BELL (Positioned here so it flows correctly) */}
-            <NotificationBell user={user} enrolledClassIds={enrolledIds} />
-        </div>
-    </div>
+    {/* --- 1. NEW PRO HEADER WIDGET --- */}
+    <HeroProfileWidget 
+        user={user} 
+        userData={userData} 
+        displayName={displayName} 
+        level={level} 
+        progress={progress} 
+        classes={classes} 
+    />
     
     {/* --- 2. DAILY DISCOVERY --- */}
     <DailyDiscoveryWidget allDecks={allDecks} user={user} userData={userData} />
@@ -3419,7 +3393,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
              </div>
              <div className="space-y-3">
                 {activeAssignments.map((l: any, i: number) => {
-                    const dateStatus = getDueStatus(l.dueDate); // Use global helper
+                    const dateStatus = getDueStatus(l.dueDate); 
                     return ( 
                     <button key={`${l.id}-${i}`} onClick={() => l.contentType === 'deck' ? onSelectDeck(l) : onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all hover:border-indigo-300 hover:shadow-md group">
                         <div className="flex items-center space-x-4">
