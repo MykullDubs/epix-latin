@@ -6088,8 +6088,17 @@ function App() {
   if (!user) return <AuthView />;
   if (!userData) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>; 
   
-  const commonHandlers = { onSaveCard: handleCreateCard, onUpdateCard: handleUpdateCard, onDeleteCard: handleDeleteCard, onSaveLesson: onSaveLesson, };
-
+const commonHandlers = { 
+      onSaveCard: handleCreateCard, 
+      onUpdateCard: handleUpdateCard, 
+      onDeleteCard: handleDeleteCard, 
+      
+      // CHANGE THIS LINE:
+      // Old: onSaveLesson: handleCreateLesson, 
+      
+      // New:
+      onSaveLesson: onSaveLesson, 
+  };
   const renderStudentView = () => {
     if (activeLesson && (activeLesson.type === 'test' || activeLesson.contentType === 'test')) {
         // @ts-ignore
