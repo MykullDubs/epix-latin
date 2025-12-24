@@ -3221,25 +3221,28 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   const [libraryExpanded, setLibraryExpanded] = useState(false);
   const [showColosseum, setShowColosseum] = useState(false);
   
-  // 1. SCROLL RESET REF
-  const mainScrollRef = useRef<HTMLDivElement>(null);
+  // 1. SCROLL REF
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
 
-  // 2. AGGRESSIVE SCROLL FIX (The Update)
-  // useLayoutEffect runs BEFORE the browser paints the screen.
+  // 2. THE NUCLEAR SCROLL FIX
+  // We use useLayoutEffect to intercept the paint before the user sees it.
   useLayoutEffect(() => {
-      const scrollContainer = mainScrollRef.current;
-      if (scrollContainer) {
-          // Force immediate reset
-          scrollContainer.scrollTop = 0;
+      const viewport = scrollViewportRef.current;
+      if (viewport) {
+          // 1. Reset immediately
+          viewport.scrollTop = 0;
+          
+          // 2. Force reset again after a tiny delay (to beat browser scroll restoration)
+          setTimeout(() => {
+              if (viewport) viewport.scrollTop = 0;
+          }, 10);
+          
+          // 3. One last check after animation starts
+          setTimeout(() => {
+              if (viewport) viewport.scrollTop = 0;
+          }, 50);
       }
-
-      // Double-check 10ms later to override any browser "scroll restoration"
-      const timer = setTimeout(() => {
-          if (scrollContainer) scrollContainer.scrollTop = 0;
-      }, 10);
-
-      return () => clearTimeout(timer);
-  }, []); // Runs once on mount
+  }, []);
 
   // 3. SMART NAME RESOLVER
   const displayName = useMemo(() => {
@@ -3264,13 +3267,10 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   const { level, progress } = getLevelInfo(userData?.xp || 0);
   const visibleLessons = libraryExpanded ? lessons : lessons.slice(0, 2);
 
-  // 5. XP HANDLER FOR COLOSSEUM
   const handleColosseumXP = async (xpAmount: number, reason: string) => {
       if (!user) return;
       try {
-          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { 
-              xp: increment(xpAmount) 
-          });
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xpAmount) });
           await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
               studentName: displayName || "Student",
               studentEmail: user.email,
@@ -3287,211 +3287,215 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   }
 
   return (
+  // OUTER CONTAINER: STRICTLY FOR SCROLLING (No Animation Classes Here)
   <div 
-    ref={mainScrollRef} // <--- IMPORTANT: This attaches the ref to the scroll container
-    className="pb-24 animate-in fade-in duration-500 overflow-y-auto h-full relative bg-slate-50 overflow-x-hidden"
+    ref={scrollViewportRef} 
+    className="h-full overflow-y-auto overflow-x-hidden relative bg-slate-50 scroll-smooth"
   >
-    
-    {/* --- OVERLAYS --- */}
-    {showLevelModal && <LevelUpModal userData={userData} onClose={() => setShowLevelModal(false)} />}
-    
-    {showColosseum && (
-        <ColosseumMode 
-            allDecks={allDecks} 
+    {/* INNER CONTAINER: STRICTLY FOR ANIMATION */}
+    <div className="pb-24 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        
+        {/* --- OVERLAYS --- */}
+        {showLevelModal && <LevelUpModal userData={userData} onClose={() => setShowLevelModal(false)} />}
+        
+        {showColosseum && (
+            <ColosseumMode 
+                allDecks={allDecks} 
+                user={user} 
+                onExit={() => setShowColosseum(false)}
+                onXPUpdate={handleColosseumXP}
+            />
+        )}
+
+        {/* --- 1. PRO HEADER WIDGET --- */}
+        <HeroProfileWidget 
             user={user} 
-            onExit={() => setShowColosseum(false)}
-            onXPUpdate={handleColosseumXP}
+            userData={userData} 
+            displayName={displayName} 
+            level={level} 
+            progress={progress} 
+            classes={classes} 
         />
-    )}
-
-    {/* --- 1. NEW PRO HEADER WIDGET --- */}
-    <HeroProfileWidget 
-        user={user} 
-        userData={userData} 
-        displayName={displayName} 
-        level={level} 
-        progress={progress} 
-        classes={classes} 
-    />
-    
-    {/* --- 2. DAILY DISCOVERY --- */}
-    <DailyDiscoveryWidget allDecks={allDecks} user={user} userData={userData} />
-    
-    {/* --- 3. THE COLOSSEUM --- */}
-    <div className="px-6 mt-6">
-        <button onClick={() => setShowColosseum(true)} className="w-full p-1 rounded-[2.5rem] bg-gradient-to-r from-rose-500 via-orange-500 to-rose-600 shadow-xl shadow-rose-200 hover:scale-[1.02] active:scale-95 transition-all group relative overflow-hidden">
-            <div className="bg-slate-900 rounded-[2.3rem] p-6 relative overflow-hidden flex items-center justify-between">
-                <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
-                <div className="relative z-10 flex items-center gap-4">
-                    <div className="w-14 h-14 bg-rose-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-rose-900/50 group-hover:rotate-12 transition-transform">
-                        <Swords size={28} />
+        
+        {/* --- 2. DAILY DISCOVERY --- */}
+        <DailyDiscoveryWidget allDecks={allDecks} user={user} userData={userData} />
+        
+        {/* --- 3. THE COLOSSEUM --- */}
+        <div className="px-6 mt-6">
+            <button onClick={() => setShowColosseum(true)} className="w-full p-1 rounded-[2.5rem] bg-gradient-to-r from-rose-500 via-orange-500 to-rose-600 shadow-xl shadow-rose-200 hover:scale-[1.02] active:scale-95 transition-all group relative overflow-hidden">
+                <div className="bg-slate-900 rounded-[2.3rem] p-6 relative overflow-hidden flex items-center justify-between">
+                    <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+                    <div className="relative z-10 flex items-center gap-4">
+                        <div className="w-14 h-14 bg-rose-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-rose-900/50 group-hover:rotate-12 transition-transform">
+                            <Swords size={28} />
+                        </div>
+                        <div className="text-left">
+                            <h3 className="text-xl font-black text-white italic tracking-tight">THE COLOSSEUM</h3>
+                            <p className="text-rose-200 text-xs font-bold uppercase tracking-widest">Infinite Survival Mode</p>
+                        </div>
                     </div>
-                    <div className="text-left">
-                        <h3 className="text-xl font-black text-white italic tracking-tight">THE COLOSSEUM</h3>
-                        <p className="text-rose-200 text-xs font-bold uppercase tracking-widest">Infinite Survival Mode</p>
+                    <div className="relative z-10 bg-white/10 p-2 rounded-full text-white/50 group-hover:text-white group-hover:bg-rose-600 transition-colors">
+                        <ChevronRight size={24} />
                     </div>
                 </div>
-                <div className="relative z-10 bg-white/10 p-2 rounded-full text-white/50 group-hover:text-white group-hover:bg-rose-600 transition-colors">
-                    <ChevronRight size={24} />
-                </div>
-            </div>
-        </button>
-    </div>
-
-    {/* --- MAIN SCROLLABLE CONTENT --- */}
-    <div className="px-6 space-y-8 mt-8 relative z-20">
-      
-      {/* 4. MY CLASSES */}
-      {classes && classes.length > 0 && (
-        <div className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
-            <div className="flex justify-between items-end mb-4 ml-1">
-                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                    <School size={16} className="text-indigo-500"/> My Classes
-                </h3>
-                <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md">{classes.length} Active</span>
-            </div>
-            
-            <div className="flex gap-5 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">
-                {classes.map((cls: any) => { 
-                    const clsTasks = cls.assignments || [];
-                    const myPending = clsTasks.filter((l: any) => { 
-                        const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); 
-                        return isForMe && !completedSet.has(l.id); 
-                    }).length;
-                    
-                    const totalTasks = clsTasks.length;
-                    const completedTasks = totalTasks - myPending;
-                    const classProgress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
-                    const studentCount = (cls.students || []).length;
-
-                    return ( 
-                        <button key={cls.id} onClick={() => setActiveStudentClass(cls)} className="snap-start min-w-[300px] h-[200px] bg-white rounded-[2rem] shadow-[0_10px_40px_-15px_rgba(0,0,0,0.1)] hover:shadow-[0_20px_50px_-12px_rgba(79,70,229,0.3)] border border-slate-100 transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden flex flex-col text-left">
-                            <div className="h-24 bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-800 relative w-full overflow-hidden">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
-                                <div className="absolute top-4 left-5 flex items-start gap-3 z-10">
-                                    <div className="w-12 h-12 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg">
-                                        {cls.name.charAt(0)}
-                                    </div>
-                                    <div className="mt-1">
-                                        <div className="bg-black/30 backdrop-blur-sm border border-white/10 text-white/90 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md inline-block mb-1">{cls.code}</div>
-                                    </div>
-                                </div>
-                                {myPending > 0 ? (
-                                    <div className="absolute top-4 right-4 bg-rose-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg border border-white/20 animate-pulse flex items-center gap-1">
-                                        <AlertCircle size={10}/> {myPending} Due
-                                    </div>
-                                ) : (
-                                    <div className="absolute top-4 right-4 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-500/30 backdrop-blur-md flex items-center gap-1">
-                                        <Check size={10}/> All Done
-                                    </div>
-                                )}
-                            </div>
-                            <div className="p-5 flex-1 flex flex-col justify-between bg-white relative z-10">
-                                <div>
-                                    <h4 className="font-serif font-bold text-slate-800 text-xl truncate pr-2 group-hover:text-indigo-600 transition-colors">{cls.name}</h4>
-                                    <div className="flex items-center gap-2 mt-1 text-slate-400 text-xs font-medium"><Users size={12} /> <span>{studentCount} Students</span></div>
-                                </div>
-                                <div className="space-y-2">
-                                    <div className="flex justify-between items-end">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Course Progress</span>
-                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${classProgress === 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-50 text-indigo-600'}`}>{Math.round(classProgress)}%</span>
-                                    </div>
-                                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                                        <div className={`h-full rounded-full transition-all duration-1000 ${classProgress === 100 ? 'bg-emerald-500' : 'bg-indigo-600'}`} style={{width: `${classProgress}%`}}></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </button> 
-                    ); 
-                })}
-            </div>
+            </button>
         </div>
-      )}
-      
-      {/* 5. UP NEXT */}
-      {activeAssignments.length > 0 && (
-          <div className="animate-in slide-in-from-bottom-4 duration-500 delay-200">
-             <div className="flex justify-between items-center mb-3 ml-1">
-                 <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Up Next</h3>
-             </div>
-             <div className="space-y-3">
-                {activeAssignments.map((l: any, i: number) => {
-                    const dateStatus = getDueStatus(l.dueDate); 
-                    return ( 
-                    <button key={`${l.id}-${i}`} onClick={() => l.contentType === 'deck' ? onSelectDeck(l) : onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all hover:border-indigo-300 hover:shadow-md group">
-                        <div className="flex items-center space-x-4">
-                            <div className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-colors shadow-sm ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white' : l.contentType === 'test' ? 'bg-rose-50 text-rose-600 group-hover:bg-rose-500 group-hover:text-white' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-500 group-hover:text-white'}`}>
-                                {l.contentType === 'deck' ? <Layers size={22}/> : l.contentType === 'test' ? <HelpCircle size={22}/> : <PlayCircle size={22} />}
-                            </div>
-                            <div className="text-left">
-                                <h4 className="font-bold text-slate-800 group-hover:text-indigo-700 transition-colors">{l.title}</h4>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide bg-slate-100 px-2 py-0.5 rounded">
-                                        {l.contentType === 'deck' ? 'Flashcards' : l.contentType === 'test' ? 'Exam' : 'Lesson'}
-                                    </span>
-                                    {dateStatus && (
-                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${dateStatus.color} ${dateStatus.urgent ? 'animate-pulse' : ''}`}>
-                                            <Clock size={10}/> {dateStatus.label}
-                                        </span>
+
+        {/* --- MAIN SCROLLABLE CONTENT --- */}
+        <div className="px-6 space-y-8 mt-8 relative z-20">
+          
+          {/* 4. MY CLASSES */}
+          {classes && classes.length > 0 && (
+            <div className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
+                <div className="flex justify-between items-end mb-4 ml-1">
+                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                        <School size={16} className="text-indigo-500"/> My Classes
+                    </h3>
+                    <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md">{classes.length} Active</span>
+                </div>
+                
+                <div className="flex gap-5 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">
+                    {classes.map((cls: any) => { 
+                        const clsTasks = cls.assignments || [];
+                        const myPending = clsTasks.filter((l: any) => { 
+                            const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); 
+                            return isForMe && !completedSet.has(l.id); 
+                        }).length;
+                        
+                        const totalTasks = clsTasks.length;
+                        const completedTasks = totalTasks - myPending;
+                        const classProgress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+                        const studentCount = (cls.students || []).length;
+
+                        return ( 
+                            <button key={cls.id} onClick={() => setActiveStudentClass(cls)} className="snap-start min-w-[300px] h-[200px] bg-white rounded-[2rem] shadow-[0_10px_40px_-15px_rgba(0,0,0,0.1)] hover:shadow-[0_20px_50px_-12px_rgba(79,70,229,0.3)] border border-slate-100 transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden flex flex-col text-left">
+                                <div className="h-24 bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-800 relative w-full overflow-hidden">
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
+                                    <div className="absolute top-4 left-5 flex items-start gap-3 z-10">
+                                        <div className="w-12 h-12 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                                            {cls.name.charAt(0)}
+                                        </div>
+                                        <div className="mt-1">
+                                            <div className="bg-black/30 backdrop-blur-sm border border-white/10 text-white/90 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md inline-block mb-1">{cls.code}</div>
+                                        </div>
+                                    </div>
+                                    {myPending > 0 ? (
+                                        <div className="absolute top-4 right-4 bg-rose-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg border border-white/20 animate-pulse flex items-center gap-1">
+                                            <AlertCircle size={10}/> {myPending} Due
+                                        </div>
+                                    ) : (
+                                        <div className="absolute top-4 right-4 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-500/30 backdrop-blur-md flex items-center gap-1">
+                                            <Check size={10}/> All Done
+                                        </div>
                                     )}
-                                    {l.xp && <span className="text-[10px] font-bold text-emerald-600">+{l.xp} XP</span>}
+                                </div>
+                                <div className="p-5 flex-1 flex flex-col justify-between bg-white relative z-10">
+                                    <div>
+                                        <h4 className="font-serif font-bold text-slate-800 text-xl truncate pr-2 group-hover:text-indigo-600 transition-colors">{cls.name}</h4>
+                                        <div className="flex items-center gap-2 mt-1 text-slate-400 text-xs font-medium"><Users size={12} /> <span>{studentCount} Students</span></div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-end">
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Course Progress</span>
+                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${classProgress === 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-50 text-indigo-600'}`}>{Math.round(classProgress)}%</span>
+                                        </div>
+                                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                            <div className={`h-full rounded-full transition-all duration-1000 ${classProgress === 100 ? 'bg-emerald-500' : 'bg-indigo-600'}`} style={{width: `${classProgress}%`}}></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </button> 
+                        ); 
+                    })}
+                </div>
+            </div>
+          )}
+          
+          {/* 5. UP NEXT */}
+          {activeAssignments.length > 0 && (
+              <div className="animate-in slide-in-from-bottom-4 duration-500 delay-200">
+                 <div className="flex justify-between items-center mb-3 ml-1">
+                     <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Up Next</h3>
+                 </div>
+                 <div className="space-y-3">
+                    {activeAssignments.map((l: any, i: number) => {
+                        const dateStatus = getDueStatus(l.dueDate); 
+                        return ( 
+                        <button key={`${l.id}-${i}`} onClick={() => l.contentType === 'deck' ? onSelectDeck(l) : onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all hover:border-indigo-300 hover:shadow-md group">
+                            <div className="flex items-center space-x-4">
+                                <div className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-colors shadow-sm ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white' : l.contentType === 'test' ? 'bg-rose-50 text-rose-600 group-hover:bg-rose-500 group-hover:text-white' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-500 group-hover:text-white'}`}>
+                                    {l.contentType === 'deck' ? <Layers size={22}/> : l.contentType === 'test' ? <HelpCircle size={22}/> : <PlayCircle size={22} />}
+                                </div>
+                                <div className="text-left">
+                                    <h4 className="font-bold text-slate-800 group-hover:text-indigo-700 transition-colors">{l.title}</h4>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide bg-slate-100 px-2 py-0.5 rounded">
+                                            {l.contentType === 'deck' ? 'Flashcards' : l.contentType === 'test' ? 'Exam' : 'Lesson'}
+                                        </span>
+                                        {dateStatus && (
+                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${dateStatus.color} ${dateStatus.urgent ? 'animate-pulse' : ''}`}>
+                                                <Clock size={10}/> {dateStatus.label}
+                                            </span>
+                                        )}
+                                        {l.xp && <span className="text-[10px] font-bold text-emerald-600">+{l.xp} XP</span>}
+                                    </div>
                                 </div>
                             </div>
+                            <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-sm">
+                                <ChevronRight size={16} />
+                            </div>
+                        </button>
+                    )})}
+                 </div>
+              </div>
+          )}
+          
+          {/* 6. LIBRARY */}
+          <div className="animate-in slide-in-from-bottom-4 duration-500 delay-300">
+             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 ml-1 flex items-center gap-2">
+                <BookOpen size={16} className="text-indigo-500"/> Library
+             </h3>
+             <div className="space-y-3">
+                {visibleLessons.map((l: any, idx: number) => (
+                    <button 
+                        key={l.id} 
+                        onClick={() => onSelectLesson(l)} 
+                        style={{ animationDelay: `${idx * 50}ms` }}
+                        className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-indigo-300 group transition-all hover:shadow-md animate-in slide-in-from-bottom-2 fade-in fill-mode-forwards"
+                    >
+                        <div className="flex items-center gap-4">
+                            <div className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-500 group-hover:bg-indigo-500 group-hover:text-white transition-colors"><BookOpen size={22}/></div>
+                            <div className="text-left"><h4 className="font-bold text-slate-800 group-hover:text-indigo-700 transition-colors">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div>
                         </div>
-                        <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-sm">
-                            <ChevronRight size={16} />
-                        </div>
+                        <ChevronRight className="text-slate-300 group-hover:text-indigo-500 transition-colors"/>
                     </button>
-                )})}
+                ))}
              </div>
+             {lessons.length > 2 && (
+                 <button 
+                    onClick={() => setLibraryExpanded(!libraryExpanded)}
+                    className="w-full mt-2 py-3 flex items-center justify-center gap-2 text-[10px] font-bold text-indigo-400 uppercase tracking-widest hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                 >
+                    {libraryExpanded ? (<>Show Less <ChevronUp size={14}/></>) : (<>View All ({lessons.length}) <ChevronDown size={14}/></>)}
+                 </button>
+             )}
           </div>
-      )}
-      
-      {/* 6. LIBRARY */}
-      <div className="animate-in slide-in-from-bottom-4 duration-500 delay-300">
-         <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 ml-1 flex items-center gap-2">
-            <BookOpen size={16} className="text-indigo-500"/> Library
-         </h3>
-         <div className="space-y-3">
-            {visibleLessons.map((l: any, idx: number) => (
-                <button 
-                    key={l.id} 
-                    onClick={() => onSelectLesson(l)} 
-                    style={{ animationDelay: `${idx * 50}ms` }}
-                    className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-indigo-300 group transition-all hover:shadow-md animate-in slide-in-from-bottom-2 fade-in fill-mode-forwards"
-                >
-                    <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-500 group-hover:bg-indigo-500 group-hover:text-white transition-colors"><BookOpen size={22}/></div>
-                        <div className="text-left"><h4 className="font-bold text-slate-800 group-hover:text-indigo-700 transition-colors">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div>
-                    </div>
-                    <ChevronRight className="text-slate-300 group-hover:text-indigo-500 transition-colors"/>
-                </button>
-            ))}
-         </div>
-         {lessons.length > 2 && (
-             <button 
-                onClick={() => setLibraryExpanded(!libraryExpanded)}
-                className="w-full mt-2 py-3 flex items-center justify-center gap-2 text-[10px] font-bold text-indigo-400 uppercase tracking-widest hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
-             >
-                {libraryExpanded ? (<>Show Less <ChevronUp size={14}/></>) : (<>View All ({lessons.length}) <ChevronDown size={14}/></>)}
-             </button>
-         )}
-      </div>
-      
-      {/* 7. QUICK ACTIONS */}
-      <div className="grid grid-cols-2 gap-4 pb-8 animate-in slide-in-from-bottom-4 duration-500 delay-500">
-        <button onClick={() => setActiveTab('flashcards')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center hover:scale-[1.02] active:scale-95 transition-all group hover:shadow-lg hover:border-orange-200 hover:bg-orange-50/30">
-            <div className="w-14 h-14 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-orange-500 group-hover:text-white transition-colors shadow-sm"><Layers size={28}/></div>
-            <span className="block font-bold text-slate-800 text-lg">Practice</span>
-            <span className="text-xs text-slate-400 font-medium">Review Cards</span>
-        </button>
-        <button onClick={() => setActiveTab('create')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center hover:scale-[1.02] active:scale-95 transition-all group hover:shadow-lg hover:border-emerald-200 hover:bg-emerald-50/30">
-            <div className="w-14 h-14 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-emerald-500 group-hover:text-white transition-colors shadow-sm"><Feather size={28}/></div>
-            <span className="block font-bold text-slate-800 text-lg">Creator</span>
-            <span className="text-xs text-slate-400 font-medium">Build Content</span>
-        </button>
-      </div>
+          
+          {/* 7. QUICK ACTIONS */}
+          <div className="grid grid-cols-2 gap-4 pb-8 animate-in slide-in-from-bottom-4 duration-500 delay-500">
+            <button onClick={() => setActiveTab('flashcards')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center hover:scale-[1.02] active:scale-95 transition-all group hover:shadow-lg hover:border-orange-200 hover:bg-orange-50/30">
+                <div className="w-14 h-14 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-orange-500 group-hover:text-white transition-colors shadow-sm"><Layers size={28}/></div>
+                <span className="block font-bold text-slate-800 text-lg">Practice</span>
+                <span className="text-xs text-slate-400 font-medium">Review Cards</span>
+            </button>
+            <button onClick={() => setActiveTab('create')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center hover:scale-[1.02] active:scale-95 transition-all group hover:shadow-lg hover:border-emerald-200 hover:bg-emerald-50/30">
+                <div className="w-14 h-14 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-emerald-500 group-hover:text-white transition-colors shadow-sm"><Feather size={28}/></div>
+                <span className="block font-bold text-slate-800 text-lg">Creator</span>
+                <span className="text-xs text-slate-400 font-medium">Build Content</span>
+            </button>
+          </div>
 
+        </div>
     </div>
   </div>
   );
