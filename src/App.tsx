@@ -3174,7 +3174,6 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
     {/* INNER CONTAINER: STRICTLY FOR ANIMATION */}
     <div className="pb-24 animate-in fade-in slide-in-from-bottom-2 duration-500">
 
-    <div className="h-1 w-full"></div>
       
         {/* --- OVERLAYS --- */}
         {showLevelModal && <LevelUpModal userData={userData} onClose={() => setShowLevelModal(false)} />}
