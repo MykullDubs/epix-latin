@@ -6046,6 +6046,18 @@ function App() {
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
+
+  // --- ADD THIS HELPER INSIDE App() ---
+  const displayName = useMemo(() => {
+      if (userData?.name && userData.name !== 'Student' && userData.name !== 'User') return userData.name;
+      if (user?.displayName) return user.displayName;
+      if (user?.email) {
+          const namePart = user.email.split('@')[0];
+          const cleanName = namePart.replace(/[0-9]/g, ''); 
+          return cleanName ? cleanName.charAt(0).toUpperCase() + cleanName.slice(1) : "Scholar";
+      }
+      return 'Student';
+  }, [userData, user]);
   
   // Data State
   const [systemDecks, setSystemDecks] = useState<any>({});
@@ -6298,33 +6310,30 @@ const commonHandlers = {
       onSaveLesson: onSaveLesson, // <--- CHANGE THIS (was handleCreateLesson)
   };
  const renderStudentView = () => {
-    // 1. Determine which content to show
     let content;
-    let viewKey; // Unique ID to force scroll reset
+    let viewKey; 
 
     if (activeLesson) {
-        // --- LESSON MODE ---
-        viewKey = `lesson-${activeLesson.id}`; // Unique key for every lesson
+        viewKey = `lesson-${activeLesson.id}`;
         
         if (activeLesson.type === 'test' || activeLesson.contentType === 'test') {
              // @ts-ignore
-             content = <TestPlayerView test={activeLesson} onFinish={(id, xp, title, score) => { handleFinishLesson(id, xp, title, score); setActiveLesson(null); }} />;
+             // Added types: (id: string, xp: number, title: string, score: any)
+             content = <TestPlayerView test={activeLesson} onFinish={(id: string, xp: number, title: string, score: any) => { handleFinishLesson(id, xp, title, score); setActiveLesson(null); }} />;
         } else if (activeLesson.type === 'email_module') {
              // @ts-ignore
-             content = <EmailSimulatorView module={activeLesson} onFinish={(id, xp, title) => { handleFinishLesson(id, xp, title); setActiveLesson(null); }} />;
+             content = <EmailSimulatorView module={activeLesson} onFinish={(id: string, xp: number, title: string) => { handleFinishLesson(id, xp, title); setActiveLesson(null); }} />;
         } else {
-             content = <LessonView lesson={activeLesson} onFinish={(id, xp, title) => { handleFinishLesson(id, xp, title); setActiveLesson(null); }} />;
+             content = <LessonView lesson={activeLesson} onFinish={(id: string, xp: number, title: string) => { handleFinishLesson(id, xp, title); setActiveLesson(null); }} />;
         }
 
     } else if (activeTab === 'home' && activeStudentClass) {
-        // --- CLASS DETAIL VIEW ---
         viewKey = `class-${activeStudentClass.id}`;
+        // displayName is now available here because we added it in Step 1
         content = <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} displayName={displayName} />;
     
     } else {
-        // --- TAB NAVIGATION ---
-        viewKey = `tab-${activeTab}`; // Forces reset when switching tabs (Home -> Profile)
-        
+        viewKey = `tab-${activeTab}`;
         switch (activeTab) {
             case 'home': 
                 content = <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} />;
@@ -6351,7 +6360,6 @@ const commonHandlers = {
                 content = <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={onSaveLesson} allDecks={allDecks} lessons={lessons} />;
                 break;
             case 'profile': 
-                // We wrap Profile in a div to ensure it fits the height
                 content = <ProfileView user={user} userData={userData} />;
                 break;
             default: 
@@ -6359,16 +6367,13 @@ const commonHandlers = {
         }
     }
 
-    // 2. THE FIX: WRAP IN A DIV WITH A KEY
-    // The 'key' prop tells React: "If this changes, destroy the old DOM and build a new one."
-    // This physically destroys the scroll container, so the new one MUST start at 0.
     return (
         <div key={viewKey} className="h-full w-full animate-in fade-in duration-300">
             {content}
         </div>
     );
   };
-
+  
   const isWidgetMode = window.location.pathname === '/widget';
 
   if (isWidgetMode) {
