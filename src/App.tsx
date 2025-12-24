@@ -41,7 +41,7 @@ import {
   ChevronUp, GripVertical, ListOrdered, ArrowRightLeft, CheckSquare, Gamepad2, Globe,
   BrainCircuit, Swords, Heart, Skull, Shield, Hourglass, Flame, Crown, Crosshair,Map, TrendingUp, Footprints,ArrowUp, Eye, EyeOff, Settings2,Type,ImageIcon,Video,Code,Quote,ArrowDownUp,Minus,MoreHorizontal, Mic, Lock, GitFork, RotateCcw,
   Inbox, MessageCircle, Send, Bell, Megaphone, XCircle, Palette, Link as LinkIcon, 
-  MapPin, Flag // <--- Added these for the new game modes
+  MapPin, Flag, Sparkles // <--- Added these for the new game modes
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -3103,6 +3103,118 @@ function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
     </div>
   );
 }
+// ============================================================================
+//  PRO HERO PROFILE WIDGET
+// ============================================================================
+function HeroProfileWidget({ user, userData, displayName, level, progress, classes }: any) {
+    const [showDetails, setShowDetails] = useState(false);
+
+    // Dynamic Rank Titles based on Level
+    const getRankTitle = (lvl: number) => {
+        if (lvl >= 50) return "Grandmaster";
+        if (lvl >= 30) return "Sage";
+        if (lvl >= 20) return "Magister";
+        if (lvl >= 10) return "Scholar";
+        if (lvl >= 5)  return "Adept";
+        return "Novice";
+    };
+
+    const enrolledIds = (classes || []).map((c: any) => c.id);
+
+    return (
+        <div className="relative w-full z-30 mb-6">
+            
+            {/* 1. BACKGROUND LAYER (Handles the Shape & Color) */}
+            {/* We apply overflow-hidden HERE only, so the background clips, but content doesn't get cut off if it expands */}
+            <div className="absolute inset-0 h-[180px] bg-slate-900 rounded-b-[3rem] overflow-hidden shadow-2xl shadow-indigo-900/40">
+                {/* Modern Mesh Gradient */}
+                <div className="absolute top-[-50%] left-[-20%] w-[150%] h-[200%] bg-[conic-gradient(at_top_right,_var(--tw-gradient-stops))] from-indigo-900 via-slate-900 to-indigo-900 animate-slow-spin opacity-50"></div>
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-900/90"></div>
+                <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
+                
+                {/* Ambient Glows */}
+                <div className="absolute top-10 right-10 w-32 h-32 bg-indigo-500 rounded-full blur-[60px] opacity-40 animate-pulse"></div>
+                <div className="absolute top-10 left-10 w-32 h-32 bg-rose-500 rounded-full blur-[60px] opacity-20"></div>
+            </div>
+
+            {/* 2. CONTENT LAYER (Sits on top, fully visible) */}
+            <div className="relative pt-14 pb-4 px-6">
+                
+                <div className="flex justify-between items-start">
+                    
+                    {/* AVATAR & IDENTITY */}
+                    <div className="flex items-center gap-5">
+                        <div className="relative group cursor-pointer" onClick={() => setShowDetails(!showDetails)}>
+                            {/* Glowing Ring */}
+                            <div className="absolute -inset-1 bg-gradient-to-tr from-rose-500 to-indigo-500 rounded-2xl blur opacity-70 group-hover:opacity-100 transition duration-500"></div>
+                            
+                            <div className="relative w-16 h-16 bg-slate-800 rounded-2xl border-2 border-white/10 flex items-center justify-center overflow-hidden shadow-xl">
+                                {userData?.photoURL ? (
+                                    <img src={userData.photoURL} alt="User" className="w-full h-full object-cover" />
+                                ) : (
+                                    <span className="font-serif font-black text-2xl text-white/90">{displayName.charAt(0)}</span>
+                                )}
+                            </div>
+                            
+                            {/* Level Badge */}
+                            <div className="absolute -bottom-2 -right-2 bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full border-2 border-slate-900 shadow-sm flex items-center gap-1">
+                                <Sparkles size={8} className="text-yellow-300"/> {level}
+                            </div>
+                        </div>
+
+                        <div>
+                            <h1 className="text-3xl font-black text-white tracking-tight drop-shadow-md">
+                                {displayName}
+                            </h1>
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className="text-xs font-bold text-indigo-200 bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-500/30 uppercase tracking-wider">
+                                    {getRankTitle(level)}
+                                </span>
+                                <div className="h-1 w-1 bg-slate-500 rounded-full"></div>
+                                <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
+                                    <Trophy size={12} className="text-yellow-500"/> {userData?.xp || 0} XP
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* NOTIFICATION BELL */}
+                    {/* High Z-Index ensures dropdown goes OVER everything */}
+                    <div className="relative z-50">
+                        <NotificationBell user={user} enrolledClassIds={enrolledIds} />
+                    </div>
+                </div>
+
+                {/* PROGRESS BAR (Floating Card Effect) */}
+                <div className="mt-8 bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl shadow-lg relative overflow-hidden group">
+                    <div className="flex justify-between items-end mb-2 relative z-10">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                            <Zap size={12} className="text-yellow-400 fill-yellow-400"/> Next Rank
+                        </span>
+                        <span className="text-xs font-bold text-white">{Math.round(progress)}%</span>
+                    </div>
+                    
+                    {/* The Bar Track */}
+                    <div className="w-full bg-slate-700/50 h-2 rounded-full overflow-hidden relative z-10">
+                        <div 
+                            className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-rose-500 shadow-[0_0_10px_rgba(99,102,241,0.5)] transition-all duration-1000 ease-out relative" 
+                            style={{ width: `${progress}%` }}
+                        >
+                            {/* Shimmer Effect */}
+                            <div className="absolute inset-0 bg-white/30 w-full animate-[shimmer_2s_infinite] skew-x-12 opacity-50"></div>
+                        </div>
+                    </div>
+
+                    {/* Decorative Background inside the card */}
+                    <div className="absolute right-0 bottom-0 opacity-5">
+                        <Trophy size={64} className="text-white"/>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    );
+}
 function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck, allDecks, user }: any) {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [showLevelModal, setShowLevelModal] = useState(false);
@@ -3170,19 +3282,14 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
         />
     )}
 
-    {/* --- 1. HERO WIDGET (Fixed Overflow) --- */}
-    {/* Note: We removed 'overflow-hidden' from this parent so the dropdown can escape */}
-    <div className="w-full relative z-10 text-left rounded-b-[2.5rem] mb-6">
-        
-        {/* Background Layer (Handles the clipping and color) */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#6495ED] to-[#4169E1] rounded-b-[2.5rem] overflow-hidden shadow-xl shadow-blue-200 z-0">
-            <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
-            {/* Surgical XP Line */}
-            <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/10">
-                <div className="h-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.6)] transition-all duration-1000" style={{ width: `${progress}%` }} />
-            </div>
-        </div>
-
+<HeroProfileWidget 
+    user={user} 
+    userData={userData} 
+    displayName={displayName} 
+    level={level} 
+    progress={progress} 
+    classes={classes} 
+/>
         {/* Content Layer (Sits on top, no overflow hidden) */}
         <div className="relative z-10 px-8 pt-12 pb-10 flex items-center justify-between text-white">
             <div className="flex items-center gap-4 cursor-pointer group" onClick={() => setShowLevelModal(true)}>
