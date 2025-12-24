@@ -6092,12 +6092,7 @@ const commonHandlers = {
       onSaveCard: handleCreateCard, 
       onUpdateCard: handleUpdateCard, 
       onDeleteCard: handleDeleteCard, 
-      
-      // CHANGE THIS LINE:
-      // Old: onSaveLesson: handleCreateLesson, 
-      
-      // New:
-      onSaveLesson: onSaveLesson, 
+      onSaveLesson: onSaveLesson, // <--- CHANGE THIS (was handleCreateLesson)
   };
   const renderStudentView = () => {
     if (activeLesson && (activeLesson.type === 'test' || activeLesson.contentType === 'test')) {
