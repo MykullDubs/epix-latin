@@ -642,207 +642,86 @@ const ACHIEVEMENTS_DATA = [
 const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 // --- BEEFED UP PROFILE VIEW (FIXED LAYOUT) ---
 function ProfileView({ user, userData }: any) {
-  const [deploying, setDeploying] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Stats Calculation
+  const joinDate = new Date(userData?.created || Date.now()).toLocaleDateString();
+  const xp = userData?.xp || 0;
+  const assignments = userData?.completedAssignments?.length || 0;
+  const level = Math.floor(xp / 1000) + 1;
 
+  // Sign Out Handler
   const handleLogout = () => signOut(auth);
-  const { level, progress, rank } = getLevelInfo(userData?.xp || 0);
-
-  // --- ACTIONS ---
-  const deploySystemContent = async () => { 
-    setDeploying(true); 
-    const batch = writeBatch(db); 
-    Object.entries(INITIAL_SYSTEM_DECKS).forEach(([key, deck]) => batch.set(doc(db, 'artifacts', appId, 'public', 'data', 'system_decks', key), deck)); 
-    INITIAL_SYSTEM_LESSONS.forEach((lesson: any) => batch.set(doc(db, 'artifacts', appId, 'public', 'data', 'system_lessons', lesson.id), lesson)); 
-    try { await batch.commit(); alert("Deployed!"); } catch (e: any) { alert("Error: " + e.message); } 
-    setDeploying(false); 
-  };
-
-  const toggleRole = async () => { 
-    if (!userData) return; 
-    const newRole = userData.role === 'instructor' ? 'student' : 'instructor'; 
-    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole }); 
-  };
-
-  const handleImageUpload = async (e: any) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      if (file.size > 5 * 1024 * 1024) { alert("File is too large (Max 5MB)"); return; }
-      if (!file.type.startsWith('image/')) { alert("Please upload an image file"); return; }
-
-      setUploading(true);
-      try {
-          const storageRef = ref(storage, `avatars/${user.uid}_${Date.now()}`);
-          await uploadBytes(storageRef, file);
-          const photoURL = await getDownloadURL(storageRef);
-          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { photoURL });
-      } catch (error) {
-          console.error("Upload failed", error);
-          alert("Failed to upload image.");
-      } finally {
-          setUploading(false);
-      }
-  };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 relative overflow-y-auto overflow-x-hidden">
-        
-        {/* --- HEADER BACKGROUND --- */}
-        <div className="absolute top-0 left-0 right-0 h-80 bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-800 rounded-b-[3rem] shadow-2xl z-0 overflow-hidden">
-            <div className="absolute top-[-50%] left-[-20%] w-[500px] h-[500px] bg-white/10 rounded-full blur-[80px] animate-pulse"></div>
-            <div className="absolute bottom-[-20%] right-[-10%] w-[300px] h-[300px] bg-purple-500/20 rounded-full blur-[60px]"></div>
-        </div>
+    <div className="h-full overflow-y-auto custom-scrollbar bg-slate-50 pb-24">
+      
+      {/* 1. Header Card */}
+      <div className="bg-slate-900 text-white pt-12 pb-8 px-6 rounded-b-[2.5rem] shadow-xl shadow-indigo-900/20 relative overflow-hidden mb-6">
+          <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500 rounded-full blur-[80px] opacity-20 transform translate-x-1/2 -translate-y-1/2"></div>
 
-        {/* --- MAIN CONTENT --- */}
-        <div className="relative z-10 px-6 pt-12 pb-24 flex flex-col items-center">
-            
-            {/* AVATAR SECTION */}
-            <div className="relative group cursor-pointer mb-4" onClick={() => fileInputRef.current?.click()}>
-                <div className="w-28 h-28 bg-white/20 backdrop-blur-xl rounded-full flex items-center justify-center border-4 border-white/30 shadow-2xl relative z-10 overflow-hidden hover:scale-105 transition-transform duration-300">
-                    {uploading ? (
-                        <Loader className="animate-spin text-white" />
-                    ) : userData?.photoURL ? (
-                        <img src={userData.photoURL} alt="Profile" className="w-full h-full object-cover" />
-                    ) : (
-                        <span className="font-serif font-bold text-5xl text-white drop-shadow-md">{userData?.name?.charAt(0) || 'U'}</span>
-                    )}
-                    {/* Upload Overlay */}
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Camera className="text-white" size={28} />
-                    </div>
-                </div>
-                {/* Level Badge */}
-                <div className="absolute -bottom-2 -right-2 bg-amber-400 text-amber-900 border-2 border-white px-2 py-1 rounded-full text-xs font-black shadow-lg z-20">
-                    LVL {level}
-                </div>
-                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
-            </div>
+          <div className="relative z-10 flex flex-col items-center text-center">
+             <div className="w-24 h-24 bg-slate-800 rounded-full border-4 border-slate-700/50 shadow-2xl flex items-center justify-center text-3xl font-serif font-bold mb-4 overflow-hidden relative group">
+                 {userData?.photoURL ? (
+                     <img src={userData.photoURL} className="w-full h-full object-cover" />
+                 ) : (
+                     <span className="group-hover:scale-110 transition-transform">{user?.email?.charAt(0).toUpperCase()}</span>
+                 )}
+                 <div className="absolute inset-0 ring-4 ring-indigo-500/20 rounded-full"></div>
+             </div>
+             
+             <h2 className="text-2xl font-bold mb-1">{userData?.name || user?.email?.split('@')[0]}</h2>
+             <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-widest bg-slate-800/50 px-3 py-1 rounded-full border border-slate-700">
+                 <span>Scholar</span> • <span>Joined {joinDate}</span>
+             </div>
+          </div>
+      </div>
 
-            <h1 className="text-3xl font-serif font-bold text-white drop-shadow-md mb-1">{userData?.name}</h1>
-            <p className="text-indigo-100 font-medium tracking-wide text-sm opacity-80 mb-6">{user.email}</p>
+      {/* 2. Stats Grid */}
+      <div className="px-6 grid grid-cols-2 gap-3 mb-6">
+          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-1">
+              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-full mb-1"><Trophy size={20}/></div>
+              <span className="text-2xl font-black text-slate-800">{level}</span>
+              <span className="text-[10px] uppercase font-bold text-slate-400">Current Level</span>
+          </div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-1">
+              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-full mb-1"><CheckCircle2 size={20}/></div>
+              <span className="text-2xl font-black text-slate-800">{assignments}</span>
+              <span className="text-[10px] uppercase font-bold text-slate-400">Completed</span>
+          </div>
+      </div>
 
-            {/* STATS ROW */}
-            <div className="w-full grid grid-cols-3 gap-3 mb-8">
-                <div className="bg-white/10 backdrop-blur-md border border-white/20 p-3 rounded-2xl text-center">
-                    <Award className="text-amber-300 mx-auto mb-1" size={20} />
-                    <span className="block text-xl font-black text-white">{userData?.xp || 0}</span>
-                    <span className="text-[9px] text-indigo-100 uppercase font-bold tracking-wider">Total XP</span>
-                </div>
-                <div className="bg-white/10 backdrop-blur-md border border-white/20 p-3 rounded-2xl text-center">
-                    <Zap className="text-blue-300 mx-auto mb-1" size={20} fill="currentColor" />
-                    <span className="block text-xl font-black text-white">{userData?.streak || 1}</span>
-                    <span className="text-[9px] text-indigo-100 uppercase font-bold tracking-wider">Day Streak</span>
-                </div>
-                <div className="bg-white/10 backdrop-blur-md border border-white/20 p-3 rounded-2xl text-center">
-                    <Target className="text-emerald-300 mx-auto mb-1" size={20} />
-                    <span className="block text-xl font-black text-white">{rank}</span>
-                    <span className="text-[9px] text-indigo-100 uppercase font-bold tracking-wider">Rank</span>
-                </div>
-            </div>
+      {/* 3. Settings Menu */}
+      <div className="px-6 space-y-3">
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-2 mb-1">Account Settings</h3>
+          
+          <button className="w-full p-4 bg-white rounded-xl border border-slate-200 flex items-center justify-between group hover:border-indigo-300 transition-all shadow-sm">
+              <div className="flex items-center gap-4">
+                  <div className="p-2 bg-slate-100 text-slate-500 rounded-lg group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors"><User size={20}/></div>
+                  <div className="text-left">
+                      <div className="font-bold text-slate-700 text-sm">Edit Profile</div>
+                      <div className="text-[10px] text-slate-400">Name, Avatar, Bio</div>
+                  </div>
+              </div>
+              <ChevronRight size={16} className="text-slate-300"/>
+          </button>
 
-            {/* --- BODY CARDS --- */}
-            <div className="w-full space-y-6">
-                
-                {/* 1. WEEKLY ACTIVITY (Mocked Logic) */}
-                <div className="bg-white p-5 rounded-3xl shadow-lg border border-slate-100">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                            <Activity size={18} className="text-indigo-500"/> Activity
-                        </h3>
-                        <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-bold">This Week</span>
-                    </div>
-                    <div className="flex justify-between">
-                        {WEEK_DAYS.map((day, i) => {
-                            // Mocking: If day index < current date % 7, it's active
-                            const isActive = i <= (new Date().getDay() - 1 + 7) % 7; 
-                            return (
-                                <div key={i} className="flex flex-col items-center gap-2">
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                                        isActive ? 'bg-indigo-600 text-white shadow-md scale-110' : 'bg-slate-100 text-slate-400'
-                                    }`}>
-                                        {isActive && <Check size={12} strokeWidth={4}/>}
-                                    </div>
-                                    <span className="text-[9px] font-bold text-slate-400">{day}</span>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
+          <button className="w-full p-4 bg-white rounded-xl border border-slate-200 flex items-center justify-between group hover:border-indigo-300 transition-all shadow-sm">
+              <div className="flex items-center gap-4">
+                  <div className="p-2 bg-slate-100 text-slate-500 rounded-lg group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors"><Bell size={20}/></div>
+                  <div className="text-left">
+                      <div className="font-bold text-slate-700 text-sm">Notifications</div>
+                      <div className="text-[10px] text-slate-400">Email & Push Alerts</div>
+                  </div>
+              </div>
+              <ChevronRight size={16} className="text-slate-300"/>
+          </button>
 
-                {/* 2. ACHIEVEMENTS */}
-                <div className="bg-white p-5 rounded-3xl shadow-lg border border-slate-100">
-                    <h3 className="font-bold text-slate-700 flex items-center gap-2 mb-4">
-                        <Medal size={18} className="text-amber-500"/> Achievements
-                    </h3>
-                    <div className="grid grid-cols-3 gap-3">
-                        {ACHIEVEMENTS_DATA.map((badge) => {
-                            let unlocked = false;
-                            if (badge.xpThreshold !== undefined && (userData?.xp || 0) >= badge.xpThreshold) unlocked = true;
-                            if (badge.streakThreshold !== undefined && (userData?.streak || 0) >= badge.streakThreshold) unlocked = true;
-                            if (badge.id === 'social' && userData?.role === 'instructor') unlocked = true; // Example logic
-
-                            return (
-                                <div key={badge.id} className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all ${
-                                    unlocked 
-                                    ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200 shadow-sm' 
-                                    : 'bg-slate-50 border-slate-100 opacity-60 grayscale'
-                                }`}>
-                                    <span className="text-2xl mb-1 filter drop-shadow-sm">{badge.icon}</span>
-                                    <span className={`text-[9px] font-bold uppercase tracking-wide ${unlocked ? 'text-amber-800' : 'text-slate-400'}`}>{badge.label}</span>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* 3. SETTINGS & ACCOUNT */}
-                <div className="bg-white rounded-3xl shadow-lg border border-slate-100 overflow-hidden">
-                    <div className="p-4 border-b border-slate-50 bg-slate-50/50">
-                        <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                            <Settings size={18} className="text-slate-400"/> Settings
-                        </h3>
-                    </div>
-                    <div className="divide-y divide-slate-100">
-                        <button onClick={toggleRole} className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center"><ArrowRightLeft size={16}/></div>
-                                <div className="text-left">
-                                    <span className="block text-sm font-bold text-slate-700">Switch Role</span>
-                                    <span className="text-xs text-slate-400">Current: {userData?.role}</span>
-                                </div>
-                            </div>
-                            <ChevronRight size={16} className="text-slate-300 group-hover:text-indigo-600"/>
-                        </button>
-
-                        <button onClick={deploySystemContent} disabled={deploying} className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
-                                    {deploying ? <Loader className="animate-spin" size={16}/> : <UploadCloud size={16}/>}
-                                </div>
-                                <div className="text-left">
-                                    <span className="block text-sm font-bold text-slate-700">Reset Content</span>
-                                    <span className="text-xs text-slate-400">Re-deploy system defaults</span>
-                                </div>
-                            </div>
-                        </button>
-
-                        <button onClick={handleLogout} className="w-full p-4 flex items-center justify-between hover:bg-rose-50 transition-colors group">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center"><LogOut size={16}/></div>
-                                <div className="text-left">
-                                    <span className="block text-sm font-bold text-rose-600">Sign Out</span>
-                                </div>
-                            </div>
-                        </button>
-                    </div>
-                </div>
-
-                <div className="text-center pb-8">
-                    <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">LinguistFlow v3.2</p>
-                </div>
-            </div>
-        </div>
+          <button onClick={handleLogout} className="w-full p-4 mt-6 bg-rose-50 rounded-xl border border-rose-100 flex items-center justify-center gap-2 text-rose-600 font-bold text-sm hover:bg-rose-100 transition-colors shadow-sm">
+              <LogOut size={18}/> Sign Out
+          </button>
+          
+          <p className="text-center text-[10px] text-slate-300 mt-4">Magister LMS v1.0.4 • Epix Latin</p>
+      </div>
     </div>
   );
 }
@@ -6418,43 +6297,77 @@ const commonHandlers = {
       onDeleteCard: handleDeleteCard, 
       onSaveLesson: onSaveLesson, // <--- CHANGE THIS (was handleCreateLesson)
   };
-  const renderStudentView = () => {
-    if (activeLesson && (activeLesson.type === 'test' || activeLesson.contentType === 'test')) {
-        // @ts-ignore
-        return <TestPlayerView test={activeLesson} onFinish={(id: string, xp: number, title: string, score: any) => { handleFinishLesson(id, xp, title, score); setActiveLesson(null); }} />;
+ const renderStudentView = () => {
+    // 1. Determine which content to show
+    let content;
+    let viewKey; // Unique ID to force scroll reset
+
+    if (activeLesson) {
+        // --- LESSON MODE ---
+        viewKey = `lesson-${activeLesson.id}`; // Unique key for every lesson
+        
+        if (activeLesson.type === 'test' || activeLesson.contentType === 'test') {
+             // @ts-ignore
+             content = <TestPlayerView test={activeLesson} onFinish={(id, xp, title, score) => { handleFinishLesson(id, xp, title, score); setActiveLesson(null); }} />;
+        } else if (activeLesson.type === 'email_module') {
+             // @ts-ignore
+             content = <EmailSimulatorView module={activeLesson} onFinish={(id, xp, title) => { handleFinishLesson(id, xp, title); setActiveLesson(null); }} />;
+        } else {
+             content = <LessonView lesson={activeLesson} onFinish={(id, xp, title) => { handleFinishLesson(id, xp, title); setActiveLesson(null); }} />;
+        }
+
+    } else if (activeTab === 'home' && activeStudentClass) {
+        // --- CLASS DETAIL VIEW ---
+        viewKey = `class-${activeStudentClass.id}`;
+        content = <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} displayName={displayName} />;
+    
+    } else {
+        // --- TAB NAVIGATION ---
+        viewKey = `tab-${activeTab}`; // Forces reset when switching tabs (Home -> Profile)
+        
+        switch (activeTab) {
+            case 'home': 
+                content = <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} />;
+                break;
+            case 'flashcards': 
+                const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
+                const deckToLoad = assignedDeck || allDecks[selectedDeckKey];
+                content = (
+                    <FlashcardView 
+                        allDecks={allDecks} 
+                        selectedDeckKey={selectedDeckKey} 
+                        onSelectDeck={setSelectedDeckKey} 
+                        onSaveCard={handleCreateCard} 
+                        activeDeckOverride={deckToLoad} 
+                        onComplete={handleFinishLesson}
+                        onLogActivity={handleLogSelfStudy}
+                        userData={userData} 
+                        onUpdatePrefs={handleUpdatePreferences} 
+                        onDeleteDeck={handleDeleteDeck} 
+                    />
+                );
+                break;
+            case 'create': 
+                content = <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={onSaveLesson} allDecks={allDecks} lessons={lessons} />;
+                break;
+            case 'profile': 
+                // We wrap Profile in a div to ensure it fits the height
+                content = <ProfileView user={user} userData={userData} />;
+                break;
+            default: 
+                content = <HomeView />;
+        }
     }
 
-    if (activeLesson && activeLesson.type === 'email_module') {
-        // @ts-ignore
-        return <EmailSimulatorView module={activeLesson} onFinish={(id: string, xp: number, title: string) => { handleFinishLesson(id, xp, title); setActiveLesson(null); }} />;
-    }
-
-    if (activeLesson) return <LessonView lesson={activeLesson} onFinish={(id: string, xp: number, title: string) => { handleFinishLesson(id, xp, title); setActiveLesson(null); }} />;
-    
-    if (activeTab === 'home' && activeStudentClass) return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} />;
-    
-    switch (activeTab) {
-      case 'home': return <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} />;
-      case 'flashcards': 
-          const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
-          const deckToLoad = assignedDeck || allDecks[selectedDeckKey];
-          return <FlashcardView 
-              allDecks={allDecks} 
-              selectedDeckKey={selectedDeckKey} 
-              onSelectDeck={setSelectedDeckKey} 
-              onSaveCard={handleCreateCard} 
-              activeDeckOverride={deckToLoad} 
-              onComplete={handleFinishLesson}
-              onLogActivity={handleLogSelfStudy} // <-- Passes logger to Practice Hub
-              userData={userData} 
-              onUpdatePrefs={handleUpdatePreferences} 
-              onDeleteDeck={handleDeleteDeck} 
-          />;
-case 'create': return <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={onSaveLesson} allDecks={allDecks} lessons={lessons} />;      case 'profile': return <ProfileView user={user} userData={userData} />;
-      default: return <HomeView />;
-    }
+    // 2. THE FIX: WRAP IN A DIV WITH A KEY
+    // The 'key' prop tells React: "If this changes, destroy the old DOM and build a new one."
+    // This physically destroys the scroll container, so the new one MUST start at 0.
+    return (
+        <div key={viewKey} className="h-full w-full animate-in fade-in duration-300">
+            {content}
+        </div>
+    );
   };
-
   const isWidgetMode = window.location.pathname === '/widget';
 
   if (isWidgetMode) {
