@@ -41,7 +41,7 @@ import {
   ChevronUp, GripVertical, ListOrdered, ArrowRightLeft, CheckSquare, Gamepad2, Globe,
   BrainCircuit, Swords, Heart, Skull, Shield, Hourglass, Flame, Crown, Crosshair,Map, TrendingUp, Footprints,ArrowUp, Eye, EyeOff, Settings2,Type,ImageIcon,Video,Code,Quote,ArrowDownUp,Minus,MoreHorizontal, Mic, Lock, GitFork, RotateCcw,
   Inbox, MessageCircle, Send, Bell, Megaphone, XCircle, Palette, Link as LinkIcon, 
-  MapPin, Flag, Sparkles // <--- Added these for the new game modes
+  MapPin, Flag, Sparkles, Building, Cloud, Star  // <--- Added these for the new game modes
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -2608,379 +2608,217 @@ const playSynthSound = (type: 'hit' | 'miss' | 'frenzy' | 'tick', comboPitch = 0
     }
 };
 
-function ColosseumMode({ allDecks, user, onExit, onXPUpdate }: any) {
-  // --- STATE ---
-  const [gameState, setGameState] = useState<'intro' | 'playing' | 'gameover'>('intro');
-  const [lives, setLives] = useState(3);
-  const [score, setScore] = useState(0);
-  const [round, setRound] = useState(1);
-  const [timeLeft, setTimeLeft] = useState(15);
-  const [combo, setCombo] = useState(0);
-  
-  // JUICE STATES
-  const [fever, setFever] = useState(0); // 0 to 100
-  const [isFeverMode, setIsFeverMode] = useState(false);
-  const [shake, setShake] = useState(0); // Shake intensity
-  const [flash, setFlash] = useState<string | null>(null); // 'red' | 'white' | 'blue'
-  const [floatingText, setFloatingText] = useState<{id: number, x: number, y: number, text: string, color: string}[]>([]);
-  const [particles, setParticles] = useState<{id: number, x: number, y: number, color: string, vx: number, vy: number, life: number}[]>([]);
+// ============================================================================
+//  THE TOWER: INFINITE ASCENSION MODE
+// ============================================================================
+function TowerMode({ allDecks, user, onExit, onXPUpdate }: any) {
+    // Game State
+    const [gameState, setGameState] = useState<'intro' | 'climbing' | 'fallen'>('intro');
+    const [floor, setFloor] = useState(1);
+    const [pendingXP, setPendingXP] = useState(0);
+    const [lives, setLives] = useState(3);
+    const [question, setQuestion] = useState<any>(null);
+    const [isAnimating, setIsAnimating] = useState(false);
 
-  // MECHANICS
-  const [loadout, setLoadout] = useState<'slash' | 'shoot'>('slash');
-  const [slashPath, setSlashPath] = useState<{x: number, y: number}[]>([]);
-  const [isInputActive, setIsInputActive] = useState(false);
-  const [pool, setPool] = useState<any[]>([]);
-  const [currentCard, setCurrentCard] = useState<any>(null);
-  const [options, setOptions] = useState<any[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  
-  const containerRef = useRef<HTMLDivElement>(null);
-  const requestRef = useRef<number>();
+    // Get all cards
+    const allCards = useMemo(() => {
+        let cards: any[] = [];
+        Object.values(allDecks).forEach((d: any) => {
+            if (d.cards) cards = [...cards, ...d.cards];
+        });
+        return cards.sort(() => Math.random() - 0.5);
+    }, [allDecks]);
 
-  // --- GAME LOOP (High Performance) ---
-  const animate = () => {
-      // 1. Particle Physics
-      setParticles(prev => prev.map(p => ({
-          ...p, x: p.x + p.vx, y: p.y + p.vy, vy: p.vy + 0.5, life: p.life - 0.05
-      })).filter(p => p.life > 0));
-
-      // 2. Floating Text Physics
-      setFloatingText(prev => prev.map(t => ({
-          ...t, y: t.y - 2 
-      })).filter(t => t.y > 0)); // Simple cleanup based on position, ideally use lifetime
-
-      requestRef.current = requestAnimationFrame(animate);
-  };
-
-  useEffect(() => {
-      requestRef.current = requestAnimationFrame(animate);
-      return () => cancelAnimationFrame(requestRef.current!);
-  }, []);
-
-  // --- TIMER LOGIC ---
-  useEffect(() => {
-      if (gameState !== 'playing' || selectedId) return;
-      // In Fever mode, time stops or slows down? Let's make it slow down
-      const intervalSpeed = isFeverMode ? 2000 : 1000;
-      
-      const timer = setInterval(() => {
-          setTimeLeft(t => {
-              if (t <= 1) { handleWrongAnswer(); return 0; }
-              return t - 1;
-          });
-      }, intervalSpeed);
-      return () => clearInterval(timer);
-  }, [timeLeft, gameState, selectedId, isFeverMode]);
-
-  // --- JUICE HELPERS ---
-  const triggerShake = (intensity = 1) => {
-      setShake(intensity);
-      setTimeout(() => setShake(0), 300);
-  };
-
-  const spawnParticles = (x: number, y: number, color: string, count = 15) => {
-      const newP = Array.from({ length: count }).map(() => ({
-          id: Math.random(), x, y, color,
-          vx: (Math.random() - 0.5) * 15,
-          vy: (Math.random() - 0.5) * 15,
-          life: 1.0
-      }));
-      setParticles(prev => [...prev, ...newP]);
-  };
-
-  const spawnText = (x: number, y: number, text: string, color: string) => {
-      setFloatingText(prev => [...prev, { id: Math.random(), x, y, text, color }]);
-      setTimeout(() => setFloatingText(prev => prev.slice(1)), 1000); // Cleanup
-  };
-
-  // --- GAMEPLAY LOGIC ---
-  const generatePool = () => {
-      // (Simplified: Grab all cards for now)
-      let combined: any[] = [];
-      Object.values(allDecks).forEach((deck: any) => { if (deck.cards) combined.push(...deck.cards); });
-      return combined.length < 4 ? combined : combined.sort(() => 0.5 - Math.random());
-  };
-
-  const nextRound = (currentPool: any[]) => {
-      if (lives <= 0) {
-          setGameState('gameover');
-          onXPUpdate(Math.ceil(score / 5), `Colosseum (${loadout})`);
-          return;
-      }
-
-      // Logic to pick question
-      const target = currentPool[Math.floor(Math.random() * currentPool.length)];
-      const others = currentPool.filter(c => c.id !== target.id);
-      const distractors = others.sort(() => 0.5 - Math.random()).slice(0, 3);
-      const newOptions = [target, ...distractors].sort(() => 0.5 - Math.random());
-      
-      setCurrentCard(target);
-      setOptions(newOptions);
-      setSelectedId(null);
-      setSlashPath([]);
-      
-      // Fever mode grants infinite time? Or just bonus time
-      setTimeLeft(isFeverMode ? 10 : 8); 
-  };
-
-  const handleStart = (mode: 'slash' | 'shoot') => {
-      const p = generatePool();
-      setPool(p);
-      setLoadout(mode);
-      setLives(3);
-      setScore(0);
-      setFever(0);
-      setIsFeverMode(false);
-      setRound(1);
-      setGameState('playing');
-      nextRound(p);
-  };
-
-  const handleCorrect = (x: number, y: number, multiplier = 1) => {
-      // 1. HIT STOP (Freeze frame for impact)
-      // We simulate this by delaying the UI update slightly
-      
-      // 2. Audio
-      playSynthSound('hit', combo);
-
-      // 3. Visuals
-      triggerShake(1);
-      setFlash('white');
-      setTimeout(() => setFlash(null), 50);
-      spawnParticles(x, y, isFeverMode ? '#FCD34D' : '#34D399'); // Gold or Green
-      
-      // 4. Calculations
-      const feverMult = isFeverMode ? 2 : 1;
-      const points = Math.round(100 * multiplier * (1 + (combo*0.1)) * feverMult);
-      setScore(s => s + points);
-      setCombo(c => c + 1);
-      spawnText(x, y - 50, `+${points}`, isFeverMode ? '#FCD34D' : '#fff');
-
-      // 5. Fever Logic
-      if (!isFeverMode) {
-          setFever(f => {
-              const next = f + 20;
-              if (next >= 100) {
-                  setIsFeverMode(true);
-                  playSynthSound('frenzy');
-                  setFlash('blue');
-                  return 100;
-              }
-              return next;
-          });
-      }
-
-      // 6. Next Round (Delayed for impact)
-      setTimeout(() => {
-          setRound(r => r + 1);
-          nextRound(pool);
-      }, isFeverMode ? 400 : 600); // Faster in fever mode
-  };
-
-  const handleWrongAnswer = (x = window.innerWidth/2, y = window.innerHeight/2) => {
-      playSynthSound('miss');
-      triggerShake(2);
-      setFlash('red');
-      setTimeout(() => setFlash(null), 100);
-      spawnParticles(x, y, '#F87171', 20); // Red explosion
-      spawnText(x, y - 50, "MISS", '#F87171');
-      
-      setCombo(0);
-      setIsFeverMode(false);
-      setFever(0);
-      setLives(l => l - 1);
-
-      if (lives <= 1) {
-          setGameState('gameover');
-          onXPUpdate(Math.ceil(score / 5), `Colosseum (${loadout})`);
-      } else {
-          setTimeout(() => nextRound(pool), 800);
-      }
-  };
-
-  // --- INPUT HANDLERS ---
-  const handleSlashDown = (e: React.PointerEvent) => {
-      if (loadout !== 'slash' || selectedId) return;
-      setIsInputActive(true);
-      if (containerRef.current) {
-          const rect = containerRef.current.getBoundingClientRect();
-          setSlashPath([{ x: e.clientX - rect.left, y: e.clientY - rect.top }]);
-      }
-  };
-
-  const handleSlashMove = (e: React.PointerEvent) => {
-      if (loadout !== 'slash' || !isInputActive || !containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      setSlashPath(prev => [...prev, { x, y }]);
-
-      // Check collision
-      const element = document.elementFromPoint(e.clientX, e.clientY);
-      const answerId = element?.getAttribute('data-answer-id');
-      
-      if (answerId && !selectedId) {
-          setSelectedId(answerId);
-          setIsInputActive(false);
-          if (answerId === currentCard.id) handleCorrect(e.clientX, e.clientY);
-          else handleWrongAnswer(e.clientX, e.clientY);
-      }
-  };
-
-  const handleShoot = (e: React.MouseEvent, answerId: string) => {
-      if (loadout !== 'shoot' || selectedId) return;
-      setSelectedId(answerId);
-      if (answerId === currentCard.id) handleCorrect(e.clientX, e.clientY);
-      else handleWrongAnswer(e.clientX, e.clientY);
-  };
-
-  return (
-    <div className={`fixed inset-0 z-[100] flex flex-col items-center justify-center font-sans overflow-hidden touch-none select-none bg-slate-900`}>
+    const generateQuestion = () => {
+        if (allCards.length === 0) return null;
+        const card = allCards[Math.floor(Math.random() * allCards.length)];
         
-        {/* --- DYNAMIC BACKGROUND --- */}
-        <div className={`absolute inset-0 transition-colors duration-500 ${flash === 'red' ? 'bg-rose-900' : flash === 'white' ? 'bg-white' : flash === 'blue' ? 'bg-indigo-600' : isFeverMode ? 'bg-amber-900' : 'bg-slate-900'}`}></div>
-        <div className={`absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] ${isFeverMode ? 'animate-[ping_1s_infinite]' : ''}`}></div>
-        
-        {/* --- PARTICLES CANVAS LAYER (DOM for simplicity here) --- */}
-        {particles.map(p => (
-            <div key={p.id} className="absolute rounded-full pointer-events-none" style={{
-                left: p.x, top: p.y, width: `${p.life * 8}px`, height: `${p.life * 8}px`, backgroundColor: p.color,
-                opacity: p.life, transform: `translate(-50%, -50%)`
-            }} />
-        ))}
+        // Generate distractors
+        const distractors = allCards
+            .filter(c => c.id !== card.id)
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 3)
+            .map(c => c.back);
 
-        {/* --- FLOATING TEXT --- */}
-        {floatingText.map(t => (
-            <div key={t.id} className="absolute z-50 text-4xl font-black italic drop-shadow-[0_4px_0_rgba(0,0,0,0.5)] whitespace-nowrap" 
-                 style={{ left: t.x, top: t.y, color: t.color, transform: 'translate(-50%, -50%) scale(1.5)', textShadow: '0 0 10px currentColor' }}>
-                {t.text}
+        const options = [...distractors, card.back].sort(() => Math.random() - 0.5);
+        
+        return {
+            prompt: card.front,
+            correct: card.back,
+            options,
+            type: 'mcq'
+        };
+    };
+
+    const handleAnswer = (selected: string) => {
+        if (isAnimating) return;
+        setIsAnimating(true);
+
+        const isCorrect = selected === question.correct;
+
+        if (isCorrect) {
+            // Climb Logic
+            setTimeout(() => {
+                setFloor(prev => prev + 1);
+                setPendingXP(prev => prev + 10 + (Math.floor(floor / 5) * 5)); // Higher floors = more XP
+                setQuestion(generateQuestion());
+                setIsAnimating(false);
+            }, 600); // Animation delay
+        } else {
+            // Damage Logic
+            setTimeout(() => {
+                if (lives > 1) {
+                    setLives(prev => prev - 1);
+                    setQuestion(generateQuestion());
+                    setIsAnimating(false);
+                } else {
+                    setGameState('fallen');
+                }
+            }, 800);
+        }
+    };
+
+    const handleCashOut = () => {
+        onXPUpdate(pendingXP, `Tower Run (Floor ${floor})`);
+        onExit();
+    };
+
+    // Initialize
+    useEffect(() => {
+        if (gameState === 'climbing' && !question) {
+            setQuestion(generateQuestion());
+        }
+    }, [gameState]);
+
+    // Dynamic Background based on Floor
+    const getBackground = () => {
+        if (floor < 5) return 'bg-gradient-to-b from-blue-400 to-emerald-300'; // Ground
+        if (floor < 10) return 'bg-gradient-to-b from-indigo-500 to-blue-400'; // Sky
+        if (floor < 20) return 'bg-gradient-to-b from-slate-900 to-indigo-600'; // Stratosphere
+        return 'bg-[conic-gradient(at_top_right,_var(--tw-gradient-stops))] from-slate-900 via-purple-900 to-slate-900'; // Space
+    };
+
+    if (allCards.length < 4) return (
+        <div className="fixed inset-0 z-50 bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-6">
+            <div className="bg-white rounded-2xl p-6 max-w-sm text-center">
+                <h3 className="font-bold text-lg mb-2">Not Enough Cards</h3>
+                <p className="text-sm text-slate-500 mb-4">You need at least 4 flashcards in your library to enter The Tower.</p>
+                <button onClick={onExit} className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold">Return</button>
             </div>
-        ))}
+        </div>
+    );
 
-        {/* --- SHAKE CONTAINER --- */}
-        <div className="w-full h-full flex flex-col relative z-10" style={{ transform: `translate(${Math.random()*shake*10}px, ${Math.random()*shake*10}px)` }}>
+    return (
+        <div className={`fixed inset-0 z-50 ${getBackground()} transition-colors duration-[2000ms] flex flex-col`}>
             
-            {/* HUD */}
-            {gameState === 'playing' && (
-                <div className="p-4 flex justify-between items-start">
-                    
-                    {/* Lives & Fever Bar */}
-                    <div className="flex flex-col gap-2">
-                        <div className="flex gap-1">
-                            {[...Array(3)].map((_, i) => (
-                                <Heart key={i} size={32} className={`${i < lives ? 'fill-rose-500 text-rose-500 drop-shadow-lg' : 'fill-slate-800 text-slate-700'}`} />
+            {/* --- VISUAL EFFECTS --- */}
+            <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
+            {/* Moving Clouds/Stars */}
+            <div className={`absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden ${floor > 10 ? 'opacity-0' : 'opacity-30'}`}>
+                <Cloud className="absolute top-20 left-10 text-white animate-[pulse_4s_infinite]" size={64} />
+                <Cloud className="absolute top-40 right-20 text-white animate-[pulse_6s_infinite]" size={48} />
+            </div>
+            {floor >= 10 && (
+                <div className="absolute inset-0 pointer-events-none">
+                    <div className="absolute top-10 left-1/4 text-white/40 animate-pulse"><Star size={12}/></div>
+                    <div className="absolute top-1/3 right-10 text-white/30 animate-pulse delay-700"><Star size={16}/></div>
+                </div>
+            )}
+
+            {/* --- HEADER --- */}
+            <div className="relative z-10 p-6 flex justify-between items-start text-white">
+                <div className="flex flex-col">
+                    <span className="text-xs font-bold uppercase tracking-widest opacity-80">Current Floor</span>
+                    <span className="text-5xl font-black flex items-center gap-2 drop-shadow-lg">
+                        {floor} <ArrowUp size={32} className="text-yellow-400 animate-bounce"/>
+                    </span>
+                </div>
+                <div className="text-right">
+                    <div className="flex gap-1 mb-2 justify-end">
+                        {[...Array(3)].map((_, i) => (
+                            <div key={i} className={`w-3 h-3 rounded-full shadow-lg ${i < lives ? 'bg-rose-500' : 'bg-slate-800/50'}`} />
+                        ))}
+                    </div>
+                    <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-lg border border-white/20">
+                        <span className="text-xs font-bold text-yellow-300">XP At Risk: </span>
+                        <span className="font-mono font-bold text-white">{pendingXP}</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* --- GAMEPLAY AREA --- */}
+            <div className="flex-1 flex flex-col justify-center px-6 pb-20 relative z-10 max-w-md mx-auto w-full">
+                
+                {gameState === 'intro' && (
+                    <div className="bg-white rounded-3xl p-8 text-center shadow-2xl animate-in zoom-in duration-300">
+                        <div className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Building size={40}/>
+                        </div>
+                        <h2 className="text-3xl font-black text-slate-800 mb-2">The Tower</h2>
+                        <p className="text-slate-500 text-sm mb-6">Ascend as high as you can. Every floor gets harder, but awards more XP. <br/><br/><strong className="text-rose-600">Warning:</strong> If you lose all hearts, you lose half your pending XP.</p>
+                        <button onClick={() => setGameState('climbing')} className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-xl shadow-indigo-200 transition-all active:scale-95">
+                            Begin Ascent
+                        </button>
+                        <button onClick={onExit} className="mt-4 text-xs font-bold text-slate-400 uppercase tracking-widest hover:text-slate-600">Cancel</button>
+                    </div>
+                )}
+
+                {gameState === 'climbing' && question && (
+                    <div className="space-y-6 animate-in slide-in-from-bottom-8 duration-500">
+                        {/* Question Card */}
+                        <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-8 rounded-3xl text-center shadow-2xl">
+                            <h3 className="text-2xl font-bold text-white drop-shadow-md">{question.prompt}</h3>
+                        </div>
+
+                        {/* Options */}
+                        <div className="grid gap-3">
+                            {question.options.map((opt: string, idx: number) => (
+                                <button
+                                    key={idx}
+                                    disabled={isAnimating}
+                                    onClick={() => handleAnswer(opt)}
+                                    className={`p-4 rounded-2xl font-bold text-lg transition-all transform active:scale-95 shadow-lg border-2 
+                                        ${isAnimating && opt === question.correct ? 'bg-emerald-500 border-emerald-400 text-white scale-105' : 
+                                          isAnimating && opt !== question.correct ? 'bg-white/5 border-transparent text-white/30' :
+                                          'bg-white text-slate-800 border-white hover:border-yellow-300 hover:bg-yellow-50'}`}
+                                >
+                                    {opt}
+                                </button>
                             ))}
                         </div>
-                        {/* FEVER BAR */}
-                        <div className="w-32 h-4 bg-slate-800 rounded-full border border-slate-700 overflow-hidden relative">
-                            <div className={`h-full transition-all duration-300 ${isFeverMode ? 'bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 animate-pulse' : 'bg-blue-500'}`} style={{ width: `${isFeverMode ? 100 : fever}%` }}></div>
-                            <span className="absolute inset-0 text-[9px] font-black text-white/80 flex items-center justify-center uppercase tracking-widest">{isFeverMode ? 'FRENZY!' : 'Fever'}</span>
+
+                        {/* Cash Out Button (Risk Management) */}
+                        {floor > 1 && !isAnimating && (
+                            <button onClick={handleCashOut} className="w-full py-3 bg-slate-900/50 hover:bg-slate-900 text-white/80 hover:text-white rounded-xl font-bold text-xs uppercase tracking-widest backdrop-blur-md border border-white/10 transition-all flex items-center justify-center gap-2">
+                                <Flag size={14}/> Bank {pendingXP} XP & Leave
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {gameState === 'fallen' && (
+                    <div className="bg-white rounded-3xl p-8 text-center shadow-2xl animate-in zoom-in duration-300 border-4 border-rose-100">
+                        <div className="w-20 h-20 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <AlertTriangle size={40}/>
                         </div>
-                    </div>
-
-                    {/* Timer */}
-                    <div className={`text-6xl font-black italic tracking-tighter drop-shadow-2xl ${timeLeft <= 3 ? 'text-rose-500 scale-110 animate-pulse' : 'text-white'}`}>
-                        {timeLeft}
-                    </div>
-
-                    {/* Score */}
-                    <div className="text-right">
-                        <div className="text-4xl font-black text-white drop-shadow-lg">{score}</div>
-                        {combo > 1 && <div className="text-amber-400 font-black italic text-xl animate-bounce">{combo}x COMBO</div>}
-                    </div>
-                </div>
-            )}
-
-            {/* GAMEPLAY LAYER */}
-            {gameState === 'playing' && currentCard && (
-                <div ref={containerRef} className="flex-1 relative touch-none" onPointerDown={handleSlashDown} onPointerMove={handleSlashMove} onPointerUp={() => setIsInputActive(false)}>
-                    
-                    {/* Slash Trail */}
-                    {loadout === 'slash' && (
-                        <svg className="absolute inset-0 w-full h-full pointer-events-none z-50 overflow-visible">
-                            <path d={`M ${slashPath.map(p => `${p.x},${p.y}`).join(" L ")}`} fill="none" stroke={isFeverMode ? "#FBBF24" : "#F43F5E"} strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 10px currentColor)' }}/>
-                            <path d={`M ${slashPath.map(p => `${p.x},${p.y}`).join(" L ")}`} fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                    )}
-
-                    {/* TARGET (Boss Enemy Visual) */}
-                    <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 flex flex-col items-center justify-center text-center z-10 transition-transform duration-200 ${selectedId === currentCard.id ? 'scale-0 opacity-0' : 'scale-100'}`}>
-                        {/* Glowing Orb Background */}
-                        <div className={`absolute inset-0 rounded-full blur-xl opacity-50 animate-pulse ${isFeverMode ? 'bg-amber-500' : 'bg-indigo-500'}`}></div>
-                        <div className="relative bg-slate-900/90 backdrop-blur-xl border-4 border-slate-700 w-full h-full rounded-full flex flex-col items-center justify-center p-6 shadow-2xl">
-                            {isFeverMode && <Flame size={32} className="text-amber-500 mb-2 animate-bounce"/>}
-                            <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Target</span>
-                            <h2 className="text-2xl font-black text-white leading-tight">{currentCard.back}</h2>
+                        <h2 className="text-3xl font-black text-slate-800 mb-1">You Fell!</h2>
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-6">Floor Reached: {floor}</p>
+                        
+                        <div className="bg-slate-50 p-4 rounded-xl mb-6 flex justify-between items-center">
+                            <span className="text-sm font-bold text-slate-500">XP Saved</span>
+                            <span className="text-xl font-black text-rose-600">+{Math.floor(pendingXP / 2)}</span>
                         </div>
-                    </div>
+                        <p className="text-[10px] text-slate-400 mb-6 italic">Next time, bank your XP before you fall.</p>
 
-                    {/* OPTIONS (Satellites) */}
-                    {options.map((opt, i) => {
-                        // Positions: Corners
-                        const posStyles = [
-                            "top-[15%] left-[10%]", "top-[15%] right-[10%]", 
-                            "bottom-[15%] left-[10%]", "bottom-[15%] right-[10%]"
-                        ];
-                        
-                        const isCorrect = opt.id === currentCard.id;
-                        const isSelected = opt.id === selectedId;
-                        let stateStyles = "bg-white border-b-4 border-slate-300 text-slate-900";
-                        
-                        if (selectedId) {
-                            if (isCorrect) stateStyles = "bg-emerald-500 border-emerald-700 text-white scale-110 shadow-[0_0_30px_rgba(16,185,129,0.6)]";
-                            else if (isSelected) stateStyles = "bg-rose-500 border-rose-700 text-white opacity-50";
-                            else stateStyles = "opacity-20 bg-slate-200";
-                        }
-
-                        return (
-                            <div 
-                                key={opt.id}
-                                data-answer-id={opt.id}
-                                onClick={(e) => handleShoot(e, opt.id)}
-                                className={`absolute ${posStyles[i]} w-40 h-24 rounded-2xl flex items-center justify-center text-center p-2 font-black text-lg shadow-xl cursor-pointer transition-all duration-200 active:scale-95 select-none ${stateStyles} ${isInputActive ? 'pointer-events-none' : ''}`}
-                            >
-                                {opt.front}
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-
-            {/* INTRO SCREEN */}
-            {gameState === 'intro' && (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-900/80 backdrop-blur-md">
-                    <Swords size={64} className="text-rose-500 mb-4 animate-pulse" />
-                    <h1 className="text-5xl font-black text-white italic tracking-tighter mb-2">COLOSSEUM</h1>
-                    <p className="text-slate-400 font-bold uppercase tracking-widest mb-8">Endless Survival Mode</p>
-                    
-                    <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
-                        <button onClick={() => handleStart('slash')} className="p-6 bg-rose-600 rounded-3xl border-b-8 border-rose-800 text-white font-black text-xl hover:translate-y-1 hover:border-b-4 transition-all">
-                            SLASH
-                            <span className="block text-[10px] font-normal opacity-80 mt-1">Swipe targets</span>
-                        </button>
-                        <button onClick={() => handleStart('shoot')} className="p-6 bg-indigo-600 rounded-3xl border-b-8 border-indigo-800 text-white font-black text-xl hover:translate-y-1 hover:border-b-4 transition-all">
-                            SHOOT
-                            <span className="block text-[10px] font-normal opacity-80 mt-1">Tap targets</span>
+                        <button onClick={() => { onXPUpdate(Math.floor(pendingXP / 2), "Tower Attempt (Fallen)"); onExit(); }} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold shadow-lg">
+                            Return to Base
                         </button>
                     </div>
-                    <button onClick={onExit} className="mt-8 text-slate-500 font-bold hover:text-white">Exit Arena</button>
-                </div>
-            )}
+                )}
 
-            {/* GAME OVER */}
-            {gameState === 'gameover' && (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-black/90 backdrop-blur-xl animate-in zoom-in">
-                    <Skull size={64} className="text-slate-700 mb-4" />
-                    <h2 className="text-6xl font-black text-white mb-2">{score}</h2>
-                    <p className="text-slate-500 font-bold uppercase tracking-widest mb-8">Final Score</p>
-                    <button onClick={onExit} className="w-full max-w-xs py-4 bg-white text-slate-900 rounded-2xl font-black text-xl hover:bg-slate-200 transition-colors">
-                        Claim XP & Exit
-                    </button>
-                </div>
-            )}
+            </div>
         </div>
-    </div>
-  );
+    );
 }
 // ============================================================================
 //  PRO HERO PROFILE WIDGET
@@ -3098,28 +2936,20 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [showLevelModal, setShowLevelModal] = useState(false);
   const [libraryExpanded, setLibraryExpanded] = useState(false);
-  const [showColosseum, setShowColosseum] = useState(false);
+  
+  // STATE: The Tower
+  const [showTower, setShowTower] = useState(false);
   
   // 1. SCROLL REF
   const scrollViewportRef = useRef<HTMLDivElement>(null);
 
   // 2. THE NUCLEAR SCROLL FIX
-  // We use useLayoutEffect to intercept the paint before the user sees it.
   useLayoutEffect(() => {
       const viewport = scrollViewportRef.current;
       if (viewport) {
-          // 1. Reset immediately
           viewport.scrollTop = 0;
-          
-          // 2. Force reset again after a tiny delay (to beat browser scroll restoration)
-          setTimeout(() => {
-              if (viewport) viewport.scrollTop = 0;
-          }, 10);
-          
-          // 3. One last check after animation starts
-          setTimeout(() => {
-              if (viewport) viewport.scrollTop = 0;
-          }, 50);
+          setTimeout(() => { if (viewport) viewport.scrollTop = 0; }, 10);
+          setTimeout(() => { if (viewport) viewport.scrollTop = 0; }, 50);
       }
   }, []);
 
@@ -3146,10 +2976,13 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   const { level, progress } = getLevelInfo(userData?.xp || 0);
   const visibleLessons = libraryExpanded ? lessons : lessons.slice(0, 2);
 
-  const handleColosseumXP = async (xpAmount: number, reason: string) => {
+  // 5. XP HANDLER FOR TOWER
+  const handleTowerXP = async (xpAmount: number, reason: string) => {
       if (!user) return;
       try {
-          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xpAmount) });
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { 
+              xp: increment(xpAmount) 
+          });
           await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
               studentName: displayName || "Student",
               studentEmail: user.email,
@@ -3166,24 +2999,21 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
   }
 
   return (
-  // OUTER CONTAINER: STRICTLY FOR SCROLLING (No Animation Classes Here)
   <div 
     ref={scrollViewportRef} 
     className="h-full overflow-y-auto overflow-x-hidden relative bg-slate-50 scroll-smooth"
   >
-    {/* INNER CONTAINER: STRICTLY FOR ANIMATION */}
     <div className="pb-24 animate-in fade-in slide-in-from-bottom-2 duration-500">
-
-      
+        
         {/* --- OVERLAYS --- */}
         {showLevelModal && <LevelUpModal userData={userData} onClose={() => setShowLevelModal(false)} />}
         
-        {showColosseum && (
-            <ColosseumMode 
+        {showTower && (
+            <TowerMode 
                 allDecks={allDecks} 
                 user={user} 
-                onExit={() => setShowColosseum(false)}
-                onXPUpdate={handleColosseumXP}
+                onExit={() => setShowTower(false)}
+                onXPUpdate={handleTowerXP}
             />
         )}
 
@@ -3200,22 +3030,25 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
         {/* --- 2. DAILY DISCOVERY --- */}
         <DailyDiscoveryWidget allDecks={allDecks} user={user} userData={userData} />
         
-        {/* --- 3. THE COLOSSEUM --- */}
+        {/* --- 3. THE TOWER (Replaces Colosseum) --- */}
         <div className="px-6 mt-6">
-            <button onClick={() => setShowColosseum(true)} className="w-full p-1 rounded-[2.5rem] bg-gradient-to-r from-rose-500 via-orange-500 to-rose-600 shadow-xl shadow-rose-200 hover:scale-[1.02] active:scale-95 transition-all group relative overflow-hidden">
+            <button onClick={() => setShowTower(true)} className="w-full p-1 rounded-[2.5rem] bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 shadow-xl shadow-indigo-200 hover:scale-[1.02] active:scale-95 transition-all group relative overflow-hidden">
                 <div className="bg-slate-900 rounded-[2.3rem] p-6 relative overflow-hidden flex items-center justify-between">
-                    <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+                    {/* Background Texture */}
+                    <div className="absolute inset-0 opacity-30 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-800 via-slate-900 to-slate-900"></div>
+                    
                     <div className="relative z-10 flex items-center gap-4">
-                        <div className="w-14 h-14 bg-rose-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-rose-900/50 group-hover:rotate-12 transition-transform">
-                            <Swords size={28} />
+                        <div className="w-14 h-14 bg-indigo-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/50 group-hover:-translate-y-1 transition-transform">
+                            <Building size={28} />
                         </div>
                         <div className="text-left">
-                            <h3 className="text-xl font-black text-white italic tracking-tight">THE COLOSSEUM</h3>
-                            <p className="text-rose-200 text-xs font-bold uppercase tracking-widest">Infinite Survival Mode</p>
+                            <h3 className="text-xl font-black text-white italic tracking-tight">THE TOWER</h3>
+                            <p className="text-indigo-200 text-xs font-bold uppercase tracking-widest">Infinite Ascent</p>
                         </div>
                     </div>
-                    <div className="relative z-10 bg-white/10 p-2 rounded-full text-white/50 group-hover:text-white group-hover:bg-rose-600 transition-colors">
-                        <ChevronRight size={24} />
+                    
+                    <div className="relative z-10 bg-white/10 p-2 rounded-full text-white/50 group-hover:text-white group-hover:bg-indigo-500 transition-colors">
+                        <ArrowUp size={24} />
                     </div>
                 </div>
             </button>
