@@ -3562,13 +3562,60 @@ function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard, availableDeck
     </div>
   );
 }
-// 2. LESSON BUILDER (With Visibility)
-function LessonBuilderView({ data, setData, onSave }: any) {
-  // Ensure visibility exists in state (default to 'private')
-  useEffect(() => {
-      if (!data.visibility) setData({ ...data, visibility: 'private' });
-  }, []);
+// ============================================================================
+//  FULL LESSON BUILDER (Fixed Inputs)
+// ============================================================================
+function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
 
+  // --- STATE HELPERS (THE FIX) ---
+  
+  // 1. Simple Update (Title, Content, URL)
+  const updateBlock = (idx: number, field: string, val: any) => {
+      const newBlocks = [...data.blocks];
+      newBlocks[idx] = { ...newBlocks[idx], [field]: val };
+      setData({ ...data, blocks: newBlocks });
+  };
+
+  // 2. Nested Array Update (Vocab Items, Dialogue Lines, Quiz Options)
+  const updateNested = (bIdx: number, arrField: string, itemIdx: number, field: string, val: any) => {
+      const newBlocks = [...data.blocks];
+      // Create a shallow copy of the array we are modifying to ensure React detects the change
+      const newArray = [...(newBlocks[bIdx][arrField] || [])];
+      newArray[itemIdx] = { ...newArray[itemIdx], [field]: val };
+      newBlocks[bIdx] = { ...newBlocks[bIdx], [arrField]: newArray };
+      setData({ ...data, blocks: newBlocks });
+  };
+
+  // 3. Add Item to Nested Array
+  const addNestedItem = (bIdx: number, arrField: string, initialItem: any) => {
+      const newBlocks = [...data.blocks];
+      const newArray = [...(newBlocks[bIdx][arrField] || []), initialItem];
+      newBlocks[bIdx] = { ...newBlocks[bIdx], [arrField]: newArray };
+      setData({ ...data, blocks: newBlocks });
+  };
+
+  // 4. Remove Item from Nested Array
+  const removeNestedItem = (bIdx: number, arrField: string, itemIdx: number) => {
+      const newBlocks = [...data.blocks];
+      const newArray = newBlocks[bIdx][arrField].filter((_:any, i:number) => i !== itemIdx);
+      newBlocks[bIdx] = { ...newBlocks[bIdx], [arrField]: newArray };
+      setData({ ...data, blocks: newBlocks });
+  };
+
+  // --- SCENARIO SPECIFIC HELPERS ---
+  const updateScenarioNode = (bIdx: number, nIdx: number, field: string, val: string) => {
+      const newBlocks = [...data.blocks];
+      newBlocks[bIdx].nodes[nIdx][field] = val;
+      setData({ ...data, blocks: newBlocks });
+  };
+  
+  const updateScenarioOption = (bIdx: number, nIdx: number, oIdx: number, field: string, val: string) => {
+      const newBlocks = [...data.blocks];
+      newBlocks[bIdx].nodes[nIdx].options[oIdx][field] = val;
+      setData({ ...data, blocks: newBlocks });
+  };
+
+  // --- BLOCK CREATION ---
   const BLOCK_TYPES = [
       { type: 'text', label: 'Text', icon: <Type size={18}/> },
       { type: 'image', label: 'Image', icon: <ImageIcon size={18}/> },
@@ -3577,6 +3624,7 @@ function LessonBuilderView({ data, setData, onSave }: any) {
       { type: 'flashcard', label: 'Card', icon: <Layers size={18}/> },
       { type: 'vocab-list', label: 'Vocab', icon: <List size={18}/> },
       { type: 'dialogue', label: 'Dialogue', icon: <MessageSquare size={18}/> },
+      { type: 'quiz', label: 'Quiz', icon: <HelpCircle size={18}/> },
       { type: 'scenario', label: 'Scenario', icon: <GitFork size={18}/> },
       { type: 'note', label: 'Note/Tip', icon: <Info size={18}/> },
       { type: 'code', label: 'Grammar', icon: <Code size={18}/> },
@@ -3592,60 +3640,36 @@ function LessonBuilderView({ data, setData, onSave }: any) {
       if(type === 'audio') base = { ...base, url: '', caption: '' } as any;
       if(type === 'image') base = { ...base, url: '', caption: '' } as any;
       if(type === 'note') base = { ...base, variant: 'info' } as any;
-      if(type === 'scenario') base = { ...base, nodes: [{ id: 'start', text: 'Start...', options: [] }] } as any;
+      if(type === 'quiz') base = { ...base, question: '', options: [{id:'a', text:''}, {id:'b', text:''}], correctId: 'a' } as any;
+      if(type === 'scenario') base = { ...base, nodes: [{ id: 'start', text: 'Start of scenario...', options: [] }] } as any;
       
       setData({ ...data, blocks: [...(data.blocks || []), { type, ...base }] }); 
   };
 
-  const updateBlock = (idx: number, field: string, val: any) => {
-      const newBlocks = [...data.blocks];
-      newBlocks[idx] = { ...newBlocks[idx], [field]: val };
-      setData({ ...data, blocks: newBlocks });
-  };
-
-  const updateNested = (bIdx: number, arrField: string, itemIdx: number, field: string, val: any) => {
-      const newBlocks = [...data.blocks];
-      newBlocks[bIdx][arrField][itemIdx][field] = val;
-      setData({ ...data, blocks: newBlocks });
-  };
-
-  // Scenario Helpers (Minified for brevity - same as before)
-  const addScenarioNode = (bIdx: number) => { const newBlocks = [...data.blocks]; newBlocks[bIdx].nodes.push({ id: `node_${Date.now()}`, text: 'New scene...', options: [] }); setData({ ...data, blocks: newBlocks }); };
-  const addScenarioOption = (bIdx: number, nIdx: number) => { const newBlocks = [...data.blocks]; newBlocks[bIdx].nodes[nIdx].options.push({ text: 'Option...', nextNodeId: 'end' }); setData({ ...data, blocks: newBlocks }); };
-  const updateScenarioOption = (bIdx: number, nIdx: number, oIdx: number, field: string, val: string) => { const newBlocks = [...data.blocks]; newBlocks[bIdx].nodes[nIdx].options[oIdx][field] = val; setData({ ...data, blocks: newBlocks }); };
-  const deleteScenarioNode = (bIdx: number, nIdx: number) => { const newBlocks = [...data.blocks]; newBlocks[bIdx].nodes = newBlocks[bIdx].nodes.filter((_:any, i:number) => i !== nIdx); setData({ ...data, blocks: newBlocks }); };
-
   return (
     <div className="space-y-6">
+       {/* HEADER */}
        <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 flex justify-between items-center text-emerald-900">
           <h3 className="font-bold flex items-center gap-2"><BookOpen size={18}/> Lesson Builder</h3>
           <span className="text-xs font-bold bg-white px-2 py-1 rounded shadow-sm opacity-70">{(data.blocks || []).length} Blocks</span>
       </div>
 
+      {/* METADATA EDITOR */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex justify-between items-start gap-4">
               <div className="flex-1">
                   <input className="w-full text-xl font-bold border-b border-slate-100 pb-2 focus:outline-none" placeholder="Lesson Title" value={data.title} onChange={e => setData({...data, title: e.target.value})} />
               </div>
-              
-              {/* --- VISIBILITY SELECTOR --- */}
               <div className="bg-slate-100 p-1 rounded-lg flex shrink-0">
-                  <button onClick={() => setData({...data, visibility: 'private'})} className={`p-2 rounded-md flex items-center gap-2 text-xs font-bold transition-all ${data.visibility === 'private' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'}`} title="Private">
-                      <Lock size={14}/> <span className="hidden sm:inline">Private</span>
-                  </button>
-                  <button onClick={() => setData({...data, visibility: 'public'})} className={`p-2 rounded-md flex items-center gap-2 text-xs font-bold transition-all ${data.visibility === 'public' ? 'bg-white shadow text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`} title="Public">
-                      <Globe size={14}/> <span className="hidden sm:inline">Public</span>
-                  </button>
-                  <button onClick={() => setData({...data, visibility: 'draft'})} className={`p-2 rounded-md flex items-center gap-2 text-xs font-bold transition-all ${data.visibility === 'draft' ? 'bg-white shadow text-amber-600' : 'text-slate-400 hover:text-slate-600'}`} title="Draft">
-                      <EyeOff size={14}/> <span className="hidden sm:inline">Draft</span>
-                  </button>
+                  <button onClick={() => setData({...data, visibility: 'private'})} className={`p-2 rounded-md ${data.visibility === 'private' ? 'bg-white shadow text-slate-800' : 'text-slate-400'}`} title="Private"><Lock size={14}/></button>
+                  <button onClick={() => setData({...data, visibility: 'public'})} className={`p-2 rounded-md ${data.visibility === 'public' ? 'bg-white shadow text-indigo-600' : 'text-slate-400'}`} title="Public"><Globe size={14}/></button>
+                  <button onClick={() => setData({...data, visibility: 'draft'})} className={`p-2 rounded-md ${data.visibility === 'draft' ? 'bg-white shadow text-amber-600' : 'text-slate-400'}`} title="Draft"><EyeOff size={14}/></button>
               </div>
           </div>
-          
           <textarea className="w-full text-sm text-slate-600 resize-none h-20 focus:outline-none" placeholder="Short description..." value={data.description} onChange={e => setData({...data, description: e.target.value})} />
       </div>
 
-      {/* ... BLOCK EDITOR LIST (Same as before) ... */}
+      {/* BLOCK EDITOR LIST */}
       <div className="space-y-4">
           {data.blocks?.map((block: any, idx: number) => (
               <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative group transition-all hover:border-indigo-200">
@@ -3654,16 +3678,161 @@ function LessonBuilderView({ data, setData, onSave }: any) {
                       <button onClick={() => setData({...data, blocks: data.blocks.filter((_:any, i:number) => i !== idx)})} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button>
                   </div>
                   
-                  {/* ... (Include all block rendering logic from previous response) ... */}
-                  {/* For brevity, I am rendering just the text input, assumes you kept the full block map from the previous step */}
+                  {/* ==================== BLOCK TYPES ==================== */}
+
+                  {/* 1. TEXT */}
                   {block.type === 'text' && (
                       <div className="mt-2 space-y-2">
                           <input className="w-full font-bold text-sm focus:outline-none" placeholder="Header (Optional)" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)}/>
                           <textarea className="w-full text-sm bg-slate-50 p-3 rounded-lg min-h-[100px]" placeholder="Body text..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)}/>
                       </div>
                   )}
-                  {/* ... (Scenario, Image, Video, etc logic goes here) ... */}
-                  {/* Copy/Paste the block rendering map from the previous response here */}
+
+                  {/* 2. MEDIA (Image, Video, Audio) */}
+                  {['image', 'video', 'audio'].includes(block.type) && (
+                      <div className="mt-2 space-y-2">
+                          <div className="flex gap-2 items-center">
+                              {block.type === 'image' ? <ImageIcon size={16} className="text-slate-400"/> : block.type === 'video' ? <Video size={16} className="text-slate-400"/> : <Mic size={16} className="text-slate-400"/>}
+                              <input className="flex-1 p-2 border-b border-slate-100 text-sm" placeholder="Media URL (https://...)" value={block.url} onChange={e => updateBlock(idx, 'url', e.target.value)}/>
+                          </div>
+                          <input className="w-full p-2 bg-slate-50 rounded-lg text-sm italic" placeholder="Caption / Description" value={block.caption} onChange={e => updateBlock(idx, 'caption', e.target.value)}/>
+                      </div>
+                  )}
+
+                  {/* 3. FLASHCARD */}
+                  {block.type === 'flashcard' && (
+                      <div className="mt-2 flex gap-4">
+                          <div className="flex-1"><label className="text-[10px] uppercase font-bold text-slate-400">Front</label><input className="w-full p-2 border rounded-lg font-bold" value={block.front} onChange={e => updateBlock(idx, 'front', e.target.value)}/></div>
+                          <div className="flex-1"><label className="text-[10px] uppercase font-bold text-slate-400">Back</label><input className="w-full p-2 border rounded-lg" value={block.back} onChange={e => updateBlock(idx, 'back', e.target.value)}/></div>
+                      </div>
+                  )}
+
+                  {/* 4. VOCAB LIST */}
+                  {block.type === 'vocab-list' && (
+                      <div className="mt-4 space-y-2">
+                          {block.items.map((item: any, i: number) => (
+                              <div key={i} className="flex gap-2">
+                                  <input className="w-1/3 p-2 bg-slate-50 rounded font-bold text-sm" placeholder="Term" value={item.term} onChange={e => updateNested(idx, 'items', i, 'term', e.target.value)}/>
+                                  <input className="flex-1 p-2 border-b border-slate-100 text-sm" placeholder="Definition" value={item.definition} onChange={e => updateNested(idx, 'items', i, 'definition', e.target.value)}/>
+                                  <button onClick={() => removeNestedItem(idx, 'items', i)} className="text-slate-300 hover:text-rose-500"><X size={14}/></button>
+                              </div>
+                          ))}
+                          <button onClick={() => addNestedItem(idx, 'items', {term:'', definition:''})} className="text-xs font-bold text-indigo-600">+ Add Term</button>
+                      </div>
+                  )}
+
+                  {/* 5. DIALOGUE */}
+                  {block.type === 'dialogue' && (
+                      <div className="mt-4 space-y-2">
+                          {block.lines.map((line: any, i: number) => (
+                              <div key={i} className="flex gap-2 items-start">
+                                  <input className="w-12 p-1 bg-slate-100 text-center text-xs font-bold rounded" placeholder="Spk" value={line.speaker} onChange={e => updateNested(idx, 'lines', i, 'speaker', e.target.value)}/>
+                                  <div className="flex-1 space-y-1">
+                                      <input className="w-full p-1 border-b border-slate-100 text-sm" placeholder="Line" value={line.text} onChange={e => updateNested(idx, 'lines', i, 'text', e.target.value)}/>
+                                      <input className="w-full p-1 text-xs text-slate-400 italic" placeholder="Translation" value={line.translation} onChange={e => updateNested(idx, 'lines', i, 'translation', e.target.value)}/>
+                                  </div>
+                                  <button onClick={() => removeNestedItem(idx, 'lines', i)} className="text-slate-300 hover:text-rose-500"><X size={14}/></button>
+                              </div>
+                          ))}
+                          <button onClick={() => addNestedItem(idx, 'lines', {speaker:'B', text:'', translation:''})} className="text-xs font-bold text-indigo-600">+ Add Line</button>
+                      </div>
+                  )}
+                  
+                  {/* 6. QUIZ BLOCK */}
+                  {block.type === 'quiz' && (
+                      <div className="mt-2 space-y-3">
+                          <input className="w-full font-bold bg-slate-50 p-2 rounded" placeholder="Question?" value={block.question} onChange={e => updateBlock(idx, 'question', e.target.value)} />
+                          {block.options.map((opt:any, oIdx:number) => (
+                              <div key={oIdx} className="flex gap-2 items-center">
+                                  <input type="radio" checked={block.correctId === opt.id} onChange={() => updateBlock(idx, 'correctId', opt.id)} />
+                                  <input className="w-8 p-1 bg-slate-100 text-center text-xs" value={opt.id} readOnly/>
+                                  <input className="flex-1 p-1 border-b border-slate-100 text-sm" value={opt.text} onChange={e => updateNested(idx, 'options', oIdx, 'text', e.target.value)}/>
+                              </div>
+                          ))}
+                          <div className="flex gap-2">
+                             <button onClick={() => addNestedItem(idx, 'options', {id: String.fromCharCode(97 + block.options.length), text: ''})} className="text-xs font-bold text-indigo-600">+ Add Option</button>
+                          </div>
+                      </div>
+                  )}
+
+                  {/* 7. SCENARIO BUILDER */}
+                  {block.type === 'scenario' && (
+                      <div className="mt-2 space-y-4">
+                          <input className="w-full font-bold text-sm focus:outline-none border-b border-slate-100 pb-1" placeholder="Scenario Title (e.g. At the Market)" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)}/>
+                          <div className="space-y-3 pl-2 border-l-2 border-slate-100">
+                              {block.nodes?.map((node: any, nIdx: number) => (
+                                  <div key={node.id} className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                      <div className="flex justify-between mb-2">
+                                          <span className="text-[10px] font-mono text-indigo-400 bg-white px-1 rounded border border-slate-200">ID: {node.id}</span>
+                                          <button onClick={() => {
+                                              const newBlocks = [...data.blocks];
+                                              newBlocks[idx].nodes = newBlocks[idx].nodes.filter((_:any, i:number) => i !== nIdx);
+                                              setData({ ...data, blocks: newBlocks });
+                                          }} className="text-slate-300 hover:text-rose-500"><X size={12}/></button>
+                                      </div>
+                                      <textarea className="w-full p-2 text-sm border border-slate-200 rounded mb-2" placeholder="Scene text..." value={node.text} onChange={(e) => updateScenarioNode(idx, nIdx, 'text', e.target.value)}/>
+                                      
+                                      <div className="space-y-2">
+                                          {node.options.map((opt: any, oIdx: number) => (
+                                              <div key={oIdx} className="flex gap-2 items-center">
+                                                  <ArrowRight size={12} className="text-slate-400"/>
+                                                  <input className="flex-1 p-1 text-xs border rounded" placeholder="Choice text" value={opt.text} onChange={(e) => updateScenarioOption(idx, nIdx, oIdx, 'text', e.target.value)} />
+                                                  <span className="text-[10px] text-slate-400">Goes to:</span>
+                                                  <select className="p-1 text-xs border rounded w-24" value={opt.nextNodeId} onChange={(e) => updateScenarioOption(idx, nIdx, oIdx, 'nextNodeId', e.target.value)}>
+                                                      <option value="end">End</option>
+                                                      {block.nodes.map((n:any) => <option key={n.id} value={n.id}>{n.id === node.id ? '(Self)' : n.id}</option>)}
+                                                  </select>
+                                                  <button onClick={() => {
+                                                       const newBlocks = [...data.blocks];
+                                                       newBlocks[idx].nodes[nIdx].options = node.options.filter((_:any, i:number) => i !== oIdx);
+                                                       setData({ ...data, blocks: newBlocks });
+                                                  }} className="text-rose-400"><X size={12}/></button>
+                                              </div>
+                                          ))}
+                                          <button onClick={() => {
+                                              const newBlocks = [...data.blocks];
+                                              newBlocks[idx].nodes[nIdx].options.push({ text: 'Option...', nextNodeId: 'end' });
+                                              setData({ ...data, blocks: newBlocks });
+                                          }} className="text-[10px] font-bold text-indigo-600 bg-white border border-indigo-200 px-2 py-1 rounded hover:bg-indigo-50">+ Choice</button>
+                                      </div>
+                                  </div>
+                              ))}
+                          </div>
+                          <button onClick={() => {
+                              const newBlocks = [...data.blocks];
+                              newBlocks[idx].nodes.push({ id: `node_${Date.now()}`, text: 'New scene...', options: [] });
+                              setData({ ...data, blocks: newBlocks });
+                          }} className="w-full py-2 border-2 border-dashed border-indigo-200 rounded-xl text-indigo-400 font-bold text-xs hover:bg-indigo-50 hover:text-indigo-600">+ Add Scene Node</button>
+                      </div>
+                  )}
+
+                  {/* 8. NOTE/TIP */}
+                  {block.type === 'note' && (
+                      <div className="mt-2 space-y-2">
+                          <div className="flex gap-2">
+                              <select className="bg-slate-100 text-xs font-bold p-2 rounded" value={block.variant} onChange={e => updateBlock(idx, 'variant', e.target.value)}>
+                                  <option value="info">Info</option><option value="tip">Tip</option><option value="warning">Warning</option>
+                              </select>
+                              <input className="flex-1 p-2 font-bold text-sm border-b border-slate-100" placeholder="Title" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)}/>
+                          </div>
+                          <textarea className="w-full p-2 bg-amber-50 rounded text-sm text-amber-900" placeholder="Note content..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)}/>
+                      </div>
+                  )}
+
+                  {/* 9. CODE/GRAMMAR */}
+                  {block.type === 'code' && (
+                      <div className="mt-2">
+                          <textarea className="w-full p-3 bg-slate-900 text-green-400 font-mono text-xs rounded-xl" placeholder="Grammar rule or code snippet..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)}/>
+                      </div>
+                  )}
+
+                  {/* 10. QUOTE */}
+                  {block.type === 'quote' && (
+                      <div className="mt-2 space-y-2">
+                          <textarea className="w-full p-3 border-l-4 border-slate-300 text-lg font-serif italic" placeholder="Quote..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)}/>
+                          <input className="w-full text-right text-xs text-slate-500" placeholder="- Author" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)}/>
+                      </div>
+                  )}
               </div>
           ))}
       </div>
