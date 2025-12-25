@@ -930,12 +930,35 @@ function QuizGame({ deckCards, onGameEnd }: any) {
     );
 }
 
-function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, activeDeckOverride, onComplete, onLogActivity, userData, onUpdatePrefs, onDeleteDeck }: any) {
- useLearningTimer(props.userData ? auth.currentUser : null, selectedDeckKey, 'deck', deck?.title || 'Flashcards');
+function FlashcardView({ 
+  allDecks, 
+  selectedDeckKey, 
+  onSelectDeck, 
+  onSaveCard, 
+  activeDeckOverride, 
+  onComplete, 
+  onLogActivity, 
+  userData, 
+  onUpdatePrefs, 
+  onDeleteDeck 
+}: any) {
+  
+  // 1. DATA PREP (Must be first for the hook)
+  const currentDeck = activeDeckOverride || allDecks[selectedDeckKey];
+  const userPrefs = userData?.deckPreferences || { hiddenDeckIds: [], customOrder: [] };
+
+  // 2. ANALYTICS HOOK
+  useLearningTimer(
+      userData ? auth.currentUser : null, 
+      selectedDeckKey, 
+      'deck', 
+      currentDeck?.title || 'Flashcards'
+  );
+
   // --- STATE ---
   const [viewState, setViewState] = useState<'browsing' | 'playing'>(activeDeckOverride ? 'playing' : 'browsing');
   const [filterLang, setFilterLang] = useState('All');
-  const [isEditMode, setIsEditMode] = useState(false); // NEW: Toggle reorder/delete mode
+  const [isEditMode, setIsEditMode] = useState(false);
   const [completionMsg, setCompletionMsg] = useState<string | null>(null);
 
   // Accordion State
@@ -950,10 +973,10 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   };
 
   // Player State
+  const [gameMode, setGameMode] = useState('study'); 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [xrayMode, setXrayMode] = useState(false);
-  const [gameMode, setGameMode] = useState('study'); 
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
 
   // Pointer/Swipe State
@@ -961,13 +984,8 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   const [dragEndX, setDragEndX] = useState<number | null>(null);
   const minSwipeDistance = 50; 
 
-  // --- DERIVED DATA & PREFERENCES ---
-  const currentDeck = activeDeckOverride || allDecks[selectedDeckKey];
-  const userPrefs = userData?.deckPreferences || { hiddenDeckIds: [], customOrder: [] };
-
-  // 1. Process and Categorize Decks
+  // --- MEMOS & FILTERING ---
   const { assignments, customDecks, libraryDecks, allProcessed, languages } = useMemo(() => {
-      // Helper to check if hidden
       const isHidden = (id: string) => userPrefs.hiddenDeckIds?.includes(id);
 
       const processed = Object.entries(allDecks)
@@ -981,20 +999,14 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
             return { id: key, ...deck, language: detectedLang, category, isHidden: isHidden(key) };
         });
 
-      // --- SORTING LOGIC ---
-      // We sort based on the index in the customOrder array. 
-      // If an ID isn't in the array, it goes to the bottom.
+      // Sort Order Logic
       const sortOrder = userPrefs.customOrder || [];
       const sorter = (a: any, b: any) => {
           const idxA = sortOrder.indexOf(a.id);
           const idxB = sortOrder.indexOf(b.id);
-          // If both are in the list, sort by index
           if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-          // If only A is in list, A comes first
           if (idxA !== -1) return -1;
-          // If only B is in list, B comes first
           if (idxB !== -1) return 1;
-          // Otherwise sort alphabetically
           return a.title.localeCompare(b.title);
       };
 
@@ -1009,80 +1021,27 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
       };
   }, [allDecks, userPrefs]);
 
-  // 2. Apply Language Filter & Visibility Filter
+  // Apply Language & Visibility Filters
   const filterList = (list: any[]) => {
       let filtered = list;
-      // Filter by Language
-      if (filterLang !== 'All') {
-          filtered = filtered.filter(d => d.language === filterLang);
-      }
-      // Filter by Visibility (Unless in Edit Mode)
-      if (!isEditMode) {
-          filtered = filtered.filter(d => !d.isHidden);
-      }
+      if (filterLang !== 'All') filtered = filtered.filter(d => d.language === filterLang);
+      if (!isEditMode) filtered = filtered.filter(d => !d.isHidden);
       return filtered;
   };
 
   const visibleAssignments = filterList(assignments);
   const visibleCustom = filterList(customDecks);
   const visibleLibrary = filterList(libraryDecks);
-
   const totalCardsAvailable = allProcessed.reduce((acc, deck: any) => acc + deck.cards.length, 0);
+
+  // Player Data
   const deckCards = currentDeck?.cards || [];
   const card = deckCards[currentIndex];
   const theme = card ? (TYPE_COLORS[card.type] || TYPE_COLORS.noun) : TYPE_COLORS.noun;
 
-  // --- PREFERENCE ACTIONS ---
-  const handleMove = (id: string, direction: 'up' | 'down', list: any[]) => {
-      const currentOrder = list.map(d => d.id);
-      const currentIndex = currentOrder.indexOf(id);
-      if (currentIndex === -1) return;
-
-      const newOrder = [...currentOrder];
-      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-
-      // Bounds check
-      if (targetIndex < 0 || targetIndex >= newOrder.length) return;
-
-      // Swap
-      [newOrder[currentIndex], newOrder[targetIndex]] = [newOrder[targetIndex], newOrder[currentIndex]];
-
-      // We need to merge this specific list's new order with the global preference list
-      // 1. Get existing global order
-      const globalOrder = [...(userPrefs.customOrder || [])];
-      
-      // 2. Ensure all items in current list are in global order (for first time sort)
-      list.forEach(d => { if(!globalOrder.includes(d.id)) globalOrder.push(d.id); });
-
-      // 3. Reconstruct global order based on the swap
-      const id1 = currentOrder[currentIndex];
-      const id2 = currentOrder[targetIndex];
-      
-      // Find their positions in global and swap them there too
-      const gIdx1 = globalOrder.indexOf(id1);
-      const gIdx2 = globalOrder.indexOf(id2);
-      
-      if(gIdx1 !== -1 && gIdx2 !== -1) {
-          [globalOrder[gIdx1], globalOrder[gIdx2]] = [globalOrder[gIdx2], globalOrder[gIdx1]];
-      }
-
-      onUpdatePrefs({ ...userPrefs, customOrder: globalOrder });
-  };
-
-  const handleToggleHide = (id: string) => {
-      const hidden = userPrefs.hiddenDeckIds || [];
-      let newHidden;
-      if (hidden.includes(id)) {
-          newHidden = hidden.filter((h: string) => h !== id);
-      } else {
-          newHidden = [...hidden, id];
-      }
-      onUpdatePrefs({ ...userPrefs, hiddenDeckIds: newHidden });
-  };
-
   // --- ACTIONS ---
   const launchDeck = (key: string) => {
-    if (isEditMode) return; // Disable launching in edit mode
+    if (isEditMode) return;
     onSelectDeck(key);
     setCurrentIndex(0);
     setIsFlipped(false);
@@ -1095,7 +1054,40 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
     launchDeck(largestDeck.id);
   };
 
-  // --- GAME END (Unchanged) ---
+  // Preference Handlers
+  const handleMove = (id: string, direction: 'up' | 'down', list: any[]) => {
+      const currentOrder = list.map(d => d.id);
+      const currentIndex = currentOrder.indexOf(id);
+      if (currentIndex === -1) return;
+
+      const newOrder = [...currentOrder];
+      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      if (targetIndex < 0 || targetIndex >= newOrder.length) return;
+
+      [newOrder[currentIndex], newOrder[targetIndex]] = [newOrder[targetIndex], newOrder[currentIndex]];
+
+      // Sync with global order
+      const globalOrder = [...(userPrefs.customOrder || [])];
+      list.forEach(d => { if(!globalOrder.includes(d.id)) globalOrder.push(d.id); });
+      
+      const id1 = currentOrder[currentIndex];
+      const id2 = currentOrder[targetIndex];
+      const gIdx1 = globalOrder.indexOf(id1);
+      const gIdx2 = globalOrder.indexOf(id2);
+      
+      if(gIdx1 !== -1 && gIdx2 !== -1) {
+          [globalOrder[gIdx1], globalOrder[gIdx2]] = [globalOrder[gIdx2], globalOrder[gIdx1]];
+      }
+      onUpdatePrefs({ ...userPrefs, customOrder: globalOrder });
+  };
+
+  const handleToggleHide = (id: string) => {
+      const hidden = userPrefs.hiddenDeckIds || [];
+      const newHidden = hidden.includes(id) ? hidden.filter((h: string) => h !== id) : [...hidden, id];
+      onUpdatePrefs({ ...userPrefs, hiddenDeckIds: newHidden });
+  };
+
+  // Game/Player Handlers
   const handleGameEnd = (data: any) => { 
       let xp = 0;
       let message = "";
@@ -1120,7 +1112,6 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
       }
   };
 
-  // --- NAVIGATION (Unchanged) ---
   const handleNext = useCallback(() => {
     setXrayMode(false); setIsFlipped(false); setSwipeDirection('left');
     setTimeout(() => { setCurrentIndex((prev) => (prev + 1) % deckCards.length); setSwipeDirection(null); }, 200);
@@ -1150,7 +1141,8 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
     setDragStartX(null); setDragEndX(null);
   };
 
-  // --- RENDER COMPONENT: DECK CARD ---
+  // --- SUB-COMPONENTS ---
+  
   const DeckCard = ({ deck, icon, colorClass, borderClass, fullList }: any) => (
       <div 
           onClick={() => launchDeck(deck.id)}
@@ -1160,7 +1152,6 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
               : `hover:shadow-md cursor-pointer ${borderClass || 'border-slate-100 hover:border-indigo-200'}`
           } ${deck.isHidden ? 'opacity-60 bg-slate-50' : ''}`}
       >
-          {/* Language Stripe */}
           <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
               deck.language === 'Latin' ? 'bg-purple-500' : 
               deck.language === 'Spanish' ? 'bg-orange-500' :
@@ -1188,7 +1179,6 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                   </div>
               </div>
               
-              {/* EDIT MODE CONTROLS */}
               {isEditMode ? (
                   <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                       <button onClick={() => handleMove(deck.id, 'up', fullList)} className="p-2 bg-slate-100 rounded-lg hover:bg-indigo-100 hover:text-indigo-600"><ArrowUp size={16}/></button>
@@ -1206,13 +1196,11 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                   <div className="text-slate-300 group-hover:text-indigo-500 transition-colors"><ChevronRight size={18}/></div>
               )}
           </div>
-
-          {/* Progress Bar (Hidden in edit mode) */}
+          
           {!isEditMode && (
               <div className="w-full pl-2 pr-1">
                   <div className="flex justify-between text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      <span>Progress</span>
-                      <span>{deck.mastery || 0}%</span>
+                      <span>Progress</span><span>{deck.mastery || 0}%</span>
                   </div>
                   <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                       <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${deck.mastery || 5}%` }}></div>
@@ -1222,9 +1210,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
       </div>
   );
 
-  // --- RENDER COMPONENT: ACCORDION WRAPPER (Unchanged) ---
   const SectionAccordion = ({ title, icon, count, isOpen, onToggle, children, colorTheme = "indigo" }: any) => {
-    // Theme mapping
     const theme: any = {
         indigo: { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-200' },
         emerald: { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' },
@@ -1235,14 +1221,9 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
 
     return (
         <div className={`mb-4 rounded-2xl bg-white border ${isOpen ? t.border : 'border-slate-200'} shadow-sm overflow-hidden transition-all duration-300`}>
-            <button 
-                onClick={onToggle}
-                className="w-full p-4 flex items-center justify-between active:bg-slate-50 transition-colors"
-            >
+            <button onClick={onToggle} className="w-full p-4 flex items-center justify-between active:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-xl ${t.bg} ${t.text}`}>
-                        {icon}
-                    </div>
+                    <div className={`p-2 rounded-xl ${t.bg} ${t.text}`}>{icon}</div>
                     <div className="text-left">
                         <h3 className="font-bold text-slate-800 text-sm">{title}</h3>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{count} Decks</p>
@@ -1252,12 +1233,9 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                     <ChevronDown size={16} />
                 </div>
             </button>
-            
             <div className={`transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
                 <div className="p-4 pt-0 border-t border-slate-50">
-                    <div className="pt-4 grid grid-cols-1 gap-3">
-                        {children}
-                    </div>
+                    <div className="pt-4 grid grid-cols-1 gap-3">{children}</div>
                 </div>
             </div>
         </div>
@@ -1270,8 +1248,6 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
 
       {viewState === 'browsing' ? (
         <div className="h-full bg-slate-50 flex flex-col overflow-y-auto pb-24 animate-in fade-in custom-scrollbar">
-            
-            {/* --- HEADER SECTION --- */}
             <div className="bg-white p-6 pb-2 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 relative z-10">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-2xl font-bold text-slate-900">Practice Hub</h1>
@@ -1284,16 +1260,11 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                                 {filterLang}
                             </button>
                         )}
-                        <button 
-                            onClick={() => setIsEditMode(!isEditMode)} 
-                            className={`px-3 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-1 transition-colors ${isEditMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500'}`}
-                        >
+                        <button onClick={() => setIsEditMode(!isEditMode)} className={`px-3 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-1 transition-colors ${isEditMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500'}`}>
                             <Settings2 size={12}/> {isEditMode ? 'Done' : 'Manage'}
                         </button>
                     </div>
                 </div>
-
-                {/* Quick Stats Row */}
                 <div className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar">
                     <div className="flex-1 min-w-[140px] bg-gradient-to-br from-indigo-50 to-blue-50 p-3 rounded-2xl border border-indigo-100 flex flex-col justify-center items-center">
                         <span className="text-2xl font-black text-indigo-600">{totalCardsAvailable}</span>
@@ -1310,99 +1281,26 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
                 </div>
             </div>
 
-            {/* --- CONTENT SECTIONS (ACCORDIONS) --- */}
             <div className="p-6">
-                
-                {/* 1. ASSIGNMENTS */}
                 {(isEditMode ? assignments : visibleAssignments).length > 0 && (
-                    <SectionAccordion 
-                        title="Class Assignments" 
-                        icon={<School size={20}/>} 
-                        count={(isEditMode ? assignments : visibleAssignments).length}
-                        isOpen={openSections.assignments}
-                        onToggle={() => toggleSection('assignments')}
-                        colorTheme="amber"
-                    >
-                        {(isEditMode ? assignments : visibleAssignments).map((deck: any) => (
-                            <DeckCard 
-                                key={deck.id} 
-                                deck={deck} 
-                                fullList={assignments}
-                                icon={<School size={20}/>} 
-                                colorClass="bg-amber-100 text-amber-600"
-                                borderClass="border-amber-200 hover:border-amber-400"
-                            />
-                        ))}
+                    <SectionAccordion title="Class Assignments" icon={<School size={20}/>} count={(isEditMode ? assignments : visibleAssignments).length} isOpen={openSections.assignments} onToggle={() => toggleSection('assignments')} colorTheme="amber">
+                        {(isEditMode ? assignments : visibleAssignments).map((deck: any) => <DeckCard key={deck.id} deck={deck} fullList={assignments} icon={<School size={20}/>} colorClass="bg-amber-100 text-amber-600" borderClass="border-amber-200 hover:border-amber-400" />)}
                     </SectionAccordion>
                 )}
 
-                {/* 2. CUSTOM DECKS */}
-                <SectionAccordion 
-                    title="My Collections" 
-                    icon={<Feather size={20}/>} 
-                    count={(isEditMode ? customDecks : visibleCustom).length}
-                    isOpen={openSections.custom}
-                    onToggle={() => toggleSection('custom')}
-                    colorTheme="emerald"
-                >
-                    {(isEditMode ? customDecks : visibleCustom).length > 0 ? (
-                        (isEditMode ? customDecks : visibleCustom).map((deck: any) => (
-                            <DeckCard 
-                                key={deck.id} 
-                                deck={deck} 
-                                fullList={customDecks}
-                                icon={<Feather size={20}/>} 
-                                colorClass="bg-emerald-100 text-emerald-600"
-                                borderClass="border-slate-100 hover:border-emerald-300"
-                            />
-                        ))
-                    ) : (
-                        <div className="p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center">
-                            <p className="text-sm text-slate-400 font-bold">No custom decks yet.</p>
-                            <p className="text-xs text-slate-300 mt-1">Use the Creator tab to build one!</p>
-                        </div>
-                    )}
+                <SectionAccordion title="My Collections" icon={<Feather size={20}/>} count={(isEditMode ? customDecks : visibleCustom).length} isOpen={openSections.custom} onToggle={() => toggleSection('custom')} colorTheme="emerald">
+                    {(isEditMode ? customDecks : visibleCustom).length > 0 ? (isEditMode ? customDecks : visibleCustom).map((deck: any) => <DeckCard key={deck.id} deck={deck} fullList={customDecks} icon={<Feather size={20}/>} colorClass="bg-emerald-100 text-emerald-600" borderClass="border-slate-100 hover:border-emerald-300" />) : <div className="p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center"><p className="text-sm text-slate-400 font-bold">No custom decks yet.</p><p className="text-xs text-slate-300 mt-1">Use the Creator tab to build one!</p></div>}
                 </SectionAccordion>
 
-                {/* 3. LIBRARY */}
-                <SectionAccordion 
-                    title="System Library" 
-                    icon={<Library size={20}/>} 
-                    count={(isEditMode ? libraryDecks : visibleLibrary).length}
-                    isOpen={openSections.library}
-                    onToggle={() => toggleSection('library')}
-                    colorTheme="blue"
-                >
-                    {(isEditMode ? libraryDecks : visibleLibrary).length > 0 ? (
-                        (isEditMode ? libraryDecks : visibleLibrary).map((deck: any) => (
-                            <DeckCard 
-                                key={deck.id} 
-                                deck={deck} 
-                                fullList={libraryDecks}
-                                icon={<BookOpen size={20}/>} 
-                                colorClass="bg-blue-100 text-blue-600"
-                                borderClass="border-slate-100 hover:border-blue-300"
-                            />
-                        ))
-                    ) : (
-                        <div className="p-4 text-center text-slate-400 text-xs italic">Library empty for this filter.</div>
-                    )}
+                <SectionAccordion title="System Library" icon={<Library size={20}/>} count={(isEditMode ? libraryDecks : visibleLibrary).length} isOpen={openSections.library} onToggle={() => toggleSection('library')} colorTheme="blue">
+                    {(isEditMode ? libraryDecks : visibleLibrary).length > 0 ? (isEditMode ? libraryDecks : visibleLibrary).map((deck: any) => <DeckCard key={deck.id} deck={deck} fullList={libraryDecks} icon={<BookOpen size={20}/>} colorClass="bg-blue-100 text-blue-600" borderClass="border-slate-100 hover:border-blue-300" />) : <div className="p-4 text-center text-slate-400 text-xs italic">Library empty for this filter.</div>}
                 </SectionAccordion>
-
-                {/* BOTTOM SPACER */}
                 <div className="h-8"></div>
             </div>
         </div>
       ) : (
-        /* PLAYER VIEW (Unchanged) */
         <div className="h-[calc(100vh-80px)] flex flex-col bg-slate-50 pb-6 relative overflow-hidden">
-          <Header 
-            title={currentDeck?.title || "Deck"} 
-            subtitle={`${currentIndex + 1} / ${deckCards.length} Cards`} 
-            sticky={false}
-            onClickTitle={() => setViewState('browsing')} 
-            rightAction={<button onClick={() => setViewState('browsing')} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 text-slate-500"><X size={20} /></button>} 
-          />
+          <Header title={currentDeck?.title || "Deck"} subtitle={`${currentIndex + 1} / ${deckCards.length} Cards`} sticky={false} onClickTitle={() => setViewState('browsing')} rightAction={<button onClick={() => setViewState('browsing')} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 text-slate-500"><X size={20} /></button>} />
           
           <div className="px-6 mt-2 mb-4 z-10">
               <div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto shadow-inner">
@@ -1458,6 +1356,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
     </>
   );
 }
+
 function LessonView({ lesson, onFinish }: any) {
   useLearningTimer(auth.currentUser, lesson.id, 'lesson', lesson.title);
   const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
