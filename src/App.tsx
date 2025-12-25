@@ -1463,7 +1463,8 @@ const JuicyDeckBlock = ({ items, title }: any) => {
     };
 
     return (
-        <div className="my-8 w-full max-w-sm mx-auto">
+        // 👇 FIX: Changed w-full to w-[90%] to prevent stack overflow
+        <div className="my-8 w-[90%] max-w-sm mx-auto relative">
             <div className="flex justify-between items-center mb-4 px-2">
                 <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2"><Layers size={14}/> {title || "Flashcards"}</h4>
                 <div className="flex gap-1">{items.map((_:any, i:number) => <div key={i} className={`h-1 w-4 rounded-full transition-colors ${i === index ? 'bg-indigo-500' : 'bg-slate-200'}`} />)}</div>
@@ -1483,6 +1484,7 @@ const JuicyDeckBlock = ({ items, title }: any) => {
                         <p className="text-lg font-medium leading-relaxed relative z-10">{currentCard.definition || currentCard.back}</p>
                     </div>
                 </div>
+                {/* Decoration */}
                 <div className="absolute top-2 left-2 w-full h-full bg-slate-100 rounded-2xl -z-10 border border-slate-200 shadow-sm transform rotate-2"></div>
             </div>
 
@@ -1716,8 +1718,11 @@ function LessonView({ lesson, onFinish }: any) {
   const isInteractive = activeBlock.type === 'quiz' || (activeBlock.type === 'scenario' && activeBlock.nodes);
 
   return (
-    <div id="lesson-scroll-container" className="h-full flex flex-col bg-white overflow-y-auto relative scroll-smooth">
-        {/* HEADER */}
+<div 
+    id="lesson-scroll-container" 
+    // 👇 FIX: Added overflow-x-hidden to kill horizontal scrolling
+    className="h-full flex flex-col bg-white overflow-y-auto overflow-x-hidden relative scroll-smooth"
+>        {/* HEADER */}
         <div className="sticky top-0 bg-white/95 backdrop-blur-md z-40 px-6 py-4 border-b border-slate-100 shadow-sm">
             <div className="flex justify-between items-center mb-2">
                 <button onClick={handleExit} className="p-2 -ml-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-rose-500 transition-colors"><X size={20} /></button>
