@@ -1357,14 +1357,13 @@ function FlashcardView({
   );
 }
 // ============================================================================
-//  ULTIMATE LESSON VIEW (Sequential Scroll + Fixed Flashcards)
+//  ULTIMATE LESSON VIEW (With Fixed Scroll Reset)
 // ============================================================================
 
-// --- 1. JUICY DECK (Fixed 3D CSS) ---
+// --- 1. JUICY DECK ---
 const JuicyDeckBlock = ({ items, title }: any) => {
     const [index, setIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
-
     const currentCard = items[index];
 
     const handleSwipe = (dir: number) => {
@@ -1374,7 +1373,6 @@ const JuicyDeckBlock = ({ items, title }: any) => {
         }, 200);
     };
 
-    // Text-to-Speech
     const playAudio = (text: string) => {
         if ('speechSynthesis' in window) {
             const utterance = new SpeechSynthesisUtterance(text);
@@ -1388,47 +1386,22 @@ const JuicyDeckBlock = ({ items, title }: any) => {
                 <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2"><Layers size={14}/> {title || "Flashcards"}</h4>
                 <div className="flex gap-1">{items.map((_:any, i:number) => <div key={i} className={`h-1 w-4 rounded-full transition-colors ${i === index ? 'bg-indigo-500' : 'bg-slate-200'}`} />)}</div>
             </div>
-            
-            {/* 3D SCENE */}
             <div className="group h-64 cursor-pointer relative perspective-1000" onClick={() => setIsFlipped(!isFlipped)}>
-                <div 
-                    className="relative w-full h-full transition-all duration-500 transform-style-3d"
-                    style={{ 
-                        transformStyle: 'preserve-3d', 
-                        transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' 
-                    }}
-                >
-                    {/* FRONT */}
-                    <div 
-                        className="absolute inset-0 bg-white rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center justify-center p-6 text-center backface-hidden"
-                        style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
-                    >
+                <div className="relative w-full h-full transition-all duration-500 transform-style-3d" style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}>
+                    <div className="absolute inset-0 bg-white rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center justify-center p-6 text-center backface-hidden" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
                         <span className="absolute top-4 left-4 text-[10px] font-bold text-slate-300 uppercase">Term</span>
                         <h3 className="text-2xl font-black text-slate-800">{currentCard.term || currentCard.front}</h3>
                         <button onClick={(e) => { e.stopPropagation(); playAudio(currentCard.term || currentCard.front); }} className="absolute bottom-4 right-4 p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"><Volume2 size={18}/></button>
                         <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[10px] text-slate-300 font-medium uppercase tracking-widest">Tap to Flip</p>
                     </div>
-
-                    {/* BACK */}
-                    <div 
-                        className="absolute inset-0 bg-slate-900 rounded-2xl shadow-xl flex flex-col items-center justify-center p-6 text-white text-center backface-hidden"
-                        style={{ 
-                            backfaceVisibility: 'hidden', 
-                            WebkitBackfaceVisibility: 'hidden', 
-                            transform: 'rotateY(180deg)' 
-                        }}
-                    >
+                    <div className="absolute inset-0 bg-slate-900 rounded-2xl shadow-xl flex flex-col items-center justify-center p-6 text-white text-center backface-hidden" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
                         <div className="absolute top-[-50%] left-[-50%] w-full h-full bg-indigo-500/20 rounded-full blur-[60px]"></div>
                         <span className="absolute top-4 left-4 text-[10px] font-bold text-slate-500 uppercase">Definition</span>
                         <p className="text-lg font-medium leading-relaxed relative z-10">{currentCard.definition || currentCard.back}</p>
                     </div>
                 </div>
-                
-                {/* Stack Decorations */}
                 <div className="absolute top-2 left-2 w-full h-full bg-slate-100 rounded-2xl -z-10 border border-slate-200 shadow-sm transform rotate-2"></div>
             </div>
-
-            {/* Controls */}
             <div className="flex justify-between items-center mt-6 px-4">
                 <button onClick={() => handleSwipe(-1)} className="p-3 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 shadow-sm active:scale-95"><ArrowLeft size={20}/></button>
                 <div className="text-xs font-bold text-slate-400">{index + 1} / {items.length}</div>
@@ -1447,7 +1420,6 @@ const ScenarioBlock = ({ block, onComplete }: any) => {
     if (!currentNode) return <div className="p-4 bg-red-50 text-red-500">Error: Broken Scenario Link</div>;
 
     const isEnd = !currentNode.options || currentNode.options.length === 0 || currentNode.options[0].nextNodeId === 'end';
-
     const bgColors: any = { neutral: 'bg-slate-900', success: 'bg-emerald-900', failure: 'bg-rose-900', critical: 'bg-amber-900' };
     const borderColor = currentNode.color === 'success' ? 'border-emerald-500' : currentNode.color === 'failure' ? 'border-rose-500' : 'border-slate-700';
 
@@ -1491,9 +1463,6 @@ const QuizBlock = ({ block, onComplete }: any) => {
 
     const handleSubmit = () => {
         setSubmitted(true);
-        if (selected === block.correctId) {
-            // Success sound could go here
-        }
     };
 
     return (
@@ -1545,20 +1514,30 @@ const ChatDialogueBlock = ({ lines }: any) => (
     </div>
 );
 
-// --- 5. MAIN LESSON VIEW (Sequential Scroll) ---
+// --- 5. MAIN LESSON VIEW (With Fixed Scroll) ---
 function LessonView({ lesson, onFinish }: any) {
   // Analytics
   useLearningTimer(auth.currentUser, lesson.id, 'lesson', lesson.title);
 
-  // We show all blocks from 0 to currentBlockIdx
+  // Scroll Reset Logic
+  const resetScroll = () => {
+      window.scrollTo(0, 0); // Reset Window
+      const container = document.getElementById('lesson-scroll-container');
+      if (container) container.scrollTop = 0; // Reset Container
+  };
+
+  // Force scroll reset on mount
+  useLayoutEffect(() => {
+      resetScroll();
+  }, []);
+
   const [currentBlockIdx, setCurrentBlockIdx] = useState(0);
   const blocks = lesson.blocks || [];
   const progress = ((currentBlockIdx + 1) / blocks.length) * 100;
   
-  // Ref for the bottom of the content
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll when new block is added
+  // Auto-scroll when new block appears
   useEffect(() => {
       if (bottomRef.current) {
           bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1569,8 +1548,16 @@ function LessonView({ lesson, onFinish }: any) {
       if (currentBlockIdx < blocks.length - 1) {
           setCurrentBlockIdx(prev => prev + 1);
       } else {
+          // --- THE FIX: SCROLL TO TOP BEFORE EXITING ---
+          resetScroll();
           onFinish(lesson.id, lesson.xp, lesson.title);
       }
+  };
+
+  const handleExit = () => {
+      // --- THE FIX: SCROLL TO TOP BEFORE EXITING ---
+      resetScroll();
+      onFinish(null, 0);
   };
 
   const renderBlockContent = (block: any) => {
@@ -1623,7 +1610,6 @@ function LessonView({ lesson, onFinish }: any) {
       }
   };
 
-  // Get the CURRENT block to check if we should show the "Next" button
   const activeBlock = blocks[currentBlockIdx];
   const isInteractive = activeBlock.type === 'quiz' || (activeBlock.type === 'scenario' && activeBlock.nodes);
 
@@ -1632,7 +1618,7 @@ function LessonView({ lesson, onFinish }: any) {
         {/* HEADER */}
         <div className="sticky top-0 bg-white/95 backdrop-blur-md z-40 px-6 py-4 border-b border-slate-100 shadow-sm">
             <div className="flex justify-between items-center mb-2">
-                <button onClick={() => onFinish(null, 0)} className="p-2 -ml-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-rose-500 transition-colors"><X size={20} /></button>
+                <button onClick={handleExit} className="p-2 -ml-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-rose-500 transition-colors"><X size={20} /></button>
                 <div className="flex flex-col items-end">
                     <span className="text-[10px] font-black text-slate-300 tracking-widest uppercase">Progress</span>
                     <span className="text-xs font-bold text-slate-800">{currentBlockIdx + 1} <span className="text-slate-300">/</span> {blocks.length}</span>
@@ -1648,13 +1634,12 @@ function LessonView({ lesson, onFinish }: any) {
             {blocks.slice(0, currentBlockIdx + 1).map((block: any, idx: number) => (
                 <div key={idx} className={idx === currentBlockIdx ? "min-h-[50vh] flex flex-col justify-center" : "opacity-40 hover:opacity-100 transition-opacity duration-500 mb-12 border-b border-slate-100 pb-12"}>
                     {renderBlockContent(block)}
-                    {/* Ref anchor for the NEWEST block */}
                     {idx === currentBlockIdx && <div ref={bottomRef} className="h-1 w-1"></div>}
                 </div>
             ))}
         </div>
 
-        {/* FOOTER NAV (Only shows if NOT interactive, or if it's the last block) */}
+        {/* FOOTER NAV */}
         {!isInteractive && (
             <div className="fixed bottom-6 left-0 right-0 px-6 z-50 flex justify-center pointer-events-none">
                 <button 
