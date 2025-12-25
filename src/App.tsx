@@ -5346,19 +5346,293 @@ function InstructorInbox({ onGradeSubmission }: any) {
     </div>
   );
 }
+// ============================================================================
+//  JUICY TOAST NOTIFICATION
+// ============================================================================
+// ============================================================================
+//  1. JUICY TOAST NOTIFICATION (Sleek Popups)
+// ============================================================================
+function JuicyToast({ message, type = 'success', onClose }: any) {
+    useEffect(() => {
+        const timer = setTimeout(onClose, 3000); // Auto-vanish after 3s
+        return () => clearTimeout(timer);
+    }, [onClose]);
+
+    const isSuccess = type === 'success';
+
+    return (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[300] animate-in slide-in-from-bottom-5 fade-in duration-300">
+            <div className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border backdrop-blur-md ${isSuccess ? 'bg-slate-900/90 border-emerald-500/30 text-white' : 'bg-white/90 border-rose-200 text-rose-600'}`}>
+                <div className={`p-2 rounded-full ${isSuccess ? 'bg-emerald-500 text-white' : 'bg-rose-100 text-rose-500'}`}>
+                    {isSuccess ? <Check size={18} strokeWidth={3} /> : <AlertCircle size={18} strokeWidth={3} />}
+                </div>
+                <div>
+                    <h4 className="font-bold text-sm">{isSuccess ? 'Success' : 'Error'}</h4>
+                    <p className={`text-xs ${isSuccess ? 'text-slate-400' : 'text-rose-400'}`}>{message}</p>
+                </div>
+                <button onClick={onClose} className="ml-4 opacity-50 hover:opacity-100 transition-opacity">
+                    <X size={14}/>
+                </button>
+            </div>
+        </div>
+    );
+}
 
 // ============================================================================
-//  2. MAIN INSTRUCTOR DASHBOARD (The Command Center)
+//  2. BROADCAST MODAL (Updated with Toast)
+// ============================================================================
+function BroadcastModal({ classes, user, onClose, onToast }: any) {
+    const [selectedClassId, setSelectedClassId] = useState(classes[0]?.id || '');
+    const [message, setMessage] = useState('');
+    const [sending, setSending] = useState(false);
+
+    const handleSend = async () => {
+        if (!message.trim() || !selectedClassId) return;
+        setSending(true);
+        try {
+            const targetClass = classes.find((c: any) => c.id === selectedClassId);
+            await addDoc(collection(db, 'artifacts', appId, 'announcements'), {
+                classId: selectedClassId,
+                className: targetClass?.name || 'Class',
+                instructorName: user.email.split('@')[0], 
+                content: message,
+                timestamp: Date.now(),
+                readBy: [] 
+            });
+            onToast("Broadcast sent to students!", "success");
+            onClose();
+        } catch (e) {
+            console.error(e);
+            onToast("Failed to send message.", "error");
+        } finally {
+            setSending(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 relative">
+                <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-rose-500"><XCircle size={24}/></button>
+                
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="p-3 bg-gradient-to-br from-rose-500 to-orange-500 text-white rounded-xl shadow-lg shadow-rose-200"><Megaphone size={24}/></div>
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900">Broadcast</h2>
+                        <p className="text-xs text-slate-500">Send a push alert to students</p>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Target Class</label>
+                        <select 
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-rose-500"
+                            value={selectedClassId}
+                            onChange={(e) => setSelectedClassId(e.target.value)}
+                        >
+                            {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Message</label>
+                        <textarea 
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm min-h-[100px] outline-none focus:ring-2 focus:ring-rose-500 resize-none"
+                            placeholder="e.g. Don't forget, the midterm is tomorrow!"
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
+                        />
+                    </div>
+                    <button 
+                        onClick={handleSend} 
+                        disabled={sending || !message}
+                        className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold shadow-lg flex justify-center items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+                    >
+                        {sending ? <Loader className="animate-spin" size={18}/> : <Send size={18}/>} Send Blast
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ============================================================================
+//  3. INSTRUCTOR INBOX (Manual Grading)
+// ============================================================================
+function InstructorInbox({ onGradeSubmission }: any) {
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  // Grading State
+  const [feedback, setFeedback] = useState('');
+  const [manualScore, setManualScore] = useState(0); // 0 to 100
+
+  useEffect(() => {
+      const q = query(
+          collection(db, 'artifacts', appId, 'activity_logs'),
+          where('scoreDetail.status', '==', 'pending_review'),
+          orderBy('timestamp', 'asc')
+      );
+      const unsub = onSnapshot(q, (snapshot) => {
+          setSubmissions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          setLoading(false);
+      });
+      return () => unsub();
+  }, []);
+
+  const selectedItem = submissions.find(s => s.id === selectedId);
+
+  const handleSubmitGrade = async () => {
+      if(!selectedItem) return;
+      const baseXP = selectedItem.xp > 0 ? selectedItem.xp : 100; 
+      const finalXP = Math.round(baseXP * (manualScore / 100));
+      await onGradeSubmission(selectedItem.id, finalXP, feedback, manualScore);
+      setSelectedId(null);
+      setFeedback('');
+      setManualScore(0);
+  };
+
+  return (
+    <div className="flex h-full bg-slate-50 relative overflow-hidden">
+        {/* --- LEFT: INBOX LIST --- */}
+        <div className={`${selectedId ? 'hidden md:flex' : 'flex'} w-full md:w-80 flex-col border-r border-slate-200 bg-white z-10`}>
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+                <h2 className="font-bold text-slate-800 flex items-center gap-2"><Inbox size={18} className="text-indigo-600"/> Inbox</h2>
+                <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-1 rounded-full">{submissions.length}</span>
+            </div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                {submissions.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 italic text-sm">All caught up! 🎉</div>
+                ) : (
+                    submissions.map(sub => (
+                        <div 
+                            key={sub.id} 
+                            onClick={() => setSelectedId(sub.id)}
+                            className={`p-4 border-b border-slate-50 cursor-pointer transition-all hover:bg-slate-50 ${selectedId === sub.id ? 'bg-indigo-50 border-indigo-200' : ''}`}
+                        >
+                            <div className="flex justify-between items-start mb-1">
+                                <span className="font-bold text-slate-700 text-sm">{sub.studentName}</span>
+                                <span className="text-[10px] text-slate-400">{new Date(sub.timestamp).toLocaleDateString()}</span>
+                            </div>
+                            <p className="text-xs text-slate-500 truncate mb-2">{sub.itemTitle}</p>
+                            <div className="flex gap-2">
+                                <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Needs Review</span>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+
+        {/* --- RIGHT: GRADING WORKSPACE --- */}
+        <div className={`flex-1 flex flex-col bg-slate-50 ${!selectedId ? 'hidden md:flex' : 'flex'}`}>
+            {selectedItem ? (
+                <>
+                    {/* Header */}
+                    <div className="p-4 bg-white border-b border-slate-200 flex justify-between items-center shadow-sm">
+                        <div className="flex items-center gap-3">
+                            <button onClick={() => setSelectedId(null)} className="md:hidden p-2 text-slate-400"><ArrowLeft size={20}/></button>
+                            <div>
+                                <h2 className="font-bold text-lg text-slate-800">{selectedItem.itemTitle}</h2>
+                                <p className="text-xs text-slate-500">Submitted by <span className="font-bold text-indigo-600">{selectedItem.studentName}</span></p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-xs text-slate-400 font-bold uppercase tracking-wider">Auto-Score</div>
+                            <div className="text-xl font-black text-slate-300">
+                                {selectedItem.scoreDetail.score}/{selectedItem.scoreDetail.total}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Content View */}
+                    <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
+                        <div className="max-w-3xl mx-auto space-y-6">
+                            {selectedItem.scoreDetail.details.map((q: any, idx: number) => (
+                                <div key={idx} className={`bg-white p-6 rounded-2xl border-2 shadow-sm ${['essay', 'short-answer'].includes(q.type) ? 'border-indigo-100 ring-4 ring-indigo-50' : 'border-slate-100 opacity-70'}`}>
+                                    <div className="flex justify-between items-start mb-4">
+                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-100 px-2 py-1 rounded">{q.type}</span>
+                                        {['essay', 'short-answer'].includes(q.type) ? (
+                                            <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded flex items-center gap-1"><AlertCircle size={12}/> Needs Grading</span>
+                                        ) : (
+                                            q.isCorrect ? <span className="text-emerald-500"><Check size={20}/></span> : <span className="text-rose-500"><X size={20}/></span>
+                                        )}
+                                    </div>
+                                    
+                                    <h3 className="font-bold text-slate-800 text-lg mb-4">{q.prompt}</h3>
+                                    
+                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-slate-700 font-medium whitespace-pre-wrap font-serif">
+                                        {q.studentVal}
+                                    </div>
+                                    
+                                    {!['essay', 'short-answer'].includes(q.type) && (
+                                        <div className="mt-2 text-xs text-slate-400">Correct: {q.correctVal}</div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Grading Footer */}
+                    <div className="p-4 bg-white border-t border-slate-200 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20">
+                        <div className="max-w-3xl mx-auto flex flex-col md:flex-row gap-6 items-end">
+                            <div className="w-full space-y-2">
+                                <label className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2"><MessageCircle size={14}/> Instructor Feedback</label>
+                                <textarea 
+                                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 h-20 resize-none"
+                                    placeholder="Great job, but watch your grammar..."
+                                    value={feedback}
+                                    onChange={(e) => setFeedback(e.target.value)}
+                                />
+                            </div>
+                            <div className="w-full md:w-auto shrink-0 flex flex-col gap-4 min-w-[250px]">
+                                <div>
+                                    <div className="flex justify-between text-xs font-bold text-slate-500 mb-2">
+                                        <span>FINAL SCORE</span>
+                                        <span className={`text-lg font-black ${manualScore >= 70 ? 'text-emerald-600' : 'text-rose-600'}`}>{manualScore}%</span>
+                                    </div>
+                                    <input 
+                                        type="range" 
+                                        min="0" max="100" 
+                                        value={manualScore} 
+                                        onChange={(e) => setManualScore(parseInt(e.target.value))}
+                                        className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    />
+                                </div>
+                                <button onClick={handleSubmitGrade} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 active:scale-95 transition-all flex justify-center items-center gap-2">
+                                    <Send size={18}/> Release Grade
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-300 p-8">
+                    <Inbox size={64} className="mb-4 opacity-50"/>
+                    <p className="text-lg font-bold">Select a submission to grade</p>
+                </div>
+            )}
+        </div>
+    </div>
+  );
+}
+
+// ============================================================================
+//  4. INSTRUCTOR DASHBOARD (Main Component)
 // ============================================================================
 function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, onLogout }: any) {
   const [activeTab, setActiveTab] = useState('dashboard');
-  
-  // --- STATE TO TRACK SPECIFIC SELECTIONS ---
   const [viewClassId, setViewClassId] = useState<string | null>(null);
   const [builderInitMode, setBuilderInitMode] = useState<'card' | 'lesson' | 'test' | null>(null);
   const [showBroadcast, setShowBroadcast] = useState(false);
+  
+  // TOAST STATE
+  const [toast, setToast] = useState<{msg: string, type: string} | null>(null);
 
-  // --- HANDLERS ---
+  const showToast = (msg: string, type: string = 'success') => {
+      setToast({ msg, type });
+  };
+
   const handleQuickCreate = (type: 'card' | 'lesson' | 'test') => {
       setBuilderInitMode(type); 
       setActiveTab('content');  
@@ -5378,137 +5652,84 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
               'scoreDetail.instructorFeedback': feedback,
               xp: finalXP
           });
-          
-          // Optionally: Find the user and add XP to their main profile here
-          // For now, the log update is sufficient for the gradebook display.
-          alert("Grade released!");
+          // Also update user profile XP here in a real app
+          showToast(`Grade released! (+${finalXP} XP)`, 'success');
       } catch (e) {
           console.error(e);
-          alert("Error saving grade");
+          showToast("Error saving grade", "error");
       }
   };
 
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden">
       
-      {/* --- BROADCAST MODAL --- */}
+      {/* --- TOAST & MODALS --- */}
+      {toast && <JuicyToast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+      
       {showBroadcast && (
           <BroadcastModal 
               classes={userData.classes || []} 
               user={user} 
               onClose={() => setShowBroadcast(false)} 
+              onToast={showToast}
           />
       )}
 
-      {/* --- SIDEBAR (Desktop/Tablet) --- */}
+      {/* --- SIDEBAR --- */}
       <div className="w-72 bg-slate-900 text-white flex-col hidden md:flex shrink-0 border-r border-slate-800 shadow-2xl relative z-20">
-        
-        {/* Identity Header */}
         <div className="p-6 border-b border-slate-800">
-            <h1 className="text-xl font-bold flex items-center gap-2 text-white">
-                <GraduationCap className="text-indigo-400" strokeWidth={2.5}/> 
-                <span>Magister</span>
-            </h1>
+            <h1 className="text-xl font-bold flex items-center gap-2 text-white"><GraduationCap className="text-indigo-400" strokeWidth={2.5}/> <span>Magister</span></h1>
             <div className="flex items-center gap-2 mt-3 bg-slate-800/50 p-2 rounded-lg border border-slate-700/50">
-                <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center font-bold text-xs">
-                    {user.email.charAt(0).toUpperCase()}
-                </div>
-                <div className="overflow-hidden">
-                    <p className="text-xs font-bold text-slate-200 truncate w-40">{user.email}</p>
-                    <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Online</p>
-                </div>
+                <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center font-bold text-xs">{user.email.charAt(0).toUpperCase()}</div>
+                <div className="overflow-hidden"><p className="text-xs font-bold text-slate-200 truncate w-40">{user.email}</p><p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Online</p></div>
             </div>
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
-            
-            {/* 1. Main Navigation */}
             <div className="space-y-1">
                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 mb-2">Menu</p>
-                <button onClick={() => setActiveTab('dashboard')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
-                    <Activity size={18} /> Live Feed
-                </button>
-                <button onClick={() => setActiveTab('inbox')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'inbox' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
-                    <Inbox size={18} /> Inbox
-                </button>
-                <button onClick={() => setActiveTab('classes')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'classes' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
-                    <School size={18} /> Class Manager
-                </button>
-                <button onClick={() => setActiveTab('content')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'content' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
-                    <Library size={18} /> Library
-                </button>
-                <button onClick={() => setActiveTab('profile')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'profile' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
-                    <User size={18} /> Settings
-                </button>
+                <button onClick={() => setActiveTab('dashboard')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Activity size={18} /> Live Feed</button>
+                <button onClick={() => setActiveTab('inbox')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'inbox' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Inbox size={18} /> Inbox</button>
+                <button onClick={() => setActiveTab('classes')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'classes' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><School size={18} /> Class Manager</button>
+                <button onClick={() => setActiveTab('content')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'content' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Library size={18} /> Library</button>
+                <button onClick={() => setActiveTab('profile')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'profile' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><User size={18} /> Settings</button>
             </div>
 
-            {/* 2. Quick Create Widget */}
             <div className="space-y-2">
                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 mb-1">Quick Create</p>
                 <div className="grid grid-cols-3 gap-2">
-                    <button onClick={() => handleQuickCreate('card')} className="flex flex-col items-center justify-center bg-slate-800 hover:bg-indigo-600 hover:text-white p-3 rounded-xl border border-slate-700 transition-all group">
-                        <Layers size={20} className="text-slate-400 group-hover:text-white mb-1"/>
-                        <span className="text-[9px] font-bold text-slate-400 group-hover:text-white">Deck</span>
-                    </button>
-                    <button onClick={() => handleQuickCreate('test')} className="flex flex-col items-center justify-center bg-slate-800 hover:bg-rose-600 hover:text-white p-3 rounded-xl border border-slate-700 transition-all group">
-                        <HelpCircle size={20} className="text-slate-400 group-hover:text-white mb-1"/>
-                        <span className="text-[9px] font-bold text-slate-400 group-hover:text-white">Quiz</span>
-                    </button>
-                    <button onClick={() => handleQuickCreate('lesson')} className="flex flex-col items-center justify-center bg-slate-800 hover:bg-emerald-600 hover:text-white p-3 rounded-xl border border-slate-700 transition-all group">
-                        <BookOpen size={20} className="text-slate-400 group-hover:text-white mb-1"/>
-                        <span className="text-[9px] font-bold text-slate-400 group-hover:text-white">Unit</span>
-                    </button>
+                    <button onClick={() => handleQuickCreate('card')} className="flex flex-col items-center justify-center bg-slate-800 hover:bg-indigo-600 hover:text-white p-3 rounded-xl border border-slate-700 transition-all group"><Layers size={20} className="text-slate-400 group-hover:text-white mb-1"/><span className="text-[9px] font-bold text-slate-400 group-hover:text-white">Deck</span></button>
+                    <button onClick={() => handleQuickCreate('test')} className="flex flex-col items-center justify-center bg-slate-800 hover:bg-rose-600 hover:text-white p-3 rounded-xl border border-slate-700 transition-all group"><HelpCircle size={20} className="text-slate-400 group-hover:text-white mb-1"/><span className="text-[9px] font-bold text-slate-400 group-hover:text-white">Quiz</span></button>
+                    <button onClick={() => handleQuickCreate('lesson')} className="flex flex-col items-center justify-center bg-slate-800 hover:bg-emerald-600 hover:text-white p-3 rounded-xl border border-slate-700 transition-all group"><BookOpen size={20} className="text-slate-400 group-hover:text-white mb-1"/><span className="text-[9px] font-bold text-slate-400 group-hover:text-white">Unit</span></button>
                 </div>
             </div>
 
-            {/* 3. Broadcast Button */}
             <div className="px-1">
                  <button onClick={() => setShowBroadcast(true)} className="w-full py-3 bg-gradient-to-r from-rose-600 to-orange-600 text-white rounded-xl font-bold shadow-lg hover:shadow-rose-900/50 active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
                      <Megaphone size={16}/> Broadcast Alert
                  </button>
             </div>
 
-            {/* 4. Class Shortcuts Widget */}
             <div className="space-y-1">
-                <div className="flex justify-between items-center px-2 mb-2">
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">My Classes</p>
-                    <span className="text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">{userData.classes?.length || 0}</span>
-                </div>
+                <div className="flex justify-between items-center px-2 mb-2"><p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">My Classes</p><span className="text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">{userData.classes?.length || 0}</span></div>
                 <div className="space-y-1">
                     {userData.classes?.length > 0 ? userData.classes.map((cls: any) => (
-                        <button 
-                            key={cls.id} 
-                            onClick={() => handleClassShortcut(cls.id)}
-                            className="w-full px-3 py-2 rounded-lg flex items-center justify-between group hover:bg-slate-800 transition-colors text-left"
-                        >
-                            <div className="flex items-center gap-2 overflow-hidden">
-                                <div className="w-2 h-2 rounded-full bg-indigo-500 group-hover:animate-pulse shrink-0"></div>
-                                <span className="text-xs font-medium text-slate-300 group-hover:text-white truncate">{cls.name}</span>
-                            </div>
+                        <button key={cls.id} onClick={() => handleClassShortcut(cls.id)} className="w-full px-3 py-2 rounded-lg flex items-center justify-between group hover:bg-slate-800 transition-colors text-left">
+                            <div className="flex items-center gap-2 overflow-hidden"><div className="w-2 h-2 rounded-full bg-indigo-500 group-hover:animate-pulse shrink-0"></div><span className="text-xs font-medium text-slate-300 group-hover:text-white truncate">{cls.name}</span></div>
                             <ChevronRight size={12} className="text-slate-600 group-hover:text-slate-400"/>
                         </button>
-                    )) : (
-                        <div className="px-3 py-4 text-center border border-dashed border-slate-800 rounded-xl">
-                            <p className="text-[10px] text-slate-500">No classes yet</p>
-                        </div>
-                    )}
+                    )) : <div className="px-3 py-4 text-center border border-dashed border-slate-800 rounded-xl"><p className="text-[10px] text-slate-500">No classes yet</p></div>}
                 </div>
             </div>
-
         </div>
 
-        {/* Footer */}
         <div className="p-4 border-t border-slate-800">
-            <button onClick={onLogout} className="w-full p-3 rounded-xl bg-slate-800 text-rose-400 flex items-center justify-center gap-2 hover:bg-rose-900/20 hover:text-rose-300 transition-colors font-bold text-xs uppercase tracking-wider">
-                <LogOut size={16} /> Sign Out
-            </button>
+            <button onClick={onLogout} className="w-full p-3 rounded-xl bg-slate-800 text-rose-400 flex items-center justify-center gap-2 hover:bg-rose-900/20 hover:text-rose-300 transition-colors font-bold text-xs uppercase tracking-wider"><LogOut size={16} /> Sign Out</button>
         </div>
       </div>
 
-      {/* --- MAIN CONTENT AREA --- */}
+      {/* --- MAIN CONTENT --- */}
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50 relative">
-         
-         {/* Mobile Header (Only visible on small phones) */}
          <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center shrink-0 z-50">
             <span className="font-bold flex items-center gap-2"><GraduationCap/> Magister</span>
             <div className="flex gap-4">
@@ -5520,75 +5741,34 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
          </div>
          
          <div className="flex-1 overflow-hidden relative">
-            
-            {/* 1. DASHBOARD TAB */}
             {activeTab === 'dashboard' && (
                 <div className="h-full flex flex-col">
                     <div className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shrink-0">
-                        <div>
-                            <h2 className="text-lg font-bold text-slate-800">Live Command Center</h2>
-                            <p className="text-xs text-slate-500 flex items-center gap-1">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> 
-                                System Active • {new Date().toLocaleDateString()}
-                            </p>
-                        </div>
+                        <div><h2 className="text-lg font-bold text-slate-800">Live Command Center</h2><p className="text-xs text-slate-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> System Active • {new Date().toLocaleDateString()}</p></div>
                         <div className="flex gap-4 text-center">
-                            <div>
-                                <span className="block text-lg font-black text-slate-800 leading-none">{userData.classes?.length || 0}</span>
-                                <span className="text-[9px] font-bold text-slate-400 uppercase">Classes</span>
-                            </div>
+                            <div><span className="block text-lg font-black text-slate-800 leading-none">{userData.classes?.length || 0}</span><span className="text-[9px] font-bold text-slate-400 uppercase">Classes</span></div>
                             <div className="w-px h-8 bg-slate-100"></div>
-                            <div>
-                                <span className="block text-lg font-black text-indigo-600 leading-none">{allDecks.custom?.cards?.length || 0}</span>
-                                <span className="text-[9px] font-bold text-slate-400 uppercase">Cards</span>
-                            </div>
+                            <div><span className="block text-lg font-black text-indigo-600 leading-none">{allDecks.custom?.cards?.length || 0}</span><span className="text-[9px] font-bold text-slate-400 uppercase">Cards</span></div>
                         </div>
                     </div>
-                    <div className="flex-1 overflow-hidden p-4 md:p-6 bg-slate-100/50">
-                        <LiveActivityFeed />
-                    </div>
+                    <div className="flex-1 overflow-hidden p-4 md:p-6 bg-slate-100/50"><LiveActivityFeed /></div>
                 </div>
             )}
 
-            {/* 2. INBOX TAB */}
-            {activeTab === 'inbox' && (
-                <div className="h-full overflow-hidden">
-                    <InstructorInbox onGradeSubmission={handleGradeSubmission} />
-                </div>
-            )}
+            {activeTab === 'inbox' && <div className="h-full overflow-hidden"><InstructorInbox onGradeSubmission={handleGradeSubmission} /></div>}
 
-            {/* 3. CLASS MANAGER TAB */}
             {activeTab === 'classes' && (
                 <div className="h-full overflow-y-auto p-4 md:p-8">
-                    <ClassManagerView 
-                        user={user} 
-                        userData={userData} 
-                        classes={userData?.classes || []} 
-                        lessons={lessons} 
-                        allDecks={allDecks}
-                        initialClassId={viewClassId}
-                        onClearSelection={() => setViewClassId(null)}
-                    />
+                    <ClassManagerView user={user} userData={userData} classes={userData?.classes || []} lessons={lessons} allDecks={allDecks} initialClassId={viewClassId} onClearSelection={() => setViewClassId(null)} />
                 </div>
             )}
 
-            {/* 4. CONTENT LIBRARY TAB */}
             {activeTab === 'content' && (
                 <div className="h-full overflow-hidden flex flex-col bg-white">
-                    <BuilderHub 
-                        onSaveCard={onSaveCard} 
-                        onUpdateCard={onUpdateCard} 
-                        onDeleteCard={onDeleteCard} 
-                        onSaveLesson={onSaveLesson} 
-                        allDecks={allDecks} 
-                        lessons={lessons}
-                        initialMode={builderInitMode} 
-                        onClearMode={() => setBuilderInitMode(null)}
-                    />
+                    <BuilderHub onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} onSaveLesson={onSaveLesson} allDecks={allDecks} lessons={lessons} initialMode={builderInitMode} onClearMode={() => setBuilderInitMode(null)} />
                 </div>
             )}
 
-            {/* 5. PROFILE TAB */}
             {activeTab === 'profile' && <ProfileView user={user} userData={userData} />}
          </div>
       </div>
@@ -5692,7 +5872,7 @@ function WidgetView({ allDecks, userData }: any) {
 // ============================================================================
 
 // 1. INSTRUCTOR: BROADCAST MODAL
-function BroadcastModal({ classes, user, onClose }: any) {
+function BroadcastModal({ classes, user, onClose, onToast }: any) {
     const [selectedClassId, setSelectedClassId] = useState(classes[0]?.id || '');
     const [message, setMessage] = useState('');
     const [sending, setSending] = useState(false);
@@ -5705,16 +5885,19 @@ function BroadcastModal({ classes, user, onClose }: any) {
             await addDoc(collection(db, 'artifacts', appId, 'announcements'), {
                 classId: selectedClassId,
                 className: targetClass?.name || 'Class',
-                instructorName: user.email.split('@')[0], // Or use profile name
+                instructorName: user.email.split('@')[0], 
                 content: message,
                 timestamp: Date.now(),
-                readBy: [] // Array of student emails who have seen it
+                readBy: [] 
             });
-            alert("Announcement Sent!");
+            
+            // 👇 THE FIX: Use the toast callback instead of alert()
+            onToast("Broadcast sent to students!", "success");
+            
             onClose();
         } catch (e) {
             console.error(e);
-            alert("Failed to send.");
+            onToast("Failed to send message.", "error");
         } finally {
             setSending(false);
         }
@@ -5726,7 +5909,7 @@ function BroadcastModal({ classes, user, onClose }: any) {
                 <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-rose-500"><XCircle size={24}/></button>
                 
                 <div className="flex items-center gap-3 mb-6">
-                    <div className="p-3 bg-rose-100 text-rose-600 rounded-full"><Megaphone size={24}/></div>
+                    <div className="p-3 bg-gradient-to-br from-rose-500 to-orange-500 text-white rounded-xl shadow-lg shadow-rose-200"><Megaphone size={24}/></div>
                     <div>
                         <h2 className="text-xl font-bold text-slate-900">Broadcast</h2>
                         <p className="text-xs text-slate-500">Send a push alert to students</p>
@@ -5756,16 +5939,15 @@ function BroadcastModal({ classes, user, onClose }: any) {
                     <button 
                         onClick={handleSend} 
                         disabled={sending || !message}
-                        className="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-lg shadow-rose-200 flex justify-center items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+                        className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold shadow-lg flex justify-center items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
                     >
-                        {sending ? <Loader className="animate-spin"/> : <Send size={18}/>} Send Blast
+                        {sending ? <Loader className="animate-spin" size={18}/> : <Send size={18}/>} Send Blast
                     </button>
                 </div>
             </div>
         </div>
     );
 }
-
 // 2. STUDENT: NOTIFICATION BELL
 function NotificationBell({ user, enrolledClassIds }: any) {
     const [isOpen, setIsOpen] = useState(false);
