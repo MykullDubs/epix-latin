@@ -41,8 +41,9 @@ import {
   ChevronUp, GripVertical, ListOrdered, ArrowRightLeft, CheckSquare, Gamepad2, Globe,
   BrainCircuit, Swords, Heart, Skull, Shield, Hourglass, Flame, Crown, Crosshair,Map, TrendingUp, Footprints,ArrowUp, Eye, EyeOff, Settings2,Type,ImageIcon,Video,Code,Quote,ArrowDownUp,Minus,MoreHorizontal, Mic, Lock, GitFork, RotateCcw,
   Inbox, MessageCircle, Send, Bell, Megaphone, XCircle, Palette, Link as LinkIcon, 
-  MapPin, Flag, Sparkles, Building, Cloud, Star  // <--- Added these for the new game modes
+  MapPin, Flag, Sparkles, Building, Cloud, Star,BarChart2, Timer  // <--- Added these for the new game modes
 } from 'lucide-react';
+
 
 // --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
@@ -62,6 +63,41 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 // @ts-ignore
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'epic-latin-prod';
+
+// ============================================================================
+//  ANALYTICS HOOK: TRACKS TIME SPENT
+// ============================================================================
+const useLearningTimer = (user: any, activityId: string, activityType: string, title: string) => {
+    useEffect(() => {
+        if (!user || !activityId) return;
+        const startTime = Date.now();
+
+        // This runs automatically when the user leaves the screen
+        return () => {
+            const endTime = Date.now();
+            const durationSec = Math.round((endTime - startTime) / 1000);
+
+            // Filter out accidental clicks (< 5 seconds)
+            if (durationSec > 5) {
+                try {
+                    addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
+                        studentName: user.displayName || user.email.split('@')[0],
+                        studentEmail: user.email,
+                        itemTitle: title || 'Unknown Activity',
+                        itemId: activityId,
+                        type: 'time_log', // Special type for analytics
+                        activityType: activityType, // 'lesson', 'deck', 'test'
+                        duration: durationSec,
+                        timestamp: Date.now()
+                    });
+                    console.log(`⏱️ Logged ${durationSec}s for ${title}`);
+                } catch (e) {
+                    console.error("Failed to log time:", e);
+                }
+            }
+        };
+    }, [user, activityId]); // Re-starts if the user switches lessons immediately
+};
 
 // --- DEFAULTS & SEED DATA ---
 const DEFAULT_USER_DATA = { 
@@ -895,6 +931,7 @@ function QuizGame({ deckCards, onGameEnd }: any) {
 }
 
 function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, activeDeckOverride, onComplete, onLogActivity, userData, onUpdatePrefs, onDeleteDeck }: any) {
+ useLearningTimer(props.userData ? auth.currentUser : null, selectedDeckKey, 'deck', deck?.title || 'Flashcards');
   // --- STATE ---
   const [viewState, setViewState] = useState<'browsing' | 'playing'>(activeDeckOverride ? 'playing' : 'browsing');
   const [filterLang, setFilterLang] = useState('All');
@@ -1422,6 +1459,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
   );
 }
 function LessonView({ lesson, onFinish }: any) {
+  useLearningTimer(auth.currentUser, lesson.id, 'lesson', lesson.title);
   const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
   const [quizAnswers, setQuizAnswers] = useState<any>({});
   const [isComplete, setIsComplete] = useState(false);
@@ -5331,6 +5369,139 @@ function InstructorInbox({ onGradeSubmission }: any) {
 }
 
 // ============================================================================
+//  ANALYTICS DASHBOARD WIDGET
+// ============================================================================
+function AnalyticsDashboard() {
+    const [logs, setLogs] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        // Fetch all time logs
+        const q = query(
+            collection(db, 'artifacts', appId, 'activity_logs'),
+            where('type', '==', 'time_log'),
+            orderBy('timestamp', 'desc'),
+            limit(500) // Limit to last 500 sessions for performance
+        );
+
+        const unsub = onSnapshot(q, (snapshot) => {
+            const fetched = snapshot.docs.map(d => d.data());
+            setLogs(fetched);
+            setLoading(false);
+        });
+        return () => unsub();
+    }, []);
+
+    // --- CALCULATIONS ---
+    const totalSeconds = logs.reduce((acc, log) => acc + log.duration, 0);
+    const totalHours = (totalSeconds / 3600).toFixed(1);
+    const avgSession = logs.length ? Math.round(totalSeconds / logs.length / 60) : 0;
+    
+    // Group by Student for Leaderboard
+    const studentStats: any = {};
+    logs.forEach(log => {
+        if (!studentStats[log.studentEmail]) {
+            studentStats[log.studentEmail] = { name: log.studentName, totalSec: 0, sessions: 0 };
+        }
+        studentStats[log.studentEmail].totalSec += log.duration;
+        studentStats[log.studentEmail].sessions += 1;
+    });
+
+    const leaderboard = Object.values(studentStats)
+        .sort((a:any, b:any) => b.totalSec - a.totalSec)
+        .slice(0, 5); // Top 5
+
+    if (loading) return <div className="p-12 text-center text-slate-400"><Loader className="animate-spin inline"/> Loading Data...</div>;
+
+    return (
+        <div className="p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4">
+            <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                <BarChart2 className="text-indigo-600"/> Student Analytics
+            </h2>
+
+            {/* STAT CARDS */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><Clock size={20}/></div>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Study Time</span>
+                    </div>
+                    <div className="text-3xl font-black text-slate-800">{totalHours} <span className="text-sm font-medium text-slate-400">Hours</span></div>
+                </div>
+                
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><Activity size={20}/></div>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Sessions</span>
+                    </div>
+                    <div className="text-3xl font-black text-slate-800">{logs.length}</div>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 bg-orange-50 text-orange-600 rounded-lg"><Timer size={20}/></div>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Avg. Session</span>
+                    </div>
+                    <div className="text-3xl font-black text-slate-800">{avgSession} <span className="text-sm font-medium text-slate-400">Min</span></div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* LEADERBOARD */}
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                        <h3 className="font-bold text-slate-700">Most Dedicated Scholars</h3>
+                        <Trophy size={16} className="text-yellow-500"/>
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                        {leaderboard.map((s:any, idx:number) => (
+                            <div key={idx} className="p-4 flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${idx === 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-500'}`}>
+                                        {idx + 1}
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-sm text-slate-700">{s.name}</div>
+                                        <div className="text-xs text-slate-400">{s.sessions} Sessions</div>
+                                    </div>
+                                </div>
+                                <div className="font-mono font-bold text-indigo-600">
+                                    {(s.totalSec / 60).toFixed(0)}m
+                                </div>
+                            </div>
+                        ))}
+                        {leaderboard.length === 0 && <div className="p-8 text-center text-slate-400 text-sm">No data yet.</div>}
+                    </div>
+                </div>
+
+                {/* RECENT ACTIVITY FEED */}
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="p-4 border-b border-slate-100 bg-slate-50">
+                        <h3 className="font-bold text-slate-700">Recent Activity</h3>
+                    </div>
+                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar p-0">
+                        {logs.slice(0, 10).map((log, i) => (
+                            <div key={i} className="p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors flex justify-between items-center">
+                                <div>
+                                    <div className="font-bold text-xs text-slate-600 uppercase tracking-wide mb-1">
+                                        {log.activityType} • {new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                    </div>
+                                    <div className="text-sm font-medium text-slate-800">{log.itemTitle}</div>
+                                    <div className="text-xs text-slate-400 mt-0.5">{log.studentName}</div>
+                                </div>
+                                <span className="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-1 rounded">
+                                    {Math.floor(log.duration / 60)}m {log.duration % 60}s
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ============================================================================
 //  4. INSTRUCTOR DASHBOARD
 // ============================================================================
 function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, onLogout }: any) {
@@ -5372,8 +5543,11 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
                 <button onClick={() => setActiveTab('inbox')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'inbox' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Inbox size={18} /> Inbox</button>
                 <button onClick={() => setActiveTab('classes')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'classes' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><School size={18} /> Class Manager</button>
                 <button onClick={() => setActiveTab('content')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'content' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Library size={18} /> Library</button>
+                {/* NEW ANALYTICS BUTTON */}
+                <button onClick={() => setActiveTab('analytics')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'analytics' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><BarChart2 size={18} /> Analytics</button>
                 <button onClick={() => setActiveTab('profile')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'profile' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><User size={18} /> Settings</button>
             </div>
+            {/* ... Rest of Sidebar ... */}
             <div className="space-y-2">
                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 mb-1">Quick Create</p>
                 <div className="grid grid-cols-3 gap-2">
@@ -5392,6 +5566,7 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
       </div>
 
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50 relative">
+         {/* Mobile Header */}
          <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center shrink-0 z-50">
             <span className="font-bold flex items-center gap-2"><GraduationCap/> Magister</span>
             <div className="flex gap-4"><button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'text-indigo-400' : 'text-slate-400'}><LayoutDashboard/></button><button onClick={() => setActiveTab('inbox')} className={activeTab === 'inbox' ? 'text-indigo-400' : 'text-slate-400'}><Inbox/></button><button onClick={() => setActiveTab('classes')} className={activeTab === 'classes' ? 'text-indigo-400' : 'text-slate-400'}><School/></button><button onClick={() => setActiveTab('content')} className={activeTab === 'content' ? 'text-indigo-400' : 'text-slate-400'}><Library/></button></div>
@@ -5406,16 +5581,23 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
                     <div className="flex-1 overflow-hidden p-4 md:p-6 bg-slate-100/50"><LiveActivityFeed /></div>
                 </div>
             )}
+            
+            {/* INBOX VIEW */}
             {activeTab === 'inbox' && <div className="h-full overflow-hidden"><InstructorInbox onGradeSubmission={handleGradeSubmission} /></div>}
+            
+            {/* ANALYTICS VIEW */}
+            {activeTab === 'analytics' && <div className="h-full overflow-y-auto bg-slate-50"><AnalyticsDashboard /></div>}
+
             {activeTab === 'classes' && <div className="h-full overflow-y-auto p-4 md:p-8"><ClassManagerView user={user} userData={userData} classes={userData?.classes || []} lessons={lessons} allDecks={allDecks} initialClassId={viewClassId} onClearSelection={() => setViewClassId(null)} /></div>}
+            
             {activeTab === 'content' && <div className="h-full overflow-hidden flex flex-col bg-white"><BuilderHub onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} onSaveLesson={onSaveLesson} allDecks={allDecks} lessons={lessons} initialMode={builderInitMode} onClearMode={() => setBuilderInitMode(null)} /></div>}
+            
             {activeTab === 'profile' && <ProfileView user={user} userData={userData} />}
          </div>
       </div>
     </div>
   );
 }
-
 
 function RoleToggle({ user, userData }: any) {
   const [switching, setSwitching] = useState(false);
