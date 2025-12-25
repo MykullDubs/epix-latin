@@ -41,7 +41,7 @@ import {
   ChevronUp, GripVertical, ListOrdered, ArrowRightLeft, CheckSquare, Gamepad2, Globe,
   BrainCircuit, Swords, Heart, Skull, Shield, Hourglass, Flame, Crown, Crosshair,Map, TrendingUp, Footprints,ArrowUp, Eye, EyeOff, Settings2,Type,ImageIcon,Video,Code,Quote,ArrowDownUp,Minus,MoreHorizontal, Mic, Lock, GitFork, RotateCcw,
   Inbox, MessageCircle, Send, Bell, Megaphone, XCircle, Palette, Link as LinkIcon, 
-  MapPin, Flag, Sparkles, Building, Cloud, Star,BarChart2, Timer  // <--- Added these for the new game modes
+  MapPin, Flag, Sparkles, Building, Cloud, Star,BarChart2, Timer, RotateCw, Speaker, Play, Maximize2  // <--- Added these for the new game modes
 } from 'lucide-react';
 
 
@@ -1356,244 +1356,345 @@ function FlashcardView({
     </>
   );
 }
+// ============================================================================
+//  ULTIMATE LESSON VIEW (Decks, Scenarios, Chat, & Interactive Quizzes)
+// ============================================================================
 
+// --- SUB-COMPONENT: JUICY DECK (Flashcards/Vocab) ---
+const JuicyDeckBlock = ({ items, title }: any) => {
+    const [index, setIndex] = useState(0);
+    const [isFlipped, setIsFlipped] = useState(false);
+    const [direction, setDirection] = useState(0); 
+
+    const currentCard = items[index];
+
+    const handleSwipe = (dir: number) => {
+        setIsFlipped(false);
+        setDirection(dir);
+        setTimeout(() => {
+            setIndex((prev) => (prev + dir + items.length) % items.length);
+            setDirection(0);
+        }, 200);
+    };
+
+    const playAudio = (text: string) => {
+        if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            window.speechSynthesis.speak(utterance);
+        }
+    };
+
+    return (
+        <div className="my-4 w-full max-w-sm mx-auto">
+            <div className="flex justify-between items-center mb-4 px-2">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2"><Layers size={14}/> {title || "Flashcards"}</h4>
+                <div className="flex gap-1">{items.map((_:any, i:number) => <div key={i} className={`h-1 w-4 rounded-full transition-colors ${i === index ? 'bg-indigo-500' : 'bg-slate-200'}`} />)}</div>
+            </div>
+            <div className="group perspective-1000 h-64 cursor-pointer relative" onClick={() => setIsFlipped(!isFlipped)}>
+                <div className={`relative w-full h-full transition-all duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''} ${direction === 1 ? 'translate-x-full opacity-0 rotate-12' : direction === -1 ? '-translate-x-full opacity-0 -rotate-12' : ''}`}>
+                    <div className="absolute inset-0 backface-hidden bg-white rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center justify-center p-6 text-center">
+                        <span className="absolute top-4 left-4 text-[10px] font-bold text-slate-300 uppercase">Term</span>
+                        <h3 className="text-2xl font-black text-slate-800">{currentCard.term || currentCard.front}</h3>
+                        <button onClick={(e) => { e.stopPropagation(); playAudio(currentCard.term || currentCard.front); }} className="absolute bottom-4 right-4 p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"><Volume2 size={18}/></button>
+                    </div>
+                    <div className="absolute inset-0 backface-hidden bg-slate-900 rounded-2xl shadow-xl rotate-y-180 flex flex-col items-center justify-center p-6 text-white text-center relative overflow-hidden">
+                        <div className="absolute top-[-50%] left-[-50%] w-full h-full bg-indigo-500/20 rounded-full blur-[60px]"></div>
+                        <span className="absolute top-4 left-4 text-[10px] font-bold text-slate-500 uppercase">Definition</span>
+                        <p className="text-lg font-medium leading-relaxed relative z-10">{currentCard.definition || currentCard.back}</p>
+                    </div>
+                </div>
+                <div className="absolute top-2 left-2 w-full h-full bg-slate-100 rounded-2xl -z-10 border border-slate-200 shadow-sm transform rotate-2"></div>
+            </div>
+            <div className="flex justify-between items-center mt-6 px-4">
+                <button onClick={() => handleSwipe(-1)} className="p-3 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 shadow-sm active:scale-95"><ArrowLeft size={20}/></button>
+                <div className="text-xs font-bold text-slate-400">{index + 1} / {items.length}</div>
+                <button onClick={() => handleSwipe(1)} className="p-3 rounded-full bg-slate-900 text-white shadow-lg hover:bg-indigo-600 active:scale-95"><ArrowRight size={20}/></button>
+            </div>
+        </div>
+    );
+};
+
+// --- SUB-COMPONENT: SCENARIO PLAYER (Branching Logic) ---
+const ScenarioBlock = ({ block, onComplete }: any) => {
+    const [currentNodeId, setCurrentNodeId] = useState(block.nodes[0].id);
+    const [history, setHistory] = useState<string[]>([]);
+    
+    const currentNode = block.nodes.find((n:any) => n.id === currentNodeId);
+    if (!currentNode) return <div className="p-4 bg-red-50 text-red-500">Error: Broken Scenario Link</div>;
+
+    const isEnd = !currentNode.options || currentNode.options.length === 0 || currentNode.options[0].nextNodeId === 'end';
+
+    const bgColors: any = { neutral: 'bg-slate-900', success: 'bg-emerald-900', failure: 'bg-rose-900', critical: 'bg-amber-900' };
+    const borderColor = currentNode.color === 'success' ? 'border-emerald-500' : currentNode.color === 'failure' ? 'border-rose-500' : 'border-slate-700';
+
+    return (
+        <div className={`${bgColors[currentNode.color || 'neutral']} text-white rounded-3xl overflow-hidden shadow-2xl border-4 ${borderColor} my-4 transition-colors duration-500`}>
+            {currentNode.imageUrl && (
+                <div className="h-40 w-full overflow-hidden relative">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent z-10"/>
+                    
+                    <img src={currentNode.imageUrl} alt="Scene" className="w-full h-full object-cover"/>
+                </div>
+            )}
+            <div className="p-4 border-b border-white/10 flex justify-between items-center relative z-20">
+                <span className="text-xs font-bold uppercase tracking-widest text-white/70 flex items-center gap-2">
+                    {currentNode.speaker ? <User size={14}/> : <GitFork size={14}/>} {currentNode.speaker || 'Scene'}
+                </span>
+                {history.length > 0 && <button onClick={() => { setCurrentNodeId(block.nodes[0].id); setHistory([]); }} className="text-xs text-white/50 hover:text-white flex items-center gap-1"><RotateCcw size={12}/> Restart</button>}
+            </div>
+            <div className="p-6 relative z-20">
+                <p className="text-lg font-serif leading-relaxed animate-in fade-in slide-in-from-bottom-2 duration-500">"{currentNode.text}"</p>
+            </div>
+            <div className="bg-black/20 p-2 grid gap-2 backdrop-blur-sm">
+                {!isEnd ? currentNode.options.map((opt:any, i:number) => (
+                    <button key={i} onClick={() => { setHistory([...history, currentNode.text]); setCurrentNodeId(opt.nextNodeId); }} className="w-full p-3 text-left bg-white/10 hover:bg-white/20 rounded-xl transition-all font-bold text-sm border border-white/5 hover:border-white/30 flex justify-between items-center group">
+                        <span>{opt.text}</span><ArrowRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity"/>
+                    </button>
+                )) : (
+                    <button onClick={onComplete} className="w-full p-4 bg-white text-slate-900 hover:bg-emerald-400 rounded-xl font-bold flex items-center justify-center gap-2 animate-pulse shadow-lg">
+                        Complete Scenario <Check size={16}/>
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// --- SUB-COMPONENT: INTERACTIVE QUIZ BLOCK ---
+const QuizBlock = ({ block, onComplete }: any) => {
+    const [selected, setSelected] = useState<string | null>(null);
+    const [submitted, setSubmitted] = useState(false);
+
+    const isCorrect = selected === block.correctId;
+
+    const handleSubmit = () => {
+        setSubmitted(true);
+        if (selected === block.correctId) {
+            // Trigger confetti or sound here if you want
+        }
+    };
+
+    return (
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm my-4">
+            <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-start gap-2">
+                <span className="bg-indigo-100 text-indigo-600 p-1 rounded-lg mt-1 shrink-0"><Check size={16}/></span>
+                {block.question}
+            </h3>
+            <div className="space-y-2">
+                {block.options.map((opt:any) => {
+                    let style = "border-slate-200 hover:bg-slate-50";
+                    if (submitted) {
+                        if (opt.id === block.correctId) style = "bg-emerald-100 border-emerald-500 text-emerald-800 font-bold";
+                        else if (opt.id === selected) style = "bg-rose-100 border-rose-500 text-rose-800 opacity-60";
+                        else style = "opacity-50 grayscale";
+                    } else if (selected === opt.id) {
+                        style = "border-indigo-500 bg-indigo-50 text-indigo-700 font-bold ring-1 ring-indigo-500";
+                    }
+
+                    return (
+                        <button 
+                            key={opt.id} 
+                            disabled={submitted}
+                            onClick={() => setSelected(opt.id)}
+                            className={`w-full p-4 text-left border-2 rounded-xl transition-all ${style}`}
+                        >
+                            {opt.text}
+                        </button>
+                    );
+                })}
+            </div>
+            {!submitted ? (
+                <button 
+                    onClick={handleSubmit} 
+                    disabled={!selected}
+                    className="w-full mt-4 py-3 bg-slate-900 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-95 transition-all"
+                >
+                    Check Answer
+                </button>
+            ) : (
+                <div className={`mt-4 p-3 rounded-xl flex justify-between items-center animate-in zoom-in ${isCorrect ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                    <span className="font-bold flex items-center gap-2">
+                        {isCorrect ? <><Check size={18}/> Correct!</> : <><X size={18}/> Incorrect</>}
+                    </span>
+                    {isCorrect && <button onClick={onComplete} className="px-3 py-1 bg-white border border-emerald-200 rounded-lg text-xs font-bold shadow-sm">Continue</button>}
+                    {!isCorrect && <button onClick={() => { setSubmitted(false); setSelected(null); }} className="px-3 py-1 bg-white border border-rose-200 rounded-lg text-xs font-bold shadow-sm">Try Again</button>}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// --- SUB-COMPONENT: CHAT DIALOGUE ---
+const ChatDialogueBlock = ({ lines }: any) => (
+    <div className="space-y-4 my-6 bg-slate-50 p-4 rounded-3xl border border-slate-100">
+        {lines.map((line: any, i: number) => {
+            const isA = line.speaker === 'A' || i % 2 === 0;
+            return (
+                <div key={i} className={`flex ${isA ? 'justify-start' : 'justify-end'}`}>
+                    <div className={`max-w-[85%] p-3 rounded-2xl text-sm relative ${isA ? 'bg-white border border-slate-200 text-slate-800 rounded-tl-none' : 'bg-indigo-600 text-white rounded-tr-none'}`}>
+                        <p className="font-medium leading-relaxed">{line.text}</p>
+                        {line.translation && (
+                            <p className={`text-[10px] mt-1 pt-1 border-t ${isA ? 'border-slate-100 text-slate-400' : 'border-indigo-500/50 text-indigo-200'}`}>
+                                {line.translation}
+                            </p>
+                        )}
+                        <span className={`absolute -top-4 text-[9px] font-bold text-slate-400 ${isA ? 'left-0' : 'right-0'}`}>
+                            {line.speaker}
+                        </span>
+                    </div>
+                </div>
+            );
+        })}
+    </div>
+);
+
+// --- MAIN COMPONENT: LESSON VIEW ---
 function LessonView({ lesson, onFinish }: any) {
+  // Analytics Timer
   useLearningTimer(auth.currentUser, lesson.id, 'lesson', lesson.title);
-  const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
-  const [quizAnswers, setQuizAnswers] = useState<any>({});
-  const [isComplete, setIsComplete] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
-  
-  // Auto-scroll to bottom when block changes
-  useEffect(() => { 
-      if (bottomRef.current) {
-          bottomRef.current.scrollIntoView({ behavior: 'smooth' }); 
+
+  const [currentBlockIdx, setCurrentBlockIdx] = useState(0);
+  const blocks = lesson.blocks || [];
+  const progress = ((currentBlockIdx + 1) / blocks.length) * 100;
+
+  // Handler for finishing the lesson
+  const handleNextBlock = () => {
+      if (currentBlockIdx < blocks.length - 1) {
+          setCurrentBlockIdx(prev => prev + 1);
+          // Smooth scroll to top
+          const container = document.getElementById('lesson-scroll-container');
+          if(container) container.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+          onFinish(lesson.id, lesson.xp, lesson.title);
       }
-  }, [currentBlockIndex]);
-
-  const handleNext = () => { 
-      if (currentBlockIndex < (lesson.blocks?.length || 0) - 1) { 
-          setCurrentBlockIndex(prev => prev + 1); 
-      } else { 
-          setIsComplete(true); 
-      } 
   };
 
-  const handleQuizOption = (blockIdx: number, optionId: string) => { 
-      setQuizAnswers({ ...quizAnswers, [blockIdx]: optionId }); 
-  };
+  const currentBlock = blocks[currentBlockIdx];
 
-  const currentBlock = lesson.blocks ? lesson.blocks[currentBlockIndex] : null;
-  
-  // Check if we should hide the main "Continue" button
-  // We hide it for Scenarios because they have their own internal "Continue" logic
-  const isInteractiveBlock = currentBlock?.type === 'scenario';
-
-  // --- SUB-COMPONENT: SCENARIO PLAYER ---
-const ScenarioPlayer = ({ block, onScenarioComplete }: any) => {
-      const [currentNodeId, setCurrentNodeId] = useState(
-          block.nodes && block.nodes.length > 0 ? block.nodes[0].id : null
-      );
-      const [history, setHistory] = useState<string[]>([]);
-
-      const currentNode = block.nodes?.find((n:any) => n.id === currentNodeId);
-      const isEnd = !currentNode || !currentNode.options || currentNode.options.length === 0;
-
-      const handleChoice = (nextNodeId: string) => {
-          if (nextNodeId === 'end') {
-              onScenarioComplete();
-          } else {
-              setHistory([...history, currentNode.text]);
-              setCurrentNodeId(nextNodeId);
-          }
-      };
-
-      if (!currentNode) return <div className="p-4 bg-slate-50 text-slate-500 rounded-xl italic">Scene not found.</div>;
-
-      // Color mapping
-      const bgColors: any = {
-          neutral: 'bg-slate-900',
-          success: 'bg-emerald-900',
-          failure: 'bg-rose-900',
-          critical: 'bg-amber-900'
-      };
-      const borderColor = currentNode.color === 'success' ? 'border-emerald-500' : currentNode.color === 'failure' ? 'border-rose-500' : 'border-slate-700';
-
-      return (
-          <div className={`${bgColors[currentNode.color || 'neutral']} text-white rounded-3xl overflow-hidden shadow-2xl border-4 ${borderColor} my-6 transition-colors duration-500`}>
-              
-              {/* IMAGE HEADER */}
-              {currentNode.imageUrl && (
-                  <div className="h-48 w-full overflow-hidden relative">
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent z-10"/>
-                      <img src={currentNode.imageUrl} alt="Scene" className="w-full h-full object-cover animate-in fade-in zoom-in-105 duration-1000"/>
+  // Helper to Render Specific Block Types
+  const renderBlockContent = (block: any) => {
+      switch (block.type) {
+          case 'text':
+              return (
+                  <div className="prose prose-slate max-w-none animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      {block.title && <h2 className="text-3xl font-black text-slate-800 mb-6 tracking-tight">{block.title}</h2>}
+                      <div className="text-lg text-slate-600 leading-loose whitespace-pre-wrap font-serif">{block.content}</div>
                   </div>
-              )}
-
-              {/* Scene Header */}
-              <div className="p-4 flex justify-between items-center border-b border-white/10 relative z-20">
-                  <span className="text-xs font-bold uppercase tracking-widest text-white/70 flex items-center gap-2">
-                      {currentNode.speaker ? <User size={14}/> : <GitFork size={14}/>} 
-                      {currentNode.speaker || 'Scene'}
-                  </span>
-                  {history.length > 0 && (
-                      <button onClick={() => { setCurrentNodeId(block.nodes[0].id); setHistory([]); }} className="text-xs text-white/50 hover:text-white flex items-center gap-1">
-                          <RotateCcw size={12}/> Restart
-                      </button>
-                  )}
-              </div>
-
-              {/* Scene Content */}
-              <div className="p-6 md:p-8 relative z-20">
-                  <div className="min-h-[80px] flex items-center justify-center">
-                      <p className="text-xl font-serif leading-relaxed text-center animate-in fade-in slide-in-from-bottom-2 duration-500 drop-shadow-md">
-                          "{currentNode.text}"
-                      </p>
+              );
+          
+          case 'image':
+              return (
+                  <div className="space-y-4 animate-in zoom-in-95 duration-500">
+                      <div className="rounded-3xl overflow-hidden shadow-2xl border-4 border-white ring-1 ring-slate-200">
+                          
+                          <img src={block.url} alt="Lesson" className="w-full object-cover" />
+                      </div>
+                      {block.caption && <p className="text-center text-xs text-slate-400 font-bold uppercase tracking-widest bg-slate-50 py-2 rounded-full inline-block px-4 mx-auto">{block.caption}</p>}
                   </div>
-              </div>
-              
-              {/* Choices Area */}
-              <div className="bg-black/20 p-2 grid gap-2 backdrop-blur-sm">
-                  {!isEnd ? (
-                      currentNode.options.map((opt:any, i:number) => (
-                          <button 
-                              key={i} 
-                              onClick={() => handleChoice(opt.nextNodeId)}
-                              className="w-full p-4 text-left bg-white/10 hover:bg-white/20 rounded-xl transition-all font-bold text-sm flex justify-between items-center group border border-white/5 hover:border-white/30 active:scale-[0.99]"
-                          >
-                              <span>{opt.text}</span>
-                              <ChevronRight size={16} className="text-white/50 group-hover:text-white transition-colors"/>
-                          </button>
-                      ))
-                  ) : (
-                      <button 
-                          onClick={onScenarioComplete} 
-                          className="w-full p-4 bg-white text-slate-900 hover:bg-slate-200 rounded-xl font-bold flex items-center justify-center gap-2 animate-pulse shadow-lg"
-                      >
-                          Complete Scene <ArrowRight size={16}/>
-                      </button>
-                  )}
-              </div>
-          </div>
-      );
+              );
+
+          case 'vocab-list':
+              return <JuicyDeckBlock items={block.items} title="Key Vocabulary" />;
+
+          case 'flashcard':
+              return <JuicyDeckBlock items={[{ front: block.front, back: block.back }]} title="Concept Card" />;
+
+          case 'quiz':
+              return <QuizBlock block={block} onComplete={handleNextBlock} />;
+
+          case 'scenario':
+              return <ScenarioBlock block={block} onComplete={handleNextBlock} />;
+
+          case 'dialogue':
+              return <ChatDialogueBlock lines={block.lines} />;
+
+          case 'video':
+              return (
+                  <div className="rounded-3xl overflow-hidden shadow-xl border border-slate-200 bg-black aspect-video relative group">
+                      <video src={block.url} controls className="w-full h-full" />
+                      <div className="absolute top-4 right-4 bg-black/50 text-white text-[10px] font-bold px-2 py-1 rounded backdrop-blur-md flex items-center gap-1"><Play size={10}/> Video</div>
+                  </div>
+              );
+
+          case 'audio':
+              return (
+                  <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-xl flex items-center gap-4">
+                      <div className="p-3 bg-indigo-500 rounded-full animate-pulse"><Volume2 size={24}/></div>
+                      <div className="flex-1">
+                          <p className="text-xs font-bold text-indigo-300 uppercase tracking-widest mb-1">Audio Clip</p>
+                          <audio src={block.url} controls className="w-full h-8 accent-indigo-500" />
+                          {block.caption && <p className="text-xs text-slate-400 mt-2 italic">{block.caption}</p>}
+                      </div>
+                  </div>
+              );
+
+          case 'note':
+              const colors: any = { info: 'bg-blue-50 text-blue-800 border-blue-100', tip: 'bg-emerald-50 text-emerald-800 border-emerald-100', warning: 'bg-amber-50 text-amber-800 border-amber-100' };
+              const icons: any = { info: <Info size={24}/>, tip: <Zap size={24}/>, warning: <AlertTriangle size={24}/> };
+              return (
+                  <div className={`p-6 rounded-3xl border-l-8 ${colors[block.variant || 'info']} shadow-sm flex gap-5 items-start my-4`}>
+                      <div className="shrink-0 mt-1">{icons[block.variant || 'info']}</div>
+                      <div>
+                          <h4 className="font-black uppercase text-xs opacity-60 mb-2 tracking-widest">{block.title || block.variant}</h4>
+                          <p className="text-base font-medium leading-relaxed">{block.content}</p>
+                      </div>
+                  </div>
+              );
+          
+          default:
+              return <div className="p-4 bg-slate-100 rounded text-slate-500 italic">Unsupported block type: {block.type}</div>;
+      }
   };
-  
+
   return (
-    <div className="h-full flex flex-col bg-white">
-      <Header 
-        title={lesson.title} 
-        subtitle={lesson.subtitle} 
-        rightAction={<button onClick={() => onFinish(lesson.id, 0, lesson.title)} className="text-slate-400 hover:text-rose-500"><X /></button>}
-      />
-      
-      <div className="flex-1 overflow-y-auto p-6 space-y-8 pb-32 custom-scrollbar">
-        {/* Lesson Intro Card */}
-        <div className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 text-center animate-in fade-in slide-in-from-bottom-4">
-            <h2 className="text-2xl font-serif font-bold text-indigo-900 mb-2">{lesson.title}</h2>
-            <p className="text-indigo-800 opacity-80">{lesson.description}</p>
+    <div id="lesson-scroll-container" className="h-full flex flex-col bg-white overflow-y-auto relative scroll-smooth">
+        
+        {/* PROGRESS HEADER */}
+        <div className="sticky top-0 bg-white/90 backdrop-blur-md z-30 px-6 py-4 border-b border-slate-100 flex flex-col gap-2">
+            <div className="flex justify-between items-center">
+                <button onClick={() => onFinish(null, 0)} className="p-2 -ml-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-rose-500 transition-colors">
+                    <X size={20} />
+                </button>
+                <div className="flex flex-col items-end">
+                    <span className="text-[10px] font-black text-slate-300 tracking-widest uppercase">Progress</span>
+                    <span className="text-xs font-bold text-slate-800">{currentBlockIdx + 1} <span className="text-slate-300">/</span> {blocks.length}</span>
+                </div>
+            </div>
+            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-indigo-600 transition-all duration-500 ease-out shadow-[0_0_10px_rgba(79,70,229,0.5)]" style={{ width: `${progress}%` }}></div>
+            </div>
         </div>
-        
-        {/* Render Blocks up to current index */}
-        {lesson.blocks?.slice(0, currentBlockIndex + 1).map((block: any, idx: number) => (
-          <div key={idx} className="animate-in slide-in-from-bottom-8 fade-in duration-500">
-            
-            {block.type === 'text' && (
-                <div className="prose prose-slate max-w-none">
-                    <h3 className="font-bold text-lg text-slate-800">{block.title}</h3>
-                    <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{block.content}</p>
-                </div>
-            )}
-            
-            {block.type === 'scenario' && (
-                <ScenarioPlayer 
-                    block={block} 
-                    onScenarioComplete={() => {
-                        // If this is the active block, advance the lesson
-                        if (idx === currentBlockIndex) handleNext();
-                    }} 
-                />
-            )}
 
-            {block.type === 'note' && (
-                <div className={`p-4 rounded-xl border-l-4 ${block.variant === 'warning' ? 'bg-rose-50 border-rose-400 text-rose-900' : block.variant === 'tip' ? 'bg-emerald-50 border-emerald-400 text-emerald-900' : 'bg-blue-50 border-blue-400 text-blue-900'}`}>
-                    <h4 className="font-bold text-sm mb-1 flex items-center gap-2">{block.variant === 'warning' ? <AlertTriangle size={16}/> : <Info size={16}/>} {block.title}</h4>
-                    <p className="text-sm opacity-90">{block.content}</p>
-                </div>
-            )}
+        {/* CONTENT AREA */}
+        <div className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full flex flex-col justify-center min-h-[60vh]">
+            <div key={currentBlockIdx} className="w-full">
+                {renderBlockContent(currentBlock)}
+            </div>
+        </div>
 
-            {block.type === 'code' && (
-                <div className="bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-sm overflow-x-auto shadow-inner">
-                    <pre>{block.content}</pre>
-                </div>
-            )}
-
-            {block.type === 'quote' && (
-                <figure className="border-l-4 border-indigo-500 pl-4 py-2 my-4">
-                    <blockquote className="text-xl font-serif italic text-slate-700">"{block.content}"</blockquote>
-                    <figcaption className="text-sm text-slate-500 mt-2 font-bold">— {block.title}</figcaption>
-                </figure>
-            )}
-
-            {block.type === 'dialogue' && (<div className="space-y-4 my-4">{block.lines.map((line: any, i: number) => (<div key={i} className={`flex flex-col ${line.side === 'right' || line.speaker === 'B' ? 'items-end' : 'items-start'}`}><span className="text-xs font-bold text-slate-400 uppercase mb-1">{line.speaker}</span><div className={`p-4 rounded-2xl max-w-[80%] ${line.side === 'right' || line.speaker === 'B' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-slate-100 text-slate-800 rounded-tl-none'}`}><p className="font-serif text-lg">{line.text}</p><p className={`text-xs mt-1 italic ${line.side === 'right' || line.speaker === 'B' ? 'text-indigo-200' : 'text-slate-500'}`}>{line.translation}</p></div></div>))}</div>)}
-            
-            {block.type === 'quiz' && (<div className="bg-white border-2 border-indigo-100 p-5 rounded-2xl shadow-sm"><p className="font-bold text-slate-800 mb-4 flex items-center gap-2"><HelpCircle className="text-indigo-500" size={20}/> {block.question}</p><div className="space-y-2">{block.options.map((opt: any) => { const isSelected = quizAnswers[idx] === opt.id; const isCorrect = opt.id === block.correctId; const showResult = !!quizAnswers[idx]; let style = "bg-slate-50 border-slate-200 hover:bg-slate-100"; if (showResult && isSelected && isCorrect) style = "bg-emerald-100 border-emerald-500 text-emerald-800 font-bold"; if (showResult && isSelected && !isCorrect) style = "bg-rose-100 border-rose-500 text-rose-800"; if (showResult && !isSelected && isCorrect) style = "bg-emerald-50 border-emerald-200 text-emerald-800"; return (<button key={opt.id} disabled={showResult} onClick={() => handleQuizOption(idx, opt.id)} className={`w-full p-3 rounded-xl border text-left transition-all ${style}`}>{opt.text}</button>); })}</div></div>)}
-            
-            {block.type === 'vocab-list' && (
-              <div className="grid grid-cols-1 gap-3">
-                {block.items.map((item: any, i:number) => (
-                  <div key={i} className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm hover:shadow-md hover:border-indigo-200 transition-all">
-                    <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
-                            <span className="font-bold text-lg text-slate-800">{item.term}</span>
-                        </div>
-                        <div className="pl-3.5 border-l-2 border-slate-100">
-                            <span className="text-slate-600 text-sm leading-relaxed block">{item.definition}</span>
-                        </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {block.type === 'image' && (<div className="rounded-xl overflow-hidden shadow-sm border border-slate-200"><img src={block.url} alt="Lesson illustration" className="w-full h-auto object-cover" />{block.caption && <div className="p-2 bg-slate-50 text-xs text-center text-slate-500 italic">{block.caption}</div>}</div>)}
-            
-            {(block.type === 'video' || block.type === 'audio') && (
-                <div className="rounded-xl overflow-hidden shadow-sm border border-slate-200 bg-black">
-                    <div className="aspect-video flex items-center justify-center text-white/50 bg-slate-900">
-                        {block.type === 'video' ? <Video size={48}/> : <Mic size={48}/>}
-                        <span className="ml-2 text-sm font-bold">Media Placeholder: {block.url}</span>
-                    </div>
-                    {block.caption && <div className="p-2 bg-slate-50 text-xs text-center text-slate-500 italic">{block.caption}</div>}
-                </div>
-            )}
-
-          </div>
-        ))}
-        
-        {/* FOOTER: Only show Continue if NOT in interactive mode */}
-        <div ref={bottomRef} className="pt-8">
-            {isComplete ? (
+        {/* FOOTER NAV */}
+        <div className="p-6 border-t border-slate-100 bg-slate-50 sticky bottom-0 z-30">
+            {/* Logic: Hide Next button if it's a quiz/scenario that handles its own flow, unless it's the last slide */}
+            {!(currentBlock.type === 'quiz' || (currentBlock.type === 'scenario' && currentBlock.nodes)) ? (
                 <button 
-                    onClick={() => onFinish(lesson.id, lesson.xp || 50, lesson.title)} 
-                    className="w-full py-4 bg-emerald-500 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-emerald-600 active:scale-95 transition-all animate-bounce"
+                    onClick={handleNextBlock}
+                    className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg shadow-xl shadow-slate-300 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
                 >
-                    Complete Lesson (+{lesson.xp || 50} XP)
+                    {currentBlockIdx < blocks.length - 1 ? (
+                        <>Next Step <ArrowRight size={20}/></>
+                    ) : (
+                        <>Complete Lesson <Check size={20}/></>
+                    )}
                 </button>
-            ) : !isInteractiveBlock && (
-                <button 
-                    onClick={handleNext} 
-                    className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 active:scale-95 transition-all flex items-center justify-center gap-2"
-                >
-                    <span>Continue</span> <ChevronDown />
-                </button>
+            ) : (
+                <div className="text-center text-xs text-slate-400 font-bold uppercase tracking-widest animate-pulse">
+                    Complete the activity to continue
+                </div>
             )}
         </div>
-      </div>
     </div>
   );
 }
-
 function ClassForum({ classId, user, userData }: any) {
   const [threads, setThreads] = useState<any[]>([]);
   const [activeThread, setActiveThread] = useState<any>(null);
