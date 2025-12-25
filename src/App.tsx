@@ -1357,10 +1357,92 @@ function FlashcardView({
   );
 }
 // ============================================================================
-//  ULTIMATE LESSON VIEW (With Fixed Scroll Reset)
+//  ULTIMATE LESSON VIEW SUITE
 // ============================================================================
 
-// --- 1. JUICY DECK ---
+// --- 1. CONCEPT CARD BLOCK (Single "Anchor" Concept) ---
+const ConceptCardBlock = ({ front, back, context, onInteraction }: any) => {
+    const [isFlipped, setIsFlipped] = useState(false);
+    const [status, setStatus] = useState<'neutral' | 'success' | 'missed'>('neutral');
+
+    const handleFlip = () => {
+        if (!isFlipped) {
+            setIsFlipped(true);
+            if (onInteraction) onInteraction(); 
+        }
+    };
+
+    const handleRating = (rating: 'success' | 'missed', e: any) => {
+        e.stopPropagation();
+        setStatus(rating);
+    };
+
+    const playAudio = (text: string, e: any) => {
+        e.stopPropagation();
+        if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            window.speechSynthesis.speak(utterance);
+        }
+    };
+
+    return (
+        <div className="my-8 w-full max-w-md mx-auto">
+            {context && (
+                <div className="mb-3 flex items-center gap-2 text-indigo-900/70 font-bold text-sm uppercase tracking-wide animate-in fade-in slide-in-from-bottom-2">
+                    <Zap size={14} className="text-amber-500 fill-amber-500"/>
+                    {context}
+                </div>
+            )}
+
+            <div 
+                onClick={handleFlip}
+                className={`relative h-64 w-full rounded-3xl cursor-pointer perspective-1000 group transition-all duration-300 ${status === 'success' ? 'ring-4 ring-emerald-100' : status === 'missed' ? 'ring-4 ring-rose-100' : ''}`}
+            >
+                <div 
+                    className="relative w-full h-full transition-all duration-500 transform-style-3d shadow-xl rounded-3xl"
+                    style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
+                >
+                    {/* FRONT */}
+                    <div className="absolute inset-0 backface-hidden bg-white rounded-3xl border-2 border-slate-100 flex flex-col items-center justify-center p-8 text-center" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
+                        <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                            <HelpCircle size={24}/>
+                        </div>
+                        <h3 className="text-2xl font-black text-slate-800 leading-tight">{front}</h3>
+                        <p className="absolute bottom-6 text-xs font-bold text-indigo-500 uppercase tracking-widest animate-pulse">Tap to Reveal</p>
+                    </div>
+
+                    {/* BACK */}
+                    <div 
+                        className="absolute inset-0 backface-hidden bg-slate-900 rounded-3xl flex flex-col items-center justify-center p-8 text-center text-white relative overflow-hidden"
+                        style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+                    >
+                        <div className={`absolute inset-0 opacity-20 transition-colors duration-500 ${status === 'success' ? 'bg-emerald-500' : status === 'missed' ? 'bg-rose-500' : 'bg-indigo-500'}`}></div>
+                        
+                        <div className="relative z-10 flex flex-col items-center w-full h-full justify-center">
+                            <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-2">Answer</span>
+                            <h3 className="text-2xl font-bold mb-6">{back}</h3>
+                            
+                            <button onClick={(e) => playAudio(back, e)} className="p-3 bg-white/10 rounded-full hover:bg-white/20 transition-colors mb-auto">
+                                <Volume2 size={20}/>
+                            </button>
+
+                            <div className="w-full grid grid-cols-2 gap-3 mt-4">
+                                <button onClick={(e) => handleRating('missed', e)} className={`py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${status === 'missed' ? 'bg-rose-500 text-white shadow-lg scale-105' : 'bg-white/10 text-white/70 hover:bg-rose-500/50'}`}>
+                                    <X size={14}/> I missed it
+                                </button>
+                                <button onClick={(e) => handleRating('success', e)} className={`py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${status === 'success' ? 'bg-emerald-500 text-white shadow-lg scale-105' : 'bg-white/10 text-white/70 hover:bg-emerald-500/50'}`}>
+                                    <Check size={14}/> I knew it
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- 2. JUICY DECK BLOCK (For Vocab Lists/Multiple Cards) ---
 const JuicyDeckBlock = ({ items, title }: any) => {
     const [index, setIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
@@ -1386,6 +1468,7 @@ const JuicyDeckBlock = ({ items, title }: any) => {
                 <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2"><Layers size={14}/> {title || "Flashcards"}</h4>
                 <div className="flex gap-1">{items.map((_:any, i:number) => <div key={i} className={`h-1 w-4 rounded-full transition-colors ${i === index ? 'bg-indigo-500' : 'bg-slate-200'}`} />)}</div>
             </div>
+            
             <div className="group h-64 cursor-pointer relative perspective-1000" onClick={() => setIsFlipped(!isFlipped)}>
                 <div className="relative w-full h-full transition-all duration-500 transform-style-3d" style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}>
                     <div className="absolute inset-0 bg-white rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center justify-center p-6 text-center backface-hidden" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
@@ -1402,6 +1485,7 @@ const JuicyDeckBlock = ({ items, title }: any) => {
                 </div>
                 <div className="absolute top-2 left-2 w-full h-full bg-slate-100 rounded-2xl -z-10 border border-slate-200 shadow-sm transform rotate-2"></div>
             </div>
+
             <div className="flex justify-between items-center mt-6 px-4">
                 <button onClick={() => handleSwipe(-1)} className="p-3 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 shadow-sm active:scale-95"><ArrowLeft size={20}/></button>
                 <div className="text-xs font-bold text-slate-400">{index + 1} / {items.length}</div>
@@ -1411,7 +1495,7 @@ const JuicyDeckBlock = ({ items, title }: any) => {
     );
 };
 
-// --- 2. SCENARIO PLAYER ---
+// --- 3. SCENARIO BLOCK ---
 const ScenarioBlock = ({ block, onComplete }: any) => {
     const [currentNodeId, setCurrentNodeId] = useState(block.nodes[0].id);
     const [history, setHistory] = useState<string[]>([]);
@@ -1455,7 +1539,7 @@ const ScenarioBlock = ({ block, onComplete }: any) => {
     );
 };
 
-// --- 3. QUIZ BLOCK ---
+// --- 4. QUIZ BLOCK ---
 const QuizBlock = ({ block, onComplete }: any) => {
     const [selected, setSelected] = useState<string | null>(null);
     const [submitted, setSubmitted] = useState(false);
@@ -1496,7 +1580,7 @@ const QuizBlock = ({ block, onComplete }: any) => {
     );
 };
 
-// --- 4. CHAT DIALOGUE ---
+// --- 5. CHAT DIALOGUE BLOCK ---
 const ChatDialogueBlock = ({ lines }: any) => (
     <div className="space-y-4 my-8 bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
         {lines.map((line: any, i: number) => {
@@ -1514,19 +1598,17 @@ const ChatDialogueBlock = ({ lines }: any) => (
     </div>
 );
 
-// --- 5. MAIN LESSON VIEW (With Fixed Scroll) ---
+// --- 6. MAIN LESSON VIEW ---
 function LessonView({ lesson, onFinish }: any) {
-  // Analytics
   useLearningTimer(auth.currentUser, lesson.id, 'lesson', lesson.title);
 
-  // Scroll Reset Logic
+  // === FIX: NUCLEAR SCROLL RESET ===
   const resetScroll = () => {
-      window.scrollTo(0, 0); // Reset Window
+      window.scrollTo(0, 0); // Window Level
       const container = document.getElementById('lesson-scroll-container');
-      if (container) container.scrollTop = 0; // Reset Container
+      if (container) container.scrollTop = 0; // Container Level
   };
 
-  // Force scroll reset on mount
   useLayoutEffect(() => {
       resetScroll();
   }, []);
@@ -1537,7 +1619,6 @@ function LessonView({ lesson, onFinish }: any) {
   
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll when new block appears
   useEffect(() => {
       if (bottomRef.current) {
           bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1548,15 +1629,13 @@ function LessonView({ lesson, onFinish }: any) {
       if (currentBlockIdx < blocks.length - 1) {
           setCurrentBlockIdx(prev => prev + 1);
       } else {
-          // --- THE FIX: SCROLL TO TOP BEFORE EXITING ---
-          resetScroll();
+          resetScroll(); // Reset before exit
           onFinish(lesson.id, lesson.xp, lesson.title);
       }
   };
 
   const handleExit = () => {
-      // --- THE FIX: SCROLL TO TOP BEFORE EXITING ---
-      resetScroll();
+      resetScroll(); // Reset before exit
       onFinish(null, 0);
   };
 
@@ -1579,7 +1658,11 @@ function LessonView({ lesson, onFinish }: any) {
                   </div>
               );
           case 'vocab-list': return <JuicyDeckBlock items={block.items} title="Key Vocabulary" />;
-          case 'flashcard': return <JuicyDeckBlock items={[{ front: block.front, back: block.back }]} title="Concept Card" />;
+          
+          // === UPDATED: USE CONCEPT CARD FOR SINGLE ITEMS ===
+          case 'flashcard': 
+              return <ConceptCardBlock front={block.front} back={block.back} context={block.title || "Check Understanding"} />;
+          
           case 'quiz': return <QuizBlock block={block} onComplete={handleNextBlock} />;
           case 'scenario': return <ScenarioBlock block={block} onComplete={handleNextBlock} />;
           case 'dialogue': return <ChatDialogueBlock lines={block.lines} />;
