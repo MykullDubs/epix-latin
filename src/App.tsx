@@ -1598,15 +1598,17 @@ const ChatDialogueBlock = ({ lines }: any) => (
     </div>
 );
 
-// --- 6. MAIN LESSON VIEW ---
+// ============================================================================
+//  MAIN LESSON VIEW (Sequential Scroll + Juiced Components)
+// ============================================================================
 function LessonView({ lesson, onFinish }: any) {
   useLearningTimer(auth.currentUser, lesson.id, 'lesson', lesson.title);
 
-  // === FIX: NUCLEAR SCROLL RESET ===
+  // === SCROLL RESET LOGIC ===
   const resetScroll = () => {
-      window.scrollTo(0, 0); // Window Level
+      window.scrollTo(0, 0); 
       const container = document.getElementById('lesson-scroll-container');
-      if (container) container.scrollTop = 0; // Container Level
+      if (container) container.scrollTop = 0; 
   };
 
   useLayoutEffect(() => {
@@ -1629,13 +1631,13 @@ function LessonView({ lesson, onFinish }: any) {
       if (currentBlockIdx < blocks.length - 1) {
           setCurrentBlockIdx(prev => prev + 1);
       } else {
-          resetScroll(); // Reset before exit
+          resetScroll(); 
           onFinish(lesson.id, lesson.xp, lesson.title);
       }
   };
 
   const handleExit = () => {
-      resetScroll(); // Reset before exit
+      resetScroll(); 
       onFinish(null, 0);
   };
 
@@ -1648,6 +1650,7 @@ function LessonView({ lesson, onFinish }: any) {
                       <div className="text-lg text-slate-600 leading-loose whitespace-pre-wrap font-serif">{block.content}</div>
                   </div>
               );
+          
           case 'image':
               return (
                   <div className="my-8 space-y-4 animate-in zoom-in-95 duration-500">
@@ -1657,15 +1660,13 @@ function LessonView({ lesson, onFinish }: any) {
                       {block.caption && <p className="text-center text-xs text-slate-400 font-bold uppercase tracking-widest bg-slate-50 py-2 rounded-full inline-block px-4 mx-auto">{block.caption}</p>}
                   </div>
               );
+
           case 'vocab-list': return <JuicyDeckBlock items={block.items} title="Key Vocabulary" />;
-          
-          // === UPDATED: USE CONCEPT CARD FOR SINGLE ITEMS ===
-          case 'flashcard': 
-              return <ConceptCardBlock front={block.front} back={block.back} context={block.title || "Check Understanding"} />;
-          
+          case 'flashcard': return <ConceptCardBlock front={block.front} back={block.back} context={block.title || "Check Understanding"} />;
           case 'quiz': return <QuizBlock block={block} onComplete={handleNextBlock} />;
           case 'scenario': return <ScenarioBlock block={block} onComplete={handleNextBlock} />;
           case 'dialogue': return <ChatDialogueBlock lines={block.lines} />;
+          
           case 'video':
               return (
                   <div className="my-8 rounded-3xl overflow-hidden shadow-xl border border-slate-200 bg-black aspect-video relative group">
@@ -1673,6 +1674,7 @@ function LessonView({ lesson, onFinish }: any) {
                       <div className="absolute top-4 right-4 bg-black/50 text-white text-[10px] font-bold px-2 py-1 rounded backdrop-blur-md flex items-center gap-1"><Play size={10}/> Video</div>
                   </div>
               );
+          
           case 'audio':
               return (
                   <div className="my-6 bg-slate-900 text-white p-6 rounded-3xl shadow-xl flex items-center gap-4">
@@ -1680,55 +1682,35 @@ function LessonView({ lesson, onFinish }: any) {
                       <div className="flex-1"><p className="text-xs font-bold text-indigo-300 uppercase tracking-widest mb-1">Audio Clip</p><audio src={block.url} controls className="w-full h-8 accent-indigo-500" />{block.caption && <p className="text-xs text-slate-400 mt-2 italic">{block.caption}</p>}</div>
                   </div>
               );
-        case 'note':
+
+          // === JUICED NOTE BLOCK ===
+          case 'note':
               const styles: any = { 
-                  info: { 
-                      bg: 'bg-gradient-to-br from-blue-50 to-indigo-50', 
-                      border: 'border-blue-100', 
-                      iconBg: 'bg-white', 
-                      iconColor: 'text-blue-600',
-                      icon: <Info size={20}/> 
-                  },
-                  tip: { 
-                      bg: 'bg-gradient-to-br from-emerald-50 to-teal-50', 
-                      border: 'border-emerald-100', 
-                      iconBg: 'bg-white', 
-                      iconColor: 'text-emerald-600',
-                      icon: <Zap size={20} className="fill-current"/> 
-                  }, 
-                  warning: { 
-                      bg: 'bg-gradient-to-br from-amber-50 to-orange-50', 
-                      border: 'border-amber-100', 
-                      iconBg: 'bg-white', 
-                      iconColor: 'text-amber-600',
-                      icon: <AlertTriangle size={20}/> 
-                  } 
+                  info: { bg: 'bg-gradient-to-br from-blue-50 to-indigo-50', border: 'border-blue-100', iconBg: 'bg-white', iconColor: 'text-blue-600', icon: <Info size={20}/> },
+                  tip: { bg: 'bg-gradient-to-br from-emerald-50 to-teal-50', border: 'border-emerald-100', iconBg: 'bg-white', iconColor: 'text-emerald-600', icon: <Zap size={20} className="fill-current"/> }, 
+                  warning: { bg: 'bg-gradient-to-br from-amber-50 to-orange-50', border: 'border-amber-100', iconBg: 'bg-white', iconColor: 'text-amber-600', icon: <AlertTriangle size={20}/> } 
               };
               
               const s = styles[block.variant || 'info'];
           
               return (
                   <div className={`relative overflow-hidden rounded-2xl border ${s.border} ${s.bg} p-5 my-6 shadow-sm animate-in slide-in-from-left-2 duration-500`}>
-                      {/* Decorative Watermark (Visual Juice) */}
                       <div className={`absolute -right-4 -top-4 opacity-10 pointer-events-none ${s.iconColor}`}>
                           {React.cloneElement(s.icon, { size: 100 })}
                       </div>
-                      
                       <div className="relative z-10 flex gap-4 items-start">
-                          <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${s.iconBg} ${s.iconColor} shadow-sm border border-white/50`}>
-                              {s.icon}
-                          </div>
+                          <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${s.iconBg} ${s.iconColor} shadow-sm border border-white/50`}>{s.icon}</div>
                           <div>
-                              <h4 className={`font-black text-[10px] uppercase tracking-widest mb-1 opacity-70 ${s.iconColor}`}>
-                                  {block.title || block.variant}
-                              </h4>
-                              <p className="text-slate-700 text-sm font-medium leading-relaxed">
-                                  {block.content}
-                              </p>
+                              <h4 className={`font-black text-[10px] uppercase tracking-widest mb-1 opacity-70 ${s.iconColor}`}>{block.title || block.variant}</h4>
+                              <p className="text-slate-700 text-sm font-medium leading-relaxed">{block.content}</p>
                           </div>
                       </div>
                   </div>
               );
+
+          default: return <div className="p-4 bg-slate-100 rounded text-slate-500 italic">Unsupported block type: {block.type}</div>;
+      }
+  };
 
   const activeBlock = blocks[currentBlockIdx];
   const isInteractive = activeBlock.type === 'quiz' || (activeBlock.type === 'scenario' && activeBlock.nodes);
