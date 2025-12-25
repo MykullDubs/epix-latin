@@ -1680,18 +1680,55 @@ function LessonView({ lesson, onFinish }: any) {
                       <div className="flex-1"><p className="text-xs font-bold text-indigo-300 uppercase tracking-widest mb-1">Audio Clip</p><audio src={block.url} controls className="w-full h-8 accent-indigo-500" />{block.caption && <p className="text-xs text-slate-400 mt-2 italic">{block.caption}</p>}</div>
                   </div>
               );
-          case 'note':
-              const colors: any = { info: 'bg-blue-50 text-blue-800 border-blue-100', tip: 'bg-emerald-50 text-emerald-800 border-emerald-100', warning: 'bg-amber-50 text-amber-800 border-amber-100' };
-              const icons: any = { info: <Info size={24}/>, tip: <Zap size={24}/>, warning: <AlertTriangle size={24}/> };
+        case 'note':
+              const styles: any = { 
+                  info: { 
+                      bg: 'bg-gradient-to-br from-blue-50 to-indigo-50', 
+                      border: 'border-blue-100', 
+                      iconBg: 'bg-white', 
+                      iconColor: 'text-blue-600',
+                      icon: <Info size={20}/> 
+                  },
+                  tip: { 
+                      bg: 'bg-gradient-to-br from-emerald-50 to-teal-50', 
+                      border: 'border-emerald-100', 
+                      iconBg: 'bg-white', 
+                      iconColor: 'text-emerald-600',
+                      icon: <Zap size={20} className="fill-current"/> 
+                  }, 
+                  warning: { 
+                      bg: 'bg-gradient-to-br from-amber-50 to-orange-50', 
+                      border: 'border-amber-100', 
+                      iconBg: 'bg-white', 
+                      iconColor: 'text-amber-600',
+                      icon: <AlertTriangle size={20}/> 
+                  } 
+              };
+              
+              const s = styles[block.variant || 'info'];
+          
               return (
-                  <div className={`p-6 rounded-3xl border-l-8 ${colors[block.variant || 'info']} shadow-sm flex gap-5 items-start my-8`}>
-                      <div className="shrink-0 mt-1">{icons[block.variant || 'info']}</div>
-                      <div><h4 className="font-black uppercase text-xs opacity-60 mb-2 tracking-widest">{block.title || block.variant}</h4><p className="text-base font-medium leading-relaxed">{block.content}</p></div>
+                  <div className={`relative overflow-hidden rounded-2xl border ${s.border} ${s.bg} p-5 my-6 shadow-sm animate-in slide-in-from-left-2 duration-500`}>
+                      {/* Decorative Watermark (Visual Juice) */}
+                      <div className={`absolute -right-4 -top-4 opacity-10 pointer-events-none ${s.iconColor}`}>
+                          {React.cloneElement(s.icon, { size: 100 })}
+                      </div>
+                      
+                      <div className="relative z-10 flex gap-4 items-start">
+                          <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${s.iconBg} ${s.iconColor} shadow-sm border border-white/50`}>
+                              {s.icon}
+                          </div>
+                          <div>
+                              <h4 className={`font-black text-[10px] uppercase tracking-widest mb-1 opacity-70 ${s.iconColor}`}>
+                                  {block.title || block.variant}
+                              </h4>
+                              <p className="text-slate-700 text-sm font-medium leading-relaxed">
+                                  {block.content}
+                              </p>
+                          </div>
+                      </div>
                   </div>
               );
-          default: return <div className="p-4 bg-slate-100 rounded text-slate-500 italic">Unsupported block type: {block.type}</div>;
-      }
-  };
 
   const activeBlock = blocks[currentBlockIdx];
   const isInteractive = activeBlock.type === 'quiz' || (activeBlock.type === 'scenario' && activeBlock.nodes);
