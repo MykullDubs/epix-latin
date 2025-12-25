@@ -939,38 +939,26 @@ function FlashcardView({
   onComplete, 
   onLogActivity, 
   userData, 
+  user, // <--- Props now include 'user'
   onUpdatePrefs, 
   onDeleteDeck 
 }: any) {
   
-  // 1. DATA PREP (Must be first for the hook)
   const currentDeck = activeDeckOverride || allDecks[selectedDeckKey];
   const userPrefs = userData?.deckPreferences || { hiddenDeckIds: [], customOrder: [] };
 
-  // 2. ANALYTICS HOOK
-  useLearningTimer(
-      userData ? auth.currentUser : null, 
-      selectedDeckKey, 
-      'deck', 
-      currentDeck?.title || 'Flashcards'
-  );
+  useLearningTimer(userData ? auth.currentUser : null, selectedDeckKey, 'deck', currentDeck?.title || 'Flashcards');
 
-  // --- STATE ---
+  // STATE
   const [viewState, setViewState] = useState<'browsing' | 'playing'>(activeDeckOverride ? 'playing' : 'browsing');
   const [filterLang, setFilterLang] = useState('All');
   const [isEditMode, setIsEditMode] = useState(false);
   const [completionMsg, setCompletionMsg] = useState<string | null>(null);
+  const [showTower, setShowTower] = useState(false); // <--- Tower State
 
   // Accordion State
-  const [openSections, setOpenSections] = useState({
-    assignments: true,
-    custom: true,
-    library: false
-  });
-
-  const toggleSection = (section: string) => {
-    setOpenSections(prev => ({ ...prev, [section]: !prev[section as keyof typeof prev] }));
-  };
+  const [openSections, setOpenSections] = useState({ assignments: true, custom: true, library: false });
+  const toggleSection = (section: string) => setOpenSections(prev => ({ ...prev, [section]: !prev[section as keyof typeof prev] }));
 
   // Player State
   const [gameMode, setGameMode] = useState('study'); 
@@ -984,10 +972,9 @@ function FlashcardView({
   const [dragEndX, setDragEndX] = useState<number | null>(null);
   const minSwipeDistance = 50; 
 
-  // --- MEMOS & FILTERING ---
+  // --- FILTERING & MEMOS ---
   const { assignments, customDecks, libraryDecks, allProcessed, languages } = useMemo(() => {
       const isHidden = (id: string) => userPrefs.hiddenDeckIds?.includes(id);
-
       const processed = Object.entries(allDecks)
         .filter(([_, deck]: any) => deck.cards && deck.cards.length > 0)
         .map(([key, deck]: any) => {
@@ -995,11 +982,9 @@ function FlashcardView({
             let category = 'library';
             if (deck.isAssignment) category = 'assignment';
             else if (key.startsWith('custom')) category = 'custom';
-
             return { id: key, ...deck, language: detectedLang, category, isHidden: isHidden(key) };
         });
 
-      // Sort Order Logic
       const sortOrder = userPrefs.customOrder || [];
       const sorter = (a: any, b: any) => {
           const idxA = sortOrder.indexOf(a.id);
@@ -1011,7 +996,6 @@ function FlashcardView({
       };
 
       const langs = new Set(processed.map(d => d.language));
-
       return {
           assignments: processed.filter(d => d.category === 'assignment').sort(sorter),
           customDecks: processed.filter(d => d.category === 'custom').sort(sorter),
@@ -1021,7 +1005,6 @@ function FlashcardView({
       };
   }, [allDecks, userPrefs]);
 
-  // Apply Language & Visibility Filters
   const filterList = (list: any[]) => {
       let filtered = list;
       if (filterLang !== 'All') filtered = filtered.filter(d => d.language === filterLang);
@@ -1039,45 +1022,32 @@ function FlashcardView({
   const card = deckCards[currentIndex];
   const theme = card ? (TYPE_COLORS[card.type] || TYPE_COLORS.noun) : TYPE_COLORS.noun;
 
-  // --- ACTIONS ---
+  // --- HANDLERS ---
   const launchDeck = (key: string) => {
     if (isEditMode) return;
-    onSelectDeck(key);
-    setCurrentIndex(0);
-    setIsFlipped(false);
-    setViewState('playing');
+    onSelectDeck(key); setCurrentIndex(0); setIsFlipped(false); setViewState('playing');
   };
 
-  const handleQuickStudy = () => {
-    if (allProcessed.length === 0) return;
-    const largestDeck = allProcessed.sort((a: any, b: any) => b.cards.length - a.cards.length)[0];
-    launchDeck(largestDeck.id);
+  const handleTowerXP = async (xpAmount: number, reason: string) => {
+      if (onLogActivity) onLogActivity('tower_game', xpAmount, reason, null);
   };
 
-  // Preference Handlers
   const handleMove = (id: string, direction: 'up' | 'down', list: any[]) => {
       const currentOrder = list.map(d => d.id);
       const currentIndex = currentOrder.indexOf(id);
       if (currentIndex === -1) return;
-
       const newOrder = [...currentOrder];
       const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
       if (targetIndex < 0 || targetIndex >= newOrder.length) return;
-
       [newOrder[currentIndex], newOrder[targetIndex]] = [newOrder[targetIndex], newOrder[currentIndex]];
-
-      // Sync with global order
+      
       const globalOrder = [...(userPrefs.customOrder || [])];
       list.forEach(d => { if(!globalOrder.includes(d.id)) globalOrder.push(d.id); });
-      
       const id1 = currentOrder[currentIndex];
       const id2 = currentOrder[targetIndex];
       const gIdx1 = globalOrder.indexOf(id1);
       const gIdx2 = globalOrder.indexOf(id2);
-      
-      if(gIdx1 !== -1 && gIdx2 !== -1) {
-          [globalOrder[gIdx1], globalOrder[gIdx2]] = [globalOrder[gIdx2], globalOrder[gIdx1]];
-      }
+      if(gIdx1 !== -1 && gIdx2 !== -1) { [globalOrder[gIdx1], globalOrder[gIdx2]] = [globalOrder[gIdx2], globalOrder[gIdx1]]; }
       onUpdatePrefs({ ...userPrefs, customOrder: globalOrder });
   };
 
@@ -1087,41 +1057,27 @@ function FlashcardView({
       onUpdatePrefs({ ...userPrefs, hiddenDeckIds: newHidden });
   };
 
-  // Game/Player Handlers
   const handleGameEnd = (data: any) => { 
       let xp = 0;
       let message = "";
-      if (typeof data === 'number') {
-          xp = data;
-          message = `Matching Complete! +${xp} XP`;
-      } else {
+      if (typeof data === 'number') { xp = data; message = `Matching Complete! +${xp} XP`; } 
+      else {
           const percentage = Math.round((data.score / data.total) * 100);
           xp = Math.round((data.score / data.total) * 50) + 10;
           message = `Score: ${percentage}% (${data.score}/${data.total}) • +${xp} XP`;
       }
       setCompletionMsg(message);
-
-      if (activeDeckOverride && onComplete) {
-          onComplete(activeDeckOverride.id, xp, currentDeck.title, data.score !== undefined ? data : null); 
-      } else if (onLogActivity) {
+      if (activeDeckOverride && onComplete) onComplete(activeDeckOverride.id, xp, currentDeck.title, data.score !== undefined ? data : null); 
+      else if (onLogActivity) {
           const scoreDetail = data.score !== undefined ? data : null;
           onLogActivity(selectedDeckKey, xp, `${currentDeck.title} (${gameMode})`, scoreDetail);
           setViewState('browsing');
-      } else {
-          setViewState('browsing');
-      }
+      } else setViewState('browsing');
   };
 
-  const handleNext = useCallback(() => {
-    setXrayMode(false); setIsFlipped(false); setSwipeDirection('left');
-    setTimeout(() => { setCurrentIndex((prev) => (prev + 1) % deckCards.length); setSwipeDirection(null); }, 200);
-  }, [deckCards.length]);
-
-  const handlePrev = useCallback(() => {
-    setXrayMode(false); setIsFlipped(false); setSwipeDirection('right');
-    setTimeout(() => { setCurrentIndex((prev) => (prev - 1 + deckCards.length) % deckCards.length); setSwipeDirection(null); }, 200);
-  }, [deckCards.length]);
-
+  const handleNext = useCallback(() => { setXrayMode(false); setIsFlipped(false); setSwipeDirection('left'); setTimeout(() => { setCurrentIndex((prev) => (prev + 1) % deckCards.length); setSwipeDirection(null); }, 200); }, [deckCards.length]);
+  const handlePrev = useCallback(() => { setXrayMode(false); setIsFlipped(false); setSwipeDirection('right'); setTimeout(() => { setCurrentIndex((prev) => (prev - 1 + deckCards.length) % deckCards.length); setSwipeDirection(null); }, 200); }, [deckCards.length]);
+  
   const playAudio = useCallback((text: string) => {
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
@@ -1142,102 +1098,30 @@ function FlashcardView({
   };
 
   // --- SUB-COMPONENTS ---
-  
   const DeckCard = ({ deck, icon, colorClass, borderClass, fullList }: any) => (
-      <div 
-          onClick={() => launchDeck(deck.id)}
-          className={`w-full bg-white p-4 rounded-2xl border shadow-sm transition-all flex flex-col gap-3 group relative overflow-hidden text-left ${
-              isEditMode 
-              ? 'border-slate-300 border-dashed cursor-default' 
-              : `hover:shadow-md cursor-pointer ${borderClass || 'border-slate-100 hover:border-indigo-200'}`
-          } ${deck.isHidden ? 'opacity-60 bg-slate-50' : ''}`}
-      >
-          <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
-              deck.language === 'Latin' ? 'bg-purple-500' : 
-              deck.language === 'Spanish' ? 'bg-orange-500' :
-              deck.language === 'English' ? 'bg-blue-500' : 'bg-slate-300'
-          }`}></div>
-
+      <div onClick={() => launchDeck(deck.id)} className={`w-full bg-white p-4 rounded-2xl border shadow-sm transition-all flex flex-col gap-3 group relative overflow-hidden text-left ${isEditMode ? 'border-slate-300 border-dashed cursor-default' : `hover:shadow-md cursor-pointer ${borderClass || 'border-slate-100 hover:border-indigo-200'}`} ${deck.isHidden ? 'opacity-60 bg-slate-50' : ''}`}>
+          <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${deck.language === 'Latin' ? 'bg-purple-500' : deck.language === 'Spanish' ? 'bg-orange-500' : deck.language === 'English' ? 'bg-blue-500' : 'bg-slate-300'}`}></div>
           <div className="flex justify-between items-start w-full pl-2">
               <div className="flex items-center gap-3">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm transition-colors ${deck.isHidden ? 'bg-slate-200 text-slate-400' : colorClass}`}>
-                      {icon}
-                  </div>
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm transition-colors ${deck.isHidden ? 'bg-slate-200 text-slate-400' : colorClass}`}>{icon}</div>
                   <div>
-                      <h4 className="font-bold text-slate-800 text-base leading-tight group-hover:text-indigo-700 transition-colors line-clamp-1 flex items-center gap-2">
-                          {deck.title}
-                          {deck.isHidden && <span className="text-[9px] bg-slate-200 text-slate-500 px-1 rounded uppercase">Hidden</span>}
-                      </h4>
-                      <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded flex items-center gap-1">
-                              <Globe size={10}/> {deck.language}
-                          </span>
-                          <span className="text-[10px] font-medium text-slate-400 flex items-center gap-1">
-                              <Layers size={10}/> {deck.cards.length}
-                          </span>
-                      </div>
+                      <h4 className="font-bold text-slate-800 text-base leading-tight group-hover:text-indigo-700 transition-colors line-clamp-1 flex items-center gap-2">{deck.title}{deck.isHidden && <span className="text-[9px] bg-slate-200 text-slate-500 px-1 rounded uppercase">Hidden</span>}</h4>
+                      <div className="flex items-center gap-2 mt-1"><span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded flex items-center gap-1"><Globe size={10}/> {deck.language}</span><span className="text-[10px] font-medium text-slate-400 flex items-center gap-1"><Layers size={10}/> {deck.cards.length}</span></div>
                   </div>
               </div>
-              
-              {isEditMode ? (
-                  <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                      <button onClick={() => handleMove(deck.id, 'up', fullList)} className="p-2 bg-slate-100 rounded-lg hover:bg-indigo-100 hover:text-indigo-600"><ArrowUp size={16}/></button>
-                      <button onClick={() => handleMove(deck.id, 'down', fullList)} className="p-2 bg-slate-100 rounded-lg hover:bg-indigo-100 hover:text-indigo-600"><ArrowDown size={16}/></button>
-                      <button onClick={() => handleToggleHide(deck.id)} className="p-2 bg-slate-100 rounded-lg hover:bg-amber-100 hover:text-amber-600">
-                          {deck.isHidden ? <EyeOff size={16}/> : <Eye size={16}/>}
-                      </button>
-                      {deck.category === 'custom' && (
-                          <button onClick={() => onDeleteDeck(deck.id)} className="p-2 bg-rose-50 rounded-lg text-rose-500 hover:bg-rose-100 hover:text-rose-700 ml-1">
-                              <Trash2 size={16}/>
-                          </button>
-                      )}
-                  </div>
-              ) : (
-                  <div className="text-slate-300 group-hover:text-indigo-500 transition-colors"><ChevronRight size={18}/></div>
-              )}
+              {isEditMode ? (<div className="flex items-center gap-1" onClick={e => e.stopPropagation()}><button onClick={() => handleMove(deck.id, 'up', fullList)} className="p-2 bg-slate-100 rounded-lg hover:bg-indigo-100 hover:text-indigo-600"><ArrowUp size={16}/></button><button onClick={() => handleMove(deck.id, 'down', fullList)} className="p-2 bg-slate-100 rounded-lg hover:bg-indigo-100 hover:text-indigo-600"><ArrowDown size={16}/></button><button onClick={() => handleToggleHide(deck.id)} className="p-2 bg-slate-100 rounded-lg hover:bg-amber-100 hover:text-amber-600">{deck.isHidden ? <EyeOff size={16}/> : <Eye size={16}/>}</button>{deck.category === 'custom' && (<button onClick={() => onDeleteDeck(deck.id)} className="p-2 bg-rose-50 rounded-lg text-rose-500 hover:bg-rose-100 hover:text-rose-700 ml-1"><Trash2 size={16}/></button>)}</div>) : (<div className="text-slate-300 group-hover:text-indigo-500 transition-colors"><ChevronRight size={18}/></div>)}
           </div>
-          
-          {!isEditMode && (
-              <div className="w-full pl-2 pr-1">
-                  <div className="flex justify-between text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      <span>Progress</span><span>{deck.mastery || 0}%</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${deck.mastery || 5}%` }}></div>
-                  </div>
-              </div>
-          )}
+          {!isEditMode && (<div className="w-full pl-2 pr-1"><div className="flex justify-between text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1"><span>Progress</span><span>{deck.mastery || 0}%</span></div><div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{ width: `${deck.mastery || 5}%` }}></div></div></div>)}
       </div>
   );
 
   const SectionAccordion = ({ title, icon, count, isOpen, onToggle, children, colorTheme = "indigo" }: any) => {
-    const theme: any = {
-        indigo: { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-200' },
-        emerald: { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' },
-        amber: { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' },
-        blue: { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' },
-    };
+    const theme: any = { indigo: { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-200' }, emerald: { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' }, amber: { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' }, blue: { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' }, };
     const t = theme[colorTheme] || theme.indigo;
-
     return (
         <div className={`mb-4 rounded-2xl bg-white border ${isOpen ? t.border : 'border-slate-200'} shadow-sm overflow-hidden transition-all duration-300`}>
-            <button onClick={onToggle} className="w-full p-4 flex items-center justify-between active:bg-slate-50 transition-colors">
-                <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-xl ${t.bg} ${t.text}`}>{icon}</div>
-                    <div className="text-left">
-                        <h3 className="font-bold text-slate-800 text-sm">{title}</h3>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{count} Decks</p>
-                    </div>
-                </div>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center bg-slate-50 text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180 bg-slate-100' : ''}`}>
-                    <ChevronDown size={16} />
-                </div>
-            </button>
-            <div className={`transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                <div className="p-4 pt-0 border-t border-slate-50">
-                    <div className="pt-4 grid grid-cols-1 gap-3">{children}</div>
-                </div>
-            </div>
+            <button onClick={onToggle} className="w-full p-4 flex items-center justify-between active:bg-slate-50 transition-colors"><div className="flex items-center gap-3"><div className={`p-2 rounded-xl ${t.bg} ${t.text}`}>{icon}</div><div className="text-left"><h3 className="font-bold text-slate-800 text-sm">{title}</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{count} Decks</p></div></div><div className={`w-8 h-8 rounded-full flex items-center justify-center bg-slate-50 text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180 bg-slate-100' : ''}`}><ChevronDown size={16} /></div></button>
+            <div className={`transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}><div className="p-4 pt-0 border-t border-slate-50"><div className="pt-4 grid grid-cols-1 gap-3">{children}</div></div></div>
         </div>
     );
   };
@@ -1245,6 +1129,16 @@ function FlashcardView({
   return (
     <>
       {completionMsg && <Toast message={completionMsg} onClose={() => setCompletionMsg(null)} />}
+      
+      {/* TOWER MODE OVERLAY */}
+      {showTower && (
+          <TowerMode 
+              allDecks={allDecks} 
+              user={user} 
+              onExit={() => setShowTower(false)}
+              onXPUpdate={handleTowerXP}
+          />
+      )}
 
       {viewState === 'browsing' ? (
         <div className="h-full bg-slate-50 flex flex-col overflow-y-auto pb-24 animate-in fade-in custom-scrollbar">
@@ -1252,64 +1146,34 @@ function FlashcardView({
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-2xl font-bold text-slate-900">Practice Hub</h1>
                     <div className="flex gap-2">
-                        {languages.length > 1 && (
-                            <button onClick={() => {
-                                const idx = languages.indexOf(filterLang);
-                                setFilterLang(languages[(idx + 1) % languages.length]);
-                            }} className="px-3 py-1.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">
-                                {filterLang}
-                            </button>
-                        )}
-                        <button onClick={() => setIsEditMode(!isEditMode)} className={`px-3 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-1 transition-colors ${isEditMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                            <Settings2 size={12}/> {isEditMode ? 'Done' : 'Manage'}
-                        </button>
+                        {languages.length > 1 && (<button onClick={() => { const idx = languages.indexOf(filterLang); setFilterLang(languages[(idx + 1) % languages.length]); }} className="px-3 py-1.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">{filterLang}</button>)}
+                        <button onClick={() => setIsEditMode(!isEditMode)} className={`px-3 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-1 transition-colors ${isEditMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500'}`}><Settings2 size={12}/> {isEditMode ? 'Done' : 'Manage'}</button>
                     </div>
                 </div>
                 <div className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar">
-                    <div className="flex-1 min-w-[140px] bg-gradient-to-br from-indigo-50 to-blue-50 p-3 rounded-2xl border border-indigo-100 flex flex-col justify-center items-center">
-                        <span className="text-2xl font-black text-indigo-600">{totalCardsAvailable}</span>
-                        <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wide">Total Cards</span>
-                    </div>
-                    <div className="flex-1 min-w-[140px] bg-gradient-to-br from-emerald-50 to-teal-50 p-3 rounded-2xl border border-emerald-100 flex flex-col justify-center items-center">
-                        <span className="text-2xl font-black text-emerald-600">{allProcessed.length}</span>
-                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">Active Decks</span>
-                    </div>
-                    <button onClick={handleQuickStudy} className="flex-1 min-w-[140px] bg-indigo-600 text-white p-3 rounded-2xl shadow-lg shadow-indigo-200 active:scale-95 transition-all flex flex-col justify-center items-center group">
-                        <PlayCircle size={24} className="mb-1 group-hover:scale-110 transition-transform"/>
-                        <span className="text-[10px] font-bold uppercase tracking-wide">Quick Review</span>
+                    <div className="flex-1 min-w-[140px] bg-gradient-to-br from-indigo-50 to-blue-50 p-3 rounded-2xl border border-indigo-100 flex flex-col justify-center items-center"><span className="text-2xl font-black text-indigo-600">{totalCardsAvailable}</span><span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wide">Total Cards</span></div>
+                    <div className="flex-1 min-w-[140px] bg-gradient-to-br from-emerald-50 to-teal-50 p-3 rounded-2xl border border-emerald-100 flex flex-col justify-center items-center"><span className="text-2xl font-black text-emerald-600">{allProcessed.length}</span><span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">Active Decks</span></div>
+                    
+                    {/* TOWER BUTTON (REPLACED QUICK STUDY) */}
+                    <button onClick={() => setShowTower(true)} className="flex-1 min-w-[140px] bg-gradient-to-br from-slate-900 via-purple-900 to-indigo-900 text-white p-3 rounded-2xl shadow-lg shadow-indigo-900/30 active:scale-95 transition-all flex flex-col justify-center items-center group relative overflow-hidden">
+                        <div className="absolute inset-0 opacity-30 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
+                        <Building size={24} className="mb-1 group-hover:scale-110 transition-transform relative z-10"/>
+                        <span className="text-[10px] font-bold uppercase tracking-wide relative z-10">The Tower</span>
                     </button>
                 </div>
             </div>
 
             <div className="p-6">
-                {(isEditMode ? assignments : visibleAssignments).length > 0 && (
-                    <SectionAccordion title="Class Assignments" icon={<School size={20}/>} count={(isEditMode ? assignments : visibleAssignments).length} isOpen={openSections.assignments} onToggle={() => toggleSection('assignments')} colorTheme="amber">
-                        {(isEditMode ? assignments : visibleAssignments).map((deck: any) => <DeckCard key={deck.id} deck={deck} fullList={assignments} icon={<School size={20}/>} colorClass="bg-amber-100 text-amber-600" borderClass="border-amber-200 hover:border-amber-400" />)}
-                    </SectionAccordion>
-                )}
-
-                <SectionAccordion title="My Collections" icon={<Feather size={20}/>} count={(isEditMode ? customDecks : visibleCustom).length} isOpen={openSections.custom} onToggle={() => toggleSection('custom')} colorTheme="emerald">
-                    {(isEditMode ? customDecks : visibleCustom).length > 0 ? (isEditMode ? customDecks : visibleCustom).map((deck: any) => <DeckCard key={deck.id} deck={deck} fullList={customDecks} icon={<Feather size={20}/>} colorClass="bg-emerald-100 text-emerald-600" borderClass="border-slate-100 hover:border-emerald-300" />) : <div className="p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center"><p className="text-sm text-slate-400 font-bold">No custom decks yet.</p><p className="text-xs text-slate-300 mt-1">Use the Creator tab to build one!</p></div>}
-                </SectionAccordion>
-
-                <SectionAccordion title="System Library" icon={<Library size={20}/>} count={(isEditMode ? libraryDecks : visibleLibrary).length} isOpen={openSections.library} onToggle={() => toggleSection('library')} colorTheme="blue">
-                    {(isEditMode ? libraryDecks : visibleLibrary).length > 0 ? (isEditMode ? libraryDecks : visibleLibrary).map((deck: any) => <DeckCard key={deck.id} deck={deck} fullList={libraryDecks} icon={<BookOpen size={20}/>} colorClass="bg-blue-100 text-blue-600" borderClass="border-slate-100 hover:border-blue-300" />) : <div className="p-4 text-center text-slate-400 text-xs italic">Library empty for this filter.</div>}
-                </SectionAccordion>
+                {(isEditMode ? assignments : visibleAssignments).length > 0 && (<SectionAccordion title="Class Assignments" icon={<School size={20}/>} count={(isEditMode ? assignments : visibleAssignments).length} isOpen={openSections.assignments} onToggle={() => toggleSection('assignments')} colorTheme="amber">{(isEditMode ? assignments : visibleAssignments).map((deck: any) => <DeckCard key={deck.id} deck={deck} fullList={assignments} icon={<School size={20}/>} colorClass="bg-amber-100 text-amber-600" borderClass="border-amber-200 hover:border-amber-400" />)}</SectionAccordion>)}
+                <SectionAccordion title="My Collections" icon={<Feather size={20}/>} count={(isEditMode ? customDecks : visibleCustom).length} isOpen={openSections.custom} onToggle={() => toggleSection('custom')} colorTheme="emerald">{(isEditMode ? customDecks : visibleCustom).length > 0 ? (isEditMode ? customDecks : visibleCustom).map((deck: any) => <DeckCard key={deck.id} deck={deck} fullList={customDecks} icon={<Feather size={20}/>} colorClass="bg-emerald-100 text-emerald-600" borderClass="border-slate-100 hover:border-emerald-300" />) : <div className="p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center"><p className="text-sm text-slate-400 font-bold">No custom decks yet.</p><p className="text-xs text-slate-300 mt-1">Use the Creator tab to build one!</p></div>}</SectionAccordion>
+                <SectionAccordion title="System Library" icon={<Library size={20}/>} count={(isEditMode ? libraryDecks : visibleLibrary).length} isOpen={openSections.library} onToggle={() => toggleSection('library')} colorTheme="blue">{(isEditMode ? libraryDecks : visibleLibrary).length > 0 ? (isEditMode ? libraryDecks : visibleLibrary).map((deck: any) => <DeckCard key={deck.id} deck={deck} fullList={libraryDecks} icon={<BookOpen size={20}/>} colorClass="bg-blue-100 text-blue-600" borderClass="border-slate-100 hover:border-blue-300" />) : <div className="p-4 text-center text-slate-400 text-xs italic">Library empty for this filter.</div>}</SectionAccordion>
                 <div className="h-8"></div>
             </div>
         </div>
       ) : (
         <div className="h-[calc(100vh-80px)] flex flex-col bg-slate-50 pb-6 relative overflow-hidden">
           <Header title={currentDeck?.title || "Deck"} subtitle={`${currentIndex + 1} / ${deckCards.length} Cards`} sticky={false} onClickTitle={() => setViewState('browsing')} rightAction={<button onClick={() => setViewState('browsing')} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 text-slate-500"><X size={20} /></button>} />
-          
-          <div className="px-6 mt-2 mb-4 z-10">
-              <div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto shadow-inner">
-                  {['study', 'quiz', 'match'].map((mode) => (
-                      <button key={mode} onClick={() => setGameMode(mode)} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg capitalize transition-all ${gameMode === mode ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>{mode}</button>
-                  ))}
-              </div>
-          </div>
-          
+          <div className="px-6 mt-2 mb-4 z-10"><div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto shadow-inner">{['study', 'quiz', 'match'].map((mode) => (<button key={mode} onClick={() => setGameMode(mode)} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg capitalize transition-all ${gameMode === mode ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>{mode}</button>))}</div></div>
           <div className="flex-1 relative w-full overflow-hidden">
               {gameMode === 'match' && <div className="h-full overflow-y-auto"><MatchingGame deckCards={deckCards} onGameEnd={handleGameEnd} /></div>}
               {gameMode === 'quiz' && <div className="h-full overflow-y-auto"><QuizGame deckCards={deckCards} onGameEnd={handleGameEnd} /></div>}
@@ -1341,15 +1205,8 @@ function FlashcardView({
                 </div>
               )}
           </div>
-          
           {gameMode === 'study' && card && (
-            <div className="px-6 pb-4 pt-2">
-              <div className="flex items-center justify-between max-w-sm mx-auto">
-                <button onClick={handlePrev} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-rose-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all hover:bg-rose-50"><X size={28} strokeWidth={2.5} /></button>
-                <button onClick={(e) => { e.stopPropagation(); if(isFlipped) setIsFlipped(false); setXrayMode(!xrayMode); }} className={`h-20 w-20 rounded-2xl flex flex-col items-center justify-center shadow-lg transition-all duration-300 border-2 ${xrayMode ? 'bg-indigo-600 border-indigo-600 text-white translate-y-[-8px] shadow-indigo-200' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'}`}><Search size={28} strokeWidth={xrayMode ? 3 : 2} className={xrayMode ? 'animate-pulse' : ''} /><span className="text-[10px] font-black tracking-wider mt-1">X-RAY</span></button>
-                <button onClick={handleNext} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-emerald-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all hover:bg-emerald-50"><Check size={28} strokeWidth={2.5} /></button>
-              </div>
-            </div>
+            <div className="px-6 pb-4 pt-2"><div className="flex items-center justify-between max-w-sm mx-auto"><button onClick={handlePrev} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-rose-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all hover:bg-rose-50"><X size={28} strokeWidth={2.5} /></button><button onClick={(e) => { e.stopPropagation(); if(isFlipped) setIsFlipped(false); setXrayMode(!xrayMode); }} className={`h-20 w-20 rounded-2xl flex flex-col items-center justify-center shadow-lg transition-all duration-300 border-2 ${xrayMode ? 'bg-indigo-600 border-indigo-600 text-white translate-y-[-8px] shadow-indigo-200' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'}`}><Search size={28} strokeWidth={xrayMode ? 3 : 2} className={xrayMode ? 'animate-pulse' : ''} /><span className="text-[10px] font-black tracking-wider mt-1">X-RAY</span></button><button onClick={handleNext} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-emerald-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all hover:bg-emerald-50"><Check size={28} strokeWidth={2.5} /></button></div></div>
           )}
         </div>
       )}
@@ -3039,132 +2896,56 @@ function HeroProfileWidget({ user, userData, displayName, level, progress, class
         </div>
     );
 }
-function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments, classes, onSelectClass, onSelectDeck, allDecks, user }: any) {
+function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userData, assignments, classes, allDecks, user }: any) {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [showLevelModal, setShowLevelModal] = useState(false);
   const [libraryExpanded, setLibraryExpanded] = useState(false);
   
-  // STATE: The Tower
-  const [showTower, setShowTower] = useState(false);
-  
-  // 1. SCROLL REF
+  // 1. SCROLL RESET LOGIC
   const scrollViewportRef = useRef<HTMLDivElement>(null);
-
-  // 2. THE NUCLEAR SCROLL FIX
   useLayoutEffect(() => {
       const viewport = scrollViewportRef.current;
       if (viewport) {
           viewport.scrollTop = 0;
           setTimeout(() => { if (viewport) viewport.scrollTop = 0; }, 10);
-          setTimeout(() => { if (viewport) viewport.scrollTop = 0; }, 50);
       }
   }, []);
 
-  // 3. SMART NAME RESOLVER
+  // 2. NAME RESOLVER
   const displayName = useMemo(() => {
-      if (userData?.name && userData.name !== 'Student' && userData.name !== 'User') return userData.name;
+      if (userData?.name && userData.name !== 'Student') return userData.name;
       if (user?.displayName) return user.displayName;
-      if (user?.email) {
-          const namePart = user.email.split('@')[0];
-          const cleanName = namePart.replace(/[0-9]/g, ''); 
-          return cleanName ? cleanName.charAt(0).toUpperCase() + cleanName.slice(1) : "Scholar";
-      }
-      return 'Student';
+      if (user?.email) return user.email.split('@')[0];
+      return 'Scholar';
   }, [userData, user]);
 
-  // 4. DATA PROCESSING
+  // 3. DATA PROCESSING
   const completedSet = new Set(userData?.completedAssignments || []);
-  
-  const relevantAssignments = (assignments || []).filter((l: any) => { 
-      return !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); 
-  });
-  
+  const relevantAssignments = (assignments || []).filter((l: any) => !l.targetStudents || l.targetStudents.includes(userData.email));
   const activeAssignments = relevantAssignments.filter((l: any) => !completedSet.has(l.id));
   const { level, progress } = getLevelInfo(userData?.xp || 0);
   const visibleLessons = libraryExpanded ? lessons : lessons.slice(0, 2);
-
-  // 5. XP HANDLER FOR TOWER
-  const handleTowerXP = async (xpAmount: number, reason: string) => {
-      if (!user) return;
-      try {
-          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { 
-              xp: increment(xpAmount) 
-          });
-          await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
-              studentName: displayName || "Student",
-              studentEmail: user.email,
-              itemTitle: reason,
-              xp: xpAmount,
-              timestamp: Date.now(),
-              type: 'game_reward'
-          });
-      } catch (e: any) { console.error("XP Save Failed:", e); }
-  };
 
   if (activeStudentClass) { 
       return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={onSelectLesson} onSelectDeck={onSelectDeck} userData={userData} user={user} displayName={displayName} />; 
   }
 
   return (
-  <div 
-    ref={scrollViewportRef} 
-    className="h-full overflow-y-auto overflow-x-hidden relative bg-slate-50 scroll-smooth"
-  >
+  <div ref={scrollViewportRef} className="h-full overflow-y-auto overflow-x-hidden relative bg-slate-50 scroll-smooth">
     <div className="pb-24 animate-in fade-in slide-in-from-bottom-2 duration-500">
         
-        {/* --- OVERLAYS --- */}
         {showLevelModal && <LevelUpModal userData={userData} onClose={() => setShowLevelModal(false)} />}
-        
-        {showTower && (
-            <TowerMode 
-                allDecks={allDecks} 
-                user={user} 
-                onExit={() => setShowTower(false)}
-                onXPUpdate={handleTowerXP}
-            />
-        )}
 
-        {/* --- 1. PRO HEADER WIDGET --- */}
-        <HeroProfileWidget 
-            user={user} 
-            userData={userData} 
-            displayName={displayName} 
-            level={level} 
-            progress={progress} 
-            classes={classes} 
-        />
+        {/* 1. HERO WIDGET */}
+        <HeroProfileWidget user={user} userData={userData} displayName={displayName} level={level} progress={progress} classes={classes} />
         
-        {/* --- 2. DAILY DISCOVERY --- */}
+        {/* 2. DAILY DISCOVERY */}
         <DailyDiscoveryWidget allDecks={allDecks} user={user} userData={userData} />
         
-        {/* --- 3. THE TOWER (Replaces Colosseum) --- */}
-        <div className="px-6 mt-6">
-            <button onClick={() => setShowTower(true)} className="w-full p-1 rounded-[2.5rem] bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 shadow-xl shadow-indigo-200 hover:scale-[1.02] active:scale-95 transition-all group relative overflow-hidden">
-                <div className="bg-slate-900 rounded-[2.3rem] p-6 relative overflow-hidden flex items-center justify-between">
-                    {/* Background Texture */}
-                    <div className="absolute inset-0 opacity-30 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-800 via-slate-900 to-slate-900"></div>
-                    
-                    <div className="relative z-10 flex items-center gap-4">
-                        <div className="w-14 h-14 bg-indigo-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/50 group-hover:-translate-y-1 transition-transform">
-                            <Building size={28} />
-                        </div>
-                        <div className="text-left">
-                            <h3 className="text-xl font-black text-white italic tracking-tight">THE TOWER</h3>
-                            <p className="text-indigo-200 text-xs font-bold uppercase tracking-widest">Infinite Ascent</p>
-                        </div>
-                    </div>
-                    
-                    <div className="relative z-10 bg-white/10 p-2 rounded-full text-white/50 group-hover:text-white group-hover:bg-indigo-500 transition-colors">
-                        <ArrowUp size={24} />
-                    </div>
-                </div>
-            </button>
-        </div>
-
-        {/* --- MAIN SCROLLABLE CONTENT --- */}
-        <div className="px-6 space-y-8 mt-8 relative z-20">
+        {/* 3. MAIN CONTENT */}
+        <div className="px-6 space-y-8 mt-8">
           
-          {/* 4. MY CLASSES */}
+          {/* MY CLASSES */}
           {classes && classes.length > 0 && (
             <div className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
                 <div className="flex justify-between items-end mb-4 ml-1">
@@ -3177,51 +2958,28 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
                 <div className="flex gap-5 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">
                     {classes.map((cls: any) => { 
                         const clsTasks = cls.assignments || [];
-                        const myPending = clsTasks.filter((l: any) => { 
-                            const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); 
-                            return isForMe && !completedSet.has(l.id); 
-                        }).length;
-                        
-                        const totalTasks = clsTasks.length;
-                        const completedTasks = totalTasks - myPending;
-                        const classProgress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
-                        const studentCount = (cls.students || []).length;
+                        const myPending = clsTasks.filter((l: any) => (!l.targetStudents || l.targetStudents.includes(userData.email)) && !completedSet.has(l.id)).length;
+                        const classProgress = clsTasks.length > 0 ? ((clsTasks.length - myPending) / clsTasks.length) * 100 : 0;
 
                         return ( 
                             <button key={cls.id} onClick={() => setActiveStudentClass(cls)} className="snap-start min-w-[300px] h-[200px] bg-white rounded-[2rem] shadow-[0_10px_40px_-15px_rgba(0,0,0,0.1)] hover:shadow-[0_20px_50px_-12px_rgba(79,70,229,0.3)] border border-slate-100 transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden flex flex-col text-left">
                                 <div className="h-24 bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-800 relative w-full overflow-hidden">
                                     <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
                                     <div className="absolute top-4 left-5 flex items-start gap-3 z-10">
-                                        <div className="w-12 h-12 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg">
-                                            {cls.name.charAt(0)}
-                                        </div>
-                                        <div className="mt-1">
-                                            <div className="bg-black/30 backdrop-blur-sm border border-white/10 text-white/90 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md inline-block mb-1">{cls.code}</div>
-                                        </div>
+                                        <div className="w-12 h-12 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg">{cls.name.charAt(0)}</div>
+                                        <div className="mt-1"><div className="bg-black/30 backdrop-blur-sm border border-white/10 text-white/90 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md inline-block mb-1">{cls.code}</div></div>
                                     </div>
                                     {myPending > 0 ? (
-                                        <div className="absolute top-4 right-4 bg-rose-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg border border-white/20 animate-pulse flex items-center gap-1">
-                                            <AlertCircle size={10}/> {myPending} Due
-                                        </div>
+                                        <div className="absolute top-4 right-4 bg-rose-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg border border-white/20 animate-pulse flex items-center gap-1"><AlertCircle size={10}/> {myPending} Due</div>
                                     ) : (
-                                        <div className="absolute top-4 right-4 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-500/30 backdrop-blur-md flex items-center gap-1">
-                                            <Check size={10}/> All Done
-                                        </div>
+                                        <div className="absolute top-4 right-4 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-500/30 backdrop-blur-md flex items-center gap-1"><Check size={10}/> All Done</div>
                                     )}
                                 </div>
                                 <div className="p-5 flex-1 flex flex-col justify-between bg-white relative z-10">
-                                    <div>
-                                        <h4 className="font-serif font-bold text-slate-800 text-xl truncate pr-2 group-hover:text-indigo-600 transition-colors">{cls.name}</h4>
-                                        <div className="flex items-center gap-2 mt-1 text-slate-400 text-xs font-medium"><Users size={12} /> <span>{studentCount} Students</span></div>
-                                    </div>
+                                    <div><h4 className="font-serif font-bold text-slate-800 text-xl truncate pr-2 group-hover:text-indigo-600 transition-colors">{cls.name}</h4><div className="flex items-center gap-2 mt-1 text-slate-400 text-xs font-medium"><Users size={12} /> <span>{(cls.students || []).length} Students</span></div></div>
                                     <div className="space-y-2">
-                                        <div className="flex justify-between items-end">
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Course Progress</span>
-                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${classProgress === 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-50 text-indigo-600'}`}>{Math.round(classProgress)}%</span>
-                                        </div>
-                                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                                            <div className={`h-full rounded-full transition-all duration-1000 ${classProgress === 100 ? 'bg-emerald-500' : 'bg-indigo-600'}`} style={{width: `${classProgress}%`}}></div>
-                                        </div>
+                                        <div className="flex justify-between items-end"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Course Progress</span><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${classProgress === 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-50 text-indigo-600'}`}>{Math.round(classProgress)}%</span></div>
+                                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden"><div className={`h-full rounded-full transition-all duration-1000 ${classProgress === 100 ? 'bg-emerald-500' : 'bg-indigo-600'}`} style={{width: `${classProgress}%`}}></div></div>
                                     </div>
                                 </div>
                             </button> 
@@ -3231,12 +2989,10 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
             </div>
           )}
           
-          {/* 5. UP NEXT */}
+          {/* UP NEXT */}
           {activeAssignments.length > 0 && (
               <div className="animate-in slide-in-from-bottom-4 duration-500 delay-200">
-                 <div className="flex justify-between items-center mb-3 ml-1">
-                     <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Up Next</h3>
-                 </div>
+                 <div className="flex justify-between items-center mb-3 ml-1"><h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Up Next</h3></div>
                  <div className="space-y-3">
                     {activeAssignments.map((l: any, i: number) => {
                         const dateStatus = getDueStatus(l.dueDate); 
@@ -3249,40 +3005,25 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
                                 <div className="text-left">
                                     <h4 className="font-bold text-slate-800 group-hover:text-indigo-700 transition-colors">{l.title}</h4>
                                     <div className="flex items-center gap-2 mt-0.5">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide bg-slate-100 px-2 py-0.5 rounded">
-                                            {l.contentType === 'deck' ? 'Flashcards' : l.contentType === 'test' ? 'Exam' : 'Lesson'}
-                                        </span>
-                                        {dateStatus && (
-                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${dateStatus.color} ${dateStatus.urgent ? 'animate-pulse' : ''}`}>
-                                                <Clock size={10}/> {dateStatus.label}
-                                            </span>
-                                        )}
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide bg-slate-100 px-2 py-0.5 rounded">{l.contentType === 'deck' ? 'Flashcards' : l.contentType === 'test' ? 'Exam' : 'Lesson'}</span>
+                                        {dateStatus && <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${dateStatus.color} ${dateStatus.urgent ? 'animate-pulse' : ''}`}><Clock size={10}/> {dateStatus.label}</span>}
                                         {l.xp && <span className="text-[10px] font-bold text-emerald-600">+{l.xp} XP</span>}
                                     </div>
                                 </div>
                             </div>
-                            <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-sm">
-                                <ChevronRight size={16} />
-                            </div>
+                            <ChevronRight className="text-slate-300 group-hover:text-indigo-500 transition-colors"/>
                         </button>
                     )})}
                  </div>
               </div>
           )}
           
-          {/* 6. LIBRARY */}
+          {/* LIBRARY */}
           <div className="animate-in slide-in-from-bottom-4 duration-500 delay-300">
-             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 ml-1 flex items-center gap-2">
-                <BookOpen size={16} className="text-indigo-500"/> Library
-             </h3>
+             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 ml-1 flex items-center gap-2"><BookOpen size={16} className="text-indigo-500"/> Library</h3>
              <div className="space-y-3">
                 {visibleLessons.map((l: any, idx: number) => (
-                    <button 
-                        key={l.id} 
-                        onClick={() => onSelectLesson(l)} 
-                        style={{ animationDelay: `${idx * 50}ms` }}
-                        className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-indigo-300 group transition-all hover:shadow-md animate-in slide-in-from-bottom-2 fade-in fill-mode-forwards"
-                    >
+                    <button key={l.id} onClick={() => onSelectLesson(l)} style={{ animationDelay: `${idx * 50}ms` }} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-indigo-300 group transition-all hover:shadow-md animate-in slide-in-from-bottom-2 fade-in fill-mode-forwards">
                         <div className="flex items-center gap-4">
                             <div className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-500 group-hover:bg-indigo-500 group-hover:text-white transition-colors"><BookOpen size={22}/></div>
                             <div className="text-left"><h4 className="font-bold text-slate-800 group-hover:text-indigo-700 transition-colors">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div>
@@ -3292,26 +3033,21 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, userData, assignments
                 ))}
              </div>
              {lessons.length > 2 && (
-                 <button 
-                    onClick={() => setLibraryExpanded(!libraryExpanded)}
-                    className="w-full mt-2 py-3 flex items-center justify-center gap-2 text-[10px] font-bold text-indigo-400 uppercase tracking-widest hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
-                 >
+                 <button onClick={() => setLibraryExpanded(!libraryExpanded)} className="w-full mt-2 py-3 flex items-center justify-center gap-2 text-[10px] font-bold text-indigo-400 uppercase tracking-widest hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
                     {libraryExpanded ? (<>Show Less <ChevronUp size={14}/></>) : (<>View All ({lessons.length}) <ChevronDown size={14}/></>)}
                  </button>
              )}
           </div>
           
-          {/* 7. QUICK ACTIONS */}
+          {/* QUICK ACTIONS */}
           <div className="grid grid-cols-2 gap-4 pb-8 animate-in slide-in-from-bottom-4 duration-500 delay-500">
             <button onClick={() => setActiveTab('flashcards')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center hover:scale-[1.02] active:scale-95 transition-all group hover:shadow-lg hover:border-orange-200 hover:bg-orange-50/30">
                 <div className="w-14 h-14 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-orange-500 group-hover:text-white transition-colors shadow-sm"><Layers size={28}/></div>
-                <span className="block font-bold text-slate-800 text-lg">Practice</span>
-                <span className="text-xs text-slate-400 font-medium">Review Cards</span>
+                <span className="block font-bold text-slate-800 text-lg">Practice</span><span className="text-xs text-slate-400 font-medium">Review Cards</span>
             </button>
             <button onClick={() => setActiveTab('create')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center hover:scale-[1.02] active:scale-95 transition-all group hover:shadow-lg hover:border-emerald-200 hover:bg-emerald-50/30">
                 <div className="w-14 h-14 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-emerald-500 group-hover:text-white transition-colors shadow-sm"><Feather size={28}/></div>
-                <span className="block font-bold text-slate-800 text-lg">Creator</span>
-                <span className="text-xs text-slate-400 font-medium">Build Content</span>
+                <span className="block font-bold text-slate-800 text-lg">Creator</span><span className="text-xs text-slate-400 font-medium">Build Content</span>
             </button>
           </div>
 
@@ -6199,6 +5935,7 @@ const commonHandlers = {
                         onComplete={handleFinishLesson}
                         onLogActivity={handleLogSelfStudy}
                         userData={userData} 
+                        user={user}
                         onUpdatePrefs={handleUpdatePreferences} 
                         onDeleteDeck={handleDeleteDeck} 
                     />
