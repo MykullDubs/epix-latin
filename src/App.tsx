@@ -44,6 +44,13 @@ const appId = typeof __app_id !== 'undefined' ? __app_id : 'epic-latin-prod';
 // --- DEFAULTS ---
 const DEFAULT_USER_DATA = { name: "Discipulus", targetLanguage: "Latin", level: "Novice", streak: 1, xp: 0, role: 'student', classes: [], completedAssignments: [] };
 
+// --- CONFIG: DAILY QUESTS ---
+const DAILY_QUESTS = [
+  { id: 'q_cards', label: "Review 10 Cards", target: 10, xp: 50, icon: 'layers', type: 'self_study' },
+  { id: 'q_quiz',  label: "Complete a Quiz", target: 1,  xp: 100, icon: 'help-circle', type: 'quiz_complete' },
+  { id: 'q_explore', label: "Find a New Deck", target: 1,  xp: 20,  icon: 'search', type: 'explore_deck' },
+];
+
 // --- SEED DATA ---
 const INITIAL_SYSTEM_DECKS: any = {
   salutationes: { title: "👋 Salutationes", cards: [{ id: 's1', front: "Salve", back: "Hello (Singular)", ipa: "/ˈsal.weː/", type: "phrase", mastery: 4, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-e", meaning: "Imp. Sing.", type: "suffix" }], usage: { sentence: "Salve, Marce!", translation: "Hello, Marcus!" }, grammar_tags: ["Imperative", "Greeting"] }, { id: 's2', front: "Salvete", back: "Hello (Plural)", ipa: "/salˈweː.te/", type: "phrase", mastery: 3, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-ete", meaning: "Imp. Pl.", type: "suffix" }], usage: { sentence: "Salvete, discipuli!", translation: "Hello, students!" }, grammar_tags: ["Imperative", "Greeting"] }, { id: 's3', front: "Vale", back: "Goodbye", ipa: "/ˈwa.leː/", type: "phrase", mastery: 3, morphology: [{ part: "Val-", meaning: "Be strong", type: "root" }, { part: "-e", meaning: "Imp.", type: "suffix" }], usage: { sentence: "Vale, amice.", translation: "Goodbye, friend." }, grammar_tags: ["Valediction"] }] },
@@ -355,46 +362,56 @@ function LessonView({ lesson, onFinish }: any) {
   );
 }
 // ============================================================================
-//  MOONSHOT EXPLORE TAB (Fixed Types & Logic)
+//  MOONSHOT EXPLORE TAB (Functional Quests)
 // ============================================================================
-function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
+function DiscoveryView({ allDecks, user, onSelectDeck, userData, onLogActivity }: any) {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState('All');
 
     // 1. DYNAMIC DATA GENERATION
     const { featuredDeck, trendingDecks, quests } = useMemo(() => {
-        // FIX: Use entries so we keep the ID (key) attached to the Deck (value)
-        // This prevents ID mismatches and fixes the TS spread error
         const validEntries = Object.entries(allDecks || {}).filter(([, deck]: any) => !deck.isAssignment);
         
         if (validEntries.length === 0) return { featuredDeck: null, trendingDecks: [], quests: [] };
 
-        // Pick a random featured deck based on date hash
+        // Featured Logic
         const today = new Date().toDateString();
         let hash = 0; for (let i = 0; i < today.length; i++) hash = today.charCodeAt(i) + ((hash << 5) - hash);
         const featIdx = Math.abs(hash) % validEntries.length;
-        
         const [featId, featData] = validEntries[featIdx];
         
-        // Mock "Trending" (Shuffle entries)
+        // Trending Logic
         const trending = [...validEntries].sort(() => 0.5 - Math.random()).slice(0, 5);
 
-        // Daily Quests
-        const dailyQuests = [
-            { id: 1, label: "Review 10 Cards", xp: 50, icon: <Layers size={14}/>, done: false },
-            { id: 2, label: "Complete a Quiz", xp: 100, icon: <HelpCircle size={14}/>, done: false },
-            { id: 3, label: "Find a new Deck", xp: 20, icon: <Search size={14}/>, done: true },
-        ];
+        // --- REAL QUEST DATA MERGE ---
+        const userProgress = userData?.questProgress || {};
+        
+        const liveQuests = DAILY_QUESTS.map(q => {
+            const current = userProgress[q.id] || 0;
+            const isDone = current >= q.target;
+            
+            // Map icon string to component
+            let IconCmp = <Layers size={14}/>;
+            if(q.icon === 'help-circle') IconCmp = <HelpCircle size={14}/>;
+            if(q.icon === 'search') IconCmp = <Search size={14}/>;
+
+            return { ...q, current, done: isDone, iconComp: IconCmp };
+        });
 
         return { 
-            // FIX: Explicitly cast as any to satisfy TS2698
             featuredDeck: { id: featId, ...(featData as any), contentType: 'deck' },
             trendingDecks: trending.map(([id, data]: any) => ({ id, ...data, contentType: 'deck' })),
-            quests: dailyQuests
+            quests: liveQuests
         };
-    }, [allDecks]);
+    }, [allDecks, userData]); // Re-run when userData changes (progress updates)
 
-    // Categories with Visual Pop
+    const handleDeckClick = (deck: any) => {
+        // Trigger the "Explore" quest
+        onLogActivity('explore_deck'); 
+        onSelectDeck(deck);
+    };
+
+    // Categories
     const categories = [
         { id: 'All', label: 'For You', icon: <Sparkles size={14}/>, color: 'bg-slate-900 text-white border-transparent' },
         { id: 'Latin', label: 'Latin', icon: <Globe size={14}/>, color: 'bg-purple-100 text-purple-700 border-purple-200' },
@@ -413,7 +430,7 @@ function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
     return (
         <div className="h-full bg-slate-50 flex flex-col overflow-hidden">
             
-            {/* 1. IMMERSIVE HEADER */}
+            {/* HEADER */}
             <div className="px-6 pt-12 pb-4 bg-white/90 backdrop-blur-xl border-b border-slate-100 z-20 sticky top-0 shadow-sm">
                 <div className="flex justify-between items-center mb-4">
                     <h1 className="text-3xl font-black text-slate-900 flex items-center gap-2 tracking-tight">
@@ -427,77 +444,54 @@ function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
                 
                 <div className="relative group">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={20}/>
-                    <input 
-                        type="text" 
-                        placeholder="Find your next obsession..." 
-                        className="w-full pl-10 pr-4 py-3 bg-slate-100 border-2 border-transparent focus:border-indigo-500/20 rounded-2xl font-bold text-slate-700 placeholder:text-slate-400 focus:ring-0 focus:bg-white outline-none transition-all shadow-inner"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+                    <input type="text" placeholder="Find your next obsession..." className="w-full pl-10 pr-4 py-3 bg-slate-100 border-2 border-transparent focus:border-indigo-500/20 rounded-2xl font-bold text-slate-700 placeholder:text-slate-400 focus:ring-0 focus:bg-white outline-none transition-all shadow-inner" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}/>
                 </div>
             </div>
 
-            {/* 2. SCROLLABLE CONTENT */}
+            {/* CONTENT */}
             <div className="flex-1 overflow-y-auto custom-scrollbar pb-32">
                 
-                {/* A. FEATURED HERO */}
+                {/* A. FEATURED */}
                 {!searchTerm && activeCategory === 'All' && featuredDeck && (
                     <div className="px-6 pt-6 mb-8">
-                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                            <Star size={14} className="text-yellow-500 fill-yellow-500"/> Spotlight
-                        </h3>
-                        <button 
-                            onClick={() => onSelectDeck(featuredDeck)}
-                            className="w-full relative h-64 rounded-[2.5rem] overflow-hidden shadow-2xl group text-left transition-transform active:scale-[0.98]"
-                        >
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Star size={14} className="text-yellow-500 fill-yellow-500"/> Spotlight</h3>
+                        <button onClick={() => handleDeckClick(featuredDeck)} className="w-full relative h-64 rounded-[2.5rem] overflow-hidden shadow-2xl group text-left transition-transform active:scale-[0.98]">
                             <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-purple-600 to-rose-500 animate-in fade-in zoom-in duration-1000"></div>
                             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-30 mix-blend-overlay"></div>
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-                            
-                            <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md border border-white/20 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-                                Featured
-                            </div>
-
+                            <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md border border-white/20 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">Featured</div>
                             <div className="relative z-10 p-8 h-full flex flex-col justify-end">
-                                <div className="mb-2 w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white border border-white/20 shadow-lg">
-                                    {featuredDeck.icon ? <span className="text-2xl">{featuredDeck.icon}</span> : <Sparkles size={24}/>}
-                                </div>
+                                <div className="mb-2 w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white border border-white/20 shadow-lg">{featuredDeck.icon ? <span className="text-2xl">{featuredDeck.icon}</span> : <Sparkles size={24}/>}</div>
                                 <h2 className="text-3xl font-black text-white leading-tight mb-2">{featuredDeck.title}</h2>
-                                <p className="text-indigo-100 text-sm font-medium line-clamp-2 max-w-[90%] mb-4">
-                                    {featuredDeck.description || "Master this topic and level up your skills today."}
-                                </p>
-                                <div className="flex items-center gap-3">
-                                    <span className="bg-indigo-500 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2 group-hover:bg-white group-hover:text-indigo-600 transition-colors">
-                                        <Play size={14} fill="currentColor"/> Start Now
-                                    </span>
-                                    <span className="text-white/60 text-xs font-bold">{featuredDeck.cards?.length || 0} Cards</span>
-                                </div>
+                                <p className="text-indigo-100 text-sm font-medium line-clamp-2 max-w-[90%] mb-4">{featuredDeck.description || "Master this topic today."}</p>
+                                <div className="flex items-center gap-3"><span className="bg-indigo-500 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2 group-hover:bg-white group-hover:text-indigo-600 transition-colors"><Play size={14} fill="currentColor"/> Start Now</span><span className="text-white/60 text-xs font-bold">{featuredDeck.cards?.length || 0} Cards</span></div>
                             </div>
                         </button>
                     </div>
                 )}
 
-                {/* B. DAILY QUESTS */}
+                {/* B. FUNCTIONAL DAILY QUESTS */}
                 {!searchTerm && (
                     <div className="px-6 mb-8">
                         <div className="flex justify-between items-end mb-3">
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                <Target size={14} className="text-rose-500"/> Daily Quests
-                            </h3>
-                            <span className="text-[10px] font-bold text-slate-400">Resets in 12h</span>
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Target size={14} className="text-rose-500"/> Daily Quests</h3>
+                            <span className="text-[10px] font-bold text-slate-400">Resets Midnight</span>
                         </div>
                         <div className="grid grid-cols-1 gap-2">
                             {quests.map((q: any) => (
-                                <div key={q.id} className={`p-3 rounded-2xl border flex items-center justify-between ${q.done ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-slate-100'}`}>
+                                <div key={q.id} className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${q.done ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-slate-100'}`}>
                                     <div className="flex items-center gap-3">
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${q.done ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-                                            {q.done ? <Check size={16} strokeWidth={3}/> : q.icon}
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${q.done ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                                            {q.done ? <Check size={16} strokeWidth={3}/> : q.iconComp}
                                         </div>
-                                        <span className={`text-sm font-bold ${q.done ? 'text-emerald-700 line-through decoration-emerald-300' : 'text-slate-700'}`}>{q.label}</span>
+                                        <div>
+                                            <span className={`text-sm font-bold block ${q.done ? 'text-emerald-700 decoration-emerald-300' : 'text-slate-700'}`}>{q.label}</span>
+                                            {!q.done && <div className="text-[10px] text-slate-400 font-bold">{q.current} / {q.target}</div>}
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-1">
-                                        <Zap size={12} className="text-yellow-500 fill-yellow-500"/>
-                                        <span className="text-xs font-black text-slate-600">+{q.xp}</span>
+                                        <Zap size={12} className={q.done ? "text-emerald-400 fill-emerald-400" : "text-yellow-500 fill-yellow-500"}/>
+                                        <span className={`text-xs font-black ${q.done ? 'text-emerald-600' : 'text-slate-600'}`}>+{q.xp}</span>
                                     </div>
                                 </div>
                             ))}
@@ -505,72 +499,33 @@ function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
                     </div>
                 )}
 
-                {/* C. TRENDING SCROLL */}
+                {/* C. TRENDING */}
                 {!searchTerm && (
                     <div className="mb-8">
-                        <div className="px-6 mb-3 flex justify-between items-center">
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                <TrendingUp size={14} className="text-indigo-500"/> Trending Now
-                            </h3>
-                        </div>
+                        <div className="px-6 mb-3 flex justify-between items-center"><h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><TrendingUp size={14} className="text-indigo-500"/> Trending Now</h3></div>
                         <div className="flex gap-4 overflow-x-auto px-6 pb-4 scrollbar-hide snap-x">
                             {trendingDecks.map((deck: any) => (
-                                <button 
-                                    key={deck.id}
-                                    onClick={() => onSelectDeck(deck)}
-                                    className="snap-start min-w-[200px] h-48 bg-white p-4 rounded-3xl border border-slate-100 shadow-[0_8px_20px_-5px_rgba(0,0,0,0.05)] hover:-translate-y-1 transition-all group flex flex-col justify-between relative overflow-hidden"
-                                >
+                                <button key={deck.id} onClick={() => handleDeckClick(deck)} className="snap-start min-w-[200px] h-48 bg-white p-4 rounded-3xl border border-slate-100 shadow-[0_8px_20px_-5px_rgba(0,0,0,0.05)] hover:-translate-y-1 transition-all group flex flex-col justify-between relative overflow-hidden">
                                     <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-bl-[50px] -mr-8 -mt-8 transition-transform group-hover:scale-150"></div>
-                                    
-                                    <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-colors relative z-10">
-                                        {deck.icon || <Layers size={18}/>}
-                                    </div>
-                                    
-                                    <div className="relative z-10">
-                                        <h4 className="font-bold text-slate-800 leading-tight mb-1 line-clamp-2">{deck.title}</h4>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[10px] font-bold text-slate-400">{deck.cards?.length || 0} Cards</span>
-                                            <span className="text-[10px] font-bold text-orange-500 flex items-center gap-0.5"><Flame size={10} fill="currentColor"/> Hot</span>
-                                        </div>
-                                    </div>
+                                    <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-colors relative z-10">{deck.icon || <Layers size={18}/>}</div>
+                                    <div className="relative z-10"><h4 className="font-bold text-slate-800 leading-tight mb-1 line-clamp-2">{deck.title}</h4><div className="flex items-center gap-2"><span className="text-[10px] font-bold text-slate-400">{deck.cards?.length || 0} Cards</span><span className="text-[10px] font-bold text-orange-500 flex items-center gap-0.5"><Flame size={10} fill="currentColor"/> Hot</span></div></div>
                                 </button>
                             ))}
                         </div>
                     </div>
                 )}
 
-                {/* D. CATEGORIES & GRID */}
+                {/* D. GRID */}
                 <div className="px-6">
-                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <Map size={14} className="text-slate-400"/> Browse All
-                    </h3>
-                    
-                    {/* Category Pills */}
+                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Map size={14} className="text-slate-400"/> Browse All</h3>
                     <div className="flex gap-3 overflow-x-auto pb-4 -mx-6 px-6 scrollbar-hide mb-2">
-                        {categories.map(cat => (
-                            <button 
-                                key={cat.id} 
-                                onClick={() => setActiveCategory(cat.id)}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-bold transition-all active:scale-95 whitespace-nowrap ${activeCategory === cat.id ? cat.color + ' shadow-md' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}
-                            >
-                                {cat.icon}
-                                <span>{cat.label}</span>
-                            </button>
-                        ))}
+                        {categories.map(cat => (<button key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-bold transition-all active:scale-95 whitespace-nowrap ${activeCategory === cat.id ? cat.color + ' shadow-md' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}>{cat.icon}<span>{cat.label}</span></button>))}
                     </div>
-
-                    {/* The Grid */}
                     <div className="grid grid-cols-2 gap-4">
                         {filteredDecks.map((deck: any) => (
-                            <button 
-                                key={deck.id} 
-                                onClick={() => onSelectDeck(deck)}
-                                className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg hover:border-indigo-100 hover:-translate-y-1 transition-all text-left group"
-                            >
+                            <button key={deck.id} onClick={() => handleDeckClick(deck)} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg hover:border-indigo-100 hover:-translate-y-1 transition-all text-left group">
                                 <div className="flex justify-between items-start mb-3">
-                                    <div className="w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
-                                        {deck.icon || <Layers size={18}/>}
-                                    </div>
+                                    <div className="w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">{deck.icon || <Layers size={18}/>}</div>
                                     {deck.xp && <span className="text-[9px] font-bold bg-emerald-50 text-emerald-600 px-2 py-1 rounded-full">+{deck.xp} XP</span>}
                                 </div>
                                 <h4 className="font-bold text-slate-800 text-sm leading-tight mb-1 line-clamp-2">{deck.title}</h4>
@@ -578,13 +533,7 @@ function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
                             </button>
                         ))}
                     </div>
-
-                    {filteredDecks.length === 0 && (
-                        <div className="text-center py-12">
-                            <p className="text-slate-400 text-sm font-bold">No decks found.</p>
-                            <button onClick={() => setActiveCategory('All')} className="text-indigo-600 text-xs font-bold mt-2">Reset Filters</button>
-                        </div>
-                    )}
+                    {filteredDecks.length === 0 && <div className="text-center py-12"><p className="text-slate-400 text-sm font-bold">No decks found.</p><button onClick={() => setActiveCategory('All')} className="text-indigo-600 text-xs font-bold mt-2">Reset Filters</button></div>}
                 </div>
 
             </div>
@@ -3087,6 +3036,90 @@ function App() {
   }, [user, userData?.role]);
 
   // --- HANDLERS ---
+  // --- QUEST ENGINE ---
+  const checkDailyQuests = async (activityType: string) => {
+      if (!user || !userData) return;
+
+      const today = new Date().toDateString();
+      const lastDate = userData.questDate || "";
+      
+      // 1. Reset Quests if it's a new day
+      let currentProgress = { ...userData.questProgress };
+      if (lastDate !== today) {
+          currentProgress = {}; // Wipe progress
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
+              questDate: today,
+              questProgress: {}
+          });
+      }
+
+      // 2. Find matching quest
+      const quest = DAILY_QUESTS.find(q => q.type === activityType);
+      if (!quest) return;
+
+      // 3. Update Progress
+      const currentVal = currentProgress[quest.id] || 0;
+      if (currentVal < quest.target) {
+          const newVal = currentVal + 1;
+          currentProgress[quest.id] = newVal;
+          
+          // Save to DB
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
+              questProgress: currentProgress
+          });
+
+          // 4. Check Completion & Award XP
+          if (newVal === quest.target) {
+              setToast(`Quest Complete: ${quest.label} (+${quest.xp} XP)`);
+              await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
+                  xp: increment(quest.xp)
+              });
+          }
+      }
+  };
+  // ============================================================================
+  //  CENTRAL LOGGING ENGINE
+  //  (Connects Actions -> Database -> Quests)
+  // ============================================================================
+  const handleLogActivity = async (itemId: string, xpEarned: number, itemTitle: string, scoreDetail: any = null) => {
+      if (!user) return;
+
+      try {
+          // 1. Create specific log entry in Firestore
+          // This populates the "Recent History" in Profile and Gradebooks
+          await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
+              userId: user.uid,
+              studentEmail: user.email,
+              studentName: userData?.name || 'Student',
+              itemId: itemId,
+              itemTitle: itemTitle,
+              xp: xpEarned,
+              timestamp: Date.now(),
+              // If we have a score, it's a completion (exam/quiz), otherwise it's self-study
+              type: scoreDetail ? 'completion' : 'self_study', 
+              scoreDetail: scoreDetail || {}
+          });
+
+          // 2. Update Total User XP
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
+              xp: increment(xpEarned),
+              lastActive: Date.now()
+          });
+
+          // 3. TRIGGER DAILY QUESTS
+          // Determine the type of action for the quest engine
+          let questType = 'self_study'; // Default (Reading cards, looking at lessons)
+          
+          if (scoreDetail?.mode === 'quiz') questType = 'quiz_complete'; // Quiz Mode
+          if (itemId === 'explore_deck') questType = 'explore_deck';     // Clicking a featured deck
+          
+          // Call the quest engine we created earlier
+          checkDailyQuests(questType);
+
+      } catch (e) {
+          console.error("Error logging activity:", e);
+      }
+  };
   const handleCreateCard = useCallback(async (c: any) => { if(!user) return; const cardId = doc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards')).id; await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), {...c, id: cardId}); setSelectedDeckKey(c.deckId || 'custom'); setActiveTab('flashcards'); }, [user]);
   const handleUpdateCard = useCallback(async (cardId: string, data: any) => { if (!user) return; try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), data); } catch (e) { console.error(e); alert("Cannot edit card. Check permissions."); } }, [user]);
   const handleDeleteCard = useCallback(async (cardId: string) => { if (!user) return; if (!window.confirm("Delete card?")) return; try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId)); } catch (e) { console.error(e); alert("Failed to delete card."); } }, [user]);
