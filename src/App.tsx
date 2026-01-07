@@ -1205,10 +1205,7 @@ function GradeDetailModal({ log, onClose }: any) {
 }
 
 // ============================================================================
-//  STUDENT GRADEBOOK (Interactive)
-// ============================================================================
-// ============================================================================
-//  STUDENT GRADEBOOK (Fixed Click & Display)
+//  STUDENT GRADEBOOK (Fixed Filtering)
 // ============================================================================
 function StudentGradebook({ classData, user }: any) {
     const [logs, setLogs] = useState<any[]>([]);
@@ -1217,11 +1214,21 @@ function StudentGradebook({ classData, user }: any) {
 
     useEffect(() => {
         if(!classData.assignments || classData.assignments.length === 0) { setLoading(false); return; }
+        
         const assignmentIds = classData.assignments.map((a:any) => a.id);
-        const q = query(collection(db, 'artifacts', appId, 'activity_logs'), where('studentEmail', '==', user.email), orderBy('timestamp', 'desc'), limit(100));
+        
+        // FIX: Filter by type 'completion' to ignore time_logs and see the actual grades
+        const q = query(
+            collection(db, 'artifacts', appId, 'activity_logs'), 
+            where('studentEmail', '==', user.email),
+            where('type', '==', 'completion'), // <--- CRITICAL FIX
+            orderBy('timestamp', 'desc'),
+            limit(100)
+        );
+
         const unsub = onSnapshot(q, (snapshot) => {
             const allLogs = snapshot.docs.map(d => d.data());
-            // Match logs to assignments
+            // Filter to only include logs relevant to this class
             const classLogs = allLogs.filter(log => assignmentIds.includes(log.itemId));
             setLogs(classLogs);
             setLoading(false);
