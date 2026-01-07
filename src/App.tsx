@@ -1724,8 +1724,10 @@ function ClassForum({ classData, user }: any) {
 // ============================================================================
 //  STUDENT CLASS VIEW (Categorized Tabs)
 // ============================================================================
+// ============================================================================
+//  STUDENT CLASS VIEW (Revamped UI)
+// ============================================================================
 function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, userData, user }: any) {
-  // Updated State for 5 Tabs
   const [activeTab, setActiveTab] = useState<'lessons' | 'exams' | 'decks' | 'grades' | 'forum'>('lessons');
   
   const completedSet = new Set(userData?.completedAssignments || []);
@@ -1746,62 +1748,71 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
   const examsList = allAssignments.filter((l: any) => l.contentType === 'test' || l.contentType === 'exam');
   const decksList = allAssignments.filter((l: any) => l.contentType === 'deck');
 
-  // Total Pending Count (for Header)
+  // Total Pending Count
   const totalPending = allAssignments.filter((l: any) => !completedSet.has(l.id)).length;
   
-  // --- HELPER: Render a List of Assignments ---
-  const renderAssignmentList = (items: any[], emptyLabel: string) => {
+  // --- HELPER: Render Assignment Cards ---
+  const renderAssignmentList = (items: any[], emptyLabel: string, type: 'lesson' | 'exam' | 'deck') => {
       if (items.length === 0) {
           return (
-              <div className="flex flex-col items-center justify-center py-16 opacity-50">
-                  <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4"><Inbox size={32} className="text-slate-300"/></div>
+              <div className="flex flex-col items-center justify-center py-20 opacity-60">
+                  <div className="w-20 h-20 bg-slate-100 rounded-3xl flex items-center justify-center mb-4 border border-slate-200">
+                      {type === 'exam' ? <FileText size={32} className="text-rose-300"/> : type === 'deck' ? <Layers size={32} className="text-orange-300"/> : <BookOpen size={32} className="text-indigo-300"/>}
+                  </div>
                   <p className="text-sm font-bold text-slate-400">{emptyLabel}</p>
               </div>
           );
       }
 
       return (
-          <div className="space-y-3 pb-24">
+          <div className="space-y-4 pb-32">
               {items.map((l: any, i: number) => {
                   const isCompleted = completedSet.has(l.id);
+                  // Color Logic based on Type
+                  const themeColor = l.contentType === 'deck' ? 'orange' : (l.contentType === 'test' || l.contentType === 'exam') ? 'rose' : 'indigo';
+                  
                   return ( 
                       <button 
                           key={`${l.id}-${i}`} 
                           onClick={() => handleAssignmentClick(l)} 
-                          className={`w-full p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all group border ${isCompleted ? 'bg-emerald-50/40 border-emerald-100 hover:border-emerald-300' : 'bg-white border-slate-200 hover:border-indigo-300'}`}
+                          className={`w-full p-5 rounded-[1.5rem] shadow-sm flex items-center justify-between active:scale-[0.98] transition-all duration-300 group border relative overflow-hidden text-left ${isCompleted ? 'bg-emerald-50/50 border-emerald-100/50 hover:border-emerald-200' : 'bg-white border-slate-100 hover:border-slate-200 hover:shadow-lg hover:-translate-y-0.5'}`}
                       >
-                          <div className="flex items-center space-x-4">
+                          <div className="flex items-center gap-5 relative z-10">
                               {/* Icon Box */}
-                              <div className={`h-12 w-12 rounded-xl flex items-center justify-center transition-colors shrink-0 
+                              <div className={`h-14 w-14 rounded-2xl flex items-center justify-center transition-colors shrink-0 shadow-inner border border-white/50 
                                   ${isCompleted ? 'bg-emerald-100 text-emerald-600' : 
-                                    l.contentType === 'deck' ? 'bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white' : 
-                                    l.contentType === 'test' || l.contentType === 'exam' ? 'bg-rose-50 text-rose-600 group-hover:bg-rose-500 group-hover:text-white' : 
-                                    'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-500 group-hover:text-white'}`}>
+                                    themeColor === 'orange' ? 'bg-orange-50 text-orange-500 group-hover:bg-orange-500 group-hover:text-white' : 
+                                    themeColor === 'rose' ? 'bg-rose-50 text-rose-500 group-hover:bg-rose-500 group-hover:text-white' : 
+                                    'bg-indigo-50 text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white'}`}>
                                   
-                                  {isCompleted ? <Check size={20} strokeWidth={3}/> : 
-                                   l.contentType === 'deck' ? <Layers size={20}/> : 
-                                   (l.contentType === 'test' || l.contentType === 'exam') ? <FileText size={20}/> : <BookOpen size={20} />}
+                                  {isCompleted ? <Check size={24} strokeWidth={3}/> : 
+                                   l.contentType === 'deck' ? <Layers size={24}/> : 
+                                   (l.contentType === 'test' || l.contentType === 'exam') ? <FileText size={24}/> : <PlayCircle size={24} />}
                               </div>
                               
                               {/* Text Info */}
-                              <div className="text-left">
-                                  <h4 className={`font-bold text-sm ${isCompleted ? 'text-slate-500 decoration-slate-300' : 'text-slate-900 group-hover:text-indigo-700'}`}>
+                              <div>
+                                  <h4 className={`font-black text-base leading-tight mb-1 ${isCompleted ? 'text-slate-600' : 'text-slate-800'}`}>
                                       {l.title}
                                   </h4>
-                                  <p className={`text-xs ${isCompleted ? 'text-emerald-600 font-bold' : 'text-slate-500'}`}>
+                                  <p className={`text-xs font-bold uppercase tracking-wide ${isCompleted ? 'text-emerald-600' : 'text-slate-400'}`}>
                                       {isCompleted 
                                           ? "Completed" 
-                                          : l.contentType === 'deck' ? 'Flashcard Deck' : (l.contentType === 'test' || l.contentType === 'exam') ? 'Exam' : 'Lesson'
+                                          : `${l.contentType === 'deck' ? 'Vocab' : (l.contentType === 'test' || l.contentType === 'exam') ? 'Assessment' : 'Unit'} • ${l.xp} XP`
                                       }
                                   </p>
                               </div>
                           </div>
                           
-                          {/* Right Icon */}
+                          {/* Right Action */}
                           {isCompleted ? (
-                              <div className="px-3 py-1 bg-white border border-emerald-100 rounded-full text-[10px] font-bold text-emerald-600 shadow-sm">Review</div>
+                              <div className="px-4 py-1.5 bg-white border border-emerald-100 rounded-full text-[10px] font-black text-emerald-600 shadow-sm uppercase tracking-wider relative z-10">
+                                  Review
+                              </div>
                           ) : (
-                              <ChevronRight size={20} className="text-slate-300 group-hover:text-indigo-500" />
+                              <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-slate-900 group-hover:text-white transition-colors relative z-10">
+                                  <ArrowRight size={14} strokeWidth={3} />
+                              </div>
                           )}
                       </button> 
                   );
@@ -1813,41 +1824,50 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
   return (
     <div className="h-full flex flex-col bg-slate-50">
       
-      {/* Sticky Header */}
-      <div className="px-6 pt-12 pb-0 bg-white sticky top-0 z-40 border-b border-slate-100 shadow-sm">
-          <button onClick={onBack} className="flex items-center text-slate-500 hover:text-indigo-600 mb-4 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back</button>
-          
-          <div className="flex justify-between items-end mb-6">
-              <div>
-                  <h1 className="text-2xl font-black text-slate-900">{classData.name}</h1>
-                  <p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">{classData.code}</p>
+      {/* 1. STICKY HEADER (Glassmorphism) */}
+      <div className="bg-white/90 backdrop-blur-xl border-b border-slate-100 sticky top-0 z-40">
+          <div className="px-6 pt-12 pb-4">
+              <button onClick={onBack} className="flex items-center text-slate-400 hover:text-indigo-600 mb-4 text-xs font-black uppercase tracking-widest transition-colors">
+                  <ArrowLeft size={14} className="mr-1"/> Back to Dashboard
+              </button>
+              
+              <div className="flex justify-between items-end mb-6">
+                  <div>
+                      <h1 className="text-3xl font-black text-slate-900 leading-none mb-2">{classData.name}</h1>
+                      <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded border border-slate-200">
+                          {classData.code}
+                      </span>
+                  </div>
+                  <div className="text-right">
+                      <div className="flex items-center gap-2 justify-end mb-1">
+                          <div className={`w-2 h-2 rounded-full ${totalPending > 0 ? 'bg-indigo-500 animate-pulse' : 'bg-emerald-500'}`}></div>
+                          <span className={`block text-2xl font-black leading-none ${totalPending > 0 ? 'text-indigo-600' : 'text-emerald-500'}`}>
+                              {totalPending}
+                          </span>
+                      </div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Assignments</span>
+                  </div>
               </div>
-              <div className="text-right">
-                  <span className={`block text-2xl font-black ${totalPending > 0 ? 'text-indigo-600' : 'text-emerald-500'}`}>
-                      {totalPending}
-                  </span>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Total To Do</span>
+              
+              {/* 5-WAY TAB NAVIGATION */}
+              <div className="flex gap-1 overflow-x-auto scrollbar-hide pb-1">
+                  <button onClick={() => setActiveTab('lessons')} className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'lessons' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'bg-white text-slate-500 border border-slate-100 hover:bg-slate-50'}`}>
+                      <BookOpen size={14}/> Readings
+                  </button>
+                  <button onClick={() => setActiveTab('exams')} className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'exams' ? 'bg-rose-500 text-white shadow-md shadow-rose-200' : 'bg-white text-slate-500 border border-slate-100 hover:bg-slate-50'}`}>
+                      <FileText size={14}/> Exams
+                  </button>
+                  <button onClick={() => setActiveTab('decks')} className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'decks' ? 'bg-orange-500 text-white shadow-md shadow-orange-200' : 'bg-white text-slate-500 border border-slate-100 hover:bg-slate-50'}`}>
+                      <Layers size={14}/> Vocab
+                  </button>
+                  <div className="w-px h-6 bg-slate-200 mx-1 self-center"></div>
+                  <button onClick={() => setActiveTab('grades')} className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'grades' ? 'bg-slate-800 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-100 hover:bg-slate-50'}`}>
+                      <ClipboardList size={14}/> Grades
+                  </button>
+                  <button onClick={() => setActiveTab('forum')} className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'forum' ? 'bg-slate-800 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-100 hover:bg-slate-50'}`}>
+                      <MessageSquare size={14}/> Stream
+                  </button>
               </div>
-          </div>
-          
-          {/* 5-WAY TAB NAVIGATION */}
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-0">
-              <button onClick={() => setActiveTab('lessons')} className={`pb-3 px-2 text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'lessons' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
-                  <BookOpen size={16}/> Readings
-              </button>
-              <button onClick={() => setActiveTab('exams')} className={`pb-3 px-2 text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'exams' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
-                  <FileText size={16}/> Exams
-              </button>
-              <button onClick={() => setActiveTab('decks')} className={`pb-3 px-2 text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'decks' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
-                  <Layers size={16}/> Vocab
-              </button>
-              <div className="w-px h-6 bg-slate-200 mx-2 self-center mb-3"></div> {/* Divider */}
-              <button onClick={() => setActiveTab('grades')} className={`pb-3 px-2 text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'grades' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
-                  <ClipboardList size={16}/> Grades
-              </button>
-              <button onClick={() => setActiveTab('forum')} className={`pb-3 px-2 text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'forum' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
-                  <MessageSquare size={16}/> Stream
-              </button>
           </div>
       </div>
 
@@ -1856,32 +1876,40 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
           <div className="h-full overflow-y-auto px-6 py-6 custom-scrollbar">
               
               {activeTab === 'lessons' && (
-                  <div>
-                      <h3 className="font-bold text-slate-800 mb-4 text-xs uppercase tracking-widest text-indigo-500">Readings & Units</h3>
-                      {renderAssignmentList(lessonsList, "No reading material assigned.")}
+                  <div className="animate-in slide-in-from-bottom-2 duration-300">
+                      <h3 className="font-black text-slate-400 mb-4 text-xs uppercase tracking-widest flex items-center gap-2">
+                          <BookOpen size={14} className="text-indigo-500"/> Study Material
+                      </h3>
+                      {renderAssignmentList(lessonsList, "No reading material assigned.", 'lesson')}
                   </div>
               )}
 
               {activeTab === 'exams' && (
-                  <div>
-                      <h3 className="font-bold text-slate-800 mb-4 text-xs uppercase tracking-widest text-rose-500">Exams & Quizzes</h3>
-                      {renderAssignmentList(examsList, "No exams currently active.")}
+                  <div className="animate-in slide-in-from-bottom-2 duration-300">
+                      <h3 className="font-black text-slate-400 mb-4 text-xs uppercase tracking-widest flex items-center gap-2">
+                          <FileText size={14} className="text-rose-500"/> Assessments
+                      </h3>
+                      {renderAssignmentList(examsList, "No exams currently active.", 'exam')}
                   </div>
               )}
 
               {activeTab === 'decks' && (
-                  <div>
-                      <h3 className="font-bold text-slate-800 mb-4 text-xs uppercase tracking-widest text-orange-500">Vocabulary Decks</h3>
-                      {renderAssignmentList(decksList, "No flashcards assigned.")}
+                  <div className="animate-in slide-in-from-bottom-2 duration-300">
+                      <h3 className="font-black text-slate-400 mb-4 text-xs uppercase tracking-widest flex items-center gap-2">
+                          <Layers size={14} className="text-orange-500"/> Vocabulary
+                      </h3>
+                      {renderAssignmentList(decksList, "No flashcards assigned.", 'deck')}
                   </div>
               )}
 
               {activeTab === 'grades' && (
-                  <StudentGradebook classData={classData} user={user} />
+                  <div className="animate-in slide-in-from-bottom-2 duration-300">
+                      <StudentGradebook classData={classData} user={user} />
+                  </div>
               )}
 
               {activeTab === 'forum' && (
-                  <div className="h-full -mx-6 -my-6"> {/* Negative margin to fill container for forum */}
+                  <div className="h-full -mx-6 -my-6 animate-in slide-in-from-bottom-2 duration-300"> 
                       <ClassForum classData={classData} user={user} />
                   </div>
               )}
@@ -1891,7 +1919,6 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
     </div>
   );
 }
-
 
 
 
