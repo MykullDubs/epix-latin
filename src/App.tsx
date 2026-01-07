@@ -1300,19 +1300,25 @@ function StudentGradebook({ classData, user }: any) {
     );
 }
 // ============================================================================
-//  CLASS FORUM (Threaded & Accordioned)
+//  CLASS FORUM (Threaded, Inline Replies, Accordion)
 // ============================================================================
 function ClassForum({ classData, user }: any) {
     const [posts, setPosts] = useState<any[]>([]);
-    const [content, setContent] = useState('');
-    const [sending, setSending] = useState(false);
     
-    // Threading State
-    const [replyingTo, setReplyingTo] = useState<string | null>(null); // ID of post being replied to
-    const [replyContent, setReplyContent] = useState('');
-    const [expandedThreads, setExpandedThreads] = useState<string[]>([]); // IDs of expanded posts
+    // Global Composer (for new top-level posts)
+    const [mainContent, setMainContent] = useState('');
+    const [isPostingMain, setIsPostingMain] = useState(false);
 
-    // Live Feed Subscription
+    // Reply State Manager: { [postId]: 'open' | null }
+    // We track which specific item (post or reply) has an open input box
+    const [activeInputId, setActiveInputId] = useState<string | null>(null);
+    const [replyContent, setReplyContent] = useState('');
+    const [sendingReply, setSendingReply] = useState(false);
+
+    // Accordion State: { [postId]: boolean } (true = expanded)
+    const [expandedThreads, setExpandedThreads] = useState<any>({});
+
+    // Live Feed
     useEffect(() => {
         const q = query(
             collection(db, 'artifacts', appId, 'class_posts'),
@@ -1326,73 +1332,97 @@ function ClassForum({ classData, user }: any) {
         return () => unsub();
     }, [classData.id]);
 
-    // Create Main Post
-    const handlePost = async () => {
-        if (!content.trim()) return;
-        setSending(true);
+    // 1. Create New Thread
+    const createPost = async () => {
+        if (!mainContent.trim()) return;
+        setIsPostingMain(true);
         try {
             await addDoc(collection(db, 'artifacts', appId, 'class_posts'), {
                 classId: classData.id,
                 userId: user.uid,
                 authorName: user.displayName || user.email.split('@')[0], 
-                content: content.trim(),
+                content: mainContent.trim(),
                 timestamp: Date.now(),
-                replies: [], // New: Array to store thread
-                likes: [] 
+                replies: [],
+                likes: []
             });
-            setContent('');
-        } catch (e) { console.error("Post failed", e); }
-        setSending(false);
+            setMainContent('');
+        } catch (e) { console.error(e); }
+        setIsPostingMain(false);
     };
 
-    // Create Reply
-    const handleReply = async (postId: string) => {
+    // 2. Add Reply to Thread
+    // parentPostId: The ID of the main document in Firebase
+    // replyToName: Optional, if replying to a specific sub-user
+    const sendReply = async (parentPostId: string, replyToName?: string) => {
         if (!replyContent.trim()) return;
+        setSendingReply(true);
         try {
-            const postRef = doc(db, 'artifacts', appId, 'class_posts', postId);
+            const postRef = doc(db, 'artifacts', appId, 'class_posts', parentPostId);
+            const text = replyToName ? `@${replyToName} ${replyContent}` : replyContent;
+            
             const newReply = {
-                id: Date.now().toString(), // Simple ID
+                id: Date.now().toString(),
                 userId: user.uid,
                 authorName: user.displayName || user.email.split('@')[0],
-                content: replyContent.trim(),
+                content: text.trim(),
                 timestamp: Date.now()
             };
             
-            await updateDoc(postRef, {
-                replies: arrayUnion(newReply)
-            });
+            await updateDoc(postRef, { replies: arrayUnion(newReply) });
             
             setReplyContent('');
-            setReplyingTo(null);
-            // Auto-expand thread on reply
-            if (!expandedThreads.includes(postId)) {
-                setExpandedThreads(prev => [...prev, postId]);
-            }
-        } catch (e) { console.error("Reply failed", e); }
+            setActiveInputId(null); // Close the box
+            setExpandedThreads({ ...expandedThreads, [parentPostId]: true }); // Auto-expand
+        } catch (e) { console.error(e); }
+        setSendingReply(false);
     };
 
-    const toggleThread = (postId: string) => {
-        if (expandedThreads.includes(postId)) {
-            setExpandedThreads(expandedThreads.filter(id => id !== postId));
-        } else {
-            setExpandedThreads([...expandedThreads, postId]);
-        }
+    const toggleAccordion = (postId: string) => {
+        setExpandedThreads((prev: any) => ({ ...prev, [postId]: !prev[postId] }));
     };
+
+    // Helper Component for the Inline Input Box
+    const InlineInput = ({ onSubmit, placeholder, onCancel }: any) => (
+        <div className="mt-3 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex gap-2 items-start">
+                <div className="flex-1 relative">
+                    <textarea
+                        autoFocus
+                        value={replyContent}
+                        onChange={(e) => setReplyContent(e.target.value)}
+                        onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit(); } }}
+                        placeholder={placeholder}
+                        className="w-full p-3 bg-slate-50 border-2 border-indigo-100 rounded-xl focus:border-indigo-500 focus:bg-white outline-none resize-none text-sm min-h-[80px]"
+                    />
+                    <div className="absolute bottom-2 right-2 flex gap-2">
+                        <button onClick={onCancel} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"><X size={14}/></button>
+                        <button onClick={onSubmit} disabled={sendingReply || !replyContent.trim()} className="p-1.5 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 disabled:opacity-50 transition-all"><Send size={14}/></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 
     return (
         <div className="flex flex-col h-full bg-slate-50 relative">
             
-            {/* Main Input */}
+            {/* MAIN POST COMPOSER */}
             <div className="p-4 bg-white border-b border-slate-200 shadow-sm sticky top-0 z-20">
                 <div className="relative group">
-                    <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder={`Start a discussion with ${classData.name}...`} className="w-full p-4 pr-14 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 focus:bg-white transition-all outline-none resize-none text-sm font-medium h-20 placeholder:text-slate-400" />
-                    <button onClick={handlePost} disabled={sending || !content.trim()} className="absolute bottom-3 right-3 p-2.5 bg-indigo-600 text-white rounded-xl shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100 transition-all flex items-center justify-center">
-                        {sending ? <Loader size={18} className="animate-spin"/> : <Send size={18} className="ml-0.5"/>}
+                    <textarea 
+                        value={mainContent} 
+                        onChange={(e) => setMainContent(e.target.value)} 
+                        placeholder={`Start a new discussion...`} 
+                        className="w-full p-4 pr-14 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 focus:bg-white transition-all outline-none resize-none text-sm font-medium h-20 placeholder:text-slate-400" 
+                    />
+                    <button onClick={createPost} disabled={isPostingMain || !mainContent.trim()} className="absolute bottom-3 right-3 p-2.5 bg-indigo-600 text-white rounded-xl shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100 transition-all flex items-center justify-center">
+                        {isPostingMain ? <Loader size={18} className="animate-spin"/> : <Send size={18} className="ml-0.5"/>}
                     </button>
                 </div>
             </div>
 
-            {/* Feed */}
+            {/* FEED */}
             <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar pb-24">
                 {posts.length === 0 && (
                     <div className="text-center py-12 opacity-60">
@@ -1403,16 +1433,17 @@ function ClassForum({ classData, user }: any) {
 
                 {posts.map((post) => {
                     const replies = post.replies || [];
-                    const isExpanded = expandedThreads.includes(post.id);
-                    // Accordion Logic: Show all if expanded, otherwise show only last 2
+                    const isExpanded = expandedThreads[post.id];
+                    // Show last 2 replies by default, or all if expanded
                     const visibleReplies = isExpanded ? replies : replies.slice(-2);
                     const hiddenCount = replies.length - visibleReplies.length;
 
                     return (
                         <div key={post.id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm animate-in slide-in-from-bottom-2 duration-300">
-                            {/* Main Post Header */}
-                            <div className="flex gap-3 mb-3">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-md shrink-0 border-2 border-white">
+                            
+                            {/* --- ROOT POST --- */}
+                            <div className="flex gap-3 relative">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-md shrink-0 border-2 border-white z-10">
                                     {post.authorName.charAt(0).toUpperCase()}
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -1421,52 +1452,74 @@ function ClassForum({ classData, user }: any) {
                                         <span className="text-[10px] font-bold text-slate-400 shrink-0">{new Date(post.timestamp).toLocaleDateString()}</span>
                                     </div>
                                     <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap break-words mt-1">{post.content}</p>
-                                </div>
-                            </div>
-
-                            {/* Action Bar */}
-                            <div className="flex items-center gap-4 pl-14 mb-2">
-                                <button onClick={() => setReplyingTo(replyingTo === post.id ? null : post.id)} className="text-xs font-bold text-slate-400 hover:text-indigo-600 flex items-center gap-1 transition-colors">
-                                    <MessageCircle size={14}/> Reply
-                                </button>
-                                {hiddenCount > 0 && (
-                                    <button onClick={() => toggleThread(post.id)} className="text-xs font-bold text-indigo-500 hover:text-indigo-700 flex items-center gap-1 bg-indigo-50 px-2 py-0.5 rounded-full">
-                                        <MoreHorizontal size={12}/> View {hiddenCount} previous replies
-                                    </button>
-                                )}
-                                {isExpanded && replies.length > 2 && (
-                                    <button onClick={() => toggleThread(post.id)} className="text-[10px] font-bold text-slate-400 hover:text-slate-600">Collapse</button>
-                                )}
-                            </div>
-
-                            {/* Reply Input */}
-                            {replyingTo === post.id && (
-                                <div className="pl-14 mb-4 animate-in slide-in-from-top-1 fade-in">
-                                    <div className="flex gap-2">
-                                        <input autoFocus value={replyContent} onChange={(e) => setReplyContent(e.target.value)} placeholder="Write a reply..." className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 transition-colors" onKeyDown={(e) => { if(e.key === 'Enter') handleReply(post.id) }}/>
-                                        <button onClick={() => handleReply(post.id)} className="p-2 bg-indigo-600 text-white rounded-xl shadow-sm hover:bg-indigo-700 transition-colors"><Send size={16}/></button>
+                                    
+                                    {/* Root Actions */}
+                                    <div className="flex items-center gap-4 mt-2">
+                                        <button 
+                                            onClick={() => { setActiveInputId(activeInputId === post.id ? null : post.id); setReplyContent(''); }} 
+                                            className="text-xs font-bold text-slate-400 hover:text-indigo-600 flex items-center gap-1 transition-colors"
+                                        >
+                                            <MessageCircle size={14}/> Reply
+                                        </button>
+                                        {hiddenCount > 0 && (
+                                            <button onClick={() => toggleAccordion(post.id)} className="text-xs font-bold text-indigo-500 hover:text-indigo-700 flex items-center gap-1 bg-indigo-50 px-2 py-0.5 rounded-full">
+                                                <MoreHorizontal size={12}/> View {hiddenCount} more
+                                            </button>
+                                        )}
+                                        {isExpanded && replies.length > 2 && (
+                                            <button onClick={() => toggleAccordion(post.id)} className="text-[10px] font-bold text-slate-400 hover:text-slate-600">Collapse</button>
+                                        )}
                                     </div>
+
+                                    {/* Inline Input for Root */}
+                                    {activeInputId === post.id && (
+                                        <InlineInput 
+                                            placeholder="Write a reply..." 
+                                            onSubmit={() => sendReply(post.id)} 
+                                            onCancel={() => setActiveInputId(null)} 
+                                        />
+                                    )}
                                 </div>
-                            )}
+                            </div>
 
-                            {/* Threaded Replies */}
+                            {/* --- REPLIES --- */}
                             {visibleReplies.length > 0 && (
-                                <div className="space-y-3 mt-2">
+                                <div className="mt-4 space-y-4">
                                     {visibleReplies.map((reply: any) => (
-                                        <div key={reply.id} className="flex gap-3 relative pl-6 group">
-                                            {/* Thread Connector Line */}
-                                            <div className="absolute left-[26px] -top-4 bottom-4 w-px bg-slate-200 rounded-full"></div>
-                                            <div className="absolute left-[26px] top-3 w-4 h-4 border-b border-l border-slate-200 rounded-bl-xl"></div>
+                                        <div key={reply.id} className="flex gap-3 relative pl-4 group">
+                                            {/* Connector Lines */}
+                                            <div className="absolute left-[19px] -top-6 bottom-0 w-px bg-slate-200"></div>
+                                            <div className="absolute left-[19px] top-3 w-4 h-px bg-slate-200"></div>
 
-                                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs shrink-0 border border-slate-200 z-10">
+                                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs shrink-0 border border-slate-200 z-10 relative">
                                                 {reply.authorName.charAt(0).toUpperCase()}
                                             </div>
-                                            <div className="flex-1 bg-slate-50 p-3 rounded-xl rounded-tl-none border border-slate-100">
+                                            
+                                            <div className="flex-1 bg-slate-50 p-3 rounded-2xl rounded-tl-none border border-slate-100 relative">
                                                 <div className="flex justify-between items-baseline mb-1">
                                                     <span className="font-bold text-slate-700 text-xs">{reply.authorName}</span>
                                                     <span className="text-[9px] text-slate-400">{new Date(reply.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
                                                 </div>
                                                 <p className="text-slate-600 text-xs leading-relaxed">{reply.content}</p>
+                                                
+                                                {/* Reply to Reply Action */}
+                                                <div className="mt-2 flex">
+                                                    <button 
+                                                        onClick={() => { setActiveInputId(activeInputId === reply.id ? null : reply.id); setReplyContent(`@${reply.authorName} `); }} 
+                                                        className="text-[10px] font-bold text-slate-400 hover:text-indigo-600 flex items-center gap-1"
+                                                    >
+                                                        <CornerDownRight size={10}/> Reply
+                                                    </button>
+                                                </div>
+
+                                                {/* Inline Input for Sub-Reply */}
+                                                {activeInputId === reply.id && (
+                                                    <InlineInput 
+                                                        placeholder={`Reply to ${reply.authorName}...`} 
+                                                        onSubmit={() => sendReply(post.id)} // Always updates parent post
+                                                        onCancel={() => setActiveInputId(null)} 
+                                                    />
+                                                )}
                                             </div>
                                         </div>
                                     ))}
