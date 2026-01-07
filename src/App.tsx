@@ -1128,22 +1128,96 @@ function ProfileView({ user, userData }: any) {
 }
 
 
+// ============================================================================
+//  GRADE DETAIL MODAL (Student View)
+// ============================================================================
+function GradeDetailModal({ log, onClose }: any) {
+    if (!log) return null;
+    const { scoreDetail, itemTitle, xp } = log;
+    const isExam = scoreDetail && scoreDetail.details; // Check if it has question breakdown
 
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
+                
+                {/* Header */}
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-3xl">
+                    <div>
+                        <h2 className="text-xl font-black text-slate-800">{itemTitle}</h2>
+                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">{new Date(log.timestamp).toLocaleDateString()} • +{xp} XP</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 bg-white rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors shadow-sm"><X size={20}/></button>
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                    {/* Score Hero */}
+                    <div className="flex flex-col items-center justify-center mb-8">
+                        <div className={`text-5xl font-black mb-2 ${scoreDetail?.finalScorePct >= 70 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                            {scoreDetail?.finalScorePct ?? 100}%
+                        </div>
+                        <div className="text-sm font-bold text-slate-400 uppercase tracking-widest">Final Score</div>
+                        {scoreDetail?.instructorFeedback && (
+                            <div className="mt-4 bg-indigo-50 border border-indigo-100 p-4 rounded-2xl max-w-md w-full text-center">
+                                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest block mb-1">Instructor Feedback</span>
+                                <p className="text-indigo-900 font-medium italic">"{scoreDetail.instructorFeedback}"</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Question Breakdown (Only if it's an Exam) */}
+                    {isExam && (
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Question Breakdown</h3>
+                            {scoreDetail.details.map((q: any, idx: number) => (
+                                <div key={idx} className={`p-4 rounded-2xl border-2 ${q.isCorrect ? 'border-emerald-100 bg-emerald-50/30' : 'border-rose-100 bg-rose-50/30'}`}>
+                                    <div className="flex justify-between items-start mb-2">
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${q.isCorrect ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                                            {q.isCorrect ? 'Correct' : 'Incorrect'}
+                                        </span>
+                                        <span className="text-xs font-bold text-slate-400">{q.awardedPoints} / {q.maxPoints} pts</span>
+                                    </div>
+                                    <p className="font-bold text-slate-800 text-sm mb-2">{q.prompt}</p>
+                                    
+                                    <div className="text-sm text-slate-600 bg-white/50 p-3 rounded-lg border border-slate-200/50 mb-2">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Your Answer</span>
+                                        {q.studentVal}
+                                    </div>
+
+                                    {!q.isCorrect && q.correctVal && q.type !== 'essay' && (
+                                        <div className="text-xs text-emerald-700 font-bold flex items-center gap-1">
+                                            <CheckCircle2 size={12}/> Correct Answer: {q.correctVal}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-4 border-t border-slate-100 bg-slate-50/50 rounded-b-3xl">
+                    <button onClick={onClose} className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold shadow-lg hover:scale-[1.01] transition-transform">Close Report</button>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 // ============================================================================
-//  STUDENT GRADEBOOK (Personal View)
+//  STUDENT GRADEBOOK (Interactive)
 // ============================================================================
 function StudentGradebook({ classData, user }: any) {
     const [logs, setLogs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    
+    // NEW: State to track which grade is being viewed
+    const [selectedLog, setSelectedLog] = useState<any>(null);
 
     useEffect(() => {
-        // Fetch logs only for this student and these assignments
         if(!classData.assignments || classData.assignments.length === 0) { setLoading(false); return; }
         
         const assignmentIds = classData.assignments.map((a:any) => a.id);
-        // Note: Firestore 'in' query is limited to 10. For production, you'd batch this or structure differently.
-        // For now, we fetch user's recent logs and filter client-side for simplicity.
         const q = query(
             collection(db, 'artifacts', appId, 'activity_logs'), 
             where('studentEmail', '==', user.email),
@@ -1162,46 +1236,78 @@ function StudentGradebook({ classData, user }: any) {
     }, [classData, user]);
 
     const getGradeStatus = (assignmentId: string) => {
+        // Find the most recent log for this assignment
         const log = logs.find(l => l.itemId === assignmentId);
-        if (!log) return { status: 'missing', label: 'Not Started', color: 'bg-slate-100 text-slate-400' };
-        if (log.scoreDetail?.status === 'pending_review') return { status: 'pending', label: 'Grading', color: 'bg-amber-100 text-amber-600' };
-        return { status: 'complete', label: `${log.scoreDetail?.finalScorePct || Math.round((log.scoreDetail?.score / log.scoreDetail?.total)*100) || 100}%`, color: 'bg-emerald-100 text-emerald-600', log };
+        
+        if (!log) return { status: 'missing', label: 'Not Started', color: 'bg-slate-100 text-slate-400', interactable: false };
+        
+        if (log.scoreDetail?.status === 'pending_review') {
+            return { status: 'pending', label: 'In Review', color: 'bg-amber-100 text-amber-600', interactable: true, log };
+        }
+        
+        // Calculate score percentage
+        let pct = 100;
+        if (log.scoreDetail?.finalScorePct !== undefined) pct = log.scoreDetail.finalScorePct;
+        else if (log.scoreDetail?.total > 0) pct = Math.round((log.scoreDetail.score / log.scoreDetail.total) * 100);
+        
+        // Determine Color
+        let color = 'bg-emerald-100 text-emerald-600';
+        if(pct < 70) color = 'bg-rose-100 text-rose-600';
+        else if(pct < 90) color = 'bg-indigo-100 text-indigo-600';
+
+        return { status: 'complete', label: `${pct}%`, color, interactable: true, log };
     };
 
     return (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2">
-            <div className="p-6 border-b border-slate-100 bg-slate-50">
-                <h3 className="font-bold text-slate-800 flex items-center gap-2"><ClipboardList size={18} className="text-indigo-600"/> Report Card</h3>
-            </div>
-            {classData.assignments?.length === 0 ? (
-                <div className="p-8 text-center text-slate-400 text-sm">No assignments yet.</div>
-            ) : (
-                <div className="divide-y divide-slate-100">
-                    {classData.assignments.map((assign: any) => {
-                        const { status, label, color, log } = getGradeStatus(assign.id);
-                        return (
-                            <div key={assign.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group">
-                                <div className="flex items-center gap-4">
-                                    <div className={`p-2 rounded-lg ${assign.contentType === 'test' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                                        {assign.contentType === 'test' ? <FileText size={16}/> : <BookOpen size={16}/>}
-                                    </div>
-                                    <div>
-                                        <h4 className="font-bold text-slate-800 text-sm">{assign.title}</h4>
-                                        <p className="text-xs text-slate-400">{assign.contentType === 'test' ? 'Exam' : 'Lesson'} • {assign.xp} XP</p>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${color}`}>{label}</span>
-                                    {log?.scoreDetail?.instructorFeedback && (
-                                        <p className="text-[10px] text-slate-500 mt-1 max-w-[150px] truncate italic">"{log.scoreDetail.instructorFeedback}"</p>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
+        <>
+            {/* RENDER THE MODAL IF A LOG IS SELECTED */}
+            {selectedLog && <GradeDetailModal log={selectedLog} onClose={() => setSelectedLog(null)} />}
+
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2">
+                <div className="p-6 border-b border-slate-100 bg-slate-50">
+                    <h3 className="font-bold text-slate-800 flex items-center gap-2"><ClipboardList size={18} className="text-indigo-600"/> Report Card</h3>
                 </div>
-            )}
-        </div>
+                {classData.assignments?.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 text-sm">No assignments yet.</div>
+                ) : (
+                    <div className="divide-y divide-slate-100">
+                        {classData.assignments.map((assign: any) => {
+                            const { status, label, color, interactable, log } = getGradeStatus(assign.id);
+                            
+                            return (
+                                <button 
+                                    key={assign.id} 
+                                    disabled={!interactable}
+                                    onClick={() => interactable && setSelectedLog(log)}
+                                    className={`w-full p-4 flex items-center justify-between transition-colors group text-left ${interactable ? 'hover:bg-slate-50 cursor-pointer' : 'cursor-default'}`}
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className={`p-2 rounded-lg ${assign.contentType === 'test' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                            {assign.contentType === 'test' ? <FileText size={16}/> : <BookOpen size={16}/>}
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-slate-800 text-sm">{assign.title}</h4>
+                                            <p className="text-xs text-slate-400">{assign.contentType === 'test' ? 'Exam' : 'Lesson'} • {assign.xp} XP</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="text-right">
+                                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${color}`}>{label}</span>
+                                            {log?.scoreDetail?.instructorFeedback && (
+                                                <div className="flex items-center justify-end gap-1 mt-1 text-[10px] text-indigo-500 font-bold">
+                                                    <MessageCircle size={10}/> Feedback
+                                                </div>
+                                            )}
+                                        </div>
+                                        {interactable && <ChevronRight size={16} className="text-slate-300 group-hover:text-indigo-500 transition-colors"/>}
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        </>
     );
 }
 
