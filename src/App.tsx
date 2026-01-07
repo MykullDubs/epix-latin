@@ -156,21 +156,117 @@ const ChatDialogueBlock = ({ lines }: any) => (
         })}
     </div>
 );
+// ============================================================================
+//  SAFE LESSON COMPONENTS (Crash-Proof)
+// ============================================================================
 
-// --- MAIN LESSON VIEW (Sequential) ---
+const ConceptCardBlock = ({ front, back, context, onInteraction }: any) => {
+    const [isFlipped, setIsFlipped] = useState(false);
+    const [status, setStatus] = useState<'neutral' | 'success' | 'missed'>('neutral');
+    const handleFlip = () => { if (!isFlipped) { setIsFlipped(true); if (onInteraction) onInteraction(); } };
+    return (
+        <div className="my-8 w-full max-w-md mx-auto">
+            {context && (<div className="mb-3 flex items-center gap-2 text-indigo-900/70 font-bold text-sm uppercase tracking-wide animate-in fade-in slide-in-from-bottom-2"><Zap size={14} className="text-amber-500 fill-amber-500"/>{context}</div>)}
+            <div onClick={handleFlip} className={`relative h-64 w-full rounded-3xl cursor-pointer perspective-1000 group transition-all duration-300 ${status === 'success' ? 'ring-4 ring-emerald-100' : status === 'missed' ? 'ring-4 ring-rose-100' : ''}`}>
+                <div className="relative w-full h-full transition-all duration-500 transform-style-3d shadow-xl rounded-3xl" style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}>
+                    <div className="absolute inset-0 backface-hidden bg-white rounded-3xl border-2 border-slate-100 flex flex-col items-center justify-center p-8 text-center" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}><div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"><HelpCircle size={24}/></div><h3 className="text-2xl font-black text-slate-800 leading-tight">{front}</h3><p className="absolute bottom-6 text-xs font-bold text-indigo-500 uppercase tracking-widest animate-pulse">Tap to Reveal</p></div>
+                    <div className="absolute inset-0 backface-hidden bg-slate-900 rounded-3xl flex flex-col items-center justify-center p-8 text-center text-white relative overflow-hidden" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
+                        <div className="relative z-10 flex flex-col items-center w-full h-full justify-center"><span className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-2">Answer</span><h3 className="text-2xl font-bold mb-6">{back}</h3><div className="w-full grid grid-cols-2 gap-3 mt-4"><button onClick={(e) => {e.stopPropagation(); setStatus('missed');}} className={`py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${status === 'missed' ? 'bg-rose-500 text-white' : 'bg-white/10 text-white/70'}`}><X size={14}/> Missed</button><button onClick={(e) => {e.stopPropagation(); setStatus('success');}} className={`py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${status === 'success' ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/70'}`}><Check size={14}/> Got it</button></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const JuicyDeckBlock = ({ items, title }: any) => {
+    const [index, setIndex] = useState(0);
+    const [isFlipped, setIsFlipped] = useState(false);
+    // Safety check for empty items
+    if (!items || items.length === 0) return null;
+    const currentCard = items[index] || items[0];
+    const handleSwipe = (dir: number) => { setIsFlipped(false); setTimeout(() => { setIndex((prev) => (prev + dir + items.length) % items.length); }, 200); };
+    return (
+        <div className="my-8 w-[90%] max-w-sm mx-auto relative">
+            <div className="flex justify-between items-center mb-4 px-2"><h4 className="text-xs font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2"><Layers size={14}/> {title || "Flashcards"}</h4><div className="flex gap-1">{items.map((_:any, i:number) => <div key={i} className={`h-1 w-4 rounded-full transition-colors ${i === index ? 'bg-indigo-500' : 'bg-slate-200'}`} />)}</div></div>
+            <div className="group h-64 cursor-pointer relative perspective-1000" onClick={() => setIsFlipped(!isFlipped)}><div className="relative w-full h-full transition-all duration-500 transform-style-3d" style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}><div className="absolute inset-0 bg-white rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center justify-center p-6 text-center backface-hidden" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}><span className="absolute top-4 left-4 text-[10px] font-bold text-slate-300 uppercase">Term</span><h3 className="text-2xl font-black text-slate-800">{currentCard.term || currentCard.front}</h3></div><div className="absolute inset-0 bg-slate-900 rounded-2xl shadow-xl flex flex-col items-center justify-center p-6 text-white text-center backface-hidden" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}><span className="absolute top-4 left-4 text-[10px] font-bold text-slate-500 uppercase">Definition</span><p className="text-lg font-medium leading-relaxed relative z-10">{currentCard.definition || currentCard.back}</p></div></div><div className="absolute top-2 left-2 w-full h-full bg-slate-100 rounded-2xl -z-10 border border-slate-200 shadow-sm transform rotate-2"></div></div>
+            <div className="flex justify-between items-center mt-6 px-4"><button onClick={() => handleSwipe(-1)} className="p-3 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 shadow-sm active:scale-95"><ArrowLeft size={20}/></button><div className="text-xs font-bold text-slate-400">{index + 1} / {items.length}</div><button onClick={() => handleSwipe(1)} className="p-3 rounded-full bg-slate-900 text-white shadow-lg hover:bg-indigo-600 active:scale-95"><ArrowRight size={20}/></button></div>
+        </div>
+    );
+};
+
+const ScenarioBlock = ({ block, onComplete }: any) => {
+    // Safety: ensure nodes exist
+    const nodes = block?.nodes || [];
+    if (nodes.length === 0) return <div className="p-4 bg-red-50 text-red-500">Error: Scenario has no nodes.</div>;
+    
+    const [currentNodeId, setCurrentNodeId] = useState(nodes[0].id);
+    const [history, setHistory] = useState<string[]>([]);
+    
+    const currentNode = nodes.find((n:any) => n.id === currentNodeId);
+    if (!currentNode) return <div className="p-4 bg-red-50 text-red-500">Error: Broken Scenario Link</div>;
+
+    const isEnd = !currentNode.options || currentNode.options.length === 0 || currentNode.options[0].nextNodeId === 'end';
+    const bgColors: any = { neutral: 'bg-slate-900', success: 'bg-emerald-900', failure: 'bg-rose-900', critical: 'bg-amber-900' };
+    const borderColor = currentNode.color === 'success' ? 'border-emerald-500' : currentNode.color === 'failure' ? 'border-rose-500' : 'border-slate-700';
+
+    return (
+        <div className={`${bgColors[currentNode.color || 'neutral']} text-white rounded-3xl overflow-hidden shadow-2xl border-4 ${borderColor} my-8 transition-colors duration-500`}>
+            {currentNode.imageUrl && (<div className="h-48 w-full overflow-hidden relative"><div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent z-10"/><img src={currentNode.imageUrl} alt="Scene" className="w-full h-full object-cover"/></div>)}
+            <div className="p-4 border-b border-white/10 flex justify-between items-center relative z-20"><span className="text-xs font-bold uppercase tracking-widest text-white/70 flex items-center gap-2">{currentNode.speaker ? <User size={14}/> : <Brain size={14}/>} {currentNode.speaker || 'Scene'}</span>{history.length > 0 && <button onClick={() => { setCurrentNodeId(nodes[0].id); setHistory([]); }} className="text-xs text-white/50 hover:text-white flex items-center gap-1"><RotateCcw size={12}/> Restart</button>}</div>
+            <div className="p-6 relative z-20 min-h-[100px] flex items-center"><p className="text-xl font-serif leading-relaxed animate-in fade-in slide-in-from-bottom-2 duration-500">"{currentNode.text}"</p></div>
+            <div className="bg-black/20 p-2 grid gap-2 backdrop-blur-sm">{!isEnd ? currentNode.options.map((opt:any, i:number) => (<button key={i} onClick={() => { setHistory([...history, currentNode.text]); setCurrentNodeId(opt.nextNodeId); }} className="w-full p-4 text-left bg-white/10 hover:bg-white/20 rounded-xl transition-all font-bold text-sm border border-white/5 hover:border-white/30 flex justify-between items-center group"><span>{opt.text}</span><ArrowRight size={16} className="opacity-50 group-hover:opacity-100 transition-opacity"/></button>)) : (<button onClick={onComplete} className="w-full p-4 bg-white text-slate-900 hover:bg-emerald-400 rounded-xl font-bold flex items-center justify-center gap-2 animate-pulse shadow-lg">Complete Scenario <Check size={16}/></button>)}</div>
+        </div>
+    );
+};
+
+const QuizBlock = ({ block, onComplete }: any) => {
+    const [selected, setSelected] = useState<string | null>(null);
+    const [submitted, setSubmitted] = useState(false);
+    const isCorrect = selected === block.correctId;
+    return (
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm my-8">
+            <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-start gap-2"><span className="bg-indigo-100 text-indigo-600 p-1 rounded-lg mt-1 shrink-0"><HelpCircle size={16}/></span>{block.question}</h3>
+            <div className="space-y-2">{block.options.map((opt:any) => { let style = "border-slate-200 hover:bg-slate-50"; if (submitted) { if (opt.id === block.correctId) style = "bg-emerald-100 border-emerald-500 text-emerald-800 font-bold"; else if (opt.id === selected) style = "bg-rose-100 border-rose-500 text-rose-800 opacity-60"; else style = "opacity-50 grayscale"; } else if (selected === opt.id) { style = "border-indigo-500 bg-indigo-50 text-indigo-700 font-bold ring-1 ring-indigo-500"; } return <button key={opt.id} disabled={submitted} onClick={() => setSelected(opt.id)} className={`w-full p-4 text-left border-2 rounded-xl transition-all ${style}`}>{opt.text}</button>; })}</div>
+            {!submitted ? (<button onClick={() => setSubmitted(true)} disabled={!selected} className="w-full mt-4 py-3 bg-slate-900 text-white rounded-xl font-bold disabled:opacity-50 transition-all">Check Answer</button>) : (<div className={`mt-4 p-3 rounded-xl flex justify-between items-center animate-in zoom-in ${isCorrect ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}><span className="font-bold flex items-center gap-2">{isCorrect ? <><Check size={18}/> Correct!</> : <><X size={18}/> Incorrect</>}</span>{isCorrect ? <button onClick={onComplete} className="px-3 py-1 bg-white border border-emerald-200 rounded-lg text-xs font-bold shadow-sm">Continue</button> : <button onClick={() => { setSubmitted(false); setSelected(null); }} className="px-3 py-1 bg-white border border-rose-200 rounded-lg text-xs font-bold shadow-sm">Try Again</button>}</div>)}
+        </div>
+    );
+};
+
+const ChatDialogueBlock = ({ lines }: any) => (
+    <div className="space-y-4 my-8 bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+        {lines && lines.map((line: any, i: number) => {
+            const isA = line.speaker === 'A' || i % 2 === 0;
+            return (<div key={i} className={`flex ${isA ? 'justify-start' : 'justify-end'}`}><div className={`max-w-[85%] p-4 rounded-2xl text-sm relative shadow-sm ${isA ? 'bg-white border border-slate-200 text-slate-800 rounded-tl-none' : 'bg-indigo-600 text-white rounded-tr-none'}`}><p className="font-medium leading-relaxed text-base">{line.text}</p>{line.translation && <p className={`text-xs mt-2 pt-2 border-t ${isA ? 'border-slate-100 text-slate-400' : 'border-indigo-500/50 text-indigo-200'}`}>{line.translation}</p>}<span className={`absolute -top-5 text-[10px] font-bold text-slate-400 ${isA ? 'left-0' : 'right-0'}`}>{line.speaker}</span></div></div>);
+        })}
+    </div>
+);
+// --- MAIN LESSON VIEW (Safety Juiced) ---
 function LessonView({ lesson, onFinish }: any) {
+  // Safety: Ensure lesson exists
+  if (!lesson) return <div className="p-8 text-center"><Loader className="animate-spin"/></div>;
+
   useLearningTimer(auth.currentUser, lesson.id, 'lesson', lesson.title);
+  
   const resetScroll = () => { window.scrollTo(0, 0); const container = document.getElementById('lesson-scroll-container'); if (container) container.scrollTop = 0; };
   useLayoutEffect(() => { resetScroll(); }, []);
+  
   const [currentBlockIdx, setCurrentBlockIdx] = useState(0);
   const blocks = lesson.blocks || [];
-  const progress = ((currentBlockIdx + 1) / blocks.length) * 100;
+  const progress = blocks.length > 0 ? ((currentBlockIdx + 1) / blocks.length) * 100 : 0;
+  
   const bottomRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (bottomRef.current) { bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }, [currentBlockIdx]);
+  
+  useEffect(() => { 
+      if (bottomRef.current) { bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); } 
+  }, [currentBlockIdx]);
+
   const handleNextBlock = () => { if (currentBlockIdx < blocks.length - 1) { setCurrentBlockIdx(prev => prev + 1); } else { resetScroll(); onFinish(lesson.id, lesson.xp, lesson.title); } };
   const handleExit = () => { resetScroll(); onFinish(null, 0); };
 
   const renderBlockContent = (block: any) => {
+      if (!block) return null; // Guard against empty blocks
+      
       switch (block.type) {
           case 'text': return (<div className="my-6 prose prose-slate max-w-none animate-in fade-in slide-in-from-bottom-4 duration-700">{block.title && <h2 className="text-3xl font-black text-slate-800 mb-6 tracking-tight">{block.title}</h2>}<div className="text-lg text-slate-600 leading-loose whitespace-pre-wrap font-serif">{block.content}</div></div>);
           case 'image': return (<div className="my-8 space-y-4 animate-in zoom-in-95 duration-500"><div className="rounded-3xl overflow-hidden shadow-2xl border-4 border-white ring-1 ring-slate-200">{block.url ? <img src={block.url} alt="Lesson" className="w-full object-cover" /> : <div className="h-48 bg-slate-100 flex items-center justify-center text-slate-400">Image Placeholder</div>}</div>{block.caption && <p className="text-center text-xs text-slate-400 font-bold uppercase tracking-widest bg-slate-50 py-2 rounded-full inline-block px-4 mx-auto">{block.caption}</p>}</div>);
@@ -179,26 +275,41 @@ function LessonView({ lesson, onFinish }: any) {
           case 'quiz': return <QuizBlock block={block} onComplete={handleNextBlock} />;
           case 'scenario': return <ScenarioBlock block={block} onComplete={handleNextBlock} />;
           case 'dialogue': return <ChatDialogueBlock lines={block.lines} />;
-          case 'note':
+          case 'note': {
+              // Wrapped in braces to scope variables
               const styles: any = { info: { bg: 'bg-gradient-to-br from-blue-50 to-indigo-50', border: 'border-blue-100', iconBg: 'bg-white', iconColor: 'text-blue-600', icon: <Info size={20}/> }, tip: { bg: 'bg-gradient-to-br from-emerald-50 to-teal-50', border: 'border-emerald-100', iconBg: 'bg-white', iconColor: 'text-emerald-600', icon: <Zap size={20} className="fill-current"/> }, warning: { bg: 'bg-gradient-to-br from-amber-50 to-orange-50', border: 'border-amber-100', iconBg: 'bg-white', iconColor: 'text-amber-600', icon: <AlertTriangle size={20}/> } };
-              const s = styles[block.variant || 'info'];
+              const s = styles[block.variant || 'info'] || styles.info; // Fallback to info
               return (<div className={`relative overflow-hidden rounded-2xl border ${s.border} ${s.bg} p-5 my-6 shadow-sm animate-in slide-in-from-left-2 duration-500`}><div className={`absolute -right-4 -top-4 opacity-10 pointer-events-none ${s.iconColor}`}>{React.cloneElement(s.icon, { size: 100 })}</div><div className="relative z-10 flex gap-4 items-start"><div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${s.iconBg} ${s.iconColor} shadow-sm border border-white/50`}>{s.icon}</div><div><h4 className={`font-black text-[10px] uppercase tracking-widest mb-1 opacity-70 ${s.iconColor}`}>{block.title || block.variant}</h4><p className="text-slate-700 text-sm font-medium leading-relaxed">{block.content}</p></div></div></div>);
+          }
           default: return <div className="p-4 bg-slate-100 rounded text-slate-500 italic">Unsupported block type: {block.type}</div>;
       }
   };
 
+  // Guard: Ensure activeBlock exists before checking type
   const activeBlock = blocks[currentBlockIdx];
-  const isInteractive = activeBlock.type === 'quiz' || (activeBlock.type === 'scenario' && activeBlock.nodes);
+  const isInteractive = activeBlock && (activeBlock.type === 'quiz' || (activeBlock.type === 'scenario' && activeBlock.nodes));
 
   return (
     <div id="lesson-scroll-container" className="h-full flex flex-col bg-white overflow-y-auto overflow-x-hidden relative scroll-smooth">
         <div className="sticky top-0 bg-white/95 backdrop-blur-md z-40 px-6 py-4 border-b border-slate-100 shadow-sm"><div className="flex justify-between items-center mb-2"><button onClick={handleExit} className="p-2 -ml-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-rose-500 transition-colors"><X size={20} /></button><div className="flex flex-col items-end"><span className="text-[10px] font-black text-slate-300 tracking-widest uppercase">Progress</span><span className="text-xs font-bold text-slate-800">{currentBlockIdx + 1} <span className="text-slate-300">/</span> {blocks.length}</span></div></div><div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-600 transition-all duration-500 ease-out shadow-[0_0_10px_rgba(79,70,229,0.5)]" style={{ width: `${progress}%` }}></div></div></div>
-        <div className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full pb-32">{blocks.slice(0, currentBlockIdx + 1).map((block: any, idx: number) => (<div key={idx} className={idx === currentBlockIdx ? "min-h-[50vh] flex flex-col justify-center" : "opacity-40 hover:opacity-100 transition-opacity duration-500 mb-12 border-b border-slate-100 pb-12"}>{renderBlockContent(block)}{idx === currentBlockIdx && <div ref={bottomRef} className="h-1 w-1"></div>}</div>))}</div>
-        {!isInteractive && (<div className="fixed bottom-6 left-0 right-0 px-6 z-50 flex justify-center pointer-events-none"><button onClick={handleNextBlock} className="pointer-events-auto w-full max-w-md py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg shadow-2xl shadow-slate-900/40 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 animate-in slide-in-from-bottom-4 duration-500">{currentBlockIdx < blocks.length - 1 ? (<>Continue <ArrowRight size={20}/></>) : (<>Complete Lesson <Check size={20}/></>)}</button></div>)}
+        <div className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full pb-32">
+            {blocks.slice(0, currentBlockIdx + 1).map((block: any, idx: number) => (
+                <div key={idx} className={idx === currentBlockIdx ? "min-h-[50vh] flex flex-col justify-center" : "opacity-40 hover:opacity-100 transition-opacity duration-500 mb-12 border-b border-slate-100 pb-12"}>
+                    {renderBlockContent(block)}
+                    {idx === currentBlockIdx && <div ref={bottomRef} className="h-1 w-1"></div>}
+                </div>
+            ))}
+        </div>
+        {!isInteractive && (
+            <div className="fixed bottom-6 left-0 right-0 px-6 z-50 flex justify-center pointer-events-none">
+                <button onClick={handleNextBlock} className="pointer-events-auto w-full max-w-md py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg shadow-2xl shadow-slate-900/40 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 animate-in slide-in-from-bottom-4 duration-500">
+                    {currentBlockIdx < blocks.length - 1 ? (<>Continue <ArrowRight size={20}/></>) : (<>Complete Lesson <Check size={20}/></>)}
+                </button>
+            </div>
+        )}
     </div>
   );
 }
-
 // ============================================================================
 //  DISCOVERY VIEW (Sanctified & Juicified)
 // ============================================================================
