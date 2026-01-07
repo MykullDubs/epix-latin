@@ -1534,10 +1534,11 @@ function ClassForum({ classData, user }: any) {
     );
 }
 // ============================================================================
-//  STUDENT CLASS VIEW (With Persistent Completed Items)
+//  STUDENT CLASS VIEW (Categorized Tabs)
 // ============================================================================
 function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, userData, user }: any) {
-  const [activeTab, setActiveTab] = useState<'assignments' | 'grades' | 'forum'>('assignments');
+  // Updated State for 5 Tabs
+  const [activeTab, setActiveTab] = useState<'lessons' | 'exams' | 'decks' | 'grades' | 'forum'>('lessons');
   
   const completedSet = new Set(userData?.completedAssignments || []);
   
@@ -1546,15 +1547,81 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
       else { onSelectLesson(assignment); } 
   };
 
-  // Filter assignments relevant to this student (ignore targetStudent logic for now if not used, or keep it)
-  const relevantAssignments = (classData.assignments || []).filter((l: any) => { 
+  // 1. Get All Relevant Assignments
+  const allAssignments = (classData.assignments || []).filter((l: any) => { 
       const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); 
       return isForMe; 
   });
 
-  // Calculate pending count just for the header badge
-  const pendingCount = relevantAssignments.filter((l: any) => !completedSet.has(l.id)).length;
+  // 2. Filter into Categories
+  const lessonsList = allAssignments.filter((l: any) => l.contentType !== 'deck' && l.contentType !== 'test' && l.contentType !== 'exam');
+  const examsList = allAssignments.filter((l: any) => l.contentType === 'test' || l.contentType === 'exam');
+  const decksList = allAssignments.filter((l: any) => l.contentType === 'deck');
+
+  // Total Pending Count (for Header)
+  const totalPending = allAssignments.filter((l: any) => !completedSet.has(l.id)).length;
   
+  // --- HELPER: Render a List of Assignments ---
+  const renderAssignmentList = (items: any[], emptyLabel: string) => {
+      if (items.length === 0) {
+          return (
+              <div className="flex flex-col items-center justify-center py-16 opacity-50">
+                  <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4"><Inbox size={32} className="text-slate-300"/></div>
+                  <p className="text-sm font-bold text-slate-400">{emptyLabel}</p>
+              </div>
+          );
+      }
+
+      return (
+          <div className="space-y-3 pb-24">
+              {items.map((l: any, i: number) => {
+                  const isCompleted = completedSet.has(l.id);
+                  return ( 
+                      <button 
+                          key={`${l.id}-${i}`} 
+                          onClick={() => handleAssignmentClick(l)} 
+                          className={`w-full p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all group border ${isCompleted ? 'bg-emerald-50/40 border-emerald-100 hover:border-emerald-300' : 'bg-white border-slate-200 hover:border-indigo-300'}`}
+                      >
+                          <div className="flex items-center space-x-4">
+                              {/* Icon Box */}
+                              <div className={`h-12 w-12 rounded-xl flex items-center justify-center transition-colors shrink-0 
+                                  ${isCompleted ? 'bg-emerald-100 text-emerald-600' : 
+                                    l.contentType === 'deck' ? 'bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white' : 
+                                    l.contentType === 'test' || l.contentType === 'exam' ? 'bg-rose-50 text-rose-600 group-hover:bg-rose-500 group-hover:text-white' : 
+                                    'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-500 group-hover:text-white'}`}>
+                                  
+                                  {isCompleted ? <Check size={20} strokeWidth={3}/> : 
+                                   l.contentType === 'deck' ? <Layers size={20}/> : 
+                                   (l.contentType === 'test' || l.contentType === 'exam') ? <FileText size={20}/> : <BookOpen size={20} />}
+                              </div>
+                              
+                              {/* Text Info */}
+                              <div className="text-left">
+                                  <h4 className={`font-bold text-sm ${isCompleted ? 'text-slate-500 decoration-slate-300' : 'text-slate-900 group-hover:text-indigo-700'}`}>
+                                      {l.title}
+                                  </h4>
+                                  <p className={`text-xs ${isCompleted ? 'text-emerald-600 font-bold' : 'text-slate-500'}`}>
+                                      {isCompleted 
+                                          ? "Completed" 
+                                          : l.contentType === 'deck' ? 'Flashcard Deck' : (l.contentType === 'test' || l.contentType === 'exam') ? 'Exam' : 'Lesson'
+                                      }
+                                  </p>
+                              </div>
+                          </div>
+                          
+                          {/* Right Icon */}
+                          {isCompleted ? (
+                              <div className="px-3 py-1 bg-white border border-emerald-100 rounded-full text-[10px] font-bold text-emerald-600 shadow-sm">Review</div>
+                          ) : (
+                              <ChevronRight size={20} className="text-slate-300 group-hover:text-indigo-500" />
+                          )}
+                      </button> 
+                  );
+              })}
+          </div>
+      );
+  };
+
   return (
     <div className="h-full flex flex-col bg-slate-50">
       
@@ -1568,104 +1635,74 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
                   <p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">{classData.code}</p>
               </div>
               <div className="text-right">
-                  <span className={`block text-2xl font-black ${pendingCount > 0 ? 'text-indigo-600' : 'text-emerald-500'}`}>
-                      {pendingCount}
+                  <span className={`block text-2xl font-black ${totalPending > 0 ? 'text-indigo-600' : 'text-emerald-500'}`}>
+                      {totalPending}
                   </span>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">To Do</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Total To Do</span>
               </div>
           </div>
           
-          {/* 3-WAY TAB NAVIGATION */}
-          <div className="flex gap-6 overflow-x-auto scrollbar-hide">
-              <button onClick={() => setActiveTab('assignments')} className={`pb-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${activeTab === 'assignments' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Assignments</button>
-              <button onClick={() => setActiveTab('grades')} className={`pb-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${activeTab === 'grades' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Gradebook</button>
-              <button onClick={() => setActiveTab('forum')} className={`pb-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'forum' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
-                  <MessageSquare size={16}/> Forum
+          {/* 5-WAY TAB NAVIGATION */}
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-0">
+              <button onClick={() => setActiveTab('lessons')} className={`pb-3 px-2 text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'lessons' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                  <BookOpen size={16}/> Readings
+              </button>
+              <button onClick={() => setActiveTab('exams')} className={`pb-3 px-2 text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'exams' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                  <FileText size={16}/> Exams
+              </button>
+              <button onClick={() => setActiveTab('decks')} className={`pb-3 px-2 text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'decks' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                  <Layers size={16}/> Vocab
+              </button>
+              <div className="w-px h-6 bg-slate-200 mx-2 self-center mb-3"></div> {/* Divider */}
+              <button onClick={() => setActiveTab('grades')} className={`pb-3 px-2 text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'grades' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                  <ClipboardList size={16}/> Grades
+              </button>
+              <button onClick={() => setActiveTab('forum')} className={`pb-3 px-2 text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'forum' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                  <MessageSquare size={16}/> Stream
               </button>
           </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-hidden relative">
-          
-          {/* TAB 1: ASSIGNMENTS */}
-          {activeTab === 'assignments' && (
-              <div className="h-full overflow-y-auto px-6 py-6 pb-24 custom-scrollbar">
-                 <div className="space-y-6">
-                    <div>
-                        <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Tasks</h3>
-                        <div className="space-y-3">
-                            {relevantAssignments.length > 0 ? ( 
-                                relevantAssignments.map((l: any, i: number) => {
-                                    const isCompleted = completedSet.has(l.id);
-                                    return ( 
-                                        <button 
-                                            key={`${l.id}-${i}`} 
-                                            onClick={() => handleAssignmentClick(l)} 
-                                            className={`w-full p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all group border ${isCompleted ? 'bg-emerald-50/40 border-emerald-100 hover:border-emerald-300' : 'bg-white border-slate-200 hover:border-indigo-300'}`}
-                                        >
-                                            <div className="flex items-center space-x-4">
-                                                {/* Icon Box */}
-                                                <div className={`h-12 w-12 rounded-xl flex items-center justify-center transition-colors shrink-0 
-                                                    ${isCompleted ? 'bg-emerald-100 text-emerald-600' : 
-                                                      l.contentType === 'deck' ? 'bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white' : 
-                                                      l.contentType === 'test' || l.contentType === 'exam' ? 'bg-rose-50 text-rose-600 group-hover:bg-rose-500 group-hover:text-white' : 
-                                                      'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-500 group-hover:text-white'}`}>
-                                                    
-                                                    {isCompleted ? <Check size={20} strokeWidth={3}/> : 
-                                                     l.contentType === 'deck' ? <Layers size={20}/> : 
-                                                     (l.contentType === 'test' || l.contentType === 'exam') ? <FileText size={20}/> : <PlayCircle size={20} />}
-                                                </div>
-                                                
-                                                {/* Text Info */}
-                                                <div className="text-left">
-                                                    <h4 className={`font-bold text-sm ${isCompleted ? 'text-slate-500 decoration-slate-300' : 'text-slate-900 group-hover:text-indigo-700'}`}>
-                                                        {l.title}
-                                                    </h4>
-                                                    <p className={`text-xs ${isCompleted ? 'text-emerald-600 font-bold' : 'text-slate-500'}`}>
-                                                        {isCompleted 
-                                                            ? "Completed" 
-                                                            : l.contentType === 'deck' ? 'Flashcard Deck' : (l.contentType === 'test' || l.contentType === 'exam') ? 'Exam' : 'Lesson'
-                                                        }
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            
-                                            {/* Right Icon */}
-                                            {isCompleted ? (
-                                                <div className="px-3 py-1 bg-white border border-emerald-100 rounded-full text-[10px] font-bold text-emerald-600 shadow-sm">Review</div>
-                                            ) : (
-                                                <ChevronRight size={20} className="text-slate-300 group-hover:text-indigo-500" />
-                                            )}
-                                        </button> 
-                                    );
-                                }) 
-                            ) : ( 
-                                <div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">No assignments yet.</div> 
-                            )}
-                        </div>
-                    </div>
-                 </div>
-              </div>
-          )}
+      <div className="flex-1 overflow-hidden relative bg-slate-50">
+          <div className="h-full overflow-y-auto px-6 py-6 custom-scrollbar">
+              
+              {activeTab === 'lessons' && (
+                  <div>
+                      <h3 className="font-bold text-slate-800 mb-4 text-xs uppercase tracking-widest text-indigo-500">Readings & Units</h3>
+                      {renderAssignmentList(lessonsList, "No reading material assigned.")}
+                  </div>
+              )}
 
-          {/* TAB 2: GRADEBOOK */}
-          {activeTab === 'grades' && (
-              <div className="h-full overflow-y-auto px-6 py-6 pb-24 custom-scrollbar">
+              {activeTab === 'exams' && (
+                  <div>
+                      <h3 className="font-bold text-slate-800 mb-4 text-xs uppercase tracking-widest text-rose-500">Exams & Quizzes</h3>
+                      {renderAssignmentList(examsList, "No exams currently active.")}
+                  </div>
+              )}
+
+              {activeTab === 'decks' && (
+                  <div>
+                      <h3 className="font-bold text-slate-800 mb-4 text-xs uppercase tracking-widest text-orange-500">Vocabulary Decks</h3>
+                      {renderAssignmentList(decksList, "No flashcards assigned.")}
+                  </div>
+              )}
+
+              {activeTab === 'grades' && (
                   <StudentGradebook classData={classData} user={user} />
-              </div>
-          )}
+              )}
 
-          {/* TAB 3: FORUM */}
-          {activeTab === 'forum' && (
-              <ClassForum classData={classData} user={user} />
-          )}
-          
+              {activeTab === 'forum' && (
+                  <div className="h-full -mx-6 -my-6"> {/* Negative margin to fill container for forum */}
+                      <ClassForum classData={classData} user={user} />
+                  </div>
+              )}
+              
+          </div>
       </div>
     </div>
   );
 }
-
 
 
 
