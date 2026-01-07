@@ -659,8 +659,189 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userDat
 // ============================================================================
 //  4. FLASHCARD VIEW & TOWER
 // ============================================================================
-function MatchingGame({ deckCards, onGameEnd }: any) { return <div className="p-10 text-center"><p>Matching Game Stub</p><button onClick={() => onGameEnd(50)} className="mt-4 bg-indigo-600 text-white px-4 py-2 rounded">Finish</button></div>; }
-function QuizGame({ deckCards, onGameEnd }: any) { return <div className="p-10 text-center"><p>Quiz Game Stub</p><button onClick={() => onGameEnd(50)} className="mt-4 bg-indigo-600 text-white px-4 py-2 rounded">Finish</button></div>; }
+function MatchingGame({ deckCards, onGameEnd }: any) {
+    // Simple Pairs Game Logic
+    const [cards, setCards] = useState<any[]>([]);
+    const [flipped, setFlipped] = useState<number[]>([]);
+    const [solved, setSolved] = useState<number[]>([]);
+
+    useEffect(() => {
+        // Create pairs (Front -> Back)
+        const gameItems = deckCards.slice(0, 6).flatMap((c: any) => [
+            { id: c.id, text: c.front, type: 'front', pairId: c.id },
+            { id: c.id + '_back', text: c.back, type: 'back', pairId: c.id }
+        ]).sort(() => Math.random() - 0.5);
+        setCards(gameItems);
+    }, [deckCards]);
+
+    const handleCardClick = (index: number) => {
+        if (flipped.length === 2 || flipped.includes(index) || solved.includes(index)) return;
+        const newFlipped = [...flipped, index];
+        setFlipped(newFlipped);
+        
+        if (newFlipped.length === 2) {
+            const [idx1, idx2] = newFlipped;
+            if (cards[idx1].pairId === cards[idx2].pairId) {
+                setSolved(prev => [...prev, idx1, idx2]);
+                setFlipped([]);
+                if (solved.length + 2 === cards.length) setTimeout(() => onGameEnd(100), 500);
+            } else {
+                setTimeout(() => setFlipped([]), 1000);
+            }
+        }
+    };
+
+    if(cards.length === 0) return <div className="p-8 text-center text-slate-400">Not enough cards for matching.</div>;
+
+    return (
+        <div className="p-4 grid grid-cols-3 gap-3 h-full content-start">
+            {cards.map((card, i) => (
+                <button 
+                    key={i} 
+                    onClick={() => handleCardClick(i)}
+                    className={`aspect-square rounded-xl text-xs font-bold flex items-center justify-center p-2 text-center transition-all duration-300 ${solved.includes(i) ? 'opacity-0' : flipped.includes(i) ? 'bg-indigo-600 text-white shadow-lg scale-105' : 'bg-white border-2 border-slate-200 text-slate-600 hover:border-indigo-300'}`}
+                >
+                    {card.text}
+                </button>
+            ))}
+        </div>
+    );
+}
+// ============================================================================
+//  THE JUICED QUIZ ENGINE
+// ============================================================================
+function QuizSessionView({ deckCards, onGameEnd }: any) {
+  // 1. Setup Quiz Data
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [qIndex, setQIndex] = useState(0);
+  
+  // 2. Game State
+  const [score, setScore] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isAnswered, setIsAnswered] = useState(false);
+
+  // Initialize
+  useEffect(() => {
+    const q = generateQuiz(deckCards);
+    setQuestions(q);
+  }, [deckCards]);
+
+  // Handlers
+  const handleOptionClick = (optId: string) => {
+    if (isAnswered) return; // Prevent double clicks
+    setSelectedId(optId);
+    setIsAnswered(true);
+
+    const isCorrect = optId === questions[qIndex].correctId;
+    if (isCorrect) {
+      setScore(s => s + 1);
+      setStreak(s => s + 1);
+      // Auto advance if correct (optional, but snappy)
+    } else {
+      setStreak(0);
+    }
+  };
+
+  const handleNext = () => {
+    if (qIndex < questions.length - 1) {
+      setQIndex(prev => prev + 1);
+      setSelectedId(null);
+      setIsAnswered(false);
+    } else {
+      // Game Over
+      onGameEnd({ score, total: questions.length });
+    }
+  };
+
+  // Loading State
+  if (questions.length === 0) return (
+    <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+      <Brain size={48} className="mb-4 animate-pulse opacity-50"/>
+      <p className="text-sm font-bold">Not enough cards to build a quiz.</p>
+      <p className="text-xs">Add at least 4 cards to this deck.</p>
+    </div>
+  );
+
+  const currentQ = questions[qIndex];
+  const isCorrect = selectedId === currentQ.correctId;
+
+  return (
+    <div className="h-full flex flex-col p-6 max-w-lg mx-auto">
+      
+      {/* 1. HUD (Heads Up Display) */}
+      <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col">
+           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Question</span>
+           <span className="text-xl font-black text-slate-800">{qIndex + 1} <span className="text-slate-300">/</span> {questions.length}</span>
+        </div>
+        <div className="flex items-center gap-2">
+            <div className={`flex items-center gap-1 px-3 py-1 rounded-full font-bold text-xs transition-colors ${streak > 2 ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-400'}`}>
+                <Zap size={14} className={streak > 2 ? "fill-orange-500 animate-pulse" : ""}/> 
+                {streak} Streak
+            </div>
+            <div className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full font-bold text-xs">
+                Score: {score}
+            </div>
+        </div>
+      </div>
+
+      {/* 2. THE QUESTION CARD */}
+      <div className="flex-1 flex flex-col justify-center">
+         <div className="mb-8 text-center">
+            <h2 className="text-3xl font-black text-slate-800 mb-2 leading-tight">{currentQ.question}</h2>
+            {currentQ.context && <p className="text-sm text-slate-500 italic">"{currentQ.context}"</p>}
+         </div>
+
+         {/* 3. OPTIONS GRID */}
+         <div className="grid grid-cols-1 gap-3">
+            {currentQ.options.map((opt: any) => {
+                let stateStyle = "bg-white border-slate-200 hover:border-indigo-300 text-slate-700";
+                
+                if (isAnswered) {
+                    if (opt.id === currentQ.correctId) {
+                        stateStyle = "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200 scale-[1.02]";
+                    } else if (opt.id === selectedId) {
+                        stateStyle = "bg-rose-500 border-rose-500 text-white opacity-50";
+                    } else {
+                        stateStyle = "bg-slate-50 border-slate-100 text-slate-400 opacity-50";
+                    }
+                }
+
+                return (
+                    <button
+                        key={opt.id}
+                        disabled={isAnswered}
+                        onClick={() => handleOptionClick(opt.id)}
+                        className={`w-full p-4 rounded-2xl border-2 font-bold text-lg transition-all duration-200 active:scale-95 flex justify-between items-center ${stateStyle}`}
+                    >
+                        <span>{opt.text}</span>
+                        {isAnswered && opt.id === currentQ.correctId && <CheckCircle2 size={20} className="animate-in zoom-in spin-in-180"/>}
+                        {isAnswered && opt.id === selectedId && opt.id !== currentQ.correctId && <XCircle size={20}/>}
+                    </button>
+                );
+            })}
+         </div>
+      </div>
+
+      {/* 4. NEXT BUTTON (Only appears after answer) */}
+      <div className="h-20 mt-4 flex items-end">
+          {isAnswered && (
+              <button 
+                onClick={handleNext} 
+                className={`w-full py-4 rounded-2xl font-bold text-lg shadow-xl flex items-center justify-center gap-2 transition-all animate-in slide-in-from-bottom-2 ${isCorrect ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-200' : 'bg-slate-900 hover:bg-slate-800 text-white shadow-slate-300'}`}
+              >
+                 {qIndex < questions.length - 1 ? (
+                    <>Next Question <ArrowRight size={20}/></>
+                 ) : (
+                    <>Finish Quiz <Award size={20}/></>
+                 )}
+              </button>
+          )}
+      </div>
+    </div>
+  );
+}
 function TowerMode({ allDecks, user, onExit, onXPUpdate }: any) { return <div className="fixed inset-0 bg-slate-900 z-[60] flex items-center justify-center text-white"><div className="text-center"><h1>The Tower</h1><p>Climb to the top!</p><button onClick={onExit} className="mt-4 bg-white text-black px-4 py-2 rounded">Exit</button></div></div>; }
 
 function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, activeDeckOverride, onComplete, onLogActivity, userData, user, onUpdatePrefs, onDeleteDeck }: any) {
@@ -733,7 +914,7 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
             <div className="p-6">{(isEditMode ? assignments : visibleAssignments).length > 0 && (<SectionAccordion title="Class Assignments" icon={<School size={20}/>} count={(isEditMode ? assignments : visibleAssignments).length} isOpen={openSections.assignments} onToggle={() => toggleSection('assignments')} colorTheme="amber">{(isEditMode ? assignments : visibleAssignments).map((deck: any) => <DeckCard key={deck.id} deck={deck} fullList={assignments} icon={<School size={20}/>} colorClass="bg-amber-100 text-amber-600" borderClass="border-amber-200 hover:border-amber-400" />)}</SectionAccordion>)}<SectionAccordion title="My Collections" icon={<Feather size={20}/>} count={(isEditMode ? customDecks : visibleCustom).length} isOpen={openSections.custom} onToggle={() => toggleSection('custom')} colorTheme="emerald">{(isEditMode ? customDecks : visibleCustom).length > 0 ? (isEditMode ? customDecks : visibleCustom).map((deck: any) => <DeckCard key={deck.id} deck={deck} fullList={customDecks} icon={<Feather size={20}/>} colorClass="bg-emerald-100 text-emerald-600" borderClass="border-slate-100 hover:border-emerald-300" />) : <div className="p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center"><p className="text-sm text-slate-400 font-bold">No custom decks yet.</p><p className="text-xs text-slate-300 mt-1">Use the Creator tab to build one!</p></div>}</SectionAccordion><SectionAccordion title="System Library" icon={<Library size={20}/>} count={(isEditMode ? libraryDecks : visibleLibrary).length} isOpen={openSections.library} onToggle={() => toggleSection('library')} colorTheme="blue">{(isEditMode ? libraryDecks : visibleLibrary).length > 0 ? (isEditMode ? libraryDecks : visibleLibrary).map((deck: any) => <DeckCard key={deck.id} deck={deck} fullList={libraryDecks} icon={<BookOpen size={20}/>} colorClass="bg-blue-100 text-blue-600" borderClass="border-slate-100 hover:border-blue-300" />) : <div className="p-4 text-center text-slate-400 text-xs italic">Library empty for this filter.</div>}</SectionAccordion><div className="h-8"></div></div>
         </div>
       ) : (
-        <div className="h-[calc(100vh-80px)] flex flex-col bg-slate-50 pb-6 relative overflow-hidden"><Header title={currentDeck?.title || "Deck"} subtitle={`${currentIndex + 1} / ${deckCards.length} Cards`} sticky={false} onClickTitle={() => setViewState('browsing')} rightAction={<button onClick={() => setViewState('browsing')} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 text-slate-500"><X size={20} /></button>} /><div className="px-6 mt-2 mb-4 z-10"><div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto shadow-inner">{['study', 'quiz', 'match'].map((mode) => (<button key={mode} onClick={() => setGameMode(mode)} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg capitalize transition-all ${gameMode === mode ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>{mode}</button>))}</div></div><div className="flex-1 relative w-full overflow-hidden">{gameMode === 'match' && <div className="h-full overflow-y-auto"><MatchingGame deckCards={deckCards} onGameEnd={handleGameEnd} /></div>}{gameMode === 'quiz' && <div className="h-full overflow-y-auto"><QuizGame deckCards={deckCards} onGameEnd={handleGameEnd} /></div>}{gameMode === 'study' && card && (<div className="flex-1 flex flex-col items-center justify-center px-4 py-2 perspective-1000 relative z-0 h-full" style={{ perspective: '1000px', touchAction: 'pan-y' }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}><div className={`relative w-full h-full max-h-[520px] cursor-pointer shadow-2xl rounded-[2rem] transition-transform duration-300 ${swipeDirection === 'left' ? '-translate-x-full opacity-0 rotate-[-10deg]' : swipeDirection === 'right' ? 'translate-x-full opacity-0 rotate-[10deg]' : 'translate-x-0 opacity-100'}`} style={{ transformStyle: 'preserve-3d', transform: isFlipped && !swipeDirection ? 'rotateY(180deg)' : swipeDirection ? undefined : 'rotateY(0deg)' }} onClick={() => !xrayMode && setIsFlipped(!isFlipped)}><div className="absolute inset-0 bg-white rounded-[2rem] border border-slate-100 overflow-hidden flex flex-col select-none" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}><div className={`h-3 w-full ${xrayMode ? theme.bg.replace('50', '500') : 'bg-slate-100'} transition-colors duration-500`} /><div className="flex-1 flex flex-col p-6 relative"><div className="flex justify-between items-start mb-8"><span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${theme.bg} ${theme.text} border ${theme.border}`}>{card.type}</span><span className="text-xs font-mono text-slate-300">{currentIndex + 1}/{deckCards.length}</span></div><div className="flex-1 flex flex-col items-center justify-center mt-[-40px]"><h2 className="text-4xl sm:text-5xl font-serif font-bold text-slate-900 text-center mb-6 leading-tight select-none">{card.front}</h2><div onClick={(e) => { e.stopPropagation(); playAudio(card.front); }} className="flex items-center gap-3 bg-slate-50 pl-3 pr-5 py-2 rounded-full border border-slate-200 cursor-pointer hover:bg-indigo-50 hover:border-indigo-200 transition-colors group active:scale-95 shadow-sm"><Volume2 size={16} className="text-indigo-400"/><span className="font-serif text-slate-500 text-lg tracking-wide group-hover:text-indigo-800 select-none">{card.ipa || "/.../"}</span></div></div><div className={`absolute inset-x-0 bottom-0 bg-white/95 backdrop-blur-xl border-t border-slate-100 transition-all duration-300 flex flex-col overflow-hidden z-20 ${xrayMode ? 'h-[75%] opacity-100 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)]' : 'h-0 opacity-0'}`} onClick={e => e.stopPropagation()}><div className="p-6 overflow-y-auto custom-scrollbar space-y-6"><div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Puzzle size={14} /> Morphology</h4><div className="flex flex-wrap gap-2">{Array.isArray(card.morphology) && card.morphology.map((m: any, i: number) => (<div key={i} className="flex flex-col items-center bg-slate-50 border border-slate-200 rounded-lg p-2 min-w-[60px]"><span className={`font-bold text-lg ${m.type === 'root' ? 'text-indigo-600' : 'text-slate-700'}`}>{m.part}</span><span className="text-slate-400 text-[9px] font-medium uppercase mt-1 text-center max-w-[80px] leading-tight">{m.meaning}</span></div>))}</div></div><div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><MessageSquare size={14} /> Context</h4><div className={`p-4 rounded-xl border ${theme.border} ${theme.bg}`}><p className="text-slate-800 font-serif font-medium text-lg mb-1">"{card.usage?.sentence || '...'}"</p><p className={`text-sm ${theme.text} opacity-80 italic`}>{card.usage?.translation || '...'}</p></div></div></div></div>{!xrayMode && (<div className="mt-auto text-center"><p className="text-xs text-slate-300 font-bold uppercase tracking-widest animate-pulse flex items-center justify-center gap-2"><ArrowLeft size={10}/> Swipe <ArrowRight size={10}/></p></div>)}</div></div><div className="absolute inset-0 bg-slate-900 rounded-[2rem] shadow-xl flex flex-col items-center justify-center p-8 text-white relative overflow-hidden select-none" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}><div className="absolute top-[-50%] left-[-50%] w-full h-full bg-indigo-500/20 rounded-full blur-[100px] pointer-events-none"></div><div className="relative z-10 flex flex-col items-center"><span className="text-indigo-300 text-xs font-bold uppercase tracking-widest mb-6 border-b border-indigo-500/30 pb-2">Translation</span><h2 className="text-3xl md:text-4xl font-bold text-center mb-8 leading-tight">{card.back}</h2></div></div></div></div>)}</div>{gameMode === 'study' && card && (<div className="px-6 pb-4 pt-2"><div className="flex items-center justify-between max-w-sm mx-auto"><button onClick={handlePrev} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-rose-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all hover:bg-rose-50"><X size={28} strokeWidth={2.5} /></button><button onClick={(e) => { e.stopPropagation(); if(isFlipped) setIsFlipped(false); setXrayMode(!xrayMode); }} className={`h-20 w-20 rounded-2xl flex flex-col items-center justify-center shadow-lg transition-all duration-300 border-2 ${xrayMode ? 'bg-indigo-600 border-indigo-600 text-white translate-y-[-8px] shadow-indigo-200' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'}`}><Search size={28} strokeWidth={xrayMode ? 3 : 2} className={xrayMode ? 'animate-pulse' : ''} /><span className="text-[10px] font-black tracking-wider mt-1">X-RAY</span></button><button onClick={handleNext} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-emerald-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all hover:bg-emerald-50"><Check size={28} strokeWidth={2.5} /></button></div></div>)}</div>
+        <div className="h-[calc(100vh-80px)] flex flex-col bg-slate-50 pb-6 relative overflow-hidden"><Header title={currentDeck?.title || "Deck"} subtitle={`${currentIndex + 1} / ${deckCards.length} Cards`} sticky={false} onClickTitle={() => setViewState('browsing')} rightAction={<button onClick={() => setViewState('browsing')} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 text-slate-500"><X size={20} /></button>} /><div className="px-6 mt-2 mb-4 z-10"><div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto shadow-inner">{['study', 'quiz', 'match'].map((mode) => (<button key={mode} onClick={() => setGameMode(mode)} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg capitalize transition-all ${gameMode === mode ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>{mode}</button>))}</div></div><div className="flex-1 relative w-full overflow-hidden">{gameMode === 'match' && <div className="h-full overflow-y-auto"><MatchingGame deckCards={deckCards} onGameEnd={handleGameEnd} /></div>}{gameMode === 'quiz' && <div className="h-full overflow-y-auto"><QuizSessionView deckCards={deckCards} onGameEnd={handleGameEnd} /></div>}{gameMode === 'study' && card && (<div className="flex-1 flex flex-col items-center justify-center px-4 py-2 perspective-1000 relative z-0 h-full" style={{ perspective: '1000px', touchAction: 'pan-y' }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}><div className={`relative w-full h-full max-h-[520px] cursor-pointer shadow-2xl rounded-[2rem] transition-transform duration-300 ${swipeDirection === 'left' ? '-translate-x-full opacity-0 rotate-[-10deg]' : swipeDirection === 'right' ? 'translate-x-full opacity-0 rotate-[10deg]' : 'translate-x-0 opacity-100'}`} style={{ transformStyle: 'preserve-3d', transform: isFlipped && !swipeDirection ? 'rotateY(180deg)' : swipeDirection ? undefined : 'rotateY(0deg)' }} onClick={() => !xrayMode && setIsFlipped(!isFlipped)}><div className="absolute inset-0 bg-white rounded-[2rem] border border-slate-100 overflow-hidden flex flex-col select-none" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}><div className={`h-3 w-full ${xrayMode ? theme.bg.replace('50', '500') : 'bg-slate-100'} transition-colors duration-500`} /><div className="flex-1 flex flex-col p-6 relative"><div className="flex justify-between items-start mb-8"><span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${theme.bg} ${theme.text} border ${theme.border}`}>{card.type}</span><span className="text-xs font-mono text-slate-300">{currentIndex + 1}/{deckCards.length}</span></div><div className="flex-1 flex flex-col items-center justify-center mt-[-40px]"><h2 className="text-4xl sm:text-5xl font-serif font-bold text-slate-900 text-center mb-6 leading-tight select-none">{card.front}</h2><div onClick={(e) => { e.stopPropagation(); playAudio(card.front); }} className="flex items-center gap-3 bg-slate-50 pl-3 pr-5 py-2 rounded-full border border-slate-200 cursor-pointer hover:bg-indigo-50 hover:border-indigo-200 transition-colors group active:scale-95 shadow-sm"><Volume2 size={16} className="text-indigo-400"/><span className="font-serif text-slate-500 text-lg tracking-wide group-hover:text-indigo-800 select-none">{card.ipa || "/.../"}</span></div></div><div className={`absolute inset-x-0 bottom-0 bg-white/95 backdrop-blur-xl border-t border-slate-100 transition-all duration-300 flex flex-col overflow-hidden z-20 ${xrayMode ? 'h-[75%] opacity-100 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)]' : 'h-0 opacity-0'}`} onClick={e => e.stopPropagation()}><div className="p-6 overflow-y-auto custom-scrollbar space-y-6"><div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Puzzle size={14} /> Morphology</h4><div className="flex flex-wrap gap-2">{Array.isArray(card.morphology) && card.morphology.map((m: any, i: number) => (<div key={i} className="flex flex-col items-center bg-slate-50 border border-slate-200 rounded-lg p-2 min-w-[60px]"><span className={`font-bold text-lg ${m.type === 'root' ? 'text-indigo-600' : 'text-slate-700'}`}>{m.part}</span><span className="text-slate-400 text-[9px] font-medium uppercase mt-1 text-center max-w-[80px] leading-tight">{m.meaning}</span></div>))}</div></div><div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><MessageSquare size={14} /> Context</h4><div className={`p-4 rounded-xl border ${theme.border} ${theme.bg}`}><p className="text-slate-800 font-serif font-medium text-lg mb-1">"{card.usage?.sentence || '...'}"</p><p className={`text-sm ${theme.text} opacity-80 italic`}>{card.usage?.translation || '...'}</p></div></div></div></div>{!xrayMode && (<div className="mt-auto text-center"><p className="text-xs text-slate-300 font-bold uppercase tracking-widest animate-pulse flex items-center justify-center gap-2"><ArrowLeft size={10}/> Swipe <ArrowRight size={10}/></p></div>)}</div></div><div className="absolute inset-0 bg-slate-900 rounded-[2rem] shadow-xl flex flex-col items-center justify-center p-8 text-white relative overflow-hidden select-none" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}><div className="absolute top-[-50%] left-[-50%] w-full h-full bg-indigo-500/20 rounded-full blur-[100px] pointer-events-none"></div><div className="relative z-10 flex flex-col items-center"><span className="text-indigo-300 text-xs font-bold uppercase tracking-widest mb-6 border-b border-indigo-500/30 pb-2">Translation</span><h2 className="text-3xl md:text-4xl font-bold text-center mb-8 leading-tight">{card.back}</h2></div></div></div></div>)}</div>{gameMode === 'study' && card && (<div className="px-6 pb-4 pt-2"><div className="flex items-center justify-between max-w-sm mx-auto"><button onClick={handlePrev} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-rose-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all hover:bg-rose-50"><X size={28} strokeWidth={2.5} /></button><button onClick={(e) => { e.stopPropagation(); if(isFlipped) setIsFlipped(false); setXrayMode(!xrayMode); }} className={`h-20 w-20 rounded-2xl flex flex-col items-center justify-center shadow-lg transition-all duration-300 border-2 ${xrayMode ? 'bg-indigo-600 border-indigo-600 text-white translate-y-[-8px] shadow-indigo-200' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'}`}><Search size={28} strokeWidth={xrayMode ? 3 : 2} className={xrayMode ? 'animate-pulse' : ''} /><span className="text-[10px] font-black tracking-wider mt-1">X-RAY</span></button><button onClick={handleNext} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-emerald-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all hover:bg-emerald-50"><Check size={28} strokeWidth={2.5} /></button></div></div>)}</div>
       )}
     </>
   );
@@ -1114,6 +1295,33 @@ function StudentNavBar({ activeTab, setActiveTab }: any) {
         </nav>
     );
 }
+
+// --- QUIZ LOGIC HELPER ---
+const generateQuiz = (cards: any[]) => {
+  if (!cards || cards.length < 4) return []; // Need at least 4 cards for distractors
+  // Shuffle cards
+  const shuffled = [...cards].sort(() => 0.5 - Math.random());
+  
+  return shuffled.map((correctCard) => {
+    // Pick 3 random distractors that aren't the correct card
+    const others = cards.filter(c => c.id !== correctCard.id);
+    const distractors = others.sort(() => 0.5 - Math.random()).slice(0, 3);
+    
+    // Combine and shuffle options
+    const options = [correctCard, ...distractors]
+        .sort(() => 0.5 - Math.random())
+        .map(c => ({ id: c.id, text: c.back })); // Assuming "Back" is the answer (English)
+
+    return {
+      id: correctCard.id,
+      question: `What is the meaning of "${correctCard.front}"?`,
+      correctId: correctCard.id,
+      options: options,
+      context: correctCard.usage?.sentence // Optional context hint
+    };
+  });
+};
+
 // ============================================================================
 //  MAIN APP COMPONENT
 // ============================================================================
