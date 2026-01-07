@@ -877,79 +877,223 @@ function QuizSessionView({ deckCards, onGameEnd }: any) {
 }
 function TowerMode({ allDecks, user, onExit, onXPUpdate }: any) { return <div className="fixed inset-0 bg-slate-900 z-[60] flex items-center justify-center text-white"><div className="text-center"><h1>The Tower</h1><p>Climb to the top!</p><button onClick={onExit} className="mt-4 bg-white text-black px-4 py-2 rounded">Exit</button></div></div>; }
 
-function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, activeDeckOverride, onComplete, onLogActivity, userData, user, onUpdatePrefs, onDeleteDeck }: any) {
-  const currentDeck = activeDeckOverride || allDecks[selectedDeckKey];
-  const userPrefs = userData?.deckPreferences || { hiddenDeckIds: [], customOrder: [] };
-  useLearningTimer(userData ? auth.currentUser : null, selectedDeckKey, 'deck', currentDeck?.title || 'Flashcards');
-  const [viewState, setViewState] = useState<'browsing' | 'playing'>(activeDeckOverride ? 'playing' : 'browsing');
-  const [filterLang, setFilterLang] = useState('All');
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [completionMsg, setCompletionMsg] = useState<string | null>(null);
-  const [showTower, setShowTower] = useState(false); 
-  const [openSections, setOpenSections] = useState({ assignments: true, custom: true, library: false });
-  const toggleSection = (section: string) => setOpenSections(prev => ({ ...prev, [section]: !prev[section as keyof typeof prev] }));
-  const [gameMode, setGameMode] = useState('study'); 
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isFlipped, setIsFlipped] = useState(false);
-  const [xrayMode, setXrayMode] = useState(false);
-  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
-  const [dragStartX, setDragStartX] = useState<number | null>(null);
-  const [dragEndX, setDragEndX] = useState<number | null>(null);
-  const minSwipeDistance = 50; 
+// ============================================================================
+//  VOCAB GYM (Revamped & Unified)
+// ============================================================================
+function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, activeDeckOverride, onComplete, onLogActivity, userData, user, onDeleteDeck }: any) {
+  // Internal State for Navigation flow
+  const [internalMode, setInternalMode] = useState<'library' | 'menu' | 'playing'>('library');
+  const [activeGame, setActiveGame] = useState<'standard' | 'quiz' | 'match' | 'tower'>('standard');
+  
+  // Effect: Handle external navigation (e.g. from Home View "Up Next")
+  useEffect(() => {
+      if (activeDeckOverride) {
+          onSelectDeck(activeDeckOverride.id || 'custom'); // Sync parent state
+          setInternalMode('menu');
+      }
+  }, [activeDeckOverride]);
 
-  const { assignments, customDecks, libraryDecks, allProcessed, languages } = useMemo(() => {
-      const isHidden = (id: string) => userPrefs.hiddenDeckIds?.includes(id);
-      const processed = Object.entries(allDecks).filter(([_, deck]: any) => deck.cards && deck.cards.length > 0).map(([key, deck]: any) => {
-            const detectedLang = deck.targetLanguage || deck.cards[0]?.targetLanguage || 'General';
-            let category = 'library';
-            if (deck.isAssignment) category = 'assignment';
-            else if (key.startsWith('custom')) category = 'custom';
-            return { id: key, ...deck, language: detectedLang, category, isHidden: isHidden(key) };
-        });
-      const sortOrder = userPrefs.customOrder || [];
-      const sorter = (a: any, b: any) => { const idxA = sortOrder.indexOf(a.id); const idxB = sortOrder.indexOf(b.id); if (idxA !== -1 && idxB !== -1) return idxA - idxB; if (idxA !== -1) return -1; if (idxB !== -1) return 1; return a.title.localeCompare(b.title); };
-      const langs = new Set(processed.map(d => d.language));
-      return { assignments: processed.filter(d => d.category === 'assignment').sort(sorter), customDecks: processed.filter(d => d.category === 'custom').sort(sorter), libraryDecks: processed.filter(d => d.category === 'library').sort(sorter), allProcessed: processed, languages: ['All', ...Array.from(langs).sort()] };
-  }, [allDecks, userPrefs]);
+  const currentDeck = allDecks[selectedDeckKey] || allDecks['salutationes']; // Fallback
+  const cards = currentDeck?.cards || [];
 
-  const filterList = (list: any[]) => { let filtered = list; if (filterLang !== 'All') filtered = filtered.filter(d => d.language === filterLang); if (!isEditMode) filtered = filtered.filter(d => !d.isHidden); return filtered; };
-  const visibleAssignments = filterList(assignments); const visibleCustom = filterList(customDecks); const visibleLibrary = filterList(libraryDecks); const totalCardsAvailable = allProcessed.reduce((acc, deck: any) => acc + deck.cards.length, 0);
-  const deckCards = currentDeck?.cards || []; const card = deckCards[currentIndex]; const theme = card ? (TYPE_COLORS[card.type] || TYPE_COLORS.noun) : TYPE_COLORS.noun;
+  // --- Handlers ---
+  const launchGame = (mode: 'standard' | 'quiz' | 'match' | 'tower') => {
+      setActiveGame(mode);
+      setInternalMode('playing');
+  };
 
-  const launchDeck = (key: string) => { if (isEditMode) return; onSelectDeck(key); setCurrentIndex(0); setIsFlipped(false); setViewState('playing'); };
-  const handleTowerXP = async (xpAmount: number, reason: string) => { if (onLogActivity) onLogActivity('tower_game', xpAmount, reason, null); };
-  const handleMove = (id: string, direction: 'up' | 'down', list: any[]) => { const currentOrder = list.map(d => d.id); const currentIndex = currentOrder.indexOf(id); if (currentIndex === -1) return; const newOrder = [...currentOrder]; const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1; if (targetIndex < 0 || targetIndex >= newOrder.length) return; [newOrder[currentIndex], newOrder[targetIndex]] = [newOrder[targetIndex], newOrder[currentIndex]]; const globalOrder = [...(userPrefs.customOrder || [])]; list.forEach(d => { if(!globalOrder.includes(d.id)) globalOrder.push(d.id); }); const id1 = currentOrder[currentIndex]; const id2 = currentOrder[targetIndex]; const gIdx1 = globalOrder.indexOf(id1); const gIdx2 = globalOrder.indexOf(id2); if(gIdx1 !== -1 && gIdx2 !== -1) { [globalOrder[gIdx1], globalOrder[gIdx2]] = [globalOrder[gIdx2], globalOrder[gIdx1]]; } onUpdatePrefs({ ...userPrefs, customOrder: globalOrder }); };
-  const handleToggleHide = (id: string) => { const hidden = userPrefs.hiddenDeckIds || []; const newHidden = hidden.includes(id) ? hidden.filter((h: string) => h !== id) : [...hidden, id]; onUpdatePrefs({ ...userPrefs, hiddenDeckIds: newHidden }); };
-  const handleGameEnd = (data: any) => { let xp = 0; let message = ""; if (typeof data === 'number') { xp = data; message = `Matching Complete! +${xp} XP`; } else { const percentage = Math.round((data.score / data.total) * 100); xp = Math.round((data.score / data.total) * 50) + 10; message = `Score: ${percentage}% (${data.score}/${data.total}) • +${xp} XP`; } setCompletionMsg(message); if (activeDeckOverride && onComplete) onComplete(activeDeckOverride.id, xp, currentDeck.title, data.score !== undefined ? data : null); else if (onLogActivity) { const scoreDetail = data.score !== undefined ? data : null; onLogActivity(selectedDeckKey, xp, `${currentDeck.title} (${gameMode})`, scoreDetail); setViewState('browsing'); } else setViewState('browsing'); };
-  const handleNext = useCallback(() => { setXrayMode(false); setIsFlipped(false); setSwipeDirection('left'); setTimeout(() => { setCurrentIndex((prev) => (prev + 1) % deckCards.length); setSwipeDirection(null); }, 200); }, [deckCards.length]);
-  const handlePrev = useCallback(() => { setXrayMode(false); setIsFlipped(false); setSwipeDirection('right'); setTimeout(() => { setCurrentIndex((prev) => (prev - 1 + deckCards.length) % deckCards.length); setSwipeDirection(null); }, 200); }, [deckCards.length]);
-  const playAudio = useCallback((text: string) => { if (!('speechSynthesis' in window)) return; window.speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(text); const voices = window.speechSynthesis.getVoices(); const preferredVoice = voices.find(v => v.lang.includes('en-US') && v.name.includes('Google')); if (preferredVoice) utterance.voice = preferredVoice; window.speechSynthesis.speak(utterance); }, []);
-  const onPointerDown = (e: React.PointerEvent) => { setDragEndX(null); setDragStartX(e.clientX); };
-  const onPointerMove = (e: React.PointerEvent) => { if (dragStartX !== null) setDragEndX(e.clientX); };
-  const onPointerUp = () => { if (dragStartX === null || dragEndX === null) { setDragStartX(null); return; } const distance = dragStartX - dragEndX; if (distance > minSwipeDistance) handleNext(); else if (distance < -minSwipeDistance) handlePrev(); setDragStartX(null); setDragEndX(null); };
+  const handleBack = () => {
+      if (internalMode === 'playing') setInternalMode('menu');
+      else if (internalMode === 'menu') {
+          setInternalMode('library');
+          onSelectDeck(null); // Clear selection in parent
+      }
+  };
 
-  const DeckCard = ({ deck, icon, colorClass, borderClass, fullList }: any) => ( <div onClick={() => launchDeck(deck.id)} className={`w-full bg-white p-4 rounded-2xl border shadow-sm transition-all flex flex-col gap-3 group relative overflow-hidden text-left ${isEditMode ? 'border-slate-300 border-dashed cursor-default' : `hover:shadow-md cursor-pointer ${borderClass || 'border-slate-100 hover:border-indigo-200'}`} ${deck.isHidden ? 'opacity-60 bg-slate-50' : ''}`}><div className={`absolute left-0 top-0 bottom-0 w-1.5 ${deck.language === 'Latin' ? 'bg-purple-500' : deck.language === 'Spanish' ? 'bg-orange-500' : deck.language === 'English' ? 'bg-blue-500' : 'bg-slate-300'}`}></div><div className="flex justify-between items-start w-full pl-2"><div className="flex items-center gap-3"><div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm transition-colors ${deck.isHidden ? 'bg-slate-200 text-slate-400' : colorClass}`}>{icon}</div><div><h4 className="font-bold text-slate-800 text-base leading-tight group-hover:text-indigo-700 transition-colors line-clamp-1 flex items-center gap-2">{deck.title}{deck.isHidden && <span className="text-[9px] bg-slate-200 text-slate-500 px-1 rounded uppercase">Hidden</span>}</h4><div className="flex items-center gap-2 mt-1"><span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded flex items-center gap-1"><Globe size={10}/> {deck.language}</span><span className="text-[10px] font-medium text-slate-400 flex items-center gap-1"><Layers size={10}/> {deck.cards.length}</span></div></div></div>{isEditMode ? (<div className="flex items-center gap-1" onClick={e => e.stopPropagation()}><button onClick={() => handleMove(deck.id, 'up', fullList)} className="p-2 bg-slate-100 rounded-lg hover:bg-indigo-100 hover:text-indigo-600"><ArrowUp size={16}/></button><button onClick={() => handleMove(deck.id, 'down', fullList)} className="p-2 bg-slate-100 rounded-lg hover:bg-indigo-100 hover:text-indigo-600"><ArrowDown size={16}/></button><button onClick={() => handleToggleHide(deck.id)} className="p-2 bg-slate-100 rounded-lg hover:bg-amber-100 hover:text-amber-600">{deck.isHidden ? <EyeOff size={16}/> : <Eye size={16}/>}</button>{deck.category === 'custom' && (<button onClick={() => onDeleteDeck(deck.id)} className="p-2 bg-rose-50 rounded-lg text-rose-500 hover:bg-rose-100 hover:text-rose-700 ml-1"><Trash2 size={16}/></button>)}</div>) : (<div className="text-slate-300 group-hover:text-indigo-500 transition-colors"><ChevronRight size={18}/></div>)}</div>{!isEditMode && (<div className="w-full pl-2 pr-1"><div className="flex justify-between text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1"><span>Progress</span><span>{deck.mastery || 0}%</span></div><div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{ width: `${deck.mastery || 5}%` }}></div></div></div>)}</div> );
-  const SectionAccordion = ({ title, icon, count, isOpen, onToggle, children, colorTheme = "indigo" }: any) => { const theme: any = { indigo: { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-200' }, emerald: { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' }, amber: { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' }, blue: { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' }, }; const t = theme[colorTheme] || theme.indigo; return ( <div className={`mb-4 rounded-2xl bg-white border ${isOpen ? t.border : 'border-slate-200'} shadow-sm overflow-hidden transition-all duration-300`}><button onClick={onToggle} className="w-full p-4 flex items-center justify-between active:bg-slate-50 transition-colors"><div className="flex items-center gap-3"><div className={`p-2 rounded-xl ${t.bg} ${t.text}`}>{icon}</div><div className="text-left"><h3 className="font-bold text-slate-800 text-sm">{title}</h3><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{count} Decks</p></div></div><div className={`w-8 h-8 rounded-full flex items-center justify-center bg-slate-50 text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180 bg-slate-100' : ''}`}><ChevronDown size={16} /></div></button><div className={`transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}><div className="p-4 pt-0 border-t border-slate-50"><div className="pt-4 grid grid-cols-1 gap-3">{children}</div></div></div></div> ); };
+  const handleGameFinish = (score: number) => {
+      // Calculate XP based on game mode & score
+      const baseXP = activeGame === 'quiz' ? 50 : activeGame === 'match' ? 30 : 10;
+      const earnedXP = Math.round(baseXP * (score / 100)); // Simple calc
+      
+      onLogActivity(selectedDeckKey, earnedXP, `${currentDeck.title} (${activeGame})`, { score, mode: activeGame });
+      
+      // If it was a "Finish" action from the game, go back to menu
+      setInternalMode('menu');
+      alert(`Workout Complete! +${earnedXP} XP`); // Replace with Juicy Toast later if desired
+  };
 
+  // --- 1. THE LIBRARY VIEW (Deck Grid) ---
+  if (internalMode === 'library') {
+      return (
+          <div className="h-full flex flex-col bg-slate-50">
+              {/* Sticky Gym Header */}
+              <div className="bg-white/90 backdrop-blur-md border-b border-slate-100 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+                  <div className="flex items-center gap-2">
+                      <div className="bg-orange-500 text-white p-1.5 rounded-lg shadow-sm">
+                          <Dumbbell size={18} strokeWidth={3}/>
+                      </div>
+                      <span className="font-black text-slate-800 tracking-tight text-lg">Vocab Gym</span>
+                  </div>
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">{Object.keys(allDecks).length} Decks</div>
+              </div>
+
+              {/* Deck Grid */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar pb-32">
+                  <div className="grid grid-cols-1 gap-4">
+                      {Object.entries(allDecks).map(([key, deck]: any) => {
+                          const cardCount = deck.cards?.length || 0;
+                          // Fake mastery for visual juice (replace with real data later)
+                          const mastery = Math.floor(Math.random() * 100); 
+                          
+                          return (
+                              <button 
+                                  key={key} 
+                                  onClick={() => { onSelectDeck(key); setInternalMode('menu'); }}
+                                  className="group relative bg-white rounded-3xl p-5 shadow-sm border border-slate-100 hover:border-orange-200 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 text-left overflow-hidden"
+                              >
+                                  {/* Background Gradient on Hover */}
+                                  <div className="absolute inset-0 bg-gradient-to-r from-orange-500/0 via-orange-500/0 to-orange-500/0 group-hover:from-orange-50 group-hover:to-amber-50 transition-all duration-500"></div>
+                                  
+                                  <div className="relative z-10 flex justify-between items-start">
+                                      <div className="flex items-center gap-4">
+                                          <div className="w-14 h-14 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center text-2xl shadow-inner group-hover:scale-110 transition-transform duration-300">
+                                              {deck.icon || <Layers size={24}/>}
+                                          </div>
+                                          <div>
+                                              <h3 className="font-black text-slate-800 text-lg leading-tight group-hover:text-orange-600 transition-colors">{deck.title}</h3>
+                                              <p className="text-xs text-slate-400 font-bold mt-1">{cardCount} Cards</p>
+                                          </div>
+                                      </div>
+                                      <div className="bg-slate-50 p-2 rounded-full text-slate-300 group-hover:bg-white group-hover:text-orange-500 shadow-sm transition-colors">
+                                          <Play size={16} fill="currentColor"/>
+                                      </div>
+                                  </div>
+
+                                  {/* Mastery Bar */}
+                                  <div className="relative z-10 mt-6">
+                                      <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase mb-1">
+                                          <span>Mastery</span>
+                                          <span>{mastery}%</span>
+                                      </div>
+                                      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                          <div className="h-full bg-gradient-to-r from-orange-400 to-red-500 transition-all duration-1000" style={{ width: `${mastery}%` }}></div>
+                                      </div>
+                                  </div>
+                              </button>
+                          );
+                      })}
+                  </div>
+              </div>
+          </div>
+      );
+  }
+
+  // --- 2. THE MENU VIEW (Choose your Workout) ---
+  if (internalMode === 'menu') {
+      return (
+          <div className="h-full flex flex-col bg-slate-50">
+              {/* Header */}
+              <div className="px-6 py-6 pb-0">
+                  <button onClick={handleBack} className="flex items-center text-slate-400 hover:text-orange-600 mb-4 text-sm font-bold transition-colors">
+                      <ArrowLeft size={16} className="mr-1"/> Back to Library
+                  </button>
+                  <h1 className="text-3xl font-black text-slate-900 mb-2">{currentDeck.title}</h1>
+                  <p className="text-slate-500 text-sm font-medium">{cards.length} cards available for training.</p>
+              </div>
+
+              {/* Game Mode Grid */}
+              <div className="flex-1 overflow-y-auto p-6 custom-scrollbar pb-32">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Choose Workout</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                      
+                      <button onClick={() => launchGame('standard')} className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-lg hover:border-orange-200 hover:-translate-y-1 transition-all group text-left">
+                          <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><Layers size={24}/></div>
+                          <h4 className="font-bold text-slate-800">Flashcards</h4>
+                          <p className="text-[10px] text-slate-400 mt-1 font-bold uppercase">Standard Mode</p>
+                      </button>
+
+                      <button onClick={() => launchGame('quiz')} className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-lg hover:border-orange-200 hover:-translate-y-1 transition-all group text-left">
+                          <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><HelpCircle size={24}/></div>
+                          <h4 className="font-bold text-slate-800">Quiz Mode</h4>
+                          <p className="text-[10px] text-slate-400 mt-1 font-bold uppercase">Multiple Choice</p>
+                      </button>
+
+                      <button onClick={() => launchGame('match')} className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-lg hover:border-orange-200 hover:-translate-y-1 transition-all group text-left">
+                          <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><Puzzle size={24}/></div>
+                          <h4 className="font-bold text-slate-800">Match 'Em</h4>
+                          <p className="text-[10px] text-slate-400 mt-1 font-bold uppercase">Speed Pairs</p>
+                      </button>
+
+                      <button onClick={() => launchGame('tower')} className="bg-slate-900 p-5 rounded-[2rem] shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all group text-left relative overflow-hidden">
+                          <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-black opacity-50"></div>
+                          <div className="relative z-10">
+                              <div className="w-12 h-12 bg-white/10 text-orange-400 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform backdrop-blur-md"><Zap size={24} fill="currentColor"/></div>
+                              <h4 className="font-bold text-white">The Tower</h4>
+                              <p className="text-[10px] text-slate-400 mt-1 font-bold uppercase">Survival Mode</p>
+                          </div>
+                      </button>
+
+                  </div>
+                  
+                  {/* Stats or Info */}
+                  <div className="mt-8 p-5 bg-orange-50 border border-orange-100 rounded-3xl flex items-center gap-4">
+                      <div className="p-3 bg-white text-orange-500 rounded-full shadow-sm"><Trophy size={20}/></div>
+                      <div>
+                          <h4 className="font-bold text-orange-900 text-sm">Pro Tip</h4>
+                          <p className="text-xs text-orange-700/80 mt-0.5">Complete "The Tower" without errors to earn double XP.</p>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      );
+  }
+
+  // --- 3. THE PLAYING VIEW (Active Game) ---
   return (
-    <>
-      {completionMsg && <Toast message={completionMsg} onClose={() => setCompletionMsg(null)} />}
-      {showTower && (<TowerMode allDecks={allDecks} user={user} onExit={() => setShowTower(false)} onXPUpdate={handleTowerXP} />)}
-      {viewState === 'browsing' ? (
-        <div className="h-full bg-slate-50 flex flex-col overflow-y-auto pb-24 animate-in fade-in custom-scrollbar">
-            <div className="bg-white p-6 pb-2 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 relative z-10">
-                <div className="flex justify-between items-center mb-6"><h1 className="text-2xl font-bold text-slate-900">Practice Hub</h1><div className="flex gap-2">{languages.length > 1 && (<button onClick={() => { const idx = languages.indexOf(filterLang); setFilterLang(languages[(idx + 1) % languages.length]); }} className="px-3 py-1.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">{filterLang}</button>)}<button onClick={() => setIsEditMode(!isEditMode)} className={`px-3 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-1 transition-colors ${isEditMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500'}`}><Edit3 size={12}/> {isEditMode ? 'Done' : 'Manage'}</button></div></div>
-                <div className="flex gap-3 overflow-x-auto pb-4 custom-scrollbar"><div className="flex-1 min-w-[140px] bg-gradient-to-br from-indigo-50 to-blue-50 p-3 rounded-2xl border border-indigo-100 flex flex-col justify-center items-center"><span className="text-2xl font-black text-indigo-600">{totalCardsAvailable}</span><span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wide">Total Cards</span></div><div className="flex-1 min-w-[140px] bg-gradient-to-br from-emerald-50 to-teal-50 p-3 rounded-2xl border border-emerald-100 flex flex-col justify-center items-center"><span className="text-2xl font-black text-emerald-600">{allProcessed.length}</span><span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">Active Decks</span></div>
-                    {/* TOWER BUTTON */}
-                    <button onClick={() => setShowTower(true)} className="flex-1 min-w-[140px] bg-gradient-to-br from-slate-900 via-purple-900 to-indigo-900 text-white p-3 rounded-2xl shadow-lg shadow-indigo-900/30 active:scale-95 transition-all flex flex-col justify-center items-center group relative overflow-hidden"><div className="absolute inset-0 opacity-30 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div><Layers size={24} className="mb-1 group-hover:scale-110 transition-transform relative z-10"/><span className="text-[10px] font-bold uppercase tracking-wide relative z-10">The Tower</span></button>
-                </div>
-            </div>
-            <div className="p-6">{(isEditMode ? assignments : visibleAssignments).length > 0 && (<SectionAccordion title="Class Assignments" icon={<School size={20}/>} count={(isEditMode ? assignments : visibleAssignments).length} isOpen={openSections.assignments} onToggle={() => toggleSection('assignments')} colorTheme="amber">{(isEditMode ? assignments : visibleAssignments).map((deck: any) => <DeckCard key={deck.id} deck={deck} fullList={assignments} icon={<School size={20}/>} colorClass="bg-amber-100 text-amber-600" borderClass="border-amber-200 hover:border-amber-400" />)}</SectionAccordion>)}<SectionAccordion title="My Collections" icon={<Feather size={20}/>} count={(isEditMode ? customDecks : visibleCustom).length} isOpen={openSections.custom} onToggle={() => toggleSection('custom')} colorTheme="emerald">{(isEditMode ? customDecks : visibleCustom).length > 0 ? (isEditMode ? customDecks : visibleCustom).map((deck: any) => <DeckCard key={deck.id} deck={deck} fullList={customDecks} icon={<Feather size={20}/>} colorClass="bg-emerald-100 text-emerald-600" borderClass="border-slate-100 hover:border-emerald-300" />) : <div className="p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center"><p className="text-sm text-slate-400 font-bold">No custom decks yet.</p><p className="text-xs text-slate-300 mt-1">Use the Creator tab to build one!</p></div>}</SectionAccordion><SectionAccordion title="System Library" icon={<Library size={20}/>} count={(isEditMode ? libraryDecks : visibleLibrary).length} isOpen={openSections.library} onToggle={() => toggleSection('library')} colorTheme="blue">{(isEditMode ? libraryDecks : visibleLibrary).length > 0 ? (isEditMode ? libraryDecks : visibleLibrary).map((deck: any) => <DeckCard key={deck.id} deck={deck} fullList={libraryDecks} icon={<BookOpen size={20}/>} colorClass="bg-blue-100 text-blue-600" borderClass="border-slate-100 hover:border-blue-300" />) : <div className="p-4 text-center text-slate-400 text-xs italic">Library empty for this filter.</div>}</SectionAccordion><div className="h-8"></div></div>
-        </div>
-      ) : (
-        <div className="h-[calc(100vh-80px)] flex flex-col bg-slate-50 pb-6 relative overflow-hidden"><Header title={currentDeck?.title || "Deck"} subtitle={`${currentIndex + 1} / ${deckCards.length} Cards`} sticky={false} onClickTitle={() => setViewState('browsing')} rightAction={<button onClick={() => setViewState('browsing')} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 text-slate-500"><X size={20} /></button>} /><div className="px-6 mt-2 mb-4 z-10"><div className="flex bg-slate-200 p-1 rounded-xl w-full max-w-sm mx-auto shadow-inner">{['study', 'quiz', 'match'].map((mode) => (<button key={mode} onClick={() => setGameMode(mode)} className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg capitalize transition-all ${gameMode === mode ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>{mode}</button>))}</div></div><div className="flex-1 relative w-full overflow-hidden">{gameMode === 'match' && <div className="h-full overflow-y-auto"><MatchingGame deckCards={deckCards} onGameEnd={handleGameEnd} /></div>}{gameMode === 'quiz' && <div className="h-full overflow-y-auto"><QuizSessionView deckCards={deckCards} onGameEnd={handleGameEnd} /></div>}{gameMode === 'study' && card && (<div className="flex-1 flex flex-col items-center justify-center px-4 py-2 perspective-1000 relative z-0 h-full" style={{ perspective: '1000px', touchAction: 'pan-y' }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}><div className={`relative w-full h-full max-h-[520px] cursor-pointer shadow-2xl rounded-[2rem] transition-transform duration-300 ${swipeDirection === 'left' ? '-translate-x-full opacity-0 rotate-[-10deg]' : swipeDirection === 'right' ? 'translate-x-full opacity-0 rotate-[10deg]' : 'translate-x-0 opacity-100'}`} style={{ transformStyle: 'preserve-3d', transform: isFlipped && !swipeDirection ? 'rotateY(180deg)' : swipeDirection ? undefined : 'rotateY(0deg)' }} onClick={() => !xrayMode && setIsFlipped(!isFlipped)}><div className="absolute inset-0 bg-white rounded-[2rem] border border-slate-100 overflow-hidden flex flex-col select-none" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}><div className={`h-3 w-full ${xrayMode ? theme.bg.replace('50', '500') : 'bg-slate-100'} transition-colors duration-500`} /><div className="flex-1 flex flex-col p-6 relative"><div className="flex justify-between items-start mb-8"><span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${theme.bg} ${theme.text} border ${theme.border}`}>{card.type}</span><span className="text-xs font-mono text-slate-300">{currentIndex + 1}/{deckCards.length}</span></div><div className="flex-1 flex flex-col items-center justify-center mt-[-40px]"><h2 className="text-4xl sm:text-5xl font-serif font-bold text-slate-900 text-center mb-6 leading-tight select-none">{card.front}</h2><div onClick={(e) => { e.stopPropagation(); playAudio(card.front); }} className="flex items-center gap-3 bg-slate-50 pl-3 pr-5 py-2 rounded-full border border-slate-200 cursor-pointer hover:bg-indigo-50 hover:border-indigo-200 transition-colors group active:scale-95 shadow-sm"><Volume2 size={16} className="text-indigo-400"/><span className="font-serif text-slate-500 text-lg tracking-wide group-hover:text-indigo-800 select-none">{card.ipa || "/.../"}</span></div></div><div className={`absolute inset-x-0 bottom-0 bg-white/95 backdrop-blur-xl border-t border-slate-100 transition-all duration-300 flex flex-col overflow-hidden z-20 ${xrayMode ? 'h-[75%] opacity-100 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)]' : 'h-0 opacity-0'}`} onClick={e => e.stopPropagation()}><div className="p-6 overflow-y-auto custom-scrollbar space-y-6"><div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Puzzle size={14} /> Morphology</h4><div className="flex flex-wrap gap-2">{Array.isArray(card.morphology) && card.morphology.map((m: any, i: number) => (<div key={i} className="flex flex-col items-center bg-slate-50 border border-slate-200 rounded-lg p-2 min-w-[60px]"><span className={`font-bold text-lg ${m.type === 'root' ? 'text-indigo-600' : 'text-slate-700'}`}>{m.part}</span><span className="text-slate-400 text-[9px] font-medium uppercase mt-1 text-center max-w-[80px] leading-tight">{m.meaning}</span></div>))}</div></div><div><h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><MessageSquare size={14} /> Context</h4><div className={`p-4 rounded-xl border ${theme.border} ${theme.bg}`}><p className="text-slate-800 font-serif font-medium text-lg mb-1">"{card.usage?.sentence || '...'}"</p><p className={`text-sm ${theme.text} opacity-80 italic`}>{card.usage?.translation || '...'}</p></div></div></div></div>{!xrayMode && (<div className="mt-auto text-center"><p className="text-xs text-slate-300 font-bold uppercase tracking-widest animate-pulse flex items-center justify-center gap-2"><ArrowLeft size={10}/> Swipe <ArrowRight size={10}/></p></div>)}</div></div><div className="absolute inset-0 bg-slate-900 rounded-[2rem] shadow-xl flex flex-col items-center justify-center p-8 text-white relative overflow-hidden select-none" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}><div className="absolute top-[-50%] left-[-50%] w-full h-full bg-indigo-500/20 rounded-full blur-[100px] pointer-events-none"></div><div className="relative z-10 flex flex-col items-center"><span className="text-indigo-300 text-xs font-bold uppercase tracking-widest mb-6 border-b border-indigo-500/30 pb-2">Translation</span><h2 className="text-3xl md:text-4xl font-bold text-center mb-8 leading-tight">{card.back}</h2></div></div></div></div>)}</div>{gameMode === 'study' && card && (<div className="px-6 pb-4 pt-2"><div className="flex items-center justify-between max-w-sm mx-auto"><button onClick={handlePrev} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-rose-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all hover:bg-rose-50"><X size={28} strokeWidth={2.5} /></button><button onClick={(e) => { e.stopPropagation(); if(isFlipped) setIsFlipped(false); setXrayMode(!xrayMode); }} className={`h-20 w-20 rounded-2xl flex flex-col items-center justify-center shadow-lg transition-all duration-300 border-2 ${xrayMode ? 'bg-indigo-600 border-indigo-600 text-white translate-y-[-8px] shadow-indigo-200' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'}`}><Search size={28} strokeWidth={xrayMode ? 3 : 2} className={xrayMode ? 'animate-pulse' : ''} /><span className="text-[10px] font-black tracking-wider mt-1">X-RAY</span></button><button onClick={handleNext} className="h-14 w-14 rounded-full bg-white border border-slate-100 shadow-md text-emerald-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-all hover:bg-emerald-50"><Check size={28} strokeWidth={2.5} /></button></div></div>)}</div>
-      )}
-    </>
+      <div className="h-full flex flex-col bg-slate-50 animate-in slide-in-from-bottom-4 duration-300">
+          {/* Game Header */}
+          <div className="px-6 py-4 bg-white border-b border-slate-100 flex justify-between items-center shadow-sm z-20">
+              <button onClick={handleBack} className="p-2 -ml-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-rose-500 transition-colors">
+                  <X size={24}/>
+              </button>
+              <div className="flex flex-col items-center">
+                  <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{activeGame === 'tower' ? 'Survival' : activeGame}</span>
+                  <span className="text-sm font-black text-slate-800">{currentDeck.title}</span>
+              </div>
+              <div className="w-8"></div> {/* Spacer for center alignment */}
+          </div>
+
+          {/* Game Container */}
+          <div className="flex-1 overflow-hidden relative">
+              {activeGame === 'standard' && (
+                  <div className="h-full flex flex-col justify-center pb-20">
+                      <JuicyDeckBlock items={cards} title="Study Mode" />
+                  </div>
+              )}
+              
+              {activeGame === 'quiz' && (
+                  <div className="h-full overflow-y-auto">
+                      <QuizSessionView deckCards={cards} onGameEnd={(res: any) => handleGameFinish(res.score ? (res.score/res.total)*100 : 0)} />
+                  </div>
+              )}
+
+              {activeGame === 'match' && (
+                  <MatchingGame deckCards={cards} onGameEnd={(score: number) => handleGameFinish(score)} />
+              )}
+
+              {/* Tower Stub (You can replace this with actual logic later) */}
+              {activeGame === 'tower' && (
+                  <div className="h-full flex flex-col items-center justify-center text-center p-8">
+                      <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mb-6 animate-bounce">
+                          <Zap size={40} className="text-orange-400 fill-orange-400"/>
+                      </div>
+                      <h2 className="text-2xl font-black text-slate-900">The Tower</h2>
+                      <p className="text-slate-500 mt-2 mb-8">This mode is under construction by the architects.</p>
+                      <button onClick={handleBack} className="px-6 py-3 bg-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-300">Retreat</button>
+                  </div>
+              )}
+          </div>
+      </div>
   );
 }
 
