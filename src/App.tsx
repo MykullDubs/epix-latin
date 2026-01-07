@@ -18,7 +18,7 @@ import {
   Pencil, Image, Info, Edit3, AlertTriangle, FlipVertical, HelpCircle, 
   CheckCircle2, Circle, Activity, Clock, Compass, Globe, RotateCcw, Play, 
   Maximize2, BarChart2, Timer, Megaphone, Inbox, XCircle, ChevronUp, Send,
-  ArrowUp, ArrowDown, Eye, EyeOff, MessageCircle, AlignLeft // <--- ADDED MISSING ICONS
+  ArrowUp, ArrowDown, Eye, EyeOff, MessageCircle, AlignLeft, ClipboardList, Table // <--- ADDED MISSING ICONS
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -1029,47 +1029,134 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
   );
 }
 
-function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, userData }: any) {
+// ============================================================================
+//  STUDENT GRADEBOOK (Personal View)
+// ============================================================================
+function StudentGradebook({ classData, user }: any) {
+    const [logs, setLogs] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        // Fetch logs only for this student and these assignments
+        if(!classData.assignments || classData.assignments.length === 0) { setLoading(false); return; }
+        
+        const assignmentIds = classData.assignments.map((a:any) => a.id);
+        // Note: Firestore 'in' query is limited to 10. For production, you'd batch this or structure differently.
+        // For now, we fetch user's recent logs and filter client-side for simplicity.
+        const q = query(
+            collection(db, 'artifacts', appId, 'activity_logs'), 
+            where('studentEmail', '==', user.email),
+            orderBy('timestamp', 'desc'),
+            limit(100)
+        );
+
+        const unsub = onSnapshot(q, (snapshot) => {
+            const allLogs = snapshot.docs.map(d => d.data());
+            // Filter to only include logs relevant to this class
+            const classLogs = allLogs.filter(log => assignmentIds.includes(log.itemId));
+            setLogs(classLogs);
+            setLoading(false);
+        });
+        return () => unsub();
+    }, [classData, user]);
+
+    const getGradeStatus = (assignmentId: string) => {
+        const log = logs.find(l => l.itemId === assignmentId);
+        if (!log) return { status: 'missing', label: 'Not Started', color: 'bg-slate-100 text-slate-400' };
+        if (log.scoreDetail?.status === 'pending_review') return { status: 'pending', label: 'Grading', color: 'bg-amber-100 text-amber-600' };
+        return { status: 'complete', label: `${log.scoreDetail?.finalScorePct || Math.round((log.scoreDetail?.score / log.scoreDetail?.total)*100) || 100}%`, color: 'bg-emerald-100 text-emerald-600', log };
+    };
+
+    return (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2">
+            <div className="p-6 border-b border-slate-100 bg-slate-50">
+                <h3 className="font-bold text-slate-800 flex items-center gap-2"><ClipboardList size={18} className="text-indigo-600"/> Report Card</h3>
+            </div>
+            {classData.assignments?.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-sm">No assignments yet.</div>
+            ) : (
+                <div className="divide-y divide-slate-100">
+                    {classData.assignments.map((assign: any) => {
+                        const { status, label, color, log } = getGradeStatus(assign.id);
+                        return (
+                            <div key={assign.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group">
+                                <div className="flex items-center gap-4">
+                                    <div className={`p-2 rounded-lg ${assign.contentType === 'test' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                        {assign.contentType === 'test' ? <FileText size={16}/> : <BookOpen size={16}/>}
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-slate-800 text-sm">{assign.title}</h4>
+                                        <p className="text-xs text-slate-400">{assign.contentType === 'test' ? 'Exam' : 'Lesson'} • {assign.xp} XP</p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${color}`}>{label}</span>
+                                    {log?.scoreDetail?.instructorFeedback && (
+                                        <p className="text-[10px] text-slate-500 mt-1 max-w-[150px] truncate italic">"{log.scoreDetail.instructorFeedback}"</p>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ============================================================================
+//  STUDENT CLASS VIEW (With Gradebook Tab)
+// ============================================================================
+function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, userData, user }: any) {
+  const [activeTab, setActiveTab] = useState<'assignments' | 'grades'>('assignments');
   const completedSet = new Set(userData?.completedAssignments || []);
+  
   const handleAssignmentClick = (assignment: any) => { if (assignment.contentType === 'deck') { onSelectDeck(assignment); } else { onSelectLesson(assignment); } };
   const relevantAssignments = (classData.assignments || []).filter((l: any) => { const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); return isForMe; });
   const pendingCount = relevantAssignments.filter((l: any) => !completedSet.has(l.id)).length;
-  return (<div className="h-full flex flex-col bg-slate-50"><div className="px-6 pt-12 pb-6 bg-white sticky top-0 z-40 border-b border-slate-100"><button onClick={onBack} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Home</button><h1 className="text-2xl font-bold text-slate-900">{classData.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {classData.code}</p></div><div className="flex-1 px-6 mt-4 overflow-y-auto pb-24"><div className="space-y-6"><div className="bg-indigo-600 rounded-2xl p-6 text-white shadow-lg"><h3 className="text-lg font-bold mb-1">Your Progress</h3><p className="text-indigo-200 text-sm">Keep up the great work!</p><div className="mt-4 flex gap-4"><div><span className="text-2xl font-bold block">{pendingCount}</span><span className="text-xs opacity-70">To Do</span></div><div><span className="text-2xl font-bold block">{classData.students?.length || 0}</span><span className="text-xs opacity-70">Classmates</span></div></div></div><div><h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Assignments</h3><div className="space-y-3">{relevantAssignments.length > 0 ? ( relevantAssignments.filter((l: any) => !completedSet.has(l.id)).map((l: any, i: number) => ( <button key={`${l.id}-${i}`} onClick={() => handleAssignmentClick(l)} className="w-full bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all"><div className="flex items-center space-x-4"><div className={`h-10 w-10 rounded-xl flex items-center justify-center ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600' : 'bg-indigo-50 text-indigo-600'}`}>{l.contentType === 'deck' ? <Layers size={20}/> : <PlayCircle size={20} />}</div><div className="text-left"><h4 className="font-bold text-indigo-900">{l.title}</h4><p className="text-xs text-indigo-600/70">{l.contentType === 'deck' ? 'Flashcard Deck' : 'Assigned Lesson'}</p></div></div><ChevronRight size={20} className="text-slate-300" /></button> )) ) : ( <div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">No pending assignments.</div> )}{relevantAssignments.every((l: any) => completedSet.has(l.id)) && relevantAssignments.length > 0 && (<div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">All assignments completed! 🎉</div>)}</div></div></div></div></div>);
-}
+  
+  return (
+    <div className="h-full flex flex-col bg-slate-50">
+      <div className="px-6 pt-12 pb-2 bg-white sticky top-0 z-40 border-b border-slate-100 shadow-sm">
+          <button onClick={onBack} className="flex items-center text-slate-500 hover:text-indigo-600 mb-4 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back</button>
+          <div className="flex justify-between items-end mb-4">
+              <div><h1 className="text-2xl font-black text-slate-900">{classData.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">{classData.code}</p></div>
+              <div className="text-right"><span className="block text-2xl font-black text-indigo-600">{pendingCount}</span><span className="text-[10px] font-bold text-slate-400 uppercase">To Do</span></div>
+          </div>
+          {/* TABS */}
+          <div className="flex gap-6">
+              <button onClick={() => setActiveTab('assignments')} className={`pb-3 text-sm font-bold border-b-2 transition-all ${activeTab === 'assignments' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Assignments</button>
+              <button onClick={() => setActiveTab('grades')} className={`pb-3 text-sm font-bold border-b-2 transition-all ${activeTab === 'grades' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Gradebook</button>
+          </div>
+      </div>
 
-function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allDecks, lessons, initialMode, onClearMode }: any) {
-  const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
-  const [mode, setMode] = useState<'card' | 'lesson' | 'exam'>(initialMode || 'card'); 
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
-
-  useEffect(() => { if (initialMode) setMode(initialMode); }, [initialMode]);
-
-  // Wrapper to provide feedback when saving exams
-  const handleSaveExam = (examData: any) => {
-      onSaveLesson(examData); // Saves to DB
-      setToastMsg("Exam Saved Successfully!");
-  };
-
-  return ( 
-    <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar">
-        {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
-        
-        {mode === 'card' && <Header title="Scriptorium" subtitle="Card Builder" rightAction={initialMode && <button onClick={onClearMode}><X/></button>}/>}
-        {mode === 'lesson' && <Header title="Curriculum" subtitle="Lesson Builder" rightAction={initialMode && <button onClick={onClearMode}><X/></button>}/>}
-        {mode === 'exam' && <Header title="Assessment" subtitle="Exam Builder" rightAction={initialMode && <button onClick={onClearMode}><X/></button>}/>}
-        
-        <div className="px-6 mt-2">
-            <div className="flex bg-slate-200 p-1 rounded-xl">
-                <button onClick={() => setMode('card')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${mode === 'card' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Card</button>
-                <button onClick={() => setMode('lesson')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${mode === 'lesson' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Lesson</button>
-                <button onClick={() => setMode('exam')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${mode === 'exam' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Exam</button>
-            </div>
-        </div>
-
-        {mode === 'card' && <CardBuilderView onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} availableDecks={allDecks} />}
-        {mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onSave={onSaveLesson} availableDecks={allDecks} />}
-        {mode === 'exam' && <ExamBuilderView onSave={handleSaveExam} />}
-    </div> 
+      <div className="flex-1 px-6 mt-6 overflow-y-auto pb-24 custom-scrollbar">
+          {activeTab === 'assignments' ? (
+              <div className="space-y-6">
+                 {/* Current Progress Block removed for cleaner UI, focusing on list */}
+                 <div>
+                    <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Tasks</h3>
+                    <div className="space-y-3">
+                        {relevantAssignments.length > 0 ? ( relevantAssignments.filter((l: any) => !completedSet.has(l.id)).map((l: any, i: number) => ( 
+                            <button key={`${l.id}-${i}`} onClick={() => handleAssignmentClick(l)} className="w-full bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all group hover:border-indigo-300">
+                                <div className="flex items-center space-x-4">
+                                    <div className={`h-12 w-12 rounded-xl flex items-center justify-center transition-colors ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white' : l.contentType === 'test' ? 'bg-rose-50 text-rose-600 group-hover:bg-rose-500 group-hover:text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-500 group-hover:text-white'}`}>
+                                        {l.contentType === 'deck' ? <Layers size={20}/> : l.contentType === 'test' ? <FileText size={20}/> : <PlayCircle size={20} />}
+                                    </div>
+                                    <div className="text-left"><h4 className="font-bold text-slate-900 group-hover:text-indigo-700">{l.title}</h4><p className="text-xs text-slate-500">{l.contentType === 'deck' ? 'Flashcard Deck' : l.contentType === 'test' ? 'Exam' : 'Lesson'}</p></div>
+                                </div>
+                                <ChevronRight size={20} className="text-slate-300 group-hover:text-indigo-500" />
+                            </button> 
+                        )) ) : ( <div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">No pending assignments.</div> )}
+                        {relevantAssignments.every((l: any) => completedSet.has(l.id)) && relevantAssignments.length > 0 && (<div className="p-8 text-center text-emerald-600 font-bold bg-emerald-50 rounded-2xl border border-emerald-100">All assignments completed! 🎉</div>)}
+                    </div>
+                 </div>
+              </div>
+          ) : (
+              <StudentGradebook classData={classData} user={user} />
+          )}
+      </div>
+    </div>
   );
 }
 
@@ -1305,6 +1392,79 @@ function LiveActivityFeed() {
 }
 
 // ============================================================================
+//  INSTRUCTOR GRADEBOOK (Matrix View)
+// ============================================================================
+function InstructorGradebook({ classData }: any) {
+    const [logs, setLogs] = useState<any[]>([]);
+    
+    useEffect(() => {
+        if(!classData.assignments || classData.assignments.length === 0) return;
+        // Fetch all completion logs that match the assignment IDs
+        // Note: Simplified query. In prod, you might query by classId if you add that field to logs.
+        const q = query(collection(db, 'artifacts', appId, 'activity_logs'), where('type', '==', 'completion'), orderBy('timestamp', 'desc'));
+        const unsub = onSnapshot(q, (snapshot) => {
+            const all = snapshot.docs.map(d => d.data());
+            const assignmentIds = classData.assignments.map((a:any) => a.id);
+            // Filter locally for this class's assignments and students
+            const relevant = all.filter(l => assignmentIds.includes(l.itemId) && classData.students.includes(l.studentEmail));
+            setLogs(relevant);
+        });
+        return () => unsub();
+    }, [classData]);
+
+    const getScoreCell = (studentEmail: string, assignmentId: string) => {
+        const log = logs.find(l => l.studentEmail === studentEmail && l.itemId === assignmentId);
+        if (!log) return <span className="text-slate-300">-</span>;
+        
+        if (log.scoreDetail?.status === 'pending_review') {
+            return <span className="text-[10px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded font-bold">Needs Grade</span>;
+        }
+
+        const score = log.scoreDetail?.finalScorePct ?? (log.scoreDetail?.score ? Math.round((log.scoreDetail.score / log.scoreDetail.total)*100) : 100);
+        const color = score >= 90 ? 'text-emerald-600 bg-emerald-50' : score >= 70 ? 'text-indigo-600 bg-indigo-50' : 'text-rose-600 bg-rose-50';
+        
+        return <span className={`text-xs font-bold px-2 py-1 rounded ${color}`}>{score}%</span>;
+    };
+
+    if (!classData.students || classData.students.length === 0) return <div className="p-8 text-center text-slate-400">No students in roster.</div>;
+
+    return (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+                <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                        <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-50 z-10">Student</th>
+                        {classData.assignments.map((a: any) => (
+                            <th key={a.id} className="p-4 text-xs font-bold text-slate-500 whitespace-nowrap min-w-[120px]">{a.title}</th>
+                        ))}
+                        <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Avg</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                    {classData.students.map((student: string) => (
+                        <tr key={student} className="hover:bg-slate-50/50">
+                            <td className="p-4 font-bold text-slate-700 text-sm sticky left-0 bg-white border-r border-slate-100">{student}</td>
+                            {classData.assignments.map((a: any) => (
+                                <td key={a.id} className="p-4 text-center">{getScoreCell(student, a.id)}</td>
+                            ))}
+                            <td className="p-4 text-right font-mono text-xs text-slate-400">
+                                {/* Simple Average Calculation */}
+                                {(() => {
+                                    const studentLogs = logs.filter(l => l.studentEmail === student);
+                                    if(studentLogs.length === 0) return '-';
+                                    const total = studentLogs.reduce((acc, l) => acc + (l.scoreDetail?.finalScorePct || 100), 0);
+                                    return Math.round(total / studentLogs.length) + '%';
+                                })()}
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+// ============================================================================
 //  UPDATED CLASS MANAGER (Now with Exams!)
 // ============================================================================
 function ClassManagerView({ user, classes, lessons, allDecks }: any) {
@@ -1318,6 +1478,8 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
   
   // 1. New State for Assignment Type
   const [assignType, setAssignType] = useState<'deck' | 'lesson' | 'exam'>('lesson');
+  // 2. New State for Gradebook Toggle
+  const [activeTab, setActiveTab] = useState<'overview' | 'gradebook'>('overview');
   
   const selectedClass = classes.find((c: any) => c.id === selectedClassId);
 
@@ -1331,7 +1493,7 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
   const addStudent = async (e: any) => { e.preventDefault(); if (!newStudentEmail || !selectedClass) return; const normalizedEmail = newStudentEmail.toLowerCase().trim(); try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { students: arrayUnion(normalizedEmail), studentEmails: arrayUnion(normalizedEmail) }); setNewStudentEmail(''); setToastMsg(`Added ${normalizedEmail}`); } catch (error) { console.error("Add student failed:", error); alert("Failed to add student."); } };
   const toggleAssignee = (email: string) => { if (selectedAssignees.includes(email)) { setSelectedAssignees(selectedAssignees.filter(e => e !== email)); } else { setSelectedAssignees([...selectedAssignees, email]); } };
   
-  // 2. Generic Assign Handler
+  // 3. Generic Assign Handler
   const assignContent = async (item: any, type: string) => { 
       if (!selectedClass) return; 
       try { 
@@ -1356,65 +1518,77 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
         {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
         
         {/* Class Header */}
-        <div className="pb-6 border-b border-slate-100 mb-6">
-          <button onClick={() => setSelectedClassId(null)} className="flex items-center text-slate-500 hover:text-indigo-600 mb-2 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Classes</button>
-          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-4">
-            <div><h1 className="text-2xl font-bold text-slate-900">{selectedClass.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {selectedClass.code}</p></div>
+        <div className="pb-4 border-b border-slate-100 mb-6 bg-white sticky top-0 z-20">
+          <button onClick={() => setSelectedClassId(null)} className="flex items-center text-slate-500 hover:text-indigo-600 mb-4 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Classes</button>
+          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-4 mb-4">
+            <div><h1 className="text-3xl font-black text-slate-900">{selectedClass.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {selectedClass.code}</p></div>
             
-            {/* 3. ASSIGN BUTTONS */}
+            {/* ASSIGN BUTTONS */}
             <div className="flex flex-wrap gap-2">
                 <button onClick={() => { setAssignType('lesson'); setAssignModalOpen(true); }} className="bg-indigo-600 text-white px-3 py-2 rounded-lg font-bold text-xs flex items-center gap-2 shadow-sm hover:bg-indigo-700 active:scale-95 transition-all uppercase tracking-wider"><BookOpen size={16}/> Lesson</button>
                 <button onClick={() => { setAssignType('deck'); setAssignModalOpen(true); }} className="bg-orange-500 text-white px-3 py-2 rounded-lg font-bold text-xs flex items-center gap-2 shadow-sm hover:bg-orange-600 active:scale-95 transition-all uppercase tracking-wider"><Layers size={16}/> Deck</button>
                 <button onClick={() => { setAssignType('exam'); setAssignModalOpen(true); }} className="bg-rose-600 text-white px-3 py-2 rounded-lg font-bold text-xs flex items-center gap-2 shadow-sm hover:bg-rose-700 active:scale-95 transition-all uppercase tracking-wider"><FileText size={16}/> Exam</button>
             </div>
           </div>
+          {/* TABS */}
+          <div className="flex gap-6">
+              <button onClick={() => setActiveTab('overview')} className={`pb-3 text-sm font-bold border-b-2 transition-all ${activeTab === 'overview' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Overview</button>
+              <button onClick={() => setActiveTab('gradebook')} className={`pb-3 text-sm font-bold border-b-2 transition-all ${activeTab === 'gradebook' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Gradebook</button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Assignments List */}
-            <div className="space-y-4">
-                <h3 className="font-bold text-slate-800 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Active Assignments</h3>
-                {(!selectedClass.assignments || selectedClass.assignments.length === 0) && <div className="p-6 border-2 border-dashed border-slate-200 rounded-xl text-center text-slate-400 text-sm">No content assigned yet.</div>}
-                
-                {selectedClass.assignments?.map((l: any, idx: number) => ( 
-                    <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center group">
-                        <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-lg ${l.contentType === 'deck' ? 'bg-orange-100 text-orange-600' : l.contentType === 'test' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                                {l.contentType === 'deck' ? <Layers size={18} /> : l.contentType === 'test' ? <FileText size={18}/> : <BookOpen size={18} />}
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-slate-800 text-sm">{l.title}</h4>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[10px] text-slate-500 uppercase font-bold">{l.contentType === 'test' ? 'Exam' : l.contentType === 'deck' ? 'Deck' : 'Unit'}</span>
-                                    {l.targetStudents && l.targetStudents.length > 0 && (<span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold flex items-center gap-1"><Users size={10}/> {l.targetStudents.length}</span>)}
+        {activeTab === 'overview' ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pb-20">
+                {/* Assignments List */}
+                <div className="space-y-4">
+                    <h3 className="font-bold text-slate-800 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Active Assignments</h3>
+                    {(!selectedClass.assignments || selectedClass.assignments.length === 0) && <div className="p-6 border-2 border-dashed border-slate-200 rounded-xl text-center text-slate-400 text-sm">No content assigned yet.</div>}
+                    
+                    {selectedClass.assignments?.map((l: any, idx: number) => ( 
+                        <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center group">
+                            <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-lg ${l.contentType === 'deck' ? 'bg-orange-100 text-orange-600' : l.contentType === 'test' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                    {l.contentType === 'deck' ? <Layers size={18} /> : l.contentType === 'test' ? <FileText size={18}/> : <BookOpen size={18} />}
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-slate-800 text-sm">{l.title}</h4>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] text-slate-500 uppercase font-bold">{l.contentType === 'test' ? 'Exam' : l.contentType === 'deck' ? 'Deck' : 'Unit'}</span>
+                                        {l.targetStudents && l.targetStudents.length > 0 && (<span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold flex items-center gap-1"><Users size={10}/> {l.targetStudents.length} Students</span>)}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <button className="text-slate-300 hover:text-rose-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity" title="Revoke (Coming Soon)"><Trash2 size={16}/></button>
-                    </div> 
-                ))}
-            </div>
-
-            {/* Roster */}
-            <div className="space-y-4">
-                <h3 className="font-bold text-slate-800 flex items-center gap-2"><Users size={18} className="text-indigo-600"/> Class Roster</h3>
-                <form onSubmit={addStudent} className="flex gap-2">
-                    <input value={newStudentEmail} onChange={e => setNewStudentEmail(e.target.value)} placeholder="Student Email" className="flex-1 p-2 rounded-lg border border-slate-200 text-sm" />
-                    <button type="submit" className="bg-slate-100 hover:bg-slate-200 text-slate-600 p-2 rounded-lg"><Plus size={18}/></button>
-                </form>
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden max-h-[400px] overflow-y-auto custom-scrollbar">
-                    {(!selectedClass.students || selectedClass.students.length === 0) && <div className="p-4 text-center text-slate-400 text-sm italic">No students joined yet.</div>}
-                    {selectedClass.students?.map((s: string, i: number) => (
-                        <div key={i} className="p-3 border-b border-slate-50 last:border-0 flex items-center gap-3">
-                            <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs">{s.charAt(0).toUpperCase()}</div>
-                            <span className="text-sm font-medium text-slate-700">{s}</span>
-                        </div>
+                            <button className="text-slate-300 hover:text-rose-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity" title="Revoke (Coming Soon)"><Trash2 size={16}/></button>
+                        </div> 
                     ))}
                 </div>
-            </div>
-        </div>
 
-        {/* 4. MODAL */}
+                {/* Roster */}
+                <div className="space-y-4">
+                    <h3 className="font-bold text-slate-800 flex items-center gap-2"><Users size={18} className="text-indigo-600"/> Class Roster</h3>
+                    <form onSubmit={addStudent} className="flex gap-2">
+                        <input value={newStudentEmail} onChange={e => setNewStudentEmail(e.target.value)} placeholder="Student Email" className="flex-1 p-2 rounded-lg border border-slate-200 text-sm" />
+                        <button type="submit" className="bg-slate-100 hover:bg-slate-200 text-slate-600 p-2 rounded-lg"><Plus size={18}/></button>
+                    </form>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden max-h-[400px] overflow-y-auto custom-scrollbar">
+                        {(!selectedClass.students || selectedClass.students.length === 0) && <div className="p-4 text-center text-slate-400 text-sm italic">No students joined yet.</div>}
+                        {selectedClass.students?.map((s: string, i: number) => (
+                            <div key={i} className="p-3 border-b border-slate-50 last:border-0 flex items-center gap-3">
+                                <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs">{s.charAt(0).toUpperCase()}</div>
+                                <span className="text-sm font-medium text-slate-700">{s}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        ) : (
+            <div className="pb-20">
+                 {/* Make sure InstructorGradebook is defined above this component! */}
+                 <InstructorGradebook classData={selectedClass} />
+            </div>
+        )}
+
+        {/* MODAL */}
         {assignModalOpen && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in duration-200">
