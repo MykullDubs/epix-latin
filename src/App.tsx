@@ -19,7 +19,7 @@ import {
   CheckCircle2, Circle, Activity, Clock, Compass, Globe, RotateCcw, Play, 
   Maximize2, BarChart2, Timer, Megaphone, Inbox, XCircle, ChevronUp, Send,
   ArrowUp, ArrowDown, Eye, EyeOff, MessageCircle, AlignLeft, ClipboardList, Table, Calendar,
-  Trophy, Flame, Settings, BarChart3  // <--- ADDED MISSING ICONS
+  Trophy, Flame, Settings, BarChart3, CornerDownRight, MoreHorizontal   // <--- ADDED MISSING ICONS
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -1300,14 +1300,19 @@ function StudentGradebook({ classData, user }: any) {
     );
 }
 // ============================================================================
-//  CLASS FORUM (The Stream of Consciousness)
+//  CLASS FORUM (Threaded & Accordioned)
 // ============================================================================
 function ClassForum({ classData, user }: any) {
     const [posts, setPosts] = useState<any[]>([]);
     const [content, setContent] = useState('');
     const [sending, setSending] = useState(false);
+    
+    // Threading State
+    const [replyingTo, setReplyingTo] = useState<string | null>(null); // ID of post being replied to
+    const [replyContent, setReplyContent] = useState('');
+    const [expandedThreads, setExpandedThreads] = useState<string[]>([]); // IDs of expanded posts
 
-    // Subscribe to live posts for this class
+    // Live Feed Subscription
     useEffect(() => {
         const q = query(
             collection(db, 'artifacts', appId, 'class_posts'),
@@ -1321,6 +1326,7 @@ function ClassForum({ classData, user }: any) {
         return () => unsub();
     }, [classData.id]);
 
+    // Create Main Post
     const handlePost = async () => {
         if (!content.trim()) return;
         setSending(true);
@@ -1328,67 +1334,147 @@ function ClassForum({ classData, user }: any) {
             await addDoc(collection(db, 'artifacts', appId, 'class_posts'), {
                 classId: classData.id,
                 userId: user.uid,
-                authorName: user.displayName || user.email.split('@')[0], // Fallback name
+                authorName: user.displayName || user.email.split('@')[0], 
                 content: content.trim(),
                 timestamp: Date.now(),
-                likes: [] // Future proofing for "Juicy Likes"
+                replies: [], // New: Array to store thread
+                likes: [] 
             });
             setContent('');
         } catch (e) { console.error("Post failed", e); }
         setSending(false);
     };
 
+    // Create Reply
+    const handleReply = async (postId: string) => {
+        if (!replyContent.trim()) return;
+        try {
+            const postRef = doc(db, 'artifacts', appId, 'class_posts', postId);
+            const newReply = {
+                id: Date.now().toString(), // Simple ID
+                userId: user.uid,
+                authorName: user.displayName || user.email.split('@')[0],
+                content: replyContent.trim(),
+                timestamp: Date.now()
+            };
+            
+            await updateDoc(postRef, {
+                replies: arrayUnion(newReply)
+            });
+            
+            setReplyContent('');
+            setReplyingTo(null);
+            // Auto-expand thread on reply
+            if (!expandedThreads.includes(postId)) {
+                setExpandedThreads(prev => [...prev, postId]);
+            }
+        } catch (e) { console.error("Reply failed", e); }
+    };
+
+    const toggleThread = (postId: string) => {
+        if (expandedThreads.includes(postId)) {
+            setExpandedThreads(expandedThreads.filter(id => id !== postId));
+        } else {
+            setExpandedThreads([...expandedThreads, postId]);
+        }
+    };
+
     return (
         <div className="flex flex-col h-full bg-slate-50 relative">
             
-            {/* Input Area (Sticky Top) */}
+            {/* Main Input */}
             <div className="p-4 bg-white border-b border-slate-200 shadow-sm sticky top-0 z-20">
                 <div className="relative group">
-                    <textarea
-                        value={content}
-                        onChange={(e) => setContent(e.target.value)}
-                        placeholder={`Share an idea with ${classData.name}...`}
-                        className="w-full p-4 pr-14 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 focus:bg-white transition-all outline-none resize-none text-sm font-medium h-24 placeholder:text-slate-400"
-                    />
-                    <button
-                        onClick={handlePost}
-                        disabled={sending || !content.trim()}
-                        className="absolute bottom-3 right-3 p-2.5 bg-indigo-600 text-white rounded-xl shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100 transition-all flex items-center justify-center"
-                    >
+                    <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder={`Start a discussion with ${classData.name}...`} className="w-full p-4 pr-14 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 focus:bg-white transition-all outline-none resize-none text-sm font-medium h-20 placeholder:text-slate-400" />
+                    <button onClick={handlePost} disabled={sending || !content.trim()} className="absolute bottom-3 right-3 p-2.5 bg-indigo-600 text-white rounded-xl shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100 transition-all flex items-center justify-center">
                         {sending ? <Loader size={18} className="animate-spin"/> : <Send size={18} className="ml-0.5"/>}
                     </button>
                 </div>
             </div>
 
             {/* Feed */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar pb-24">
-                {posts.length === 0 ? (
+            <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar pb-24">
+                {posts.length === 0 && (
                     <div className="text-center py-12 opacity-60">
-                        <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <MessageSquare size={32} className="text-slate-400"/>
-                        </div>
+                        <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-4"><MessageSquare size={32} className="text-slate-400"/></div>
                         <p className="text-sm font-bold text-slate-500">It's quiet in here...</p>
-                        <p className="text-xs text-slate-400">Be the first to start the conversation!</p>
                     </div>
-                ) : (
-                    posts.map((post) => (
-                        <div key={post.id} className="bg-white p-4 rounded-2xl border border-slate-200/60 shadow-sm flex gap-3 animate-in slide-in-from-bottom-2 duration-300">
-                            {/* Avatar */}
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-md shrink-0 border-2 border-white">
-                                {post.authorName.charAt(0).toUpperCase()}
-                            </div>
-                            
-                            {/* Content */}
-                            <div className="flex-1 min-w-0">
-                                <div className="flex justify-between items-baseline mb-1">
-                                    <span className="font-black text-slate-800 text-sm truncate pr-2">{post.authorName}</span>
-                                    <span className="text-[10px] font-bold text-slate-400 shrink-0">{new Date(post.timestamp).toLocaleDateString()}</span>
-                                </div>
-                                <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap break-words">{post.content}</p>
-                            </div>
-                        </div>
-                    ))
                 )}
+
+                {posts.map((post) => {
+                    const replies = post.replies || [];
+                    const isExpanded = expandedThreads.includes(post.id);
+                    // Accordion Logic: Show all if expanded, otherwise show only last 2
+                    const visibleReplies = isExpanded ? replies : replies.slice(-2);
+                    const hiddenCount = replies.length - visibleReplies.length;
+
+                    return (
+                        <div key={post.id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm animate-in slide-in-from-bottom-2 duration-300">
+                            {/* Main Post Header */}
+                            <div className="flex gap-3 mb-3">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-md shrink-0 border-2 border-white">
+                                    {post.authorName.charAt(0).toUpperCase()}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex justify-between items-baseline">
+                                        <span className="font-black text-slate-800 text-sm truncate">{post.authorName}</span>
+                                        <span className="text-[10px] font-bold text-slate-400 shrink-0">{new Date(post.timestamp).toLocaleDateString()}</span>
+                                    </div>
+                                    <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap break-words mt-1">{post.content}</p>
+                                </div>
+                            </div>
+
+                            {/* Action Bar */}
+                            <div className="flex items-center gap-4 pl-14 mb-2">
+                                <button onClick={() => setReplyingTo(replyingTo === post.id ? null : post.id)} className="text-xs font-bold text-slate-400 hover:text-indigo-600 flex items-center gap-1 transition-colors">
+                                    <MessageCircle size={14}/> Reply
+                                </button>
+                                {hiddenCount > 0 && (
+                                    <button onClick={() => toggleThread(post.id)} className="text-xs font-bold text-indigo-500 hover:text-indigo-700 flex items-center gap-1 bg-indigo-50 px-2 py-0.5 rounded-full">
+                                        <MoreHorizontal size={12}/> View {hiddenCount} previous replies
+                                    </button>
+                                )}
+                                {isExpanded && replies.length > 2 && (
+                                    <button onClick={() => toggleThread(post.id)} className="text-[10px] font-bold text-slate-400 hover:text-slate-600">Collapse</button>
+                                )}
+                            </div>
+
+                            {/* Reply Input */}
+                            {replyingTo === post.id && (
+                                <div className="pl-14 mb-4 animate-in slide-in-from-top-1 fade-in">
+                                    <div className="flex gap-2">
+                                        <input autoFocus value={replyContent} onChange={(e) => setReplyContent(e.target.value)} placeholder="Write a reply..." className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 transition-colors" onKeyDown={(e) => { if(e.key === 'Enter') handleReply(post.id) }}/>
+                                        <button onClick={() => handleReply(post.id)} className="p-2 bg-indigo-600 text-white rounded-xl shadow-sm hover:bg-indigo-700 transition-colors"><Send size={16}/></button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Threaded Replies */}
+                            {visibleReplies.length > 0 && (
+                                <div className="space-y-3 mt-2">
+                                    {visibleReplies.map((reply: any) => (
+                                        <div key={reply.id} className="flex gap-3 relative pl-6 group">
+                                            {/* Thread Connector Line */}
+                                            <div className="absolute left-[26px] -top-4 bottom-4 w-px bg-slate-200 rounded-full"></div>
+                                            <div className="absolute left-[26px] top-3 w-4 h-4 border-b border-l border-slate-200 rounded-bl-xl"></div>
+
+                                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs shrink-0 border border-slate-200 z-10">
+                                                {reply.authorName.charAt(0).toUpperCase()}
+                                            </div>
+                                            <div className="flex-1 bg-slate-50 p-3 rounded-xl rounded-tl-none border border-slate-100">
+                                                <div className="flex justify-between items-baseline mb-1">
+                                                    <span className="font-bold text-slate-700 text-xs">{reply.authorName}</span>
+                                                    <span className="text-[9px] text-slate-400">{new Date(reply.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                                                </div>
+                                                <p className="text-slate-600 text-xs leading-relaxed">{reply.content}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
