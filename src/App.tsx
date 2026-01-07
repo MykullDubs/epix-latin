@@ -3008,8 +3008,8 @@ const renderStudentView = () => {
     }
 
     const isLessonMode = !!activeLesson;
-    return (
-        <div key={viewKey} className={`h-full w-full animate-in fade-in duration-300 ${!isLessonMode ? 'pt-12' : ''}`}>
+return (
+        <div key={viewKey} className="h-full w-full animate-in fade-in duration-300">
             {content}
         </div>
     );
