@@ -157,13 +157,15 @@ const ChatDialogueBlock = ({ lines }: any) => (
     </div>
 );
 // ============================================================================
-//  SAFE LESSON COMPONENTS (Crash-Proof)
+//  DEFINITIVE LESSON ENGINE (Sub-components + Main View)
 // ============================================================================
 
+// 1. CONCEPT CARD (Single Interactive Card)
 const ConceptCardBlock = ({ front, back, context, onInteraction }: any) => {
     const [isFlipped, setIsFlipped] = useState(false);
     const [status, setStatus] = useState<'neutral' | 'success' | 'missed'>('neutral');
     const handleFlip = () => { if (!isFlipped) { setIsFlipped(true); if (onInteraction) onInteraction(); } };
+    const handleRating = (rating: 'success' | 'missed', e: any) => { e.stopPropagation(); setStatus(rating); };
     return (
         <div className="my-8 w-full max-w-md mx-auto">
             {context && (<div className="mb-3 flex items-center gap-2 text-indigo-900/70 font-bold text-sm uppercase tracking-wide animate-in fade-in slide-in-from-bottom-2"><Zap size={14} className="text-amber-500 fill-amber-500"/>{context}</div>)}
@@ -171,7 +173,8 @@ const ConceptCardBlock = ({ front, back, context, onInteraction }: any) => {
                 <div className="relative w-full h-full transition-all duration-500 transform-style-3d shadow-xl rounded-3xl" style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}>
                     <div className="absolute inset-0 backface-hidden bg-white rounded-3xl border-2 border-slate-100 flex flex-col items-center justify-center p-8 text-center" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}><div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"><HelpCircle size={24}/></div><h3 className="text-2xl font-black text-slate-800 leading-tight">{front}</h3><p className="absolute bottom-6 text-xs font-bold text-indigo-500 uppercase tracking-widest animate-pulse">Tap to Reveal</p></div>
                     <div className="absolute inset-0 backface-hidden bg-slate-900 rounded-3xl flex flex-col items-center justify-center p-8 text-center text-white relative overflow-hidden" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
-                        <div className="relative z-10 flex flex-col items-center w-full h-full justify-center"><span className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-2">Answer</span><h3 className="text-2xl font-bold mb-6">{back}</h3><div className="w-full grid grid-cols-2 gap-3 mt-4"><button onClick={(e) => {e.stopPropagation(); setStatus('missed');}} className={`py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${status === 'missed' ? 'bg-rose-500 text-white' : 'bg-white/10 text-white/70'}`}><X size={14}/> Missed</button><button onClick={(e) => {e.stopPropagation(); setStatus('success');}} className={`py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${status === 'success' ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/70'}`}><Check size={14}/> Got it</button></div></div>
+                        <div className={`absolute inset-0 opacity-20 transition-colors duration-500 ${status === 'success' ? 'bg-emerald-500' : status === 'missed' ? 'bg-rose-500' : 'bg-indigo-500'}`}></div>
+                        <div className="relative z-10 flex flex-col items-center w-full h-full justify-center"><span className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-2">Answer</span><h3 className="text-2xl font-bold mb-6">{back}</h3><div className="w-full grid grid-cols-2 gap-3 mt-4"><button onClick={(e) => handleRating('missed', e)} className={`py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${status === 'missed' ? 'bg-rose-500 text-white shadow-lg scale-105' : 'bg-white/10 text-white/70 hover:bg-rose-500/50'}`}><X size={14}/> I missed it</button><button onClick={(e) => handleRating('success', e)} className={`py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${status === 'success' ? 'bg-emerald-500 text-white shadow-lg scale-105' : 'bg-white/10 text-white/70 hover:bg-emerald-500/50'}`}><Check size={14}/> I knew it</button></div></div>
                     </div>
                 </div>
             </div>
@@ -179,31 +182,33 @@ const ConceptCardBlock = ({ front, back, context, onInteraction }: any) => {
     );
 };
 
+// 2. JUICY DECK (Vocab List / Multiple Cards)
 const JuicyDeckBlock = ({ items, title }: any) => {
     const [index, setIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
-    // Safety check for empty items
+    // Safety check for empty items to prevent white screen
     if (!items || items.length === 0) return null;
     const currentCard = items[index] || items[0];
+    
     const handleSwipe = (dir: number) => { setIsFlipped(false); setTimeout(() => { setIndex((prev) => (prev + dir + items.length) % items.length); }, 200); };
     return (
         <div className="my-8 w-[90%] max-w-sm mx-auto relative">
             <div className="flex justify-between items-center mb-4 px-2"><h4 className="text-xs font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2"><Layers size={14}/> {title || "Flashcards"}</h4><div className="flex gap-1">{items.map((_:any, i:number) => <div key={i} className={`h-1 w-4 rounded-full transition-colors ${i === index ? 'bg-indigo-500' : 'bg-slate-200'}`} />)}</div></div>
-            <div className="group h-64 cursor-pointer relative perspective-1000" onClick={() => setIsFlipped(!isFlipped)}><div className="relative w-full h-full transition-all duration-500 transform-style-3d" style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}><div className="absolute inset-0 bg-white rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center justify-center p-6 text-center backface-hidden" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}><span className="absolute top-4 left-4 text-[10px] font-bold text-slate-300 uppercase">Term</span><h3 className="text-2xl font-black text-slate-800">{currentCard.term || currentCard.front}</h3></div><div className="absolute inset-0 bg-slate-900 rounded-2xl shadow-xl flex flex-col items-center justify-center p-6 text-white text-center backface-hidden" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}><span className="absolute top-4 left-4 text-[10px] font-bold text-slate-500 uppercase">Definition</span><p className="text-lg font-medium leading-relaxed relative z-10">{currentCard.definition || currentCard.back}</p></div></div><div className="absolute top-2 left-2 w-full h-full bg-slate-100 rounded-2xl -z-10 border border-slate-200 shadow-sm transform rotate-2"></div></div>
+            <div className="group h-64 cursor-pointer relative perspective-1000" onClick={() => setIsFlipped(!isFlipped)}><div className="relative w-full h-full transition-all duration-500 transform-style-3d" style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}><div className="absolute inset-0 bg-white rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center justify-center p-6 text-center backface-hidden" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}><span className="absolute top-4 left-4 text-[10px] font-bold text-slate-300 uppercase">Term</span><h3 className="text-2xl font-black text-slate-800">{currentCard.term || currentCard.front}</h3><p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[10px] text-slate-300 font-medium uppercase tracking-widest">Tap to Flip</p></div><div className="absolute inset-0 bg-slate-900 rounded-2xl shadow-xl flex flex-col items-center justify-center p-6 text-white text-center backface-hidden" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}><span className="absolute top-4 left-4 text-[10px] font-bold text-slate-500 uppercase">Definition</span><p className="text-lg font-medium leading-relaxed relative z-10">{currentCard.definition || currentCard.back}</p></div></div><div className="absolute top-2 left-2 w-full h-full bg-slate-100 rounded-2xl -z-10 border border-slate-200 shadow-sm transform rotate-2"></div></div>
             <div className="flex justify-between items-center mt-6 px-4"><button onClick={() => handleSwipe(-1)} className="p-3 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 shadow-sm active:scale-95"><ArrowLeft size={20}/></button><div className="text-xs font-bold text-slate-400">{index + 1} / {items.length}</div><button onClick={() => handleSwipe(1)} className="p-3 rounded-full bg-slate-900 text-white shadow-lg hover:bg-indigo-600 active:scale-95"><ArrowRight size={20}/></button></div>
         </div>
     );
 };
 
+// 3. SCENARIO BLOCK (Branching)
 const ScenarioBlock = ({ block, onComplete }: any) => {
-    // Safety: ensure nodes exist
-    const nodes = block?.nodes || [];
-    if (nodes.length === 0) return <div className="p-4 bg-red-50 text-red-500">Error: Scenario has no nodes.</div>;
-    
-    const [currentNodeId, setCurrentNodeId] = useState(nodes[0].id);
+    const [currentNodeId, setCurrentNodeId] = useState(block?.nodes?.[0]?.id);
     const [history, setHistory] = useState<string[]>([]);
     
-    const currentNode = nodes.find((n:any) => n.id === currentNodeId);
+    // Safety check if nodes are missing
+    if (!block?.nodes || block.nodes.length === 0) return <div className="p-4 bg-red-50 text-red-500">Error: Invalid Scenario Data</div>;
+
+    const currentNode = block.nodes.find((n:any) => n.id === currentNodeId);
     if (!currentNode) return <div className="p-4 bg-red-50 text-red-500">Error: Broken Scenario Link</div>;
 
     const isEnd = !currentNode.options || currentNode.options.length === 0 || currentNode.options[0].nextNodeId === 'end';
@@ -213,13 +218,14 @@ const ScenarioBlock = ({ block, onComplete }: any) => {
     return (
         <div className={`${bgColors[currentNode.color || 'neutral']} text-white rounded-3xl overflow-hidden shadow-2xl border-4 ${borderColor} my-8 transition-colors duration-500`}>
             {currentNode.imageUrl && (<div className="h-48 w-full overflow-hidden relative"><div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent z-10"/><img src={currentNode.imageUrl} alt="Scene" className="w-full h-full object-cover"/></div>)}
-            <div className="p-4 border-b border-white/10 flex justify-between items-center relative z-20"><span className="text-xs font-bold uppercase tracking-widest text-white/70 flex items-center gap-2">{currentNode.speaker ? <User size={14}/> : <Brain size={14}/>} {currentNode.speaker || 'Scene'}</span>{history.length > 0 && <button onClick={() => { setCurrentNodeId(nodes[0].id); setHistory([]); }} className="text-xs text-white/50 hover:text-white flex items-center gap-1"><RotateCcw size={12}/> Restart</button>}</div>
+            <div className="p-4 border-b border-white/10 flex justify-between items-center relative z-20"><span className="text-xs font-bold uppercase tracking-widest text-white/70 flex items-center gap-2">{currentNode.speaker ? <User size={14}/> : <Brain size={14}/>} {currentNode.speaker || 'Scene'}</span>{history.length > 0 && <button onClick={() => { setCurrentNodeId(block.nodes[0].id); setHistory([]); }} className="text-xs text-white/50 hover:text-white flex items-center gap-1"><RotateCcw size={12}/> Restart</button>}</div>
             <div className="p-6 relative z-20 min-h-[100px] flex items-center"><p className="text-xl font-serif leading-relaxed animate-in fade-in slide-in-from-bottom-2 duration-500">"{currentNode.text}"</p></div>
             <div className="bg-black/20 p-2 grid gap-2 backdrop-blur-sm">{!isEnd ? currentNode.options.map((opt:any, i:number) => (<button key={i} onClick={() => { setHistory([...history, currentNode.text]); setCurrentNodeId(opt.nextNodeId); }} className="w-full p-4 text-left bg-white/10 hover:bg-white/20 rounded-xl transition-all font-bold text-sm border border-white/5 hover:border-white/30 flex justify-between items-center group"><span>{opt.text}</span><ArrowRight size={16} className="opacity-50 group-hover:opacity-100 transition-opacity"/></button>)) : (<button onClick={onComplete} className="w-full p-4 bg-white text-slate-900 hover:bg-emerald-400 rounded-xl font-bold flex items-center justify-center gap-2 animate-pulse shadow-lg">Complete Scenario <Check size={16}/></button>)}</div>
         </div>
     );
 };
 
+// 4. QUIZ BLOCK
 const QuizBlock = ({ block, onComplete }: any) => {
     const [selected, setSelected] = useState<string | null>(null);
     const [submitted, setSubmitted] = useState(false);
@@ -233,6 +239,7 @@ const QuizBlock = ({ block, onComplete }: any) => {
     );
 };
 
+// 5. CHAT DIALOGUE
 const ChatDialogueBlock = ({ lines }: any) => (
     <div className="space-y-4 my-8 bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
         {lines && lines.map((line: any, i: number) => {
@@ -241,10 +248,11 @@ const ChatDialogueBlock = ({ lines }: any) => (
         })}
     </div>
 );
-// --- MAIN LESSON VIEW (Safety Juiced) ---
+
+// 6. MAIN LESSON VIEW (Safety Juiced + Scroll Reset)
 function LessonView({ lesson, onFinish }: any) {
   // Safety: Ensure lesson exists
-  if (!lesson) return <div className="p-8 text-center"><Loader className="animate-spin"/></div>;
+  if (!lesson) return <div className="p-8 text-center"><Loader className="animate-spin text-indigo-500"/></div>;
 
   useLearningTimer(auth.currentUser, lesson.id, 'lesson', lesson.title);
   
@@ -269,23 +277,21 @@ function LessonView({ lesson, onFinish }: any) {
       
       switch (block.type) {
           case 'text': return (<div className="my-6 prose prose-slate max-w-none animate-in fade-in slide-in-from-bottom-4 duration-700">{block.title && <h2 className="text-3xl font-black text-slate-800 mb-6 tracking-tight">{block.title}</h2>}<div className="text-lg text-slate-600 leading-loose whitespace-pre-wrap font-serif">{block.content}</div></div>);
-          case 'image': return (<div className="my-8 space-y-4 animate-in zoom-in-95 duration-500"><div className="rounded-3xl overflow-hidden shadow-2xl border-4 border-white ring-1 ring-slate-200">{block.url ? <img src={block.url} alt="Lesson" className="w-full object-cover" /> : <div className="h-48 bg-slate-100 flex items-center justify-center text-slate-400">Image Placeholder</div>}</div>{block.caption && <p className="text-center text-xs text-slate-400 font-bold uppercase tracking-widest bg-slate-50 py-2 rounded-full inline-block px-4 mx-auto">{block.caption}</p>}</div>);
+          case 'image': return (<div className="my-8 space-y-4 animate-in zoom-in-95 duration-500"><div className="rounded-3xl overflow-hidden shadow-2xl border-4 border-white ring-1 ring-slate-200"><img src={block.url} alt="Lesson" className="w-full object-cover" /></div>{block.caption && <p className="text-center text-xs text-slate-400 font-bold uppercase tracking-widest bg-slate-50 py-2 rounded-full inline-block px-4 mx-auto">{block.caption}</p>}</div>);
           case 'vocab-list': return <JuicyDeckBlock items={block.items} title="Key Vocabulary" />;
           case 'flashcard': return <ConceptCardBlock front={block.front} back={block.back} context={block.title || "Check Understanding"} />;
           case 'quiz': return <QuizBlock block={block} onComplete={handleNextBlock} />;
           case 'scenario': return <ScenarioBlock block={block} onComplete={handleNextBlock} />;
           case 'dialogue': return <ChatDialogueBlock lines={block.lines} />;
           case 'note': {
-              // Wrapped in braces to scope variables
               const styles: any = { info: { bg: 'bg-gradient-to-br from-blue-50 to-indigo-50', border: 'border-blue-100', iconBg: 'bg-white', iconColor: 'text-blue-600', icon: <Info size={20}/> }, tip: { bg: 'bg-gradient-to-br from-emerald-50 to-teal-50', border: 'border-emerald-100', iconBg: 'bg-white', iconColor: 'text-emerald-600', icon: <Zap size={20} className="fill-current"/> }, warning: { bg: 'bg-gradient-to-br from-amber-50 to-orange-50', border: 'border-amber-100', iconBg: 'bg-white', iconColor: 'text-amber-600', icon: <AlertTriangle size={20}/> } };
-              const s = styles[block.variant || 'info'] || styles.info; // Fallback to info
+              const s = styles[block.variant || 'info'] || styles.info;
               return (<div className={`relative overflow-hidden rounded-2xl border ${s.border} ${s.bg} p-5 my-6 shadow-sm animate-in slide-in-from-left-2 duration-500`}><div className={`absolute -right-4 -top-4 opacity-10 pointer-events-none ${s.iconColor}`}>{React.cloneElement(s.icon, { size: 100 })}</div><div className="relative z-10 flex gap-4 items-start"><div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${s.iconBg} ${s.iconColor} shadow-sm border border-white/50`}>{s.icon}</div><div><h4 className={`font-black text-[10px] uppercase tracking-widest mb-1 opacity-70 ${s.iconColor}`}>{block.title || block.variant}</h4><p className="text-slate-700 text-sm font-medium leading-relaxed">{block.content}</p></div></div></div>);
           }
           default: return <div className="p-4 bg-slate-100 rounded text-slate-500 italic">Unsupported block type: {block.type}</div>;
       }
   };
 
-  // Guard: Ensure activeBlock exists before checking type
   const activeBlock = blocks[currentBlockIdx];
   const isInteractive = activeBlock && (activeBlock.type === 'quiz' || (activeBlock.type === 'scenario' && activeBlock.nodes));
 
