@@ -17,7 +17,8 @@ import {
   School, Users, Copy, List, ArrowRight, LayoutDashboard, ArrowLeft, Library, 
   Pencil, Image, Info, Edit3, AlertTriangle, FlipVertical, HelpCircle, 
   CheckCircle2, Circle, Activity, Clock, Compass, Globe, RotateCcw, Play, 
-  Maximize2, BarChart2, Timer, Megaphone, Inbox, XCircle, ChevronUp, Send
+  Maximize2, BarChart2, Timer, Megaphone, Inbox, XCircle, ChevronUp, Send,
+  ArrowUp, ArrowDown, Eye, EyeOff, MessageCircle // <--- ADDED MISSING ICONS
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -78,7 +79,7 @@ function Header({ title, subtitle, rightAction, onClickTitle, sticky = true }: a
 }
 
 // ============================================================================
-//  1. LESSON VIEW & SUB-COMPONENTS
+//  LESSON VIEW SUB-COMPONENTS
 // ============================================================================
 
 const ConceptCardBlock = ({ front, back, context, onInteraction }: any) => {
@@ -466,18 +467,39 @@ function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, on
   );
 }
 
+// ============================================================================
+//  4-BUTTON NAVIGATION BAR
+// ============================================================================
 function StudentNavBar({ activeTab, setActiveTab }: any) {
-    const tabs = [{ id: 'home', label: 'Home', icon: LayoutDashboard }, { id: 'discovery', label: 'Explore', icon: Compass }, { id: 'flashcards', label: 'Practice', icon: Layers }, { id: 'profile', label: 'Me', icon: User }];
+    const tabs = [
+        { id: 'home', label: 'Home', icon: LayoutDashboard },
+        { id: 'discovery', label: 'Explore', icon: Compass },   // <--- The New 4th Button
+        { id: 'flashcards', label: 'Practice', icon: Layers },
+        { id: 'profile', label: 'Me', icon: User }
+    ];
+
     return (
         <nav className="fixed bottom-0 w-full max-w-md bg-white/90 backdrop-blur-xl border-t border-slate-200 pb-safe pt-2 px-6 z-40 flex justify-between items-center h-[85px] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
             {tabs.map((tab) => {
                 const isActive = activeTab === tab.id;
-                return (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center gap-1 transition-all duration-300 w-16 ${isActive ? 'text-indigo-600 -translate-y-1' : 'text-slate-400 hover:text-slate-600'}`}><div className={`p-2 rounded-2xl transition-all ${isActive ? 'bg-indigo-50 shadow-sm ring-1 ring-indigo-100' : ''}`}><tab.icon size={24} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'fill-indigo-100' : ''}/></div><span className={`text-[10px] font-bold ${isActive ? 'opacity-100' : 'opacity-0 scale-0'} transition-all duration-300 absolute -bottom-2`}>{tab.label}</span></button>);
+                return (
+                    <button 
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)} 
+                        className={`flex flex-col items-center gap-1 transition-all duration-300 w-16 ${isActive ? 'text-indigo-600 -translate-y-1' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                        <div className={`p-2 rounded-2xl transition-all ${isActive ? 'bg-indigo-50 shadow-sm ring-1 ring-indigo-100' : ''}`}>
+                            <tab.icon size={24} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'fill-indigo-100' : ''}/>
+                        </div>
+                        <span className={`text-[10px] font-bold ${isActive ? 'opacity-100' : 'opacity-0 scale-0'} transition-all duration-300 absolute -bottom-2`}>
+                            {tab.label}
+                        </span>
+                    </button>
+                );
             })}
         </nav>
     );
 }
-
 // ============================================================================
 //  MAIN APP COMPONENT
 // ============================================================================
@@ -486,16 +508,20 @@ function App() {
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  
+  // Content & State
   const [systemDecks, setSystemDecks] = useState<any>({});
   const [systemLessons, setSystemLessons] = useState<any[]>([]);
   const [customCards, setCustomCards] = useState<any[]>([]);
   const [customLessons, setCustomLessons] = useState<any[]>([]);
+  
   const [activeLesson, setActiveLesson] = useState<any>(null);
   const [selectedDeckKey, setSelectedDeckKey] = useState('salutationes');
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [classLessons, setClassLessons] = useState<any[]>([]);
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
 
+  // --- MEMOS ---
   const allDecks = useMemo(() => {
     const decks: any = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: [] } };
     customCards.forEach(card => {
@@ -528,34 +554,71 @@ function App() {
       } 
   };
 
+  // --- EFFECTS ---
   useEffect(() => { const unsubscribe = onAuthStateChanged(auth, (u) => { setUser(u); setAuthChecked(true); }); return () => unsubscribe(); }, []);
   
   useEffect(() => {
     if (!user) { setUserData(null); return; }
     setSystemDecks(INITIAL_SYSTEM_DECKS); setSystemLessons(INITIAL_SYSTEM_LESSONS);
+    
     const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (docSnap) => { if (docSnap.exists()) setUserData(docSnap.data()); else setUserData(DEFAULT_USER_DATA); });
     const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     const unsubSysDecks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_decks'), (snap) => { const d: any = {}; snap.docs.forEach(doc => { d[doc.id] = doc.data(); }); if (Object.keys(d).length > 0) setSystemDecks(d); });
     const unsubSysLessons = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_lessons'), (snap) => { const l = snap.docs.map(d => ({ id: d.id, ...d.data() })); if (l.length > 0) setSystemLessons(l); });
+
     let qClasses;
     if (userData?.role === 'instructor') {
          qClasses = query(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'));
     } else {
          qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
     }
-    const unsubClasses = onSnapshot(qClasses, (snapshot) => { const cls = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); setEnrolledClasses(cls); const newAssignments: any[] = []; cls.forEach((c: any) => { if (c.assignments && Array.isArray(c.assignments)) { newAssignments.push(...c.assignments); } }); setClassLessons(newAssignments); setUserData((prev: any) => ({...prev, classes: cls, classAssignments: newAssignments})); }, (error) => { console.log("Class sync error:", error); setUserData((prev: any) => ({...prev, classSyncError: true})); });
+
+    const unsubClasses = onSnapshot(qClasses, (snapshot) => { 
+        const cls = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); 
+        setEnrolledClasses(cls); 
+        const newAssignments: any[] = []; 
+        cls.forEach((c: any) => { if (c.assignments && Array.isArray(c.assignments)) { newAssignments.push(...c.assignments); } }); 
+        setClassLessons(newAssignments); 
+        setUserData((prev: any) => ({...prev, classes: cls, classAssignments: newAssignments})); 
+    }, (error) => { console.log("Class sync error:", error); setUserData((prev: any) => ({...prev, classSyncError: true})); });
+    
     return () => { unsubProfile(); unsubCards(); unsubLessons(); unsubSysDecks(); unsubSysLessons(); unsubClasses(); };
   }, [user, userData?.role]);
 
+  // --- HANDLERS ---
   const handleCreateCard = useCallback(async (c: any) => { if(!user) return; const cardId = doc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards')).id; await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), {...c, id: cardId}); setSelectedDeckKey(c.deckId || 'custom'); setActiveTab('flashcards'); }, [user]);
   const handleUpdateCard = useCallback(async (cardId: string, data: any) => { if (!user) return; try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), data); } catch (e) { console.error(e); alert("Cannot edit card. Check permissions."); } }, [user]);
-  const handleDeleteCard = useCallback(async (cardId: string) => { if (!user) return; if (!window.confirm("Are you sure you want to delete this card?")) return; try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId)); } catch (e) { console.error(e); alert("Failed to delete card."); } }, [user]);
+  const handleDeleteCard = useCallback(async (cardId: string) => { if (!user) return; if (!window.confirm("Delete card?")) return; try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId)); } catch (e) { console.error(e); alert("Failed to delete card."); } }, [user]);
   const handleCreateLesson = useCallback(async (l: any, id = null) => { if(!user) return; if (id) { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', id), l); } else { await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), l); } setActiveTab('home'); }, [user]);
   const handleUpdatePreferences = useCallback(async (prefs: any) => { if (!user) return; await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { deckPreferences: prefs }); setUserData((prev: any) => ({ ...prev, deckPreferences: prefs })); }, [user]);
   const handleDeleteDeck = useCallback(async (deckId: string) => { if(!user) return; if(!window.confirm("Delete this deck?")) return; try { const toDelete = customCards.filter(c => c.deckId === deckId); for(const c of toDelete) { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', c.id)); } setSelectedDeckKey('custom'); } catch(e) { console.error(e); } }, [user, customCards]);
-  const handleLogSelfStudy = useCallback(async (deckId: string, xp: number, title: string, scoreDetail?: any) => { if (!user) return; try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp) }); await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { studentName: displayName, studentEmail: user.email, itemTitle: title, itemId: deckId, xp: xp, timestamp: Date.now(), type: 'self_study', scoreDetail }); } catch (e) { console.error("Log failed", e); } }, [user, displayName]);
-  const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title: string = 'Lesson', score: any = null) => { setActiveTab('home'); if (xp > 0 && user) { try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp), completedAssignments: arrayUnion(lessonId) }); await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { studentName: displayName, studentEmail: user.email, itemTitle: title, xp: xp, timestamp: Date.now(), type: 'completion', scoreDetail: score }); } catch (e) { console.error(e); } } }, [user, displayName]);
+  const handleLogSelfStudy = useCallback(async (deckId: string, xp: number, title: string, scoreDetail?: any) => { 
+      if (!user) return; 
+      try { 
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp) }); 
+          await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { 
+              studentName: displayName, 
+              studentEmail: user.email, 
+              itemTitle: title, 
+              itemId: deckId, 
+              xp: xp, 
+              timestamp: Date.now(), 
+              type: 'self_study', 
+              scoreDetail 
+          }); 
+      } catch (e) { console.error("Log failed", e); } 
+  }, [user, displayName]);
+
+  const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title: string = 'Lesson', score: any = null) => { 
+    setActiveTab('home'); 
+    if (xp > 0 && user) { 
+        try { 
+            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp), completedAssignments: arrayUnion(lessonId) }); 
+            await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { studentName: displayName, studentEmail: user.email, itemTitle: title, xp: xp, timestamp: Date.now(), type: 'completion', scoreDetail: score });
+        } catch (e) { console.error(e); } 
+    } 
+  }, [user, displayName]);
 
   if (!authChecked) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
   if (!user) return <AuthView />;
@@ -564,7 +627,9 @@ function App() {
   const commonHandlers = { onSaveCard: handleCreateCard, onUpdateCard: handleUpdateCard, onDeleteCard: handleDeleteCard, onSaveLesson: handleCreateLesson, };
   const isInstructor = userData.role === 'instructor';
 
-  if (isInstructor) { return <InstructorDashboard user={user} userData={{...userData, classes: enrolledClasses}} allDecks={allDecks} lessons={libraryLessons} {...commonHandlers} onLogout={() => signOut(auth)} />; }
+  if (isInstructor) {
+      return <InstructorDashboard user={user} userData={{...userData, classes: enrolledClasses}} allDecks={allDecks} lessons={libraryLessons} {...commonHandlers} onLogout={() => signOut(auth)} />;
+  }
 
   const renderStudentView = () => {
     let content;
@@ -579,25 +644,58 @@ function App() {
     } else {
         viewKey = `tab-${activeTab}`;
         switch (activeTab) {
-            case 'home': content = <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} />; break;
-            case 'discovery': content = <DiscoveryView allDecks={allDecks} user={user} onSelectDeck={handleContentSelection} />; break;
-            case 'flashcards': const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck'); const deckToLoad = assignedDeck || allDecks[selectedDeckKey]; content = <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} activeDeckOverride={deckToLoad} onComplete={handleFinishLesson} onLogActivity={handleLogSelfStudy} userData={userData} user={user} onUpdatePrefs={handleUpdatePreferences} onDeleteDeck={handleDeleteDeck} />; break;
-            case 'create': content = <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />; break;
-            case 'profile': content = <ProfileView user={user} userData={userData} />; break;
-            default: content = <HomeView />;
+            case 'home': 
+                content = <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} />;
+                break;
+            case 'discovery': // NEW TAB
+                content = <DiscoveryView allDecks={allDecks} user={user} onSelectDeck={handleContentSelection} />;
+                break;
+            case 'flashcards': 
+                const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
+                const deckToLoad = assignedDeck || allDecks[selectedDeckKey];
+                content = <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} activeDeckOverride={deckToLoad} onComplete={handleFinishLesson} onLogActivity={handleLogSelfStudy} userData={userData} user={user} onUpdatePrefs={handleUpdatePreferences} onDeleteDeck={handleDeleteDeck} />;
+                break;
+            case 'create': 
+                content = <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />;
+                break;
+            case 'profile': 
+                content = <ProfileView user={user} userData={userData} />;
+                break;
+            default: 
+                content = <HomeView />;
         }
     }
+
     const isLessonMode = !!activeLesson;
-    return <div key={viewKey} className={`h-full w-full animate-in fade-in duration-300 ${!isLessonMode ? 'pt-12' : ''}`}>{content}</div>;
+    return (
+        <div key={viewKey} className={`h-full w-full animate-in fade-in duration-300 ${!isLessonMode ? 'pt-12' : ''}`}>
+            {content}
+        </div>
+    );
   };
 
   return (
     <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-start relative overflow-hidden">
       <div className="w-full max-w-md h-[100dvh] bg-white shadow-2xl relative overflow-hidden flex flex-col">
-        <div className="flex-1 h-full overflow-hidden relative">{renderStudentView()}</div>
+        
+        {/* VIEWPORT CONTENT */}
+        <div className="flex-1 h-full overflow-hidden relative">
+            {renderStudentView()}
+        </div>
+
+        {/* BOTTOM NAVIGATION (4 BUTTONS) */}
         {!activeLesson && <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />}
       </div>
-      <style>{` .perspective-1000 { perspective: 1000px; } .preserve-3d { transform-style: preserve-3d; } .backface-hidden { backface-visibility: hidden; } .rotate-y-180 { transform: rotateY(180deg); } .custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; } .pb-safe { padding-bottom: env(safe-area-inset-bottom); } `}</style>
+      <style>{` 
+        .perspective-1000 { perspective: 1000px; } 
+        .preserve-3d { transform-style: preserve-3d; } 
+        .backface-hidden { backface-visibility: hidden; } 
+        .rotate-y-180 { transform: rotateY(180deg); } 
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; } 
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; } 
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+      `}</style>
     </div>
   );
 }
