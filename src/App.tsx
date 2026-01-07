@@ -514,7 +514,7 @@ function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
 }
 
 // ============================================================================
-//  HOME VIEW (With Professional App Bar)
+//  HOME VIEW (Cleaned & Action-Oriented)
 // ============================================================================
 function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userData, assignments, classes, user }: any) {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
@@ -527,9 +527,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userDat
   }, []);
 
   const completedSet = new Set(userData?.completedAssignments || []);
-  const relevantAssignments = (assignments || []).filter((l: any) => !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email));
-  const activeAssignments = relevantAssignments.filter((l: any) => !completedSet.has(l.id));
-
+  
   // Stats Calculation
   const xp = userData?.xp || 0;
   const level = Math.floor(xp / 1000) + 1;
@@ -551,15 +549,12 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userDat
         
         {/* 1. PROFESSIONAL APP BAR (Sticky) */}
         <div className="bg-white/90 backdrop-blur-md border-b border-slate-100 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
-            {/* Brand */}
             <div className="flex items-center gap-2">
                 <div className="bg-indigo-600 text-white p-1.5 rounded-lg shadow-sm">
                     <GraduationCap size={18} strokeWidth={3}/>
                 </div>
                 <span className="font-black text-indigo-900 tracking-tighter text-lg">LLLMS</span>
             </div>
-
-            {/* Target Language Badge */}
             <div className="px-3 py-1.5 bg-slate-100 rounded-full border border-slate-200 flex items-center gap-1.5">
                 <Globe size={14} className="text-indigo-500"/>
                 <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">{targetLang}</span>
@@ -569,16 +564,13 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userDat
         {/* Scrollable Content */}
         <div ref={scrollViewportRef} className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth pb-32">
             
-            {/* 2. HERO SECTION (Streamlined) */}
+            {/* 2. HERO SECTION */}
             <div className="bg-white pt-6 pb-8 px-6 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 relative z-10">
-                
-                {/* Greeting */}
                 <div className="mb-8">
                     <h1 className="text-3xl font-medium text-slate-400 tracking-tight">{greeting},</h1>
                     <h1 className="text-4xl font-black text-slate-800 tracking-tight">{firstName}.</h1>
                 </div>
 
-                {/* Stats Grid */}
                 <div className="grid grid-cols-3 gap-3">
                     <div className="p-3 bg-indigo-50 rounded-2xl border border-indigo-100 flex flex-col items-center justify-center">
                         <Flame size={20} className="text-orange-500 mb-1 fill-orange-500"/>
@@ -597,7 +589,6 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userDat
                     </div>
                 </div>
 
-                {/* Progress Bar */}
                 <div className="mt-6 flex items-center gap-3">
                     <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
                         <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-1000" style={{ width: `${progress}%` }}></div>
@@ -608,20 +599,16 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userDat
 
             <div className="px-6 space-y-8 mt-8">
               
-              {/* --- MY CLASSES SECTION --- */}
+              {/* --- MY CLASSES --- */}
               {classes && classes.length > 0 ? (
                 <div className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
                     <div className="flex justify-between items-end mb-4 ml-1">
-                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                            My Classes
-                        </h3>
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">My Classes</h3>
                     </div>
                     
                     <div className="flex gap-5 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">
                         {classes.map((cls: any, index: number) => { 
                             const pending = (cls.assignments || []).filter((l: any) => (!l.targetStudents || l.targetStudents.includes(userData.email)) && !completedSet.has(l.id)).length;
-                            
-                            // Gradient Logic
                             const gradients = ["from-indigo-600 to-violet-600", "from-emerald-500 to-teal-600", "from-orange-500 to-rose-600", "from-blue-600 to-cyan-600"];
                             const themeGradient = gradients[index % gradients.length];
 
@@ -629,30 +616,18 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userDat
                                 <button key={cls.id} onClick={() => setActiveStudentClass(cls)} className="snap-start min-w-[280px] h-[180px] bg-white rounded-[2rem] shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-slate-100 transition-all duration-300 active:scale-95 hover:-translate-y-1 hover:shadow-xl group relative overflow-hidden flex flex-col text-left">
                                     <div className={`h-24 w-full bg-gradient-to-r ${themeGradient} relative p-5 flex justify-between items-start overflow-hidden`}>
                                         <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
-                                        <div className="w-12 h-12 bg-white/20 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-sm z-10">
-                                            {cls.name.charAt(0).toUpperCase()}
-                                        </div>
+                                        <div className="w-12 h-12 bg-white/20 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-sm z-10">{cls.name.charAt(0).toUpperCase()}</div>
                                         {pending > 0 ? (
-                                            <div className="flex items-center gap-1.5 bg-white text-rose-600 text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg z-10 animate-in zoom-in">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></div>
-                                                {pending} Due
-                                            </div>
+                                            <div className="flex items-center gap-1.5 bg-white text-rose-600 text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg z-10 animate-in zoom-in"><div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></div>{pending} Due</div>
                                         ) : (
-                                            <div className="bg-white/20 backdrop-blur-md text-white text-[10px] font-bold px-3 py-1.5 rounded-full z-10 flex items-center gap-1">
-                                                <Check size={12} strokeWidth={4}/> Done
-                                            </div>
+                                            <div className="bg-white/20 backdrop-blur-md text-white text-[10px] font-bold px-3 py-1.5 rounded-full z-10 flex items-center gap-1"><Check size={12} strokeWidth={4}/> Done</div>
                                         )}
                                     </div>
                                     <div className="p-5 flex-1 flex flex-col justify-between relative">
-                                        <div className="absolute top-0 right-5 -mt-5 bg-white text-slate-800 p-2 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 duration-300">
-                                            <ArrowRight size={16} />
-                                        </div>
+                                        <div className="absolute top-0 right-5 -mt-5 bg-white text-slate-800 p-2 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 duration-300"><ArrowRight size={16} /></div>
                                         <div>
                                             <h4 className="font-black text-slate-800 text-xl truncate leading-tight group-hover:text-indigo-600 transition-colors">{cls.name}</h4>
-                                            <div className="flex items-center gap-2 mt-2">
-                                                <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100">{cls.code}</span>
-                                                <span className="text-[10px] font-bold text-slate-400">{(cls.students || []).length} Students</span>
-                                            </div>
+                                            <div className="flex items-center gap-2 mt-2"><span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100">{cls.code}</span><span className="text-[10px] font-bold text-slate-400">{(cls.students || []).length} Students</span></div>
                                         </div>
                                     </div>
                                 </button> 
@@ -661,50 +636,52 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userDat
                     </div>
                 </div>
               ) : (
-                 <div className="p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center">
-                    <School size={32} className="mx-auto text-slate-300 mb-2"/>
-                    <p className="text-sm text-slate-400 font-bold">No classes yet.</p>
-                    <p className="text-xs text-slate-400 mt-1">Ask your instructor for a code.</p>
-                 </div>
+                 <div className="p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center"><School size={32} className="mx-auto text-slate-300 mb-2"/><p className="text-sm text-slate-400 font-bold">No classes yet.</p><p className="text-xs text-slate-400 mt-1">Ask your instructor for a code.</p></div>
               )}
 
-              {/* UP NEXT (ASSIGNMENTS) */}
-              {activeAssignments.length > 0 && (
-                  <div className="animate-in slide-in-from-bottom-4 duration-500 delay-200">
-                     <div className="flex justify-between items-center mb-3 ml-1">
-                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Up Next</h3>
-                     </div>
-                     <div className="space-y-3">
-                        {activeAssignments.slice(0, 3).map((l: any, i: number) => ( 
-                            <button key={`${l.id}-${i}`} onClick={() => l.contentType === 'deck' ? onSelectDeck(l) : onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all group hover:border-indigo-300 hover:shadow-md">
-                                <div className="flex items-center space-x-4">
-                                    <div className={`h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600' : l.contentType === 'test' || l.contentType === 'exam' ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'}`}>
-                                        {l.contentType === 'deck' ? <Layers size={22}/> : (l.contentType === 'test' || l.contentType === 'exam') ? <FileText size={20}/> : <PlayCircle size={22} />}
-                                    </div>
-                                    <div className="text-left">
-                                        <h4 className="font-bold text-slate-800 text-sm">{l.title}</h4>
-                                        <p className="text-xs text-slate-400 font-medium">{(l.contentType === 'test' || l.contentType === 'exam') ? 'Exam' : l.contentType === 'deck' ? 'Flashcards' : 'Lesson'} • {l.xp} XP</p>
-                                    </div>
-                                </div>
-                                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                                    <Play size={12} fill="currentColor" />
-                                </div>
-                            </button>
-                        ))}
-                     </div>
-                  </div>
-              )}
-              
-              {/* QUICK ACTIONS */}
-              <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-bottom-4 duration-500 delay-300">
-                <button onClick={() => setActiveTab('flashcards')} className="p-5 bg-white rounded-3xl border border-slate-200 shadow-sm text-center active:scale-95 transition-all group hover:border-orange-300 hover:shadow-md">
-                    <div className="w-12 h-12 bg-orange-50 text-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform"><Layers size={24}/></div>
-                    <span className="block font-bold text-slate-800 text-sm">Practice Vocab</span>
+              {/* --- ACTION CARDS (REVAMPED) --- */}
+              <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-bottom-4 duration-500 delay-200">
+                
+                {/* 1. Practice Card */}
+                <button 
+                    onClick={() => setActiveTab('flashcards')} 
+                    className="relative h-40 rounded-[2rem] overflow-hidden shadow-lg hover:shadow-orange-200/50 transition-all duration-300 active:scale-95 group text-left"
+                >
+                    <div className="absolute inset-0 bg-gradient-to-br from-orange-400 to-red-500"></div>
+                    <div className="absolute -right-4 -bottom-4 text-white opacity-20 transform rotate-12 group-hover:scale-110 transition-transform duration-500">
+                        <Layers size={100} strokeWidth={1.5} />
+                    </div>
+                    <div className="relative z-10 p-5 h-full flex flex-col justify-between">
+                        <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center text-white shadow-inner">
+                            <Layers size={20} />
+                        </div>
+                        <div>
+                            <h3 className="text-white font-black text-xl leading-none mb-1">Vocab Gym</h3>
+                            <p className="text-orange-100 text-xs font-medium">Train your brain</p>
+                        </div>
+                    </div>
                 </button>
-                <button onClick={() => setActiveTab('create')} className="p-5 bg-white rounded-3xl border border-slate-200 shadow-sm text-center active:scale-95 transition-all group hover:border-emerald-300 hover:shadow-md">
-                    <div className="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform"><Feather size={24}/></div>
-                    <span className="block font-bold text-slate-800 text-sm">Create Content</span>
+
+                {/* 2. Create Card */}
+                <button 
+                    onClick={() => setActiveTab('create')} 
+                    className="relative h-40 rounded-[2rem] overflow-hidden shadow-lg hover:shadow-emerald-200/50 transition-all duration-300 active:scale-95 group text-left"
+                >
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-teal-600"></div>
+                    <div className="absolute -right-4 -bottom-4 text-white opacity-20 transform -rotate-12 group-hover:scale-110 transition-transform duration-500">
+                        <Feather size={100} strokeWidth={1.5} />
+                    </div>
+                    <div className="relative z-10 p-5 h-full flex flex-col justify-between">
+                        <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center text-white shadow-inner">
+                            <Feather size={20} />
+                        </div>
+                        <div>
+                            <h3 className="text-white font-black text-xl leading-none mb-1">Studio</h3>
+                            <p className="text-emerald-100 text-xs font-medium">Build & Share</p>
+                        </div>
+                    </div>
                 </button>
+
               </div>
 
             </div>
@@ -712,7 +689,6 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userDat
     </div>
   );
 }
-
 // ============================================================================
 //  4. FLASHCARD VIEW & TOWER
 // ============================================================================
