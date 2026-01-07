@@ -1300,22 +1300,44 @@ function StudentGradebook({ classData, user }: any) {
     );
 }
 // ============================================================================
-//  CLASS FORUM (Threaded, Inline Replies, Accordion)
+//  CLASS FORUM (Fixed Typing Bug)
 // ============================================================================
+
+// 1. Helper Component (Moved OUTSIDE to fix focus/typing bugs)
+const InlineInput = ({ value, onChange, onSubmit, onCancel, placeholder, sending }: any) => (
+    <div className="mt-3 animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="flex gap-2 items-start">
+            <div className="flex-1 relative">
+                <textarea
+                    autoFocus
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit(); } }}
+                    placeholder={placeholder}
+                    className="w-full p-3 bg-slate-50 border-2 border-indigo-100 rounded-xl focus:border-indigo-500 focus:bg-white outline-none resize-none text-sm min-h-[80px]"
+                />
+                <div className="absolute bottom-2 right-2 flex gap-2">
+                    <button onClick={onCancel} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"><X size={14}/></button>
+                    <button onClick={onSubmit} disabled={sending || !value.trim()} className="p-1.5 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 disabled:opacity-50 transition-all"><Send size={14}/></button>
+                </div>
+            </div>
+        </div>
+    </div>
+);
+
 function ClassForum({ classData, user }: any) {
     const [posts, setPosts] = useState<any[]>([]);
     
-    // Global Composer (for new top-level posts)
+    // Global Composer
     const [mainContent, setMainContent] = useState('');
     const [isPostingMain, setIsPostingMain] = useState(false);
 
-    // Reply State Manager: { [postId]: 'open' | null }
-    // We track which specific item (post or reply) has an open input box
+    // Reply State
     const [activeInputId, setActiveInputId] = useState<string | null>(null);
     const [replyContent, setReplyContent] = useState('');
     const [sendingReply, setSendingReply] = useState(false);
 
-    // Accordion State: { [postId]: boolean } (true = expanded)
+    // Accordion State
     const [expandedThreads, setExpandedThreads] = useState<any>({});
 
     // Live Feed
@@ -1332,7 +1354,7 @@ function ClassForum({ classData, user }: any) {
         return () => unsub();
     }, [classData.id]);
 
-    // 1. Create New Thread
+    // Create New Thread
     const createPost = async () => {
         if (!mainContent.trim()) return;
         setIsPostingMain(true);
@@ -1351,9 +1373,7 @@ function ClassForum({ classData, user }: any) {
         setIsPostingMain(false);
     };
 
-    // 2. Add Reply to Thread
-    // parentPostId: The ID of the main document in Firebase
-    // replyToName: Optional, if replying to a specific sub-user
+    // Add Reply
     const sendReply = async (parentPostId: string, replyToName?: string) => {
         if (!replyContent.trim()) return;
         setSendingReply(true);
@@ -1372,8 +1392,8 @@ function ClassForum({ classData, user }: any) {
             await updateDoc(postRef, { replies: arrayUnion(newReply) });
             
             setReplyContent('');
-            setActiveInputId(null); // Close the box
-            setExpandedThreads({ ...expandedThreads, [parentPostId]: true }); // Auto-expand
+            setActiveInputId(null); 
+            setExpandedThreads({ ...expandedThreads, [parentPostId]: true });
         } catch (e) { console.error(e); }
         setSendingReply(false);
     };
@@ -1381,28 +1401,6 @@ function ClassForum({ classData, user }: any) {
     const toggleAccordion = (postId: string) => {
         setExpandedThreads((prev: any) => ({ ...prev, [postId]: !prev[postId] }));
     };
-
-    // Helper Component for the Inline Input Box
-    const InlineInput = ({ onSubmit, placeholder, onCancel }: any) => (
-        <div className="mt-3 animate-in fade-in slide-in-from-top-2 duration-200">
-            <div className="flex gap-2 items-start">
-                <div className="flex-1 relative">
-                    <textarea
-                        autoFocus
-                        value={replyContent}
-                        onChange={(e) => setReplyContent(e.target.value)}
-                        onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSubmit(); } }}
-                        placeholder={placeholder}
-                        className="w-full p-3 bg-slate-50 border-2 border-indigo-100 rounded-xl focus:border-indigo-500 focus:bg-white outline-none resize-none text-sm min-h-[80px]"
-                    />
-                    <div className="absolute bottom-2 right-2 flex gap-2">
-                        <button onClick={onCancel} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"><X size={14}/></button>
-                        <button onClick={onSubmit} disabled={sendingReply || !replyContent.trim()} className="p-1.5 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 disabled:opacity-50 transition-all"><Send size={14}/></button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
 
     return (
         <div className="flex flex-col h-full bg-slate-50 relative">
@@ -1434,14 +1432,13 @@ function ClassForum({ classData, user }: any) {
                 {posts.map((post) => {
                     const replies = post.replies || [];
                     const isExpanded = expandedThreads[post.id];
-                    // Show last 2 replies by default, or all if expanded
                     const visibleReplies = isExpanded ? replies : replies.slice(-2);
                     const hiddenCount = replies.length - visibleReplies.length;
 
                     return (
                         <div key={post.id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm animate-in slide-in-from-bottom-2 duration-300">
                             
-                            {/* --- ROOT POST --- */}
+                            {/* ROOT POST */}
                             <div className="flex gap-3 relative">
                                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-md shrink-0 border-2 border-white z-10">
                                     {post.authorName.charAt(0).toUpperCase()}
@@ -1474,20 +1471,22 @@ function ClassForum({ classData, user }: any) {
                                     {/* Inline Input for Root */}
                                     {activeInputId === post.id && (
                                         <InlineInput 
+                                            value={replyContent}
+                                            onChange={setReplyContent}
                                             placeholder="Write a reply..." 
                                             onSubmit={() => sendReply(post.id)} 
-                                            onCancel={() => setActiveInputId(null)} 
+                                            onCancel={() => setActiveInputId(null)}
+                                            sending={sendingReply}
                                         />
                                     )}
                                 </div>
                             </div>
 
-                            {/* --- REPLIES --- */}
+                            {/* REPLIES */}
                             {visibleReplies.length > 0 && (
                                 <div className="mt-4 space-y-4">
                                     {visibleReplies.map((reply: any) => (
                                         <div key={reply.id} className="flex gap-3 relative pl-4 group">
-                                            {/* Connector Lines */}
                                             <div className="absolute left-[19px] -top-6 bottom-0 w-px bg-slate-200"></div>
                                             <div className="absolute left-[19px] top-3 w-4 h-px bg-slate-200"></div>
 
@@ -1502,7 +1501,6 @@ function ClassForum({ classData, user }: any) {
                                                 </div>
                                                 <p className="text-slate-600 text-xs leading-relaxed">{reply.content}</p>
                                                 
-                                                {/* Reply to Reply Action */}
                                                 <div className="mt-2 flex">
                                                     <button 
                                                         onClick={() => { setActiveInputId(activeInputId === reply.id ? null : reply.id); setReplyContent(`@${reply.authorName} `); }} 
@@ -1515,9 +1513,12 @@ function ClassForum({ classData, user }: any) {
                                                 {/* Inline Input for Sub-Reply */}
                                                 {activeInputId === reply.id && (
                                                     <InlineInput 
+                                                        value={replyContent}
+                                                        onChange={setReplyContent}
                                                         placeholder={`Reply to ${reply.authorName}...`} 
-                                                        onSubmit={() => sendReply(post.id)} // Always updates parent post
+                                                        onSubmit={() => sendReply(post.id)} 
                                                         onCancel={() => setActiveInputId(null)} 
+                                                        sending={sendingReply}
                                                     />
                                                 )}
                                             </div>
