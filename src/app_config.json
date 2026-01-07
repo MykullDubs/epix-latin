@@ -1,0 +1,48 @@
+{
+  "config_id": "global_branding_v2",
+  "app_info": {
+    "name": "LLLMS",
+    "full_name": "The Little Language Learning Management System",
+    "version": "1.0.0-beta",
+    "tagline": "Big fluency in little steps.",
+    "welcome_message": "Welcome to LLLMS. Your personalized path to language mastery starts here."
+  },
+  "ui_theme": {
+    "mode": "light",
+    "primary_color": "#6366f1", 
+    "secondary_color": "#a5b4fc",
+    "accent_color": "#f43f5e",
+    "background_color": "#f8fafc",
+    "surface_color": "#ffffff",
+    "font_family_header": "'Nunito', sans-serif",
+    "font_family_body": "'Inter', sans-serif",
+    "border_radius": "12px",
+    "box_shadow": "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)"
+  },
+  "layout_components": {
+    "header": {
+      "visible": true,
+      "title_display": "LLLMS",
+      "show_user_avatar": true,
+      "show_xp_counter": true,
+      "show_streak_flame": true
+    },
+    "navigation_bar": {
+      "items": [
+        { "id": "home", "label": "Learn", "icon": "book-open" },
+        { "id": "practice", "label": "Review", "icon": "dumbbell" },
+        { "id": "leaderboard", "label": "Ranks", "icon": "trophy" },
+        { "id": "profile", "label": "Me", "icon": "user" }
+      ]
+    },
+    "lesson_card_style": {
+      "display_type": "grid",
+      "show_progress_bar": true,
+      "animation_speed": "fast"
+    }
+  },
+  "localization": {
+    "default_language": "en-US",
+    "supported_languages": ["en-US", "es-MX", "fr-FR", "de-DE"]
+  }
+}
