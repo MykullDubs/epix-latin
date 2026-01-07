@@ -514,7 +514,7 @@ function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
 }
 
 // ============================================================================
-//  HOME VIEW (LLLMS Revamped)
+//  HOME VIEW (With Professional App Bar)
 // ============================================================================
 function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userData, assignments, classes, user }: any) {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
@@ -547,26 +547,31 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userDat
   }
 
   return (
-    <div ref={scrollViewportRef} className="h-full overflow-y-auto overflow-x-hidden relative bg-slate-50 scroll-smooth">
-        <div className="pb-32 animate-in fade-in slide-in-from-bottom-2 duration-500">
-            
-            {/* --- HERO SECTION --- */}
-            <div className="bg-white pt-8 pb-8 px-6 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 relative z-10">
-                
-                {/* Brand & Language Badge */}
-                <div className="flex justify-between items-start mb-6">
-                    <div className="flex items-center gap-2">
-                        <div className="bg-indigo-600 text-white p-1.5 rounded-lg">
-                            <GraduationCap size={16} strokeWidth={3}/>
-                        </div>
-                        <span className="font-black text-indigo-900 tracking-tighter text-sm">LLLMS</span>
-                    </div>
-                    <div className="px-3 py-1 bg-slate-100 rounded-full border border-slate-200 flex items-center gap-1.5">
-                        <Globe size={12} className="text-indigo-500"/>
-                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">{targetLang}</span>
-                    </div>
+    <div className="h-full flex flex-col bg-slate-50">
+        
+        {/* 1. PROFESSIONAL APP BAR (Sticky) */}
+        <div className="bg-white/90 backdrop-blur-md border-b border-slate-100 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
+            {/* Brand */}
+            <div className="flex items-center gap-2">
+                <div className="bg-indigo-600 text-white p-1.5 rounded-lg shadow-sm">
+                    <GraduationCap size={18} strokeWidth={3}/>
                 </div>
+                <span className="font-black text-indigo-900 tracking-tighter text-lg">LLLMS</span>
+            </div>
 
+            {/* Target Language Badge */}
+            <div className="px-3 py-1.5 bg-slate-100 rounded-full border border-slate-200 flex items-center gap-1.5">
+                <Globe size={14} className="text-indigo-500"/>
+                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">{targetLang}</span>
+            </div>
+        </div>
+
+        {/* Scrollable Content */}
+        <div ref={scrollViewportRef} className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth pb-32">
+            
+            {/* 2. HERO SECTION (Streamlined) */}
+            <div className="bg-white pt-6 pb-8 px-6 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 relative z-10">
+                
                 {/* Greeting */}
                 <div className="mb-8">
                     <h1 className="text-3xl font-medium text-slate-400 tracking-tight">{greeting},</h1>
@@ -592,7 +597,7 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userDat
                     </div>
                 </div>
 
-                {/* Progress Bar (Subtle) */}
+                {/* Progress Bar */}
                 <div className="mt-6 flex items-center gap-3">
                     <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
                         <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-1000" style={{ width: `${progress}%` }}></div>
@@ -612,78 +617,48 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userDat
                         </h3>
                     </div>
                     
-                   <div className="flex gap-5 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">
-    {classes.map((cls: any, index: number) => { 
-        // 1. Calculate Status
-        const pending = (cls.assignments || []).filter((l: any) => 
-            (!l.targetStudents || l.targetStudents.includes(userData.email)) && 
-            !completedSet.has(l.id)
-        ).length;
+                    <div className="flex gap-5 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">
+                        {classes.map((cls: any, index: number) => { 
+                            const pending = (cls.assignments || []).filter((l: any) => (!l.targetStudents || l.targetStudents.includes(userData.email)) && !completedSet.has(l.id)).length;
+                            
+                            // Gradient Logic
+                            const gradients = ["from-indigo-600 to-violet-600", "from-emerald-500 to-teal-600", "from-orange-500 to-rose-600", "from-blue-600 to-cyan-600"];
+                            const themeGradient = gradients[index % gradients.length];
 
-        // 2. Pick a Gradient Theme based on index (Juice factor)
-        const gradients = [
-            "from-indigo-600 to-violet-600",
-            "from-emerald-500 to-teal-600",
-            "from-orange-500 to-rose-600",
-            "from-blue-600 to-cyan-600"
-        ];
-        const themeGradient = gradients[index % gradients.length];
-        const shadowColor = index % gradients.length === 2 ? 'shadow-rose-200' : index % gradients.length === 1 ? 'shadow-emerald-200' : 'shadow-indigo-200';
-
-        return ( 
-            <button 
-                key={cls.id} 
-                onClick={() => setActiveStudentClass(cls)} 
-                className="snap-start min-w-[280px] h-[180px] bg-white rounded-[2rem] shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-slate-100 transition-all duration-300 active:scale-95 hover:-translate-y-1 hover:shadow-xl group relative overflow-hidden flex flex-col text-left"
-            >
-                {/* A. Header Background with Abstract Shape */}
-                <div className={`h-24 w-full bg-gradient-to-r ${themeGradient} relative p-5 flex justify-between items-start overflow-hidden`}>
-                    {/* Decorative Circle */}
-                    <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
-                    
-                    {/* Class Initial (Frosted Glass) */}
-                    <div className="w-12 h-12 bg-white/20 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-sm z-10">
-                        {cls.name.charAt(0).toUpperCase()}
+                            return ( 
+                                <button key={cls.id} onClick={() => setActiveStudentClass(cls)} className="snap-start min-w-[280px] h-[180px] bg-white rounded-[2rem] shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-slate-100 transition-all duration-300 active:scale-95 hover:-translate-y-1 hover:shadow-xl group relative overflow-hidden flex flex-col text-left">
+                                    <div className={`h-24 w-full bg-gradient-to-r ${themeGradient} relative p-5 flex justify-between items-start overflow-hidden`}>
+                                        <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
+                                        <div className="w-12 h-12 bg-white/20 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-sm z-10">
+                                            {cls.name.charAt(0).toUpperCase()}
+                                        </div>
+                                        {pending > 0 ? (
+                                            <div className="flex items-center gap-1.5 bg-white text-rose-600 text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg z-10 animate-in zoom-in">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></div>
+                                                {pending} Due
+                                            </div>
+                                        ) : (
+                                            <div className="bg-white/20 backdrop-blur-md text-white text-[10px] font-bold px-3 py-1.5 rounded-full z-10 flex items-center gap-1">
+                                                <Check size={12} strokeWidth={4}/> Done
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="p-5 flex-1 flex flex-col justify-between relative">
+                                        <div className="absolute top-0 right-5 -mt-5 bg-white text-slate-800 p-2 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 duration-300">
+                                            <ArrowRight size={16} />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-black text-slate-800 text-xl truncate leading-tight group-hover:text-indigo-600 transition-colors">{cls.name}</h4>
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100">{cls.code}</span>
+                                                <span className="text-[10px] font-bold text-slate-400">{(cls.students || []).length} Students</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </button> 
+                            ); 
+                        })}
                     </div>
-
-                    {/* Status Badge */}
-                    {pending > 0 ? (
-                        <div className="flex items-center gap-1.5 bg-white text-rose-600 text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg z-10 animate-in zoom-in">
-                            <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></div>
-                            {pending} Due
-                        </div>
-                    ) : (
-                        <div className="bg-white/20 backdrop-blur-md text-white text-[10px] font-bold px-3 py-1.5 rounded-full z-10 flex items-center gap-1">
-                            <Check size={12} strokeWidth={4}/> Done
-                        </div>
-                    )}
-                </div>
-
-                {/* B. Card Body */}
-                <div className="p-5 flex-1 flex flex-col justify-between relative">
-                    {/* Floating Action Icon (Appears on Hover) */}
-                    <div className="absolute top-0 right-5 -mt-5 bg-white text-slate-800 p-2 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 duration-300">
-                        <ArrowRight size={16} />
-                    </div>
-
-                    <div>
-                        <h4 className="font-black text-slate-800 text-xl truncate leading-tight group-hover:text-indigo-600 transition-colors">
-                            {cls.name}
-                        </h4>
-                        <div className="flex items-center gap-2 mt-2">
-                            <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100">
-                                {cls.code}
-                            </span>
-                            <span className="text-[10px] font-bold text-slate-400">
-                                {(cls.students || []).length} Students
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </button> 
-        ); 
-    })}
-</div>
                 </div>
               ) : (
                  <div className="p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center">
