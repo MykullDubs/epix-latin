@@ -18,7 +18,7 @@ import {
   Pencil, Image, Info, Edit3, AlertTriangle, FlipVertical, HelpCircle, 
   CheckCircle2, Circle, Activity, Clock, Compass, Globe, RotateCcw, Play, 
   Maximize2, BarChart2, Timer, Megaphone, Inbox, XCircle, ChevronUp, Send,
-  ArrowUp, ArrowDown, Eye, EyeOff, MessageCircle // <--- ADDED MISSING ICONS
+  ArrowUp, ArrowDown, Eye, EyeOff, MessageCircle, AlignLeft // <--- ADDED MISSING ICONS
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
