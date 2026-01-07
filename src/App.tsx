@@ -355,35 +355,41 @@ function LessonView({ lesson, onFinish }: any) {
   );
 }
 // ============================================================================
-//  MOONSHOT EXPLORE TAB (Netflix-Style Discovery)
+//  MOONSHOT EXPLORE TAB (Fixed Types & Logic)
 // ============================================================================
 function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState('All');
 
-    // 1. DYNAMIC DATA GENERATION (Simulating a lively ecosystem)
+    // 1. DYNAMIC DATA GENERATION
     const { featuredDeck, trendingDecks, quests } = useMemo(() => {
-        const decks = Object.values(allDecks).filter((d: any) => !d.isAssignment);
-        if (decks.length === 0) return { featuredDeck: null, trendingDecks: [], quests: [] };
+        // FIX: Use entries so we keep the ID (key) attached to the Deck (value)
+        // This prevents ID mismatches and fixes the TS spread error
+        const validEntries = Object.entries(allDecks || {}).filter(([, deck]: any) => !deck.isAssignment);
+        
+        if (validEntries.length === 0) return { featuredDeck: null, trendingDecks: [], quests: [] };
 
         // Pick a random featured deck based on date hash
         const today = new Date().toDateString();
         let hash = 0; for (let i = 0; i < today.length; i++) hash = today.charCodeAt(i) + ((hash << 5) - hash);
-        const featIdx = Math.abs(hash) % decks.length;
+        const featIdx = Math.abs(hash) % validEntries.length;
         
-        // Mock "Trending" (Just shuffle them for now)
-        const trending = [...decks].sort(() => 0.5 - Math.random()).slice(0, 5);
+        const [featId, featData] = validEntries[featIdx];
+        
+        // Mock "Trending" (Shuffle entries)
+        const trending = [...validEntries].sort(() => 0.5 - Math.random()).slice(0, 5);
 
-        // Daily Quests (Gamification)
+        // Daily Quests
         const dailyQuests = [
             { id: 1, label: "Review 10 Cards", xp: 50, icon: <Layers size={14}/>, done: false },
             { id: 2, label: "Complete a Quiz", xp: 100, icon: <HelpCircle size={14}/>, done: false },
-            { id: 3, label: "Find a new Deck", xp: 20, icon: <Search size={14}/>, done: true }, // Mock completed
+            { id: 3, label: "Find a new Deck", xp: 20, icon: <Search size={14}/>, done: true },
         ];
 
         return { 
-            featuredDeck: { id: Object.keys(allDecks)[featIdx], ...decks[featIdx], contentType: 'deck' },
-            trendingDecks: trending.map(d => ({ ...d, contentType: 'deck', id: Object.keys(allDecks).find(k => allDecks[k] === d) })),
+            // FIX: Explicitly cast as any to satisfy TS2698
+            featuredDeck: { id: featId, ...(featData as any), contentType: 'deck' },
+            trendingDecks: trending.map(([id, data]: any) => ({ id, ...data, contentType: 'deck' })),
             quests: dailyQuests
         };
     }, [allDecks]);
@@ -434,7 +440,7 @@ function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
             {/* 2. SCROLLABLE CONTENT */}
             <div className="flex-1 overflow-y-auto custom-scrollbar pb-32">
                 
-                {/* A. FEATURED HERO (The "Moonshot") */}
+                {/* A. FEATURED HERO */}
                 {!searchTerm && activeCategory === 'All' && featuredDeck && (
                     <div className="px-6 pt-6 mb-8">
                         <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
@@ -444,7 +450,6 @@ function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
                             onClick={() => onSelectDeck(featuredDeck)}
                             className="w-full relative h-64 rounded-[2.5rem] overflow-hidden shadow-2xl group text-left transition-transform active:scale-[0.98]"
                         >
-                            {/* Dynamic Animated Background */}
                             <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-purple-600 to-rose-500 animate-in fade-in zoom-in duration-1000"></div>
                             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-30 mix-blend-overlay"></div>
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
@@ -472,7 +477,7 @@ function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
                     </div>
                 )}
 
-                {/* B. DAILY QUESTS (Gamification) */}
+                {/* B. DAILY QUESTS */}
                 {!searchTerm && (
                     <div className="px-6 mb-8">
                         <div className="flex justify-between items-end mb-3">
@@ -500,7 +505,7 @@ function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
                     </div>
                 )}
 
-                {/* C. TRENDING SCROLL (Horizontal) */}
+                {/* C. TRENDING SCROLL */}
                 {!searchTerm && (
                     <div className="mb-8">
                         <div className="px-6 mb-3 flex justify-between items-center">
@@ -586,7 +591,6 @@ function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
         </div>
     );
 }
-
 // ============================================================================
 //  HOME VIEW (Cleaned & Action-Oriented)
 // ============================================================================
