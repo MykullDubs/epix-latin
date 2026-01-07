@@ -1205,10 +1205,7 @@ function GradeDetailModal({ log, onClose }: any) {
 }
 
 // ============================================================================
-//  STUDENT GRADEBOOK (Robust Memory Filtering)
-// ============================================================================
-// ============================================================================
-//  STUDENT GRADEBOOK (Robust Filtering)
+//  STUDENT GRADEBOOK (With Fuzzy Title Matching)
 // ============================================================================
 function StudentGradebook({ classData, user }: any) {
     const [logs, setLogs] = useState<any[]>([]);
@@ -1218,38 +1215,43 @@ function StudentGradebook({ classData, user }: any) {
     useEffect(() => {
         if(!classData.assignments || classData.assignments.length === 0) { setLoading(false); return; }
         
-        // 1. Fetch ALL recent history for this user
-        // We removed specific filters to ensure we catch everything
+        // 1. Fetch EVERYTHING recent for this student
         const q = query(
             collection(db, 'artifacts', appId, 'activity_logs'), 
             where('studentEmail', '==', user.email),
             orderBy('timestamp', 'desc'),
-            limit(200)
+            limit(100)
         );
 
         const unsub = onSnapshot(q, (snapshot) => {
             const allLogs = snapshot.docs.map(d => d.data());
-            
-            // 2. ROBUST MATCHING logic
-            // We want logs that are 'completion' AND match either ID
-            const relevantLogs = allLogs.filter(log => 
-                log.type === 'completion' && 
-                classData.assignments.some((a: any) => a.id === log.itemId || a.originalId === log.itemId)
-            );
-            
-            setLogs(relevantLogs);
+            // We don't filter here anymore to ensure we catch everything
+            setLogs(allLogs);
             setLoading(false);
         });
         return () => unsub();
     }, [classData, user]);
 
     const getGradeStatus = (assign: any) => {
-        // Try finding log by Assignment ID first (Best), then Original ID (Fallback)
-        const log = logs.find(l => l.itemId === assign.id) || logs.find(l => l.itemId === assign.originalId);
+        // --- ROBUST MATCHING LOGIC ---
+        // 1. Try Exact Match (Assignment ID) - Best Case
+        let log = logs.find(l => l.itemId === assign.id && l.type === 'completion');
         
+        // 2. Try Original ID Match (Content ID) - Fallback
+        if (!log && assign.originalId) {
+            log = logs.find(l => l.itemId === assign.originalId && l.type === 'completion');
+        }
+
+        // 3. Try Title Match (Fuzzy) - The "Savior" Case
+        // If IDs failed but titles match, assume it's the right one.
+        if (!log) {
+            log = logs.find(l => l.itemTitle === assign.title && l.type === 'completion');
+        }
+        
+        // If still nothing, it really is missing
         if (!log) return { status: 'missing', label: 'Not Started', color: 'bg-slate-100 text-slate-400', interactable: false };
         
-        // Exam Logic
+        // --- SCORE DISPLAY LOGIC ---
         if (assign.contentType === 'test' || assign.contentType === 'exam') {
              if (log.scoreDetail?.status === 'pending_review') {
                  return { status: 'pending', label: 'In Review', color: 'bg-amber-100 text-amber-600', interactable: true, log };
@@ -1267,7 +1269,6 @@ function StudentGradebook({ classData, user }: any) {
              return { status: 'complete', label: `${score}/${total} pts`, color, interactable: true, log };
         }
 
-        // Standard Lesson/Deck Logic
         return { status: 'complete', label: 'Complete', color: 'bg-emerald-100 text-emerald-600', interactable: true, log };
     };
 
@@ -1298,7 +1299,6 @@ function StudentGradebook({ classData, user }: any) {
         </>
     );
 }
-
 // ============================================================================
 //  STUDENT CLASS VIEW (With Gradebook Tab)
 // ============================================================================
