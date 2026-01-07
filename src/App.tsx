@@ -22,6 +22,8 @@ import {
   Trophy, Flame, Settings, BarChart3, CornerDownRight, MoreHorizontal   // <--- ADDED MISSING ICONS
 } from 'lucide-react';
 
+import
+
 // --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
   apiKey: "AIzaSyAjK79x_N5pSWzWluFUg25mqEc_HeraRPk",
@@ -513,7 +515,7 @@ function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
 }
 
 // ============================================================================
-//  HOME VIEW (With Classes Restored)
+//  HOME VIEW (LLLMS Revamped)
 // ============================================================================
 function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userData, assignments, classes, user }: any) {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
@@ -529,10 +531,17 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userDat
   const relevantAssignments = (assignments || []).filter((l: any) => !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email));
   const activeAssignments = relevantAssignments.filter((l: any) => !completedSet.has(l.id));
 
-  // XP Calc
+  // Stats Calculation
   const xp = userData?.xp || 0;
   const level = Math.floor(xp / 1000) + 1;
   const progress = ((xp % 1000) / 1000) * 100;
+  const streak = userData?.streak || 1;
+  const targetLang = userData?.targetLanguage || "English";
+
+  // Dynamic Greeting
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
+  const firstName = userData?.name?.split(' ')[0] || "Learner";
 
   if (activeStudentClass) { 
       return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={onSelectLesson} onSelectDeck={onSelectDeck} userData={userData} user={user} />; 
@@ -542,64 +551,90 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userDat
     <div ref={scrollViewportRef} className="h-full overflow-y-auto overflow-x-hidden relative bg-slate-50 scroll-smooth">
         <div className="pb-32 animate-in fade-in slide-in-from-bottom-2 duration-500">
             
-            {/* HERO SECTION */}
-            <div className="bg-white p-6 pb-8 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 relative z-10">
-                <div className="flex justify-between items-center mb-6">
-                    <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 font-bold border border-slate-200 shadow-inner text-lg">
-                            {userData?.name?.charAt(0) || user?.email?.charAt(0).toUpperCase()}
+            {/* --- HERO SECTION --- */}
+            <div className="bg-white pt-8 pb-8 px-6 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 relative z-10">
+                
+                {/* Brand & Language Badge */}
+                <div className="flex justify-between items-start mb-6">
+                    <div className="flex items-center gap-2">
+                        <div className="bg-indigo-600 text-white p-1.5 rounded-lg">
+                            <GraduationCap size={16} strokeWidth={3}/>
                         </div>
-                        <div>
-                            <h2 className="text-xl font-black text-slate-800 leading-tight">Ave, {userData?.name?.split(' ')[0] || 'Scholar'}!</h2>
-                            <div className="flex items-center gap-1.5"><span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full uppercase tracking-wider">Level {level}</span></div>
-                        </div>
+                        <span className="font-black text-indigo-900 tracking-tighter text-sm">LLLMS</span>
                     </div>
-                    <div className="text-right">
-                        <span className="block text-2xl font-black text-slate-800">{xp}</span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total XP</span>
+                    <div className="px-3 py-1 bg-slate-100 rounded-full border border-slate-200 flex items-center gap-1.5">
+                        <Globe size={12} className="text-indigo-500"/>
+                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">{targetLang}</span>
                     </div>
                 </div>
-                <div className="relative h-4 bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                    <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 transition-all duration-1000" style={{ width: `${progress}%` }}></div>
+
+                {/* Greeting */}
+                <div className="mb-8">
+                    <h1 className="text-3xl font-medium text-slate-400 tracking-tight">{greeting},</h1>
+                    <h1 className="text-4xl font-black text-slate-800 tracking-tight">{firstName}.</h1>
                 </div>
-                <div className="flex justify-between mt-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                    <span>{xp % 1000} XP</span>
-                    <span>{1000 - (xp % 1000)} to Lvl {level + 1}</span>
+
+                {/* Stats Grid */}
+                <div className="grid grid-cols-3 gap-3">
+                    <div className="p-3 bg-indigo-50 rounded-2xl border border-indigo-100 flex flex-col items-center justify-center">
+                        <Flame size={20} className="text-orange-500 mb-1 fill-orange-500"/>
+                        <span className="text-lg font-black text-indigo-900">{streak}</span>
+                        <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wider">Day Streak</span>
+                    </div>
+                    <div className="p-3 bg-indigo-50 rounded-2xl border border-indigo-100 flex flex-col items-center justify-center">
+                        <Zap size={20} className="text-yellow-500 mb-1 fill-yellow-500"/>
+                        <span className="text-lg font-black text-indigo-900">{xp}</span>
+                        <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wider">Total XP</span>
+                    </div>
+                    <div className="p-3 bg-indigo-50 rounded-2xl border border-indigo-100 flex flex-col items-center justify-center">
+                        <Trophy size={20} className="text-emerald-500 mb-1 fill-emerald-500"/>
+                        <span className="text-lg font-black text-indigo-900">{level}</span>
+                        <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wider">Level</span>
+                    </div>
+                </div>
+
+                {/* Progress Bar (Subtle) */}
+                <div className="mt-6 flex items-center gap-3">
+                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-1000" style={{ width: `${progress}%` }}></div>
+                    </div>
+                    <span className="text-[9px] font-bold text-slate-400 whitespace-nowrap">{Math.round(1000 - (xp % 1000))} XP to Next Lvl</span>
                 </div>
             </div>
 
             <div className="px-6 space-y-8 mt-8">
               
-              {/* --- MY CLASSES SECTION (Restored) --- */}
+              {/* --- MY CLASSES SECTION --- */}
               {classes && classes.length > 0 ? (
                 <div className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
                     <div className="flex justify-between items-end mb-4 ml-1">
-                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                            <School size={16} className="text-indigo-500"/> My Classes
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                            My Classes
                         </h3>
-                        <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md">{classes.length} Active</span>
                     </div>
                     
-                    <div className="flex gap-5 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">
+                    <div className="flex gap-4 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">
                         {classes.map((cls: any) => { 
                             const pending = (cls.assignments || []).filter((l: any) => (!l.targetStudents || l.targetStudents.includes(userData.email)) && !completedSet.has(l.id)).length;
                             
                             return ( 
-                                <button key={cls.id} onClick={() => setActiveStudentClass(cls)} className="snap-start min-w-[280px] h-[180px] bg-white rounded-[2rem] shadow-sm border border-slate-100 transition-all active:scale-95 group relative overflow-hidden flex flex-col text-left hover:shadow-md hover:border-indigo-200">
-                                    <div className="h-20 bg-gradient-to-br from-slate-800 to-slate-900 relative w-full p-5 flex justify-between items-start">
-                                        <div className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-white font-bold">
+                                <button key={cls.id} onClick={() => setActiveStudentClass(cls)} className="snap-start min-w-[260px] h-[160px] bg-white rounded-3xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.05)] border border-slate-100 transition-all active:scale-95 group relative overflow-hidden flex flex-col text-left hover:border-indigo-200">
+                                    {/* Abstract Header Art */}
+                                    <div className="h-20 bg-slate-900 relative w-full p-5 flex justify-between items-start overflow-hidden">
+                                        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-indigo-500 via-purple-500 to-transparent"></div>
+                                        <div className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-white font-bold relative z-10 border border-white/10">
                                             {cls.name.charAt(0)}
                                         </div>
                                         {pending > 0 ? (
-                                            <span className="bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg animate-pulse">{pending} Due</span>
+                                            <span className="bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg relative z-10">{pending} Due</span>
                                         ) : (
-                                            <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-1 rounded-full backdrop-blur-md">Done</span>
+                                            <div className="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-1 rounded-full backdrop-blur-md relative z-10 flex items-center gap-1"><Check size={10}/> Done</div>
                                         )}
                                     </div>
                                     <div className="p-5 flex-1 flex flex-col justify-between">
                                         <div>
-                                            <h4 className="font-bold text-slate-800 text-lg truncate">{cls.name}</h4>
-                                            <p className="text-xs text-slate-400 font-medium">{cls.code}</p>
+                                            <h4 className="font-bold text-slate-800 text-lg truncate group-hover:text-indigo-700 transition-colors">{cls.name}</h4>
+                                            <p className="text-xs text-slate-400 font-medium font-mono">{cls.code}</p>
                                         </div>
                                     </div>
                                 </button> 
@@ -608,9 +643,10 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userDat
                     </div>
                 </div>
               ) : (
-                 // Empty State for Classes
-                 <div className="p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center text-slate-400 text-sm">
-                    No classes found. Ask your instructor for a code to join!
+                 <div className="p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center">
+                    <School size={32} className="mx-auto text-slate-300 mb-2"/>
+                    <p className="text-sm text-slate-400 font-bold">No classes yet.</p>
+                    <p className="text-xs text-slate-400 mt-1">Ask your instructor for a code.</p>
                  </div>
               )}
 
@@ -618,21 +654,23 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userDat
               {activeAssignments.length > 0 && (
                   <div className="animate-in slide-in-from-bottom-4 duration-500 delay-200">
                      <div className="flex justify-between items-center mb-3 ml-1">
-                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Up Next</h3>
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Up Next</h3>
                      </div>
                      <div className="space-y-3">
-                        {activeAssignments.map((l: any, i: number) => ( 
-                            <button key={`${l.id}-${i}`} onClick={() => l.contentType === 'deck' ? onSelectDeck(l) : onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all group">
+                        {activeAssignments.slice(0, 3).map((l: any, i: number) => ( 
+                            <button key={`${l.id}-${i}`} onClick={() => l.contentType === 'deck' ? onSelectDeck(l) : onSelectLesson(l)} className="w-full bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all group hover:border-indigo-300 hover:shadow-md">
                                 <div className="flex items-center space-x-4">
-                                    <div className={`h-12 w-12 rounded-2xl flex items-center justify-center ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>
-                                        {l.contentType === 'deck' ? <Layers size={22}/> : <PlayCircle size={22} />}
+                                    <div className={`h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600' : l.contentType === 'test' || l.contentType === 'exam' ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                                        {l.contentType === 'deck' ? <Layers size={22}/> : (l.contentType === 'test' || l.contentType === 'exam') ? <FileText size={20}/> : <PlayCircle size={22} />}
                                     </div>
                                     <div className="text-left">
-                                        <h4 className="font-bold text-slate-800">{l.title}</h4>
-                                        <p className="text-xs text-slate-400">{l.contentType === 'deck' ? 'Flashcards' : 'Lesson'}</p>
+                                        <h4 className="font-bold text-slate-800 text-sm">{l.title}</h4>
+                                        <p className="text-xs text-slate-400 font-medium">{(l.contentType === 'test' || l.contentType === 'exam') ? 'Exam' : l.contentType === 'deck' ? 'Flashcards' : 'Lesson'} • {l.xp} XP</p>
                                     </div>
                                 </div>
-                                <ChevronRight className="text-slate-300 group-hover:text-indigo-500 transition-colors"/>
+                                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                                    <Play size={12} fill="currentColor" />
+                                </div>
                             </button>
                         ))}
                      </div>
@@ -641,13 +679,13 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userDat
               
               {/* QUICK ACTIONS */}
               <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-bottom-4 duration-500 delay-300">
-                <button onClick={() => setActiveTab('flashcards')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center active:scale-95 transition-all group hover:border-orange-200">
-                    <div className="w-12 h-12 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-3"><Layers size={24}/></div>
-                    <span className="block font-bold text-slate-800">Practice</span>
+                <button onClick={() => setActiveTab('flashcards')} className="p-5 bg-white rounded-3xl border border-slate-200 shadow-sm text-center active:scale-95 transition-all group hover:border-orange-300 hover:shadow-md">
+                    <div className="w-12 h-12 bg-orange-50 text-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform"><Layers size={24}/></div>
+                    <span className="block font-bold text-slate-800 text-sm">Practice Vocab</span>
                 </button>
-                <button onClick={() => setActiveTab('create')} className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center active:scale-95 transition-all group hover:border-emerald-200">
-                    <div className="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-3"><Feather size={24}/></div>
-                    <span className="block font-bold text-slate-800">Create</span>
+                <button onClick={() => setActiveTab('create')} className="p-5 bg-white rounded-3xl border border-slate-200 shadow-sm text-center active:scale-95 transition-all group hover:border-emerald-300 hover:shadow-md">
+                    <div className="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform"><Feather size={24}/></div>
+                    <span className="block font-bold text-slate-800 text-sm">Create Content</span>
                 </button>
               </div>
 
