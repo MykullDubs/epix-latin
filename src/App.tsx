@@ -819,139 +819,106 @@ function MatchingGame({ deckCards, onGameEnd }: any) {
     );
 }
 // ============================================================================
-//  THE JUICED QUIZ ENGINE
+//  QUIZ SESSION (Fixed Auto-Advance)
 // ============================================================================
 function QuizSessionView({ deckCards, onGameEnd }: any) {
-  // 1. Setup Quiz Data
-  const [questions, setQuestions] = useState<any[]>([]);
-  const [qIndex, setQIndex] = useState(0);
-  
-  // 2. Game State
-  const [score, setScore] = useState(0);
-  const [streak, setStreak] = useState(0);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [isAnswered, setIsAnswered] = useState(false);
+    const [index, setIndex] = useState(0);
+    const [score, setScore] = useState(0);
+    const [selectedOption, setSelectedOption] = useState<string | null>(null);
+    const [isProcessing, setIsProcessing] = useState(false); // Prevents double clicking
 
-  // Initialize
-  useEffect(() => {
-    const q = generateQuiz(deckCards);
-    setQuestions(q);
-  }, [deckCards]);
+    // 1. Get Current Card
+    const currentCard = deckCards[index];
 
-  // Handlers
-  const handleOptionClick = (optId: string) => {
-    if (isAnswered) return; // Prevent double clicks
-    setSelectedId(optId);
-    setIsAnswered(true);
+    // 2. Generate Options (Correct Answer + 3 Random Distractors)
+    const options = useMemo(() => {
+        if (!currentCard) return [];
+        const distractors = deckCards
+            .filter((c: any) => c.id !== currentCard.id)
+            .sort(() => 0.5 - Math.random())
+            .slice(0, 3)
+            .map((c: any) => c.back);
+        
+        return [...distractors, currentCard.back].sort(() => 0.5 - Math.random());
+    }, [currentCard, deckCards]);
 
-    const isCorrect = optId === questions[qIndex].correctId;
-    if (isCorrect) {
-      setScore(s => s + 1);
-      setStreak(s => s + 1);
-      // Auto advance if correct (optional, but snappy)
-    } else {
-      setStreak(0);
-    }
-  };
+    // 3. Handle Click
+    const handleOptionClick = (option: string) => {
+        if (isProcessing) return; // Stop user from clicking multiple times
+        setIsProcessing(true);
+        setSelectedOption(option);
 
-  const handleNext = () => {
-    if (qIndex < questions.length - 1) {
-      setQIndex(prev => prev + 1);
-      setSelectedId(null);
-      setIsAnswered(false);
-    } else {
-      // Game Over
-      onGameEnd({ score, total: questions.length });
-    }
-  };
+        const isCorrect = option === currentCard.back;
+        const newScore = isCorrect ? score + 1 : score;
+        if (isCorrect) setScore(newScore);
 
-  // Loading State
-  if (questions.length === 0) return (
-    <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-      <Brain size={48} className="mb-4 animate-pulse opacity-50"/>
-      <p className="text-sm font-bold">Not enough cards to build a quiz.</p>
-      <p className="text-xs">Add at least 4 cards to this deck.</p>
-    </div>
-  );
+        // 4. WAIT & ADVANCE
+        setTimeout(() => {
+            if (index < deckCards.length - 1) {
+                setIndex(prev => prev + 1);
+                setSelectedOption(null);
+                setIsProcessing(false);
+            } else {
+                // Game Over
+                onGameEnd({ score: newScore, total: deckCards.length });
+            }
+        }, 1200); // 1.2 second delay to see the result
+    };
 
-  const currentQ = questions[qIndex];
-  const isCorrect = selectedId === currentQ.correctId;
+    if (!currentCard) return <div className="p-10 text-center">Loading...</div>;
 
-  return (
-    <div className="h-full flex flex-col p-6 max-w-lg mx-auto">
-      
-      {/* 1. HUD (Heads Up Display) */}
-      <div className="flex justify-between items-center mb-8">
-        <div className="flex flex-col">
-           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Question</span>
-           <span className="text-xl font-black text-slate-800">{qIndex + 1} <span className="text-slate-300">/</span> {questions.length}</span>
-        </div>
-        <div className="flex items-center gap-2">
-            <div className={`flex items-center gap-1 px-3 py-1 rounded-full font-bold text-xs transition-colors ${streak > 2 ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-400'}`}>
-                <Zap size={14} className={streak > 2 ? "fill-orange-500 animate-pulse" : ""}/> 
-                {streak} Streak
+    const progress = ((index) / deckCards.length) * 100;
+
+    return (
+        <div className="flex flex-col h-full max-w-md mx-auto p-6">
+            
+            {/* Progress Bar */}
+            <div className="mb-8">
+                <div className="flex justify-between text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    <span>Question {index + 1} / {deckCards.length}</span>
+                    <span>Score: {score}</span>
+                </div>
+                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-indigo-500 transition-all duration-500" style={{ width: `${progress}%` }}></div>
+                </div>
             </div>
-            <div className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full font-bold text-xs">
-                Score: {score}
+
+            {/* The Question (Front of Card) */}
+            <div className="bg-white rounded-3xl shadow-lg border-b-4 border-slate-100 p-10 flex flex-col items-center justify-center text-center min-h-[200px] mb-6 animate-in zoom-in-95 duration-300 key={index}">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Translate this</span>
+                <h2 className="text-3xl font-black text-slate-800">{currentCard.front}</h2>
+                {currentCard.ipa && <p className="text-sm font-mono text-slate-400 mt-2">{currentCard.ipa}</p>}
             </div>
-        </div>
-      </div>
 
-      {/* 2. THE QUESTION CARD */}
-      <div className="flex-1 flex flex-col justify-center">
-         <div className="mb-8 text-center">
-            <h2 className="text-3xl font-black text-slate-800 mb-2 leading-tight">{currentQ.question}</h2>
-            {currentQ.context && <p className="text-sm text-slate-500 italic">"{currentQ.context}"</p>}
-         </div>
-
-         {/* 3. OPTIONS GRID */}
-         <div className="grid grid-cols-1 gap-3">
-            {currentQ.options.map((opt: any) => {
-                let stateStyle = "bg-white border-slate-200 hover:border-indigo-300 text-slate-700";
-                
-                if (isAnswered) {
-                    if (opt.id === currentQ.correctId) {
-                        stateStyle = "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200 scale-[1.02]";
-                    } else if (opt.id === selectedId) {
-                        stateStyle = "bg-rose-500 border-rose-500 text-white opacity-50";
-                    } else {
-                        stateStyle = "bg-slate-50 border-slate-100 text-slate-400 opacity-50";
+            {/* The Options */}
+            <div className="space-y-3">
+                {options.map((opt, idx) => {
+                    let stateStyles = "bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:shadow-md"; // Default
+                    
+                    if (selectedOption) {
+                        if (opt === currentCard.back) {
+                            stateStyles = "bg-emerald-500 border-emerald-600 text-white shadow-emerald-200"; // Correct (Always highlight correct answer)
+                        } else if (opt === selectedOption) {
+                            stateStyles = "bg-rose-500 border-rose-600 text-white shadow-rose-200"; // Wrong (Highlight if user picked it)
+                        } else {
+                            stateStyles = "bg-slate-50 border-slate-100 text-slate-300 opacity-50"; // Others fade out
+                        }
                     }
-                }
 
-                return (
-                    <button
-                        key={opt.id}
-                        disabled={isAnswered}
-                        onClick={() => handleOptionClick(opt.id)}
-                        className={`w-full p-4 rounded-2xl border-2 font-bold text-lg transition-all duration-200 active:scale-95 flex justify-between items-center ${stateStyle}`}
-                    >
-                        <span>{opt.text}</span>
-                        {isAnswered && opt.id === currentQ.correctId && <CheckCircle2 size={20} className="animate-in zoom-in spin-in-180"/>}
-                        {isAnswered && opt.id === selectedId && opt.id !== currentQ.correctId && <XCircle size={20}/>}
-                    </button>
-                );
-            })}
-         </div>
-      </div>
-
-      {/* 4. NEXT BUTTON (Only appears after answer) */}
-      <div className="h-20 mt-4 flex items-end">
-          {isAnswered && (
-              <button 
-                onClick={handleNext} 
-                className={`w-full py-4 rounded-2xl font-bold text-lg shadow-xl flex items-center justify-center gap-2 transition-all animate-in slide-in-from-bottom-2 ${isCorrect ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-200' : 'bg-slate-900 hover:bg-slate-800 text-white shadow-slate-300'}`}
-              >
-                 {qIndex < questions.length - 1 ? (
-                    <>Next Question <ArrowRight size={20}/></>
-                 ) : (
-                    <>Finish Quiz <Award size={20}/></>
-                 )}
-              </button>
-          )}
-      </div>
-    </div>
-  );
+                    return (
+                        <button
+                            key={idx}
+                            onClick={() => handleOptionClick(opt)}
+                            disabled={isProcessing}
+                            className={`w-full p-4 rounded-xl border-2 font-bold text-lg transition-all duration-200 active:scale-95 ${stateStyles} shadow-sm`}
+                        >
+                            {opt}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
 }
 function TowerMode({ allDecks, user, onExit, onXPUpdate }: any) { return <div className="fixed inset-0 bg-slate-900 z-[60] flex items-center justify-center text-white"><div className="text-center"><h1>The Tower</h1><p>Climb to the top!</p><button onClick={onExit} className="mt-4 bg-white text-black px-4 py-2 rounded">Exit</button></div></div>; }
 
