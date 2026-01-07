@@ -1040,7 +1040,25 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
 function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allDecks }: any) {
   const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
   const [mode, setMode] = useState('card'); 
-  return ( <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar">{mode === 'card' && <Header title="Scriptorium" subtitle="Card Builder" />}{mode === 'card' && (<><div className="px-6 mt-2"><div className="flex bg-slate-200 p-1 rounded-xl"><button onClick={() => setMode('card')} className="flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow-sm text-indigo-700">Flashcard</button><button onClick={() => setMode('lesson')} className="flex-1 py-2 text-sm font-bold rounded-lg text-slate-500">Full Lesson</button></div></div><CardBuilderView onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} availableDecks={allDecks} /></>)}{mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onSave={onSaveLesson} availableDecks={allDecks} />}</div> );
+  return ( 
+    <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar">
+        {mode === 'card' && <Header title="Scriptorium" subtitle="Card Builder" />}
+        {mode === 'lesson' && <Header title="Curriculum" subtitle="Lesson Builder" />}
+        {mode === 'exam' && <Header title="Assessment" subtitle="Exam Builder" />}
+        
+        <div className="px-6 mt-2">
+            <div className="flex bg-slate-200 p-1 rounded-xl">
+                <button onClick={() => setMode('card')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${mode === 'card' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Card</button>
+                <button onClick={() => setMode('lesson')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${mode === 'lesson' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Lesson</button>
+                <button onClick={() => setMode('exam')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${mode === 'exam' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Exam</button>
+            </div>
+        </div>
+
+        {mode === 'card' && <CardBuilderView onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} availableDecks={allDecks} />}
+        {mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onSave={onSaveLesson} availableDecks={allDecks} />}
+        {mode === 'exam' && <ExamBuilderView onSave={onSaveLesson} />}
+    </div> 
+  );
 }
 
 function JuicyToast({ message, type = 'success', onClose }: any) {
@@ -1321,6 +1339,250 @@ const generateQuiz = (cards: any[]) => {
     };
   });
 };
+// ============================================================================
+//  EXAM BUILDER (Instructor Tool)
+// ============================================================================
+function ExamBuilderView({ onSave, initialData }: any) {
+    const [examData, setExamData] = useState(initialData || { 
+        title: '', description: '', type: 'test', questions: [] 
+    });
+    const [jsonMode, setJsonMode] = useState(false);
+    const [jsonInput, setJsonInput] = useState('');
+
+    const addQuestion = (type: string) => {
+        const base = { id: Date.now().toString(), type, prompt: '', points: 10 };
+        const extras = type === 'multiple-choice' ? { options: ['Option A', 'Option B'], correctAnswer: 'Option A' } 
+                     : type === 'boolean' ? { correctAnswer: 'true' } 
+                     : {}; // essay needs no extras
+        setExamData({ ...examData, questions: [...examData.questions, { ...base, ...extras }] });
+    };
+
+    const updateQuestion = (idx: number, field: string, val: any) => {
+        const newQs = [...examData.questions];
+        newQs[idx][field] = val;
+        setExamData({ ...examData, questions: newQs });
+    };
+
+    const handleImport = () => {
+        try {
+            const parsed = JSON.parse(jsonInput);
+            setExamData({ ...parsed, type: 'test' });
+            setJsonMode(false);
+        } catch (e) { alert("Invalid JSON"); }
+    };
+
+    return (
+        <div className="pb-24">
+            <div className="flex justify-between items-center mb-6 px-6 mt-4">
+                <h2 className="text-2xl font-bold text-slate-800">Exam Builder</h2>
+                <button onClick={() => setJsonMode(!jsonMode)} className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg">
+                    {jsonMode ? 'Visual Editor' : 'JSON Import'}
+                </button>
+            </div>
+
+            {jsonMode ? (
+                <div className="px-6">
+                    <textarea className="w-full h-96 p-4 bg-slate-900 text-green-400 font-mono text-xs rounded-xl" value={jsonInput} onChange={e => setJsonInput(e.target.value)} placeholder="Paste JSON here..." />
+                    <button onClick={handleImport} className="w-full mt-4 bg-indigo-600 text-white p-3 rounded-xl font-bold">Import JSON</button>
+                </div>
+            ) : (
+                <div className="px-6 space-y-6">
+                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                        <input className="w-full text-lg font-bold border-b border-slate-100 pb-2 outline-none" placeholder="Exam Title" value={examData.title} onChange={e => setExamData({...examData, title: e.target.value})} />
+                        <input className="w-full text-sm text-slate-500 border-b border-slate-100 pb-2 outline-none" placeholder="Description" value={examData.description} onChange={e => setExamData({...examData, description: e.target.value})} />
+                    </div>
+
+                    {examData.questions.map((q: any, idx: number) => (
+                        <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative group">
+                            <div className="absolute right-4 top-4 flex gap-2">
+                                <span className="text-[10px] font-bold uppercase bg-slate-100 text-slate-500 px-2 py-1 rounded">{q.type}</span>
+                                <button onClick={() => { const n = [...examData.questions]; n.splice(idx,1); setExamData({...examData, questions: n}); }} className="text-rose-400 hover:text-rose-600"><Trash2 size={16}/></button>
+                            </div>
+                            
+                            <div className="flex gap-2 items-center mb-2">
+                                <span className="font-bold text-slate-300">Q{idx+1}</span>
+                                <input className="w-16 p-1 bg-slate-50 text-center text-xs font-bold rounded" type="number" value={q.points} onChange={e => updateQuestion(idx, 'points', parseInt(e.target.value))} />
+                                <span className="text-xs text-slate-400">pts</span>
+                            </div>
+
+                            <textarea className="w-full p-3 bg-slate-50 rounded-xl font-medium text-slate-800 mb-3" placeholder="Question Prompt" value={q.prompt} onChange={e => updateQuestion(idx, 'prompt', e.target.value)} />
+
+                            {/* TYPE SPECIFIC INPUTS */}
+                            {q.type === 'multiple-choice' && (
+                                <div className="space-y-2 pl-4 border-l-2 border-slate-100">
+                                    {q.options.map((opt: string, oIdx: number) => (
+                                        <div key={oIdx} className="flex items-center gap-2">
+                                            <input type="radio" checked={q.correctAnswer === opt} onChange={() => updateQuestion(idx, 'correctAnswer', opt)} />
+                                            <input className="flex-1 p-2 border-b border-slate-100 text-sm" value={opt} onChange={(e) => { const newOpts = [...q.options]; newOpts[oIdx] = e.target.value; updateQuestion(idx, 'options', newOpts); }} />
+                                            <button onClick={() => { const newOpts = q.options.filter((_:any, i:number) => i !== oIdx); updateQuestion(idx, 'options', newOpts); }}><X size={14} className="text-slate-300"/></button>
+                                        </div>
+                                    ))}
+                                    <button onClick={() => updateQuestion(idx, 'options', [...q.options, 'New Option'])} className="text-xs font-bold text-indigo-600">+ Add Option</button>
+                                </div>
+                            )}
+
+                            {q.type === 'boolean' && (
+                                <div className="flex gap-4">
+                                    <label className="flex items-center gap-2 text-sm font-bold"><input type="radio" name={`bool_${idx}`} checked={q.correctAnswer === 'true'} onChange={() => updateQuestion(idx, 'correctAnswer', 'true')} /> True</label>
+                                    <label className="flex items-center gap-2 text-sm font-bold"><input type="radio" name={`bool_${idx}`} checked={q.correctAnswer === 'false'} onChange={() => updateQuestion(idx, 'correctAnswer', 'false')} /> False</label>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+
+                    <div className="grid grid-cols-3 gap-2">
+                        <button onClick={() => addQuestion('multiple-choice')} className="p-4 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><List size={20}/><span className="text-[10px] font-bold">Multiple Choice</span></button>
+                        <button onClick={() => addQuestion('boolean')} className="p-4 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><CheckCircle2 size={20}/><span className="text-[10px] font-bold">True / False</span></button>
+                        <button onClick={() => addQuestion('essay')} className="p-4 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><AlignLeft size={20}/><span className="text-[10px] font-bold">Written Essay</span></button>
+                    </div>
+
+                    <button onClick={() => onSave(examData)} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform">
+                        <Save size={20} /> Save Exam
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+// ============================================================================
+//  EXAM PLAYER (Student Taking Test)
+// ============================================================================
+function ExamPlayerView({ exam, onFinish }: any) {
+    const [answers, setAnswers] = useState<any>({});
+    const [submitted, setSubmitted] = useState(false);
+    const [scoreDetail, setScoreDetail] = useState<any>(null);
+
+    const handleAnswer = (qId: string, val: any) => {
+        if (submitted) return;
+        setAnswers({ ...answers, [qId]: val });
+    };
+
+    const submitExam = () => {
+        if (!window.confirm("Submit your exam? You cannot change answers after this.")) return;
+        
+        // Grading Logic
+        let totalPoints = 0;
+        let earnedPoints = 0;
+        const details: any[] = [];
+
+        exam.questions.forEach((q: any) => {
+            totalPoints += (q.points || 0);
+            const studentVal = answers[q.id];
+            let isCorrect = false;
+            let status = 'graded';
+
+            if (q.type === 'multiple-choice' || q.type === 'boolean') {
+                if (studentVal === q.correctAnswer) {
+                    earnedPoints += (q.points || 0);
+                    isCorrect = true;
+                }
+            } else if (q.type === 'essay') {
+                status = 'pending_review'; // Instructor must grade
+                isCorrect = false; // Placeholder
+            }
+
+            details.push({
+                qId: q.id,
+                prompt: q.prompt,
+                type: q.type,
+                studentVal,
+                correctVal: q.correctAnswer,
+                isCorrect,
+                status
+            });
+        });
+
+        const finalScore = { score: earnedPoints, total: totalPoints, details, status: details.some(d => d.status === 'pending_review') ? 'pending_review' : 'complete' };
+        setScoreDetail(finalScore);
+        setSubmitted(true);
+    };
+
+    if (submitted) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center p-8 bg-slate-50">
+                <div className="bg-white p-8 rounded-3xl shadow-xl text-center max-w-sm w-full">
+                    <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${scoreDetail.status === 'pending_review' ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                        {scoreDetail.status === 'pending_review' ? <Clock size={40}/> : <Award size={40}/>}
+                    </div>
+                    <h2 className="text-2xl font-black text-slate-900 mb-2">Exam Submitted</h2>
+                    <p className="text-slate-500 mb-6">
+                        {scoreDetail.status === 'pending_review' 
+                            ? "Your written answers have been sent to your instructor for grading." 
+                            : `You scored ${scoreDetail.score} / ${scoreDetail.total}`}
+                    </p>
+                    <button onClick={() => onFinish(exam.id, scoreDetail.score, exam.title, scoreDetail)} className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold">Return Home</button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="h-full flex flex-col bg-slate-50 overflow-hidden">
+            <div className="px-6 py-4 bg-white border-b border-slate-200 sticky top-0 z-20 flex justify-between items-center">
+                <div>
+                    <h1 className="text-lg font-bold text-slate-800 flex items-center gap-2"><FileText size={18} className="text-indigo-600"/> {exam.title}</h1>
+                    <p className="text-xs text-slate-400">{exam.questions.length} Questions</p>
+                </div>
+                <div className="text-xs font-mono font-bold bg-slate-100 px-2 py-1 rounded text-slate-500">Live Exam</div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-32">
+                {exam.questions.map((q: any, i: number) => (
+                    <div key={q.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                        <div className="flex justify-between items-start mb-4">
+                            <span className="text-xs font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded uppercase tracking-wider">Question {i + 1}</span>
+                            <span className="text-xs font-bold text-indigo-600">{q.points} pts</span>
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-800 mb-6">{q.prompt}</h3>
+
+                        {q.type === 'multiple-choice' && (
+                            <div className="space-y-3">
+                                {q.options.map((opt: string) => (
+                                    <button 
+                                        key={opt} 
+                                        onClick={() => handleAnswer(q.id, opt)}
+                                        className={`w-full p-4 text-left rounded-xl border-2 transition-all font-medium ${answers[q.id] === opt ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-100 hover:border-slate-300'}`}
+                                    >
+                                        {opt}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        {q.type === 'boolean' && (
+                            <div className="flex gap-4">
+                                {['true', 'false'].map((val) => (
+                                    <button 
+                                        key={val} 
+                                        onClick={() => handleAnswer(q.id, val)}
+                                        className={`flex-1 p-4 rounded-xl border-2 font-bold capitalize transition-all ${answers[q.id] === val ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-100 hover:border-slate-300'}`}
+                                    >
+                                        {val}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        {q.type === 'essay' && (
+                            <textarea 
+                                className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-indigo-500 outline-none h-32 resize-none" 
+                                placeholder="Type your answer here..."
+                                value={answers[q.id] || ''}
+                                onChange={(e) => handleAnswer(q.id, e.target.value)}
+                            />
+                        )}
+                    </div>
+                ))}
+            </div>
+
+            <div className="bg-white p-4 border-t border-slate-200 sticky bottom-0 z-20">
+                <button onClick={submitExam} className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 active:scale-95 transition-transform flex items-center justify-center gap-2">
+                    Submit Exam <Check size={20}/>
+                </button>
+            </div>
+        </div>
+    );
+}
 
 // ============================================================================
 //  MAIN APP COMPONENT
@@ -1463,9 +1725,16 @@ const handleFinishLesson = useCallback(async (lessonId: string, xp: number, titl
     let content;
     let viewKey; 
 
-    if (activeLesson) {
+if (activeLesson) {
         viewKey = `lesson-${activeLesson.id}`;
-        content = <LessonView lesson={activeLesson} onFinish={handleFinishLesson} />;
+        
+        // 👇 CHECK: Is it an Exam or a Lesson?
+        if (activeLesson.type === 'test' || activeLesson.type === 'exam') {
+             content = <ExamPlayerView exam={activeLesson} onFinish={handleFinishLesson} />;
+        } else {
+             content = <LessonView lesson={activeLesson} onFinish={handleFinishLesson} />;
+        }
+        
     } else if (activeTab === 'home' && activeStudentClass) {
         viewKey = `class-${activeStudentClass.id}`;
         content = <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} displayName={displayName} />;
@@ -1475,7 +1744,7 @@ const handleFinishLesson = useCallback(async (lessonId: string, xp: number, titl
             case 'home': 
                 content = <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} />;
                 break;
-            case 'discovery': // NEW TAB
+            case 'discovery': 
                 content = <DiscoveryView allDecks={allDecks} user={user} onSelectDeck={handleContentSelection} />;
                 break;
             case 'flashcards': 
