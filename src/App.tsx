@@ -1593,38 +1593,59 @@ function LiveActivityFeed() {
 }
 
 // ============================================================================
-//  INSTRUCTOR GRADEBOOK (Matrix View)
+//  INSTRUCTOR GRADEBOOK (Fixed: Robust Matching)
 // ============================================================================
 function InstructorGradebook({ classData }: any) {
     const [logs, setLogs] = useState<any[]>([]);
     
     useEffect(() => {
-        if(!classData.assignments || classData.assignments.length === 0) return;
-        // Fetch all completion logs that match the assignment IDs
-        // Note: Simplified query. In prod, you might query by classId if you add that field to logs.
-        const q = query(collection(db, 'artifacts', appId, 'activity_logs'), where('type', '==', 'completion'), orderBy('timestamp', 'desc'));
+        if(!classData.assignments || classData.assignments.length === 0 || !classData.students || classData.students.length === 0) return;
+        
+        // 1. Fetch ALL recent completions for students in this class
+        // We act broadly here and filter in memory to catch everything
+        const q = query(
+            collection(db, 'artifacts', appId, 'activity_logs'), 
+            where('type', '==', 'completion'), // Only finished items
+            where('studentEmail', 'in', classData.students.slice(0, 10)), // Firestore 'in' limit is 10. For larger classes, you'd need multiple queries or client-side filtering.
+            orderBy('timestamp', 'desc')
+        );
+
         const unsub = onSnapshot(q, (snapshot) => {
             const all = snapshot.docs.map(d => d.data());
-            const assignmentIds = classData.assignments.map((a:any) => a.id);
-            // Filter locally for this class's assignments and students
-            const relevant = all.filter(l => assignmentIds.includes(l.itemId) && classData.students.includes(l.studentEmail));
-            setLogs(relevant);
+            setLogs(all);
         });
         return () => unsub();
     }, [classData]);
 
-    const getScoreCell = (studentEmail: string, assignmentId: string) => {
-        const log = logs.find(l => l.studentEmail === studentEmail && l.itemId === assignmentId);
+    const getScoreCell = (studentEmail: string, assign: any) => {
+        // --- ROBUST MATCHING LOGIC (Same as Student View) ---
+        // 1. Try Exact Match (Assignment ID)
+        let log = logs.find(l => l.studentEmail === studentEmail && l.itemId === assign.id);
+        
+        // 2. Try Original ID
+        if (!log && assign.originalId) {
+            log = logs.find(l => l.studentEmail === studentEmail && l.itemId === assign.originalId);
+        }
+
+        // 3. Try Title Match
+        if (!log) {
+            log = logs.find(l => l.studentEmail === studentEmail && l.itemTitle === assign.title);
+        }
+
         if (!log) return <span className="text-slate-300">-</span>;
         
         if (log.scoreDetail?.status === 'pending_review') {
-            return <span className="text-[10px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded font-bold">Needs Grade</span>;
+            return <span className="text-[10px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded font-bold whitespace-nowrap">Needs Grade</span>;
         }
 
-        const score = log.scoreDetail?.finalScorePct ?? (log.scoreDetail?.score ? Math.round((log.scoreDetail.score / log.scoreDetail.total)*100) : 100);
-        const color = score >= 90 ? 'text-emerald-600 bg-emerald-50' : score >= 70 ? 'text-indigo-600 bg-indigo-50' : 'text-rose-600 bg-rose-50';
+        // Calculate Score %
+        let pct = 100;
+        if (log.scoreDetail?.finalScorePct !== undefined) pct = log.scoreDetail.finalScorePct;
+        else if (log.scoreDetail?.total > 0) pct = Math.round((log.scoreDetail.score / log.scoreDetail.total) * 100);
         
-        return <span className={`text-xs font-bold px-2 py-1 rounded ${color}`}>{score}%</span>;
+        const color = pct >= 90 ? 'text-emerald-600 bg-emerald-50' : pct >= 70 ? 'text-indigo-600 bg-indigo-50' : 'text-rose-600 bg-rose-50';
+        
+        return <span className={`text-xs font-bold px-2 py-1 rounded ${color}`}>{pct}%</span>;
     };
 
     if (!classData.students || classData.students.length === 0) return <div className="p-8 text-center text-slate-400">No students in roster.</div>;
@@ -1634,27 +1655,45 @@ function InstructorGradebook({ classData }: any) {
             <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
-                        <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-50 z-10">Student</th>
+                        <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-50 z-10 border-r border-slate-200">Student</th>
                         {classData.assignments.map((a: any) => (
-                            <th key={a.id} className="p-4 text-xs font-bold text-slate-500 whitespace-nowrap min-w-[120px]">{a.title}</th>
+                            <th key={a.id} className="p-4 text-xs font-bold text-slate-500 whitespace-nowrap min-w-[120px] text-center border-r border-slate-100 last:border-0">{a.title}</th>
                         ))}
-                        <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Avg</th>
+                        <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest text-right sticky right-0 bg-slate-50 z-10 border-l border-slate-200">Avg</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                     {classData.students.map((student: string) => (
                         <tr key={student} className="hover:bg-slate-50/50">
-                            <td className="p-4 font-bold text-slate-700 text-sm sticky left-0 bg-white border-r border-slate-100">{student}</td>
+                            <td className="p-4 font-bold text-slate-700 text-sm sticky left-0 bg-white border-r border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                                {student.split('@')[0]}
+                                <div className="text-[9px] text-slate-400 font-normal">{student}</div>
+                            </td>
                             {classData.assignments.map((a: any) => (
-                                <td key={a.id} className="p-4 text-center">{getScoreCell(student, a.id)}</td>
+                                <td key={a.id} className="p-4 text-center border-r border-slate-50 last:border-0">
+                                    {getScoreCell(student, a)}
+                                </td>
                             ))}
-                            <td className="p-4 text-right font-mono text-xs text-slate-400">
-                                {/* Simple Average Calculation */}
+                            <td className="p-4 text-right font-mono text-xs text-slate-400 sticky right-0 bg-white border-l border-slate-200 shadow-[-2px_0_5px_rgba(0,0,0,0.02)]">
                                 {(() => {
-                                    const studentLogs = logs.filter(l => l.studentEmail === student);
-                                    if(studentLogs.length === 0) return '-';
-                                    const total = studentLogs.reduce((acc, l) => acc + (l.scoreDetail?.finalScorePct || 100), 0);
-                                    return Math.round(total / studentLogs.length) + '%';
+                                    // Calculate row average based on VISIBLE cells only
+                                    let totalPct = 0;
+                                    let count = 0;
+                                    classData.assignments.forEach((a: any) => {
+                                        // Re-run find logic simply to get the stats
+                                        let log = logs.find(l => l.studentEmail === student && l.itemId === a.id);
+                                        if (!log && a.originalId) log = logs.find(l => l.studentEmail === student && l.itemId === a.originalId);
+                                        if (!log) log = logs.find(l => l.studentEmail === student && l.itemTitle === a.title);
+
+                                        if (log) {
+                                            let p = 100;
+                                            if (log.scoreDetail?.finalScorePct !== undefined) p = log.scoreDetail.finalScorePct;
+                                            else if (log.scoreDetail?.total > 0) p = Math.round((log.scoreDetail.score / log.scoreDetail.total) * 100);
+                                            totalPct += p;
+                                            count++;
+                                        }
+                                    });
+                                    return count === 0 ? '-' : Math.round(totalPct / count) + '%';
                                 })()}
                             </td>
                         </tr>
@@ -1664,7 +1703,6 @@ function InstructorGradebook({ classData }: any) {
         </div>
     );
 }
-
 // ============================================================================
 //  CLASS MANAGER (With Juicy Revoke Modal)
 // ============================================================================
