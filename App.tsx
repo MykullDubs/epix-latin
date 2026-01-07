@@ -397,7 +397,7 @@ function App() {
       try { 
           await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp) }); 
           await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { studentName: displayName, studentEmail: user.email, itemTitle: title, itemId: deckId, xp: xp, timestamp: Date.now(), type: 'self_study', scoreDetail }); 
-      } catch (e) { console.error(e); } 
+      } catch (e) { console.error("Log failed", e); } 
   }, [user, displayName]);
 
   const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title: string = 'Lesson', score: any = null) => { 
@@ -437,7 +437,7 @@ function App() {
             case 'home': 
                 content = <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} />;
                 break;
-            case 'discovery': 
+            case 'discovery': // NEW TAB
                 content = <DiscoveryView allDecks={allDecks} user={user} onSelectDeck={handleContentSelection} />;
                 break;
             case 'flashcards': 
@@ -489,4 +489,5 @@ function App() {
     </div>
   );
 }
+
 export default App;
