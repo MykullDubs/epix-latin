@@ -1207,6 +1207,9 @@ function GradeDetailModal({ log, onClose }: any) {
 // ============================================================================
 //  STUDENT GRADEBOOK (Robust Memory Filtering)
 // ============================================================================
+// ============================================================================
+//  STUDENT GRADEBOOK (Robust Filtering)
+// ============================================================================
 function StudentGradebook({ classData, user }: any) {
     const [logs, setLogs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -1215,22 +1218,22 @@ function StudentGradebook({ classData, user }: any) {
     useEffect(() => {
         if(!classData.assignments || classData.assignments.length === 0) { setLoading(false); return; }
         
-        // 1. SIMPLER QUERY (Matches Profile View)
-        // We removed "where('type', '==', 'completion')" to avoid index errors.
+        // 1. Fetch ALL recent history for this user
+        // We removed specific filters to ensure we catch everything
         const q = query(
             collection(db, 'artifacts', appId, 'activity_logs'), 
             where('studentEmail', '==', user.email),
             orderBy('timestamp', 'desc'),
-            limit(200) // Increase limit to ensure we catch completions amidst other logs
+            limit(200)
         );
 
         const unsub = onSnapshot(q, (snapshot) => {
             const allLogs = snapshot.docs.map(d => d.data());
             
-            // 2. ROBUST LOCAL FILTERING
-            // We find logs that match the assignment ID OR the original content ID
+            // 2. ROBUST MATCHING logic
+            // We want logs that are 'completion' AND match either ID
             const relevantLogs = allLogs.filter(log => 
-                log.type === 'completion' && // Only finished items
+                log.type === 'completion' && 
                 classData.assignments.some((a: any) => a.id === log.itemId || a.originalId === log.itemId)
             );
             
@@ -1241,13 +1244,12 @@ function StudentGradebook({ classData, user }: any) {
     }, [classData, user]);
 
     const getGradeStatus = (assign: any) => {
-        // Find the most recent completion log for this assignment
-        // We check both the Assignment ID (assign_xyz) and the Content ID (l1) just in case
-        const log = logs.find(l => l.itemId === assign.id || l.itemId === assign.originalId);
+        // Try finding log by Assignment ID first (Best), then Original ID (Fallback)
+        const log = logs.find(l => l.itemId === assign.id) || logs.find(l => l.itemId === assign.originalId);
         
         if (!log) return { status: 'missing', label: 'Not Started', color: 'bg-slate-100 text-slate-400', interactable: false };
         
-        // EXAM LOGIC
+        // Exam Logic
         if (assign.contentType === 'test' || assign.contentType === 'exam') {
              if (log.scoreDetail?.status === 'pending_review') {
                  return { status: 'pending', label: 'In Review', color: 'bg-amber-100 text-amber-600', interactable: true, log };
@@ -1255,7 +1257,6 @@ function StudentGradebook({ classData, user }: any) {
              
              const score = log.scoreDetail?.score || 0;
              const total = log.scoreDetail?.total || 100;
-             // Calculate percentage safely
              const pct = log.scoreDetail?.finalScorePct ?? (total > 0 ? Math.round((score/total)*100) : 0);
              
              let color = 'bg-slate-100 text-slate-600';
@@ -1266,7 +1267,7 @@ function StudentGradebook({ classData, user }: any) {
              return { status: 'complete', label: `${score}/${total} pts`, color, interactable: true, log };
         }
 
-        // LESSON/DECK LOGIC
+        // Standard Lesson/Deck Logic
         return { status: 'complete', label: 'Complete', color: 'bg-emerald-100 text-emerald-600', interactable: true, log };
     };
 
@@ -1297,6 +1298,7 @@ function StudentGradebook({ classData, user }: any) {
         </>
     );
 }
+
 // ============================================================================
 //  STUDENT CLASS VIEW (With Gradebook Tab)
 // ============================================================================
@@ -2427,18 +2429,25 @@ const handleFinishLesson = useCallback(async (lessonId: string, xp: number, titl
       return <InstructorDashboard user={user} userData={{...userData, classes: enrolledClasses}} allDecks={allDecks} lessons={libraryLessons} {...commonHandlers} onLogout={() => signOut(auth)} />;
   }
 
-  const renderStudentView = () => {
+const renderStudentView = () => {
     let content;
     let viewKey; 
 
-if (activeLesson) {
+    if (activeLesson) {
         viewKey = `lesson-${activeLesson.id}`;
         
-        // 👇 CHECK: Is it an Exam or a Lesson?
+        // --- CRITICAL FIX: Force Assignment ID ---
+        // This wrapper forces the Gradebook to see the correct Assignment ID
+        // instead of the original Content ID.
+        const handleFinish = (id: string, xp: number, title: string, score: any) => {
+             handleFinishLesson(activeLesson.id, xp, title, score);
+        };
+
+        // Check Type & Render
         if (activeLesson.type === 'test' || activeLesson.type === 'exam') {
-             content = <ExamPlayerView exam={activeLesson} onFinish={handleFinishLesson} />;
+             content = <ExamPlayerView exam={activeLesson} onFinish={handleFinish} />;
         } else {
-             content = <LessonView lesson={activeLesson} onFinish={handleFinishLesson} />;
+             content = <LessonView lesson={activeLesson} onFinish={handleFinish} />;
         }
         
     } else if (activeTab === 'home' && activeStudentClass) {
