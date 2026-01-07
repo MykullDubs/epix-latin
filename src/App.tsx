@@ -18,7 +18,8 @@ import {
   Pencil, Image, Info, Edit3, AlertTriangle, FlipVertical, HelpCircle, 
   CheckCircle2, Circle, Activity, Clock, Compass, Globe, RotateCcw, Play, 
   Maximize2, BarChart2, Timer, Megaphone, Inbox, XCircle, ChevronUp, Send,
-  ArrowUp, ArrowDown, Eye, EyeOff, MessageCircle, AlignLeft, ClipboardList, Table // <--- ADDED MISSING ICONS
+  ArrowUp, ArrowDown, Eye, EyeOff, MessageCircle, AlignLeft, ClipboardList, Table, Calendar,
+  Trophy, Flame, Settings, BarChart3  // <--- ADDED MISSING ICONS
 } from 'lucide-react';
 
 // --- FIREBASE CONFIGURATION ---
@@ -935,14 +936,196 @@ function AuthView() {
   return ( <div className="h-full flex flex-col p-6 bg-slate-50"><div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full"><div className="text-center mb-8"><div className="w-20 h-20 bg-indigo-600 rounded-3xl mx-auto flex items-center justify-center text-white mb-4 shadow-xl"><GraduationCap size={40} /></div><h1 className="text-3xl font-bold text-slate-900">LinguistFlow v3.0</h1></div><form onSubmit={handleAuth} className="space-y-4">{!isLogin && <><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase">Name</label><input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl" required={!isLogin} /></div><div className="flex gap-3"><button type="button" onClick={() => setRole('student')} className={`flex-1 p-3 rounded-xl border font-bold text-sm ${role === 'student' ? 'bg-indigo-600 text-white' : 'bg-white'}`}>Student</button><button type="button" onClick={() => setRole('instructor')} className={`flex-1 p-3 rounded-xl border font-bold text-sm ${role === 'instructor' ? 'bg-indigo-600 text-white' : 'bg-white'}`}>Instructor</button></div></>}<div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase">Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl" required /></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase">Password</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl" required /></div>{error && <div className="p-3 bg-rose-50 text-rose-600 text-sm rounded-lg">{error}</div>}<button type="submit" disabled={loading} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg">{loading ? <Loader className="animate-spin" /> : (isLogin ? "Sign In" : "Create Account")}</button></form><div className="mt-6 text-center"><button onClick={() => setIsLogin(!isLogin)} className="text-indigo-600 font-bold text-sm hover:underline">{isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}</button></div></div></div> );
 }
 
-function ProfileView({ user, userData }: any) {
-  const [deploying, setDeploying] = useState(false);
-  const handleLogout = () => signOut(auth);
-  const deploySystemContent = async () => { setDeploying(true); const batch = writeBatch(db); Object.entries(INITIAL_SYSTEM_DECKS).forEach(([key, deck]) => batch.set(doc(db, 'artifacts', appId, 'public', 'data', 'system_decks', key), deck)); INITIAL_SYSTEM_LESSONS.forEach((lesson) => batch.set(doc(db, 'artifacts', appId, 'public', 'data', 'system_lessons', lesson.id), lesson)); try { await batch.commit(); alert("Deployed!"); } catch (e: any) { alert("Error: " + e.message); } setDeploying(false); };
-  const toggleRole = async () => { if (!userData) return; const newRole = userData.role === 'instructor' ? 'student' : 'instructor'; await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole }); };
-  return (<div className="h-full flex flex-col bg-slate-50"><Header title="Ego" subtitle="Profile" /><div className="flex-1 px-6 mt-4"><div className="bg-white p-6 rounded-3xl shadow-sm border flex flex-col items-center mb-6"><h2 className="text-2xl font-bold">{userData?.name}</h2><p className="text-sm text-slate-500">{user.email}</p><div className="mt-4 px-4 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold uppercase">{userData?.role}</div></div><div className="space-y-3"><button onClick={toggleRole} className="w-full bg-white p-4 rounded-xl border text-slate-700 font-bold mb-4 flex justify-between"><span>Switch Role</span><School size={20} /></button><button onClick={handleLogout} className="w-full bg-white p-4 rounded-xl border text-rose-600 font-bold mb-4 flex justify-between"><span>Sign Out</span><LogOut/></button><button onClick={deploySystemContent} disabled={deploying} className="w-full bg-slate-800 text-white p-4 rounded-xl font-bold flex justify-between">{deploying ? <Loader className="animate-spin"/> : <UploadCloud/>}<span>Deploy Content</span></button></div></div></div>);
-}
+// --- PROFILE HELPER: CALCULATE STATS ---
+const calculateUserStats = (logs: any[]) => {
+    let totalSeconds = 0;
+    let cardsMastered = 0;
+    let perfectScores = 0;
+    const activityByDay: any = {};
 
+    // Initialize last 7 days
+    for(let i=6; i>=0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        activityByDay[d.toLocaleDateString()] = 0;
+    }
+
+    logs.forEach(log => {
+        // Time
+        if (log.type === 'time_log') totalSeconds += (log.duration || 0);
+        
+        // Activity Graph
+        const dateKey = new Date(log.timestamp).toLocaleDateString();
+        if (activityByDay[dateKey] !== undefined) {
+            activityByDay[dateKey] += (log.xp || 10);
+        }
+
+        // Achievements
+        if (log.type === 'completion' && log.scoreDetail?.finalScorePct === 100) perfectScores++;
+        if (log.type === 'self_study') cardsMastered += 1; // Approx
+    });
+
+    const graphData = Object.keys(activityByDay).map(date => ({
+        date: date.split('/')[0] + '/' + date.split('/')[1], // Short date
+        xp: activityByDay[date],
+        height: Math.min(100, Math.max(10, (activityByDay[date] / 200) * 100)) // Scale to 100px max
+    }));
+
+    return { 
+        totalHours: (totalSeconds / 3600).toFixed(1),
+        cardsMastered, 
+        perfectScores, 
+        graphData 
+    };
+};
+
+// ============================================================================
+//  ULTIMATE PROFILE VIEW
+// ============================================================================
+function ProfileView({ user, userData }: any) {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>({ totalHours: 0, cardsMastered: 0, perfectScores: 0, graphData: [] });
+  const [loading, setLoading] = useState(true);
+  const [deploying, setDeploying] = useState(false);
+
+  // Fetch History
+  useEffect(() => {
+      if(!user) return;
+      const q = query(collection(db, 'artifacts', appId, 'activity_logs'), where('studentEmail', '==', user.email), orderBy('timestamp', 'desc'), limit(100));
+      const unsub = onSnapshot(q, (snapshot) => {
+          const data = snapshot.docs.map(d => d.data());
+          setLogs(data);
+          setStats(calculateUserStats(data));
+          setLoading(false);
+      });
+      return () => unsub();
+  }, [user]);
+
+  const handleLogout = () => signOut(auth);
+  
+  const toggleRole = async () => { 
+      if (!userData) return; 
+      const newRole = userData.role === 'instructor' ? 'student' : 'instructor'; 
+      await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { role: newRole }); 
+  };
+
+  const deploySystemContent = async () => { 
+      if (!window.confirm("Overwrite system content? This is an admin action.")) return;
+      setDeploying(true); 
+      const batch = writeBatch(db); 
+      Object.entries(INITIAL_SYSTEM_DECKS).forEach(([key, deck]) => batch.set(doc(db, 'artifacts', appId, 'public', 'data', 'system_decks', key), deck)); 
+      INITIAL_SYSTEM_LESSONS.forEach((lesson) => batch.set(doc(db, 'artifacts', appId, 'public', 'data', 'system_lessons', lesson.id), lesson)); 
+      try { await batch.commit(); alert("Content Deployed!"); } catch (e: any) { alert("Error: " + e.message); } 
+      setDeploying(false); 
+  };
+
+  const xp = userData?.xp || 0;
+  const level = Math.floor(xp / 1000) + 1;
+  const nextLevelXp = 1000 - (xp % 1000);
+
+  return (
+    <div className="h-full flex flex-col bg-slate-50 overflow-y-auto custom-scrollbar pb-32">
+        
+        {/* 1. HERO CARD */}
+        <div className="bg-white p-6 pb-8 rounded-b-[3rem] shadow-sm border-b border-slate-100 relative z-10">
+            <div className="flex flex-col items-center">
+                <div className="w-24 h-24 bg-gradient-to-tr from-indigo-500 to-purple-600 rounded-full p-1 shadow-xl mb-4">
+                    <div className="w-full h-full bg-white rounded-full flex items-center justify-center text-3xl font-black text-slate-800 border-4 border-white">
+                        {userData?.name?.charAt(0).toUpperCase() || "U"}
+                    </div>
+                </div>
+                <h2 className="text-2xl font-black text-slate-900">{userData?.name}</h2>
+                <div className="flex items-center gap-2 mt-1">
+                    <span className="px-3 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded-full uppercase tracking-wider">{userData?.role}</span>
+                    <span className="px-3 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-full flex items-center gap-1"><Flame size={12} fill="currentColor"/> {userData?.streak || 1} Day Streak</span>
+                </div>
+            </div>
+
+            {/* Level Bar */}
+            <div className="mt-8">
+                <div className="flex justify-between text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest">
+                    <span>Level {level}</span>
+                    <span>{nextLevelXp} XP to Level {level+1}</span>
+                </div>
+                <div className="h-4 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                    <div className="h-full bg-indigo-500 transition-all duration-1000" style={{ width: `${(xp % 1000) / 10}%` }}></div>
+                </div>
+            </div>
+        </div>
+
+        <div className="px-6 mt-6 space-y-6">
+            
+            {/* 2. STATS GRID */}
+            <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2 text-indigo-600"><Clock size={18}/> <span className="text-[10px] font-bold uppercase text-slate-400">Time</span></div>
+                    <div className="text-2xl font-black text-slate-800">{stats.totalHours} <span className="text-xs font-medium text-slate-400">Hrs</span></div>
+                </div>
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2 text-emerald-600"><Trophy size={18}/> <span className="text-[10px] font-bold uppercase text-slate-400">Perfect</span></div>
+                    <div className="text-2xl font-black text-slate-800">{stats.perfectScores} <span className="text-xs font-medium text-slate-400">Tests</span></div>
+                </div>
+            </div>
+
+            {/* 3. ACTIVITY GRAPH (The "Juice") */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2"><BarChart3 size={18} className="text-indigo-600"/> 7-Day Activity</h3>
+                <div className="flex items-end justify-between h-32 gap-2">
+                    {stats.graphData.map((d: any, i: number) => (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
+                            <div 
+                                className="w-full bg-indigo-100 rounded-t-lg relative group-hover:bg-indigo-500 transition-colors"
+                                style={{ height: `${d.height}%` }}
+                            >
+                                {d.xp > 0 && <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">{d.xp} XP</div>}
+                            </div>
+                            <span className="text-[10px] font-bold text-slate-300">{d.date}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* 4. RECENT HISTORY */}
+            <div>
+                <h3 className="font-bold text-slate-800 mb-4 px-2">Recent History</h3>
+                <div className="space-y-3">
+                    {logs.slice(0, 5).map((log: any) => (
+                        <div key={log.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                            <div className={`p-3 rounded-xl ${log.type === 'completion' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>
+                                {log.type === 'completion' ? <CheckCircle2 size={18}/> : <Zap size={18}/>}
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="font-bold text-slate-800 text-sm">{log.itemTitle}</h4>
+                                <p className="text-xs text-slate-400">{new Date(log.timestamp).toLocaleDateString()}</p>
+                            </div>
+                            <span className="font-black text-indigo-600 text-sm">+{log.xp}</span>
+                        </div>
+                    ))}
+                    {logs.length === 0 && <div className="text-center text-slate-400 text-sm py-4">No history yet. Start learning!</div>}
+                </div>
+            </div>
+
+            {/* 5. SETTINGS / ADMIN */}
+            <div className="bg-slate-200 p-1 rounded-2xl">
+                <button onClick={toggleRole} className="w-full bg-white p-4 rounded-xl text-slate-700 font-bold flex justify-between items-center mb-1 active:scale-[0.98] transition-transform">
+                    <span className="flex items-center gap-3"><Settings size={18} className="text-slate-400"/> Switch Role ({userData?.role})</span>
+                    <ChevronRight size={16} className="text-slate-300"/>
+                </button>
+                {userData?.role === 'instructor' && (
+                    <button onClick={deploySystemContent} disabled={deploying} className="w-full bg-white p-4 rounded-xl text-slate-700 font-bold flex justify-between items-center mb-1 active:scale-[0.98] transition-transform">
+                        <span className="flex items-center gap-3"><UploadCloud size={18} className="text-slate-400"/> {deploying ? 'Deploying...' : 'Reset System Content'}</span>
+                        <ChevronRight size={16} className="text-slate-300"/>
+                    </button>
+                )}
+                <button onClick={handleLogout} className="w-full bg-white p-4 rounded-xl text-rose-600 font-bold flex justify-between items-center active:scale-[0.98] transition-transform">
+                    <span className="flex items-center gap-3"><LogOut size={18} className="text-rose-400"/> Sign Out</span>
+                </button>
+            </div>
+
+        </div>
+    </div>
+  );
+}
 
 
 
