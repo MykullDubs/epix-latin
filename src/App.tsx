@@ -53,14 +53,53 @@ const DAILY_QUESTS = [
 ];
 
 // --- SEED DATA ---
-const INITIAL_SYSTEM_DECKS: any = {
-  salutationes: { title: "👋 Salutationes", cards: [{ id: 's1', front: "Salve", back: "Hello (Singular)", ipa: "/ˈsal.weː/", type: "phrase", mastery: 4, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-e", meaning: "Imp. Sing.", type: "suffix" }], usage: { sentence: "Salve, Marce!", translation: "Hello, Marcus!" }, grammar_tags: ["Imperative", "Greeting"] }, { id: 's2', front: "Salvete", back: "Hello (Plural)", ipa: "/salˈweː.te/", type: "phrase", mastery: 3, morphology: [{ part: "Salv-", meaning: "Health", type: "root" }, { part: "-ete", meaning: "Imp. Pl.", type: "suffix" }], usage: { sentence: "Salvete, discipuli!", translation: "Hello, students!" }, grammar_tags: ["Imperative", "Greeting"] }, { id: 's3', front: "Vale", back: "Goodbye", ipa: "/ˈwa.leː/", type: "phrase", mastery: 3, morphology: [{ part: "Val-", meaning: "Be strong", type: "root" }, { part: "-e", meaning: "Imp.", type: "suffix" }], usage: { sentence: "Vale, amice.", translation: "Goodbye, friend." }, grammar_tags: ["Valediction"] }] },
-  medicina: { title: "⚕️ Medicina", cards: [{ id: 'm1', front: "Vulnus", back: "Wound", ipa: "/ˈwul.nus/", type: "noun", mastery: 1, morphology: [{ part: "Vuln-", meaning: "Wound", type: "root" }, { part: "-us", meaning: "Nom.", type: "suffix" }], usage: { sentence: "Vulnus grave est.", translation: "The wound is serious." }, grammar_tags: ["3rd Declension"] }] }
+const INITIAL_SYSTEM_DECKS = {
+  prep_time: {
+    title: "Prepositions of Time ⏰",
+    targetLanguage: "English",
+    description: "Master the tricky rules of 'at', 'in', and 'on' for dates and schedules.",
+    cards: [
+      { id: 't1', front: "at (time)", back: "Used for precise times (e.g., 5:00 PM, midnight).", type: "grammar" },
+      { id: 't2', front: "in (months/years)", back: "Used for months, years, centuries, and long periods.", type: "grammar" },
+      { id: 't3', front: "on (days)", back: "Used for days and dates (e.g., Tuesday, July 4th).", type: "grammar" },
+      { id: 't4', front: "during", back: "Used when something happens within a specific period.", type: "grammar" },
+      { id: 't5', front: "by", back: "Not later than; at or before.", type: "grammar" },
+      { id: 't6', front: "until", back: "Up to a certain point in time.", type: "grammar" },
+      { id: 't7', front: "since", back: "From a starting point in the past until now.", type: "grammar" },
+      { id: 't8', front: "for (duration)", back: "Used to show an amount of time (e.g., 2 hours).", type: "grammar" },
+    ]
+  },
+  prep_place: {
+    title: "Prepositions of Place 📍",
+    targetLanguage: "English",
+    description: "Learn to describe where objects are located relative to others.",
+    cards: [
+      { id: 'p1', front: "in (place)", back: "Inside an enclosed space or container.", type: "grammar" },
+      { id: 'p2', front: "on (surface)", back: "Touching the surface of something.", type: "grammar" },
+      { id: 'p3', front: "at (point)", back: "Specific point or location (e.g., the bus stop).", type: "grammar" },
+      { id: 'p4', front: "under", back: "Directly below something.", type: "grammar" },
+      { id: 'p5', front: "between", back: "In the space separating two objects.", type: "grammar" },
+      { id: 'p6', front: "behind", back: "At the back of something.", type: "grammar" },
+      { id: 'p7', front: "in front of", back: "Further forward than someone or something.", type: "grammar" },
+      { id: 'p8', front: "next to / beside", back: "At the side of someone or something.", type: "grammar" },
+    ]
+  },
+  prep_movement: {
+    title: "Prepositions of Movement 🏃",
+    targetLanguage: "English",
+    description: "Vocabulary for giving directions and describing motion.",
+    cards: [
+      { id: 'm1', front: "to", back: "Movement towards a specific destination.", type: "grammar" },
+      { id: 'm2', front: "through", back: "Movement in one side and out the other.", type: "grammar" },
+      { id: 'm3', front: "across", back: "Movement from one side to the other side.", type: "grammar" },
+      { id: 'm4', front: "into", back: "Movement entering an enclosed space.", type: "grammar" },
+      { id: 'm5', front: "along", back: "Movement following a line (e.g., a road).", type: "grammar" },
+      { id: 'm6', front: "over", back: "Movement above and across something.", type: "grammar" },
+      { id: 'm7', front: "past", back: "Moving beyond something without stopping.", type: "grammar" },
+      { id: 'm8', front: "towards", back: "Movement in the direction of something.", type: "grammar" },
+    ]
+  }
 };
-
-const INITIAL_SYSTEM_LESSONS: any[] = [
-  { id: 'l1', title: "Salutationes", subtitle: "Greetings in the Forum", description: "Learn how to greet friends and elders.", xp: 50, vocab: ['Salve', 'Vale', 'Quid agis?'], blocks: [{ type: 'text', title: 'The Basics', content: 'In Latin, we distinguish between addressing one person ("Salve") and multiple people ("Salvete").' }, { type: 'dialogue', lines: [ { speaker: "Marcus", text: "Salve, Iulia!", translation: "Hello, Julia!", side: "left" }, { speaker: "Iulia", text: "Salve, Marce.", translation: "Hello, Marcus.", side: "right" } ] }, { type: 'quiz', question: "How do you say 'Hello' to a group?", options: [{ id: 'a', text: "Salve" }, { id: 'b', text: "Salvete" }, { id: 'c', text: "Vale" }], correctId: 'b' }] }
-];
 
 const TYPE_COLORS: any = { verb: { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700' }, noun: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' }, adverb: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' }, phrase: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' }, adjective: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700' } };
 
