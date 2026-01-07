@@ -1389,14 +1389,21 @@ function InstructorGradebook({ classData }: any) {
 }
 
 // ============================================================================
-//  UPDATED CLASS MANAGER (Now with Exams!)
+//  CLASS MANAGER (With Juicy Revoke Modal)
 // ============================================================================
 function ClassManagerView({ user, classes, lessons, allDecks }: any) {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [newClassName, setNewClassName] = useState('');
   const [newStudentEmail, setNewStudentEmail] = useState('');
+  
+  // Modals & Feedback
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  
+  // NEW: State for the Revoke Modal
+  const [assignmentToRemove, setAssignmentToRemove] = useState<any>(null);
+
+  // Assignment Logic State
   const [targetStudentMode, setTargetStudentMode] = useState('all'); 
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [assignType, setAssignType] = useState<'deck' | 'lesson' | 'exam'>('lesson');
@@ -1432,19 +1439,22 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
       } catch (error) { console.error("Assign failed:", error); alert("Failed to assign."); } 
   };
 
-  // --- NEW: REMOVE ASSIGNMENT HANDLER ---
-  const handleRemoveAssignment = async (assignment: any) => {
-      if (!selectedClass) return;
-      if (!window.confirm(`Are you sure you want to revoke "${assignment.title}"? Students will no longer see it.`)) return;
+  // --- NEW REVOKE LOGIC ---
+  const initiateRemove = (assignment: any) => {
+      setAssignmentToRemove(assignment);
+  };
 
+  const confirmRemove = async () => {
+      if (!selectedClass || !assignmentToRemove) return;
       try {
           await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), {
-              assignments: arrayRemove(assignment) // <--- MAGIC HAPPENS HERE
+              assignments: arrayRemove(assignmentToRemove)
           });
-          setToastMsg("Assignment Removed Successfully");
+          setToastMsg("Assignment Revoked");
+          setAssignmentToRemove(null);
       } catch (e) {
           console.error(e);
-          alert("Failed to remove assignment.");
+          setToastMsg("Error removing assignment");
       }
   };
 
@@ -1453,6 +1463,35 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
       <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-300 relative">
         {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
         
+        {/* --- JUICY REVOKE MODAL --- */}
+        {assignmentToRemove && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
+                    <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Trash2 size={32} />
+                    </div>
+                    <h3 className="text-xl font-black text-slate-900 mb-2">Revoke Access?</h3>
+                    <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+                        Are you sure you want to remove <strong>"{assignmentToRemove.title}"</strong>? Students will no longer see it in their dashboard.
+                    </p>
+                    <div className="flex gap-3">
+                        <button 
+                            onClick={() => setAssignmentToRemove(null)} 
+                            className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            onClick={confirmRemove} 
+                            className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 shadow-lg shadow-rose-200 transition-all active:scale-95"
+                        >
+                            Revoke
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
         {/* Class Header */}
         <div className="pb-4 border-b border-slate-100 mb-6 bg-white sticky top-0 z-20">
           <button onClick={() => setSelectedClassId(null)} className="flex items-center text-slate-500 hover:text-indigo-600 mb-4 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Classes</button>
@@ -1490,11 +1529,11 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
                                     </div>
                                 </div>
                             </div>
-                            {/* REMOVE BUTTON WIRED UP */}
+                            {/* REVOKE BUTTON (Triggers Modal) */}
                             <button 
-                                onClick={() => handleRemoveAssignment(l)}
+                                onClick={() => initiateRemove(l)}
                                 className="text-slate-300 hover:text-rose-500 hover:bg-rose-50 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all" 
-                                title="Remove Assignment"
+                                title="Revoke Assignment"
                             >
                                 <Trash2 size={18}/>
                             </button>
@@ -1531,7 +1570,6 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
                   <div className="bg-white p-1 rounded-lg border border-slate-200 flex mb-2"><button onClick={() => setTargetStudentMode('all')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${targetStudentMode === 'all' ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Entire Class</button><button onClick={() => setTargetStudentMode('specific')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${targetStudentMode === 'specific' ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Specific Students</button></div>
                   {targetStudentMode === 'specific' && (<div className="mt-2 max-h-32 overflow-y-auto border border-slate-200 rounded-lg bg-white p-2 custom-scrollbar">{(!selectedClass.students || selectedClass.students.length === 0) ? (<p className="text-xs text-slate-400 italic text-center p-2">No students in roster.</p>) : (selectedClass.students.map((studentEmail: string) => (<button key={studentEmail} onClick={() => toggleAssignee(studentEmail)} className="flex items-center gap-2 w-full p-2 hover:bg-slate-50 rounded text-left">{selectedAssignees.includes(studentEmail) ? <CheckCircle2 size={16} className="text-indigo-600"/> : <Circle size={16} className="text-slate-300"/>}<span className="text-xs font-medium text-slate-700 truncate">{studentEmail}</span></button>)))}</div>)}
               </div>
-              
               <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
                   {assignType === 'exam' && (
                       <div className="space-y-2">{availableExams.length === 0 ? <p className="text-sm text-slate-400 italic">No exams found.</p> : availableExams.map((l: any) => (<button key={l.id} onClick={() => assignContent(l, 'test')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-rose-500 hover:bg-rose-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{l.title}</h4><p className="text-xs text-slate-500">{l.questions?.length || 0} Questions</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-rose-500"/></button>))}</div>
