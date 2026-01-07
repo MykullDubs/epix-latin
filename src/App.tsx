@@ -1919,19 +1919,40 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
 
 
 // ============================================================================
-//  JUICY TOAST NOTIFICATION
+//  JUICY TOAST NOTIFICATION (Now supports types!)
 // ============================================================================
-function JuicyToast({ message, onClose }: { message: string, onClose: () => void }) {
+function JuicyToast({ message, type = 'success', onClose }: { message: string, type?: string, onClose: () => void }) {
   useEffect(() => {
     const timer = setTimeout(onClose, 3000);
     return () => clearTimeout(timer);
   }, [onClose]);
 
+  // Style Config
+  const styles: any = {
+    success: { 
+        bg: 'bg-slate-900/90', 
+        iconBg: 'bg-emerald-500', 
+        icon: <Check size={12} strokeWidth={4} className="text-slate-900" /> 
+    },
+    error: { 
+        bg: 'bg-rose-900/90', 
+        iconBg: 'bg-white', 
+        icon: <X size={12} strokeWidth={4} className="text-rose-900" /> 
+    },
+    info: { 
+        bg: 'bg-indigo-900/90', 
+        iconBg: 'bg-white', 
+        icon: <Info size={12} strokeWidth={4} className="text-indigo-900" /> 
+    }
+  };
+
+  const s = styles[type] || styles.success;
+
   return (
     <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-4 duration-300">
-      <div className="bg-slate-900/90 backdrop-blur-md text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border border-white/10">
-        <div className="bg-emerald-500 rounded-full p-1">
-          <Check size={12} strokeWidth={4} className="text-slate-900" />
+      <div className={`${s.bg} backdrop-blur-md text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border border-white/10`}>
+        <div className={`${s.iconBg} rounded-full p-1`}>
+          {s.icon}
         </div>
         <span className="font-bold text-sm">{message}</span>
       </div>
