@@ -1114,16 +1114,148 @@ function AnalyticsDashboard({ classes }: any) {
     );
 }
 
+// ============================================================================
+//  INSTRUCTOR GRADING SUITE (Inbox)
+// ============================================================================
 function InstructorInbox({ onGradeSubmission }: any) {
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState('');
-  const [manualScore, setManualScore] = useState(0); 
-  useEffect(() => { const q = query(collection(db, 'artifacts', appId, 'activity_logs'), where('scoreDetail.status', '==', 'pending_review'), orderBy('timestamp', 'asc')); const unsub = onSnapshot(q, (snapshot) => { setSubmissions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))); setLoading(false); }); return () => unsub(); }, []);
+  
+  // Local state for the grade adjustments
+  const [grades, setGrades] = useState<any>({}); // { questionIndex: pointsAwarded }
+
+  useEffect(() => { 
+      const q = query(collection(db, 'artifacts', appId, 'activity_logs'), where('scoreDetail.status', '==', 'pending_review'), orderBy('timestamp', 'asc')); 
+      const unsub = onSnapshot(q, (snapshot) => { 
+          setSubmissions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))); 
+          setLoading(false); 
+      }); 
+      return () => unsub(); 
+  }, []);
+
   const selectedItem = submissions.find(s => s.id === selectedId);
-  const handleSubmitGrade = async () => { if(!selectedItem) return; const baseXP = selectedItem.xp > 0 ? selectedItem.xp : 100; const finalXP = Math.round(baseXP * (manualScore / 100)); await onGradeSubmission(selectedItem.id, finalXP, feedback, manualScore); setSelectedId(null); setFeedback(''); setManualScore(0); };
-  return ( <div className="flex h-full bg-slate-50 relative overflow-hidden"><div className={`${selectedId ? 'hidden md:flex' : 'flex'} w-full md:w-80 flex-col border-r border-slate-200 bg-white z-10`}><div className="p-4 border-b border-slate-100 flex justify-between items-center"><h2 className="font-bold text-slate-800 flex items-center gap-2"><Inbox size={18} className="text-indigo-600"/> Inbox</h2><span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-1 rounded-full">{submissions.length}</span></div><div className="flex-1 overflow-y-auto custom-scrollbar">{submissions.length === 0 ? <div className="p-8 text-center text-slate-400 italic text-sm">All caught up! 🎉</div> : submissions.map(sub => (<div key={sub.id} onClick={() => setSelectedId(sub.id)} className={`p-4 border-b border-slate-50 cursor-pointer transition-all hover:bg-slate-50 ${selectedId === sub.id ? 'bg-indigo-50 border-indigo-200' : ''}`}><div className="flex justify-between items-start mb-1"><span className="font-bold text-slate-700 text-sm">{sub.studentName}</span><span className="text-[10px] text-slate-400">{new Date(sub.timestamp).toLocaleDateString()}</span></div><p className="text-xs text-slate-500 truncate mb-2">{sub.itemTitle}</p><div className="flex gap-2"><span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Needs Review</span></div></div>))}</div></div><div className={`flex-1 flex flex-col bg-slate-50 ${!selectedId ? 'hidden md:flex' : 'flex'}`}>{selectedItem ? (<><div className="p-4 bg-white border-b border-slate-200 flex justify-between items-center shadow-sm"><div className="flex items-center gap-3"><button onClick={() => setSelectedId(null)} className="md:hidden p-2 text-slate-400"><ArrowLeft size={20}/></button><div><h2 className="font-bold text-lg text-slate-800">{selectedItem.itemTitle}</h2><p className="text-xs text-slate-500">Submitted by <span className="font-bold text-indigo-600">{selectedItem.studentName}</span></p></div></div><div className="text-right"><div className="text-xs text-slate-400 font-bold uppercase tracking-wider">Auto-Score</div><div className="text-xl font-black text-slate-300">{selectedItem.scoreDetail.score}/{selectedItem.scoreDetail.total}</div></div></div><div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar"><div className="max-w-3xl mx-auto space-y-6">{selectedItem.scoreDetail.details.map((q: any, idx: number) => (<div key={idx} className={`bg-white p-6 rounded-2xl border-2 shadow-sm ${['essay', 'short-answer'].includes(q.type) ? 'border-indigo-100 ring-4 ring-indigo-50' : 'border-slate-100 opacity-70'}`}><div className="flex justify-between items-start mb-4"><span className="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-100 px-2 py-1 rounded">{q.type}</span>{['essay', 'short-answer'].includes(q.type) ? <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded flex items-center gap-1"><AlertTriangle size={12}/> Needs Grading</span> : (q.isCorrect ? <span className="text-emerald-500"><Check size={20}/></span> : <span className="text-rose-500"><X size={20}/></span>)}</div><h3 className="font-bold text-slate-800 text-lg mb-4">{q.prompt}</h3><div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-slate-700 font-medium whitespace-pre-wrap font-serif">{q.studentVal}</div>{!['essay', 'short-answer'].includes(q.type) && <div className="mt-2 text-xs text-slate-400">Correct: {q.correctVal}</div>}</div>))}</div></div><div className="p-4 bg-white border-t border-slate-200 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20"><div className="max-w-3xl mx-auto flex flex-col md:flex-row gap-6 items-end"><div className="w-full space-y-2"><label className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2"><MessageCircle size={14}/> Instructor Feedback</label><textarea className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 h-20 resize-none" placeholder="Great job, but..." value={feedback} onChange={(e) => setFeedback(e.target.value)}/></div><div className="w-full md:w-auto shrink-0 flex flex-col gap-4 min-w-[250px]"><div><div className="flex justify-between text-xs font-bold text-slate-500 mb-2"><span>FINAL SCORE</span><span className={`text-lg font-black ${manualScore >= 70 ? 'text-emerald-600' : 'text-rose-600'}`}>{manualScore}%</span></div><input type="range" min="0" max="100" value={manualScore} onChange={(e) => setManualScore(parseInt(e.target.value))} className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"/></div><button onClick={handleSubmitGrade} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 active:scale-95 transition-all flex justify-center items-center gap-2"><Send size={18}/> Release Grade</button></div></div></div></>) : <div className="flex-1 flex flex-col items-center justify-center text-slate-300 p-8"><Inbox size={64} className="mb-4 opacity-50"/><p className="text-lg font-bold">Select a submission to grade</p></div>}</div></div> );
+
+  // Initialize grades when a submission is selected
+  useEffect(() => {
+      if (selectedItem) {
+          const initGrades: any = {};
+          selectedItem.scoreDetail.details.forEach((q: any, i: number) => {
+              // Default to existing awarded points (auto-graded ones)
+              initGrades[i] = q.awardedPoints || 0;
+          });
+          setGrades(initGrades);
+      }
+  }, [selectedItem]);
+
+  const handlePointChange = (idx: number, points: number) => {
+      setGrades({ ...grades, [idx]: points });
+  };
+
+  const calculateTotal = () => {
+      return Object.values(grades).reduce((acc: number, val: any) => acc + (parseInt(val) || 0), 0);
+  };
+
+  const handleSubmitGrade = async () => { 
+      if(!selectedItem) return; 
+      const finalScore = calculateTotal();
+      const totalPossible = selectedItem.scoreDetail.total;
+      const scorePct = Math.round((finalScore / totalPossible) * 100);
+      
+      // Update the submission with individual question grades if you wanted to be fancy,
+      // but for now we just update the total score and status.
+      await onGradeSubmission(selectedItem.id, finalScore, feedback, scorePct); 
+      setSelectedId(null); 
+      setFeedback(''); 
+      setGrades({});
+  };
+
+  return ( 
+    <div className="flex h-full bg-slate-50 relative overflow-hidden">
+        {/* SIDEBAR LIST */}
+        <div className={`${selectedId ? 'hidden md:flex' : 'flex'} w-full md:w-80 flex-col border-r border-slate-200 bg-white z-10`}>
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center"><h2 className="font-bold text-slate-800 flex items-center gap-2"><Inbox size={18} className="text-indigo-600"/> Inbox</h2><span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-1 rounded-full">{submissions.length}</span></div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                {submissions.length === 0 ? <div className="p-8 text-center text-slate-400 italic text-sm">All caught up! 🎉</div> : submissions.map(sub => (
+                    <div key={sub.id} onClick={() => setSelectedId(sub.id)} className={`p-4 border-b border-slate-50 cursor-pointer transition-all hover:bg-slate-50 ${selectedId === sub.id ? 'bg-indigo-50 border-indigo-200' : ''}`}>
+                        <div className="flex justify-between items-start mb-1"><span className="font-bold text-slate-700 text-sm">{sub.studentName}</span><span className="text-[10px] text-slate-400">{new Date(sub.timestamp).toLocaleDateString()}</span></div>
+                        <p className="text-xs text-slate-500 truncate mb-2">{sub.itemTitle}</p>
+                        <div className="flex gap-2"><span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Needs Review</span></div>
+                    </div>
+                ))}
+            </div>
+        </div>
+
+        {/* GRADING PANE */}
+        <div className={`flex-1 flex flex-col bg-slate-50 ${!selectedId ? 'hidden md:flex' : 'flex'}`}>
+            {selectedItem ? (
+                <>
+                    <div className="p-4 bg-white border-b border-slate-200 flex justify-between items-center shadow-sm">
+                        <div className="flex items-center gap-3"><button onClick={() => setSelectedId(null)} className="md:hidden p-2 text-slate-400"><ArrowLeft size={20}/></button><div><h2 className="font-bold text-lg text-slate-800">{selectedItem.itemTitle}</h2><p className="text-xs text-slate-500">Submitted by <span className="font-bold text-indigo-600">{selectedItem.studentName}</span></p></div></div>
+                        <div className="text-right"><div className="text-xs text-slate-400 font-bold uppercase tracking-wider">Total Score</div><div className="text-2xl font-black text-indigo-600">{calculateTotal()} <span className="text-sm text-slate-300 font-medium">/ {selectedItem.scoreDetail.total}</span></div></div>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
+                        <div className="max-w-3xl mx-auto space-y-6">
+                            {selectedItem.scoreDetail.details.map((q: any, idx: number) => (
+                                <div key={idx} className={`bg-white p-6 rounded-2xl border-2 shadow-sm ${['essay'].includes(q.type) ? 'border-indigo-100 ring-4 ring-indigo-50' : 'border-slate-100'}`}>
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-100 px-2 py-1 rounded">{q.type}</span>
+                                            {/* Status Badge */}
+                                            {q.type === 'essay' && <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded flex items-center gap-1"><AlertTriangle size={10}/> Essay</span>}
+                                        </div>
+                                        {/* Point Input */}
+                                        <div className="flex items-center gap-2">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Points:</label>
+                                            <input type="number" min="0" max={q.maxPoints} value={grades[idx] || 0} onChange={(e) => handlePointChange(idx, parseInt(e.target.value))} className="w-16 p-1 text-center font-bold border border-slate-200 rounded-lg text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"/>
+                                            <span className="text-xs font-bold text-slate-400">/ {q.maxPoints}</span>
+                                        </div>
+                                    </div>
+                                    <h3 className="font-bold text-slate-800 text-lg mb-4">{q.prompt}</h3>
+                                    
+                                    {/* Student Answer Display */}
+                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-slate-700 font-medium whitespace-pre-wrap font-serif leading-relaxed">
+                                        {q.studentVal}
+                                    </div>
+                                    
+                                    {/* Correct Answer (If applicable) */}
+                                    {q.type !== 'essay' && (
+                                        <div className="mt-3 flex items-center gap-2 text-xs">
+                                            <span className="font-bold text-slate-400 uppercase">Correct Answer:</span>
+                                            <span className={`px-2 py-1 rounded font-bold ${q.isCorrect ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>{q.correctVal}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    {/* Footer Grading Action */}
+                    <div className="p-4 bg-white border-t border-slate-200 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20">
+                        <div className="max-w-3xl mx-auto flex flex-col md:flex-row gap-6 items-end">
+                            <div className="w-full space-y-2">
+                                <label className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2"><MessageCircle size={14}/> Final Feedback</label>
+                                <textarea className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 h-20 resize-none" placeholder="Great job! Here is some advice..." value={feedback} onChange={(e) => setFeedback(e.target.value)}/>
+                            </div>
+                            <div className="w-full md:w-auto shrink-0">
+                                <button onClick={handleSubmitGrade} className="w-full py-4 px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 active:scale-95 transition-all flex justify-center items-center gap-2">
+                                    <Send size={18}/> Release Grade ({calculateTotal()} pts)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-300 p-8">
+                    <Inbox size={64} className="mb-4 opacity-50"/>
+                    <p className="text-lg font-bold">Select a submission to grade</p>
+                </div>
+            )}
+        </div>
+    </div> 
+  );
 }
 
 // ============================================================================
@@ -1549,7 +1681,7 @@ function ExamBuilderView({ onSave, initialData }: any) {
     );
 }
 // ============================================================================
-//  EXAM PLAYER (Student Taking Test)
+//  EXAM PLAYER (With Data Snapshotting)
 // ============================================================================
 function ExamPlayerView({ exam, onFinish }: any) {
     const [answers, setAnswers] = useState<any>({});
@@ -1564,57 +1696,73 @@ function ExamPlayerView({ exam, onFinish }: any) {
     const submitExam = () => {
         if (!window.confirm("Submit your exam? You cannot change answers after this.")) return;
         
-        // Grading Logic
         let totalPoints = 0;
         let earnedPoints = 0;
         const details: any[] = [];
+        let requiresManualGrading = false;
 
+        // 1. AUTO-GRADE & SNAPSHOT
+        // We save the 'prompt' and 'maxPoints' here so the instructor sees them even if the exam changes later.
         exam.questions.forEach((q: any) => {
-            totalPoints += (q.points || 0);
+            const points = parseInt(q.points || 0);
+            totalPoints += points;
+            
             const studentVal = answers[q.id];
             let isCorrect = false;
-            let status = 'graded';
+            let awarded = 0;
 
             if (q.type === 'multiple-choice' || q.type === 'boolean') {
                 if (studentVal === q.correctAnswer) {
-                    earnedPoints += (q.points || 0);
+                    awarded = points;
                     isCorrect = true;
                 }
             } else if (q.type === 'essay') {
-                status = 'pending_review'; // Instructor must grade
-                isCorrect = false; // Placeholder
+                requiresManualGrading = true;
+                awarded = 0; // Placeholder until graded
             }
 
             details.push({
                 qId: q.id,
-                prompt: q.prompt,
                 type: q.type,
-                studentVal,
-                correctVal: q.correctAnswer,
-                isCorrect,
-                status
+                prompt: q.prompt, // Snapshot the question text
+                maxPoints: points,
+                studentVal: studentVal || "(No Answer)",
+                correctVal: q.correctAnswer || "(Essay)",
+                awardedPoints: awarded,
+                isCorrect
             });
+            
+            earnedPoints += awarded;
         });
 
-        const finalScore = { score: earnedPoints, total: totalPoints, details, status: details.some(d => d.status === 'pending_review') ? 'pending_review' : 'complete' };
-        setScoreDetail(finalScore);
+        // 2. COMPILE REPORT
+        const finalStatus = requiresManualGrading ? 'pending_review' : 'graded';
+        
+        const result = { 
+            score: earnedPoints, 
+            total: totalPoints, 
+            status: finalStatus,
+            details: details 
+        };
+
+        setScoreDetail(result);
         setSubmitted(true);
     };
 
     if (submitted) {
         return (
-            <div className="h-full flex flex-col items-center justify-center p-8 bg-slate-50">
-                <div className="bg-white p-8 rounded-3xl shadow-xl text-center max-w-sm w-full">
-                    <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${scoreDetail.status === 'pending_review' ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'}`}>
+            <div className="h-full flex flex-col items-center justify-center p-8 bg-slate-50 animate-in zoom-in duration-300">
+                <div className="bg-white p-8 rounded-3xl shadow-xl text-center max-w-sm w-full border border-slate-100">
+                    <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm ${scoreDetail.status === 'pending_review' ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'}`}>
                         {scoreDetail.status === 'pending_review' ? <Clock size={40}/> : <Award size={40}/>}
                     </div>
                     <h2 className="text-2xl font-black text-slate-900 mb-2">Exam Submitted</h2>
-                    <p className="text-slate-500 mb-6">
+                    <p className="text-slate-500 mb-6 font-medium">
                         {scoreDetail.status === 'pending_review' 
-                            ? "Your written answers have been sent to your instructor for grading." 
+                            ? "Your answers have been sent to the instructor for grading." 
                             : `You scored ${scoreDetail.score} / ${scoreDetail.total}`}
                     </p>
-                    <button onClick={() => onFinish(exam.id, scoreDetail.score, exam.title, scoreDetail)} className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold">Return Home</button>
+                    <button onClick={() => onFinish(exam.id, scoreDetail.score, exam.title, scoreDetail)} className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold shadow-lg hover:scale-105 transition-transform">Return Home</button>
                 </div>
             </div>
         );
@@ -1622,68 +1770,22 @@ function ExamPlayerView({ exam, onFinish }: any) {
 
     return (
         <div className="h-full flex flex-col bg-slate-50 overflow-hidden">
-            <div className="px-6 py-4 bg-white border-b border-slate-200 sticky top-0 z-20 flex justify-between items-center">
-                <div>
-                    <h1 className="text-lg font-bold text-slate-800 flex items-center gap-2"><FileText size={18} className="text-indigo-600"/> {exam.title}</h1>
-                    <p className="text-xs text-slate-400">{exam.questions.length} Questions</p>
-                </div>
-                <div className="text-xs font-mono font-bold bg-slate-100 px-2 py-1 rounded text-slate-500">Live Exam</div>
+            <div className="px-6 py-4 bg-white border-b border-slate-200 sticky top-0 z-20 flex justify-between items-center shadow-sm">
+                <div><h1 className="text-lg font-bold text-slate-800 flex items-center gap-2"><FileText size={18} className="text-indigo-600"/> {exam.title}</h1><p className="text-xs text-slate-400 font-medium">{exam.questions.length} Questions • {exam.timeLimitMinutes || 30} Mins</p></div>
+                <div className="text-xs font-mono font-bold bg-rose-50 text-rose-600 px-2 py-1 rounded flex items-center gap-1 animate-pulse"><Circle size={8} fill="currentColor"/> Live</div>
             </div>
-
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-32">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-32 custom-scrollbar">
                 {exam.questions.map((q: any, i: number) => (
                     <div key={q.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                        <div className="flex justify-between items-start mb-4">
-                            <span className="text-xs font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded uppercase tracking-wider">Question {i + 1}</span>
-                            <span className="text-xs font-bold text-indigo-600">{q.points} pts</span>
-                        </div>
-                        <h3 className="text-lg font-bold text-slate-800 mb-6">{q.prompt}</h3>
-
-                        {q.type === 'multiple-choice' && (
-                            <div className="space-y-3">
-                                {q.options.map((opt: string) => (
-                                    <button 
-                                        key={opt} 
-                                        onClick={() => handleAnswer(q.id, opt)}
-                                        className={`w-full p-4 text-left rounded-xl border-2 transition-all font-medium ${answers[q.id] === opt ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-100 hover:border-slate-300'}`}
-                                    >
-                                        {opt}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-
-                        {q.type === 'boolean' && (
-                            <div className="flex gap-4">
-                                {['true', 'false'].map((val) => (
-                                    <button 
-                                        key={val} 
-                                        onClick={() => handleAnswer(q.id, val)}
-                                        className={`flex-1 p-4 rounded-xl border-2 font-bold capitalize transition-all ${answers[q.id] === val ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-100 hover:border-slate-300'}`}
-                                    >
-                                        {val}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-
-                        {q.type === 'essay' && (
-                            <textarea 
-                                className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-indigo-500 outline-none h-32 resize-none" 
-                                placeholder="Type your answer here..."
-                                value={answers[q.id] || ''}
-                                onChange={(e) => handleAnswer(q.id, e.target.value)}
-                            />
-                        )}
+                        <div className="flex justify-between items-start mb-4"><span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded uppercase tracking-wider">Question {i + 1}</span><span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{q.points} pts</span></div>
+                        <h3 className="text-lg font-bold text-slate-800 mb-6 font-serif">{q.prompt}</h3>
+                        {q.type === 'multiple-choice' && (<div className="space-y-3">{q.options.map((opt: string) => (<button key={opt} onClick={() => handleAnswer(q.id, opt)} className={`w-full p-4 text-left rounded-xl border-2 transition-all font-medium flex justify-between items-center ${answers[q.id] === opt ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-100 hover:border-slate-300'}`}>{opt}{answers[q.id] === opt && <CheckCircle2 size={16}/>}</button>))}</div>)}
+                        {q.type === 'boolean' && (<div className="flex gap-4">{['true', 'false'].map((val) => (<button key={val} onClick={() => handleAnswer(q.id, val)} className={`flex-1 p-4 rounded-xl border-2 font-bold capitalize transition-all ${answers[q.id] === val ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-100 hover:border-slate-300'}`}>{val}</button>))}</div>)}
+                        {q.type === 'essay' && (<textarea className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-indigo-500 outline-none h-40 resize-none font-medium text-slate-700" placeholder="Type your answer here..." value={answers[q.id] || ''} onChange={(e) => handleAnswer(q.id, e.target.value)}/>)}
                     </div>
                 ))}
             </div>
-
-            <div className="bg-white p-4 border-t border-slate-200 sticky bottom-0 z-20">
-                <button onClick={submitExam} className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 active:scale-95 transition-transform flex items-center justify-center gap-2">
-                    Submit Exam <Check size={20}/>
-                </button>
-            </div>
+            <div className="bg-white p-4 border-t border-slate-200 sticky bottom-0 z-20"><button onClick={submitExam} className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2">Submit Exam <Check size={20}/></button></div>
         </div>
     );
 }
