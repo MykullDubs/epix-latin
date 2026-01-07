@@ -511,86 +511,104 @@ function LessonView({ lesson, onFinish }: any) {
   );
 }
 // ============================================================================
-//  MOONSHOT EXPLORE (Fuzzy Logic Engine)
+//  MOONSHOT EXPLORE (Unified Lessons & Decks)
 // ============================================================================
-function DiscoveryView({ allDecks, user, onSelectDeck, onLogActivity, userData }: any) {
+function DiscoveryView({ allDecks, lessons, user, onSelectDeck, onSelectLesson, onLogActivity, userData }: any) {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState('All');
     const [sortMode, setSortMode] = useState<'relevance' | 'size' | 'alpha'>('relevance');
 
-    // --- 1. THE FUZZY BRAIN ---
-    const { processedDecks, categories, difficultyGroups } = useMemo(() => {
-        // A. Convert Object to Array & Normalize
-        let entries = Object.entries(allDecks || {})
+    // --- 1. THE FUZZY BRAIN (Unified) ---
+    const { processedItems, categories, difficultyGroups } = useMemo(() => {
+        
+        // A. Normalize Decks
+        const deckEntries = Object.entries(allDecks || {})
             .filter(([, deck]: any) => !deck.isAssignment)
             .map(([id, deck]: any) => ({
                 id,
                 ...deck,
                 contentType: 'deck',
-                cardCount: deck.cards?.length || 0,
-                // Create a "Search String" for fuzzy matching
-                _searchStr: `${deck.title} ${deck.targetLanguage || ''} ${deck.description || ''}`.toLowerCase()
+                magnitude: (deck.cards?.length || 0), // Base size metric
+                displayCount: `${deck.cards?.length || 0} Cards`,
+                _searchStr: `${deck.title} ${deck.targetLanguage || ''} ${deck.description || ''} vocab flashcards`.toLowerCase()
             }));
 
-        // B. Extract Categories (Dynamic)
+        // B. Normalize Lessons
+        const lessonEntries = (lessons || [])
+            .map((lesson: any) => ({
+                ...lesson,
+                contentType: 'lesson',
+                // Weight blocks higher than cards for "Size" sorting (1 block ~= 3 cards effort)
+                magnitude: (lesson.blocks?.length || 0) * 3, 
+                displayCount: `${lesson.blocks?.length || 0} Blocks`,
+                _searchStr: `${lesson.title} ${lesson.subtitle || ''} ${lesson.description || ''} reading lesson`.toLowerCase()
+            }));
+
+        // C. Merge
+        let entries = [...deckEntries, ...lessonEntries];
+
+        // D. Extract Categories
         const uniqueLangs = Array.from(new Set(entries.map((d: any) => d.targetLanguage || 'General')));
         const cats = ['All', ...uniqueLangs];
 
-        // C. Filter Logic
+        // E. Filter Logic
         if (activeCategory !== 'All') {
             entries = entries.filter((d: any) => (d.targetLanguage || 'General') === activeCategory);
         }
 
-        // D. Fuzzy Search Scoring
+        // F. Fuzzy Search Scoring
         if (searchTerm.trim()) {
             const tokens = searchTerm.toLowerCase().split(' ').filter(t => t.length > 0);
             entries = entries.map((d: any) => {
                 let score = 0;
-                // Exact Title Match (High Score)
                 if (d.title.toLowerCase().includes(searchTerm.toLowerCase())) score += 10;
-                // Token Matching
-                tokens.forEach(token => {
-                    if (d._searchStr.includes(token)) score += 2;
-                });
+                tokens.forEach(token => { if (d._searchStr.includes(token)) score += 2; });
                 return { ...d, _score: score };
-            }).filter((d: any) => d._score > 0); // Remove non-matches
+            }).filter((d: any) => d._score > 0);
         } else {
-            // Default score if no search (randomize slightly for freshness)
+            // Randomize freshness if no search
             entries = entries.map((d: any) => ({ ...d, _score: Math.random() }));
         }
 
-        // E. Sorting Logic
+        // G. Sorting Logic
         entries.sort((a: any, b: any) => {
-            if (sortMode === 'size') return b.cardCount - a.cardCount; // Biggest first
-            if (sortMode === 'alpha') return a.title.localeCompare(b.title); // A-Z
-            return b._score - a._score; // Relevance/Default
+            if (sortMode === 'size') return b.magnitude - a.magnitude;
+            if (sortMode === 'alpha') return a.title.localeCompare(b.title);
+            return b._score - a._score;
         });
 
-        // F. Grouping by Difficulty (Card Count heuristic)
+        // H. Grouping by Difficulty (Unified Magnitude)
+        // Quick: < 10 items (or < 3 lesson blocks)
+        // Master: > 30 items (or > 10 lesson blocks)
         const groups = {
-            quick: entries.filter((d: any) => d.cardCount < 10),
-            standard: entries.filter((d: any) => d.cardCount >= 10 && d.cardCount < 30),
-            master: entries.filter((d: any) => d.cardCount >= 30)
+            quick: entries.filter((d: any) => d.magnitude < 10),
+            standard: entries.filter((d: any) => d.magnitude >= 10 && d.magnitude < 30),
+            master: entries.filter((d: any) => d.magnitude >= 30)
         };
 
-        return { processedDecks: entries, categories: cats, difficultyGroups: groups };
-    }, [allDecks, searchTerm, activeCategory, sortMode]);
+        return { processedItems: entries, categories: cats, difficultyGroups: groups };
+    }, [allDecks, lessons, searchTerm, activeCategory, sortMode]);
 
-    // --- 2. QUEST DATA (Memoized) ---
+    // --- 2. QUEST DATA ---
     const quests = useMemo(() => {
         const userProgress = userData?.questProgress || {};
         const Q = [
             { id: 'q_cards', label: "Review 10 Cards", target: 10, xp: 50, icon: <Layers size={14}/> },
             { id: 'q_quiz',  label: "Complete a Quiz", target: 1,  xp: 100, icon: <HelpCircle size={14}/> },
-            { id: 'q_explore', label: "Find a New Deck", target: 1,  xp: 20,  icon: <Search size={14}/> },
+            { id: 'q_explore', label: "Find New Content", target: 1,  xp: 20,  icon: <Search size={14}/> },
         ];
         return Q.map(q => ({ ...q, current: userProgress[q.id] || 0, done: (userProgress[q.id] || 0) >= q.target }));
     }, [userData]);
 
     // Handler
-    const handleDeckClick = (deck: any) => {
+    const handleItemClick = (item: any) => {
         if (onLogActivity) onLogActivity('explore_deck', 0, "Exploration");
-        onSelectDeck(deck);
+        
+        if (item.contentType === 'lesson') {
+            onSelectLesson(item);
+        } else {
+            onSelectDeck(item);
+        }
     };
 
     const isSearching = searchTerm.length > 0;
@@ -598,15 +616,13 @@ function DiscoveryView({ allDecks, user, onSelectDeck, onLogActivity, userData }
     return (
         <div className="h-full bg-slate-50 flex flex-col overflow-hidden">
             
-            {/* --- HEADER --- */}
+            {/* HEADER */}
             <div className="px-6 pt-12 pb-4 bg-white/90 backdrop-blur-xl border-b border-slate-100 z-20 sticky top-0 shadow-sm transition-all">
-                {/* Top Row: Title or Filters */}
                 <div className="flex justify-between items-center mb-4">
                     <h1 className="text-3xl font-black text-slate-900 flex items-center gap-2 tracking-tight">
                         <Compass className="text-indigo-600" size={28} strokeWidth={2.5}/> Explore
                     </h1>
                     
-                    {/* Sort Dropdown Toggle */}
                     <div className="flex gap-2">
                         <button onClick={() => setSortMode('relevance')} className={`p-2 rounded-full border transition-all ${sortMode === 'relevance' ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-slate-200 text-slate-400'}`} title="Smart Sort"><Sparkles size={16}/></button>
                         <button onClick={() => setSortMode('size')} className={`p-2 rounded-full border transition-all ${sortMode === 'size' ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-slate-200 text-slate-400'}`} title="Sort by Size"><BarChart3 size={16}/></button>
@@ -614,54 +630,50 @@ function DiscoveryView({ allDecks, user, onSelectDeck, onLogActivity, userData }
                     </div>
                 </div>
                 
-                {/* Search Input */}
                 <div className="relative group">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={20}/>
                     <input 
                         type="text" 
-                        placeholder="Search topics, tags, or languages..." 
+                        placeholder="Search lessons, decks, topics..." 
                         className="w-full pl-10 pr-4 py-3 bg-slate-100 border-2 border-transparent focus:border-indigo-500/20 rounded-2xl font-bold text-slate-700 placeholder:text-slate-400 focus:ring-0 focus:bg-white outline-none transition-all shadow-inner"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
 
-                {/* Filter Pills */}
                 <div className="flex gap-2 overflow-x-auto pt-4 pb-2 -mx-6 px-6 scrollbar-hide">
                     {categories.map(cat => (
-                        <button 
-                            key={cat} 
-                            onClick={() => setActiveCategory(cat)} 
-                            className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border ${activeCategory === cat ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'}`}
-                        >
-                            {cat}
-                        </button>
+                        <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border ${activeCategory === cat ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'}`}>{cat}</button>
                     ))}
                 </div>
             </div>
 
-            {/* --- SCROLLABLE CONTENT --- */}
+            {/* SCROLLABLE CONTENT */}
             <div className="flex-1 overflow-y-auto custom-scrollbar pb-32">
                 
-                {/* 1. MARKETING SECTION (Hide if searching to focus on results) */}
+                {/* 1. MARKETING SECTION */}
                 {!isSearching && activeCategory === 'All' && (
                     <>
-                        {/* Hero: "Daily Hype" */}
-                        {processedDecks.length > 0 && (
+                        {/* Hero */}
+                        {processedItems.length > 0 && (
                             <div className="px-6 pt-6 mb-8">
-                                <button onClick={() => handleDeckClick(processedDecks[0])} className="w-full relative h-56 rounded-[2.5rem] overflow-hidden shadow-2xl group text-left transition-transform active:scale-[0.98]">
+                                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Star size={14} className="text-yellow-500 fill-yellow-500"/> Spotlight</h3>
+                                <button onClick={() => handleItemClick(processedItems[0])} className="w-full relative h-56 rounded-[2.5rem] overflow-hidden shadow-2xl group text-left transition-transform active:scale-[0.98]">
                                     <div className="absolute inset-0 bg-gradient-to-tr from-indigo-600 via-purple-600 to-orange-500 animate-in fade-in zoom-in duration-1000"></div>
                                     <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20 mix-blend-overlay"></div>
+                                    <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md border border-white/20 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">Featured</div>
                                     <div className="relative z-10 p-8 h-full flex flex-col justify-end">
                                         <div className="flex justify-between items-start mb-auto">
-                                            <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-white text-[10px] font-bold uppercase tracking-wider border border-white/20">Featured</div>
-                                            <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white">{processedDecks[0].icon || <Star size={18} fill="currentColor"/>}</div>
+                                            <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-white text-[10px] font-bold uppercase tracking-wider border border-white/20">{processedItems[0].contentType === 'lesson' ? 'Lesson' : 'Deck'}</div>
+                                            <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white">
+                                                {processedItems[0].contentType === 'lesson' ? <BookOpen size={18}/> : <Layers size={18}/>}
+                                            </div>
                                         </div>
-                                        <h2 className="text-2xl font-black text-white leading-tight mb-2 line-clamp-2">{processedDecks[0].title}</h2>
+                                        <h2 className="text-2xl font-black text-white leading-tight mb-2 line-clamp-2">{processedItems[0].title}</h2>
                                         <div className="flex items-center gap-2 text-indigo-100 text-xs font-bold">
-                                            <Layers size={14}/> {processedDecks[0].cardCount} Cards
+                                            <span>{processedItems[0].displayCount}</span>
                                             <span className="w-1 h-1 bg-white/50 rounded-full"></span>
-                                            <Globe size={14}/> {processedDecks[0].targetLanguage || 'General'}
+                                            <Globe size={14}/> {processedItems[0].targetLanguage || 'General'}
                                         </div>
                                     </div>
                                 </button>
@@ -673,9 +685,9 @@ function DiscoveryView({ allDecks, user, onSelectDeck, onLogActivity, userData }
                             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Target size={14} className="text-rose-500"/> Daily Quests</h3>
                             <div className="grid grid-cols-1 gap-2">
                                 {quests.map((q: any) => (
-                                    <div key={q.id} className={`p-3 rounded-2xl border flex items-center justify-between ${q.done ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-slate-100'}`}>
+                                    <div key={q.id} className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${q.done ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-slate-100'}`}>
                                         <div className="flex items-center gap-3">
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${q.done ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>{q.done ? <Check size={16} strokeWidth={3}/> : q.icon}</div>
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${q.done ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>{q.done ? <Check size={16} strokeWidth={3}/> : q.icon}</div>
                                             <span className={`text-sm font-bold ${q.done ? 'text-emerald-700 line-through' : 'text-slate-700'}`}>{q.label}</span>
                                         </div>
                                         <span className={`text-xs font-black ${q.done ? 'text-emerald-600' : 'text-slate-600'}`}>+{q.xp}</span>
@@ -690,28 +702,27 @@ function DiscoveryView({ allDecks, user, onSelectDeck, onLogActivity, userData }
                 <div className="px-6">
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                         {isSearching ? <Search size={14}/> : <Map size={14}/>} 
-                        {isSearching ? `Found ${processedDecks.length} Matches` : 'Browse Collection'}
+                        {isSearching ? `Found ${processedItems.length} Matches` : 'Browse Collection'}
                     </h3>
 
-                    {/* Logic: If sorting by size, use groups. Otherwise use list. */}
                     {sortMode === 'size' && !isSearching ? (
                         <div className="space-y-8">
-                            {difficultyGroups.master.length > 0 && <DeckGroup title="Master Class (30+ Cards)" items={difficultyGroups.master} onClick={handleDeckClick} icon={<Trophy size={14} className="text-yellow-500"/>}/>}
-                            {difficultyGroups.standard.length > 0 && <DeckGroup title="Standard Decks" items={difficultyGroups.standard} onClick={handleDeckClick} icon={<Layers size={14} className="text-indigo-500"/>}/>}
-                            {difficultyGroups.quick.length > 0 && <DeckGroup title="Quick Bites (<10 Cards)" items={difficultyGroups.quick} onClick={handleDeckClick} icon={<Zap size={14} className="text-orange-500"/>}/>}
+                            {difficultyGroups.master.length > 0 && <DeckGroup title="Master Class (Long)" items={difficultyGroups.master} onClick={handleItemClick} icon={<Trophy size={14} className="text-yellow-500"/>}/>}
+                            {difficultyGroups.standard.length > 0 && <DeckGroup title="Standard" items={difficultyGroups.standard} onClick={handleItemClick} icon={<Layers size={14} className="text-indigo-500"/>}/>}
+                            {difficultyGroups.quick.length > 0 && <DeckGroup title="Quick Bites" items={difficultyGroups.quick} onClick={handleItemClick} icon={<Zap size={14} className="text-orange-500"/>}/>}
                         </div>
                     ) : (
                         <div className="grid grid-cols-2 gap-4">
-                            {processedDecks.map((deck: any) => (
-                                <DeckCard key={deck.id} deck={deck} onClick={() => handleDeckClick(deck)} />
+                            {processedItems.map((item: any) => (
+                                <DiscoveryCard key={item.id} item={item} onClick={() => handleItemClick(item)} />
                             ))}
                         </div>
                     )}
 
-                    {processedDecks.length === 0 && (
+                    {processedItems.length === 0 && (
                         <div className="text-center py-12">
                             <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300"><Search size={32}/></div>
-                            <p className="text-slate-400 text-sm font-bold">No decks found.</p>
+                            <p className="text-slate-400 text-sm font-bold">No results found.</p>
                             <button onClick={() => {setSearchTerm(''); setActiveCategory('All');}} className="text-indigo-600 text-xs font-bold mt-2">Clear Filters</button>
                         </div>
                     )}
@@ -721,18 +732,20 @@ function DiscoveryView({ allDecks, user, onSelectDeck, onLogActivity, userData }
     );
 }
 
-// --- SUB-COMPONENTS for Cleanliness ---
+// --- SUB-COMPONENTS ---
 
 const DeckGroup = ({ title, items, onClick, icon }: any) => (
     <div>
         <h4 className="text-xs font-bold text-slate-500 mb-3 flex items-center gap-2">{icon} {title}</h4>
         <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6 scrollbar-hide snap-x">
-            {items.map((deck: any) => (
-                <button key={deck.id} onClick={() => onClick(deck)} className="snap-start min-w-[160px] h-40 bg-white p-4 rounded-3xl border border-slate-100 shadow-sm hover:border-indigo-200 transition-all group flex flex-col justify-between text-left">
-                    <div className="w-10 h-10 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">{deck.icon || <Layers size={18}/>}</div>
+            {items.map((item: any) => (
+                <button key={item.id} onClick={() => onClick(item)} className="snap-start min-w-[160px] h-44 bg-white p-4 rounded-3xl border border-slate-100 shadow-sm hover:border-indigo-200 transition-all group flex flex-col justify-between text-left">
+                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-colors ${item.contentType === 'lesson' ? 'bg-indigo-50 text-indigo-600' : 'bg-orange-50 text-orange-600'}`}>
+                        {item.contentType === 'lesson' ? <BookOpen size={18}/> : <Layers size={18}/>}
+                    </div>
                     <div>
-                        <h4 className="font-bold text-slate-800 text-sm leading-tight mb-1 line-clamp-2">{deck.title}</h4>
-                        <p className="text-[10px] text-slate-400 font-bold">{deck.cardCount} Cards</p>
+                        <h4 className="font-bold text-slate-800 text-sm leading-tight mb-1 line-clamp-2">{item.title}</h4>
+                        <p className="text-[10px] text-slate-400 font-bold">{item.displayCount}</p>
                     </div>
                 </button>
             ))}
@@ -740,21 +753,30 @@ const DeckGroup = ({ title, items, onClick, icon }: any) => (
     </div>
 );
 
-const DeckCard = ({ deck, onClick }: any) => (
-    <button onClick={onClick} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg hover:border-indigo-100 hover:-translate-y-1 transition-all text-left group h-full flex flex-col justify-between">
-        <div className="flex justify-between items-start mb-3">
-            <div className="w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">{deck.icon || <Layers size={18}/>}</div>
-            <span className={`text-[9px] font-bold px-2 py-1 rounded-full ${deck.cardCount > 20 ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-600'}`}>{deck.cardCount}</span>
-        </div>
-        <div>
-            <h4 className="font-bold text-slate-800 text-sm leading-tight mb-1 line-clamp-2">{deck.title}</h4>
-            <div className="flex items-center gap-1.5 mt-2">
-                <Globe size={10} className="text-slate-300"/>
-                <p className="text-[10px] text-slate-400 font-medium truncate">{deck.targetLanguage || 'General'}</p>
+const DiscoveryCard = ({ item, onClick }: any) => {
+    // Style logic: Blue for Lessons, Orange for Decks
+    const isLesson = item.contentType === 'lesson';
+    const bgClass = isLesson ? 'bg-indigo-50 group-hover:bg-indigo-100 group-hover:text-indigo-600' : 'bg-orange-50 group-hover:bg-orange-100 group-hover:text-orange-600';
+    const textClass = isLesson ? 'text-indigo-400' : 'text-orange-400';
+
+    return (
+        <button onClick={onClick} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg hover:border-indigo-100 hover:-translate-y-1 transition-all text-left group h-full flex flex-col justify-between">
+            <div className="flex justify-between items-start mb-3">
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-colors ${textClass} ${bgClass}`}>
+                    {isLesson ? <BookOpen size={18}/> : <Layers size={18}/>}
+                </div>
+                {item.xp && <span className="text-[9px] font-bold bg-emerald-50 text-emerald-600 px-2 py-1 rounded-full">+{item.xp} XP</span>}
             </div>
-        </div>
-    </button>
-);
+            <div>
+                <h4 className="font-bold text-slate-800 text-sm leading-tight mb-1 line-clamp-2">{item.title}</h4>
+                <div className="flex items-center gap-1.5 mt-2">
+                    <Globe size={10} className="text-slate-300"/>
+                    <p className="text-[10px] text-slate-400 font-medium truncate">{item.targetLanguage || 'General'}</p>
+                </div>
+            </div>
+        </button>
+    );
+}
 // ============================================================================
 //  HOME VIEW (Cleaned & Action-Oriented)
 // ============================================================================
