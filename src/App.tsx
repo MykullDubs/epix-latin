@@ -1903,28 +1903,33 @@ function ExamBuilderView({ onSave, initialData }: any) {
     );
 }
 // ============================================================================
-//  EXAM PLAYER (With Data Snapshotting)
+//  EXAM PLAYER (With Custom "Juicy" Confirmation)
 // ============================================================================
 function ExamPlayerView({ exam, onFinish }: any) {
     const [answers, setAnswers] = useState<any>({});
     const [submitted, setSubmitted] = useState(false);
     const [scoreDetail, setScoreDetail] = useState<any>(null);
+    
+    // NEW: State for the confirmation modal
+    const [showConfirm, setShowConfirm] = useState(false);
 
     const handleAnswer = (qId: string, val: any) => {
         if (submitted) return;
         setAnswers({ ...answers, [qId]: val });
     };
 
-    const submitExam = () => {
-        if (!window.confirm("Submit your exam? You cannot change answers after this.")) return;
-        
+    // 1. Trigger the Modal
+    const requestSubmit = () => {
+        setShowConfirm(true);
+    };
+
+    // 2. Execute the Logic (Moved from the old submitExam)
+    const confirmSubmit = () => {
         let totalPoints = 0;
         let earnedPoints = 0;
         const details: any[] = [];
         let requiresManualGrading = false;
 
-        // 1. AUTO-GRADE & SNAPSHOT
-        // We save the 'prompt' and 'maxPoints' here so the instructor sees them even if the exam changes later.
         exam.questions.forEach((q: any) => {
             const points = parseInt(q.points || 0);
             totalPoints += points;
@@ -1940,13 +1945,13 @@ function ExamPlayerView({ exam, onFinish }: any) {
                 }
             } else if (q.type === 'essay') {
                 requiresManualGrading = true;
-                awarded = 0; // Placeholder until graded
+                awarded = 0; 
             }
 
             details.push({
                 qId: q.id,
                 type: q.type,
-                prompt: q.prompt, // Snapshot the question text
+                prompt: q.prompt,
                 maxPoints: points,
                 studentVal: studentVal || "(No Answer)",
                 correctVal: q.correctAnswer || "(Essay)",
@@ -1957,9 +1962,7 @@ function ExamPlayerView({ exam, onFinish }: any) {
             earnedPoints += awarded;
         });
 
-        // 2. COMPILE REPORT
         const finalStatus = requiresManualGrading ? 'pending_review' : 'graded';
-        
         const result = { 
             score: earnedPoints, 
             total: totalPoints, 
@@ -1969,8 +1972,10 @@ function ExamPlayerView({ exam, onFinish }: any) {
 
         setScoreDetail(result);
         setSubmitted(true);
+        setShowConfirm(false);
     };
 
+    // 3. Post-Submission View
     if (submitted) {
         return (
             <div className="h-full flex flex-col items-center justify-center p-8 bg-slate-50 animate-in zoom-in duration-300">
@@ -1991,11 +1996,44 @@ function ExamPlayerView({ exam, onFinish }: any) {
     }
 
     return (
-        <div className="h-full flex flex-col bg-slate-50 overflow-hidden">
+        <div className="h-full flex flex-col bg-slate-50 overflow-hidden relative">
+            
+            {/* --- CUSTOM CONFIRMATION MODAL --- */}
+            {showConfirm && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
+                        <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <AlertTriangle size={32} />
+                        </div>
+                        <h3 className="text-xl font-black text-slate-900 mb-2">Submit Assessment?</h3>
+                        <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+                            You are about to submit your answers. You cannot change them after this point.
+                        </p>
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={() => setShowConfirm(false)} 
+                                className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors"
+                            >
+                                Not yet
+                            </button>
+                            <button 
+                                onClick={confirmSubmit} 
+                                className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 shadow-lg shadow-rose-200 transition-all active:scale-95"
+                            >
+                                Submit
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Header */}
             <div className="px-6 py-4 bg-white border-b border-slate-200 sticky top-0 z-20 flex justify-between items-center shadow-sm">
                 <div><h1 className="text-lg font-bold text-slate-800 flex items-center gap-2"><FileText size={18} className="text-indigo-600"/> {exam.title}</h1><p className="text-xs text-slate-400 font-medium">{exam.questions.length} Questions • {exam.timeLimitMinutes || 30} Mins</p></div>
                 <div className="text-xs font-mono font-bold bg-rose-50 text-rose-600 px-2 py-1 rounded flex items-center gap-1 animate-pulse"><Circle size={8} fill="currentColor"/> Live</div>
             </div>
+
+            {/* Questions Feed */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-32 custom-scrollbar">
                 {exam.questions.map((q: any, i: number) => (
                     <div key={q.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
@@ -2007,7 +2045,16 @@ function ExamPlayerView({ exam, onFinish }: any) {
                     </div>
                 ))}
             </div>
-            <div className="bg-white p-4 border-t border-slate-200 sticky bottom-0 z-20"><button onClick={submitExam} className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2">Submit Exam <Check size={20}/></button></div>
+
+            {/* Footer */}
+            <div className="bg-white p-4 border-t border-slate-200 sticky bottom-0 z-20">
+                <button 
+                    onClick={requestSubmit} 
+                    className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                    Submit Exam <Check size={20}/>
+                </button>
+            </div>
         </div>
     );
 }
