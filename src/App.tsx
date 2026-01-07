@@ -19,7 +19,7 @@ import {
   CheckCircle2, Circle, Activity, Clock, Compass, Globe, RotateCcw, Play, 
   Maximize2, BarChart2, Timer, Megaphone, Inbox, XCircle, ChevronUp, Send,
   ArrowUp, ArrowDown, Eye, EyeOff, MessageCircle, AlignLeft, ClipboardList, Table, Calendar,
-  Trophy, Flame, Settings, BarChart3, CornerDownRight, MoreHorizontal   // <--- ADDED MISSING ICONS
+  Trophy, Flame, Settings, BarChart3, CornerDownRight, MoreHorizontal, Dumbbell   // <--- ADDED MISSING ICONS
 } from 'lucide-react';
 
 
