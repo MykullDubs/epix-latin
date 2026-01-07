@@ -174,37 +174,31 @@ const ChatDialogueBlock = ({ lines }: any) => (
 );
 
 // ============================================================================
-//  SMART LESSON VIEW (Textbook Style + Interactive Breaks)
+//  LESSON VIEW (Modern "Story" Style)
 // ============================================================================
 function LessonView({ lesson, onFinish }: any) {
   useLearningTimer(auth.currentUser, lesson.id, 'lesson', lesson.title);
 
   // 1. SMART PAGING ALGORITHM
-  // Group consecutive "passive" blocks into pages. Stop for "interactive" blocks.
   const pages = useMemo(() => {
       const rawBlocks = lesson.blocks || [];
       const groupedPages: any[] = [];
       let currentBuffer: any[] = [];
 
       rawBlocks.forEach((block: any) => {
-          // Define what breaks the flow (Focus items)
           const isInteractive = ['quiz', 'flashcard', 'scenario'].includes(block.type);
 
           if (isInteractive) {
-              // Push any buffered passive content as a page
               if (currentBuffer.length > 0) {
                   groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
                   currentBuffer = [];
               }
-              // Push the interactive block as its own page
               groupedPages.push({ type: 'interact', blocks: [block] });
           } else {
-              // Accumulate passive content (Text, Image, Note, Vocab, Dialogue)
               currentBuffer.push(block);
           }
       });
 
-      // Push remaining buffer
       if (currentBuffer.length > 0) {
           groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
       }
@@ -212,11 +206,10 @@ function LessonView({ lesson, onFinish }: any) {
       return groupedPages;
   }, [lesson]);
 
-  // 2. Navigation State
+  // 2. State & Scrolling
   const [currentPageIdx, setCurrentPageIdx] = useState(0);
-  
-  // 3. Scroll Management
   const scrollRef = useRef<HTMLDivElement>(null);
+  
   useEffect(() => {
       if (scrollRef.current) {
           scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
@@ -225,8 +218,7 @@ function LessonView({ lesson, onFinish }: any) {
 
   const currentPage = pages[currentPageIdx];
   const isLastPage = currentPageIdx >= pages.length - 1;
-  const progress = ((currentPageIdx + 1) / pages.length) * 100;
-
+  
   const handleNext = () => {
       if (!isLastPage) {
           setCurrentPageIdx(prev => prev + 1);
@@ -235,81 +227,127 @@ function LessonView({ lesson, onFinish }: any) {
       }
   };
 
-  // 4. Block Renderer (Same as before, but mapped)
+  // 3. Block Renderer
   const renderBlock = (block: any, idx: number) => {
       switch (block.type) {
-          case 'text': return (<div key={idx} className="my-6 prose prose-slate max-w-none animate-in fade-in slide-in-from-bottom-2 duration-700">{block.title && <h2 className="text-3xl font-black text-slate-800 mb-6 tracking-tight">{block.title}</h2>}<div className="text-lg text-slate-600 leading-loose whitespace-pre-wrap font-serif">{block.content}</div></div>);
-          case 'image': return (<div key={idx} className="my-8 space-y-4 animate-in zoom-in-95 duration-500"><div className="rounded-3xl overflow-hidden shadow-2xl border-4 border-white ring-1 ring-slate-200"><img src={block.url} alt="Lesson" className="w-full object-cover" /></div>{block.caption && <p className="text-center text-xs text-slate-400 font-bold uppercase tracking-widest bg-slate-50 py-2 rounded-full inline-block px-4 mx-auto">{block.caption}</p>}</div>);
-          case 'vocab-list': return <div key={idx}><JuicyDeckBlock items={block.items} title="Key Vocabulary" /></div>;
-          case 'dialogue': return <div key={idx}><ChatDialogueBlock lines={block.lines} /></div>;
-          case 'video': return (<div key={idx} className="my-8 rounded-3xl overflow-hidden shadow-xl border border-slate-200 bg-black aspect-video relative group"><video src={block.url} controls className="w-full h-full" /><div className="absolute top-4 right-4 bg-black/50 text-white text-[10px] font-bold px-2 py-1 rounded backdrop-blur-md flex items-center gap-1"><Play size={10}/> Video</div></div>);
-          case 'audio': return (<div key={idx} className="my-6 bg-slate-900 text-white p-6 rounded-3xl shadow-xl flex items-center gap-4"><div className="p-3 bg-indigo-500 rounded-full animate-pulse"><Volume2 size={24}/></div><div className="flex-1"><p className="text-xs font-bold text-indigo-300 uppercase tracking-widest mb-1">Audio Clip</p><audio src={block.url} controls className="w-full h-8 accent-indigo-500" />{block.caption && <p className="text-xs text-slate-400 mt-2 italic">{block.caption}</p>}</div></div>);
+          case 'text': return (
+              <div key={idx} className="my-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                  {block.title && <h2 className="text-2xl font-black text-slate-800 mb-4 tracking-tight">{block.title}</h2>}
+                  <div className="text-lg text-slate-600 leading-loose whitespace-pre-wrap font-serif antialiased">{block.content}</div>
+              </div>
+          );
+          case 'image': return (
+              <div key={idx} className="my-8 space-y-3 animate-in zoom-in-95 duration-500 group">
+                  <div className="rounded-[2rem] overflow-hidden shadow-xl shadow-slate-200 border-4 border-white ring-1 ring-slate-100 relative">
+                      
+                      <img src={block.url} alt="Lesson" className="w-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                  </div>
+                  {block.caption && (
+                      <p className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest bg-slate-50 py-1.5 px-3 rounded-full inline-block mx-auto border border-slate-100">
+                          {block.caption}
+                      </p>
+                  )}
+              </div>
+          );
+          case 'vocab-list': return <div key={idx} className="my-8"><JuicyDeckBlock items={block.items} title="Key Vocabulary" /></div>;
+          case 'dialogue': return <div key={idx} className="my-8"><ChatDialogueBlock lines={block.lines} /></div>;
           case 'note': {
-              const styles: any = { info: { bg: 'bg-gradient-to-br from-blue-50 to-indigo-50', border: 'border-blue-100', iconBg: 'bg-white', iconColor: 'text-blue-600', icon: <Info size={20}/> }, tip: { bg: 'bg-gradient-to-br from-emerald-50 to-teal-50', border: 'border-emerald-100', iconBg: 'bg-white', iconColor: 'text-emerald-600', icon: <Zap size={20} className="fill-current"/> }, warning: { bg: 'bg-gradient-to-br from-amber-50 to-orange-50', border: 'border-amber-100', iconBg: 'bg-white', iconColor: 'text-amber-600', icon: <AlertTriangle size={20}/> } };
+              const styles: any = { 
+                  info: { bg: 'bg-indigo-50', border: 'border-indigo-100', icon: <Info size={20} className="text-indigo-600"/>, title: 'text-indigo-900' }, 
+                  tip: { bg: 'bg-emerald-50', border: 'border-emerald-100', icon: <Zap size={20} className="text-emerald-600 fill-emerald-600"/>, title: 'text-emerald-900' }, 
+                  warning: { bg: 'bg-amber-50', border: 'border-amber-100', icon: <AlertTriangle size={20} className="text-amber-600"/>, title: 'text-amber-900' } 
+              };
               const s = styles[block.variant || 'info'] || styles.info;
-              return (<div key={idx} className={`relative overflow-hidden rounded-2xl border ${s.border} ${s.bg} p-5 my-6 shadow-sm animate-in slide-in-from-left-2 duration-500`}><div className={`absolute -right-4 -top-4 opacity-10 pointer-events-none ${s.iconColor}`}>{React.cloneElement(s.icon, { size: 100 })}</div><div className="relative z-10 flex gap-4 items-start"><div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${s.iconBg} ${s.iconColor} shadow-sm border border-white/50`}>{s.icon}</div><div><h4 className={`font-black text-[10px] uppercase tracking-widest mb-1 opacity-70 ${s.iconColor}`}>{block.title || block.variant}</h4><p className="text-slate-700 text-sm font-medium leading-relaxed">{block.content}</p></div></div></div>);
+              return (
+                  <div key={idx} className={`relative overflow-hidden rounded-2xl border ${s.border} ${s.bg} p-6 my-8 shadow-sm animate-in slide-in-from-left-2 duration-500 flex gap-4 items-start`}>
+                      <div className="shrink-0 bg-white p-2 rounded-xl shadow-sm">{s.icon}</div>
+                      <div>
+                          <h4 className={`font-black text-xs uppercase tracking-widest mb-1 opacity-70 ${s.title}`}>{block.title || block.variant}</h4>
+                          <p className={`text-sm font-medium leading-relaxed ${s.title} opacity-90`}>{block.content}</p>
+                      </div>
+                  </div>
+              );
           }
-          // Interactive Blocks (These are handled directly in the page map, but if they slip through):
+          // Interactive Fallbacks (if rendered in flow)
           case 'flashcard': return <ConceptCardBlock key={idx} front={block.front} back={block.back} context={block.title} />;
           case 'quiz': return <QuizBlock key={idx} block={block} onComplete={handleNext} />;
           case 'scenario': return <ScenarioBlock key={idx} block={block} onComplete={handleNext} />;
-          default: return <div key={idx} className="p-4 bg-slate-100 text-slate-500">Unknown Block</div>;
+          default: return null;
       }
   };
 
-  // 5. Render Logic
-  // If the page type is 'interact', we hide the Next button until they finish (handled by component).
-  // If 'read', we show the Next button at the bottom.
   const isInteractivePage = currentPage?.type === 'interact';
-  const isInteractiveBlock = isInteractivePage && currentPage.blocks[0];
 
   return (
-    <div id="lesson-scroll-container" className="h-full flex flex-col bg-white overflow-y-auto overflow-x-hidden relative scroll-smooth" ref={scrollRef}>
+    <div className="h-full flex flex-col bg-white">
         
-        {/* Header */}
-        <div className="sticky top-0 bg-white/95 backdrop-blur-md z-40 px-6 py-4 border-b border-slate-100 shadow-sm flex flex-col gap-2">
+        {/* 1. HEADER (Instagram Story Style) */}
+        <div className="bg-white/95 backdrop-blur-xl border-b border-slate-100 sticky top-0 z-50 pt-12 pb-4 px-6 shadow-sm">
+            
+            {/* Segmented Progress Bar */}
+            <div className="flex gap-1.5 mb-4">
+                {pages.map((_, idx) => (
+                    <div key={idx} className="h-1.5 flex-1 rounded-full bg-slate-100 overflow-hidden">
+                        <div 
+                            className={`h-full transition-all duration-500 ${idx < currentPageIdx ? 'bg-indigo-600' : idx === currentPageIdx ? 'bg-indigo-600' : 'bg-transparent'}`}
+                            style={{ width: idx === currentPageIdx ? '100%' : idx < currentPageIdx ? '100%' : '0%' }}
+                        ></div>
+                    </div>
+                ))}
+            </div>
+
             <div className="flex justify-between items-center">
-                <button onClick={() => onFinish(null, 0)} className="p-2 -ml-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-rose-500 transition-colors"><X size={20} /></button>
-                <div className="flex flex-col items-end">
-                    <span className="text-[10px] font-black text-slate-300 tracking-widest uppercase">Page</span>
-                    <span className="text-xs font-bold text-slate-800">{currentPageIdx + 1} <span className="text-slate-300">/</span> {pages.length}</span>
+                <button onClick={() => onFinish(null, 0)} className="p-2 -ml-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                    <X size={24} />
+                </button>
+                <div className="text-center">
+                    <h2 className="text-sm font-black text-slate-800 tracking-tight line-clamp-1 max-w-[200px]">{lesson.title}</h2>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        {isInteractivePage ? 'Interactive' : `Part ${currentPageIdx + 1}`}
+                    </p>
                 </div>
-            </div>
-            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-600 transition-all duration-500 ease-out shadow-[0_0_10px_rgba(79,70,229,0.5)]" style={{ width: `${progress}%` }}></div>
+                <div className="w-8"></div> {/* Spacer for centering */}
             </div>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full pb-32 min-h-[60vh]">
-            {currentPage?.blocks.map((block: any, idx: number) => {
-                // If it's an interactive page, render the special block logic
-                if (isInteractivePage) {
-                    if (block.type === 'quiz') return <QuizBlock key={idx} block={block} onComplete={handleNext} />;
-                    if (block.type === 'scenario') return <ScenarioBlock key={idx} block={block} onComplete={handleNext} />;
-                    if (block.type === 'flashcard') return (
-                        <div key={idx} className="flex flex-col h-full justify-center">
-                             <ConceptCardBlock front={block.front} back={block.back} context={block.title} />
-                             {/* Flashcards don't auto-advance, so we show the button for them */}
-                             <div className="mt-8 text-center animate-in fade-in delay-1000 fill-mode-forwards">
-                                <button onClick={handleNext} className="px-8 py-3 bg-slate-900 text-white rounded-xl font-bold shadow-lg hover:scale-105 transition-transform">Continue</button>
-                             </div>
-                        </div>
-                    );
-                }
-                // Otherwise render the passive stack
-                return renderBlock(block, idx);
-            })}
+        {/* 2. CONTENT AREA */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth bg-white">
+            <div className="px-6 py-4 max-w-2xl mx-auto w-full pb-40 min-h-full flex flex-col">
+                
+                {currentPage?.blocks.map((block: any, idx: number) => {
+                    // Special layout for Interactive Pages (Center them vertically)
+                    if (isInteractivePage) {
+                        return (
+                            <div key={idx} className="flex-1 flex flex-col justify-center animate-in zoom-in-95 duration-500">
+                                {block.type === 'quiz' && <QuizBlock block={block} onComplete={handleNext} />}
+                                {block.type === 'scenario' && <ScenarioBlock block={block} onComplete={handleNext} />}
+                                {block.type === 'flashcard' && (
+                                    <div className="flex flex-col items-center w-full">
+                                         <ConceptCardBlock front={block.front} back={block.back} context={block.title} />
+                                         <button onClick={handleNext} className="mt-8 px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 hover:scale-105 active:scale-95 transition-all flex items-center gap-2">
+                                            Continue <ArrowRight size={18}/>
+                                         </button>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    }
+                    // Standard Reading Flow
+                    return renderBlock(block, idx);
+                })}
+
+            </div>
         </div>
 
-        {/* Footer (Only for Read pages) */}
+        {/* 3. FOOTER (Floating Action Button) */}
         {!isInteractivePage && (
-            <div className="fixed bottom-6 left-0 right-0 px-6 z-50 flex justify-center">
+            <div className="fixed bottom-8 left-0 right-0 px-6 z-50 flex justify-center pointer-events-none">
                 <button 
                     onClick={handleNext}
-                    className="w-full max-w-md py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg shadow-2xl shadow-slate-900/40 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 animate-in slide-in-from-bottom-4 duration-500"
+                    className="pointer-events-auto shadow-2xl shadow-indigo-500/30 bg-indigo-600 text-white pl-8 pr-6 py-4 rounded-full font-bold text-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-3 animate-in slide-in-from-bottom-4 duration-500 group"
                 >
-                    {isLastPage ? <>Complete Lesson <Check size={20}/></> : <>Next Page <ArrowRight size={20}/></>}
+                    {isLastPage ? "Complete Lesson" : "Continue"} 
+                    {isLastPage ? <Check size={20} strokeWidth={3}/> : <ArrowRight size={20} strokeWidth={3} className="group-hover:translate-x-1 transition-transform"/>}
                 </button>
             </div>
         )}
