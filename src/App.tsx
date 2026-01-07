@@ -1205,7 +1205,7 @@ function GradeDetailModal({ log, onClose }: any) {
 }
 
 // ============================================================================
-//  STUDENT GRADEBOOK (Fixed Filtering)
+//  STUDENT GRADEBOOK (Robust Memory Filtering)
 // ============================================================================
 function StudentGradebook({ classData, user }: any) {
     const [logs, setLogs] = useState<any[]>([]);
@@ -1215,45 +1215,58 @@ function StudentGradebook({ classData, user }: any) {
     useEffect(() => {
         if(!classData.assignments || classData.assignments.length === 0) { setLoading(false); return; }
         
-        const assignmentIds = classData.assignments.map((a:any) => a.id);
-        
-        // FIX: Filter by type 'completion' to ignore time_logs and see the actual grades
+        // 1. SIMPLER QUERY (Matches Profile View)
+        // We removed "where('type', '==', 'completion')" to avoid index errors.
         const q = query(
             collection(db, 'artifacts', appId, 'activity_logs'), 
             where('studentEmail', '==', user.email),
-            where('type', '==', 'completion'), // <--- CRITICAL FIX
             orderBy('timestamp', 'desc'),
-            limit(100)
+            limit(200) // Increase limit to ensure we catch completions amidst other logs
         );
 
         const unsub = onSnapshot(q, (snapshot) => {
             const allLogs = snapshot.docs.map(d => d.data());
-            // Filter to only include logs relevant to this class
-            const classLogs = allLogs.filter(log => assignmentIds.includes(log.itemId));
-            setLogs(classLogs);
+            
+            // 2. ROBUST LOCAL FILTERING
+            // We find logs that match the assignment ID OR the original content ID
+            const relevantLogs = allLogs.filter(log => 
+                log.type === 'completion' && // Only finished items
+                classData.assignments.some((a: any) => a.id === log.itemId || a.originalId === log.itemId)
+            );
+            
+            setLogs(relevantLogs);
             setLoading(false);
         });
         return () => unsub();
     }, [classData, user]);
 
     const getGradeStatus = (assign: any) => {
-        const log = logs.find(l => l.itemId === assign.id);
+        // Find the most recent completion log for this assignment
+        // We check both the Assignment ID (assign_xyz) and the Content ID (l1) just in case
+        const log = logs.find(l => l.itemId === assign.id || l.itemId === assign.originalId);
         
         if (!log) return { status: 'missing', label: 'Not Started', color: 'bg-slate-100 text-slate-400', interactable: false };
         
-        // If it's an exam, show score/total
+        // EXAM LOGIC
         if (assign.contentType === 'test' || assign.contentType === 'exam') {
              if (log.scoreDetail?.status === 'pending_review') {
                  return { status: 'pending', label: 'In Review', color: 'bg-amber-100 text-amber-600', interactable: true, log };
              }
+             
              const score = log.scoreDetail?.score || 0;
              const total = log.scoreDetail?.total || 100;
-             const pct = log.scoreDetail?.finalScorePct ?? Math.round((score/total)*100);
-             let color = pct >= 90 ? 'bg-emerald-100 text-emerald-600' : pct >= 70 ? 'bg-indigo-100 text-indigo-600' : 'bg-rose-100 text-rose-600';
+             // Calculate percentage safely
+             const pct = log.scoreDetail?.finalScorePct ?? (total > 0 ? Math.round((score/total)*100) : 0);
+             
+             let color = 'bg-slate-100 text-slate-600';
+             if (pct >= 90) color = 'bg-emerald-100 text-emerald-600';
+             else if (pct >= 70) color = 'bg-indigo-100 text-indigo-600';
+             else color = 'bg-rose-100 text-rose-600';
+
              return { status: 'complete', label: `${score}/${total} pts`, color, interactable: true, log };
         }
 
-        // Standard Lesson/Deck
+        // LESSON/DECK LOGIC
         return { status: 'complete', label: 'Complete', color: 'bg-emerald-100 text-emerald-600', interactable: true, log };
     };
 
@@ -1284,7 +1297,6 @@ function StudentGradebook({ classData, user }: any) {
         </>
     );
 }
-
 // ============================================================================
 //  STUDENT CLASS VIEW (With Gradebook Tab)
 // ============================================================================
