@@ -200,28 +200,197 @@ function LessonView({ lesson, onFinish }: any) {
 }
 
 // ============================================================================
-//  2. DISCOVERY VIEW
+//  DISCOVERY VIEW (Sanctified & Juicified)
 // ============================================================================
 function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
     const [searchTerm, setSearchTerm] = useState('');
+    const [activeCategory, setActiveCategory] = useState('All');
+
+    // 1. Robust Daily Pick Logic (Prevents crashes on load)
     const dailyPick = useMemo(() => {
+        if (!allDecks) return null;
         const deckKeys = Object.keys(allDecks).filter(k => !allDecks[k].isAssignment);
         if (deckKeys.length === 0) return null;
+        
+        // Seed random based on date string so it stays same all day
         const today = new Date().toDateString(); 
-        let hash = 0; for (let i = 0; i < today.length; i++) hash = today.charCodeAt(i) + ((hash << 5) - hash);
+        let hash = 0;
+        for (let i = 0; i < today.length; i++) hash = today.charCodeAt(i) + ((hash << 5) - hash);
         const idx = Math.abs(hash) % deckKeys.length;
-        return { id: deckKeys[idx], ...allDecks[deckKeys[idx]] };
+        
+        // Return structured object with contentType for routing
+        return { 
+            id: deckKeys[idx], 
+            ...allDecks[deckKeys[idx]], 
+            contentType: 'deck' // <--- CRITICAL FIX: Ensures correct routing
+        };
     }, [allDecks]);
-    const categories = [{ id: 'trending', name: 'Trending', icon: <Activity size={16}/>, color: 'text-rose-500', bg: 'bg-rose-50' }, { id: 'new', name: 'New', icon: <Zap size={16}/>, color: 'text-amber-500', bg: 'bg-amber-50' }, { id: 'classics', name: 'Classics', icon: <BookOpen size={16}/>, color: 'text-indigo-500', bg: 'bg-indigo-50' }];
-    const filteredDecks = Object.entries(allDecks).map(([id, deck]: any) => ({ id, ...deck })).filter(d => !d.isAssignment && (d.title.toLowerCase().includes(searchTerm.toLowerCase()) || d.language?.toLowerCase().includes(searchTerm.toLowerCase())));
+
+    // 2. Dynamic Categories
+    const categories = [
+        { id: 'All', label: 'All', icon: <Compass size={14}/>, color: 'bg-slate-100 text-slate-600', active: 'bg-slate-800 text-white' },
+        { id: 'Latin', label: 'Latin', icon: <Globe size={14}/>, color: 'bg-purple-50 text-purple-600', active: 'bg-purple-600 text-white' },
+        { id: 'Science', label: 'Science', icon: <Activity size={14}/>, color: 'bg-emerald-50 text-emerald-600', active: 'bg-emerald-600 text-white' },
+        { id: 'History', label: 'History', icon: <BookOpen size={14}/>, color: 'bg-amber-50 text-amber-600', active: 'bg-amber-600 text-white' },
+    ];
+
+    // 3. Robust Filtering
+    const filteredDecks = useMemo(() => {
+        if (!allDecks) return [];
+        return Object.entries(allDecks)
+            .map(([id, deck]: any) => ({ 
+                id, 
+                ...deck, 
+                contentType: 'deck' // <--- CRITICAL FIX
+            }))
+            .filter(d => {
+                const matchesSearch = d.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                                      (d.description && d.description.toLowerCase().includes(searchTerm.toLowerCase()));
+                const matchesCategory = activeCategory === 'All' || 
+                                        d.targetLanguage === activeCategory || 
+                                        d.tags?.includes(activeCategory); // Support tags if you add them later
+                
+                return !d.isAssignment && matchesSearch && matchesCategory;
+            });
+    }, [allDecks, searchTerm, activeCategory]);
 
     return (
         <div className="h-full bg-slate-50 flex flex-col overflow-hidden animate-in fade-in duration-500">
-            <div className="p-6 pb-4 bg-white border-b border-slate-100 z-10"><h1 className="text-2xl font-black text-slate-800 mb-4 flex items-center gap-2"><Compass className="text-indigo-600" strokeWidth={2.5}/> Explore</h1><div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18}/><input type="text" placeholder="Search decks..." className="w-full pl-10 pr-4 py-3 bg-slate-100 border-none rounded-xl font-bold text-slate-600 focus:ring-2 focus:ring-indigo-500 outline-none" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div></div>
+            
+            {/* Header / Search */}
+            <div className="px-6 pt-12 pb-4 bg-white/80 backdrop-blur-md border-b border-slate-200 z-20 sticky top-0">
+                <h1 className="text-3xl font-black text-slate-900 mb-4 flex items-center gap-2 tracking-tight">
+                    <Compass className="text-indigo-600" size={28} strokeWidth={2.5}/> Explore
+                </h1>
+                <div className="relative group">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={20}/>
+                    <input 
+                        type="text" 
+                        placeholder="Search decks, topics..." 
+                        className="w-full pl-10 pr-4 py-3 bg-slate-100 border-2 border-transparent focus:border-indigo-500/20 rounded-2xl font-bold text-slate-700 placeholder:text-slate-400 focus:ring-0 focus:bg-white outline-none transition-all shadow-inner"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+            </div>
+
+            {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8 pb-32">
-                {!searchTerm && dailyPick && (<div className="relative overflow-hidden rounded-[2rem] bg-slate-900 shadow-2xl text-white group cursor-pointer" onClick={() => onSelectDeck(dailyPick)}><div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-purple-600 to-slate-900 opacity-90"></div><div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div><div className="relative z-10 p-8 flex flex-col items-center text-center"><span className="bg-white/20 backdrop-blur-md border border-white/20 text-xs font-black uppercase tracking-widest py-1 px-3 rounded-full mb-4 shadow-lg">Daily Pick</span><div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-3xl shadow-xl mb-4 text-indigo-600">{dailyPick.icon || <Layers/>}</div><h2 className="text-2xl font-black mb-2">{dailyPick.title}</h2><p className="text-indigo-200 text-sm font-medium line-clamp-2 max-w-xs">{dailyPick.description || "Master this topic today."}</p></div></div>)}
-                {!searchTerm && (<div className="flex gap-3 overflow-x-auto pb-2 -mx-6 px-6 scrollbar-hide">{categories.map(cat => (<button key={cat.id} className="flex items-center gap-2 px-4 py-3 bg-white border border-slate-100 rounded-xl shadow-sm active:scale-95 transition-all"><div className={`p-1.5 rounded-lg ${cat.bg} ${cat.color}`}>{cat.icon}</div><span className="font-bold text-slate-700 text-xs">{cat.name}</span></button>))}</div>)}
-                <div><h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider mb-4">{searchTerm ? 'Results' : 'Recommended'}</h3><div className="grid grid-cols-2 gap-4">{filteredDecks.map((deck: any) => (<button key={deck.id} onClick={() => onSelectDeck(deck)} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all text-left flex flex-col h-full"><div className="flex justify-between items-start mb-3"><div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400">{deck.icon ? <span className="text-lg">{deck.icon}</span> : <Layers size={18}/>}</div>{deck.xp && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">+{deck.xp} XP</span>}</div><h4 className="font-bold text-slate-800 text-sm leading-tight mb-1 line-clamp-2">{deck.title}</h4><div className="mt-3 pt-3 border-t border-slate-50 flex justify-between items-center text-[10px] font-bold text-slate-400"><span>{deck.cards?.length || 0} Cards</span><ChevronRight size={14}/></div></button>))}</div></div>
+                
+                {/* DAILY PICK (Juiced Up) */}
+                {!searchTerm && activeCategory === 'All' && dailyPick && (
+                    <div className="relative w-full">
+                        <div className="flex justify-between items-end mb-4">
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <Zap size={14} className="text-amber-500 fill-amber-500"/> Daily Pick
+                            </h3>
+                        </div>
+                        
+                        <button 
+                            onClick={() => onSelectDeck(dailyPick)}
+                            className="w-full relative overflow-hidden rounded-[2.5rem] bg-slate-900 shadow-2xl text-white group text-left aspect-[4/3] sm:aspect-[2/1] active:scale-[0.98] transition-transform"
+                        >
+                            {/* Dynamic Background */}
+                            <div className={`absolute inset-0 opacity-80 bg-gradient-to-br ${dailyPick.targetLanguage === 'Latin' ? 'from-purple-600 to-indigo-900' : 'from-emerald-500 to-teal-900'}`}></div>
+                            <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
+                            
+                            {/* Shine Effect */}
+                            <div className="absolute -inset-full top-0 block h-full w-1/2 -skew-x-12 bg-gradient-to-r from-transparent to-white opacity-20 group-hover:animate-shine" />
+
+                            <div className="relative z-10 p-8 h-full flex flex-col">
+                                <div className="flex justify-between items-start">
+                                    <span className="bg-white/20 backdrop-blur-md border border-white/20 text-[10px] font-black uppercase tracking-widest py-1.5 px-3 rounded-full shadow-lg">
+                                        {dailyPick.targetLanguage || 'General'}
+                                    </span>
+                                    {dailyPick.xp && <span className="text-emerald-300 font-black text-sm">+{dailyPick.xp} XP</span>}
+                                </div>
+                                
+                                <div className="mt-auto">
+                                    <h2 className="text-3xl font-black mb-2 leading-tight">{dailyPick.title}</h2>
+                                    <p className="text-indigo-100 text-sm font-medium line-clamp-2 max-w-[90%]">
+                                        {dailyPick.description || "Master this topic today."}
+                                    </p>
+                                    <div className="mt-4 flex items-center gap-2 text-xs font-bold text-white/60">
+                                        <Layers size={14}/> {dailyPick.cards?.length || 0} Cards
+                                    </div>
+                                </div>
+                            </div>
+                        </button>
+                    </div>
+                )}
+
+                {/* CATEGORIES SCROLL */}
+                {!searchTerm && (
+                    <div className="flex gap-3 overflow-x-auto pb-4 -mx-6 px-6 scrollbar-hide snap-x">
+                        {categories.map(cat => (
+                            <button 
+                                key={cat.id} 
+                                onClick={() => setActiveCategory(cat.id)}
+                                className={`snap-start flex items-center gap-2 px-5 py-3 rounded-2xl border transition-all active:scale-95 shadow-sm whitespace-nowrap ${activeCategory === cat.id ? `${cat.active} border-transparent shadow-lg shadow-indigo-200` : `bg-white border-slate-100 text-slate-600 hover:border-slate-300`}`}
+                            >
+                                {cat.icon}
+                                <span className="font-bold text-xs">{cat.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {/* DECK GRID */}
+                <div>
+                    <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+                        {searchTerm ? 'Search Results' : `${activeCategory} Collection`}
+                    </h3>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                        {filteredDecks.map((deck: any) => (
+                            <button 
+                                key={deck.id} 
+                                onClick={() => onSelectDeck(deck)}
+                                className="bg-white p-5 rounded-3xl border border-slate-100 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] hover:shadow-xl hover:-translate-y-1 hover:border-indigo-100 transition-all text-left flex flex-col h-full group relative overflow-hidden"
+                            >
+                                {/* Hover Decoration */}
+                                <div className="absolute top-0 right-0 w-20 h-20 bg-indigo-50 rounded-bl-[100px] -mr-10 -mt-10 transition-transform group-hover:scale-150 group-hover:bg-indigo-100"></div>
+
+                                <div className="flex justify-between items-start mb-4 relative z-10">
+                                    <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-colors shadow-sm">
+                                        {deck.icon ? <span className="text-xl">{deck.icon}</span> : <Layers size={20}/>}
+                                    </div>
+                                </div>
+                                
+                                <div className="relative z-10 flex-1">
+                                    <h4 className="font-black text-slate-800 text-base leading-tight mb-2 line-clamp-2">
+                                        {deck.title}
+                                    </h4>
+                                    <p className="text-xs text-slate-400 font-medium line-clamp-2">
+                                        {deck.description || "No description available."}
+                                    </p>
+                                </div>
+
+                                <div className="mt-4 pt-4 border-t border-slate-50 flex justify-between items-center text-[10px] font-bold text-slate-400 relative z-10">
+                                    <span className="bg-slate-100 px-2 py-1 rounded-md">{deck.cards?.length || 0} Cards</span>
+                                    <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                        <Play size={10} fill="currentColor"/>
+                                    </div>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+
+                    {filteredDecks.length === 0 && (
+                        <div className="text-center py-16">
+                            <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+                                <Search size={32} className="text-slate-300"/>
+                            </div>
+                            <h3 className="text-slate-900 font-bold text-lg">No decks found</h3>
+                            <p className="text-slate-400 text-sm mt-1">Try searching for something else.</p>
+                            {activeCategory !== 'All' && (
+                                <button onClick={() => setActiveCategory('All')} className="mt-4 text-indigo-600 font-bold text-sm hover:underline">
+                                    Clear Category
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
