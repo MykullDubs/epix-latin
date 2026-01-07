@@ -612,34 +612,78 @@ function HomeView({ setActiveTab, lessons, onSelectLesson, onSelectDeck, userDat
                         </h3>
                     </div>
                     
-                    <div className="flex gap-4 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">
-                        {classes.map((cls: any) => { 
-                            const pending = (cls.assignments || []).filter((l: any) => (!l.targetStudents || l.targetStudents.includes(userData.email)) && !completedSet.has(l.id)).length;
-                            
-                            return ( 
-                                <button key={cls.id} onClick={() => setActiveStudentClass(cls)} className="snap-start min-w-[260px] h-[160px] bg-white rounded-3xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.05)] border border-slate-100 transition-all active:scale-95 group relative overflow-hidden flex flex-col text-left hover:border-indigo-200">
-                                    {/* Abstract Header Art */}
-                                    <div className="h-20 bg-slate-900 relative w-full p-5 flex justify-between items-start overflow-hidden">
-                                        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-indigo-500 via-purple-500 to-transparent"></div>
-                                        <div className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-white font-bold relative z-10 border border-white/10">
-                                            {cls.name.charAt(0)}
-                                        </div>
-                                        {pending > 0 ? (
-                                            <span className="bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg relative z-10">{pending} Due</span>
-                                        ) : (
-                                            <div className="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-1 rounded-full backdrop-blur-md relative z-10 flex items-center gap-1"><Check size={10}/> Done</div>
-                                        )}
-                                    </div>
-                                    <div className="p-5 flex-1 flex flex-col justify-between">
-                                        <div>
-                                            <h4 className="font-bold text-slate-800 text-lg truncate group-hover:text-indigo-700 transition-colors">{cls.name}</h4>
-                                            <p className="text-xs text-slate-400 font-medium font-mono">{cls.code}</p>
-                                        </div>
-                                    </div>
-                                </button> 
-                            ); 
-                        })}
+                   <div className="flex gap-5 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">
+    {classes.map((cls: any, index: number) => { 
+        // 1. Calculate Status
+        const pending = (cls.assignments || []).filter((l: any) => 
+            (!l.targetStudents || l.targetStudents.includes(userData.email)) && 
+            !completedSet.has(l.id)
+        ).length;
+
+        // 2. Pick a Gradient Theme based on index (Juice factor)
+        const gradients = [
+            "from-indigo-600 to-violet-600",
+            "from-emerald-500 to-teal-600",
+            "from-orange-500 to-rose-600",
+            "from-blue-600 to-cyan-600"
+        ];
+        const themeGradient = gradients[index % gradients.length];
+        const shadowColor = index % gradients.length === 2 ? 'shadow-rose-200' : index % gradients.length === 1 ? 'shadow-emerald-200' : 'shadow-indigo-200';
+
+        return ( 
+            <button 
+                key={cls.id} 
+                onClick={() => setActiveStudentClass(cls)} 
+                className="snap-start min-w-[280px] h-[180px] bg-white rounded-[2rem] shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-slate-100 transition-all duration-300 active:scale-95 hover:-translate-y-1 hover:shadow-xl group relative overflow-hidden flex flex-col text-left"
+            >
+                {/* A. Header Background with Abstract Shape */}
+                <div className={`h-24 w-full bg-gradient-to-r ${themeGradient} relative p-5 flex justify-between items-start overflow-hidden`}>
+                    {/* Decorative Circle */}
+                    <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
+                    
+                    {/* Class Initial (Frosted Glass) */}
+                    <div className="w-12 h-12 bg-white/20 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-sm z-10">
+                        {cls.name.charAt(0).toUpperCase()}
                     </div>
+
+                    {/* Status Badge */}
+                    {pending > 0 ? (
+                        <div className="flex items-center gap-1.5 bg-white text-rose-600 text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg z-10 animate-in zoom-in">
+                            <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></div>
+                            {pending} Due
+                        </div>
+                    ) : (
+                        <div className="bg-white/20 backdrop-blur-md text-white text-[10px] font-bold px-3 py-1.5 rounded-full z-10 flex items-center gap-1">
+                            <Check size={12} strokeWidth={4}/> Done
+                        </div>
+                    )}
+                </div>
+
+                {/* B. Card Body */}
+                <div className="p-5 flex-1 flex flex-col justify-between relative">
+                    {/* Floating Action Icon (Appears on Hover) */}
+                    <div className="absolute top-0 right-5 -mt-5 bg-white text-slate-800 p-2 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 duration-300">
+                        <ArrowRight size={16} />
+                    </div>
+
+                    <div>
+                        <h4 className="font-black text-slate-800 text-xl truncate leading-tight group-hover:text-indigo-600 transition-colors">
+                            {cls.name}
+                        </h4>
+                        <div className="flex items-center gap-2 mt-2">
+                            <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100">
+                                {cls.code}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-400">
+                                {(cls.students || []).length} Students
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </button> 
+        ); 
+    })}
+</div>
                 </div>
               ) : (
                  <div className="p-6 border-2 border-dashed border-slate-200 rounded-2xl text-center">
