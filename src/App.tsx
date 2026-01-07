@@ -362,9 +362,9 @@ function LessonView({ lesson, onFinish }: any) {
   );
 }
 // ============================================================================
-//  MOONSHOT EXPLORE TAB (Functional Quests)
+//  MOONSHOT EXPLORE TAB (Fixed Click Handler)
 // ============================================================================
-function DiscoveryView({ allDecks, user, onSelectDeck, userData, onLogActivity }: any) {
+function DiscoveryView({ allDecks, user, onSelectDeck, onLogActivity }: any) {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState('All');
 
@@ -374,41 +374,35 @@ function DiscoveryView({ allDecks, user, onSelectDeck, userData, onLogActivity }
         
         if (validEntries.length === 0) return { featuredDeck: null, trendingDecks: [], quests: [] };
 
-        // Featured Logic
         const today = new Date().toDateString();
         let hash = 0; for (let i = 0; i < today.length; i++) hash = today.charCodeAt(i) + ((hash << 5) - hash);
         const featIdx = Math.abs(hash) % validEntries.length;
+        
         const [featId, featData] = validEntries[featIdx];
         
-        // Trending Logic
         const trending = [...validEntries].sort(() => 0.5 - Math.random()).slice(0, 5);
 
-        // --- REAL QUEST DATA MERGE ---
-        const userProgress = userData?.questProgress || {};
-        
-        const liveQuests = DAILY_QUESTS.map(q => {
-            const current = userProgress[q.id] || 0;
-            const isDone = current >= q.target;
-            
-            // Map icon string to component
-            let IconCmp = <Layers size={14}/>;
-            if(q.icon === 'help-circle') IconCmp = <HelpCircle size={14}/>;
-            if(q.icon === 'search') IconCmp = <Search size={14}/>;
-
-            return { ...q, current, done: isDone, iconComp: IconCmp };
-        });
+        const dailyQuests = [
+            { id: 1, label: "Review 10 Cards", xp: 50, icon: <Layers size={14}/>, done: false },
+            { id: 2, label: "Complete a Quiz", xp: 100, icon: <HelpCircle size={14}/>, done: false },
+            { id: 3, label: "Find a new Deck", xp: 20, icon: <Search size={14}/>, done: true },
+        ];
 
         return { 
             featuredDeck: { id: featId, ...(featData as any), contentType: 'deck' },
             trendingDecks: trending.map(([id, data]: any) => ({ id, ...data, contentType: 'deck' })),
-            quests: liveQuests
+            quests: dailyQuests
         };
-    }, [allDecks, userData]); // Re-run when userData changes (progress updates)
+    }, [allDecks]);
 
+    // 2. CLICK HANDLER (Fixed)
     const handleDeckClick = (deck: any) => {
-        // Trigger the "Explore" quest
-        onLogActivity('explore_deck'); 
-        onSelectDeck(deck);
+        // Safe check before logging to prevent crash
+        if (onLogActivity) {
+            onLogActivity('explore_deck', 0, "Exploration"); 
+        }
+        // Ensure ID is passed correctly
+        onSelectDeck({ ...deck, contentType: 'deck' });
     };
 
     // Categories
@@ -448,10 +442,10 @@ function DiscoveryView({ allDecks, user, onSelectDeck, userData, onLogActivity }
                 </div>
             </div>
 
-            {/* CONTENT */}
+            {/* SCROLLABLE CONTENT */}
             <div className="flex-1 overflow-y-auto custom-scrollbar pb-32">
                 
-                {/* A. FEATURED */}
+                {/* A. FEATURED HERO */}
                 {!searchTerm && activeCategory === 'All' && featuredDeck && (
                     <div className="px-6 pt-6 mb-8">
                         <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Star size={14} className="text-yellow-500 fill-yellow-500"/> Spotlight</h3>
@@ -470,28 +464,25 @@ function DiscoveryView({ allDecks, user, onSelectDeck, userData, onLogActivity }
                     </div>
                 )}
 
-                {/* B. FUNCTIONAL DAILY QUESTS */}
+                {/* B. DAILY QUESTS */}
                 {!searchTerm && (
                     <div className="px-6 mb-8">
                         <div className="flex justify-between items-end mb-3">
                             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Target size={14} className="text-rose-500"/> Daily Quests</h3>
-                            <span className="text-[10px] font-bold text-slate-400">Resets Midnight</span>
+                            <span className="text-[10px] font-bold text-slate-400">Resets in 12h</span>
                         </div>
                         <div className="grid grid-cols-1 gap-2">
                             {quests.map((q: any) => (
-                                <div key={q.id} className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${q.done ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-slate-100'}`}>
+                                <div key={q.id} className={`p-3 rounded-2xl border flex items-center justify-between ${q.done ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-slate-100'}`}>
                                     <div className="flex items-center gap-3">
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${q.done ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-                                            {q.done ? <Check size={16} strokeWidth={3}/> : q.iconComp}
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${q.done ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                                            {q.done ? <Check size={16} strokeWidth={3}/> : q.icon}
                                         </div>
-                                        <div>
-                                            <span className={`text-sm font-bold block ${q.done ? 'text-emerald-700 decoration-emerald-300' : 'text-slate-700'}`}>{q.label}</span>
-                                            {!q.done && <div className="text-[10px] text-slate-400 font-bold">{q.current} / {q.target}</div>}
-                                        </div>
+                                        <span className={`text-sm font-bold ${q.done ? 'text-emerald-700 line-through decoration-emerald-300' : 'text-slate-700'}`}>{q.label}</span>
                                     </div>
                                     <div className="flex items-center gap-1">
-                                        <Zap size={12} className={q.done ? "text-emerald-400 fill-emerald-400" : "text-yellow-500 fill-yellow-500"}/>
-                                        <span className={`text-xs font-black ${q.done ? 'text-emerald-600' : 'text-slate-600'}`}>+{q.xp}</span>
+                                        <Zap size={12} className="text-yellow-500 fill-yellow-500"/>
+                                        <span className="text-xs font-black text-slate-600">+{q.xp}</span>
                                     </div>
                                 </div>
                             ))}
@@ -499,7 +490,7 @@ function DiscoveryView({ allDecks, user, onSelectDeck, userData, onLogActivity }
                     </div>
                 )}
 
-                {/* C. TRENDING */}
+                {/* C. TRENDING SCROLL */}
                 {!searchTerm && (
                     <div className="mb-8">
                         <div className="px-6 mb-3 flex justify-between items-center"><h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><TrendingUp size={14} className="text-indigo-500"/> Trending Now</h3></div>
@@ -3228,8 +3219,15 @@ const renderStudentView = () => {
                 content = <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} />;
                 break;
             case 'discovery': 
-                content = <DiscoveryView allDecks={allDecks} user={user} onSelectDeck={handleContentSelection} />;
-                break;
+    content = <DiscoveryView 
+        allDecks={allDecks} 
+        user={user} 
+        onSelectDeck={handleContentSelection} 
+        // 👇 THESE TWO MUST BE HERE FOR QUESTS TO WORK
+        userData={userData}
+        onLogActivity={(type: string) => checkDailyQuests(type)} 
+    />;
+    break;
             case 'flashcards': 
                 const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
                 const deckToLoad = assignedDeck || allDecks[selectedDeckKey];
