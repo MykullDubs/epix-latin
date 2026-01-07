@@ -19,7 +19,7 @@ import {
   CheckCircle2, Circle, Activity, Clock, Compass, Globe, RotateCcw, Play, 
   Maximize2, BarChart2, Timer, Megaphone, Inbox, XCircle, ChevronUp, Send,
   ArrowUp, ArrowDown, Eye, EyeOff, MessageCircle, AlignLeft, ClipboardList, Table, Calendar,
-  Trophy, Flame, Settings, BarChart3, CornerDownRight, MoreHorizontal, Dumbbell   // <--- ADDED MISSING ICONS
+  Trophy, Flame, Settings, BarChart3, CornerDownRight, MoreHorizontal, Dumbbell, Map, Sparkles, Star, TrendingUp, Target    // <--- ADDED MISSING ICONS
 } from 'lucide-react';
 
 
@@ -355,73 +355,75 @@ function LessonView({ lesson, onFinish }: any) {
   );
 }
 // ============================================================================
-//  DISCOVERY VIEW (Sanctified & Juicified)
+//  MOONSHOT EXPLORE TAB (Netflix-Style Discovery)
 // ============================================================================
 function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState('All');
 
-    // 1. Robust Daily Pick Logic (Prevents crashes on load)
-    const dailyPick = useMemo(() => {
-        if (!allDecks) return null;
-        const deckKeys = Object.keys(allDecks).filter(k => !allDecks[k].isAssignment);
-        if (deckKeys.length === 0) return null;
+    // 1. DYNAMIC DATA GENERATION (Simulating a lively ecosystem)
+    const { featuredDeck, trendingDecks, quests } = useMemo(() => {
+        const decks = Object.values(allDecks).filter((d: any) => !d.isAssignment);
+        if (decks.length === 0) return { featuredDeck: null, trendingDecks: [], quests: [] };
+
+        // Pick a random featured deck based on date hash
+        const today = new Date().toDateString();
+        let hash = 0; for (let i = 0; i < today.length; i++) hash = today.charCodeAt(i) + ((hash << 5) - hash);
+        const featIdx = Math.abs(hash) % decks.length;
         
-        // Seed random based on date string so it stays same all day
-        const today = new Date().toDateString(); 
-        let hash = 0;
-        for (let i = 0; i < today.length; i++) hash = today.charCodeAt(i) + ((hash << 5) - hash);
-        const idx = Math.abs(hash) % deckKeys.length;
-        
-        // Return structured object with contentType for routing
+        // Mock "Trending" (Just shuffle them for now)
+        const trending = [...decks].sort(() => 0.5 - Math.random()).slice(0, 5);
+
+        // Daily Quests (Gamification)
+        const dailyQuests = [
+            { id: 1, label: "Review 10 Cards", xp: 50, icon: <Layers size={14}/>, done: false },
+            { id: 2, label: "Complete a Quiz", xp: 100, icon: <HelpCircle size={14}/>, done: false },
+            { id: 3, label: "Find a new Deck", xp: 20, icon: <Search size={14}/>, done: true }, // Mock completed
+        ];
+
         return { 
-            id: deckKeys[idx], 
-            ...allDecks[deckKeys[idx]], 
-            contentType: 'deck' // <--- CRITICAL FIX: Ensures correct routing
+            featuredDeck: { id: Object.keys(allDecks)[featIdx], ...decks[featIdx], contentType: 'deck' },
+            trendingDecks: trending.map(d => ({ ...d, contentType: 'deck', id: Object.keys(allDecks).find(k => allDecks[k] === d) })),
+            quests: dailyQuests
         };
     }, [allDecks]);
 
-    // 2. Dynamic Categories
+    // Categories with Visual Pop
     const categories = [
-        { id: 'All', label: 'All', icon: <Compass size={14}/>, color: 'bg-slate-100 text-slate-600', active: 'bg-slate-800 text-white' },
-        { id: 'Latin', label: 'Latin', icon: <Globe size={14}/>, color: 'bg-purple-50 text-purple-600', active: 'bg-purple-600 text-white' },
-        { id: 'Science', label: 'Science', icon: <Activity size={14}/>, color: 'bg-emerald-50 text-emerald-600', active: 'bg-emerald-600 text-white' },
-        { id: 'History', label: 'History', icon: <BookOpen size={14}/>, color: 'bg-amber-50 text-amber-600', active: 'bg-amber-600 text-white' },
+        { id: 'All', label: 'For You', icon: <Sparkles size={14}/>, color: 'bg-slate-900 text-white border-transparent' },
+        { id: 'Latin', label: 'Latin', icon: <Globe size={14}/>, color: 'bg-purple-100 text-purple-700 border-purple-200' },
+        { id: 'Science', label: 'Science', icon: <Activity size={14}/>, color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+        { id: 'History', label: 'History', icon: <BookOpen size={14}/>, color: 'bg-amber-100 text-amber-700 border-amber-200' },
     ];
 
-    // 3. Robust Filtering
-    const filteredDecks = useMemo(() => {
-        if (!allDecks) return [];
-        return Object.entries(allDecks)
-            .map(([id, deck]: any) => ({ 
-                id, 
-                ...deck, 
-                contentType: 'deck' // <--- CRITICAL FIX
-            }))
-            .filter(d => {
-                const matchesSearch = d.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                      (d.description && d.description.toLowerCase().includes(searchTerm.toLowerCase()));
-                const matchesCategory = activeCategory === 'All' || 
-                                        d.targetLanguage === activeCategory || 
-                                        d.tags?.includes(activeCategory); // Support tags if you add them later
-                
-                return !d.isAssignment && matchesSearch && matchesCategory;
-            });
-    }, [allDecks, searchTerm, activeCategory]);
+    const filteredDecks = Object.entries(allDecks)
+        .map(([id, deck]: any) => ({ id, ...deck, contentType: 'deck' }))
+        .filter(d => {
+            const matchesSearch = d.title.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesCategory = activeCategory === 'All' || d.targetLanguage === activeCategory;
+            return !d.isAssignment && matchesSearch && matchesCategory;
+        });
 
     return (
-        <div className="h-full bg-slate-50 flex flex-col overflow-hidden animate-in fade-in duration-500">
+        <div className="h-full bg-slate-50 flex flex-col overflow-hidden">
             
-            {/* Header / Search */}
-            <div className="px-6 pt-12 pb-4 bg-white/80 backdrop-blur-md border-b border-slate-200 z-20 sticky top-0">
-                <h1 className="text-3xl font-black text-slate-900 mb-4 flex items-center gap-2 tracking-tight">
-                    <Compass className="text-indigo-600" size={28} strokeWidth={2.5}/> Explore
-                </h1>
+            {/* 1. IMMERSIVE HEADER */}
+            <div className="px-6 pt-12 pb-4 bg-white/90 backdrop-blur-xl border-b border-slate-100 z-20 sticky top-0 shadow-sm">
+                <div className="flex justify-between items-center mb-4">
+                    <h1 className="text-3xl font-black text-slate-900 flex items-center gap-2 tracking-tight">
+                        <Compass className="text-indigo-600" size={28} strokeWidth={2.5}/> Explore
+                    </h1>
+                    <div className="flex items-center gap-1 bg-orange-50 border border-orange-100 px-3 py-1 rounded-full">
+                        <Flame size={14} className="text-orange-500 fill-orange-500 animate-pulse"/>
+                        <span className="text-xs font-black text-orange-600 uppercase">Daily Hype</span>
+                    </div>
+                </div>
+                
                 <div className="relative group">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={20}/>
                     <input 
                         type="text" 
-                        placeholder="Search decks, topics..." 
+                        placeholder="Find your next obsession..." 
                         className="w-full pl-10 pr-4 py-3 bg-slate-100 border-2 border-transparent focus:border-indigo-500/20 rounded-2xl font-bold text-slate-700 placeholder:text-slate-400 focus:ring-0 focus:bg-white outline-none transition-all shadow-inner"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -429,123 +431,157 @@ function DiscoveryView({ allDecks, user, onSelectDeck }: any) {
                 </div>
             </div>
 
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8 pb-32">
+            {/* 2. SCROLLABLE CONTENT */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar pb-32">
                 
-                {/* DAILY PICK (Juiced Up) */}
-                {!searchTerm && activeCategory === 'All' && dailyPick && (
-                    <div className="relative w-full">
-                        <div className="flex justify-between items-end mb-4">
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                <Zap size={14} className="text-amber-500 fill-amber-500"/> Daily Pick
-                            </h3>
-                        </div>
-                        
+                {/* A. FEATURED HERO (The "Moonshot") */}
+                {!searchTerm && activeCategory === 'All' && featuredDeck && (
+                    <div className="px-6 pt-6 mb-8">
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                            <Star size={14} className="text-yellow-500 fill-yellow-500"/> Spotlight
+                        </h3>
                         <button 
-                            onClick={() => onSelectDeck(dailyPick)}
-                            className="w-full relative overflow-hidden rounded-[2.5rem] bg-slate-900 shadow-2xl text-white group text-left aspect-[4/3] sm:aspect-[2/1] active:scale-[0.98] transition-transform"
+                            onClick={() => onSelectDeck(featuredDeck)}
+                            className="w-full relative h-64 rounded-[2.5rem] overflow-hidden shadow-2xl group text-left transition-transform active:scale-[0.98]"
                         >
-                            {/* Dynamic Background */}
-                            <div className={`absolute inset-0 opacity-80 bg-gradient-to-br ${dailyPick.targetLanguage === 'Latin' ? 'from-purple-600 to-indigo-900' : 'from-emerald-500 to-teal-900'}`}></div>
-                            <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
+                            {/* Dynamic Animated Background */}
+                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-purple-600 to-rose-500 animate-in fade-in zoom-in duration-1000"></div>
+                            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-30 mix-blend-overlay"></div>
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
                             
-                            {/* Shine Effect */}
-                            <div className="absolute -inset-full top-0 block h-full w-1/2 -skew-x-12 bg-gradient-to-r from-transparent to-white opacity-20 group-hover:animate-shine" />
+                            <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md border border-white/20 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                                Featured
+                            </div>
 
-                            <div className="relative z-10 p-8 h-full flex flex-col">
-                                <div className="flex justify-between items-start">
-                                    <span className="bg-white/20 backdrop-blur-md border border-white/20 text-[10px] font-black uppercase tracking-widest py-1.5 px-3 rounded-full shadow-lg">
-                                        {dailyPick.targetLanguage || 'General'}
-                                    </span>
-                                    {dailyPick.xp && <span className="text-emerald-300 font-black text-sm">+{dailyPick.xp} XP</span>}
+                            <div className="relative z-10 p-8 h-full flex flex-col justify-end">
+                                <div className="mb-2 w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white border border-white/20 shadow-lg">
+                                    {featuredDeck.icon ? <span className="text-2xl">{featuredDeck.icon}</span> : <Sparkles size={24}/>}
                                 </div>
-                                
-                                <div className="mt-auto">
-                                    <h2 className="text-3xl font-black mb-2 leading-tight">{dailyPick.title}</h2>
-                                    <p className="text-indigo-100 text-sm font-medium line-clamp-2 max-w-[90%]">
-                                        {dailyPick.description || "Master this topic today."}
-                                    </p>
-                                    <div className="mt-4 flex items-center gap-2 text-xs font-bold text-white/60">
-                                        <Layers size={14}/> {dailyPick.cards?.length || 0} Cards
-                                    </div>
+                                <h2 className="text-3xl font-black text-white leading-tight mb-2">{featuredDeck.title}</h2>
+                                <p className="text-indigo-100 text-sm font-medium line-clamp-2 max-w-[90%] mb-4">
+                                    {featuredDeck.description || "Master this topic and level up your skills today."}
+                                </p>
+                                <div className="flex items-center gap-3">
+                                    <span className="bg-indigo-500 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2 group-hover:bg-white group-hover:text-indigo-600 transition-colors">
+                                        <Play size={14} fill="currentColor"/> Start Now
+                                    </span>
+                                    <span className="text-white/60 text-xs font-bold">{featuredDeck.cards?.length || 0} Cards</span>
                                 </div>
                             </div>
                         </button>
                     </div>
                 )}
 
-                {/* CATEGORIES SCROLL */}
+                {/* B. DAILY QUESTS (Gamification) */}
                 {!searchTerm && (
-                    <div className="flex gap-3 overflow-x-auto pb-4 -mx-6 px-6 scrollbar-hide snap-x">
+                    <div className="px-6 mb-8">
+                        <div className="flex justify-between items-end mb-3">
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <Target size={14} className="text-rose-500"/> Daily Quests
+                            </h3>
+                            <span className="text-[10px] font-bold text-slate-400">Resets in 12h</span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2">
+                            {quests.map((q: any) => (
+                                <div key={q.id} className={`p-3 rounded-2xl border flex items-center justify-between ${q.done ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-slate-100'}`}>
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${q.done ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                                            {q.done ? <Check size={16} strokeWidth={3}/> : q.icon}
+                                        </div>
+                                        <span className={`text-sm font-bold ${q.done ? 'text-emerald-700 line-through decoration-emerald-300' : 'text-slate-700'}`}>{q.label}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <Zap size={12} className="text-yellow-500 fill-yellow-500"/>
+                                        <span className="text-xs font-black text-slate-600">+{q.xp}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* C. TRENDING SCROLL (Horizontal) */}
+                {!searchTerm && (
+                    <div className="mb-8">
+                        <div className="px-6 mb-3 flex justify-between items-center">
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <TrendingUp size={14} className="text-indigo-500"/> Trending Now
+                            </h3>
+                        </div>
+                        <div className="flex gap-4 overflow-x-auto px-6 pb-4 scrollbar-hide snap-x">
+                            {trendingDecks.map((deck: any) => (
+                                <button 
+                                    key={deck.id}
+                                    onClick={() => onSelectDeck(deck)}
+                                    className="snap-start min-w-[200px] h-48 bg-white p-4 rounded-3xl border border-slate-100 shadow-[0_8px_20px_-5px_rgba(0,0,0,0.05)] hover:-translate-y-1 transition-all group flex flex-col justify-between relative overflow-hidden"
+                                >
+                                    <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-bl-[50px] -mr-8 -mt-8 transition-transform group-hover:scale-150"></div>
+                                    
+                                    <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-colors relative z-10">
+                                        {deck.icon || <Layers size={18}/>}
+                                    </div>
+                                    
+                                    <div className="relative z-10">
+                                        <h4 className="font-bold text-slate-800 leading-tight mb-1 line-clamp-2">{deck.title}</h4>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-bold text-slate-400">{deck.cards?.length || 0} Cards</span>
+                                            <span className="text-[10px] font-bold text-orange-500 flex items-center gap-0.5"><Flame size={10} fill="currentColor"/> Hot</span>
+                                        </div>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* D. CATEGORIES & GRID */}
+                <div className="px-6">
+                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <Map size={14} className="text-slate-400"/> Browse All
+                    </h3>
+                    
+                    {/* Category Pills */}
+                    <div className="flex gap-3 overflow-x-auto pb-4 -mx-6 px-6 scrollbar-hide mb-2">
                         {categories.map(cat => (
                             <button 
                                 key={cat.id} 
                                 onClick={() => setActiveCategory(cat.id)}
-                                className={`snap-start flex items-center gap-2 px-5 py-3 rounded-2xl border transition-all active:scale-95 shadow-sm whitespace-nowrap ${activeCategory === cat.id ? `${cat.active} border-transparent shadow-lg shadow-indigo-200` : `bg-white border-slate-100 text-slate-600 hover:border-slate-300`}`}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-bold transition-all active:scale-95 whitespace-nowrap ${activeCategory === cat.id ? cat.color + ' shadow-md' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}
                             >
                                 {cat.icon}
-                                <span className="font-bold text-xs">{cat.label}</span>
+                                <span>{cat.label}</span>
                             </button>
                         ))}
                     </div>
-                )}
 
-                {/* DECK GRID */}
-                <div>
-                    <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
-                        {searchTerm ? 'Search Results' : `${activeCategory} Collection`}
-                    </h3>
-                    
+                    {/* The Grid */}
                     <div className="grid grid-cols-2 gap-4">
                         {filteredDecks.map((deck: any) => (
                             <button 
                                 key={deck.id} 
                                 onClick={() => onSelectDeck(deck)}
-                                className="bg-white p-5 rounded-3xl border border-slate-100 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] hover:shadow-xl hover:-translate-y-1 hover:border-indigo-100 transition-all text-left flex flex-col h-full group relative overflow-hidden"
+                                className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg hover:border-indigo-100 hover:-translate-y-1 transition-all text-left group"
                             >
-                                {/* Hover Decoration */}
-                                <div className="absolute top-0 right-0 w-20 h-20 bg-indigo-50 rounded-bl-[100px] -mr-10 -mt-10 transition-transform group-hover:scale-150 group-hover:bg-indigo-100"></div>
-
-                                <div className="flex justify-between items-start mb-4 relative z-10">
-                                    <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-colors shadow-sm">
-                                        {deck.icon ? <span className="text-xl">{deck.icon}</span> : <Layers size={20}/>}
+                                <div className="flex justify-between items-start mb-3">
+                                    <div className="w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                                        {deck.icon || <Layers size={18}/>}
                                     </div>
+                                    {deck.xp && <span className="text-[9px] font-bold bg-emerald-50 text-emerald-600 px-2 py-1 rounded-full">+{deck.xp} XP</span>}
                                 </div>
-                                
-                                <div className="relative z-10 flex-1">
-                                    <h4 className="font-black text-slate-800 text-base leading-tight mb-2 line-clamp-2">
-                                        {deck.title}
-                                    </h4>
-                                    <p className="text-xs text-slate-400 font-medium line-clamp-2">
-                                        {deck.description || "No description available."}
-                                    </p>
-                                </div>
-
-                                <div className="mt-4 pt-4 border-t border-slate-50 flex justify-between items-center text-[10px] font-bold text-slate-400 relative z-10">
-                                    <span className="bg-slate-100 px-2 py-1 rounded-md">{deck.cards?.length || 0} Cards</span>
-                                    <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                                        <Play size={10} fill="currentColor"/>
-                                    </div>
-                                </div>
+                                <h4 className="font-bold text-slate-800 text-sm leading-tight mb-1 line-clamp-2">{deck.title}</h4>
+                                <p className="text-[10px] text-slate-400 font-medium">{deck.cards?.length || 0} Cards</p>
                             </button>
                         ))}
                     </div>
 
                     {filteredDecks.length === 0 && (
-                        <div className="text-center py-16">
-                            <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-                                <Search size={32} className="text-slate-300"/>
-                            </div>
-                            <h3 className="text-slate-900 font-bold text-lg">No decks found</h3>
-                            <p className="text-slate-400 text-sm mt-1">Try searching for something else.</p>
-                            {activeCategory !== 'All' && (
-                                <button onClick={() => setActiveCategory('All')} className="mt-4 text-indigo-600 font-bold text-sm hover:underline">
-                                    Clear Category
-                                </button>
-                            )}
+                        <div className="text-center py-12">
+                            <p className="text-slate-400 text-sm font-bold">No decks found.</p>
+                            <button onClick={() => setActiveCategory('All')} className="text-indigo-600 text-xs font-bold mt-2">Reset Filters</button>
                         </div>
                     )}
                 </div>
+
             </div>
         </div>
     );
