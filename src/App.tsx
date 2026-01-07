@@ -1534,16 +1534,25 @@ function ClassForum({ classData, user }: any) {
     );
 }
 // ============================================================================
-//  STUDENT CLASS VIEW (Assignments + Grades + Forum)
+//  STUDENT CLASS VIEW (With Persistent Completed Items)
 // ============================================================================
 function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, userData, user }: any) {
-  // Updated Type Definition for 3 Tabs
   const [activeTab, setActiveTab] = useState<'assignments' | 'grades' | 'forum'>('assignments');
   
   const completedSet = new Set(userData?.completedAssignments || []);
   
-  const handleAssignmentClick = (assignment: any) => { if (assignment.contentType === 'deck') { onSelectDeck(assignment); } else { onSelectLesson(assignment); } };
-  const relevantAssignments = (classData.assignments || []).filter((l: any) => { const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); return isForMe; });
+  const handleAssignmentClick = (assignment: any) => { 
+      if (assignment.contentType === 'deck') { onSelectDeck(assignment); } 
+      else { onSelectLesson(assignment); } 
+  };
+
+  // Filter assignments relevant to this student (ignore targetStudent logic for now if not used, or keep it)
+  const relevantAssignments = (classData.assignments || []).filter((l: any) => { 
+      const isForMe = !l.targetStudents || l.targetStudents.length === 0 || l.targetStudents.includes(userData.email); 
+      return isForMe; 
+  });
+
+  // Calculate pending count just for the header badge
   const pendingCount = relevantAssignments.filter((l: any) => !completedSet.has(l.id)).length;
   
   return (
@@ -1559,7 +1568,9 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
                   <p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">{classData.code}</p>
               </div>
               <div className="text-right">
-                  <span className="block text-2xl font-black text-indigo-600">{pendingCount}</span>
+                  <span className={`block text-2xl font-black ${pendingCount > 0 ? 'text-indigo-600' : 'text-emerald-500'}`}>
+                      {pendingCount}
+                  </span>
                   <span className="text-[10px] font-bold text-slate-400 uppercase">To Do</span>
               </div>
           </div>
@@ -1584,18 +1595,54 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
                     <div>
                         <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Tasks</h3>
                         <div className="space-y-3">
-                            {relevantAssignments.length > 0 ? ( relevantAssignments.filter((l: any) => !completedSet.has(l.id)).map((l: any, i: number) => ( 
-                                <button key={`${l.id}-${i}`} onClick={() => handleAssignmentClick(l)} className="w-full bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all group hover:border-indigo-300">
-                                    <div className="flex items-center space-x-4">
-                                        <div className={`h-12 w-12 rounded-xl flex items-center justify-center transition-colors ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white' : l.contentType === 'test' || l.contentType === 'exam' ? 'bg-rose-50 text-rose-600 group-hover:bg-rose-500 group-hover:text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-500 group-hover:text-white'}`}>
-                                            {l.contentType === 'deck' ? <Layers size={20}/> : (l.contentType === 'test' || l.contentType === 'exam') ? <FileText size={20}/> : <PlayCircle size={20} />}
-                                        </div>
-                                        <div className="text-left"><h4 className="font-bold text-slate-900 group-hover:text-indigo-700">{l.title}</h4><p className="text-xs text-slate-500">{l.contentType === 'deck' ? 'Flashcard Deck' : (l.contentType === 'test' || l.contentType === 'exam') ? 'Exam' : 'Lesson'}</p></div>
-                                    </div>
-                                    <ChevronRight size={20} className="text-slate-300 group-hover:text-indigo-500" />
-                                </button> 
-                            )) ) : ( <div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">No pending assignments.</div> )}
-                            {relevantAssignments.every((l: any) => completedSet.has(l.id)) && relevantAssignments.length > 0 && (<div className="p-8 text-center text-emerald-600 font-bold bg-emerald-50 rounded-2xl border border-emerald-100">All assignments completed! 🎉</div>)}
+                            {relevantAssignments.length > 0 ? ( 
+                                relevantAssignments.map((l: any, i: number) => {
+                                    const isCompleted = completedSet.has(l.id);
+                                    return ( 
+                                        <button 
+                                            key={`${l.id}-${i}`} 
+                                            onClick={() => handleAssignmentClick(l)} 
+                                            className={`w-full p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all group border ${isCompleted ? 'bg-emerald-50/40 border-emerald-100 hover:border-emerald-300' : 'bg-white border-slate-200 hover:border-indigo-300'}`}
+                                        >
+                                            <div className="flex items-center space-x-4">
+                                                {/* Icon Box */}
+                                                <div className={`h-12 w-12 rounded-xl flex items-center justify-center transition-colors shrink-0 
+                                                    ${isCompleted ? 'bg-emerald-100 text-emerald-600' : 
+                                                      l.contentType === 'deck' ? 'bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white' : 
+                                                      l.contentType === 'test' || l.contentType === 'exam' ? 'bg-rose-50 text-rose-600 group-hover:bg-rose-500 group-hover:text-white' : 
+                                                      'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-500 group-hover:text-white'}`}>
+                                                    
+                                                    {isCompleted ? <Check size={20} strokeWidth={3}/> : 
+                                                     l.contentType === 'deck' ? <Layers size={20}/> : 
+                                                     (l.contentType === 'test' || l.contentType === 'exam') ? <FileText size={20}/> : <PlayCircle size={20} />}
+                                                </div>
+                                                
+                                                {/* Text Info */}
+                                                <div className="text-left">
+                                                    <h4 className={`font-bold text-sm ${isCompleted ? 'text-slate-500 decoration-slate-300' : 'text-slate-900 group-hover:text-indigo-700'}`}>
+                                                        {l.title}
+                                                    </h4>
+                                                    <p className={`text-xs ${isCompleted ? 'text-emerald-600 font-bold' : 'text-slate-500'}`}>
+                                                        {isCompleted 
+                                                            ? "Completed" 
+                                                            : l.contentType === 'deck' ? 'Flashcard Deck' : (l.contentType === 'test' || l.contentType === 'exam') ? 'Exam' : 'Lesson'
+                                                        }
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Right Icon */}
+                                            {isCompleted ? (
+                                                <div className="px-3 py-1 bg-white border border-emerald-100 rounded-full text-[10px] font-bold text-emerald-600 shadow-sm">Review</div>
+                                            ) : (
+                                                <ChevronRight size={20} className="text-slate-300 group-hover:text-indigo-500" />
+                                            )}
+                                        </button> 
+                                    );
+                                }) 
+                            ) : ( 
+                                <div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">No assignments yet.</div> 
+                            )}
                         </div>
                     </div>
                  </div>
@@ -1609,7 +1656,7 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
               </div>
           )}
 
-          {/* TAB 3: FORUM (NEW) */}
+          {/* TAB 3: FORUM */}
           {activeTab === 'forum' && (
               <ClassForum classData={classData} user={user} />
           )}
