@@ -1207,27 +1207,21 @@ function GradeDetailModal({ log, onClose }: any) {
 // ============================================================================
 //  STUDENT GRADEBOOK (Interactive)
 // ============================================================================
+// ============================================================================
+//  STUDENT GRADEBOOK (Fixed Click & Display)
+// ============================================================================
 function StudentGradebook({ classData, user }: any) {
     const [logs, setLogs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    
-    // NEW: State to track which grade is being viewed
     const [selectedLog, setSelectedLog] = useState<any>(null);
 
     useEffect(() => {
         if(!classData.assignments || classData.assignments.length === 0) { setLoading(false); return; }
-        
         const assignmentIds = classData.assignments.map((a:any) => a.id);
-        const q = query(
-            collection(db, 'artifacts', appId, 'activity_logs'), 
-            where('studentEmail', '==', user.email),
-            orderBy('timestamp', 'desc'),
-            limit(100)
-        );
-
+        const q = query(collection(db, 'artifacts', appId, 'activity_logs'), where('studentEmail', '==', user.email), orderBy('timestamp', 'desc'), limit(100));
         const unsub = onSnapshot(q, (snapshot) => {
             const allLogs = snapshot.docs.map(d => d.data());
-            // Filter to only include logs relevant to this class
+            // Match logs to assignments
             const classLogs = allLogs.filter(log => assignmentIds.includes(log.itemId));
             setLogs(classLogs);
             setLoading(false);
@@ -1235,72 +1229,45 @@ function StudentGradebook({ classData, user }: any) {
         return () => unsub();
     }, [classData, user]);
 
-    const getGradeStatus = (assignmentId: string) => {
-        // Find the most recent log for this assignment
-        const log = logs.find(l => l.itemId === assignmentId);
+    const getGradeStatus = (assign: any) => {
+        const log = logs.find(l => l.itemId === assign.id);
         
         if (!log) return { status: 'missing', label: 'Not Started', color: 'bg-slate-100 text-slate-400', interactable: false };
         
-        if (log.scoreDetail?.status === 'pending_review') {
-            return { status: 'pending', label: 'In Review', color: 'bg-amber-100 text-amber-600', interactable: true, log };
+        // If it's an exam, show score/total
+        if (assign.contentType === 'test' || assign.contentType === 'exam') {
+             if (log.scoreDetail?.status === 'pending_review') {
+                 return { status: 'pending', label: 'In Review', color: 'bg-amber-100 text-amber-600', interactable: true, log };
+             }
+             const score = log.scoreDetail?.score || 0;
+             const total = log.scoreDetail?.total || 100;
+             const pct = log.scoreDetail?.finalScorePct ?? Math.round((score/total)*100);
+             let color = pct >= 90 ? 'bg-emerald-100 text-emerald-600' : pct >= 70 ? 'bg-indigo-100 text-indigo-600' : 'bg-rose-100 text-rose-600';
+             return { status: 'complete', label: `${score}/${total} pts`, color, interactable: true, log };
         }
-        
-        // Calculate score percentage
-        let pct = 100;
-        if (log.scoreDetail?.finalScorePct !== undefined) pct = log.scoreDetail.finalScorePct;
-        else if (log.scoreDetail?.total > 0) pct = Math.round((log.scoreDetail.score / log.scoreDetail.total) * 100);
-        
-        // Determine Color
-        let color = 'bg-emerald-100 text-emerald-600';
-        if(pct < 70) color = 'bg-rose-100 text-rose-600';
-        else if(pct < 90) color = 'bg-indigo-100 text-indigo-600';
 
-        return { status: 'complete', label: `${pct}%`, color, interactable: true, log };
+        // Standard Lesson/Deck
+        return { status: 'complete', label: 'Complete', color: 'bg-emerald-100 text-emerald-600', interactable: true, log };
     };
 
     return (
         <>
-            {/* RENDER THE MODAL IF A LOG IS SELECTED */}
             {selectedLog && <GradeDetailModal log={selectedLog} onClose={() => setSelectedLog(null)} />}
-
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2">
-                <div className="p-6 border-b border-slate-100 bg-slate-50">
-                    <h3 className="font-bold text-slate-800 flex items-center gap-2"><ClipboardList size={18} className="text-indigo-600"/> Report Card</h3>
-                </div>
-                {classData.assignments?.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400 text-sm">No assignments yet.</div>
-                ) : (
+                <div className="p-6 border-b border-slate-100 bg-slate-50"><h3 className="font-bold text-slate-800 flex items-center gap-2"><ClipboardList size={18} className="text-indigo-600"/> Report Card</h3></div>
+                {classData.assignments?.length === 0 ? <div className="p-8 text-center text-slate-400 text-sm">No assignments yet.</div> : (
                     <div className="divide-y divide-slate-100">
                         {classData.assignments.map((assign: any) => {
-                            const { status, label, color, interactable, log } = getGradeStatus(assign.id);
-                            
+                            const { status, label, color, interactable, log } = getGradeStatus(assign);
                             return (
-                                <button 
-                                    key={assign.id} 
-                                    disabled={!interactable}
-                                    onClick={() => interactable && setSelectedLog(log)}
-                                    className={`w-full p-4 flex items-center justify-between transition-colors group text-left ${interactable ? 'hover:bg-slate-50 cursor-pointer' : 'cursor-default'}`}
-                                >
+                                <button key={assign.id} disabled={!interactable} onClick={() => interactable && setSelectedLog(log)} className={`w-full p-4 flex items-center justify-between transition-colors group text-left ${interactable ? 'hover:bg-slate-50 cursor-pointer' : 'cursor-default'}`}>
                                     <div className="flex items-center gap-4">
-                                        <div className={`p-2 rounded-lg ${assign.contentType === 'test' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                                            {assign.contentType === 'test' ? <FileText size={16}/> : <BookOpen size={16}/>}
+                                        <div className={`p-2 rounded-lg ${assign.contentType === 'test' || assign.contentType === 'exam' ? 'bg-rose-100 text-rose-600' : assign.contentType === 'deck' ? 'bg-orange-100 text-orange-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                            {assign.contentType === 'deck' ? <Layers size={16}/> : (assign.contentType === 'test' || assign.contentType === 'exam') ? <FileText size={16}/> : <BookOpen size={16}/>}
                                         </div>
-                                        <div>
-                                            <h4 className="font-bold text-slate-800 text-sm">{assign.title}</h4>
-                                            <p className="text-xs text-slate-400">{assign.contentType === 'test' ? 'Exam' : 'Lesson'} • {assign.xp} XP</p>
-                                        </div>
+                                        <div><h4 className="font-bold text-slate-800 text-sm">{assign.title}</h4><p className="text-xs text-slate-400">{(assign.contentType === 'test' || assign.contentType === 'exam') ? 'Exam' : 'Lesson'}</p></div>
                                     </div>
-                                    <div className="flex items-center gap-3">
-                                        <div className="text-right">
-                                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${color}`}>{label}</span>
-                                            {log?.scoreDetail?.instructorFeedback && (
-                                                <div className="flex items-center justify-end gap-1 mt-1 text-[10px] text-indigo-500 font-bold">
-                                                    <MessageCircle size={10}/> Feedback
-                                                </div>
-                                            )}
-                                        </div>
-                                        {interactable && <ChevronRight size={16} className="text-slate-300 group-hover:text-indigo-500 transition-colors"/>}
-                                    </div>
+                                    <div className="flex items-center gap-3"><div className="text-right"><span className={`px-3 py-1 rounded-full text-xs font-bold ${color}`}>{label}</span>{log?.scoreDetail?.instructorFeedback && <div className="flex items-center justify-end gap-1 mt-1 text-[10px] text-indigo-500 font-bold"><MessageCircle size={10}/> Feedback</div>}</div>{interactable && <ChevronRight size={16} className="text-slate-300 group-hover:text-indigo-500 transition-colors"/>}</div>
                                 </button>
                             );
                         })}
@@ -2206,14 +2173,12 @@ function ExamBuilderView({ onSave, initialData }: any) {
     );
 }
 // ============================================================================
-//  EXAM PLAYER (With Custom "Juicy" Confirmation)
+//  EXAM PLAYER (Auto-Save on Submit)
 // ============================================================================
 function ExamPlayerView({ exam, onFinish }: any) {
     const [answers, setAnswers] = useState<any>({});
     const [submitted, setSubmitted] = useState(false);
     const [scoreDetail, setScoreDetail] = useState<any>(null);
-    
-    // NEW: State for the confirmation modal
     const [showConfirm, setShowConfirm] = useState(false);
 
     const handleAnswer = (qId: string, val: any) => {
@@ -2221,12 +2186,6 @@ function ExamPlayerView({ exam, onFinish }: any) {
         setAnswers({ ...answers, [qId]: val });
     };
 
-    // 1. Trigger the Modal
-    const requestSubmit = () => {
-        setShowConfirm(true);
-    };
-
-    // 2. Execute the Logic (Moved from the old submitExam)
     const confirmSubmit = () => {
         let totalPoints = 0;
         let earnedPoints = 0;
@@ -2236,13 +2195,12 @@ function ExamPlayerView({ exam, onFinish }: any) {
         exam.questions.forEach((q: any) => {
             const points = parseInt(q.points || 0);
             totalPoints += points;
-            
             const studentVal = answers[q.id];
             let isCorrect = false;
             let awarded = 0;
 
             if (q.type === 'multiple-choice' || q.type === 'boolean') {
-                if (studentVal === q.correctAnswer) {
+                if (String(studentVal) === String(q.correctAnswer)) { // String comparison safety
                     awarded = points;
                     isCorrect = true;
                 }
@@ -2251,34 +2209,22 @@ function ExamPlayerView({ exam, onFinish }: any) {
                 awarded = 0; 
             }
 
-            details.push({
-                qId: q.id,
-                type: q.type,
-                prompt: q.prompt,
-                maxPoints: points,
-                studentVal: studentVal || "(No Answer)",
-                correctVal: q.correctAnswer || "(Essay)",
-                awardedPoints: awarded,
-                isCorrect
-            });
-            
+            details.push({ qId: q.id, type: q.type, prompt: q.prompt, maxPoints: points, studentVal: studentVal || "(No Answer)", correctVal: q.correctAnswer || "(Essay)", awardedPoints: awarded, isCorrect });
             earnedPoints += awarded;
         });
 
         const finalStatus = requiresManualGrading ? 'pending_review' : 'graded';
-        const result = { 
-            score: earnedPoints, 
-            total: totalPoints, 
-            status: finalStatus,
-            details: details 
-        };
+        const result = { score: earnedPoints, total: totalPoints, status: finalStatus, details };
 
         setScoreDetail(result);
         setSubmitted(true);
         setShowConfirm(false);
+
+        // --- CRITICAL FIX: SAVE IMMEDIATELY ---
+        // Don't wait for "Return Home". Save data now.
+        onFinish(exam.id, earnedPoints, exam.title, result);
     };
 
-    // 3. Post-Submission View
     if (submitted) {
         return (
             <div className="h-full flex flex-col items-center justify-center p-8 bg-slate-50 animate-in zoom-in duration-300">
@@ -2288,11 +2234,10 @@ function ExamPlayerView({ exam, onFinish }: any) {
                     </div>
                     <h2 className="text-2xl font-black text-slate-900 mb-2">Exam Submitted</h2>
                     <p className="text-slate-500 mb-6 font-medium">
-                        {scoreDetail.status === 'pending_review' 
-                            ? "Your answers have been sent to the instructor for grading." 
-                            : `You scored ${scoreDetail.score} / ${scoreDetail.total}`}
+                        {scoreDetail.status === 'pending_review' ? "Sent for grading." : `You scored ${scoreDetail.score} / ${scoreDetail.total}`}
                     </p>
-                    <button onClick={() => onFinish(exam.id, scoreDetail.score, exam.title, scoreDetail)} className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold shadow-lg hover:scale-105 transition-transform">Return Home</button>
+                    {/* Button now just closes the view since data is already saved */}
+                    <button onClick={() => onFinish(null, 0)} className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold shadow-lg hover:scale-105 transition-transform">Return Home</button>
                 </div>
             </div>
         );
@@ -2300,64 +2245,28 @@ function ExamPlayerView({ exam, onFinish }: any) {
 
     return (
         <div className="h-full flex flex-col bg-slate-50 overflow-hidden relative">
-            
-            {/* --- CUSTOM CONFIRMATION MODAL --- */}
             {showConfirm && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
-                        <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <AlertTriangle size={32} />
-                        </div>
+                        <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4"><AlertTriangle size={32} /></div>
                         <h3 className="text-xl font-black text-slate-900 mb-2">Submit Assessment?</h3>
-                        <p className="text-slate-500 text-sm mb-6 leading-relaxed">
-                            You are about to submit your answers. You cannot change them after this point.
-                        </p>
-                        <div className="flex gap-3">
-                            <button 
-                                onClick={() => setShowConfirm(false)} 
-                                className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors"
-                            >
-                                Not yet
-                            </button>
-                            <button 
-                                onClick={confirmSubmit} 
-                                className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 shadow-lg shadow-rose-200 transition-all active:scale-95"
-                            >
-                                Submit
-                            </button>
-                        </div>
+                        <p className="text-slate-500 text-sm mb-6 leading-relaxed">You cannot change answers after this point.</p>
+                        <div className="flex gap-3"><button onClick={() => setShowConfirm(false)} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors">Not yet</button><button onClick={confirmSubmit} className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 shadow-lg shadow-rose-200 transition-all active:scale-95">Submit</button></div>
                     </div>
                 </div>
             )}
-
-            {/* Header */}
-            <div className="px-6 py-4 bg-white border-b border-slate-200 sticky top-0 z-20 flex justify-between items-center shadow-sm">
-                <div><h1 className="text-lg font-bold text-slate-800 flex items-center gap-2"><FileText size={18} className="text-indigo-600"/> {exam.title}</h1><p className="text-xs text-slate-400 font-medium">{exam.questions.length} Questions • {exam.timeLimitMinutes || 30} Mins</p></div>
-                <div className="text-xs font-mono font-bold bg-rose-50 text-rose-600 px-2 py-1 rounded flex items-center gap-1 animate-pulse"><Circle size={8} fill="currentColor"/> Live</div>
-            </div>
-
-            {/* Questions Feed */}
+            <div className="px-6 py-4 bg-white border-b border-slate-200 sticky top-0 z-20 flex justify-between items-center shadow-sm"><div><h1 className="text-lg font-bold text-slate-800 flex items-center gap-2"><FileText size={18} className="text-indigo-600"/> {exam.title}</h1><p className="text-xs text-slate-400 font-medium">{exam.questions.length} Questions</p></div><div className="text-xs font-mono font-bold bg-rose-50 text-rose-600 px-2 py-1 rounded flex items-center gap-1 animate-pulse"><Circle size={8} fill="currentColor"/> Live</div></div>
             <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-32 custom-scrollbar">
                 {exam.questions.map((q: any, i: number) => (
                     <div key={q.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                        <div className="flex justify-between items-start mb-4"><span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded uppercase tracking-wider">Question {i + 1}</span><span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{q.points} pts</span></div>
-                        <h3 className="text-lg font-bold text-slate-800 mb-6 font-serif">{q.prompt}</h3>
+                        <div className="flex justify-between items-start mb-4"><span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded uppercase tracking-wider">Question {i + 1}</span><span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{q.points} pts</span></div><h3 className="text-lg font-bold text-slate-800 mb-6 font-serif">{q.prompt}</h3>
                         {q.type === 'multiple-choice' && (<div className="space-y-3">{q.options.map((opt: string) => (<button key={opt} onClick={() => handleAnswer(q.id, opt)} className={`w-full p-4 text-left rounded-xl border-2 transition-all font-medium flex justify-between items-center ${answers[q.id] === opt ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-100 hover:border-slate-300'}`}>{opt}{answers[q.id] === opt && <CheckCircle2 size={16}/>}</button>))}</div>)}
                         {q.type === 'boolean' && (<div className="flex gap-4">{['true', 'false'].map((val) => (<button key={val} onClick={() => handleAnswer(q.id, val)} className={`flex-1 p-4 rounded-xl border-2 font-bold capitalize transition-all ${answers[q.id] === val ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-100 hover:border-slate-300'}`}>{val}</button>))}</div>)}
                         {q.type === 'essay' && (<textarea className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-indigo-500 outline-none h-40 resize-none font-medium text-slate-700" placeholder="Type your answer here..." value={answers[q.id] || ''} onChange={(e) => handleAnswer(q.id, e.target.value)}/>)}
                     </div>
                 ))}
             </div>
-
-            {/* Footer */}
-            <div className="bg-white p-4 border-t border-slate-200 sticky bottom-0 z-20">
-                <button 
-                    onClick={requestSubmit} 
-                    className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2"
-                >
-                    Submit Exam <Check size={20}/>
-                </button>
-            </div>
+            <div className="bg-white p-4 border-t border-slate-200 sticky bottom-0 z-20"><button onClick={() => setShowConfirm(true)} className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2">Submit Exam <Check size={20}/></button></div>
         </div>
     );
 }
