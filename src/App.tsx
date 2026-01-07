@@ -1300,10 +1300,106 @@ function StudentGradebook({ classData, user }: any) {
     );
 }
 // ============================================================================
-//  STUDENT CLASS VIEW (With Gradebook Tab)
+//  CLASS FORUM (The Stream of Consciousness)
+// ============================================================================
+function ClassForum({ classData, user }: any) {
+    const [posts, setPosts] = useState<any[]>([]);
+    const [content, setContent] = useState('');
+    const [sending, setSending] = useState(false);
+
+    // Subscribe to live posts for this class
+    useEffect(() => {
+        const q = query(
+            collection(db, 'artifacts', appId, 'class_posts'),
+            where('classId', '==', classData.id),
+            orderBy('timestamp', 'desc'),
+            limit(50)
+        );
+        const unsub = onSnapshot(q, (snap) => {
+            setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+        return () => unsub();
+    }, [classData.id]);
+
+    const handlePost = async () => {
+        if (!content.trim()) return;
+        setSending(true);
+        try {
+            await addDoc(collection(db, 'artifacts', appId, 'class_posts'), {
+                classId: classData.id,
+                userId: user.uid,
+                authorName: user.displayName || user.email.split('@')[0], // Fallback name
+                content: content.trim(),
+                timestamp: Date.now(),
+                likes: [] // Future proofing for "Juicy Likes"
+            });
+            setContent('');
+        } catch (e) { console.error("Post failed", e); }
+        setSending(false);
+    };
+
+    return (
+        <div className="flex flex-col h-full bg-slate-50 relative">
+            
+            {/* Input Area (Sticky Top) */}
+            <div className="p-4 bg-white border-b border-slate-200 shadow-sm sticky top-0 z-20">
+                <div className="relative group">
+                    <textarea
+                        value={content}
+                        onChange={(e) => setContent(e.target.value)}
+                        placeholder={`Share an idea with ${classData.name}...`}
+                        className="w-full p-4 pr-14 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 focus:bg-white transition-all outline-none resize-none text-sm font-medium h-24 placeholder:text-slate-400"
+                    />
+                    <button
+                        onClick={handlePost}
+                        disabled={sending || !content.trim()}
+                        className="absolute bottom-3 right-3 p-2.5 bg-indigo-600 text-white rounded-xl shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100 transition-all flex items-center justify-center"
+                    >
+                        {sending ? <Loader size={18} className="animate-spin"/> : <Send size={18} className="ml-0.5"/>}
+                    </button>
+                </div>
+            </div>
+
+            {/* Feed */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar pb-24">
+                {posts.length === 0 ? (
+                    <div className="text-center py-12 opacity-60">
+                        <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <MessageSquare size={32} className="text-slate-400"/>
+                        </div>
+                        <p className="text-sm font-bold text-slate-500">It's quiet in here...</p>
+                        <p className="text-xs text-slate-400">Be the first to start the conversation!</p>
+                    </div>
+                ) : (
+                    posts.map((post) => (
+                        <div key={post.id} className="bg-white p-4 rounded-2xl border border-slate-200/60 shadow-sm flex gap-3 animate-in slide-in-from-bottom-2 duration-300">
+                            {/* Avatar */}
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-md shrink-0 border-2 border-white">
+                                {post.authorName.charAt(0).toUpperCase()}
+                            </div>
+                            
+                            {/* Content */}
+                            <div className="flex-1 min-w-0">
+                                <div className="flex justify-between items-baseline mb-1">
+                                    <span className="font-black text-slate-800 text-sm truncate pr-2">{post.authorName}</span>
+                                    <span className="text-[10px] font-bold text-slate-400 shrink-0">{new Date(post.timestamp).toLocaleDateString()}</span>
+                                </div>
+                                <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap break-words">{post.content}</p>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+    );
+}
+// ============================================================================
+//  STUDENT CLASS VIEW (Assignments + Grades + Forum)
 // ============================================================================
 function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, userData, user }: any) {
-  const [activeTab, setActiveTab] = useState<'assignments' | 'grades'>('assignments');
+  // Updated Type Definition for 3 Tabs
+  const [activeTab, setActiveTab] = useState<'assignments' | 'grades' | 'forum'>('assignments');
+  
   const completedSet = new Set(userData?.completedAssignments || []);
   
   const handleAssignmentClick = (assignment: any) => { if (assignment.contentType === 'deck') { onSelectDeck(assignment); } else { onSelectLesson(assignment); } };
@@ -1312,44 +1408,72 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
   
   return (
     <div className="h-full flex flex-col bg-slate-50">
-      <div className="px-6 pt-12 pb-2 bg-white sticky top-0 z-40 border-b border-slate-100 shadow-sm">
+      
+      {/* Sticky Header */}
+      <div className="px-6 pt-12 pb-0 bg-white sticky top-0 z-40 border-b border-slate-100 shadow-sm">
           <button onClick={onBack} className="flex items-center text-slate-500 hover:text-indigo-600 mb-4 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back</button>
-          <div className="flex justify-between items-end mb-4">
-              <div><h1 className="text-2xl font-black text-slate-900">{classData.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">{classData.code}</p></div>
-              <div className="text-right"><span className="block text-2xl font-black text-indigo-600">{pendingCount}</span><span className="text-[10px] font-bold text-slate-400 uppercase">To Do</span></div>
+          
+          <div className="flex justify-between items-end mb-6">
+              <div>
+                  <h1 className="text-2xl font-black text-slate-900">{classData.name}</h1>
+                  <p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">{classData.code}</p>
+              </div>
+              <div className="text-right">
+                  <span className="block text-2xl font-black text-indigo-600">{pendingCount}</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">To Do</span>
+              </div>
           </div>
-          {/* TABS */}
-          <div className="flex gap-6">
-              <button onClick={() => setActiveTab('assignments')} className={`pb-3 text-sm font-bold border-b-2 transition-all ${activeTab === 'assignments' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Assignments</button>
-              <button onClick={() => setActiveTab('grades')} className={`pb-3 text-sm font-bold border-b-2 transition-all ${activeTab === 'grades' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Gradebook</button>
+          
+          {/* 3-WAY TAB NAVIGATION */}
+          <div className="flex gap-6 overflow-x-auto scrollbar-hide">
+              <button onClick={() => setActiveTab('assignments')} className={`pb-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${activeTab === 'assignments' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Assignments</button>
+              <button onClick={() => setActiveTab('grades')} className={`pb-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${activeTab === 'grades' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Gradebook</button>
+              <button onClick={() => setActiveTab('forum')} className={`pb-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'forum' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                  <MessageSquare size={16}/> Forum
+              </button>
           </div>
       </div>
 
-      <div className="flex-1 px-6 mt-6 overflow-y-auto pb-24 custom-scrollbar">
-          {activeTab === 'assignments' ? (
-              <div className="space-y-6">
-                 {/* Current Progress Block removed for cleaner UI, focusing on list */}
-                 <div>
-                    <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Tasks</h3>
-                    <div className="space-y-3">
-                        {relevantAssignments.length > 0 ? ( relevantAssignments.filter((l: any) => !completedSet.has(l.id)).map((l: any, i: number) => ( 
-                            <button key={`${l.id}-${i}`} onClick={() => handleAssignmentClick(l)} className="w-full bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all group hover:border-indigo-300">
-                                <div className="flex items-center space-x-4">
-                                    <div className={`h-12 w-12 rounded-xl flex items-center justify-center transition-colors ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white' : l.contentType === 'test' ? 'bg-rose-50 text-rose-600 group-hover:bg-rose-500 group-hover:text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-500 group-hover:text-white'}`}>
-                                        {l.contentType === 'deck' ? <Layers size={20}/> : l.contentType === 'test' ? <FileText size={20}/> : <PlayCircle size={20} />}
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-hidden relative">
+          
+          {/* TAB 1: ASSIGNMENTS */}
+          {activeTab === 'assignments' && (
+              <div className="h-full overflow-y-auto px-6 py-6 pb-24 custom-scrollbar">
+                 <div className="space-y-6">
+                    <div>
+                        <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Tasks</h3>
+                        <div className="space-y-3">
+                            {relevantAssignments.length > 0 ? ( relevantAssignments.filter((l: any) => !completedSet.has(l.id)).map((l: any, i: number) => ( 
+                                <button key={`${l.id}-${i}`} onClick={() => handleAssignmentClick(l)} className="w-full bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex items-center justify-between active:scale-[0.98] transition-all group hover:border-indigo-300">
+                                    <div className="flex items-center space-x-4">
+                                        <div className={`h-12 w-12 rounded-xl flex items-center justify-center transition-colors ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600 group-hover:bg-orange-500 group-hover:text-white' : l.contentType === 'test' || l.contentType === 'exam' ? 'bg-rose-50 text-rose-600 group-hover:bg-rose-500 group-hover:text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-500 group-hover:text-white'}`}>
+                                            {l.contentType === 'deck' ? <Layers size={20}/> : (l.contentType === 'test' || l.contentType === 'exam') ? <FileText size={20}/> : <PlayCircle size={20} />}
+                                        </div>
+                                        <div className="text-left"><h4 className="font-bold text-slate-900 group-hover:text-indigo-700">{l.title}</h4><p className="text-xs text-slate-500">{l.contentType === 'deck' ? 'Flashcard Deck' : (l.contentType === 'test' || l.contentType === 'exam') ? 'Exam' : 'Lesson'}</p></div>
                                     </div>
-                                    <div className="text-left"><h4 className="font-bold text-slate-900 group-hover:text-indigo-700">{l.title}</h4><p className="text-xs text-slate-500">{l.contentType === 'deck' ? 'Flashcard Deck' : l.contentType === 'test' ? 'Exam' : 'Lesson'}</p></div>
-                                </div>
-                                <ChevronRight size={20} className="text-slate-300 group-hover:text-indigo-500" />
-                            </button> 
-                        )) ) : ( <div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">No pending assignments.</div> )}
-                        {relevantAssignments.every((l: any) => completedSet.has(l.id)) && relevantAssignments.length > 0 && (<div className="p-8 text-center text-emerald-600 font-bold bg-emerald-50 rounded-2xl border border-emerald-100">All assignments completed! 🎉</div>)}
+                                    <ChevronRight size={20} className="text-slate-300 group-hover:text-indigo-500" />
+                                </button> 
+                            )) ) : ( <div className="p-8 text-center text-slate-400 italic border-2 border-dashed border-slate-200 rounded-2xl">No pending assignments.</div> )}
+                            {relevantAssignments.every((l: any) => completedSet.has(l.id)) && relevantAssignments.length > 0 && (<div className="p-8 text-center text-emerald-600 font-bold bg-emerald-50 rounded-2xl border border-emerald-100">All assignments completed! 🎉</div>)}
+                        </div>
                     </div>
                  </div>
               </div>
-          ) : (
-              <StudentGradebook classData={classData} user={user} />
           )}
+
+          {/* TAB 2: GRADEBOOK */}
+          {activeTab === 'grades' && (
+              <div className="h-full overflow-y-auto px-6 py-6 pb-24 custom-scrollbar">
+                  <StudentGradebook classData={classData} user={user} />
+              </div>
+          )}
+
+          {/* TAB 3: FORUM (NEW) */}
+          {activeTab === 'forum' && (
+              <ClassForum classData={classData} user={user} />
+          )}
+          
       </div>
     </div>
   );
