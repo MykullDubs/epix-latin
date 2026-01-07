@@ -1918,20 +1918,26 @@ function StudentClassView({ classData, onBack, onSelectLesson, onSelectDeck, use
 
 
 
-function JuicyToast({ message, type = 'success', onClose }: any) {
-    useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
-    const isSuccess = type === 'success';
-    return (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[300] animate-in slide-in-from-bottom-5 fade-in duration-300">
-            <div className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border backdrop-blur-md ${isSuccess ? 'bg-slate-900/90 border-emerald-500/30 text-white' : 'bg-white/90 border-rose-200 text-rose-600'}`}>
-                <div className={`p-2 rounded-full ${isSuccess ? 'bg-emerald-500 text-white' : 'bg-rose-100 text-rose-500'}`}>{isSuccess ? <Check size={18} strokeWidth={3} /> : <AlertTriangle size={18} strokeWidth={3} />}</div>
-                <div><h4 className="font-bold text-sm">{isSuccess ? 'Success' : 'Error'}</h4><p className={`text-xs ${isSuccess ? 'text-slate-400' : 'text-rose-400'}`}>{message}</p></div>
-                <button onClick={onClose} className="ml-4 opacity-50 hover:opacity-100 transition-opacity"><X size={14}/></button>
-            </div>
-        </div>
-    );
-}
+// ============================================================================
+//  JUICY TOAST NOTIFICATION
+// ============================================================================
+function JuicyToast({ message, onClose }: { message: string, onClose: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
 
+  return (
+    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-4 duration-300">
+      <div className="bg-slate-900/90 backdrop-blur-md text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border border-white/10">
+        <div className="bg-emerald-500 rounded-full p-1">
+          <Check size={12} strokeWidth={4} className="text-slate-900" />
+        </div>
+        <span className="font-bold text-sm">{message}</span>
+      </div>
+    </div>
+  );
+}
 function BroadcastModal({ classes, user, onClose, onToast }: any) {
     const [selectedClassId, setSelectedClassId] = useState(classes[0]?.id || '');
     const [message, setMessage] = useState('');
@@ -2963,7 +2969,7 @@ function App() {
   const [systemLessons, setSystemLessons] = useState<any[]>([]);
   const [customCards, setCustomCards] = useState<any[]>([]);
   const [customLessons, setCustomLessons] = useState<any[]>([]);
-  
+  const [toast, setToast] = useState<string | null>(null);
   const [activeLesson, setActiveLesson] = useState<any>(null);
   const [selectedDeckKey, setSelectedDeckKey] = useState('salutationes');
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
@@ -2972,7 +2978,7 @@ function App() {
 
   // --- MEMOS ---
   const allDecks = useMemo(() => {
-    const decks: any = { ...systemDecks, custom: { title: "✍️ Scriptorium", cards: [] } };
+    const decks: any = { ...systemDecks, custom: { title: "✍️ Card Builder", cards: [] } };
     customCards.forEach(card => {
         const target = card.deckId || 'custom';
         if (!decks[target]) { decks[target] = { title: card.deckTitle || "Custom Deck", cards: [] }; }
@@ -3230,7 +3236,7 @@ return (
   return (
     <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-start relative overflow-hidden">
       <div className="w-full max-w-md h-[100dvh] bg-white shadow-2xl relative overflow-hidden flex flex-col">
-        
+       {toast && <JuicyToast message={toast} onClose={() => setToast(null)} />} 
         {/* VIEWPORT CONTENT */}
         <div className="flex-1 h-full overflow-hidden relative">
             {renderStudentView()}
