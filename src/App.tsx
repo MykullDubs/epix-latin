@@ -22,7 +22,6 @@ import {
   Trophy, Flame, Settings, BarChart3, CornerDownRight, MoreHorizontal   // <--- ADDED MISSING ICONS
 } from 'lucide-react';
 
-import
 
 // --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
