@@ -3285,6 +3285,7 @@ function App() {
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   
   // Content & State
   const [systemDecks, setSystemDecks] = useState<any>({});
@@ -3321,9 +3322,13 @@ function App() {
   }, [userData, user]);
 
 const handleContentSelection = (item: any) => {
+  // Save the ID so ClassView can find it later
+  if (item.id) {
+    setSelectedLessonId(item.id);
+  }
+
   if (item.contentType === 'lesson' || item.type === 'lesson') {
-    setSelectedLessonId(item.id); // Save the ID for ClassView
-    setActiveLesson(item);       // Standard lesson player
+    setActiveLesson(item);
   } else if (item.contentType === 'deck' || item.type === 'deck') {
     setSelectedDeckKey(item.id);
     setActiveTab('flashcards');
@@ -3535,7 +3540,7 @@ const renderStudentView = () => {
                 content = <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />;
                 break;
             case 'presentation':
-                // selectedLessonId is now defined in state and passed here
+                // Using the state variable defined in Step 1
                 content = <ClassView lessonId={selectedLessonId} lessons={lessons} />;
                 break;
             case 'profile': 
@@ -3552,33 +3557,6 @@ const renderStudentView = () => {
         </div>
     );
 };
-
-const isPresentation = activeTab === 'presentation';
-
-return (
-    <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-start relative overflow-hidden">
-      <div className={`w-full ${isPresentation ? 'h-screen' : 'max-w-md h-[100dvh] shadow-2xl'} bg-white relative overflow-hidden flex flex-col transition-all duration-500`}>
-        {toast && <JuicyToast message={toast} onClose={() => setToast(null)} />} 
-        
-        <div className="flex-1 h-full overflow-hidden relative">
-            {renderStudentView()}
-        </div>
-
-        {!activeLesson && !isPresentation && <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />}
-      </div>
-
-      <style>{` 
-        .perspective-1000 { perspective: 1000px; } 
-        .preserve-3d { transform-style: preserve-3d; } 
-        .backface-hidden { backface-visibility: hidden; } 
-        .rotate-y-180 { transform: rotateY(180deg); } 
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; } 
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; } 
-        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-      `}</style>
-    </div>
-);
 }
 
 export default App;
