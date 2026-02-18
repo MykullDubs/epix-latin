@@ -328,6 +328,37 @@ const ChatDialogueBlock = ({ lines }: any) => (
         })}
     </div>
 );
+function ClassView({ lessonId }) {
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  // Sync with Firestore: Whenever the 'activeSlide' changes in the database, 
+  // the big screen automatically flips.
+  useEffect(() => {
+    const docRef = doc(db, 'live_sessions', lessonId);
+    return onSnapshot(docRef, (doc) => {
+      if (doc.exists()) setCurrentSlide(doc.data().activeSlide);
+    });
+  }, [lessonId]);
+
+  return (
+    <div className="h-screen w-screen bg-white flex flex-col items-center justify-center p-20">
+      <div className="animate-in fade-in zoom-in duration-500">
+        <h2 className="text-6xl font-black text-slate-900 mb-10">
+          {lessons[currentSlide].title}
+        </h2>
+        <div className="text-4xl leading-relaxed text-slate-600">
+          {lessons[currentSlide].text}
+        </div>
+      </div>
+      
+      {/* Discreet footer for teacher status */}
+      <div className="absolute bottom-10 right-10 flex gap-4 opacity-30 hover:opacity-100 transition-opacity">
+        <div className="bg-indigo-600 w-4 h-4 rounded-full animate-pulse" />
+        <span className="font-bold text-slate-400">LIVE SYNC ACTIVE</span>
+      </div>
+    </div>
+  );
+}
 
 // ============================================================================
 //  LESSON VIEW (Modern "Story" Style)
