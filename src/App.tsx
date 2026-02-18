@@ -3545,138 +3545,109 @@ const handleFinishLesson = useCallback(async (lessonId: string, xp: number, titl
   }
 
 const renderStudentView = () => {
-    let content: React.ReactNode;
-    let viewKey: string; 
+  let content: React.ReactNode = null;
+  let viewKey: string = "default";
 
-    // 1. Priority View: Active Lesson Player
-    // We only show the player if we aren't specifically trying to "Present"
-    if (activeLesson && activeTab !== 'presentation') {
-        viewKey = `lesson-${activeLesson.id}`;
-        
-        const handleFinish = (id: string, xp: number, title: string, score: any) => {
-             handleFinishLesson(activeLesson.id, xp, title, score);
-        };
+  // Debugging: Check current state in console
+  console.log("Current View State:", { activeTab, activeLesson: !!activeLesson, activeStudentClass: !!activeStudentClass });
 
-        if (activeLesson.type === 'test' || activeLesson.type === 'exam') {
-             content = <ExamPlayerView exam={activeLesson} onFinish={handleFinish} />;
-        } else {
-             content = <LessonView lesson={activeLesson} onFinish={handleFinish} />;
-        }
-        
-    // 2. Secondary View: Specific Class View
-    } else if (activeTab === 'home' && activeStudentClass) {
-        viewKey = `class-${activeStudentClass.id}`;
-        content = <StudentClassView 
-            classData={activeStudentClass} 
-            onBack={() => setActiveStudentClass(null)} 
-            onSelectLesson={handleContentSelection} 
-            onSelectDeck={handleContentSelection} 
-            userData={userData} 
-            user={user} 
-            displayName={displayName} 
-        />;
+  // 1. Presentation Mode (Global Overlay)
+  if (activeTab === 'presentation') {
+    viewKey = "presentation-view";
+    content = <ClassView lessonId={selectedLessonId} lessons={lessons} />;
+  } 
+  // 2. Active Lesson Player
+  else if (activeLesson) {
+    viewKey = `lesson-${activeLesson.id}`;
+    const handleFinish = (id: string, xp: number, title: string, score: any) => {
+      handleFinishLesson(activeLesson.id, xp, title, score);
+    };
 
-    // 3. Tab Navigation Views
-    } else {
-        viewKey = `tab-${activeTab || 'home'}`; // Fallback to 'home' if tab is null
-        
-        switch (activeTab) {
-            case 'home': 
-                content = <HomeView 
-                    setActiveTab={setActiveTab} 
-                    allDecks={allDecks} 
-                    lessons={lessons} // Ensure this matches your state variable name
-                    assignments={classLessons} 
-                    classes={enrolledClasses} 
-                    onSelectClass={(c: any) => setActiveStudentClass(c)} 
-                    onSelectLesson={handleContentSelection} 
-                    onSelectDeck={handleContentSelection} 
-                    userData={userData} 
-                    user={user} 
-                />;
-                break;
-
-            case 'discovery': 
-                content = <DiscoveryView 
-                    allDecks={allDecks} 
-                    user={user} 
-                    onSelectDeck={handleContentSelection} 
-                    userData={userData}
-                    onLogActivity={(type: string) => checkDailyQuests(type)} 
-                />;
-                break;
-
-            case 'flashcards': 
-                const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
-                const deckToLoad = assignedDeck || allDecks[selectedDeckKey];
-                content = <FlashcardView 
-                    allDecks={allDecks} 
-                    selectedDeckKey={selectedDeckKey} 
-                    onSelectDeck={setSelectedDeckKey} 
-                    onSaveCard={handleCreateCard} 
-                    activeDeckOverride={deckToLoad} 
-                    onComplete={handleFinishLesson} 
-                    onLogActivity={handleLogSelfStudy} 
-                    userData={userData} 
-                    user={user} 
-                    onUpdatePrefs={handleUpdatePreferences} 
-                    onDeleteDeck={handleDeleteDeck} 
-                />;
-                break;
-
-            case 'create': 
-                content = <BuilderHub 
-                    onSaveCard={handleCreateCard} 
-                    onUpdateCard={handleUpdateCard} 
-                    onDeleteCard={handleDeleteCard} 
-                    onSaveLesson={handleCreateLesson} 
-                    allDecks={allDecks} 
-                    lessons={lessons} 
-                />;
-                break;
-
-            case 'presentation':
-                content = <ClassView lessonId={selectedLessonId} lessons={lessons} />;
-                break;
-
-            case 'profile': 
-                content = <ProfileView user={user} userData={userData} />;
-                break;
-
-            // FIX: The default case now passes all required props to HomeView
-            // to prevent a crash on an empty HomeView.
-            default: 
-                content = <HomeView 
-                    setActiveTab={setActiveTab} 
-                    allDecks={allDecks} 
-                    lessons={lessons} 
-                    assignments={classLessons} 
-                    classes={enrolledClasses} 
-                    onSelectClass={(c: any) => setActiveStudentClass(c)} 
-                    onSelectLesson={handleContentSelection} 
-                    onSelectDeck={handleContentSelection} 
-                    userData={userData} 
-                    user={user} 
-                />;
-        }
+    content = activeLesson.type === 'test' || activeLesson.type === 'exam' 
+      ? <ExamPlayerView exam={activeLesson} onFinish={handleFinish} />
+      : <LessonView lesson={activeLesson} onFinish={handleFinish} />;
+  } 
+  // 3. Class Specific View
+  else if (activeTab === 'home' && activeStudentClass) {
+    viewKey = `class-${activeStudentClass.id}`;
+    content = (
+      <StudentClassView 
+        classData={activeStudentClass} 
+        onBack={() => setActiveStudentClass(null)} 
+        onSelectLesson={handleContentSelection} 
+        onSelectDeck={handleContentSelection} 
+        userData={userData} 
+        user={user} 
+        displayName={displayName} 
+      />
+    );
+  } 
+  // 4. Standard Tab Navigation
+  else {
+    viewKey = `tab-${activeTab || 'home'}`;
+    switch (activeTab) {
+      case 'discovery':
+        content = <DiscoveryView allDecks={allDecks} user={user} onSelectDeck={handleContentSelection} userData={userData} onLogActivity={(type: string) => checkDailyQuests(type)} />;
+        break;
+      case 'flashcards':
+        const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
+        content = <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} activeDeckOverride={assignedDeck || allDecks[selectedDeckKey]} onComplete={handleFinishLesson} onLogActivity={handleLogSelfStudy} userData={userData} user={user} onUpdatePrefs={handleUpdatePreferences} onDeleteDeck={handleDeleteDeck} />;
+        break;
+      case 'create':
+        content = <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />;
+        break;
+      case 'profile':
+        content = <ProfileView user={user} userData={userData} />;
+        break;
+      case 'home':
+      default:
+        content = <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} />;
+        break;
     }
+  }
 
-    // SAFETY CHECK: If for some reason content is still null, 
-    // show a loading state instead of a blank screen.
-    if (!content) {
-        return (
-            <div className="h-full flex items-center justify-center text-slate-400 font-bold bg-white">
-                <div className="animate-pulse">Loading View...</div>
-            </div>
-        );
-    }
+  return (
+    <div key={viewKey} className="h-full w-full animate-in fade-in duration-300">
+      {content || <div className="p-20 text-center text-slate-400">Content failed to load.</div>}
+    </div>
+  );
+};
+  // --- PLACE IT HERE ---
+    // This logic runs every time the App renders to decide if we are in "Class Mode"
+    const isPresentation = activeTab === 'presentation';
 
     return (
-        <div key={viewKey} className="h-full w-full animate-in fade-in duration-300">
-            {content}
+        <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-start relative overflow-hidden">
+            {/* The container expands to full screen if isPresentation is true */}
+            <div className={`w-full transition-all duration-500 bg-white relative overflow-hidden flex flex-col ${
+                isPresentation ? 'h-screen' : 'max-w-md h-[100dvh] shadow-2xl'
+            }`}>
+                
+                {toast && <JuicyToast message={toast} onClose={() => setToast(null)} />} 
+
+                {/* VIEWPORT CONTENT */}
+                <div className="flex-1 h-full overflow-hidden relative">
+                    {renderStudentView()}
+                </div>
+
+                {/* NAVIGATION: Hidden during lessons and presentations */}
+                {!activeLesson && !isPresentation && (
+                    <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
+                )}
+            </div>
+
+            <style>{` 
+                .perspective-1000 { perspective: 1000px; } 
+                .preserve-3d { transform-style: preserve-3d; } 
+                .backface-hidden { backface-visibility: hidden; } 
+                .rotate-y-180 { transform: rotateY(180deg); } 
+                .custom-scrollbar::-webkit-scrollbar { width: 4px; } 
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; } 
+                .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+            `}</style>
         </div>
     );
-};
 }
 
 export default App;
