@@ -1389,6 +1389,7 @@ function AuthView() {
   const [role, setRole] = useState('student');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const handleAuth = async (e: any) => { e.preventDefault(); setError(''); setLoading(true); try { if (isLogin) await signInWithEmailAndPassword(auth, email, password); else { const uc = await createUserWithEmailAndPassword(auth, email, password); await setDoc(doc(db, 'artifacts', appId, 'users', uc.user.uid, 'profile', 'main'), { ...DEFAULT_USER_DATA, name: name || "User", email: email, role: role }); } } catch (err: any) { setError(err.message.replace('Firebase: ', '')); } finally { setLoading(false); } };
   return ( <div className="h-full flex flex-col p-6 bg-slate-50"><div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full"><div className="text-center mb-8"><div className="w-20 h-20 bg-indigo-600 rounded-3xl mx-auto flex items-center justify-center text-white mb-4 shadow-xl"><GraduationCap size={40} /></div><h1 className="text-3xl font-bold text-slate-900">LinguistFlow v3.0</h1></div><form onSubmit={handleAuth} className="space-y-4">{!isLogin && <><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase">Name</label><input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl" required={!isLogin} /></div><div className="flex gap-3"><button type="button" onClick={() => setRole('student')} className={`flex-1 p-3 rounded-xl border font-bold text-sm ${role === 'student' ? 'bg-indigo-600 text-white' : 'bg-white'}`}>Student</button><button type="button" onClick={() => setRole('instructor')} className={`flex-1 p-3 rounded-xl border font-bold text-sm ${role === 'instructor' ? 'bg-indigo-600 text-white' : 'bg-white'}`}>Instructor</button></div></>}<div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase">Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl" required /></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase">Password</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl" required /></div>{error && <div className="p-3 bg-rose-50 text-rose-600 text-sm rounded-lg">{error}</div>}<button type="submit" disabled={loading} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg">{loading ? <Loader className="animate-spin" /> : (isLogin ? "Sign In" : "Create Account")}</button></form><div className="mt-6 text-center"><button onClick={() => setIsLogin(!isLogin)} className="text-indigo-600 font-bold text-sm hover:underline">{isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}</button></div></div></div> );
 }
@@ -3319,16 +3320,15 @@ function App() {
       return 'Scholar';
   }, [userData, user]);
 
-  const handleContentSelection = (item: any) => { 
-      if (item.contentType === 'deck') { 
-          setSelectedDeckKey(item.id); 
-          setActiveTab('flashcards'); 
-          setActiveStudentClass(null); 
-          setActiveLesson(null); 
-      } else { 
-          setActiveLesson(item); 
-      } 
-  };
+const handleContentSelection = (item: any) => {
+  if (item.contentType === 'lesson' || item.type === 'lesson') {
+    setSelectedLessonId(item.id); // Save the ID for ClassView
+    setActiveLesson(item);       // Standard lesson player
+  } else if (item.contentType === 'deck' || item.type === 'deck') {
+    setSelectedDeckKey(item.id);
+    setActiveTab('flashcards');
+  }
+};
 
   // --- EFFECTS ---
   useEffect(() => { const unsubscribe = onAuthStateChanged(auth, (u) => { setUser(u); setAuthChecked(true); }); return () => unsubscribe(); }, []);
@@ -3501,7 +3501,7 @@ const renderStudentView = () => {
     let content;
     let viewKey; 
 
-    if (activeLesson) {
+    if (activeLesson && activeTab !== 'presentation') {
         viewKey = `lesson-${activeLesson.id}`;
         
         const handleFinish = (id: string, xp: number, title: string, score: any) => {
@@ -3535,7 +3535,7 @@ const renderStudentView = () => {
                 content = <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />;
                 break;
             case 'presentation':
-                // Pass selectedLessonId and the lessons array from your state
+                // selectedLessonId is now defined in state and passed here
                 content = <ClassView lessonId={selectedLessonId} lessons={lessons} />;
                 break;
             case 'profile': 
@@ -3557,18 +3557,13 @@ const isPresentation = activeTab === 'presentation';
 
 return (
     <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-start relative overflow-hidden">
-      {/* The container expands to full width and height during presentation mode, 
-          removing the max-w-md constraint for the projector screen.
-      */}
       <div className={`w-full ${isPresentation ? 'h-screen' : 'max-w-md h-[100dvh] shadow-2xl'} bg-white relative overflow-hidden flex flex-col transition-all duration-500`}>
         {toast && <JuicyToast message={toast} onClose={() => setToast(null)} />} 
         
-        {/* VIEWPORT CONTENT */}
         <div className="flex-1 h-full overflow-hidden relative">
             {renderStudentView()}
         </div>
 
-        {/* BOTTOM NAVIGATION (4 BUTTONS) - Hidden during lessons and presentations */}
         {!activeLesson && !isPresentation && <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />}
       </div>
 
