@@ -3440,8 +3440,8 @@ const renderStudentView = () => {
     let viewKey: string = "default";
 
     // 1. PRIORITY 1: Presentation Mode (ClassView)
-    // We check this first to ensure the full-screen presentation 
-    // overrides any active lesson player or dashboard.
+    // This is checked first to ensure that when an instructor launches a 
+    // presentation, it takes over the entire viewport immediately.
     if (activeTab === 'presentation') {
       viewKey = `presentation-${selectedLessonId}`;
       content = (
@@ -3453,8 +3453,8 @@ const renderStudentView = () => {
     } 
     
     // 2. PRIORITY 2: Active Lesson Player
-    // Handles the standard learning experience for students 
-    // and the "Remote Control" mode for instructors.
+    // Handles the standard student learning experience and the instructor 
+    // "Master Remote" view.
     else if (activeLesson) {
       viewKey = `lesson-${activeLesson.id}`;
       
@@ -3462,7 +3462,7 @@ const renderStudentView = () => {
         handleFinishLesson(activeLesson.id, xp, title, score);
       };
 
-      // Determines if the instructor UI (Sync toggle/Remote) should be visible
+      // Check user role to activate instructor-only remotes and sync toggles
       const isTeacher = userData?.role === 'instructor';
 
       if (activeLesson.type === 'test' || activeLesson.type === 'exam') {
@@ -3478,8 +3478,8 @@ const renderStudentView = () => {
       }
     } 
     
-    // 3. PRIORITY 3: Active Class Workspace
-    // Shown when a user clicks into a specific class from the home tab.
+    // 3. PRIORITY 3: Active Class Context
+    // Rendered when a user selects a specific class from their home dashboard.
     else if (activeTab === 'home' && activeStudentClass) {
       viewKey = `class-${activeStudentClass.id}`;
       content = (
@@ -3491,10 +3491,9 @@ const renderStudentView = () => {
           userData={userData} 
           user={user} 
           displayName={displayName}
-          // These props allow the class view to launch the presentation mode
           setActiveTab={setActiveTab}
           setSelectedLessonId={setSelectedLessonId}
-          // Critical fix: Pass the master library to resolve IDs to full data
+          // Resolves Lesson IDs in the class object into full lesson data
           allLessons={lessons} 
         />
       );
@@ -3518,7 +3517,7 @@ const renderStudentView = () => {
           break;
 
         case 'flashcards':
-          // Attempt to find an assigned version of the deck first
+          // Locate assigned versions of decks for specific class contexts
           const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
           content = (
             <FlashcardView 
@@ -3579,16 +3578,6 @@ const renderStudentView = () => {
         {content || (
           <div className="flex items-center justify-center h-full text-slate-400 font-bold bg-white">
             <div className="animate-pulse">Loading Workspace...</div>
-          </div>
-        )}
-      </div>
-    );
-  };
-    return (
-      <div key={viewKey} className="h-full w-full animate-in fade-in duration-300">
-        {content || (
-          <div className="flex items-center justify-center h-full text-slate-400 font-bold">
-            Loading Workspace...
           </div>
         )}
       </div>
