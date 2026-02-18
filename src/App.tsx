@@ -2068,45 +2068,57 @@ function StudentClassView({
   onSelectDeck, 
   userData, 
   allLessons = [], 
+  classLessons = [], // The assigned items
   setActiveTab, 
   setSelectedLessonId 
 }: any) {
     
+    // RESOLUTION LOGIC
     const resolvedLessons = useMemo(() => {
-        // 1. Try every common field name found in Firestore structures
-        const rawList = classData.lessons || 
-                        classData.lessonIds || 
-                        classData.assignedLessons || 
-                        classData.content || 
-                        classData.lesson_ids || [];
-        
-        if (!Array.isArray(rawList)) return [];
+        // 1. First, look for lessons assigned specifically to THIS class ID
+        // This is likely what your "six due" bubble is counting
+        const assignedToThisClass = classLessons.filter((l: any) => 
+            l.classId === classData.id || l.courseId === classData.id
+        );
 
-        return rawList.map((item: any) => {
-            // If the item is already a full object with a title, use it
-            if (item && typeof item === 'object' && item.title) return item;
-            
-            // If it's an ID, find it in the master library (allLessons)
-            const idToFind = typeof item === 'string' ? item : item.id;
-            return allLessons.find((l: any) => l.id === idToFind);
+        if (assignedToThisClass.length > 0) return assignedToThisClass;
+
+        // 2. Fallback: If your system uses an ID array inside the class document
+        const rawList = classData.lessons || classData.lessonIds || [];
+        return rawList.map((ref: any) => {
+            if (ref && typeof ref === 'object' && ref.title) return ref;
+            const id = typeof ref === 'string' ? ref : ref.id;
+            return allLessons.find((l: any) => l.id === id);
         }).filter(Boolean);
-    }, [classData, allLessons]);
+    }, [classData, allLessons, classLessons]);
+
+    // Same logic for Decks
+    const resolvedDecks = useMemo(() => {
+        return classLessons.filter((l: any) => 
+            (l.classId === classData.id) && (l.contentType === 'deck' || l.type === 'deck')
+        );
+    }, [classData, classLessons]);
 
     return (
         <div className="h-full flex flex-col bg-slate-50">
-            {/* Header */}
+            {/* Header Area */}
             <div className="bg-white px-6 pt-12 pb-6 border-b border-slate-100 shadow-sm">
                 <button onClick={onBack} className="flex items-center gap-2 text-slate-400 font-bold text-sm mb-4">
-                    <ChevronLeft size={18} /> Back
+                    <ChevronLeft size={18} /> Back to Classes
                 </button>
                 <h1 className="text-3xl font-black text-slate-900 tracking-tight">{classData.name}</h1>
+                <p className="text-slate-500 font-medium">
+                    {resolvedLessons.length} lessons assigned to this class.
+                </p>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                
+                {/* LESSONS SECTION */}
                 <section>
                     <div className="flex items-center gap-2 mb-4">
                         <div className="bg-indigo-100 p-1.5 rounded-lg text-indigo-600"><BookOpen size={16} /></div>
-                        <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Lessons</h2>
+                        <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Class Curriculum</h2>
                     </div>
 
                     <div className="space-y-3">
@@ -2114,20 +2126,29 @@ function StudentClassView({
                             <div key={lesson.id} className="bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm flex items-center justify-between">
                                 <div className="flex-1 min-w-0 mr-4">
                                     <h3 className="font-bold text-slate-800 truncate">{lesson.title}</h3>
-                                    <p className="text-[10px] text-slate-400 font-black uppercase">Lesson</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-black uppercase">
+                                            {lesson.type || 'Lesson'}
+                                        </span>
+                                    </div>
                                 </div>
+
                                 <div className="flex items-center gap-2">
-                                    <button onClick={() => onSelectLesson(lesson)} className="px-4 py-2 bg-slate-50 text-slate-600 rounded-xl font-bold text-xs hover:bg-indigo-600 hover:text-white transition-all">
+                                    <button 
+                                        onClick={() => onSelectLesson(lesson)}
+                                        className="px-4 py-2 bg-slate-50 text-slate-600 rounded-xl font-bold text-xs hover:bg-indigo-600 hover:text-white transition-all border border-slate-100"
+                                    >
                                         Open
                                     </button>
+
                                     {userData?.role === 'instructor' && (
                                         <button 
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                setSelectedLessonId(lesson.id);
+                                                setSelectedLessonId(lesson.lessonId || lesson.id);
                                                 setActiveTab('presentation');
                                             }}
-                                            className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100"
+                                            className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
                                         >
                                             <Monitor size={18} />
                                         </button>
@@ -2136,19 +2157,12 @@ function StudentClassView({
                             </div>
                         )) : (
                             <div className="text-center py-12 bg-white/50 border-2 border-dashed border-slate-200 rounded-[2rem] px-6">
-                                <p className="text-slate-400 font-bold text-sm">No lessons found in this class.</p>
-                                
-                                {/* DEBUG TOOL: Only visible to you as an instructor */}
+                                <p className="text-slate-400 font-bold text-sm">No assignments found.</p>
+                                {/* Debug info for the instructor */}
                                 {userData?.role === 'instructor' && (
-                                    <div className="mt-4 p-3 bg-amber-50 rounded-xl text-left">
-                                        <p className="text-[9px] font-black text-amber-600 uppercase mb-2">Instructor Debug Info:</p>
-                                        <p className="text-[10px] text-amber-700 break-all">
-                                            <strong>Raw IDs in Class:</strong> {JSON.stringify(classData.lessons || classData.lessonIds || classData.content || "Field Missing")}
-                                        </p>
-                                        <p className="text-[10px] text-amber-700 mt-1">
-                                            <strong>Master Library Count:</strong> {allLessons.length} lessons loaded.
-                                        </p>
-                                    </div>
+                                    <p className="text-[9px] text-amber-600 font-black mt-2 uppercase">
+                                        Debug: ClassID {classData.id} | Total Assignments: {classLessons.length}
+                                    </p>
                                 )}
                             </div>
                         )}
@@ -3457,32 +3471,25 @@ const renderStudentView = () => {
           lessons={lessons} 
         />
       );
-    } 
-    
-    // 2. PRIORITY 2: Active Lesson Player
-    // Handles the standard student learning experience and the instructor 
-    // "Master Remote" view.
-    else if (activeLesson) {
-      viewKey = `lesson-${activeLesson.id}`;
-      
-      const handleFinish = (id: string, xp: number, title: string, score: any) => {
-        handleFinishLesson(activeLesson.id, xp, title, score);
-      };
-
-      // Check user role to activate instructor-only remotes and sync toggles
-      const isTeacher = userData?.role === 'instructor';
-
-      if (activeLesson.type === 'test' || activeLesson.type === 'exam') {
-        content = <ExamPlayerView exam={activeLesson} onFinish={handleFinish} />;
-      } else {
-        content = (
-          <LessonView 
-            lesson={activeLesson} 
-            onFinish={handleFinish} 
-            isInstructor={isTeacher} 
-          />
-        );
-      }
+// Inside renderStudentView
+} else if (activeTab === 'home' && activeStudentClass) {
+    viewKey = `class-${activeStudentClass.id}`;
+    content = (
+        <StudentClassView 
+            classData={activeStudentClass} 
+            onBack={() => setActiveStudentClass(null)} 
+            onSelectLesson={handleContentSelection} 
+            onSelectDeck={handleContentSelection} 
+            userData={userData} 
+            setActiveTab={setActiveTab}
+            setSelectedLessonId={setSelectedLessonId}
+            
+            // --- THE FIXES ---
+            allLessons={lessons}       // Your master library
+            classLessons={classLessons} // The "due" lessons causing the notification
+        />
+    );
+}
     } 
     
     // 3. PRIORITY 3: Active Class Context
