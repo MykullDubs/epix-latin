@@ -330,8 +330,8 @@ const ChatDialogueBlock = ({ lines }: any) => (
 );
 // 1. Define the Interface for Props
 interface ClassViewProps {
-  lessonId: string;
-  lessons: any[]; // Replace 'any' with your Lesson type if defined
+lessonId: string | null;
+lessons: any[]; // Replace 'any' with your Lesson type if defined
 }
 
 function ClassView({ lessonId, lessons }: ClassViewProps) {
