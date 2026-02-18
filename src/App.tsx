@@ -2067,74 +2067,63 @@ function StudentClassView({
   onSelectLesson, 
   onSelectDeck, 
   userData, 
-  // We add 'allLessons' here to resolve IDs to full data
   allLessons = [], 
   setActiveTab, 
   setSelectedLessonId 
 }: any) {
     
-    // RESOLUTION LOGIC: 
-    // If classData.lessons contains IDs, we find the full objects from allLessons.
-    const resolvedLessons = useMemo(() => {
-        const classLessonRefs = classData.lessons || [];
-        
-        return classLessonRefs.map((ref: any) => {
-            // If it's already an object with a title, use it
-            if (ref && typeof ref === 'object' && ref.title) return ref;
-            
-            // If it's an ID (string), find the matching lesson in our master list
-            return allLessons.find((l: any) => l.id === ref);
-        }).filter(Boolean); // Remove any that weren't found
-    }, [classData.lessons, allLessons]);
+    // DEBUG: Look at your console (F12) to see what is actually inside classData
+    console.log("Class Data Received:", classData);
+    console.log("Master Lessons Library:", allLessons);
 
-    const decks = classData.decks || [];
+    const resolvedLessons = useMemo(() => {
+        // We try multiple common field names in case your Firestore uses a different key
+        const rawList = classData.lessons || classData.lessonIds || classData.assignedLessons || [];
+        
+        if (!Array.isArray(rawList)) return [];
+
+        return rawList.map((item: any) => {
+            // 1. If it's already a full object, use it
+            if (item && typeof item === 'object' && item.title) return item;
+            
+            // 2. If it's a string (ID), find it in the master list
+            const lessonId = typeof item === 'string' ? item : item.id;
+            const found = allLessons.find((l: any) => l.id === lessonId);
+            
+            if (!found) console.warn(`Could not find lesson with ID: ${lessonId} in master list.`);
+            return found;
+        }).filter(Boolean);
+    }, [classData, allLessons]);
 
     return (
         <div className="h-full flex flex-col bg-slate-50">
+            {/* Header */}
             <div className="bg-white px-6 pt-12 pb-6 border-b border-slate-100 shadow-sm">
-                <button 
-                    onClick={onBack}
-                    className="flex items-center gap-2 text-slate-400 font-bold text-sm mb-4 hover:text-indigo-600 transition-colors"
-                >
-                    <ChevronLeft size={18} />
-                    Back to Classes
+                <button onClick={onBack} className="flex items-center gap-2 text-slate-400 font-bold text-sm mb-4 hover:text-indigo-600 transition-colors">
+                    <ChevronLeft size={18} /> Back
                 </button>
-                <h1 className="text-3xl font-black text-slate-900 tracking-tight">{classData.name}</h1>
-                <p className="text-slate-500 font-medium line-clamp-2">{classData.description || 'Class workspace'}</p>
+                <h1 className="text-3xl font-black text-slate-900 tracking-tight">{classData.name || 'Untitled Class'}</h1>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {/* Lessons Section */}
                 <section>
                     <div className="flex items-center gap-2 mb-4">
-                        <div className="bg-indigo-100 p-1.5 rounded-lg text-indigo-600">
-                            <BookOpen size={16} />
-                        </div>
-                        <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Assigned Lessons</h2>
+                        <div className="bg-indigo-100 p-1.5 rounded-lg text-indigo-600"><BookOpen size={16} /></div>
+                        <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Lessons</h2>
                     </div>
 
                     <div className="space-y-3">
                         {resolvedLessons.length > 0 ? resolvedLessons.map((lesson: any) => (
-                            <div 
-                                key={lesson.id} 
-                                className="group bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm hover:border-indigo-100 transition-all flex items-center justify-between"
-                            >
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="font-bold text-slate-800 truncate pr-4">{lesson.title}</h3>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-black uppercase">
-                                            {lesson.xp || 100} XP
-                                        </span>
-                                    </div>
+                            <div key={lesson.id} className="bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm flex items-center justify-between">
+                                <div className="flex-1 min-w-0 mr-4">
+                                    <h3 className="font-bold text-slate-800 truncate">{lesson.title}</h3>
+                                    <p className="text-[10px] text-slate-400 font-black uppercase">{lesson.type || 'Lesson'}</p>
                                 </div>
-
                                 <div className="flex items-center gap-2">
-                                    <button 
-                                        onClick={() => onSelectLesson(lesson)}
-                                        className="px-4 py-2 bg-slate-50 text-slate-600 rounded-xl font-bold text-xs hover:bg-indigo-600 hover:text-white transition-all border border-slate-100"
-                                    >
+                                    <button onClick={() => onSelectLesson(lesson)} className="px-4 py-2 bg-slate-50 text-slate-600 rounded-xl font-bold text-xs hover:bg-indigo-600 hover:text-white transition-all">
                                         Open
                                     </button>
-
                                     {userData?.role === 'instructor' && (
                                         <button 
                                             onClick={(e) => {
@@ -2142,7 +2131,7 @@ function StudentClassView({
                                                 setSelectedLessonId(lesson.id);
                                                 setActiveTab('presentation');
                                             }}
-                                            className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                                            className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100"
                                         >
                                             <Monitor size={18} />
                                         </button>
@@ -2150,19 +2139,17 @@ function StudentClassView({
                                 </div>
                             </div>
                         )) : (
-                            <div className="text-center py-10 bg-white/50 border-2 border-dashed border-slate-200 rounded-[2rem] text-slate-400 font-bold text-sm">
-                                No lessons assigned to this class yet.
+                            <div className="text-center py-12 bg-white/50 border-2 border-dashed border-slate-200 rounded-[2rem]">
+                                <p className="text-slate-400 font-bold text-sm">No lessons found.</p>
+                                <p className="text-[10px] text-slate-300 mt-1 uppercase">Check Firestore field names or ID matching</p>
                             </div>
                         )}
                     </div>
                 </section>
-
-                {/* Decks Section remains same... */}
             </div>
         </div>
     );
 }
-
 
 
 // ============================================================================
@@ -3453,7 +3440,8 @@ const renderStudentView = () => {
     let viewKey: string = "default";
 
     // 1. PRIORITY 1: Presentation Mode (ClassView)
-    // We check this first so it overrides the standard lesson player when active.
+    // We check this first to ensure the full-screen presentation 
+    // overrides any active lesson player or dashboard.
     if (activeTab === 'presentation') {
       viewKey = `presentation-${selectedLessonId}`;
       content = (
@@ -3465,7 +3453,8 @@ const renderStudentView = () => {
     } 
     
     // 2. PRIORITY 2: Active Lesson Player
-    // Shown when a student or instructor is actively taking/previewing a lesson.
+    // Handles the standard learning experience for students 
+    // and the "Remote Control" mode for instructors.
     else if (activeLesson) {
       viewKey = `lesson-${activeLesson.id}`;
       
@@ -3473,7 +3462,7 @@ const renderStudentView = () => {
         handleFinishLesson(activeLesson.id, xp, title, score);
       };
 
-      // Determine if instructor tools (Remote/Sync) should be visible
+      // Determines if the instructor UI (Sync toggle/Remote) should be visible
       const isTeacher = userData?.role === 'instructor';
 
       if (activeLesson.type === 'test' || activeLesson.type === 'exam') {
@@ -3489,8 +3478,8 @@ const renderStudentView = () => {
       }
     } 
     
-    // 3. PRIORITY 3: Active Class View
-    // Shown when a user has drilled down into a specific class from the Home tab.
+    // 3. PRIORITY 3: Active Class Workspace
+    // Shown when a user clicks into a specific class from the home tab.
     else if (activeTab === 'home' && activeStudentClass) {
       viewKey = `class-${activeStudentClass.id}`;
       content = (
@@ -3502,9 +3491,11 @@ const renderStudentView = () => {
           userData={userData} 
           user={user} 
           displayName={displayName}
+          // These props allow the class view to launch the presentation mode
           setActiveTab={setActiveTab}
           setSelectedLessonId={setSelectedLessonId}
-          allLessons={lessons} // Passed to resolve Lesson IDs to full data
+          // Critical fix: Pass the master library to resolve IDs to full data
+          allLessons={lessons} 
         />
       );
     } 
@@ -3527,6 +3518,7 @@ const renderStudentView = () => {
           break;
 
         case 'flashcards':
+          // Attempt to find an assigned version of the deck first
           const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
           content = (
             <FlashcardView 
@@ -3582,6 +3574,16 @@ const renderStudentView = () => {
       }
     }
 
+    return (
+      <div key={viewKey} className="h-full w-full animate-in fade-in duration-300">
+        {content || (
+          <div className="flex items-center justify-center h-full text-slate-400 font-bold bg-white">
+            <div className="animate-pulse">Loading Workspace...</div>
+          </div>
+        )}
+      </div>
+    );
+  };
     return (
       <div key={viewKey} className="h-full w-full animate-in fade-in duration-300">
         {content || (
