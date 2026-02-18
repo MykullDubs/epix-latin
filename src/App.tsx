@@ -328,33 +328,65 @@ const ChatDialogueBlock = ({ lines }: any) => (
         })}
     </div>
 );
-function ClassView({ lessonId }) {
+// 1. Define the Interface for Props
+interface ClassViewProps {
+  lessonId: string;
+  lessons: any[]; // Replace 'any' with your Lesson type if defined
+}
+
+function ClassView({ lessonId, lessons }: ClassViewProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  // Sync with Firestore: Whenever the 'activeSlide' changes in the database, 
-  // the big screen automatically flips.
+  // 2. Find the specific lesson data from the passed lessons array
+  const activeLessonData = lessons.find(l => l.id === lessonId);
+
   useEffect(() => {
+    // Ensure we have a valid lessonId before listening
+    if (!lessonId) return;
+
+    // Use your existing 'db' constant
     const docRef = doc(db, 'live_sessions', lessonId);
     return onSnapshot(docRef, (doc) => {
-      if (doc.exists()) setCurrentSlide(doc.data().activeSlide);
+      if (doc.exists()) {
+        const data = doc.data();
+        if (data.activeSlide !== undefined) {
+          setCurrentSlide(data.activeSlide);
+        }
+      }
     });
   }, [lessonId]);
 
+  // Handle case where lesson isn't found yet
+  if (!activeLessonData) {
+    return (
+      <div className="h-screen flex items-center justify-center text-slate-400 font-bold">
+        Loading Lesson Data...
+      </div>
+    );
+  }
+
+  // Get the current content block safely
+  const currentBlock = activeLessonData.content?.[currentSlide];
+
   return (
-    <div className="h-screen w-screen bg-white flex flex-col items-center justify-center p-20">
-      <div className="animate-in fade-in zoom-in duration-500">
-        <h2 className="text-6xl font-black text-slate-900 mb-10">
-          {lessons[currentSlide].title}
+    <div className="h-screen w-screen bg-white flex flex-col items-center justify-center p-20 z-[100] fixed inset-0">
+      <div className="animate-in fade-in zoom-in duration-500 max-w-5xl text-center">
+        <h2 className="text-6xl font-black text-slate-900 mb-12 tracking-tight">
+          {activeLessonData.title}
         </h2>
-        <div className="text-4xl leading-relaxed text-slate-600">
-          {lessons[currentSlide].text}
-        </div>
+        
+        {currentBlock && (
+          <div className="text-5xl leading-tight text-slate-600 font-medium">
+            {currentBlock.text}
+          </div>
+        )}
       </div>
       
-      {/* Discreet footer for teacher status */}
-      <div className="absolute bottom-10 right-10 flex gap-4 opacity-30 hover:opacity-100 transition-opacity">
-        <div className="bg-indigo-600 w-4 h-4 rounded-full animate-pulse" />
-        <span className="font-bold text-slate-400">LIVE SYNC ACTIVE</span>
+      <div className="absolute bottom-12 right-12 flex items-center gap-4 opacity-40">
+        <div className="bg-indigo-600 w-3 h-3 rounded-full animate-pulse" />
+        <span className="font-bold text-sm tracking-widest text-slate-500 uppercase">
+          Live Class Mode
+        </span>
       </div>
     </div>
   );
@@ -3472,14 +3504,10 @@ const renderStudentView = () => {
     if (activeLesson) {
         viewKey = `lesson-${activeLesson.id}`;
         
-        // --- CRITICAL FIX: Force Assignment ID ---
-        // This wrapper forces the Gradebook to see the correct Assignment ID
-        // instead of the original Content ID.
         const handleFinish = (id: string, xp: number, title: string, score: any) => {
              handleFinishLesson(activeLesson.id, xp, title, score);
         };
 
-        // Check Type & Render
         if (activeLesson.type === 'test' || activeLesson.type === 'exam') {
              content = <ExamPlayerView exam={activeLesson} onFinish={handleFinish} />;
         } else {
@@ -3496,15 +3524,8 @@ const renderStudentView = () => {
                 content = <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} />;
                 break;
             case 'discovery': 
-    content = <DiscoveryView 
-        allDecks={allDecks} 
-        user={user} 
-        onSelectDeck={handleContentSelection} 
-        // 👇 THESE TWO MUST BE HERE FOR QUESTS TO WORK
-        userData={userData}
-        onLogActivity={(type: string) => checkDailyQuests(type)} 
-    />;
-    break;
+                content = <DiscoveryView allDecks={allDecks} user={user} onSelectDeck={handleContentSelection} userData={userData} onLogActivity={(type: string) => checkDailyQuests(type)} />;
+                break;
             case 'flashcards': 
                 const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
                 const deckToLoad = assignedDeck || allDecks[selectedDeckKey];
@@ -3512,6 +3533,10 @@ const renderStudentView = () => {
                 break;
             case 'create': 
                 content = <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />;
+                break;
+            case 'presentation':
+                // Pass selectedLessonId and the lessons array from your state
+                content = <ClassView lessonId={selectedLessonId} lessons={lessons} />;
                 break;
             case 'profile': 
                 content = <ProfileView user={user} userData={userData} />;
@@ -3521,26 +3546,32 @@ const renderStudentView = () => {
         }
     }
 
-    const isLessonMode = !!activeLesson;
-return (
+    return (
         <div key={viewKey} className="h-full w-full animate-in fade-in duration-300">
             {content}
         </div>
     );
-  };
+};
 
-  return (
+const isPresentation = activeTab === 'presentation';
+
+return (
     <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-start relative overflow-hidden">
-      <div className="w-full max-w-md h-[100dvh] bg-white shadow-2xl relative overflow-hidden flex flex-col">
-       {toast && <JuicyToast message={toast} onClose={() => setToast(null)} />} 
+      {/* The container expands to full width and height during presentation mode, 
+          removing the max-w-md constraint for the projector screen.
+      */}
+      <div className={`w-full ${isPresentation ? 'h-screen' : 'max-w-md h-[100dvh] shadow-2xl'} bg-white relative overflow-hidden flex flex-col transition-all duration-500`}>
+        {toast && <JuicyToast message={toast} onClose={() => setToast(null)} />} 
+        
         {/* VIEWPORT CONTENT */}
         <div className="flex-1 h-full overflow-hidden relative">
             {renderStudentView()}
         </div>
 
-        {/* BOTTOM NAVIGATION (4 BUTTONS) */}
-        {!activeLesson && <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />}
+        {/* BOTTOM NAVIGATION (4 BUTTONS) - Hidden during lessons and presentations */}
+        {!activeLesson && !isPresentation && <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />}
       </div>
+
       <style>{` 
         .perspective-1000 { perspective: 1000px; } 
         .preserve-3d { transform-style: preserve-3d; } 
@@ -3552,7 +3583,7 @@ return (
         .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
       `}</style>
     </div>
-  );
+);
 }
 
 export default App;
