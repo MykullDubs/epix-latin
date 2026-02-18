@@ -3460,9 +3460,8 @@ const renderStudentView = () => {
     let content: React.ReactNode = null;
     let viewKey: string = "default";
 
-    // 1. PRIORITY 1: Presentation Mode (ClassView)
-    // This is checked first to ensure that when an instructor launches a 
-    // presentation, it takes over the entire viewport immediately.
+    // 1. PRIORITY: Presentation Mode (ClassView)
+    // We check this first so the projector view takes over the entire screen.
     if (activeTab === 'presentation') {
       viewKey = `presentation-${selectedLessonId}`;
       content = (
@@ -3471,29 +3470,35 @@ const renderStudentView = () => {
           lessons={lessons} 
         />
       );
-// Inside renderStudentView
-} else if (activeTab === 'home' && activeStudentClass) {
-    viewKey = `class-${activeStudentClass.id}`;
-    content = (
-        <StudentClassView 
-            classData={activeStudentClass} 
-            onBack={() => setActiveStudentClass(null)} 
-            onSelectLesson={handleContentSelection} 
-            onSelectDeck={handleContentSelection} 
-            userData={userData} 
-            setActiveTab={setActiveTab}
-            setSelectedLessonId={setSelectedLessonId}
-            
-            // --- THE FIXES ---
-            allLessons={lessons}       // Your master library
-            classLessons={classLessons} // The "due" lessons causing the notification
-        />
-    );
-}
     } 
     
-    // 3. PRIORITY 3: Active Class Context
-    // Rendered when a user selects a specific class from their home dashboard.
+    // 2. PRIORITY: Active Lesson Player
+    // Handles the student lesson flow and the instructor master remote.
+    else if (activeLesson) {
+      viewKey = `lesson-${activeLesson.id}`;
+      
+      const handleFinish = (id: string, xp: number, title: string, score: any) => {
+        handleFinishLesson(activeLesson.id, xp, title, score);
+      };
+
+      // Check role to activate Instructor Sync/Remote features
+      const isTeacher = userData?.role === 'instructor';
+
+      if (activeLesson.type === 'test' || activeLesson.type === 'exam') {
+        content = <ExamPlayerView exam={activeLesson} onFinish={handleFinish} />;
+      } else {
+        content = (
+          <LessonView 
+            lesson={activeLesson} 
+            onFinish={handleFinish} 
+            isInstructor={isTeacher} 
+          />
+        );
+      }
+    } 
+    
+    // 3. PRIORITY: Specific Class Dashboard
+    // This is where you see the "six due" lessons.
     else if (activeTab === 'home' && activeStudentClass) {
       viewKey = `class-${activeStudentClass.id}`;
       content = (
@@ -3507,13 +3512,14 @@ const renderStudentView = () => {
           displayName={displayName}
           setActiveTab={setActiveTab}
           setSelectedLessonId={setSelectedLessonId}
-          // Resolves Lesson IDs in the class object into full lesson data
+          // CRITICAL: We pass both the master library AND the specific assignments
           allLessons={lessons} 
+          classLessons={classLessons} 
         />
       );
     } 
     
-    // 4. PRIORITY 4: Standard Tab Navigation
+    // 4. PRIORITY: Standard Navigation Tabs
     else {
       viewKey = `tab-${activeTab || 'home'}`;
       
@@ -3531,7 +3537,6 @@ const renderStudentView = () => {
           break;
 
         case 'flashcards':
-          // Locate assigned versions of decks for specific class contexts
           const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
           content = (
             <FlashcardView 
