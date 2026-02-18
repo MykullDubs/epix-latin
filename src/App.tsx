@@ -3545,9 +3545,11 @@ const handleFinishLesson = useCallback(async (lessonId: string, xp: number, titl
   }
 
 const renderStudentView = () => {
-    let content;
-    let viewKey; 
+    let content: React.ReactNode;
+    let viewKey: string; 
 
+    // 1. Priority View: Active Lesson Player
+    // We only show the player if we aren't specifically trying to "Present"
     if (activeLesson && activeTab !== 'presentation') {
         viewKey = `lesson-${activeLesson.id}`;
         
@@ -3561,36 +3563,112 @@ const renderStudentView = () => {
              content = <LessonView lesson={activeLesson} onFinish={handleFinish} />;
         }
         
+    // 2. Secondary View: Specific Class View
     } else if (activeTab === 'home' && activeStudentClass) {
         viewKey = `class-${activeStudentClass.id}`;
-        content = <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} displayName={displayName} />;
+        content = <StudentClassView 
+            classData={activeStudentClass} 
+            onBack={() => setActiveStudentClass(null)} 
+            onSelectLesson={handleContentSelection} 
+            onSelectDeck={handleContentSelection} 
+            userData={userData} 
+            user={user} 
+            displayName={displayName} 
+        />;
+
+    // 3. Tab Navigation Views
     } else {
-        viewKey = `tab-${activeTab}`;
+        viewKey = `tab-${activeTab || 'home'}`; // Fallback to 'home' if tab is null
+        
         switch (activeTab) {
             case 'home': 
-                content = <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} />;
+                content = <HomeView 
+                    setActiveTab={setActiveTab} 
+                    allDecks={allDecks} 
+                    lessons={lessons} // Ensure this matches your state variable name
+                    assignments={classLessons} 
+                    classes={enrolledClasses} 
+                    onSelectClass={(c: any) => setActiveStudentClass(c)} 
+                    onSelectLesson={handleContentSelection} 
+                    onSelectDeck={handleContentSelection} 
+                    userData={userData} 
+                    user={user} 
+                />;
                 break;
+
             case 'discovery': 
-                content = <DiscoveryView allDecks={allDecks} user={user} onSelectDeck={handleContentSelection} userData={userData} onLogActivity={(type: string) => checkDailyQuests(type)} />;
+                content = <DiscoveryView 
+                    allDecks={allDecks} 
+                    user={user} 
+                    onSelectDeck={handleContentSelection} 
+                    userData={userData}
+                    onLogActivity={(type: string) => checkDailyQuests(type)} 
+                />;
                 break;
+
             case 'flashcards': 
                 const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
                 const deckToLoad = assignedDeck || allDecks[selectedDeckKey];
-                content = <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} activeDeckOverride={deckToLoad} onComplete={handleFinishLesson} onLogActivity={handleLogSelfStudy} userData={userData} user={user} onUpdatePrefs={handleUpdatePreferences} onDeleteDeck={handleDeleteDeck} />;
+                content = <FlashcardView 
+                    allDecks={allDecks} 
+                    selectedDeckKey={selectedDeckKey} 
+                    onSelectDeck={setSelectedDeckKey} 
+                    onSaveCard={handleCreateCard} 
+                    activeDeckOverride={deckToLoad} 
+                    onComplete={handleFinishLesson} 
+                    onLogActivity={handleLogSelfStudy} 
+                    userData={userData} 
+                    user={user} 
+                    onUpdatePrefs={handleUpdatePreferences} 
+                    onDeleteDeck={handleDeleteDeck} 
+                />;
                 break;
+
             case 'create': 
-                content = <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />;
+                content = <BuilderHub 
+                    onSaveCard={handleCreateCard} 
+                    onUpdateCard={handleUpdateCard} 
+                    onDeleteCard={handleDeleteCard} 
+                    onSaveLesson={handleCreateLesson} 
+                    allDecks={allDecks} 
+                    lessons={lessons} 
+                />;
                 break;
+
             case 'presentation':
-                // Using the state variable defined in Step 1
                 content = <ClassView lessonId={selectedLessonId} lessons={lessons} />;
                 break;
+
             case 'profile': 
                 content = <ProfileView user={user} userData={userData} />;
                 break;
+
+            // FIX: The default case now passes all required props to HomeView
+            // to prevent a crash on an empty HomeView.
             default: 
-                content = <HomeView />;
+                content = <HomeView 
+                    setActiveTab={setActiveTab} 
+                    allDecks={allDecks} 
+                    lessons={lessons} 
+                    assignments={classLessons} 
+                    classes={enrolledClasses} 
+                    onSelectClass={(c: any) => setActiveStudentClass(c)} 
+                    onSelectLesson={handleContentSelection} 
+                    onSelectDeck={handleContentSelection} 
+                    userData={userData} 
+                    user={user} 
+                />;
         }
+    }
+
+    // SAFETY CHECK: If for some reason content is still null, 
+    // show a loading state instead of a blank screen.
+    if (!content) {
+        return (
+            <div className="h-full flex items-center justify-center text-slate-400 font-bold bg-white">
+                <div className="animate-pulse">Loading View...</div>
+            </div>
+        );
     }
 
     return (
