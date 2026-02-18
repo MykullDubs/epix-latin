@@ -1,0 +1,150 @@
+import React, { useState, useEffect } from 'react';
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, collection, writeBatch, onSnapshot } from "firebase/firestore";
+import { Save, Send, Plus, Trash2, Edit3, Layers, BookOpen, CheckCircle } from 'lucide-react';
+
+// Configuration mirrors the LMS to ensure tight integration
+const firebaseConfig = {
+  apiKey: "AIzaSyAjK79x_N5pSWzWluFUg25mqEc_HeraRPk",
+  authDomain: "epic-latin.firebaseapp.com",
+  projectId: "epic-latin",
+  storageBucket: "epic-latin.firebasestorage.app",
+  appId: "1:321050459278:web:df00b3cf5b8befb0d55ddf"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const appId = 'epic-latin-prod';
+
+export default function CTMS() {
+  const [lessons, setLessons] = useState([]);
+  const [activeLesson, setActiveLesson] = useState(null);
+  const [batchQueue, setBatchQueue] = useState(new Set());
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  // Load existing lessons from the LMS production path
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_lessons'), (snap) => {
+      setLessons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return unsub;
+  }, []);
+
+  // Stage changes for batch publishing
+  const updateLessonLocally = (updatedLesson) => {
+    setLessons(prev => prev.map(l => l.id === updatedLesson.id ? updatedLesson : l));
+    setBatchQueue(prev => new Set(prev).add(updatedLesson.id));
+  };
+
+  // The Batch Publishing Logic
+  const publishAllChanges = async () => {
+    setIsPublishing(true);
+    const batch = writeBatch(db);
+
+    batchQueue.forEach(lessonId => {
+      const lessonData = lessons.find(l => l.id === lessonId);
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'system_lessons', lessonId);
+      batch.set(docRef, lessonData);
+    });
+
+    try {
+      await batch.commit();
+      setBatchQueue(new Set());
+      alert("Successfully published all changes to the LMS.");
+    } catch (error) {
+      console.error("Batch publish failed:", error);
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  return (
+    <div className="flex h-screen bg-slate-50 text-slate-900 font-sans">
+      {/* Sidebar: Lesson List & Batch Status */}
+      <aside className="w-80 bg-white border-r border-slate-100 flex flex-col">
+        <div className="p-6 border-b border-slate-50">
+          <h1 className="text-xl font-black tracking-tight flex items-center gap-2">
+            <Edit3 className="text-indigo-600" /> CTMS Editor
+          </h1>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          {lessons.map(lesson => (
+            <button
+              key={lesson.id}
+              onClick={() => setActiveLesson(lesson)}
+              className={`w-full text-left p-4 rounded-2xl transition-all border ${
+                activeLesson?.id === lesson.id ? 'bg-indigo-50 border-indigo-100' : 'bg-white border-transparent hover:bg-slate-50'
+              }`}
+            >
+              <div className="flex justify-between items-start">
+                <span className="font-bold text-sm truncate pr-2">{lesson.title}</span>
+                {batchQueue.has(lesson.id) && (
+                  <span className="bg-orange-100 text-orange-600 text-[10px] px-2 py-0.5 rounded-full font-black uppercase">Pending</span>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Batch Action Bar */}
+        <div className="p-6 bg-slate-50 border-t border-slate-100">
+          <button
+            disabled={batchQueue.size === 0 || isPublishing}
+            onClick={publishAllChanges}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white p-4 rounded-2xl font-black flex items-center justify-center gap-2 shadow-lg transition-all"
+          >
+            <Send size={18} />
+            {isPublishing ? 'Publishing...' : `Publish ${batchQueue.size} Changes`}
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Workspace: Extracted Editor */}
+      <main className="flex-1 overflow-y-auto bg-white">
+        {activeLesson ? (
+          <div className="max-w-3xl mx-auto py-20 px-10">
+            <div className="flex items-center gap-4 mb-8">
+              <input
+                className="text-4xl font-black tracking-tight w-full outline-none focus:text-indigo-600 transition-colors"
+                value={activeLesson.title}
+                onChange={(e) => updateLessonLocally({...activeLesson, title: e.target.value})}
+              />
+            </div>
+
+            {/* Content Blocks Editor */}
+            <div className="space-y-6">
+              {activeLesson.content?.map((block, idx) => (
+                <div key={idx} className="group relative bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+                  <div className="absolute -left-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button className="bg-white shadow-md p-2 rounded-full text-slate-400 hover:text-red-500">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                  <textarea
+                    className="bg-transparent w-full font-medium text-slate-600 resize-none outline-none"
+                    value={block.text}
+                    onChange={(e) => {
+                      const newContent = [...activeLesson.content];
+                      newContent[idx].text = e.target.value;
+                      updateLessonLocally({...activeLesson, content: newContent});
+                    }}
+                  />
+                </div>
+              ))}
+              
+              <button className="w-full border-2 border-dashed border-slate-200 p-6 rounded-[2rem] text-slate-400 font-bold hover:border-indigo-200 hover:text-indigo-400 transition-all flex items-center justify-center gap-2">
+                <Plus size={20} /> Add Content Block
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center text-slate-300">
+            <BookOpen size={64} strokeWidth={1} />
+            <p className="mt-4 font-bold">Select a lesson to begin editing</p>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
