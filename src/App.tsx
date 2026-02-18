@@ -400,219 +400,216 @@ function LessonView({ lesson, onFinish, isInstructor = false }: any) {
 
   // 1. SMART PAGING ALGORITHM
   const pages = useMemo(() => {
-      const rawBlocks = lesson.blocks || [];
-      const groupedPages: any[] = [];
-      let currentBuffer: any[] = [];
+    const rawBlocks = lesson.blocks || [];
+    const groupedPages: any[] = [];
+    let currentBuffer: any[] = [];
 
-      rawBlocks.forEach((block: any) => {
-          const isInteractive = ['quiz', 'flashcard', 'scenario'].includes(block.type);
-          if (isInteractive) {
-              if (currentBuffer.length > 0) {
-                  groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
-                  currentBuffer = [];
-              }
-              groupedPages.push({ type: 'interact', blocks: [block] });
-          } else {
-              currentBuffer.push(block);
-          }
-      });
-
-      if (currentBuffer.length > 0) {
+    rawBlocks.forEach((block: any) => {
+      const isInteractive = ['quiz', 'flashcard', 'scenario'].includes(block.type);
+      if (isInteractive) {
+        if (currentBuffer.length > 0) {
           groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
+          currentBuffer = [];
+        }
+        groupedPages.push({ type: 'interact', blocks: [block] });
+      } else {
+        currentBuffer.push(block);
       }
-      return groupedPages;
+    });
+
+    if (currentBuffer.length > 0) {
+      groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
+    }
+    return groupedPages;
   }, [lesson]);
 
   // 2. State & Scrolling
   const [currentPageIdx, setCurrentPageIdx] = useState(0);
   const [isLiveSynced, setIsLiveSynced] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  
-  // LIVE SYNC LOGIC: Listen for remote navigation
+
+  // LIVE SYNC: Receive updates (Students)
   useEffect(() => {
-      if (!lesson.id) return;
-      
-      const docRef = doc(db, 'live_sessions', lesson.id);
-      const unsub = onSnapshot(docRef, (docSnap) => {
-          if (docSnap.exists() && !isInstructor) {
-              const data = docSnap.data();
-              if (data.activePageIdx !== undefined) {
-                  setCurrentPageIdx(data.activePageIdx);
-              }
-          }
-      });
-      return () => unsub();
+    if (!lesson.id || isInstructor) return;
+    const docRef = doc(db, 'live_sessions', lesson.id);
+    const unsub = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (typeof data.activePageIdx === 'number') {
+          setCurrentPageIdx(data.activePageIdx);
+        }
+      }
+    });
+    return () => unsub();
   }, [lesson.id, isInstructor]);
 
-  // LIVE SYNC LOGIC: Broadcast navigation (Instructor only)
+  // LIVE SYNC: Broadcast updates (Instructor)
   const broadcastNavigation = async (index: number) => {
-      if (!isInstructor || !isLiveSynced) return;
-      const docRef = doc(db, 'live_sessions', lesson.id);
-      await setDoc(docRef, { 
-          activePageIdx: index,
-          updatedAt: Date.now() 
-      }, { merge: true });
+    if (!isInstructor || !isLiveSynced) return;
+    const docRef = doc(db, 'live_sessions', lesson.id);
+    await setDoc(docRef, {
+      activePageIdx: index,
+      updatedAt: Date.now()
+    }, { merge: true });
   };
 
   useEffect(() => {
-      if (scrollRef.current) {
-          scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-      }
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }, [currentPageIdx]);
 
   const currentPage = pages[currentPageIdx];
   const isLastPage = currentPageIdx >= pages.length - 1;
-  
+
   const handleNext = () => {
-      if (!isLastPage) {
-          const newIdx = currentPageIdx + 1;
-          setCurrentPageIdx(newIdx);
-          broadcastNavigation(newIdx);
-      } else {
-          onFinish(lesson.id, lesson.xp, lesson.title);
-      }
+    if (!isLastPage) {
+      const nextIdx = currentPageIdx + 1;
+      setCurrentPageIdx(nextIdx);
+      broadcastNavigation(nextIdx);
+    } else {
+      onFinish(lesson.id, lesson.xp, lesson.title);
+    }
   };
 
   const handlePrev = () => {
-      if (currentPageIdx > 0) {
-          const newIdx = currentPageIdx - 1;
-          setCurrentPageIdx(newIdx);
-          broadcastNavigation(newIdx);
-      }
+    if (currentPageIdx > 0) {
+      const prevIdx = currentPageIdx - 1;
+      setCurrentPageIdx(prevIdx);
+      broadcastNavigation(prevIdx);
+    }
   };
 
-  // 3. Block Renderer (Same as your original)
+  // 3. Block Renderer
   const renderBlock = (block: any, idx: number) => {
-      switch (block.type) {
-          case 'text': return (
-              <div key={idx} className="my-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                  {block.title && <h2 className="text-3xl font-black text-slate-800 mb-4 tracking-tight leading-tight">{block.title}</h2>}
-                  <div className="text-xl text-slate-600 leading-relaxed whitespace-pre-wrap font-serif antialiased">{block.content}</div>
-              </div>
-          );
-          case 'image': return (
-              <div key={idx} className="my-8 space-y-3 animate-in zoom-in-95 duration-500 group">
-                  <div className="rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-white relative">
-                      <img src={block.url} alt="Lesson" className="w-full object-cover" />
-                  </div>
-              </div>
-          );
-          case 'vocab-list': return <div key={idx} className="my-8"><JuicyDeckBlock items={block.items} title="Key Vocabulary" /></div>;
-          case 'dialogue': return <div key={idx} className="my-8"><ChatDialogueBlock lines={block.lines} /></div>;
-          case 'note': {
-              const styles: any = { 
-                  info: { bg: 'bg-indigo-50', border: 'border-indigo-100', icon: <Info size={24} className="text-indigo-600"/>, title: 'text-indigo-900' }, 
-                  tip: { bg: 'bg-emerald-50', border: 'border-emerald-100', icon: <Zap size={24} className="text-emerald-600 fill-emerald-600"/>, title: 'text-emerald-900' }, 
-                  warning: { bg: 'bg-amber-50', border: 'border-amber-100', icon: <AlertTriangle size={24} className="text-amber-600"/>, title: 'text-amber-900' } 
-              };
-              const s = styles[block.variant || 'info'] || styles.info;
-              return (
-                  <div key={idx} className={`rounded-[2rem] border-2 ${s.border} ${s.bg} p-8 my-10 flex gap-6 items-start`}>
-                      <div className="shrink-0 bg-white p-3 rounded-2xl shadow-sm">{s.icon}</div>
-                      <div>
-                          <h4 className={`font-black text-sm uppercase tracking-widest mb-2 opacity-70 ${s.title}`}>{block.title || block.variant}</h4>
-                          <p className={`text-lg font-medium leading-relaxed ${s.title}`}>{block.content}</p>
-                      </div>
-                  </div>
-              );
-          }
-          default: return null;
+    switch (block.type) {
+      case 'text': return (
+        <div key={idx} className="my-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          {block.title && <h2 className="text-3xl font-black text-slate-800 mb-4 tracking-tight leading-tight">{block.title}</h2>}
+          <div className="text-xl text-slate-600 leading-relaxed whitespace-pre-wrap font-serif antialiased">{block.content}</div>
+        </div>
+      );
+      case 'image': return (
+        <div key={idx} className="my-8 space-y-3 animate-in zoom-in-95 duration-500 group">
+          <div className="rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-white relative">
+            <img src={block.url} alt="Lesson" className="w-full object-cover" />
+          </div>
+        </div>
+      );
+      case 'vocab-list': return <div key={idx} className="my-8"><JuicyDeckBlock items={block.items} title="Key Vocabulary" /></div>;
+      case 'dialogue': return <div key={idx} className="my-8"><ChatDialogueBlock lines={block.lines} /></div>;
+      case 'note': {
+        const styles: any = {
+          info: { bg: 'bg-indigo-50', border: 'border-indigo-100', icon: <Info size={24} className="text-indigo-600" />, title: 'text-indigo-900' },
+          tip: { bg: 'bg-emerald-50', border: 'border-emerald-100', icon: <Zap size={24} className="text-emerald-600 fill-emerald-600" />, title: 'text-emerald-900' },
+          warning: { bg: 'bg-amber-50', border: 'border-amber-100', icon: <AlertTriangle size={24} className="text-amber-600" />, title: 'text-amber-900' }
+        };
+        const s = styles[block.variant || 'info'] || styles.info;
+        return (
+          <div key={idx} className={`rounded-[2rem] border-2 ${s.border} ${s.bg} p-8 my-10 flex gap-6 items-start animate-in slide-in-from-left-4`}>
+            <div className="shrink-0 bg-white p-3 rounded-2xl shadow-sm">{s.icon}</div>
+            <div>
+              <h4 className={`font-black text-sm uppercase tracking-widest mb-2 opacity-70 ${s.title}`}>{block.title || block.variant}</h4>
+              <p className={`text-lg font-medium leading-relaxed ${s.title}`}>{block.content}</p>
+            </div>
+          </div>
+        );
       }
+      default: return null;
+    }
   };
 
   const isInteractivePage = currentPage?.type === 'interact';
 
   return (
     <div className="h-full flex flex-col bg-white">
-        
-        {/* HEADER */}
-        <div className="bg-white border-b border-slate-100 sticky top-0 z-50 pt-12 pb-4 px-6">
-            <div className="flex gap-1.5 mb-4">
-                {pages.map((_, idx) => (
-                    <div key={idx} className="h-2 flex-1 rounded-full bg-slate-100 overflow-hidden">
-                        <div 
-                            className={`h-full transition-all duration-500 ${idx <= currentPageIdx ? 'bg-indigo-600' : 'bg-transparent'}`}
-                            style={{ width: idx <= currentPageIdx ? '100%' : '0%' }}
-                        ></div>
-                    </div>
-                ))}
+      {/* HEADER */}
+      <div className="bg-white/95 backdrop-blur-xl border-b border-slate-100 sticky top-0 z-50 pt-12 pb-4 px-6">
+        <div className="flex gap-1.5 mb-4">
+          {pages.map((_, idx) => (
+            <div key={idx} className="h-2 flex-1 rounded-full bg-slate-100 overflow-hidden">
+              <div
+                className={`h-full transition-all duration-500 ${idx <= currentPageIdx ? 'bg-indigo-600' : 'bg-transparent'}`}
+                style={{ width: idx <= currentPageIdx ? '100%' : '0%' }}
+              ></div>
             </div>
-
-            <div className="flex justify-between items-center">
-                <button onClick={() => onFinish(null, 0)} className="p-2 -ml-2 rounded-full text-slate-400">
-                    <X size={24} />
-                </button>
-                
-                <div className="text-center">
-                    <h2 className="text-sm font-black text-slate-800 tracking-tight">{lesson.title}</h2>
-                    <div className="flex items-center gap-2 justify-center">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                            {isInteractivePage ? 'Interactive' : `Part ${currentPageIdx + 1}`}
-                        </p>
-                        {isInstructor && (
-                            <button 
-                                onClick={() => setIsLiveSynced(!isLiveSynced)}
-                                className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase transition-colors ${isLiveSynced ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}
-                            >
-                                {isLiveSynced ? '● Live Sync On' : 'Sync Off'}
-                            </button>
-                        )}
-                    </div>
-                </div>
-                
-                <div className="w-8"></div>
-            </div>
+          ))}
         </div>
 
-        {/* CONTENT AREA */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto bg-white">
-            <div className="px-8 py-6 max-w-3xl mx-auto w-full pb-40 min-h-full flex flex-col">
-                {currentPage?.blocks.map((block: any, idx: number) => (
-                    isInteractivePage ? (
-                        <div key={idx} className="flex-1 flex flex-col justify-center py-10">
-                            {block.type === 'quiz' && <QuizBlock block={block} onComplete={handleNext} />}
-                            {block.type === 'flashcard' && (
-                                <div className="flex flex-col items-center">
-                                     <ConceptCardBlock front={block.front} back={block.back} context={block.title} />
-                                     <button onClick={handleNext} className="mt-12 px-10 py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-xl flex items-center gap-2">
-                                        Continue <ArrowRight size={20}/>
-                                     </button>
-                                </div>
-                            )}
-                        </div>
-                    ) : renderBlock(block, idx)
-                ))}
-            </div>
-        </div>
+        <div className="flex justify-between items-center">
+          <button onClick={() => onFinish(null, 0)} className="p-2 -ml-2 rounded-full text-slate-400 hover:bg-slate-50">
+            <X size={24} />
+          </button>
 
-        {/* INSTRUCTOR REMOTE CONTROLS (Floating) */}
-        {isInstructor && isLiveSynced && (
-            <div className="fixed bottom-32 left-1/2 -translate-x-1/2 flex gap-3 bg-white/90 backdrop-blur-xl p-3 rounded-[2rem] shadow-2xl border border-slate-100 z-[60] animate-in slide-in-from-bottom-10">
-                <button onClick={handlePrev} disabled={currentPageIdx === 0} className="p-4 bg-slate-100 rounded-2xl text-slate-600 disabled:opacity-30">
-                    <ChevronLeft size={24} />
-                </button>
-                <div className="px-4 flex flex-col items-center justify-center">
-                    <span className="text-[10px] font-black text-indigo-600 uppercase">Slide</span>
-                    <span className="text-xl font-black text-slate-900">{currentPageIdx + 1}</span>
-                </div>
-                <button onClick={handleNext} className="p-4 bg-indigo-600 rounded-2xl text-white">
-                    <ChevronRight size={24} />
-                </button>
-            </div>
-        )}
-
-        {/* FOOTER */}
-        {!isInteractivePage && (
-            <div className="fixed bottom-8 left-0 right-0 px-6 z-50 flex justify-center pointer-events-none">
-                <button 
-                    onClick={handleNext}
-                    className="pointer-events-auto shadow-2xl bg-indigo-600 text-white px-10 py-5 rounded-full font-black text-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3 animate-in slide-in-from-bottom-4"
+          <div className="text-center">
+            <h2 className="text-sm font-black text-slate-800 tracking-tight">{lesson.title}</h2>
+            <div className="flex items-center gap-2 justify-center">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                {isInteractivePage ? 'Interactive' : `Part ${currentPageIdx + 1}`}
+              </p>
+              {isInstructor && (
+                <button
+                  onClick={() => setIsLiveSynced(!isLiveSynced)}
+                  className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase transition-all ${isLiveSynced ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-slate-100 text-slate-400'}`}
                 >
-                    {isLastPage ? "Complete" : "Continue"} 
-                    {isLastPage ? <Check size={24} strokeWidth={3}/> : <ArrowRight size={24} strokeWidth={3}/>}
+                  {isLiveSynced ? '● Sync Active' : 'Sync Off'}
                 </button>
+              )}
             </div>
-        )}
+          </div>
+          <div className="w-8"></div>
+        </div>
+      </div>
+
+      {/* CONTENT AREA */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto bg-white custom-scrollbar">
+        <div className="px-8 py-6 max-w-3xl mx-auto w-full pb-40 min-h-full flex flex-col">
+          {currentPage?.blocks.map((block: any, idx: number) => (
+            isInteractivePage ? (
+              <div key={idx} className="flex-1 flex flex-col justify-center py-10 animate-in zoom-in-95 duration-500">
+                {block.type === 'quiz' && <QuizBlock block={block} onComplete={handleNext} />}
+                {block.type === 'flashcard' && (
+                  <div className="flex flex-col items-center">
+                    <ConceptCardBlock front={block.front} back={block.back} context={block.title} />
+                    <button onClick={handleNext} className="mt-12 px-10 py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-xl shadow-indigo-100 flex items-center gap-3">
+                      Continue <ArrowRight size={20} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : renderBlock(block, idx)
+          ))}
+        </div>
+      </div>
+
+      {/* INSTRUCTOR FLOATING REMOTE */}
+      {isInstructor && isLiveSynced && (
+        <div className="fixed bottom-32 left-1/2 -translate-x-1/2 flex gap-3 bg-white/90 backdrop-blur-xl p-3 rounded-[2.5rem] shadow-2xl border border-slate-100 z-[60] animate-in slide-in-from-bottom-10">
+          <button onClick={handlePrev} disabled={currentPageIdx === 0} className="p-5 bg-slate-50 text-slate-400 rounded-3xl disabled:opacity-20 hover:bg-slate-100 transition-colors">
+            <ChevronLeft size={28} />
+          </button>
+          <div className="px-6 flex flex-col items-center justify-center">
+            <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Slide</span>
+            <span className="text-2xl font-black text-slate-900">{currentPageIdx + 1}</span>
+          </div>
+          <button onClick={handleNext} className="p-5 bg-indigo-600 text-white rounded-3xl hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all">
+            <ChevronRight size={28} />
+          </button>
+        </div>
+      )}
+
+      {/* MOBILE FOOTER */}
+      {!isInteractivePage && (
+        <div className="fixed bottom-8 left-0 right-0 px-6 z-50 flex justify-center pointer-events-none">
+          <button
+            onClick={handleNext}
+            className="pointer-events-auto shadow-2xl bg-indigo-600 text-white px-10 py-5 rounded-full font-black text-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3 animate-in slide-in-from-bottom-4"
+          >
+            {isLastPage ? "Finish" : "Continue"}
+            {isLastPage ? <Check size={24} strokeWidth={3} /> : <ArrowRight size={24} strokeWidth={3} />}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -3545,72 +3542,65 @@ const handleFinishLesson = useCallback(async (lessonId: string, xp: number, titl
   }
 
 const renderStudentView = () => {
-  let content: React.ReactNode = null;
-  let viewKey: string = "default";
+    let content: React.ReactNode = null;
+    let viewKey: string = "default";
 
-  // Debugging: Check current state in console
-  console.log("Current View State:", { activeTab, activeLesson: !!activeLesson, activeStudentClass: !!activeStudentClass });
+    // 1. Check for Active Lesson Player
+    if (activeLesson && activeTab !== 'presentation') {
+        viewKey = `lesson-${activeLesson.id}`;
+        
+        const handleFinish = (id: string, xp: number, title: string, score: any) => {
+             handleFinishLesson(activeLesson.id, xp, title, score);
+        };
 
-  // 1. Presentation Mode (Global Overlay)
-  if (activeTab === 'presentation') {
-    viewKey = "presentation-view";
-    content = <ClassView lessonId={selectedLessonId} lessons={lessons} />;
-  } 
-  // 2. Active Lesson Player
-  else if (activeLesson) {
-    viewKey = `lesson-${activeLesson.id}`;
-    const handleFinish = (id: string, xp: number, title: string, score: any) => {
-      handleFinishLesson(activeLesson.id, xp, title, score);
-    };
+        // Check if the current user should see instructor tools
+        const isTeacher = userData?.role === 'instructor';
 
-    content = activeLesson.type === 'test' || activeLesson.type === 'exam' 
-      ? <ExamPlayerView exam={activeLesson} onFinish={handleFinish} />
-      : <LessonView lesson={activeLesson} onFinish={handleFinish} />;
-  } 
-  // 3. Class Specific View
-  else if (activeTab === 'home' && activeStudentClass) {
-    viewKey = `class-${activeStudentClass.id}`;
-    content = (
-      <StudentClassView 
-        classData={activeStudentClass} 
-        onBack={() => setActiveStudentClass(null)} 
-        onSelectLesson={handleContentSelection} 
-        onSelectDeck={handleContentSelection} 
-        userData={userData} 
-        user={user} 
-        displayName={displayName} 
-      />
-    );
-  } 
-  // 4. Standard Tab Navigation
-  else {
-    viewKey = `tab-${activeTab || 'home'}`;
-    switch (activeTab) {
-      case 'discovery':
-        content = <DiscoveryView allDecks={allDecks} user={user} onSelectDeck={handleContentSelection} userData={userData} onLogActivity={(type: string) => checkDailyQuests(type)} />;
-        break;
-      case 'flashcards':
-        const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
-        content = <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} activeDeckOverride={assignedDeck || allDecks[selectedDeckKey]} onComplete={handleFinishLesson} onLogActivity={handleLogSelfStudy} userData={userData} user={user} onUpdatePrefs={handleUpdatePreferences} onDeleteDeck={handleDeleteDeck} />;
-        break;
-      case 'create':
-        content = <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />;
-        break;
-      case 'profile':
-        content = <ProfileView user={user} userData={userData} />;
-        break;
-      case 'home':
-      default:
-        content = <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} />;
-        break;
+        if (activeLesson.type === 'test' || activeLesson.type === 'exam') {
+             content = <ExamPlayerView exam={activeLesson} onFinish={handleFinish} />;
+        } else {
+             content = <LessonView lesson={activeLesson} onFinish={handleFinish} isInstructor={isTeacher} />;
+        }
+        
+    // 2. Class Specific View
+    } else if (activeTab === 'home' && activeStudentClass) {
+        viewKey = `class-${activeStudentClass.id}`;
+        content = <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} displayName={displayName} />;
+    } 
+    // 3. Main Navigation Switches
+    else {
+        viewKey = `tab-${activeTab || 'home'}`;
+        switch (activeTab) {
+            case 'home': 
+                content = <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} />;
+                break;
+            case 'discovery': 
+                content = <DiscoveryView allDecks={allDecks} user={user} onSelectDeck={handleContentSelection} userData={userData} onLogActivity={(type: string) => checkDailyQuests(type)} />;
+                break;
+            case 'flashcards': 
+                const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
+                content = <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} activeDeckOverride={assignedDeck || allDecks[selectedDeckKey]} onComplete={handleFinishLesson} onLogActivity={handleLogSelfStudy} userData={userData} user={user} onUpdatePrefs={handleUpdatePreferences} onDeleteDeck={handleDeleteDeck} />;
+                break;
+            case 'create': 
+                content = <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />;
+                break;
+            case 'presentation':
+                // selectedLessonId must be defined in your App state
+                content = <ClassView lessonId={selectedLessonId} lessons={lessons} />;
+                break;
+            case 'profile': 
+                content = <ProfileView user={user} userData={userData} />;
+                break;
+            default: 
+                content = <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} />;
+        }
     }
-  }
 
-  return (
-    <div key={viewKey} className="h-full w-full animate-in fade-in duration-300">
-      {content || <div className="p-20 text-center text-slate-400">Content failed to load.</div>}
-    </div>
-  );
+    return (
+        <div key={viewKey} className="h-full w-full animate-in fade-in duration-300">
+            {content || <div className="p-10 text-slate-400">Loading view...</div>}
+        </div>
+    );
 };
   // --- PLACE IT HERE ---
     // This logic runs every time the App renders to decide if we are in "Class Mode"
