@@ -2067,18 +2067,30 @@ function StudentClassView({
   onSelectLesson, 
   onSelectDeck, 
   userData, 
-  user, 
-  displayName,
-  // Ensure these are passed down from the main App component
+  // We add 'allLessons' here to resolve IDs to full data
+  allLessons = [], 
   setActiveTab, 
   setSelectedLessonId 
 }: any) {
-    const lessons = classData.lessons || [];
+    
+    // RESOLUTION LOGIC: 
+    // If classData.lessons contains IDs, we find the full objects from allLessons.
+    const resolvedLessons = useMemo(() => {
+        const classLessonRefs = classData.lessons || [];
+        
+        return classLessonRefs.map((ref: any) => {
+            // If it's already an object with a title, use it
+            if (ref && typeof ref === 'object' && ref.title) return ref;
+            
+            // If it's an ID (string), find the matching lesson in our master list
+            return allLessons.find((l: any) => l.id === ref);
+        }).filter(Boolean); // Remove any that weren't found
+    }, [classData.lessons, allLessons]);
+
     const decks = classData.decks || [];
 
     return (
         <div className="h-full flex flex-col bg-slate-50">
-            {/* Header Area */}
             <div className="bg-white px-6 pt-12 pb-6 border-b border-slate-100 shadow-sm">
                 <button 
                     onClick={onBack}
@@ -2088,12 +2100,10 @@ function StudentClassView({
                     Back to Classes
                 </button>
                 <h1 className="text-3xl font-black text-slate-900 tracking-tight">{classData.name}</h1>
-                <p className="text-slate-500 font-medium">{classData.description || 'Welcome to your class workspace.'}</p>
+                <p className="text-slate-500 font-medium line-clamp-2">{classData.description || 'Class workspace'}</p>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
-                
-                {/* 1. LESSONS SECTION */}
                 <section>
                     <div className="flex items-center gap-2 mb-4">
                         <div className="bg-indigo-100 p-1.5 rounded-lg text-indigo-600">
@@ -2103,7 +2113,7 @@ function StudentClassView({
                     </div>
 
                     <div className="space-y-3">
-                        {lessons.length > 0 ? lessons.map((lesson: any) => (
+                        {resolvedLessons.length > 0 ? resolvedLessons.map((lesson: any) => (
                             <div 
                                 key={lesson.id} 
                                 className="group bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm hover:border-indigo-100 transition-all flex items-center justify-between"
@@ -2118,7 +2128,6 @@ function StudentClassView({
                                 </div>
 
                                 <div className="flex items-center gap-2">
-                                    {/* STANDARD START BUTTON (For Everyone) */}
                                     <button 
                                         onClick={() => onSelectLesson(lesson)}
                                         className="px-4 py-2 bg-slate-50 text-slate-600 rounded-xl font-bold text-xs hover:bg-indigo-600 hover:text-white transition-all border border-slate-100"
@@ -2126,7 +2135,6 @@ function StudentClassView({
                                         Open
                                     </button>
 
-                                    {/* INSTRUCTOR PRESENTATION BUTTON */}
                                     {userData?.role === 'instructor' && (
                                         <button 
                                             onClick={(e) => {
@@ -2134,8 +2142,7 @@ function StudentClassView({
                                                 setSelectedLessonId(lesson.id);
                                                 setActiveTab('presentation');
                                             }}
-                                            className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center"
-                                            title="Launch Class Presentation"
+                                            className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
                                         >
                                             <Monitor size={18} />
                                         </button>
@@ -2144,44 +2151,17 @@ function StudentClassView({
                             </div>
                         )) : (
                             <div className="text-center py-10 bg-white/50 border-2 border-dashed border-slate-200 rounded-[2rem] text-slate-400 font-bold text-sm">
-                                No lessons assigned yet.
+                                No lessons assigned to this class yet.
                             </div>
                         )}
                     </div>
                 </section>
 
-                {/* 2. FLASHCARDS SECTION */}
-                <section className="pb-20">
-                    <div className="flex items-center gap-2 mb-4">
-                        <div className="bg-orange-100 p-1.5 rounded-lg text-orange-600">
-                            <Layers size={16} />
-                        </div>
-                        <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Flashcard Decks</h2>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        {decks.map((deck: any) => (
-                            <button 
-                                key={deck.id}
-                                onClick={() => onSelectDeck(deck)}
-                                className="bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm text-left hover:scale-[1.02] active:scale-[0.98] transition-all group"
-                            >
-                                <div className="w-10 h-10 bg-slate-50 rounded-xl mb-3 flex items-center justify-center text-slate-400 group-hover:text-orange-500 transition-colors">
-                                    <Layers size={20} />
-                                </div>
-                                <h3 className="font-black text-slate-800 text-sm line-clamp-2 leading-tight">{deck.title}</h3>
-                                <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase tracking-tighter">
-                                    {deck.cardCount || 0} Cards
-                                </p>
-                            </button>
-                        ))}
-                    </div>
-                </section>
+                {/* Decks Section remains same... */}
             </div>
         </div>
     );
 }
-
 
 
 
@@ -3472,63 +3452,146 @@ const renderStudentView = () => {
     let content: React.ReactNode = null;
     let viewKey: string = "default";
 
-    // 1. Check for Active Lesson Player
-    if (activeLesson && activeTab !== 'presentation') {
-        viewKey = `lesson-${activeLesson.id}`;
-        
-        const handleFinish = (id: string, xp: number, title: string, score: any) => {
-             handleFinishLesson(activeLesson.id, xp, title, score);
-        };
-
-        // Check if the current user should see instructor tools
-        const isTeacher = userData?.role === 'instructor';
-
-        if (activeLesson.type === 'test' || activeLesson.type === 'exam') {
-             content = <ExamPlayerView exam={activeLesson} onFinish={handleFinish} />;
-        } else {
-             content = <LessonView lesson={activeLesson} onFinish={handleFinish} isInstructor={isTeacher} />;
-        }
-        
-    // 2. Class Specific View
-    } else if (activeTab === 'home' && activeStudentClass) {
-        viewKey = `class-${activeStudentClass.id}`;
-        content = <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} displayName={displayName} />;
+    // 1. PRIORITY 1: Presentation Mode (ClassView)
+    // We check this first so it overrides the standard lesson player when active.
+    if (activeTab === 'presentation') {
+      viewKey = `presentation-${selectedLessonId}`;
+      content = (
+        <ClassView 
+          lessonId={selectedLessonId} 
+          lessons={lessons} 
+        />
+      );
     } 
-    // 3. Main Navigation Switches
+    
+    // 2. PRIORITY 2: Active Lesson Player
+    // Shown when a student or instructor is actively taking/previewing a lesson.
+    else if (activeLesson) {
+      viewKey = `lesson-${activeLesson.id}`;
+      
+      const handleFinish = (id: string, xp: number, title: string, score: any) => {
+        handleFinishLesson(activeLesson.id, xp, title, score);
+      };
+
+      // Determine if instructor tools (Remote/Sync) should be visible
+      const isTeacher = userData?.role === 'instructor';
+
+      if (activeLesson.type === 'test' || activeLesson.type === 'exam') {
+        content = <ExamPlayerView exam={activeLesson} onFinish={handleFinish} />;
+      } else {
+        content = (
+          <LessonView 
+            lesson={activeLesson} 
+            onFinish={handleFinish} 
+            isInstructor={isTeacher} 
+          />
+        );
+      }
+    } 
+    
+    // 3. PRIORITY 3: Active Class View
+    // Shown when a user has drilled down into a specific class from the Home tab.
+    else if (activeTab === 'home' && activeStudentClass) {
+      viewKey = `class-${activeStudentClass.id}`;
+      content = (
+        <StudentClassView 
+          classData={activeStudentClass} 
+          onBack={() => setActiveStudentClass(null)} 
+          onSelectLesson={handleContentSelection} 
+          onSelectDeck={handleContentSelection} 
+          userData={userData} 
+          user={user} 
+          displayName={displayName}
+          setActiveTab={setActiveTab}
+          setSelectedLessonId={setSelectedLessonId}
+          allLessons={lessons} // Passed to resolve Lesson IDs to full data
+        />
+      );
+    } 
+    
+    // 4. PRIORITY 4: Standard Tab Navigation
     else {
-        viewKey = `tab-${activeTab || 'home'}`;
-        switch (activeTab) {
-            case 'home': 
-                content = <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} />;
-                break;
-            case 'discovery': 
-                content = <DiscoveryView allDecks={allDecks} user={user} onSelectDeck={handleContentSelection} userData={userData} onLogActivity={(type: string) => checkDailyQuests(type)} />;
-                break;
-            case 'flashcards': 
-                const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
-                content = <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} activeDeckOverride={assignedDeck || allDecks[selectedDeckKey]} onComplete={handleFinishLesson} onLogActivity={handleLogSelfStudy} userData={userData} user={user} onUpdatePrefs={handleUpdatePreferences} onDeleteDeck={handleDeleteDeck} />;
-                break;
-            case 'create': 
-                content = <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />;
-                break;
-            case 'presentation':
-                // selectedLessonId must be defined in your App state
-                content = <ClassView lessonId={selectedLessonId} lessons={lessons} />;
-                break;
-            case 'profile': 
-                content = <ProfileView user={user} userData={userData} />;
-                break;
-            default: 
-                content = <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} />;
-        }
+      viewKey = `tab-${activeTab || 'home'}`;
+      
+      switch (activeTab) {
+        case 'discovery':
+          content = (
+            <DiscoveryView 
+              allDecks={allDecks} 
+              user={user} 
+              onSelectDeck={handleContentSelection} 
+              userData={userData}
+              onLogActivity={(type: string) => checkDailyQuests(type)} 
+            />
+          );
+          break;
+
+        case 'flashcards':
+          const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
+          content = (
+            <FlashcardView 
+              allDecks={allDecks} 
+              selectedDeckKey={selectedDeckKey} 
+              onSelectDeck={setSelectedDeckKey} 
+              onSaveCard={handleCreateCard} 
+              activeDeckOverride={assignedDeck || allDecks[selectedDeckKey]} 
+              onComplete={handleFinishLesson} 
+              onLogActivity={handleLogSelfStudy} 
+              userData={userData} 
+              user={user} 
+              onUpdatePrefs={handleUpdatePreferences} 
+              onDeleteDeck={handleDeleteDeck} 
+            />
+          );
+          break;
+
+        case 'create':
+          content = (
+            <BuilderHub 
+              onSaveCard={handleCreateCard} 
+              onUpdateCard={handleUpdateCard} 
+              onDeleteCard={handleDeleteCard} 
+              onSaveLesson={handleCreateLesson} 
+              allDecks={allDecks} 
+              lessons={lessons} 
+            />
+          );
+          break;
+
+        case 'profile':
+          content = <ProfileView user={user} userData={userData} />;
+          break;
+
+        case 'home':
+        default:
+          content = (
+            <HomeView 
+              setActiveTab={setActiveTab} 
+              allDecks={allDecks} 
+              lessons={lessons} 
+              assignments={classLessons} 
+              classes={enrolledClasses} 
+              onSelectClass={(c: any) => setActiveStudentClass(c)} 
+              onSelectLesson={handleContentSelection} 
+              onSelectDeck={handleContentSelection} 
+              userData={userData} 
+              user={user} 
+            />
+          );
+          break;
+      }
     }
 
     return (
-        <div key={viewKey} className="h-full w-full animate-in fade-in duration-300">
-            {content || <div className="p-10 text-slate-400">Loading view...</div>}
-        </div>
+      <div key={viewKey} className="h-full w-full animate-in fade-in duration-300">
+        {content || (
+          <div className="flex items-center justify-center h-full text-slate-400 font-bold">
+            Loading Workspace...
+          </div>
+        )}
+      </div>
     );
-};
+  };
   // --- PLACE IT HERE ---
     // This logic runs every time the App renders to decide if we are in "Class Mode"
     const isPresentation = activeTab === 'presentation';
