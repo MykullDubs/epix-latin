@@ -3211,7 +3211,7 @@ function ExamPlayerView({ exam, onFinish }: any) {
 }
 
 function App() {
-  // --- 1. STATE ---
+  // --- 1. STATE DECLARATIONS ---
   const [activeTab, setActiveTab] = useState('home');
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
@@ -3228,7 +3228,7 @@ function App() {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  // --- 2. AUTH SYNC ---
+  // --- 2. AUTH & PROFILE SYNC ---
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -3240,88 +3240,84 @@ function App() {
     return () => unsubAuth();
   }, []);
 
-  // --- 3. PROFILE & CONTENT SYNC ---
   useEffect(() => {
     if (!user?.uid) return;
+    const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main');
+    const unsubProfile = onSnapshot(profileRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setUserData(docSnap.data());
+      } else {
+        setUserData(DEFAULT_USER_DATA);
+      }
+      setAuthChecked(true);
+    });
+    return () => unsubProfile();
+  }, [user?.uid]);
 
-    // Load Local Data
+  // --- 3. CONTENT & CLASS SYNC ---
+  useEffect(() => {
+    if (!user?.uid || !userData?.role) return;
+
+    // A. Set Static Data
     setSystemDecks(INITIAL_SYSTEM_DECKS);
     setSystemLessons(INITIAL_SYSTEM_LESSONS);
 
-    // Sync Profile
-    const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
-      if (snap.exists()) setUserData(snap.data());
-      else setUserData(DEFAULT_USER_DATA);
-      setAuthChecked(true);
-    });
-
-    // Sync Library
+    // B. Sync Library (Cards & Lessons)
     const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => 
       setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     
     const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => 
       setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-    const unsubSysDecks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_decks'), (snap) => {
-      const d: any = {}; snap.docs.forEach(doc => { d[doc.id] = doc.data(); });
-      if (Object.keys(d).length > 0) setSystemDecks(d);
-    });
-
-    const unsubSysLessons = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_lessons'), (snap) => {
-      const l = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      if (l.length > 0) setSystemLessons(l);
-    });
-
-    return () => { unsubProfile(); unsubCards(); unsubLessons(); unsubSysDecks(); unsubSysLessons(); };
-  }, [user?.uid]);
-
-  // --- 4. CLASSROOM SYNC (Flattening Assignments) ---
-  useEffect(() => {
-    if (!user?.uid || !userData?.role) return;
-
-    // Build query based on role
-    const q = userData.role === 'instructor' 
+    // C. Sync Classroom Assignments (The Critical Part)
+    const qClasses = userData.role === 'instructor' 
       ? query(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'))
       : query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
 
-    const unsubClasses = onSnapshot(q, (snapshot) => {
+    const unsubClasses = onSnapshot(qClasses, (snapshot) => {
       const fetchedClasses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setEnrolledClasses(fetchedClasses);
 
-      // FLATTEN: Combine all assignments from all classes into one list
       let allAssignments: any[] = [];
       fetchedClasses.forEach((cls: any) => {
         if (cls.assignments && Array.isArray(cls.assignments)) {
+          // WE INJECT THE CLASS ID HERE SO THE FILTER WORKS
           const mapped = cls.assignments.map((a: any) => ({
             ...a,
-            classId: cls.id, // Linked for StudentClassView filter
+            classId: cls.id, 
             className: cls.name
           }));
           allAssignments = [...allAssignments, ...mapped];
         }
       });
 
-      console.log(`✅ Classroom Sync: Found ${allAssignments.length} assignments.`);
+      console.log(`✅ Classroom Sync: Found ${allAssignments.length} total lessons.`);
       setClassLessons(allAssignments);
-    }, (error) => {
-      console.error("❌ Class sync error:", error);
     });
 
-    return () => unsubClasses();
+    return () => { unsubCards(); unsubLessons(); unsubClasses(); };
   }, [user?.uid, userData?.role, user?.email]);
-  // --- MEMOS ---
+
+  // --- 4. MEMOS ---
   const allDecks = useMemo(() => {
     const decks: any = { ...systemDecks, custom: { title: "✍️ Card Builder", cards: [] } };
     customCards.forEach(card => {
         const target = card.deckId || 'custom';
-        if (!decks[target]) { decks[target] = { title: card.deckTitle || "Custom Deck", cards: [] }; }
-        if (!decks[target].cards) decks[target].cards = [];
+        if (!decks[target]) decks[target] = { title: card.deckTitle || "Custom Deck", cards: [] };
         decks[target].cards.push(card);
     });
     return decks;
   }, [systemDecks, customCards]);
 
-  const lessons = useMemo(() => [...systemLessons, ...customLessons, ...classLessons.filter(l => l.contentType !== 'deck')], [systemLessons, customLessons, classLessons]);
+  const lessons = useMemo(() => {
+    // We combine the master library with the assignments to ensure descriptions load
+    const library = [...systemLessons, ...customLessons];
+    return classLessons.map(assignment => {
+      const base = library.find(l => l.id === (assignment.originalId || assignment.id));
+      return base ? { ...base, ...assignment } : assignment;
+    });
+  }, [systemLessons, customLessons, classLessons]);
+
   const libraryLessons = useMemo(() => [...systemLessons, ...customLessons], [systemLessons, customLessons]);
 
   const displayName = useMemo(() => {
@@ -3331,22 +3327,16 @@ function App() {
       return 'Scholar';
   }, [userData, user]);
 
-const handleContentSelection = (item: any) => {
-  // Save the ID so ClassView can find it later
-  if (item.id) {
-    setSelectedLessonId(item.id);
-  }
-
-  if (item.contentType === 'lesson' || item.type === 'lesson') {
-    setActiveLesson(item);
-  } else if (item.contentType === 'deck' || item.type === 'deck') {
-    setSelectedDeckKey(item.id);
-    setActiveTab('flashcards');
-  }
-};
-
-  // --- EFFECTS ---
-  useEffect(() => { const unsubscribe = onAuthStateChanged(auth, (u) => { setUser(u); setAuthChecked(true); }); return () => unsubscribe(); }, []);
+  // --- 5. NAVIGATION HANDLERS ---
+  const handleContentSelection = (item: any) => {
+    if (item.id) setSelectedLessonId(item.id);
+    if (item.contentType === 'lesson' || item.type === 'lesson') {
+      setActiveLesson(item);
+    } else if (item.contentType === 'deck' || item.type === 'deck') {
+      setSelectedDeckKey(item.id);
+      setActiveTab('flashcards');
+    }
+  };
   
  
 
