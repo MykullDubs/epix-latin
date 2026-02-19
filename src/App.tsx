@@ -438,6 +438,7 @@ function LessonView({ lesson, onFinish, isInstructor = false }: any) {
   useLearningTimer(auth.currentUser, lesson.id, 'lesson', lesson.title);
 
   // 1. SMART PAGING ALGORITHM
+  // This groups static text/images together and creates separate pages for interactions.
   const pages = useMemo(() => {
     const rawBlocks = lesson.blocks || [];
     const groupedPages: any[] = [];
@@ -462,36 +463,26 @@ function LessonView({ lesson, onFinish, isInstructor = false }: any) {
     return groupedPages;
   }, [lesson]);
 
-  // 2. State & Scrolling
+  // 2. STATE & SYNC
   const [currentPageIdx, setCurrentPageIdx] = useState(0);
   const [isLiveSynced, setIsLiveSynced] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // LIVE SYNC: Receive updates (Students)
-  useEffect(() => {
-    if (!lesson.id || isInstructor) return;
-    const docRef = doc(db, 'live_sessions', lesson.id);
-    const unsub = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (typeof data.activePageIdx === 'number') {
-          setCurrentPageIdx(data.activePageIdx);
-        }
-      }
-    });
-    return () => unsub();
-  }, [lesson.id, isInstructor]);
-
-  // LIVE SYNC: Broadcast updates (Instructor)
+  // BROADCAST: Send current page to the Big Screen (ClassView)
   const broadcastNavigation = async (index: number) => {
-    if (!isInstructor || !isLiveSynced) return;
-    const docRef = doc(db, 'live_sessions', lesson.id);
-    await setDoc(docRef, {
-      activePageIdx: index,
-      updatedAt: Date.now()
-    }, { merge: true });
+    if (!isLiveSynced) return; 
+    try {
+      const docRef = doc(db, 'live_sessions', lesson.id);
+      await setDoc(docRef, {
+        activePageIdx: index,
+        updatedAt: Date.now()
+      }, { merge: true });
+    } catch (e) {
+      console.error("Broadcast failed:", e);
+    }
   };
 
+  // SCROLL RESET: Jump to top on page change
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
@@ -501,13 +492,14 @@ function LessonView({ lesson, onFinish, isInstructor = false }: any) {
   const currentPage = pages[currentPageIdx];
   const isLastPage = currentPageIdx >= pages.length - 1;
 
+  // 3. NAVIGATION HANDLERS
   const handleNext = () => {
     if (!isLastPage) {
       const nextIdx = currentPageIdx + 1;
       setCurrentPageIdx(nextIdx);
       broadcastNavigation(nextIdx);
     } else {
-      onFinish(lesson.id, lesson.xp, lesson.title);
+      onFinish(lesson.id, lesson.xp || 150, lesson.title);
     }
   };
 
@@ -519,37 +511,38 @@ function LessonView({ lesson, onFinish, isInstructor = false }: any) {
     }
   };
 
-  // 3. Block Renderer
+  // 4. BLOCK RENDERER
   const renderBlock = (block: any, idx: number) => {
     switch (block.type) {
       case 'text': return (
         <div key={idx} className="my-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          {block.title && <h2 className="text-3xl font-black text-slate-800 mb-4 tracking-tight leading-tight">{block.title}</h2>}
-          <div className="text-xl text-slate-600 leading-relaxed whitespace-pre-wrap font-serif antialiased">{block.content}</div>
+          {block.title && <h2 className="text-3xl font-black text-slate-800 mb-4 tracking-tight">{block.title}</h2>}
+          <div className="text-xl text-slate-600 leading-relaxed font-serif antialiased">{block.content}</div>
         </div>
       );
       case 'image': return (
-        <div key={idx} className="my-8 space-y-3 animate-in zoom-in-95 duration-500 group">
+        <div key={idx} className="my-8 space-y-3 animate-in zoom-in-95 duration-500">
           <div className="rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-white relative">
-            <img src={block.url} alt="Lesson" className="w-full object-cover" />
+            <img src={block.url} alt="Lesson content" className="w-full object-cover" />
           </div>
+          {block.caption && <p className="text-center text-sm font-bold text-slate-400 italic">{block.caption}</p>}
         </div>
       );
-      case 'vocab-list': return <div key={idx} className="my-8"><JuicyDeckBlock items={block.items} title="Key Vocabulary" /></div>;
+      case 'vocab-list': return <div key={idx} className="my-8"><JuicyDeckBlock items={block.items} title="Vocabulary" /></div>;
       case 'dialogue': return <div key={idx} className="my-8"><ChatDialogueBlock lines={block.lines} /></div>;
       case 'note': {
         const styles: any = {
-          info: { bg: 'bg-indigo-50', border: 'border-indigo-100', icon: <Info size={24} className="text-indigo-600" />, title: 'text-indigo-900' },
-          tip: { bg: 'bg-emerald-50', border: 'border-emerald-100', icon: <Zap size={24} className="text-emerald-600 fill-emerald-600" />, title: 'text-emerald-900' },
-          warning: { bg: 'bg-amber-50', border: 'border-amber-100', icon: <AlertTriangle size={24} className="text-amber-600" />, title: 'text-amber-900' }
+          tip: { bg: 'bg-emerald-50', border: 'border-emerald-100', icon: <Zap size={24} className="text-emerald-600 fill-emerald-600" />, text: 'text-emerald-900' },
+          warning: { bg: 'bg-amber-50', border: 'border-amber-100', icon: <AlertTriangle size={24} className="text-amber-600" />, text: 'text-amber-900' },
+          info: { bg: 'bg-indigo-50', border: 'border-indigo-100', icon: <Info size={24} className="text-indigo-600" />, text: 'text-indigo-900' }
         };
         const s = styles[block.variant || 'info'] || styles.info;
         return (
-          <div key={idx} className={`rounded-[2rem] border-2 ${s.border} ${s.bg} p-8 my-10 flex gap-6 items-start animate-in slide-in-from-left-4`}>
+          <div key={idx} className={`rounded-[2rem] border-2 ${s.border} ${s.bg} p-8 my-10 flex gap-6 items-start`}>
             <div className="shrink-0 bg-white p-3 rounded-2xl shadow-sm">{s.icon}</div>
             <div>
-              <h4 className={`font-black text-sm uppercase tracking-widest mb-2 opacity-70 ${s.title}`}>{block.title || block.variant}</h4>
-              <p className={`text-lg font-medium leading-relaxed ${s.title}`}>{block.content}</p>
+              <h4 className={`font-black text-xs uppercase tracking-widest mb-1 opacity-60 ${s.text}`}>{block.title || "Note"}</h4>
+              <p className={`text-lg font-medium leading-relaxed ${s.text}`}>{block.content}</p>
             </div>
           </div>
         );
@@ -562,11 +555,12 @@ function LessonView({ lesson, onFinish, isInstructor = false }: any) {
 
   return (
     <div className="h-full flex flex-col bg-white">
-      {/* HEADER */}
+      
+      {/* --- FLOATING STATUS HEADER --- */}
       <div className="bg-white/95 backdrop-blur-xl border-b border-slate-100 sticky top-0 z-50 pt-12 pb-4 px-6">
         <div className="flex gap-1.5 mb-4">
           {pages.map((_, idx) => (
-            <div key={idx} className="h-2 flex-1 rounded-full bg-slate-100 overflow-hidden">
+            <div key={idx} className="h-1.5 flex-1 rounded-full bg-slate-100 overflow-hidden">
               <div
                 className={`h-full transition-all duration-500 ${idx <= currentPageIdx ? 'bg-indigo-600' : 'bg-transparent'}`}
                 style={{ width: idx <= currentPageIdx ? '100%' : '0%' }}
@@ -576,76 +570,80 @@ function LessonView({ lesson, onFinish, isInstructor = false }: any) {
         </div>
 
         <div className="flex justify-between items-center">
-          <button onClick={() => onFinish(null, 0)} className="p-2 -ml-2 rounded-full text-slate-400 hover:bg-slate-50">
+          <button onClick={() => onFinish(null, 0)} className="p-2 -ml-2 rounded-full text-slate-300 hover:text-rose-500 transition-colors">
             <X size={24} />
           </button>
 
-        <div className="text-center">
-  <h2 className="text-sm font-black text-slate-800 tracking-tight">{lesson.title}</h2>
-  <div className="flex items-center gap-2 justify-center">
-    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-      {isInteractivePage ? 'Interactive' : `Part ${currentPageIdx + 1}`}
-    </p>
-    
-    {/* FORCE THE SYNC BUTTON TO APPEAR FOR TESTING */}
-    <button
-      onClick={() => setIsLiveSynced(!isLiveSynced)}
-      className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase transition-all ${isLiveSynced ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-100 text-slate-400'}`}
-    >
-      {isLiveSynced ? '● Sync Active' : 'Sync Off'}
-    </button>
-  </div>
-</div>
+          <div className="text-center">
+            <h2 className="text-sm font-black text-slate-800 tracking-tight">{lesson.title}</h2>
+            <div className="flex items-center gap-2 justify-center">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                {isInteractivePage ? 'Interaction' : `Step ${currentPageIdx + 1}`}
+              </p>
+              
+              {/* REMOTE SYNC TOGGLE */}
+              <button
+                onClick={() => {
+                  const newState = !isLiveSynced;
+                  setIsLiveSynced(newState);
+                  if (newState) broadcastNavigation(currentPageIdx);
+                }}
+                className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase transition-all shadow-sm ${
+                  isLiveSynced ? 'bg-emerald-500 text-white ring-4 ring-emerald-100' : 'bg-slate-100 text-slate-400'
+                }`}
+              >
+                {isLiveSynced ? '● Sync On' : 'Sync Off'}
+              </button>
+            </div>
+          </div>
+          <div className="w-8"></div>
+        </div>
+      </div>
 
-      {/* CONTENT AREA */}
+      {/* --- SCROLLABLE CONTENT --- */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto bg-white custom-scrollbar">
-        <div className="px-8 py-6 max-w-3xl mx-auto w-full pb-40 min-h-full flex flex-col">
+        <div className="px-8 py-6 max-w-3xl mx-auto w-full pb-44 flex flex-col min-h-full">
           {currentPage?.blocks.map((block: any, idx: number) => (
             isInteractivePage ? (
-              <div key={idx} className="flex-1 flex flex-col justify-center py-10 animate-in zoom-in-95 duration-500">
+              <div key={idx} className="flex-1 flex flex-col justify-center animate-in zoom-in-95 duration-500">
                 {block.type === 'quiz' && <QuizBlock block={block} onComplete={handleNext} />}
                 {block.type === 'flashcard' && (
                   <div className="flex flex-col items-center">
                     <ConceptCardBlock front={block.front} back={block.back} context={block.title} />
-                    <button onClick={handleNext} className="mt-12 px-10 py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-xl shadow-indigo-100 flex items-center gap-3">
-                      Continue <ArrowRight size={20} />
+                    <button onClick={handleNext} className="mt-12 px-12 py-5 bg-indigo-600 text-white rounded-full font-black shadow-xl shadow-indigo-200 flex items-center gap-3">
+                      Got it <ChevronRight size={24} strokeWidth={3}/>
                     </button>
                   </div>
                 )}
+                {block.type === 'scenario' && <ScenarioBlock block={block} onComplete={handleNext} />}
               </div>
             ) : renderBlock(block, idx)
           ))}
         </div>
       </div>
 
-      {/* INSTRUCTOR FLOATING REMOTE */}
-      {isInstructor && isLiveSynced && (
-        <div className="fixed bottom-32 left-1/2 -translate-x-1/2 flex gap-3 bg-white/90 backdrop-blur-xl p-3 rounded-[2.5rem] shadow-2xl border border-slate-100 z-[60] animate-in slide-in-from-bottom-10">
-          <button onClick={handlePrev} disabled={currentPageIdx === 0} className="p-5 bg-slate-50 text-slate-400 rounded-3xl disabled:opacity-20 hover:bg-slate-100 transition-colors">
-            <ChevronLeft size={28} />
-          </button>
-          <div className="px-6 flex flex-col items-center justify-center">
-            <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Slide</span>
-            <span className="text-2xl font-black text-slate-900">{currentPageIdx + 1}</span>
-          </div>
-          <button onClick={handleNext} className="p-5 bg-indigo-600 text-white rounded-3xl hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all">
-            <ChevronRight size={28} />
-          </button>
-        </div>
-      )}
-
-      {/* MOBILE FOOTER */}
-      {!isInteractivePage && (
-        <div className="fixed bottom-8 left-0 right-0 px-6 z-50 flex justify-center pointer-events-none">
+      {/* --- REMOTE NAV FOOTER --- */}
+      <div className="fixed bottom-8 left-0 right-0 px-8 z-40 flex justify-center pointer-events-none">
+        <div className="pointer-events-auto flex items-center gap-3 bg-white/80 backdrop-blur-2xl p-2 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-slate-100">
+          {currentPageIdx > 0 && (
+            <button 
+              onClick={handlePrev} 
+              className="p-4 bg-slate-50 text-slate-400 rounded-full hover:bg-slate-100 transition-colors"
+            >
+              <ArrowLeft size={24} />
+            </button>
+          )}
+          
           <button
             onClick={handleNext}
-            className="pointer-events-auto shadow-2xl bg-indigo-600 text-white px-10 py-5 rounded-full font-black text-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3 animate-in slide-in-from-bottom-4"
+            className="shadow-2xl bg-indigo-600 text-white px-10 py-5 rounded-full font-black text-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3"
           >
             {isLastPage ? "Finish" : "Continue"}
             {isLastPage ? <Check size={24} strokeWidth={3} /> : <ArrowRight size={24} strokeWidth={3} />}
           </button>
         </div>
-      )}
+      </div>
+
     </div>
   );
 }
