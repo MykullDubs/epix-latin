@@ -394,17 +394,22 @@ function ClassView({ lessonId, lessons }: any) {
           </div>
         );
 
-      case 'vocab-list':
-        return (
-          <div key={idx} className="grid grid-cols-2 gap-8 w-full max-w-6xl mx-auto mt-10">
-            {block.items.map((item: any, i: number) => (
-              <div key={i} className="bg-slate-50 p-10 rounded-[3rem] border-4 border-slate-100 animate-in fade-in slide-in-from-left-4" style={{ delay: `${i * 100}ms` }}>
-                <p className="text-5xl font-black text-indigo-600 mb-2">{item.term}</p>
-                <p className="text-3xl text-slate-500 font-bold">{item.definition}</p>
-              </div>
-            ))}
-          </div>
-        );
+case 'vocab-list':
+  return (
+    <div key={idx} className="grid grid-cols-2 gap-8 w-full max-w-6xl mx-auto mt-10">
+      {(block.items || []).map((item: any, i: number) => (
+        <div 
+          key={i} 
+          className="bg-slate-50 p-10 rounded-[3rem] border-4 border-slate-100 animate-in fade-in slide-in-from-left-4" 
+          // --- THE FIX: Change 'delay' to 'animationDelay' ---
+          style={{ animationDelay: `${i * 100}ms` }} 
+        >
+          <p className="text-5xl font-black text-indigo-600 mb-2">{item.term}</p>
+          <p className="text-3xl text-slate-500 font-bold">{item.definition}</p>
+        </div>
+      ))}
+    </div>
+  );
 
       case 'dialogue':
         return (
