@@ -3233,39 +3233,70 @@ function App() {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   // Inside function App() { ...
 
+// --- EFFECT 1: SYNC USER PROFILE ---
+// This runs once when you log in and stays open. 
+// It does NOT depend on the role, so it won't loop.
+useEffect(() => {
+  if (!user) {
+    setUserData(null);
+    setAuthChecked(true);
+    return;
+  }
+
+  const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main');
+  const unsubProfile = onSnapshot(profileRef, (docSnap) => {
+    if (docSnap.exists()) {
+      setUserData(docSnap.data());
+    } else {
+      // Fallback if no profile exists yet
+      setUserData(DEFAULT_USER_DATA);
+    }
+    setAuthChecked(true);
+  }, (error) => {
+    console.error("Profile Sync Error:", error);
+    setAuthChecked(true); 
+  });
+
+  return () => unsubProfile();
+}, [user?.uid]); // Only restarts if the User ID changes
+
+
+// --- EFFECT 2: SYNC CLASSES & ASSIGNMENTS ---
+// This waits for the Profile (Role) to be ready, then fetches data.
 useEffect(() => {
   if (!user?.uid || !userData?.role) return;
 
-  // 1. Unified Query Logic
+  console.log("📡 Syncing Classes for:", userData.role);
+
+  // 1. Build Query based on Role
   const q = userData.role === 'instructor' 
     ? query(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'))
     : query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
 
-  const unsub = onSnapshot(q, (snapshot) => {
+  const unsubClasses = onSnapshot(q, (snapshot) => {
     const fetchedClasses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     setEnrolledClasses(fetchedClasses);
 
-    // 2. THE FLATTENING (The part that was missing the ID)
-    let allAssignedItems: any[] = [];
+    // 2. FLATTEN ASSIGNMENTS & INJECT CLASS ID
+    // This is what makes Michael's Class show the 6 lessons
+    let flattened: any[] = [];
     fetchedClasses.forEach((cls: any) => {
       if (cls.assignments && Array.isArray(cls.assignments)) {
         const mapped = cls.assignments.map((a: any) => ({
           ...a,
-          classId: cls.id, // <--- THE MISSING LINK
+          classId: cls.id, // Linked for StudentClassView filter
           className: cls.name
         }));
-        allAssignedItems = [...allAssignedItems, ...mapped];
+        flattened = [...flattened, ...mapped];
       }
     });
 
-    console.log(`✅ Sync Complete: ${fetchedClasses.length} classes, ${allAssignedItems.length} assignments.`);
-    setClassLessons(allAssignedItems);
-  }, (error) => {
-    console.error("❌ Class sync error:", error);
+    console.log(`✅ Success: Found ${flattened.length} assignments.`);
+    setClassLessons(flattened);
   });
 
-  return () => unsub();
-}, [user?.uid, user?.email, userData?.role]);
+  return () => unsubClasses();
+}, [user?.uid, userData?.role, user?.email]);
   
   // --- MEMOS ---
   const allDecks = useMemo(() => {
