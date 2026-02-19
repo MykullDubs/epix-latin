@@ -413,15 +413,16 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
 
   const currentPage = pages[activePageIdx];
 
-// --- BIG SCREEN RENDERER (Optimized for Auto-Fit) ---
+// --- BIG SCREEN RENDERER (Squish-to-Fit Logic) ---
   const renderBigBlock = (block: any, idx: number) => {
-    // We use 'vh' (viewport height) so text scales with the window size
+    const baseClasses = "flex flex-col items-center justify-center w-full min-h-0 flex-1 overflow-hidden";
+    
     switch (block.type) {
       case 'text':
         return (
-          <div key={idx} className="flex flex-col justify-center items-center h-full max-h-[70vh] px-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {block.title && <h3 className="text-[4vh] font-black text-indigo-600 uppercase tracking-tighter mb-[2vh]">{block.title}</h3>}
-            <p className="text-[6vh] lg:text-[7.5vh] leading-[1.1] text-slate-800 font-bold max-w-5xl mx-auto whitespace-pre-wrap tracking-tight">
+          <div key={idx} className={`${baseClasses} py-[2vh]`}>
+            {block.title && <h3 className="text-[3vh] font-black text-indigo-600 uppercase tracking-tighter mb-2 shrink-0">{block.title}</h3>}
+            <p className="text-[5vh] lg:text-[6.5vh] leading-tight text-slate-800 font-bold max-w-5xl mx-auto whitespace-pre-wrap tracking-tight text-center overflow-hidden">
               {block.content}
             </p>
           </div>
@@ -429,19 +430,23 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
 
       case 'image':
         return (
-          <div key={idx} className="flex flex-col items-center justify-center h-full max-h-[70vh] animate-in zoom-in-95 duration-500">
-            <img src={block.url} className="max-h-[55vh] w-auto object-contain rounded-[3rem] shadow-2xl border-[1vw] border-white" alt="Slide Visual" />
-            {block.caption && <p className="mt-[2vh] text-[3vh] font-bold text-slate-400 italic">{block.caption}</p>}
+          <div key={idx} className={`${baseClasses} py-[2vh]`}>
+            <img 
+              src={block.url} 
+              className="max-h-full max-w-full w-auto h-auto object-contain rounded-[2rem] shadow-2xl border-[1vw] border-white" 
+              alt="Slide Visual" 
+            />
+            {block.caption && <p className="mt-2 text-[2.5vh] font-bold text-slate-400 italic shrink-0">{block.caption}</p>}
           </div>
         );
 
       case 'vocab-list':
         return (
-          <div key={idx} className="grid grid-cols-2 gap-[2vw] w-full max-w-6xl mx-auto items-center justify-center py-[2vh]">
-            {block.items.map((item: any, i: number) => (
-              <div key={i} className="bg-slate-50 p-[3vh] rounded-[2.5rem] border-4 border-slate-100 flex flex-col justify-center items-center shadow-sm">
-                <p className="text-[5vh] font-black text-indigo-600 leading-none mb-[1vh]">{item.term}</p>
-                <p className="text-[3vh] text-slate-500 font-bold leading-tight">{item.definition}</p>
+          <div key={idx} className="grid grid-cols-2 gap-[2vh] w-full max-w-6xl mx-auto flex-1 min-h-0 py-[2vh]">
+            {(block.items || []).map((item: any, i: number) => (
+              <div key={i} className="bg-slate-50 p-[2vh] rounded-[2rem] border-4 border-slate-100 flex flex-col justify-center items-center overflow-hidden">
+                <p className="text-[4vh] font-black text-indigo-600 leading-none mb-1">{item.term}</p>
+                <p className="text-[2.5vh] text-slate-500 font-bold leading-tight text-center">{item.definition}</p>
               </div>
             ))}
           </div>
@@ -449,12 +454,12 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
 
       case 'dialogue':
         return (
-          <div key={idx} className="space-y-[2vh] w-full max-w-5xl mx-auto flex flex-col justify-center py-[2vh]">
-            {block.lines.map((line: any, i: number) => (
-              <div key={i} className={`flex ${line.side === 'right' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`p-[3vh] px-[4vh] rounded-[3rem] max-w-[85%] shadow-xl border-4 ${line.side === 'right' ? 'bg-indigo-600 text-white border-indigo-500 rounded-tr-none' : 'bg-white text-slate-800 border-slate-100 rounded-tl-none'}`}>
-                  <p className="text-[4vh] font-bold leading-tight">{line.text}</p>
-                  {line.translation && <p className={`text-[2vh] mt-[1.5vh] pt-[1.5vh] border-t ${line.side === 'right' ? 'border-white/20 text-indigo-100' : 'border-slate-100 text-slate-400'} italic`}>{line.translation}</p>}
+          <div key={idx} className="space-y-[1.5vh] w-full max-w-4xl mx-auto flex flex-col justify-center flex-1 min-h-0 py-[2vh]">
+            {(block.lines || []).map((line: any, i: number) => (
+              <div key={i} className={`flex ${line.side === 'right' ? 'justify-end' : 'justify-start'} min-h-0`}>
+                <div className={`p-[2vh] px-[3vh] rounded-[2.5rem] max-w-[80%] shadow-lg border-2 ${line.side === 'right' ? 'bg-indigo-600 text-white border-indigo-500 rounded-tr-none' : 'bg-white text-slate-800 border-slate-100 rounded-tl-none'}`}>
+                  <p className="text-[3vh] font-bold leading-tight">{line.text}</p>
+                  {line.translation && <p className={`text-[1.8vh] mt-1 pt-1 border-t ${line.side === 'right' ? 'border-white/20 text-indigo-100' : 'border-slate-100 text-slate-400'} italic`}>{line.translation}</p>}
                 </div>
               </div>
             ))}
@@ -463,20 +468,20 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
 
       case 'note':
         return (
-          <div key={idx} className="p-[4vh] bg-amber-50 rounded-[4rem] border-8 border-amber-100 max-w-5xl mx-auto flex gap-10 items-center shadow-lg">
-             <div className="bg-white p-[2vh] rounded-full shadow-md"><Zap size={60} className="text-amber-500 fill-amber-500" /></div>
-             <div className="text-left">
-                <h4 className="text-[2vh] font-black text-amber-600 uppercase tracking-widest mb-1">{block.title || "Note"}</h4>
-                <p className="text-[5vh] font-bold text-amber-900 leading-tight">{block.content}</p>
+          <div key={idx} className="p-[3vh] bg-amber-50 rounded-[3rem] border-4 border-amber-100 max-w-4xl mx-auto flex gap-6 items-center shadow-lg flex-1 min-h-0">
+             <div className="bg-white p-[1.5vh] rounded-full shadow-md shrink-0"><Zap size={40} className="text-amber-500 fill-amber-500" /></div>
+             <div className="text-left overflow-hidden">
+                <h4 className="text-[1.8vh] font-black text-amber-600 uppercase tracking-widest mb-1">{block.title || "Note"}</h4>
+                <p className="text-[3.5vh] font-bold text-amber-900 leading-tight">{block.content}</p>
              </div>
           </div>
         );
 
       default:
         return (
-          <div key={idx} className="py-[10vh] px-[5vw] bg-indigo-50 rounded-[5rem] border-8 border-indigo-100/50 text-center">
-            <p className="text-[8vh] font-black text-indigo-600 uppercase tracking-tighter">Participation</p>
-            <p className="text-[3vh] font-bold text-indigo-400">Check mobile devices!</p>
+          <div key={idx} className="flex-1 flex flex-col justify-center items-center py-[5vh] px-[5vw] bg-indigo-50 rounded-[4rem] border-4 border-indigo-100/50">
+            <p className="text-[6vh] font-black text-indigo-600 uppercase tracking-tighter">Participation</p>
+            <p className="text-[2.5vh] font-bold text-indigo-400">Check mobile devices!</p>
           </div>
         );
     }
@@ -500,9 +505,9 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
       </div>
 
       {/* Primary Slide Content */}
-      <div className="flex-1 flex flex-col justify-center text-center max-w-[90vw] mx-auto w-full relative z-10">
-        {currentPage?.blocks.map((block: any, idx: number) => renderBigBlock(block, idx))}
-      </div>
+      <div className="flex-1 flex flex-col justify-center items-center text-center w-full min-h-0 overflow-hidden relative z-10">
+    {currentPage?.blocks.map((block: any, idx: number) => renderBigBlock(block, idx))}
+    </div>
 
       {/* Professional Footer */}
       <div className="mt-12 pt-10 border-t-4 border-slate-50 flex justify-between items-end relative z-10">
