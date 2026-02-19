@@ -3254,7 +3254,8 @@ function App() {
     return () => unsubProfile();
   }, [user?.uid]);
 
-  // --- 3. CONTENT & CLASS SYNC ---
+  // --- 3. MASTER CONTENT & CLASS SYNC ---
+  // This single effect handles Lessons, Cards, and Classes to prevent state collisions.
   useEffect(() => {
     if (!user?.uid || !userData?.role) return;
 
@@ -3262,14 +3263,25 @@ function App() {
     setSystemDecks(INITIAL_SYSTEM_DECKS);
     setSystemLessons(INITIAL_SYSTEM_LESSONS);
 
-    // B. Sync Library (Cards & Lessons)
+    // B. Sync User-Created Content
     const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => 
-      setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+        setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     
     const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => 
-      setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+        setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-    // C. Sync Classroom Assignments (The Critical Part)
+    // C. Sync Public System Data
+    const unsubSysDecks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_decks'), (snap) => {
+      const d: any = {}; snap.docs.forEach(doc => { d[doc.id] = doc.data(); });
+      if (Object.keys(d).length > 0) setSystemDecks(d);
+    });
+
+    const unsubSysLessons = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_lessons'), (snap) => {
+      const l = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (l.length > 0) setSystemLessons(l);
+    });
+
+    // D. Sync Classroom Assignments (The Fix)
     const qClasses = userData.role === 'instructor' 
       ? query(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'))
       : query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
@@ -3281,7 +3293,7 @@ function App() {
       let allAssignments: any[] = [];
       fetchedClasses.forEach((cls: any) => {
         if (cls.assignments && Array.isArray(cls.assignments)) {
-          // WE INJECT THE CLASS ID HERE SO THE FILTER WORKS
+          // Inject classId into each lesson so the Dashboard filter matches
           const mapped = cls.assignments.map((a: any) => ({
             ...a,
             classId: cls.id, 
@@ -3290,12 +3302,11 @@ function App() {
           allAssignments = [...allAssignments, ...mapped];
         }
       });
-
-      console.log(`✅ Classroom Sync: Found ${allAssignments.length} total lessons.`);
+      
       setClassLessons(allAssignments);
     });
 
-    return () => { unsubCards(); unsubLessons(); unsubClasses(); };
+    return () => { unsubCards(); unsubLessons(); unsubSysDecks(); unsubSysLessons(); unsubClasses(); };
   }, [user?.uid, userData?.role, user?.email]);
 
   // --- 4. MEMOS ---
@@ -3304,20 +3315,13 @@ function App() {
     customCards.forEach(card => {
         const target = card.deckId || 'custom';
         if (!decks[target]) decks[target] = { title: card.deckTitle || "Custom Deck", cards: [] };
+        if (!decks[target].cards) decks[target].cards = [];
         decks[target].cards.push(card);
     });
     return decks;
   }, [systemDecks, customCards]);
 
-  const lessons = useMemo(() => {
-    // We combine the master library with the assignments to ensure descriptions load
-    const library = [...systemLessons, ...customLessons];
-    return classLessons.map(assignment => {
-      const base = library.find(l => l.id === (assignment.originalId || assignment.id));
-      return base ? { ...base, ...assignment } : assignment;
-    });
-  }, [systemLessons, customLessons, classLessons]);
-
+  const lessons = useMemo(() => [...systemLessons, ...customLessons, ...classLessons.filter(l => l.contentType !== 'deck')], [systemLessons, customLessons, classLessons]);
   const libraryLessons = useMemo(() => [...systemLessons, ...customLessons], [systemLessons, customLessons]);
 
   const displayName = useMemo(() => {
@@ -3327,7 +3331,7 @@ function App() {
       return 'Scholar';
   }, [userData, user]);
 
-  // --- 5. NAVIGATION HANDLERS ---
+  // --- 5. HANDLERS ---
   const handleContentSelection = (item: any) => {
     if (item.id) setSelectedLessonId(item.id);
     if (item.contentType === 'lesson' || item.type === 'lesson') {
@@ -3337,236 +3341,112 @@ function App() {
       setActiveTab('flashcards');
     }
   };
-  
- 
 
-  // --- HANDLERS ---
-  // --- QUEST ENGINE ---
   const checkDailyQuests = async (activityType: string) => {
-      if (!user || !userData) return;
-
-      const today = new Date().toDateString();
-      const lastDate = userData.questDate || "";
-      
-      // 1. Reset Quests if it's a new day
-      let currentProgress = { ...userData.questProgress };
-      if (lastDate !== today) {
-          currentProgress = {}; // Wipe progress
-          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
-              questDate: today,
-              questProgress: {}
-          });
-      }
-
-      // 2. Find matching quest
-      const quest = DAILY_QUESTS.find(q => q.type === activityType);
-      if (!quest) return;
-
-      // 3. Update Progress
-      const currentVal = currentProgress[quest.id] || 0;
-      if (currentVal < quest.target) {
-          const newVal = currentVal + 1;
-          currentProgress[quest.id] = newVal;
-          
-          // Save to DB
-          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
-              questProgress: currentProgress
-          });
-
-          // 4. Check Completion & Award XP
-          if (newVal === quest.target) {
-              setToast(`Quest Complete: ${quest.label} (+${quest.xp} XP)`);
-              await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
-                  xp: increment(quest.xp)
-              });
-          }
-      }
+    if (!user || !userData) return;
+    const today = new Date().toDateString();
+    let currentProgress = { ...userData.questProgress };
+    if (userData.questDate !== today) {
+        currentProgress = {};
+        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { questDate: today, questProgress: {} });
+    }
+    const quest = DAILY_QUESTS.find(q => q.type === activityType);
+    if (!quest) return;
+    const currentVal = currentProgress[quest.id] || 0;
+    if (currentVal < quest.target) {
+        const newVal = currentVal + 1;
+        currentProgress[quest.id] = newVal;
+        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { questProgress: currentProgress });
+        if (newVal === quest.target) {
+            setToast(`Quest Complete: ${quest.label} (+${quest.xp} XP)`);
+            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(quest.xp) });
+        }
+    }
   };
-  // ============================================================================
-  //  CENTRAL LOGGING ENGINE
-  //  (Connects Actions -> Database -> Quests)
-  // ============================================================================
+
   const handleLogActivity = async (itemId: string, xpEarned: number, itemTitle: string, scoreDetail: any = null) => {
       if (!user) return;
-
       try {
-          // 1. Create specific log entry in Firestore
-          // This populates the "Recent History" in Profile and Gradebooks
           await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
-              userId: user.uid,
-              studentEmail: user.email,
-              studentName: userData?.name || 'Student',
-              itemId: itemId,
-              itemTitle: itemTitle,
-              xp: xpEarned,
-              timestamp: Date.now(),
-              // If we have a score, it's a completion (exam/quiz), otherwise it's self-study
-              type: scoreDetail ? 'completion' : 'self_study', 
-              scoreDetail: scoreDetail || {}
+              userId: user.uid, studentEmail: user.email, studentName: userData?.name || 'Student',
+              itemId, itemTitle, xp: xpEarned, timestamp: Date.now(),
+              type: scoreDetail ? 'completion' : 'self_study', scoreDetail: scoreDetail || {}
           });
-
-          // 2. Update Total User XP
-          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
-              xp: increment(xpEarned),
-              lastActive: Date.now()
-          });
-
-          // 3. TRIGGER DAILY QUESTS
-          // Determine the type of action for the quest engine
-          let questType = 'self_study'; // Default (Reading cards, looking at lessons)
-          
-          if (scoreDetail?.mode === 'quiz') questType = 'quiz_complete'; // Quiz Mode
-          if (itemId === 'explore_deck') questType = 'explore_deck';     // Clicking a featured deck
-          
-          // Call the quest engine we created earlier
-          checkDailyQuests(questType);
-
-      } catch (e) {
-          console.error("Error logging activity:", e);
-      }
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xpEarned), lastActive: Date.now() });
+          checkDailyQuests(scoreDetail?.mode === 'quiz' ? 'quiz_complete' : itemId === 'explore_deck' ? 'explore_deck' : 'self_study');
+      } catch (e) { console.error("Log error:", e); }
   };
+
   const handleCreateCard = useCallback(async (c: any) => { if(!user) return; const cardId = doc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards')).id; await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), {...c, id: cardId}); setSelectedDeckKey(c.deckId || 'custom'); setActiveTab('flashcards'); }, [user]);
-  const handleUpdateCard = useCallback(async (cardId: string, data: any) => { if (!user) return; try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), data); } catch (e) { console.error(e); alert("Cannot edit card. Check permissions."); } }, [user]);
-  const handleDeleteCard = useCallback(async (cardId: string) => { if (!user) return; if (!window.confirm("Delete card?")) return; try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId)); } catch (e) { console.error(e); alert("Failed to delete card."); } }, [user]);
+  const handleUpdateCard = useCallback(async (cardId: string, data: any) => { if (!user) return; try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), data); } catch (e) { console.error(e); } }, [user]);
+  const handleDeleteCard = useCallback(async (cardId: string) => { if (!user || !window.confirm("Delete card?")) return; try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId)); } catch (e) { console.error(e); } }, [user]);
   const handleCreateLesson = useCallback(async (l: any, id = null) => { if(!user) return; if (id) { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', id), l); } else { await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), l); } setActiveTab('home'); }, [user]);
-  const handleUpdatePreferences = useCallback(async (prefs: any) => { if (!user) return; await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { deckPreferences: prefs }); setUserData((prev: any) => ({ ...prev, deckPreferences: prefs })); }, [user]);
-  const handleDeleteDeck = useCallback(async (deckId: string) => { if(!user) return; if(!window.confirm("Delete this deck?")) return; try { const toDelete = customCards.filter(c => c.deckId === deckId); for(const c of toDelete) { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', c.id)); } setSelectedDeckKey('custom'); } catch(e) { console.error(e); } }, [user, customCards]);
-  const handleLogSelfStudy = useCallback(async (deckId: string, xp: number, title: string, scoreDetail?: any) => { 
-      if (!user) return; 
+  const handleUpdatePreferences = useCallback(async (prefs: any) => { if (!user) return; await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { deckPreferences: prefs }); }, [user]);
+  const handleDeleteDeck = useCallback(async (deckId: string) => { if(!user || !window.confirm("Delete this deck?")) return; try { const toDelete = customCards.filter(c => c.deckId === deckId); for(const c of toDelete) { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', c.id)); } setSelectedDeckKey('custom'); } catch(e) { console.error(e); } }, [user, customCards]);
+  const handleLogSelfStudy = useCallback(async (deckId: string, xp: number, title: string, scoreDetail?: any) => { if (!user) return; try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp) }); await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { studentName: displayName, studentEmail: user.email, itemTitle: title, itemId: deckId, xp, timestamp: Date.now(), type: 'self_study', scoreDetail }); } catch (e) { console.error("Log failed", e); } }, [user, displayName]);
+
+  const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title: string = 'Lesson', score: any = null) => { 
+    setActiveLesson(null); 
+    setActiveTab('home'); 
+    if (xp > 0 && user) { 
       try { 
-          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp) }); 
-          await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { 
-              studentName: displayName, 
-              studentEmail: user.email, 
-              itemTitle: title, 
-              itemId: deckId, 
-              xp: xp, 
-              timestamp: Date.now(), 
-              type: 'self_study', 
-              scoreDetail 
-          }); 
-      } catch (e) { console.error("Log failed", e); } 
+        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp), completedAssignments: arrayUnion(lessonId) }); 
+        await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { studentName: displayName, studentEmail: user.email, itemTitle: title, xp, timestamp: Date.now(), type: 'completion', scoreDetail: score });
+      } catch (e) { console.error(e); } 
+    } 
   }, [user, displayName]);
 
-const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title: string = 'Lesson', score: any = null) => { 
-    // 1. CRITICAL FIX: Close the lesson viewer!
-    setActiveLesson(null); 
-    
-    // 2. Go back to dashboard
-    setActiveTab('home'); 
-    
-    // 3. Save progress
-    if (xp > 0 && user) { 
-        try { 
-            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp), completedAssignments: arrayUnion(lessonId) }); 
-            await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { studentName: displayName, studentEmail: user.email, itemTitle: title, xp: xp, timestamp: Date.now(), type: 'completion', scoreDetail: score });
-        } catch (e) { console.error(e); } 
-    } 
-  }, [user, displayName]);;
-
+  // --- 6. RENDER LOGIC ---
   if (!authChecked) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
   if (!user) return <AuthView />;
   if (!userData) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>; 
-  
-  const commonHandlers = { onSaveCard: handleCreateCard, onUpdateCard: handleUpdateCard, onDeleteCard: handleDeleteCard, onSaveLesson: handleCreateLesson, };
-  const isInstructor = userData.role === 'instructor';
 
+  const isInstructor = userData.role === 'instructor';
   if (isInstructor) {
-      return <InstructorDashboard user={user} userData={{...userData, classes: enrolledClasses}} allDecks={allDecks} lessons={libraryLessons} {...commonHandlers} onLogout={() => signOut(auth)} />;
+      return <InstructorDashboard user={user} userData={{...userData, classes: enrolledClasses}} allDecks={allDecks} lessons={libraryLessons} onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} onLogout={() => signOut(auth)} />;
   }
 
-const renderStudentView = () => {
+  const renderStudentView = () => {
     let content: React.ReactNode = null;
     let viewKey: string = "default";
 
-    // 1. PRESENTATION MODE
     if (activeTab === 'presentation') {
       viewKey = `presentation-${selectedLessonId}`;
       content = <ClassView lessonId={selectedLessonId} lessons={lessons} />;
     } 
-    // 2. ACTIVE LESSON PLAYER
     else if (activeLesson) {
       viewKey = `lesson-${activeLesson.id}`;
-      const isTeacher = userData?.role === 'instructor';
-      content = <LessonView lesson={activeLesson} onFinish={handleFinishLesson} isInstructor={isTeacher} />;
+      content = <LessonView lesson={activeLesson} onFinish={handleFinishLesson} isInstructor={false} />;
     } 
-    // 3. SPECIFIC CLASS VIEW (Michael's Class)
     else if (activeTab === 'home' && activeStudentClass) {
       viewKey = `class-${activeStudentClass.id}`;
-      content = (
-        <StudentClassView 
-            classData={activeStudentClass} 
-            onBack={() => setActiveStudentClass(null)} 
-            onSelectLesson={handleContentSelection} 
-            onSelectDeck={handleContentSelection} 
-            userData={userData} 
-            setActiveTab={setActiveTab}
-            setSelectedLessonId={setSelectedLessonId}
-            allLessons={lessons} 
-            classLessons={classLessons} 
-        />
-      );
+      content = <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} setActiveTab={setActiveTab} setSelectedLessonId={setSelectedLessonId} allLessons={lessons} classLessons={classLessons} />;
     } 
-    // 4. MAIN NAVIGATION TABS
     else {
       viewKey = `tab-${activeTab || 'home'}`;
       switch (activeTab) {
-        case 'discovery':
-          content = <DiscoveryView allDecks={allDecks} lessons={lessons} user={user} onSelectDeck={handleContentSelection} onSelectLesson={handleContentSelection} userData={userData} onLogActivity={handleLogActivity} />;
-          break;
-        case 'flashcards':
-          content = <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} activeDeckOverride={null} onComplete={handleFinishLesson} onLogActivity={handleLogSelfStudy} userData={userData} user={user} onDeleteDeck={handleDeleteDeck} />;
-          break;
-        case 'create':
-          content = <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />;
-          break;
-        case 'profile':
-          content = <ProfileView user={user} userData={userData} />;
-          break;
+        case 'discovery': content = <DiscoveryView allDecks={allDecks} lessons={lessons} user={user} onSelectDeck={handleContentSelection} onSelectLesson={handleContentSelection} userData={userData} onLogActivity={handleLogActivity} />; break;
+        case 'flashcards': content = <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} activeDeckOverride={null} onComplete={handleFinishLesson} onLogActivity={handleLogSelfStudy} userData={userData} user={user} onDeleteDeck={handleDeleteDeck} />; break;
+        case 'create': content = <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />; break;
+        case 'profile': content = <ProfileView user={user} userData={userData} />; break;
         case 'home':
-        default:
-          content = (
-            <HomeView 
-              setActiveTab={setActiveTab} 
-              allDecks={allDecks} 
-              lessons={lessons} 
-              assignments={classLessons} 
-              classes={enrolledClasses} 
-              onSelectClass={(c: any) => setActiveStudentClass(c)} 
-              onSelectLesson={handleContentSelection} 
-              onSelectDeck={handleContentSelection} 
-              userData={userData} 
-              user={user} 
-            />
-          );
-          break;
+        default: content = <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} />; break;
       }
     }
+    return <div key={viewKey} className="h-full w-full animate-in fade-in duration-300">{content}</div>;
+  };
 
-    return (
-      <div key={viewKey} className="h-full w-full animate-in fade-in duration-300">
-        {content || <div className="p-10 text-slate-400">Loading workspace...</div>}
-      </div>
-    );
-  }; // This brace closes renderStudentView
-
-  // --- FINAL APP RENDER ---
   return (
     <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-start relative overflow-hidden">
         <div className={`w-full transition-all duration-500 bg-white relative overflow-hidden flex flex-col ${
             activeTab === 'presentation' ? 'h-screen' : 'max-w-md h-[100dvh] shadow-2xl'
         }`}>
-            <div className="flex-1 h-full overflow-hidden relative">
-                {renderStudentView()}
-            </div>
-
-            {(!activeLesson && activeTab !== 'presentation') && (
-                <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
-            )}
+            <div className="flex-1 h-full overflow-hidden relative">{renderStudentView()}</div>
+            {(!activeLesson && activeTab !== 'presentation') && <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />}
         </div>
         {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </div>
   );
-} // This brace closes function App()
+}
 
 export default App;
