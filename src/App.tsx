@@ -373,60 +373,102 @@ function ClassView({ lessonId, lessons }: any) {
 
   const currentPage = pages[activePageIdx];
 
+  // --- BIG SCREEN RENDERER ---
+  const renderBigBlock = (block: any, idx: number) => {
+    switch (block.type) {
+      case 'text':
+        return (
+          <div key={idx} className="space-y-6 mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {block.title && <h3 className="text-4xl font-black text-indigo-600 uppercase tracking-tighter">{block.title}</h3>}
+            <p className="text-6xl lg:text-7xl leading-tight text-slate-800 font-bold max-w-5xl mx-auto whitespace-pre-wrap">
+              {block.content}
+            </p>
+          </div>
+        );
+
+      case 'image':
+        return (
+          <div key={idx} className="flex flex-col items-center my-10 animate-in zoom-in-95 duration-500">
+            <img src={block.url} className="max-h-[60vh] rounded-[4rem] shadow-2xl border-[16px] border-white" alt="Slide" />
+            {block.caption && <p className="mt-6 text-3xl font-bold text-slate-400 italic">{block.caption}</p>}
+          </div>
+        );
+
+      case 'vocab-list':
+        return (
+          <div key={idx} className="grid grid-cols-2 gap-8 w-full max-w-6xl mx-auto mt-10">
+            {block.items.map((item: any, i: number) => (
+              <div key={i} className="bg-slate-50 p-10 rounded-[3rem] border-4 border-slate-100 animate-in fade-in slide-in-from-left-4" style={{ delay: `${i * 100}ms` }}>
+                <p className="text-5xl font-black text-indigo-600 mb-2">{item.term}</p>
+                <p className="text-3xl text-slate-500 font-bold">{item.definition}</p>
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'dialogue':
+        return (
+          <div key={idx} className="space-y-6 w-full max-w-5xl mx-auto mt-10">
+            {block.lines.map((line: any, i: number) => (
+              <div key={i} className={`flex ${line.side === 'right' ? 'justify-end' : 'justify-start'} animate-in fade-in duration-500`}>
+                <div className={`p-8 rounded-[2.5rem] max-w-[80%] shadow-lg border-4 ${line.side === 'right' ? 'bg-indigo-600 text-white border-indigo-500 rounded-tr-none' : 'bg-white text-slate-800 border-slate-100 rounded-tl-none'}`}>
+                  <p className="text-4xl font-bold leading-tight">{line.text}</p>
+                  {line.translation && <p className={`text-xl mt-4 pt-4 border-t ${line.side === 'right' ? 'border-white/20 text-indigo-100' : 'border-slate-100 text-slate-400'} italic`}>{line.translation}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'note':
+        return (
+          <div key={idx} className="my-10 p-12 bg-amber-50 rounded-[4rem] border-8 border-amber-100 max-w-5xl mx-auto flex gap-10 items-center animate-in zoom-in-95">
+             <div className="bg-white p-6 rounded-full shadow-xl"><Zap size={64} className="text-amber-500 fill-amber-500" /></div>
+             <div className="text-left">
+                <h4 className="text-2xl font-black text-amber-600 uppercase tracking-widest mb-2">{block.title || "Note"}</h4>
+                <p className="text-5xl font-bold text-amber-900 leading-tight">{block.content}</p>
+             </div>
+          </div>
+        );
+
+      default:
+        return (
+          <div key={idx} className="py-24 px-16 bg-indigo-50 rounded-[5rem] border-8 border-indigo-100/50 text-center animate-in pulse duration-1000">
+            <p className="text-6xl font-black text-indigo-600 uppercase mb-6">Participation Mode</p>
+            <p className="text-3xl font-bold text-indigo-400">Interaction required on mobile devices.</p>
+          </div>
+        );
+    }
+  };
+
   return (
-    <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col p-12 lg:p-20 overflow-hidden">
-      {/* Background Decor */}
+    <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col p-12 lg:p-20 overflow-hidden select-none">
+      {/* Ambience */}
       <div className="absolute top-[-10%] right-[-5%] w-[50vw] h-[50vw] bg-indigo-50 rounded-full blur-[120px] opacity-40 -z-10" />
       
       {/* Header */}
-      <div className="flex items-center gap-8 mb-12">
-        <div className="h-2 flex-1 bg-slate-100 rounded-full overflow-hidden">
-          <div className="h-full bg-indigo-600 transition-all duration-700" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} />
+      <div className="flex items-center gap-8 mb-16">
+        <div className="h-2.5 flex-1 bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-full bg-indigo-600 transition-all duration-1000 ease-out shadow-[0_0_20px_rgba(79,70,229,0.4)]" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} />
         </div>
-        <span className="text-2xl font-black text-slate-200 tabular-nums">{activePageIdx + 1} / {pages.length}</span>
+        <span className="text-3xl font-black text-slate-300 tabular-nums">{activePageIdx + 1} / {pages.length}</span>
       </div>
 
-      {/* Main Content: Organized Grid */}
-      <div className="flex-1 flex flex-col justify-center items-center text-center max-w-7xl mx-auto w-full overflow-hidden">
-        <div className="space-y-10 w-full">
-          {currentPage?.blocks.map((block: any, idx: number) => (
-            <div key={idx} className="animate-in fade-in slide-in-from-bottom-8 duration-700">
-              {block.title && <h3 className="text-4xl lg:text-5xl font-black text-indigo-600 uppercase tracking-tighter mb-6">{block.title}</h3>}
-              
-              {/* Organized Text Block */}
-              {block.content && (
-                <p className="text-5xl lg:text-7xl leading-[1.15] text-slate-800 font-bold max-w-5xl mx-auto">
-                  {block.content}
-                </p>
-              )}
-
-              {/* Organized Image Block */}
-              {block.url && (
-                <div className="relative inline-block mt-4">
-                  <img src={block.url} className="max-h-[50vh] w-auto rounded-[3rem] shadow-2xl border-[16px] border-white" alt="Slide content" />
-                  {block.caption && <p className="mt-4 text-2xl font-bold text-slate-400 italic">{block.caption}</p>}
-                </div>
-              )}
-
-              {/* Interaction Placeholder */}
-              {['quiz', 'flashcard', 'scenario'].includes(block.type) && (
-                <div className="py-16 px-12 bg-indigo-50 rounded-[4rem] border-4 border-indigo-100/50">
-                   <p className="text-5xl font-black text-indigo-600 uppercase mb-4">Interactive Mode</p>
-                   <p className="text-2xl font-bold text-indigo-400">Please check your mobile device to participate!</p>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+      {/* Dynamic Content */}
+      <div className="flex-1 flex flex-col justify-center overflow-y-auto custom-scrollbar">
+        {currentPage?.blocks.map((block: any, idx: number) => renderBigBlock(block, idx))}
       </div>
 
       {/* Footer */}
-      <div className="mt-auto pt-8 border-t border-slate-100 flex justify-between items-end">
-        <div className="flex items-center gap-4">
-          <div className="w-4 h-4 bg-emerald-500 rounded-full animate-pulse" />
-          <span className="font-black text-lg text-slate-300 uppercase tracking-widest">Live: {lesson.title}</span>
+      <div className="mt-12 pt-8 border-t border-slate-100 flex justify-between items-center">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3">
+             <div className="w-5 h-5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_20px_rgba(16,185,129,0.5)]" />
+             <span className="font-black text-2xl tracking-[0.2em] text-slate-400 uppercase">Live</span>
+          </div>
+          <h2 className="text-3xl font-black text-slate-900 opacity-10 uppercase tracking-[0.3em]">{lesson.title}</h2>
         </div>
-        <div className="bg-slate-900 text-white px-6 py-2 rounded-2xl font-bold text-lg">LLLMS PRO</div>
+        <div className="bg-slate-900 text-white px-8 py-3 rounded-3xl font-black text-xl shadow-xl">LLLMS PRO</div>
       </div>
     </div>
   );
