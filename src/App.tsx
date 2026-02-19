@@ -337,16 +337,10 @@ lessons: any[]; // Replace 'any' with your Lesson type if defined
 function ClassView({ lessonId, lessons }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
 
-  // 1. Find the specific lesson data (Smart Match for Michael's Class)
   const lesson = useMemo(() => {
-    return lessons.find((l: any) => 
-      l.id === lessonId || 
-      l.originalId === lessonId || 
-      (l.lessonId && l.lessonId === lessonId)
-    );
+    return lessons.find((l: any) => l.id === lessonId || l.originalId === lessonId);
   }, [lessonId, lessons]);
 
-  // 2. SMART PAGING (Must match LessonView logic for sync to work)
   const pages = useMemo(() => {
     if (!lesson) return [];
     const rawBlocks = lesson.blocks || [];
@@ -354,124 +348,95 @@ function ClassView({ lessonId, lessons }: any) {
     let currentBuffer: any[] = [];
 
     rawBlocks.forEach((block: any) => {
-      const isInteractive = ['quiz', 'flashcard', 'scenario'].includes(block.type);
-      if (isInteractive) {
-        if (currentBuffer.length > 0) {
-          groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
-          currentBuffer = [];
-        }
+      if (['quiz', 'flashcard', 'scenario'].includes(block.type)) {
+        if (currentBuffer.length > 0) groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
         groupedPages.push({ type: 'interact', blocks: [block] });
+        currentBuffer = [];
       } else {
         currentBuffer.push(block);
       }
     });
-
-    if (currentBuffer.length > 0) {
-      groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
-    }
+    if (currentBuffer.length > 0) groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
     return groupedPages;
   }, [lesson]);
 
-  // 3. LISTEN FOR INSTRUCTOR REMOTE
+  // SYNC: Listen for Instructor Remote
   useEffect(() => {
     if (!lessonId) return;
-    // We look for the session using the ID provided
-    const docRef = doc(db, 'live_sessions', lessonId);
-    const unsub = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (typeof data.activePageIdx === 'number') {
-          setActivePageIdx(data.activePageIdx);
-        }
+    return onSnapshot(doc(db, 'live_sessions', lessonId), (snap) => {
+      if (snap.exists() && typeof snap.data().activePageIdx === 'number') {
+        setActivePageIdx(snap.data().activePageIdx);
       }
     });
-    return () => unsub();
   }, [lessonId]);
 
-  if (!lesson) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-400 font-bold">
-        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
-        Searching for Class Data...
-      </div>
-    );
-  }
+  // TEST OVERRIDE: Allow Arrow Keys to navigate if testing on one screen
+  useEffect(() => {
+    const handleKeys = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') setActivePageIdx(p => Math.min(pages.length - 1, p + 1));
+      if (e.key === 'ArrowLeft') setActivePageIdx(p => Math.max(0, p - 1));
+    };
+    window.addEventListener('keydown', handleKeys);
+    return () => window.removeEventListener('keydown', handleKeys);
+  }, [pages.length]);
+
+  if (!lesson) return <div className="h-screen flex items-center justify-center font-black text-slate-300 animate-pulse">SYNCING CLASSROOM DATA...</div>;
 
   const currentPage = pages[activePageIdx];
 
-  // 4. BIG SCREEN BLOCK RENDERER
-  const renderBigBlock = (block: any, idx: number) => {
-    switch (block.type) {
-      case 'text':
-        return (
-          <div key={idx} className="space-y-6 mb-10">
-            {block.title && <h3 className="text-4xl font-black text-indigo-600 tracking-tight">{block.title}</h3>}
-            <p className="text-6xl leading-tight text-slate-800 font-medium whitespace-pre-wrap antialiased">
-              {block.content || block.text}
-            </p>
-          </div>
-        );
-      case 'image':
-        return (
-          <div key={idx} className="flex justify-center my-10">
-            <img src={block.url} className="max-h-[60vh] rounded-[3rem] shadow-2xl border-[12px] border-white" alt="Slide content" />
-          </div>
-        );
-      case 'vocab-list':
-        return (
-          <div key={idx} className="grid grid-cols-2 gap-8 mt-10">
-            {(block.items || []).map((item: any, i: number) => (
-              <div key={i} className="bg-slate-50 p-8 rounded-[2rem] border-2 border-slate-100">
-                <p className="text-4xl font-black text-slate-900">{item.term}</p>
-                <p className="text-2xl text-slate-500 font-medium mt-2">{item.definition}</p>
-              </div>
-            ))}
-          </div>
-        );
-      default:
-        return (
-          <div key={idx} className="py-20 bg-indigo-50 rounded-[4rem] text-center">
-            <p className="text-4xl font-black text-indigo-600 uppercase tracking-widest">
-               {block.type} Mode
-            </p>
-            <p className="text-2xl text-indigo-400 mt-4 font-bold">Check your mobile device for interaction</p>
-          </div>
-        );
-    }
-  };
-
   return (
-    <div className="h-screen w-screen bg-white flex flex-col items-center justify-center p-24 z-[100] fixed inset-0 overflow-hidden">
-      <div className="absolute top-[-10%] right-[-5%] w-[40vw] h-[40vw] bg-indigo-50 rounded-full blur-[120px] opacity-60" />
+    <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col p-12 lg:p-24 overflow-hidden select-none">
+      {/* Background Ambience */}
+      <div className="absolute top-[-10%] right-[-5%] w-[50vw] h-[50vw] bg-indigo-50 rounded-full blur-[120px] opacity-40 -z-10" />
       
-      <div className="relative z-10 w-full max-w-7xl animate-in fade-in zoom-in duration-700">
-        <div className="flex items-center gap-6 mb-16">
-          <div className="h-1 flex-1 bg-slate-100 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-indigo-600 transition-all duration-1000" 
-              style={{ width: `${((activePageIdx + 1) / (pages.length || 1)) * 100}%` }}
-            />
-          </div>
-          <span className="text-xl font-black text-slate-300 tabular-nums">
-            {activePageIdx + 1} / {pages.length}
-          </span>
+      {/* Top Header / Progress */}
+      <div className="flex items-center gap-8 mb-20">
+        <div className="h-2 flex-1 bg-slate-100 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-indigo-600 transition-all duration-700 ease-out" 
+            style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }}
+          />
         </div>
-
-        <div className="min-h-[50vh] flex flex-col justify-center">
-          {currentPage?.blocks.map((block: any, idx: number) => renderBigBlock(block, idx))}
-        </div>
+        <span className="text-3xl font-black text-slate-200 tabular-nums">
+          {activePageIdx + 1} <span className="text-slate-100">/</span> {pages.length}
+        </span>
       </div>
 
-      <div className="absolute bottom-16 left-24 right-24 flex justify-between items-center">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col justify-center max-w-6xl mx-auto w-full">
+        {currentPage?.blocks.map((block: any, idx: number) => (
+          <div key={idx} className="animate-in fade-in zoom-in-95 duration-500 space-y-10">
+            {block.title && (
+              <h3 className="text-5xl font-black text-indigo-600 tracking-tighter uppercase">
+                {block.title}
+              </h3>
+            )}
+            
+            <div className="text-7xl lg:text-8xl leading-[1.1] text-slate-800 font-bold whitespace-pre-wrap tracking-tight">
+              {block.content || block.text || (block.type === 'interact' && "Check your mobile device!")}
+            </div>
+
+            {block.url && (
+              <img 
+                src={block.url} 
+                className="max-h-[55vh] object-contain rounded-[4rem] shadow-2xl border-[16px] border-white" 
+                alt="Slide"
+              />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Footer Status */}
+      <div className="flex justify-between items-end mt-12 border-t border-slate-100 pt-8">
         <div className="flex items-center gap-4">
-          <div className="w-4 h-4 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_15px_rgba(16,185,129,0.5)]" />
-          <span className="font-black text-lg tracking-[0.2em] text-slate-400 uppercase">
-            Live Class Active
-          </span>
+          <div className="w-5 h-5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_20px_rgba(16,185,129,0.4)]" />
+          <span className="font-black text-xl tracking-[0.2em] text-slate-300 uppercase">Live Session</span>
         </div>
-        <h2 className="text-2xl font-black text-slate-900 opacity-20 uppercase tracking-widest">
-          {lesson.title}
-        </h2>
+        <div className="text-right">
+          <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">Current Unit</p>
+          <h2 className="text-3xl font-black text-slate-900 opacity-20">{lesson.title}</h2>
+        </div>
       </div>
     </div>
   );
