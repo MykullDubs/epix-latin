@@ -3145,7 +3145,7 @@ function ExamPlayerView({ exam, onFinish }: any) {
 }
 
 function App() {
-  // --- 1. STATE DECLARATIONS ---
+  // --- 1. STATE ---
   const [activeTab, setActiveTab] = useState('home');
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
@@ -3161,17 +3161,14 @@ function App() {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  // --- 2. DERIVED DATA (The "Handshake" Logic) ---
-  // We calculate these based on the state above so components always have fresh data.
-  
-  // A. Flattened assignments for Michael's Class filter
+  // --- 2. DERIVED DATA (The Handshake) ---
   const classLessons = useMemo(() => {
     let all: any[] = [];
     enrolledClasses.forEach((cls: any) => {
       if (cls.assignments && Array.isArray(cls.assignments)) {
         all.push(...cls.assignments.map((a: any) => ({
           ...a,
-          classId: cls.id, 
+          classId: cls.id,
           className: cls.name
         })));
       }
@@ -3179,13 +3176,10 @@ function App() {
     return all;
   }, [enrolledClasses]);
 
-  // B. Hydrated lesson list (System + Custom + Assigned)
   const lessons = useMemo(() => {
     const library = [...systemLessons, ...customLessons];
     return [...library, ...classLessons];
   }, [systemLessons, customLessons, classLessons]);
-
-  const displayName = useMemo(() => userData?.name || user?.email?.split('@')[0] || 'Scholar', [userData, user]);
 
   const allDecks = useMemo(() => {
     const decks: any = { ...systemDecks, custom: { title: "✍️ Builder", cards: [] } };
@@ -3198,6 +3192,8 @@ function App() {
     return decks;
   }, [systemDecks, customCards]);
 
+  const displayName = useMemo(() => userData?.name || user?.email?.split('@')[0] || 'Scholar', [userData, user]);
+
   // --- 3. MASTER SYNC ENGINE ---
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
@@ -3206,19 +3202,16 @@ function App() {
     });
 
     if (user?.uid) {
-      // Sync Profile
       const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
         if (snap.exists()) setUserData(snap.data());
         setAuthChecked(true);
       });
 
-      // Sync Classes
       const qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
       const unsubClasses = onSnapshot(qClasses, (snapshot) => {
         setEnrolledClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       });
 
-      // Sync Library Content
       setSystemDecks(INITIAL_SYSTEM_DECKS);
       setSystemLessons(INITIAL_SYSTEM_LESSONS);
       const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
@@ -3226,7 +3219,6 @@ function App() {
 
       return () => { unsubAuth(); unsubProfile(); unsubClasses(); unsubCards(); unsubLessons(); };
     }
-    
     return () => unsubAuth();
   }, [user?.uid, user?.email]);
 
@@ -3235,7 +3227,6 @@ function App() {
     const targetId = item.lessonId || item.id || item.originalId;
     if (targetId) setSelectedLessonId(targetId);
 
-    // HYDRATION: Swap "hollow" assignment metadata for the "full" lesson that has blocks
     const fullContent = [...systemLessons, ...customLessons].find(l => 
       l.id === targetId || l.id === item.originalId
     );
@@ -3260,23 +3251,14 @@ function App() {
 
   // --- 5. RENDER STUDENT VIEW HELPER ---
   const renderStudentView = () => {
-    // A. PRESENTATION MODE (Big Screen)
     if (activeTab === 'presentation') {
-      return (
-        <ClassView 
-          lessonId={selectedLessonId} 
-          lessons={lessons} 
-          classLessons={classLessons} 
-        />
-      );
+      return <ClassView lessonId={selectedLessonId} lessons={lessons} classLessons={classLessons} />;
     }
 
-    // B. ACTIVE LESSON PLAYER (Mobile Story Mode)
     if (activeLesson) {
       return <LessonView lesson={activeLesson} onFinish={handleFinishLesson} isInstructor={false} />;
     }
     
-    // C. SPECIFIC CLASS VIEW (Michael's Class)
     if (activeTab === 'home' && activeStudentClass) {
       return (
         <StudentClassView 
@@ -3293,47 +3275,37 @@ function App() {
       );
     }
 
-    // D. MAIN NAVIGATION TABS
     switch (activeTab) {
-      case 'discovery': 
-        return <DiscoveryView allDecks={allDecks} lessons={lessons} user={user} onSelectDeck={handleContentSelection} onSelectLesson={handleContentSelection} userData={userData} onLogActivity={() => {}} />;
-      case 'flashcards': 
-        return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} activeDeckOverride={null} onComplete={handleFinishLesson} userData={userData} user={user} onDeleteDeck={() => {}} />;
-      case 'profile': 
-        return <ProfileView user={user} userData={userData} />;
-      case 'home':
-      default: 
-        return (
-          <HomeView 
-            setActiveTab={setActiveTab} 
-            classes={enrolledClasses} 
-            onSelectClass={(c: any) => setActiveStudentClass(c)} 
-            userData={userData} 
-            user={user} 
-          />
-        );
+      case 'discovery': return <DiscoveryView allDecks={allDecks} lessons={lessons} user={user} onSelectDeck={handleContentSelection} onSelectLesson={handleContentSelection} userData={userData} onLogActivity={() => {}} />;
+      case 'flashcards': return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} activeDeckOverride={null} onComplete={handleFinishLesson} userData={userData} user={user} onDeleteDeck={() => {}} />;
+      case 'profile': return <ProfileView user={user} userData={userData} />;
+      default: return <HomeView setActiveTab={setActiveTab} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} userData={userData} user={user} />;
     }
   };
 
-  // --- 6. FINAL RENDER LOGIC ---
-  if (!authChecked) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
+  // --- 6. FINAL RENDER ---
+  if (!authChecked) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-white">
+        <Loader className="animate-spin text-indigo-600" size={32} />
+      </div>
+    );
+  }
+
   if (!user) return <AuthView />;
 
-  // Redirect to Instructor Dashboard if role matches
   if (userData?.role === 'instructor') {
       return <InstructorDashboard user={user} userData={{...userData, classes: enrolledClasses}} allDecks={allDecks} lessons={lessons} onLogout={() => signOut(auth)} />;
   }
 
   return (
-    <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-start relative overflow-hidden">
+    <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-start overflow-hidden">
         <div className={`w-full transition-all duration-500 bg-white relative overflow-hidden flex flex-col ${
-            activeTab === 'presentation' ? 'h-screen' : 'max-w-md h-[100dvh] shadow-2xl'
+            activeTab === 'presentation' ? 'h-screen w-screen fixed inset-0 z-[200]' : 'max-w-md h-[100dvh] shadow-2xl'
         }`}>
             <div className="flex-1 h-full overflow-hidden relative">
                 {renderStudentView()}
             </div>
-
-            {/* Hide Nav Bar when presenting or in a lesson */}
             {(!activeLesson && activeTab !== 'presentation') && (
                 <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
             )}
