@@ -338,9 +338,17 @@ function ClassView({ lessonId, lessons }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
 
   const lesson = useMemo(() => {
-    return lessons.find((l: any) => l.id === lessonId || l.originalId === lessonId);
-  }, [lessonId, lessons]);
-
+  // Look in the master list first
+  let found = lessons.find((l: any) => l.id === lessonId || l.originalId === lessonId);
+  
+  // FALLBACK: If Michael's class assignments are the only thing we have, use them
+  if (!found || !found.blocks) {
+    // We look for 'classLessons' which we know MICHAEL'S class is populated with
+    found = classLessons?.find((l: any) => l.id === lessonId);
+  }
+  
+  return found;
+}, [lessonId, lessons, classLessons]);
   const pages = useMemo(() => {
     if (!lesson) return [];
     const rawBlocks = lesson.blocks || [];
@@ -3327,16 +3335,26 @@ function App() {
   }, [user?.uid, user?.email]);
 
   // --- 4. HANDLERS ---
-  const handleContentSelection = (item: any) => {
-    if (item.id) setSelectedLessonId(item.id);
-    if (item.contentType === 'lesson' || item.type === 'lesson') {
-      const full = lessons.find(l => l.id === (item.lessonId || item.id));
-      setActiveLesson(full || item);
-    } else {
-      setSelectedDeckKey(item.id);
-      setActiveTab('flashcards');
-    }
-  };
+const handleContentSelection = (item: any) => {
+  // 1. Save the ID for Michael's class tracking
+  const targetId = item.lessonId || item.id || item.originalId;
+  if (targetId) setSelectedLessonId(targetId);
+
+  // 2. HYDRATION: Find the version of this lesson that actually has 'blocks'
+  // We search both the system library and custom lessons
+  const fullContent = [...systemLessons, ...customLessons].find(l => 
+    l.id === targetId || l.id === item.originalId
+  );
+
+  // 3. Routing
+  if (item.contentType === 'lesson' || item.type === 'lesson' || fullContent) {
+    setActiveLesson(fullContent || item);
+    // If we are already in Michael's class, this ensures the projector sees the full blocks
+  } else {
+    setSelectedDeckKey(item.id);
+    setActiveTab('flashcards');
+  }
+};
 
   const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title: string = 'Lesson', score: any = null) => { 
     setActiveLesson(null); setActiveTab('home'); 
