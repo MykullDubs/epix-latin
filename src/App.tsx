@@ -3429,18 +3429,15 @@ const renderStudentView = () => {
     let content: React.ReactNode = null;
     let viewKey: string = "default";
 
-    // 1. PRESENTATION MODE
     if (activeTab === 'presentation') {
       viewKey = `presentation-${selectedLessonId}`;
       content = <ClassView lessonId={selectedLessonId} lessons={lessons} />;
     } 
-    // 2. LESSON PLAYER
     else if (activeLesson) {
       viewKey = `lesson-${activeLesson.id}`;
       const isTeacher = userData?.role === 'instructor';
       content = <LessonView lesson={activeLesson} onFinish={handleFinishLesson} isInstructor={isTeacher} />;
     } 
-    // 3. CLASS DASHBOARD
     else if (activeTab === 'home' && activeStudentClass) {
       viewKey = `class-${activeStudentClass.id}`;
       content = (
@@ -3457,7 +3454,6 @@ const renderStudentView = () => {
         />
       );
     } 
-    // 4. MAIN TABS
     else {
       viewKey = `tab-${activeTab || 'home'}`;
       switch (activeTab) {
@@ -3487,26 +3483,32 @@ const renderStudentView = () => {
           content = <ProfileView user={user} userData={userData} />;
           break;
         default:
-          content = <div className="p-10 text-slate-400">Select a tab.</div>;
+          content = <div className="p-10 text-slate-400">Loading workspace...</div>;
       }
     }
 
-return (
-        <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-start relative overflow-hidden">
-            <div className={`w-full transition-all duration-500 bg-white relative overflow-hidden flex flex-col ${
-                activeTab === 'presentation' ? 'h-screen' : 'max-w-md h-[100dvh] shadow-2xl'
-            }`}>
-                <div className="flex-1 h-full overflow-hidden relative">
-                    {renderStudentView()}
-                </div>
+    return (
+      <div key={viewKey} className="h-full w-full animate-in fade-in duration-300">
+        {content}
+      </div>
+    );
+  }; // This closes renderStudentView
 
-                {(!activeLesson && activeTab !== 'presentation') && (
-                    <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
-                )}
+  return (
+    <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-start relative overflow-hidden">
+        <div className={`w-full transition-all duration-500 bg-white relative overflow-hidden flex flex-col ${
+            activeTab === 'presentation' ? 'h-screen' : 'max-w-md h-[100dvh] shadow-2xl'
+        }`}>
+            <div className="flex-1 h-full overflow-hidden relative">
+                {renderStudentView()}
             </div>
-        </div>
-    ); 
-} // <--- THIS BRACE CLOSES function App()
 
-// EXPORTS MUST BE OUTSIDE THE BRACE
+            {(!activeLesson && activeTab !== 'presentation') && (
+                <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
+            )}
+        </div>
+    </div>
+  );
+} // This closes function App()
+
 export default App;
