@@ -337,8 +337,20 @@ lessons: any[]; // Replace 'any' with your Lesson type if defined
 function ClassView({ lessonId, lessons }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
 
-  // 1. Find lesson content
-  const lesson = lessons.find((l: any) => l.id === lessonId || l.originalId === lessonId);
+  // --- THE SMART MATCH FIX ---
+  // We check for the ID, the originalId, OR a fallback match to Michael's class data
+  const lesson = useMemo(() => {
+    return lessons.find((l: any) => 
+      l.id === lessonId || 
+      l.originalId === lessonId || 
+      (l.lessonId && l.lessonId === lessonId)
+    );
+  }, [lessonId, lessons]);
+
+  // 2. Smart Paging (Matches student view logic)
+  const pages = useMemo(() => {
+    if (!lesson) return [];
+    // ... (rest of your paging logic remains the same)
 
   // 2. Smart Paging (Matches student view logic)
   const pages = useMemo(() => {
@@ -3242,8 +3254,11 @@ function App() {
     return () => unsubAuth();
   }, [user?.uid, user?.email]);
 
-  const lessons = useMemo(() => [...systemLessons, ...customLessons], [systemLessons, customLessons]);
-
+const lessons = useMemo(() => {
+    const library = [...systemLessons, ...customLessons];
+    // We add the class lessons to the list so ClassView can see the 'assign_...' IDs
+    return [...library, ...classLessons];
+  }, [systemLessons, customLessons, classLessons]);
   const handleContentSelection = (item: any) => {
     if (item.id) setSelectedLessonId(item.id);
     if (item.contentType === 'lesson' || item.type === 'lesson') {
