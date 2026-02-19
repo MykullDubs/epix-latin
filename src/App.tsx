@@ -3211,7 +3211,7 @@ function ExamPlayerView({ exam, onFinish }: any) {
 }
 
 function App() {
-  // --- 1. STATE DECLARATIONS ---
+  // --- 1. STATE ---
   const [activeTab, setActiveTab] = useState('home');
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
@@ -3228,7 +3228,7 @@ function App() {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  // --- 2. AUTH SYNC ---
+  // --- 2. AUTH & PROFILE SYNC ---
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -3240,57 +3240,64 @@ function App() {
     return () => unsubAuth();
   }, []);
 
-  // --- 3. PROFILE & CONTENT SYNC ---
   useEffect(() => {
     if (!user?.uid) return;
-    setSystemDecks(INITIAL_SYSTEM_DECKS);
-    setSystemLessons(INITIAL_SYSTEM_LESSONS);
-
-    const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
-      if (snap.exists()) setUserData(snap.data());
+    const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main');
+    const unsubProfile = onSnapshot(profileRef, (docSnap) => {
+      if (docSnap.exists()) setUserData(docSnap.data());
       else setUserData(DEFAULT_USER_DATA);
       setAuthChecked(true);
     });
+    return () => unsubProfile();
+  }, [user?.uid]);
 
+  // --- 3. MASTER CONTENT & CLASSROOM SYNC ---
+  useEffect(() => {
+    if (!user?.uid || !userData?.role) return;
+
+    setSystemDecks(INITIAL_SYSTEM_DECKS);
+    setSystemLessons(INITIAL_SYSTEM_LESSONS);
+
+    // Sync Library Content
     const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => 
       setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     
     const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => 
       setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-    return () => { unsubProfile(); unsubCards(); unsubLessons(); };
-  }, [user?.uid]);
-
-  // --- 4. THE UNIVERSAL CLASS SYNC (The Fix for 0 Assignments) ---
-  useEffect(() => {
-    if (!user?.uid || !userData?.role) return;
-
-    // We use collectionGroup to find classes regardless of which user created them
-    const q = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
+    // Sync Classes (Flattening for the HUD)
+    const q = userData.role === 'instructor' 
+      ? query(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'))
+      : query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
 
     const unsubClasses = onSnapshot(q, (snapshot) => {
       const fetchedClasses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setEnrolledClasses(fetchedClasses);
 
-      let allAssignments: any[] = [];
+      let flattened: any[] = [];
       fetchedClasses.forEach((cls: any) => {
         if (cls.assignments && Array.isArray(cls.assignments)) {
-          allAssignments.push(...cls.assignments.map((a: any) => ({
+          flattened.push(...cls.assignments.map((a: any) => ({
             ...a,
-            classId: cls.id, // THE CRITICAL HANDSHAKE LINK
+            classId: cls.id, // THE FIX: Handshake link for StudentClassView
             className: cls.name
           })));
         }
       });
-
-      console.log("HUD SYNC: Found", allAssignments.length, "assignments");
-      setClassLessons(allAssignments);
+      setClassLessons(flattened);
     });
 
-    return () => unsubClasses();
-  }, [user?.email, userData?.role]);
+    return () => { unsubCards(); unsubLessons(); unsubClasses(); };
+  }, [user?.uid, userData?.role, user?.email]);
 
-  // --- 5. DATA HYDRATION (Memos) ---
+  // --- 4. DATA CALCULATIONS (Memos) ---
+  const displayName = useMemo(() => {
+      if (userData?.name && userData.name !== 'Student' && userData.name !== 'User') return userData.name;
+      if (user?.displayName) return user.displayName;
+      if (user?.email) return user.email.split('@')[0];
+      return 'Scholar';
+  }, [userData, user]);
+
   const allDecks = useMemo(() => {
     const decks: any = { ...systemDecks, custom: { title: "✍️ Builder", cards: [] } };
     customCards.forEach(card => {
@@ -3303,14 +3310,15 @@ function App() {
   }, [systemDecks, customCards]);
 
   const lessons = useMemo(() => [...systemLessons, ...customLessons], [systemLessons, customLessons]);
+  const libraryLessons = useMemo(() => [...systemLessons, ...customLessons], [systemLessons, customLessons]);
 
-  // --- 6. HANDLERS ---
+  // --- 5. HANDLERS ---
   const handleContentSelection = (item: any) => {
     if (item.id) setSelectedLessonId(item.id);
     if (item.contentType === 'lesson' || item.type === 'lesson') {
-      const fullLesson = lessons.find(l => l.id === (item.lessonId || item.id));
-      setActiveLesson(fullLesson || item);
-    } else if (item.contentType === 'deck' || item.type === 'deck') {
+      const full = lessons.find(l => l.id === (item.lessonId || item.id));
+      setActiveLesson(full || item);
+    } else {
       setSelectedDeckKey(item.id);
       setActiveTab('flashcards');
     }
@@ -3325,25 +3333,27 @@ function App() {
         await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { studentName: displayName, studentEmail: user.email, itemTitle: title, xp, timestamp: Date.now(), type: 'completion', scoreDetail: score });
       } catch (e) { console.error(e); } 
     } 
-  }, [user, userData]);
+  }, [user, displayName]);
 
-  const handleLogActivity = (itemId: string, xpEarned: number, itemTitle: string) => {
-     // Quest and log logic goes here
+  const handleLogActivity = async (itemId: string, xpEarned: number, itemTitle: string) => {
+      if (!user) return;
+      await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { studentName: displayName, studentEmail: user.email, itemTitle, xp: xpEarned, timestamp: Date.now(), type: 'self_study' });
+      await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xpEarned) });
   };
 
-  const handleCreateCard = async (c: any) => { /* logic */ };
-  const handleUpdateCard = async (id: string, data: any) => { /* logic */ };
-  const handleDeleteCard = async (id: string) => { /* logic */ };
-  const handleCreateLesson = async (l: any) => { /* logic */ };
-  const handleDeleteDeck = async (id: string) => { /* logic */ };
-  const handleLogSelfStudy = async (id: string, xp: number, title: string) => { /* logic */ };
+  const handleCreateCard = (c: any) => { /* Logic */ };
+  const handleUpdateCard = (id: string, d: any) => { /* Logic */ };
+  const handleDeleteCard = (id: string) => { /* Logic */ };
+  const handleCreateLesson = (l: any) => { /* Logic */ };
+  const handleDeleteDeck = (id: string) => { /* Logic */ };
+  const handleLogSelfStudy = (id: string, xp: number, t: string) => { /* Logic */ };
 
+  // --- 6. RENDER LOGIC ---
   if (!authChecked || (user && !userData)) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
   if (!user) return <AuthView />;
 
-  const isInstructor = userData.role === 'instructor';
-  if (isInstructor) {
-      return <InstructorDashboard user={user} userData={{...userData, classes: enrolledClasses}} allDecks={allDecks} lessons={lessons} onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} onLogout={() => signOut(auth)} />;
+  if (userData.role === 'instructor') {
+      return <InstructorDashboard user={user} userData={{...userData, classes: enrolledClasses}} allDecks={allDecks} lessons={libraryLessons} onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} onLogout={() => signOut(auth)} />;
   }
 
   const renderStudentView = () => {
@@ -3351,17 +3361,7 @@ function App() {
     if (activeLesson) return <LessonView lesson={activeLesson} onFinish={handleFinishLesson} isInstructor={false} />;
     
     if (activeTab === 'home' && activeStudentClass) {
-      return <StudentClassView 
-                classData={activeStudentClass} 
-                onBack={() => setActiveStudentClass(null)} 
-                onSelectLesson={handleContentSelection} 
-                onSelectDeck={handleContentSelection} 
-                userData={userData} 
-                setActiveTab={setActiveTab} 
-                setSelectedLessonId={setSelectedLessonId} 
-                allLessons={lessons} 
-                classLessons={classLessons} 
-             />;
+      return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} setActiveTab={setActiveTab} setSelectedLessonId={setSelectedLessonId} allLessons={lessons} classLessons={classLessons} />;
     }
 
     switch (activeTab) {
