@@ -3432,77 +3432,104 @@ const handleFinishLesson = useCallback(async (lessonId: string, xp: number, titl
       return <InstructorDashboard user={user} userData={{...userData, classes: enrolledClasses}} allDecks={allDecks} lessons={libraryLessons} {...commonHandlers} onLogout={() => signOut(auth)} />;
   }
 
-const renderStudentView = () => {
-    let content: React.ReactNode = null;
-    let viewKey: string = "default";
+function StudentClassView({ 
+  classData, 
+  onBack, 
+  onSelectLesson, 
+  onSelectDeck, 
+  userData, 
+  allLessons = [], 
+  classLessons = [], 
+  setActiveTab, 
+  setSelectedLessonId 
+}: any) {
+    
+    const currentClassId = classData?.id || classData?.uid;
 
-    // PRIORITY 1: Presentation mode (ClassView)
-    if (activeTab === 'presentation') {
-      viewKey = `presentation-${selectedLessonId}`;
-      content = <ClassView lessonId={selectedLessonId} lessons={lessons} />;
-    } 
-    // PRIORITY 2: Individual lesson player
-    else if (activeLesson) {
-      viewKey = `lesson-${activeLesson.id}`;
-      const isTeacher = userData?.role === 'instructor';
-      content = (
-        <LessonView 
-          lesson={activeLesson} 
-          onFinish={handleFinishLesson} 
-          isInstructor={isTeacher} 
-        />
-      );
-    } 
-    // PRIORITY 3: The Class Dashboard (Michael's Class)
-    else if (activeTab === 'home' && activeStudentClass) {
-      viewKey = `class-${activeStudentClass.id}`;
-      content = (
-        <StudentClassView 
-            classData={activeStudentClass} 
-            onBack={() => setActiveStudentClass(null)} 
-            onSelectLesson={handleContentSelection} 
-            onSelectDeck={handleContentSelection} 
-            userData={userData} 
-            setActiveTab={setActiveTab}
-            setSelectedLessonId={setSelectedLessonId}
-            allLessons={lessons} 
-            classLessons={classLessons} 
-        />
-      );
-    } 
-    // PRIORITY 4: Standard Tab Navigation
-    else {
-      viewKey = `tab-${activeTab || 'home'}`;
-      switch (activeTab) {
-        case 'home':
-          content = (
-            <HomeView 
-              setActiveTab={setActiveTab} 
-              allDecks={allDecks} 
-              lessons={lessons} 
-              assignments={classLessons} 
-              classes={enrolledClasses} 
-              // --- FIX: Added :any to parameter 'c' ---
-              onSelectClass={(c: any) => setActiveStudentClass(c)} 
-              onSelectLesson={handleContentSelection} 
-              onSelectDeck={handleContentSelection} 
-              userData={userData} 
-              user={user} 
-            />
-          );
-          break;
-        case 'flashcards':
-          content = <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} activeDeckOverride={null} onComplete={handleFinishLesson} userData={userData} user={user} />;
-          break;
-        case 'create':
-          content = <BuilderHub onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />;
-          break;
-        case 'profile':
-          content = <ProfileView user={user} userData={userData} />;
-          break;
-        default:
-          content = <div className="p-10 text-slate-400">Select a tab to begin.</div>;
-      }
+    const resolvedLessons = useMemo(() => {
+        // 1. Filter assignments for this specific class
+        const matches = classLessons.filter((a: any) => 
+            a.classId === currentClassId || 
+            a.courseId === currentClassId || 
+            a.class === currentClassId
+        );
+
+        // 2. Map them to full lesson data
+        return matches.map((assignment: any) => {
+            const lessonId = assignment.lessonId || assignment.id;
+            const fullContent = allLessons.find((l: any) => l.id === lessonId);
+            
+            // If we find the full content, merge it. 
+            // If NOT, we keep the assignment info so it at least shows up!
+            return fullContent 
+                ? { ...fullContent, ...assignment, resolved: true } 
+                : { ...assignment, title: assignment.title || `Unresolved: ${lessonId}`, resolved: false };
+        });
+    }, [classData, allLessons, classLessons]);
+
+    return (
+        <div className="h-full flex flex-col bg-slate-50">
+            <div className="bg-white px-6 pt-12 pb-6 border-b border-slate-100 shadow-sm">
+                <button onClick={onBack} className="flex items-center gap-2 text-slate-400 font-bold text-sm mb-4"><ChevronLeft size={18} /> Back</button>
+                <h1 className="text-3xl font-black text-slate-900 tracking-tight">{classData?.name}</h1>
+                <p className="text-slate-500 font-medium">{resolvedLessons.length} lessons found</p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {resolvedLessons.length > 0 ? resolvedLessons.map((lesson: any) => (
+                    <div key={lesson.id} className={`bg-white p-5 rounded-[2rem] border flex items-center justify-between shadow-sm ${!lesson.resolved ? 'border-amber-200 bg-amber-50/30' : 'border-slate-100'}`}>
+                        <div className="flex-1 pr-4">
+                            <h3 className="font-bold text-slate-800 text-lg leading-tight">{lesson.title}</h3>
+                            {!lesson.resolved && (
+                                <p className="text-[9px] text-amber-600 font-black uppercase mt-1">⚠️ Lesson content missing from library</p>
+                            )}
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => onSelectLesson(lesson)} className="px-4 py-2 bg-white text-slate-600 rounded-xl font-bold text-xs border border-slate-200">Open</button>
+                            {userData?.role === 'instructor' && (
+                                <button 
+                                    onClick={() => {
+                                        setSelectedLessonId(lesson.lessonId || lesson.id);
+                                        setActiveTab('presentation');
+                                    }}
+                                    className="p-3 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100"
+                                >
+                                    <Monitor size={18} />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )) : (
+                    <div className="bg-slate-900 text-slate-300 p-8 rounded-[2.5rem] font-mono text-[10px] space-y-4">
+                        <p className="text-indigo-400 font-black text-xs uppercase tracking-widest">Handshake Troubleshooter</p>
+                        
+                        <div>
+                            <p className="text-emerald-400">1. Target Class ID:</p>
+                            <p className="text-white text-xs">{currentClassId || 'NULL'}</p>
+                        </div>
+
+                        <div>
+                            <p className="text-emerald-400">2. Assignment Count in State:</p>
+                            <p className="text-white text-xs">{classLessons.length} assignments total</p>
+                        </div>
+
+                        {classLessons.length > 0 && (
+                            <div>
+                                <p className="text-emerald-400">3. First Assignment Check:</p>
+                                <p>Class Link ID: <span className="text-amber-400">{classLessons[0].classId || classLessons[0].courseId || 'MISSING'}</span></p>
+                                <p>Lesson Link ID: <span className="text-amber-400">{classLessons[0].lessonId || classLessons[0].id}</span></p>
+                            </div>
+                        )}
+
+                        <div className="pt-4 border-t border-slate-800 text-[9px] leading-relaxed italic">
+                            If 'Target Class ID' doesn't match 'Class Link ID', the list will be empty.
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
     }
 
     return (
