@@ -3491,29 +3491,22 @@ const renderStudentView = () => {
       }
     }
 
-    return (
-      <div key={viewKey} className="h-full w-full animate-in fade-in duration-300">
-        {content}
-      </div>
-    );
-  }; // <--- Closes renderStudentView
+return (
+        <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-start relative overflow-hidden">
+            <div className={`w-full transition-all duration-500 bg-white relative overflow-hidden flex flex-col ${
+                activeTab === 'presentation' ? 'h-screen' : 'max-w-md h-[100dvh] shadow-2xl'
+            }`}>
+                <div className="flex-1 h-full overflow-hidden relative">
+                    {renderStudentView()}
+                </div>
 
-  // MAIN APP RETURN
-  return (
-    <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-start relative overflow-hidden">
-        <div className={`w-full transition-all duration-500 bg-white relative overflow-hidden flex flex-col ${
-            activeTab === 'presentation' ? 'h-screen' : 'max-w-md h-[100dvh] shadow-2xl'
-        }`}>
-            <div className="flex-1 h-full overflow-hidden relative">
-                {renderStudentView()}
+                {(!activeLesson && activeTab !== 'presentation') && (
+                    <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
+                )}
             </div>
-
-            {(!activeLesson && activeTab !== 'presentation') && (
-                <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
-            )}
         </div>
-    </div>
-  ); // <--- Closes Main Return
-} // <--- Closes function App()
+    ); 
+} // <--- THIS BRACE CLOSES function App()
 
+// EXPORTS MUST BE OUTSIDE THE BRACE
 export default App;
