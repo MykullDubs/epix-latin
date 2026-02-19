@@ -3213,91 +3213,106 @@ function ExamPlayerView({ exam, onFinish }: any) {
 // ============================================================================
 //  MAIN APP COMPONENT
 // ============================================================================
-function App() {
+// --- 1. STATE DECLARATIONS ---
   const [activeTab, setActiveTab] = useState('home');
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
-  
-  // Content & State
   const [systemDecks, setSystemDecks] = useState<any>({});
   const [systemLessons, setSystemLessons] = useState<any[]>([]);
   const [customCards, setCustomCards] = useState<any[]>([]);
   const [customLessons, setCustomLessons] = useState<any[]>([]);
-  const [toast, setToast] = useState<string | null>(null);
   const [activeLesson, setActiveLesson] = useState<any>(null);
   const [selectedDeckKey, setSelectedDeckKey] = useState('salutationes');
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [classLessons, setClassLessons] = useState<any[]>([]);
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
-  // Inside function App() { ...
+  const [toast, setToast] = useState<string | null>(null);
 
-// --- EFFECT 1: SYNC USER PROFILE ---
-// This runs once when you log in and stays open. 
-// It does NOT depend on the role, so it won't loop.
-useEffect(() => {
-  if (!user) {
-    setUserData(null);
-    setAuthChecked(true);
-    return;
-  }
-
-  const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main');
-  const unsubProfile = onSnapshot(profileRef, (docSnap) => {
-    if (docSnap.exists()) {
-      setUserData(docSnap.data());
-    } else {
-      // Fallback if no profile exists yet
-      setUserData(DEFAULT_USER_DATA);
-    }
-    setAuthChecked(true);
-  }, (error) => {
-    console.error("Profile Sync Error:", error);
-    setAuthChecked(true); 
-  });
-
-  return () => unsubProfile();
-}, [user?.uid]); // Only restarts if the User ID changes
-
-
-// --- EFFECT 2: SYNC CLASSES & ASSIGNMENTS ---
-// This waits for the Profile (Role) to be ready, then fetches data.
-useEffect(() => {
-  if (!user?.uid || !userData?.role) return;
-
-  console.log("📡 Syncing Classes for:", userData.role);
-
-  // 1. Build Query based on Role
-  const q = userData.role === 'instructor' 
-    ? query(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'))
-    : query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
-
-  const unsubClasses = onSnapshot(q, (snapshot) => {
-    const fetchedClasses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    setEnrolledClasses(fetchedClasses);
-
-    // 2. FLATTEN ASSIGNMENTS & INJECT CLASS ID
-    // This is what makes Michael's Class show the 6 lessons
-    let flattened: any[] = [];
-    fetchedClasses.forEach((cls: any) => {
-      if (cls.assignments && Array.isArray(cls.assignments)) {
-        const mapped = cls.assignments.map((a: any) => ({
-          ...a,
-          classId: cls.id, // Linked for StudentClassView filter
-          className: cls.name
-        }));
-        flattened = [...flattened, ...mapped];
+  // --- 2. EFFECT: AUTH & PROFILE SYNC ---
+  useEffect(() => {
+    const unsubAuth = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      if (!u) {
+        setUserData(null);
+        setAuthChecked(true);
       }
     });
+    return () => unsubAuth();
+  }, []);
 
-    console.log(`✅ Success: Found ${flattened.length} assignments.`);
-    setClassLessons(flattened);
-  });
+  useEffect(() => {
+    if (!user?.uid) return;
+    const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main');
+    const unsubProfile = onSnapshot(profileRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setUserData(docSnap.data());
+      } else {
+        setUserData(DEFAULT_USER_DATA);
+      }
+      setAuthChecked(true);
+    });
+    return () => unsubProfile();
+  }, [user?.uid]);
 
-  return () => unsubClasses();
-}, [user?.uid, userData?.role, user?.email]);
-  
+  // --- 3. EFFECT: CONTENT LIBRARY SYNC (Cards & Lessons) ---
+  useEffect(() => {
+    if (!user?.uid) return;
+    setSystemDecks(INITIAL_SYSTEM_DECKS);
+    setSystemLessons(INITIAL_SYSTEM_LESSONS);
+
+    const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => 
+        setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    
+    const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => 
+        setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+    const unsubSysDecks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_decks'), (snap) => {
+      const d: any = {}; snap.docs.forEach(doc => { d[doc.id] = doc.data(); });
+      if (Object.keys(d).length > 0) setSystemDecks(d);
+    });
+
+    const unsubSysLessons = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_lessons'), (snap) => {
+      const l = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (l.length > 0) setSystemLessons(l);
+    });
+
+    return () => { unsubCards(); unsubLessons(); unsubSysDecks(); unsubSysLessons(); };
+  }, [user?.uid]);
+
+  // --- 4. EFFECT: CLASSROOM SYNC (Flattening Assignments) ---
+  useEffect(() => {
+    if (!user?.uid || !userData?.role) return;
+
+    // Determine query based on role
+    const q = userData.role === 'instructor' 
+      ? query(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'))
+      : query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
+
+    const unsubClasses = onSnapshot(q, (snapshot) => {
+      const fetchedClasses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setEnrolledClasses(fetchedClasses);
+
+      // FLATTEN: This ensures Michaels's class has its 6 lessons
+      let allAssignments: any[] = [];
+      fetchedClasses.forEach((cls: any) => {
+        if (cls.assignments && Array.isArray(cls.assignments)) {
+          const mapped = cls.assignments.map((a: any) => ({
+            ...a,
+            classId: cls.id, // INJECT: This links the lesson to the class ID
+            className: cls.name
+          }));
+          allAssignments = [...allAssignments, ...mapped];
+        }
+      });
+
+      console.log(`✅ Success: Synced ${allAssignments.length} total assignments.`);
+      setClassLessons(allAssignments);
+    });
+
+    return () => unsubClasses();
+  }, [user?.uid, userData?.role, user?.email]);
   // --- MEMOS ---
   const allDecks = useMemo(() => {
     const decks: any = { ...systemDecks, custom: { title: "✍️ Card Builder", cards: [] } };
