@@ -2068,24 +2068,34 @@ function StudentClassView({
   onSelectDeck, 
   userData, 
   allLessons = [], 
-  classLessons = [], // This will now receive the 'assignments' array
+  classLessons = [], 
   setActiveTab, 
   setSelectedLessonId 
 }: any) {
     
+    // THE MASTER RESOLVER
     const resolvedLessons = useMemo(() => {
         const currentClassId = classData?.id || classData?.uid;
+        if (!currentClassId) return [];
 
-        // Filter assignments by the current class ID
-        return classLessons.filter((assignment: any) => {
-            return assignment.classId === currentClassId || 
-                   assignment.courseId === currentClassId ||
-                   assignment.class === currentClassId;
-        }).map((assignment: any) => {
-            // Find full details from the master library
+        // 1. Filter by every possible ID variation
+        const matches = classLessons.filter((a: any) => {
+            const assignmentClassId = a.classId || a.courseId || a.class || a.class_id;
+            
+            // Check for match (Loose equality in case one is a number or string)
+            return String(assignmentClassId) === String(currentClassId);
+        });
+
+        // 2. Resolve the full content from your library
+        return matches.map((assignment: any) => {
             const lessonId = assignment.lessonId || assignment.id;
-            const fullLesson = allLessons.find((l: any) => l.id === lessonId);
-            return fullLesson ? { ...fullLesson, ...assignment } : assignment;
+            const fullLesson = allLessons.find((l: any) => String(l.id) === String(lessonId));
+            
+            // If we find the lesson content, merge it. 
+            // If not, we still return the assignment so it shows up in the list!
+            return fullLesson 
+                ? { ...fullLesson, ...assignment, resolved: true } 
+                : { ...assignment, title: assignment.title || `Lesson: ${lessonId}`, resolved: false };
         });
     }, [classData, allLessons, classLessons]);
 
@@ -2098,7 +2108,7 @@ function StudentClassView({
                 </button>
                 <h1 className="text-3xl font-black text-slate-900 tracking-tight">{classData?.name}</h1>
                 <p className="text-slate-500 font-medium">
-                    {resolvedLessons.length} lessons available
+                    {resolvedLessons.length} lessons assigned
                 </p>
             </div>
 
@@ -2107,20 +2117,14 @@ function StudentClassView({
                     <div key={lesson.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-bottom-2">
                         <div className="flex-1 pr-4">
                             <h3 className="font-bold text-slate-800 text-lg leading-tight">{lesson.title}</h3>
-                            <p className="text-[10px] text-slate-400 font-black uppercase mt-1 tracking-widest">
-                                {lesson.type || 'Lesson'}
-                            </p>
+                            {!lesson.resolved && (
+                                <p className="text-[10px] text-amber-600 font-black uppercase mt-1">Content Missing from Library</p>
+                            )}
                         </div>
                         <div className="flex gap-2">
-                            {/* Student View Button */}
-                            <button 
-                                onClick={() => onSelectLesson(lesson)} 
-                                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
-                            >
+                            <button onClick={() => onSelectLesson(lesson)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs">
                                 Open
                             </button>
-                            
-                            {/* Instructor Presentation Button */}
                             {userData?.role === 'instructor' && (
                                 <button 
                                     onClick={(e) => {
@@ -2128,8 +2132,7 @@ function StudentClassView({
                                         setSelectedLessonId(lesson.lessonId || lesson.id);
                                         setActiveTab('presentation');
                                     }}
-                                    className="p-3 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
-                                    title="Present to Class"
+                                    className="p-3 bg-indigo-600 text-white rounded-xl shadow-lg"
                                 >
                                     <Monitor size={18} />
                                 </button>
@@ -2137,18 +2140,36 @@ function StudentClassView({
                         </div>
                     </div>
                 )) : (
-                    <div className="text-center py-20 bg-white/50 border-2 border-dashed border-slate-200 rounded-[3rem]">
-                        <p className="text-slate-400 font-bold">No assignments matched for this class.</p>
-                        <p className="text-[10px] text-slate-300 mt-2 font-mono uppercase tracking-widest">
-                            Class ID: {classData?.id}
-                        </p>
+                    <div className="space-y-6">
+                        <div className="text-center py-10 bg-white/50 border-2 border-dashed border-slate-200 rounded-[3rem]">
+                            <p className="text-slate-400 font-bold">No assignments matched.</p>
+                        </div>
+
+                        {/* 🛠️ LIVE TROUBLESHOOTER (Only visible during debugging) */}
+                        <div className="bg-slate-900 rounded-[2rem] p-6 font-mono text-[10px] text-slate-300">
+                            <p className="text-indigo-400 font-black mb-3 text-xs uppercase tracking-widest">Diagnostic HUD</p>
+                            <div className="space-y-2">
+                                <p><span className="text-emerald-400">Class Target ID:</span> {classData?.id}</p>
+                                <p><span className="text-emerald-400">Assignments in State:</span> {classLessons.length}</p>
+                                
+                                {classLessons.length > 0 && (
+                                    <div className="pt-2 border-t border-slate-800 mt-2">
+                                        <p className="text-amber-400 mb-1">First Assignment Keys found:</p>
+                                        <div className="bg-black/30 p-2 rounded text-slate-400">
+                                            {JSON.stringify(Object.keys(classLessons[0]))}
+                                        </div>
+                                        <p className="mt-2 text-amber-400">Value of 'classId' in first assignment:</p>
+                                        <p className="text-white">"{classLessons[0].classId || classLessons[0].courseId || 'NOT FOUND'}"</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>
         </div>
     );
 }
-
 // ============================================================================
 //  JUICY TOAST NOTIFICATION (Now supports types!)
 // ============================================================================
