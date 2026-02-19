@@ -3227,25 +3227,24 @@ function App() {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  // --- 2. THE HANDSHAKE (The Fix) ---
-  // Instead of a state variable that can fail to update, we 'derive' 
-  // classLessons directly from enrolledClasses.
+  // --- 2. THE HANDSHAKE (The Master Fix) ---
+  // We derive classLessons directly from enrolledClasses. 
+  // This ensures the HUD and the Home Bubble are always in sync.
   const classLessons = useMemo(() => {
     let all: any[] = [];
     enrolledClasses.forEach((cls: any) => {
       if (cls.assignments && Array.isArray(cls.assignments)) {
         all.push(...cls.assignments.map((a: any) => ({
           ...a,
-          classId: cls.id, // THE HANDSHAKE KEY
+          classId: cls.id, // THE LINKING KEY for Michael's Class
           className: cls.name
         })));
       }
     });
-    console.log("Calculated classLessons:", all.length);
     return all;
   }, [enrolledClasses]);
 
-  // --- 3. AUTH & PROFILE SYNC ---
+  // --- 3. AUTH & PROFILE ---
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -3264,33 +3263,37 @@ function App() {
     return () => unsubProfile();
   }, [user?.uid]);
 
-  // --- 4. DATA FETCHING ---
+  // --- 4. MASTER DATA FETCH ---
   useEffect(() => {
     if (!user?.uid || !userData?.role) return;
 
     setSystemDecks(INITIAL_SYSTEM_DECKS);
     setSystemLessons(INITIAL_SYSTEM_LESSONS);
 
+    // B. Sync Library
     const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => 
       setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     
     const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => 
       setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
+    // C. Sync Classes (Universal Query)
     const q = userData.role === 'instructor' 
       ? query(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'))
       : query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
 
     const unsubClasses = onSnapshot(q, (snapshot) => {
-      setEnrolledClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const clsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setEnrolledClasses(clsData);
     });
 
     return () => { unsubCards(); unsubLessons(); unsubClasses(); };
   }, [user?.uid, userData?.role, user?.email]);
 
-  // --- 5. DERIVED DATA ---
-  const displayName = useMemo(() => userData?.name || user?.email?.split('@')[0] || 'Scholar', [userData, user]);
+  // --- 5. DERIVED DATA & HELPERS ---
+  const displayName = useMemo(() => userData?.name || user?.email?.split('@')[0] || 'Learner', [userData, user]);
   const lessons = useMemo(() => [...systemLessons, ...customLessons], [systemLessons, customLessons]);
+  
   const allDecks = useMemo(() => {
     const decks: any = { ...systemDecks, custom: { title: "✍️ Builder", cards: [] } };
     customCards.forEach(card => {
@@ -3302,7 +3305,6 @@ function App() {
     return decks;
   }, [systemDecks, customCards]);
 
-  // --- 6. HANDLERS ---
   const handleContentSelection = (item: any) => {
     if (item.id) setSelectedLessonId(item.id);
     if (item.contentType === 'lesson' || item.type === 'lesson') {
@@ -3324,27 +3326,36 @@ function App() {
     } 
   }, [user, displayName]);
 
-  // Placeholders for build stability
-  const handleLogActivity = () => {}; const handleCreateCard = (c: any) => {}; const handleUpdateCard = (id: string, d: any) => {}; const handleDeleteCard = (id: string) => {}; const handleCreateLesson = (l: any) => {}; const handleDeleteDeck = (id: string) => {}; const handleLogSelfStudy = (id: string, xp: number, t: string) => {};
-
-  // --- 7. RENDERING ---
+  // --- 6. RENDER LOGIC ---
   if (!authChecked || (user && !userData)) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
   if (!user) return <AuthView />;
 
   if (userData.role === 'instructor') {
-      return <InstructorDashboard user={user} userData={{...userData, classes: enrolledClasses}} allDecks={allDecks} lessons={lessons} onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} onLogout={() => signOut(auth)} />;
+      return <InstructorDashboard user={user} userData={{...userData, classes: enrolledClasses}} allDecks={allDecks} lessons={lessons} onSaveCard={() => {}} onUpdateCard={() => {}} onDeleteCard={() => {}} onSaveLesson={() => {}} onLogout={() => signOut(auth)} />;
   }
 
   const renderStudentView = () => {
     if (activeTab === 'presentation') return <ClassView lessonId={selectedLessonId} lessons={lessons} />;
     if (activeLesson) return <LessonView lesson={activeLesson} onFinish={handleFinishLesson} isInstructor={false} />;
+    
     if (activeTab === 'home' && activeStudentClass) {
-      return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} setActiveTab={setActiveTab} setSelectedLessonId={setSelectedLessonId} allLessons={lessons} classLessons={classLessons} />;
+      return <StudentClassView 
+                classData={activeStudentClass} 
+                onBack={() => setActiveStudentClass(null)} 
+                onSelectLesson={handleContentSelection} 
+                onSelectDeck={handleContentSelection} 
+                userData={userData} 
+                setActiveTab={setActiveTab} 
+                setSelectedLessonId={setSelectedLessonId} 
+                allLessons={lessons} 
+                classLessons={classLessons} 
+             />;
     }
+
     switch (activeTab) {
-      case 'discovery': return <DiscoveryView allDecks={allDecks} lessons={lessons} user={user} onSelectDeck={handleContentSelection} onSelectLesson={handleContentSelection} userData={userData} onLogActivity={handleLogActivity} />;
-      case 'flashcards': return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} activeDeckOverride={null} onComplete={handleFinishLesson} userData={userData} user={user} onDeleteDeck={handleDeleteDeck} />;
-      case 'create': return <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />;
+      case 'discovery': return <DiscoveryView allDecks={allDecks} lessons={lessons} user={user} onSelectDeck={handleContentSelection} onSelectLesson={handleContentSelection} userData={userData} onLogActivity={() => {}} />;
+      case 'flashcards': return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} activeDeckOverride={null} onComplete={handleFinishLesson} userData={userData} user={user} onDeleteDeck={() => {}} />;
+      case 'create': return <BuilderHub onSaveCard={() => {}} onUpdateCard={() => {}} onDeleteCard={() => {}} onSaveLesson={() => {}} allDecks={allDecks} lessons={lessons} />;
       case 'profile': return <ProfileView user={user} userData={userData} />;
       default: return <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} />;
     }
