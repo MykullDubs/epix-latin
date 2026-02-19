@@ -371,18 +371,19 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
     });
   }, [lessonId]);
 
-  if (!lesson) return <div className="h-screen flex items-center justify-center font-black text-slate-300">PREPARING STAGE...</div>;
+  if (!lesson) return <div className="h-screen flex items-center justify-center font-black text-slate-300">CLEANING THE STAGE...</div>;
 
   const currentPage = pages[activePageIdx];
 
-  // --- THE STAGE RENDERER ---
-  const renderBlockOnStage = (block: any, idx: number) => {
+  // --- THE NATURAL RENDERER ---
+  // No absolute positioning here! Just normal vertical flow.
+  const renderBlockNaturally = (block: any, idx: number) => {
     switch (block.type) {
       case 'text':
         return (
-          <div key={idx} className="w-full flex flex-col justify-center items-center py-4 min-h-0">
-            {block.title && <h3 className="text-[3.5vh] font-black text-indigo-600 uppercase tracking-widest mb-4 shrink-0">{block.title}</h3>}
-            <p className="text-[5.5vh] lg:text-[6.5vh] leading-[1.2] text-slate-800 font-bold max-w-5xl whitespace-pre-wrap tracking-tight text-center">
+          <div key={idx} className="w-full space-y-4 mb-8">
+            {block.title && <h3 className="text-[3vh] font-black text-indigo-600 uppercase tracking-[0.2em]">{block.title}</h3>}
+            <p className="text-[5vh] lg:text-[6vh] leading-tight text-slate-800 font-bold max-w-5xl mx-auto whitespace-pre-wrap tracking-tight">
               {block.content}
             </p>
           </div>
@@ -390,23 +391,23 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
 
       case 'image':
         return (
-          <div key={idx} className="w-full h-full flex flex-col items-center justify-center min-h-0 p-4">
+          <div key={idx} className="w-full flex flex-col items-center py-6">
             <img 
               src={block.url} 
-              className="max-h-[60vh] max-w-full object-contain rounded-[2.5rem] shadow-2xl border-[12px] border-white shrink" 
+              className="max-h-[50vh] max-w-[80%] object-contain rounded-[3rem] shadow-2xl border-[12px] border-white" 
               alt="Visual" 
             />
-            {block.caption && <p className="mt-4 text-[2.5vh] font-bold text-slate-400 italic shrink-0">{block.caption}</p>}
+            {block.caption && <p className="mt-4 text-[2.5vh] font-bold text-slate-400 italic">{block.caption}</p>}
           </div>
         );
 
       case 'vocab-list':
         return (
-          <div key={idx} className="grid grid-cols-2 gap-6 w-full max-w-6xl py-6 min-h-0">
+          <div key={idx} className="grid grid-cols-2 gap-6 w-full max-w-6xl mx-auto py-8">
             {(block.items || []).map((item: any, i: number) => (
-              <div key={i} className="bg-slate-50 p-8 rounded-[2.5rem] border-4 border-slate-100 flex flex-col justify-center items-center shadow-sm">
-                <p className="text-[4.5vh] font-black text-indigo-600 mb-1">{item.term}</p>
-                <p className="text-[2.8vh] text-slate-500 font-bold text-center">{item.definition}</p>
+              <div key={i} className="bg-slate-50 p-8 rounded-[3rem] border-4 border-slate-100 flex flex-col justify-center items-center shadow-sm">
+                <p className="text-[4vh] font-black text-indigo-600 mb-1">{item.term}</p>
+                <p className="text-[2.5vh] text-slate-500 font-bold text-center">{item.definition}</p>
               </div>
             ))}
           </div>
@@ -414,12 +415,12 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
 
       case 'dialogue':
         return (
-          <div key={idx} className="space-y-4 w-full max-w-4xl py-6 min-h-0">
+          <div key={idx} className="space-y-6 w-full max-w-4xl mx-auto py-8">
             {(block.lines || []).map((line: any, i: number) => (
               <div key={i} className={`flex ${line.side === 'right' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`p-6 px-8 rounded-[2.5rem] max-w-[85%] shadow-lg border-2 ${line.side === 'right' ? 'bg-indigo-600 text-white border-indigo-500 rounded-tr-none' : 'bg-white text-slate-800 border-slate-100 rounded-tl-none'}`}>
-                  <p className="text-[3.2vh] font-bold leading-tight">{line.text}</p>
-                  {line.translation && <p className={`text-[1.8vh] mt-2 pt-2 border-t ${line.side === 'right' ? 'border-white/20 text-indigo-100' : 'border-slate-100 text-slate-400'} italic`}>{line.translation}</p>}
+                <div className={`p-8 px-10 rounded-[3rem] max-w-[80%] shadow-lg border-2 ${line.side === 'right' ? 'bg-indigo-600 text-white border-indigo-500 rounded-tr-none' : 'bg-white text-slate-800 border-slate-100 rounded-tl-none'}`}>
+                  <p className="text-[3.5vh] font-bold leading-tight">{line.text}</p>
+                  {line.translation && <p className={`text-[2vh] mt-3 pt-3 border-t ${line.side === 'right' ? 'border-white/20 text-indigo-100' : 'border-slate-100 text-slate-400'} italic`}>{line.translation}</p>}
                 </div>
               </div>
             ))}
@@ -428,55 +429,55 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
 
       case 'note':
         return (
-          <div key={idx} className="p-10 bg-amber-50 rounded-[3rem] border-4 border-amber-100 max-w-5xl flex gap-8 items-center shadow-lg my-4">
-             <div className="bg-white p-4 rounded-full shadow-md shrink-0"><Zap size={48} className="text-amber-500 fill-amber-500" /></div>
+          <div key={idx} className="p-10 bg-amber-50 rounded-[4rem] border-4 border-amber-100 max-w-5xl mx-auto flex gap-10 items-center shadow-lg my-10">
+             <div className="bg-white p-6 rounded-full shadow-md shrink-0"><Zap size={48} className="text-amber-500 fill-amber-500" /></div>
              <div className="text-left">
                 <h4 className="text-[2vh] font-black text-amber-600 uppercase tracking-widest mb-1">{block.title || "Note"}</h4>
-                <p className="text-[4vh] font-bold text-amber-900 leading-tight">{block.content}</p>
+                <p className="text-[4.5vh] font-bold text-amber-900 leading-tight">{block.content}</p>
              </div>
           </div>
         );
 
       default:
         return (
-          <div key={idx} className="py-20 px-12 bg-indigo-50 rounded-[4rem] border-4 border-indigo-100/50 text-center animate-pulse">
-            <p className="text-[7vh] font-black text-indigo-600 uppercase mb-4 tracking-tighter">Interaction</p>
-            <p className="text-[3vh] font-bold text-indigo-400 uppercase tracking-widest">Submit on your phone!</p>
+          <div key={idx} className="py-24 px-16 bg-indigo-50 rounded-[5rem] border-8 border-indigo-100/50 text-center animate-pulse flex flex-col items-center justify-center">
+            <p className="text-[8vh] font-black text-indigo-600 uppercase mb-4 tracking-tighter">Participation</p>
+            <p className="text-[3.5vh] font-bold text-indigo-400">Interaction required on mobile!</p>
           </div>
         );
     }
   };
 
   return (
-    <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col overflow-hidden select-none">
+    <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col overflow-hidden text-center select-none">
       
-      {/* 1. TOP BAR (Fixed Height) */}
-      <div className="h-[12vh] w-full px-16 flex items-center gap-10 shrink-0">
+      {/* 1. HEADER (Top) */}
+      <div className="h-[12vh] w-full px-16 flex items-center gap-12 shrink-0 border-b border-slate-50">
         <div className="h-2 flex-1 bg-slate-100 rounded-full overflow-hidden shadow-inner">
           <div 
             className="h-full bg-indigo-600 transition-all duration-1000 ease-out" 
             style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} 
           />
         </div>
-        <span className="text-[3vh] font-black text-slate-300 tabular-nums">{activePageIdx + 1} / {pages.length}</span>
+        <span className="text-[3.5vh] font-black text-slate-300 tabular-nums">{activePageIdx + 1} / {pages.length}</span>
       </div>
 
-      {/* 2. THE MAIN STAGE (Auto-scaling zone) */}
-      <div className="flex-1 w-full px-16 flex flex-col justify-center items-center overflow-hidden">
-        <div className="w-full flex flex-col items-center justify-center gap-4 max-h-full">
-          {currentPage?.blocks.map((block: any, idx: number) => renderBlockOnStage(block, idx))}
+      {/* 2. THE STAGE (Middle - Scrollable if content is massive) */}
+      <div className="flex-1 w-full px-16 py-12 overflow-y-auto custom-scrollbar flex flex-col items-center">
+        <div className="w-full max-w-7xl flex flex-col gap-4">
+          {currentPage?.blocks.map((block: any, idx: number) => renderBlockNaturally(block, idx))}
         </div>
       </div>
 
-      {/* 3. FOOTER (Fixed Height) */}
-      <div className="h-[12vh] w-full px-16 border-t-2 border-slate-50 flex justify-between items-center shrink-0">
+      {/* 3. FOOTER (Bottom) */}
+      <div className="h-[12vh] w-full px-16 border-t-2 border-slate-50 flex justify-between items-center shrink-0 bg-white">
         <div className="flex items-center gap-4">
-           <div className="w-4 h-4 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_20px_rgba(16,185,129,0.5)]" />
-           <span className="font-black text-[2vh] tracking-[0.3em] text-slate-400 uppercase">Live Presentation</span>
+           <div className="w-5 h-5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_20px_rgba(16,185,129,0.5)]" />
+           <span className="font-black text-[2.2vh] tracking-[0.3em] text-slate-400 uppercase">Live Presentation</span>
         </div>
-        <div className="flex items-center gap-6">
-           <h2 className="text-[2.5vh] font-black text-slate-900 opacity-20 uppercase tracking-[0.2em]">{lesson.title}</h2>
-           <div className="bg-slate-900 text-white px-6 py-2 rounded-2xl font-black text-[2vh]">LLLMS PRO</div>
+        <div className="flex items-center gap-8">
+           <h2 className="text-[2.8vh] font-black text-slate-900 opacity-20 uppercase tracking-[0.2em]">{lesson.title}</h2>
+           <div className="bg-slate-900 text-white px-8 py-3 rounded-[2rem] font-black text-[2.2vh] shadow-xl">LLLMS PRO</div>
         </div>
       </div>
 
