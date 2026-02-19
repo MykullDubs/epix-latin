@@ -3436,7 +3436,7 @@ const renderStudentView = () => {
     let content: React.ReactNode = null;
     let viewKey: string = "default";
 
-    // PRIORITY 1: Presentation mode overrides everything
+    // PRIORITY 1: Presentation mode (ClassView)
     if (activeTab === 'presentation') {
       viewKey = `presentation-${selectedLessonId}`;
       content = <ClassView lessonId={selectedLessonId} lessons={lessons} />;
@@ -3453,7 +3453,7 @@ const renderStudentView = () => {
         />
       );
     } 
-    // PRIORITY 3: The Class Dashboard
+    // PRIORITY 3: The Class Dashboard (Michael's Class)
     else if (activeTab === 'home' && activeStudentClass) {
       viewKey = `class-${activeStudentClass.id}`;
       content = (
@@ -3466,7 +3466,7 @@ const renderStudentView = () => {
             setActiveTab={setActiveTab}
             setSelectedLessonId={setSelectedLessonId}
             allLessons={lessons} 
-            classLessons={classLessons} // Using the state variable 'classLessons'
+            classLessons={classLessons} 
         />
       );
     } 
@@ -3482,7 +3482,8 @@ const renderStudentView = () => {
               lessons={lessons} 
               assignments={classLessons} 
               classes={enrolledClasses} 
-              onSelectClass={(c) => setActiveStudentClass(c)} 
+              // --- FIX: Added :any to parameter 'c' ---
+              onSelectClass={(c: any) => setActiveStudentClass(c)} 
               onSelectLesson={handleContentSelection} 
               onSelectDeck={handleContentSelection} 
               userData={userData} 
