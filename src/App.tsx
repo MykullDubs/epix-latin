@@ -2073,96 +2073,68 @@ function StudentClassView({
   setSelectedLessonId 
 }: any) {
     
-    // THE MASTER RESOLVER
     const resolvedLessons = useMemo(() => {
         const currentClassId = classData?.id || classData?.uid;
         if (!currentClassId) return [];
 
-        // 1. Filter by every possible ID variation
+        // 1. FILTER: Find assignments for this class
         const matches = classLessons.filter((a: any) => {
-            const assignmentClassId = a.classId || a.courseId || a.class || a.class_id;
-            
-            // Check for match (Loose equality in case one is a number or string)
-            return String(assignmentClassId) === String(currentClassId);
+            const aID = String(a.classId || a.courseId || a.class || a.class_id);
+            return aID === String(currentClassId);
         });
 
-        // 2. Resolve the full content from your library
+        // 2. RESOLVE: Match them to content
         return matches.map((assignment: any) => {
             const lessonId = assignment.lessonId || assignment.id;
             const fullLesson = allLessons.find((l: any) => String(l.id) === String(lessonId));
-            
-            // If we find the lesson content, merge it. 
-            // If not, we still return the assignment so it shows up in the list!
-            return fullLesson 
-                ? { ...fullLesson, ...assignment, resolved: true } 
-                : { ...assignment, title: assignment.title || `Lesson: ${lessonId}`, resolved: false };
-        });
+            return fullLesson ? { ...fullLesson, ...assignment, resolved: true } : { ...assignment, resolved: false };
+        }).filter(Boolean);
     }, [classData, allLessons, classLessons]);
 
     return (
         <div className="h-full flex flex-col bg-slate-50">
-            {/* Header */}
             <div className="bg-white px-6 pt-12 pb-6 border-b border-slate-100 shadow-sm">
-                <button onClick={onBack} className="flex items-center gap-2 text-slate-400 font-bold text-sm mb-4">
-                    <ChevronLeft size={18} /> Back
-                </button>
+                <button onClick={onBack} className="flex items-center gap-2 text-slate-400 font-bold text-sm mb-4"><ChevronLeft size={18} /> Back</button>
                 <h1 className="text-3xl font-black text-slate-900 tracking-tight">{classData?.name}</h1>
-                <p className="text-slate-500 font-medium">
-                    {resolvedLessons.length} lessons assigned
-                </p>
+                <p className="text-slate-500 font-medium">{resolvedLessons.length} lessons found</p>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
                 {resolvedLessons.length > 0 ? resolvedLessons.map((lesson: any) => (
-                    <div key={lesson.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-bottom-2">
+                    <div key={lesson.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 flex items-center justify-between shadow-sm">
                         <div className="flex-1 pr-4">
-                            <h3 className="font-bold text-slate-800 text-lg leading-tight">{lesson.title}</h3>
-                            {!lesson.resolved && (
-                                <p className="text-[10px] text-amber-600 font-black uppercase mt-1">Content Missing from Library</p>
-                            )}
+                            <h3 className="font-bold text-slate-800 text-lg leading-tight">{lesson.title || "Untitled Lesson"}</h3>
                         </div>
                         <div className="flex gap-2">
-                            <button onClick={() => onSelectLesson(lesson)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs">
-                                Open
-                            </button>
-                            {userData?.role === 'instructor' && (
-                                <button 
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedLessonId(lesson.lessonId || lesson.id);
-                                        setActiveTab('presentation');
-                                    }}
-                                    className="p-3 bg-indigo-600 text-white rounded-xl shadow-lg"
-                                >
-                                    <Monitor size={18} />
-                                </button>
-                            )}
+                            <button onClick={() => onSelectLesson(lesson)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs">Open</button>
+                            <button onClick={() => { setSelectedLessonId(lesson.id); setActiveTab('presentation'); }} className="p-3 bg-indigo-600 text-white rounded-xl"><Monitor size={18} /></button>
                         </div>
                     </div>
                 )) : (
-                    <div className="space-y-6">
+                    <div className="space-y-4">
                         <div className="text-center py-10 bg-white/50 border-2 border-dashed border-slate-200 rounded-[3rem]">
-                            <p className="text-slate-400 font-bold">No assignments matched.</p>
+                            <p className="text-slate-400 font-bold">No matches found.</p>
                         </div>
 
-                        {/* 🛠️ LIVE TROUBLESHOOTER (Only visible during debugging) */}
+                        {/* THE TRUTH SEEKER: DIAGNOSTIC BOX */}
                         <div className="bg-slate-900 rounded-[2rem] p-6 font-mono text-[10px] text-slate-300">
-                            <p className="text-indigo-400 font-black mb-3 text-xs uppercase tracking-widest">Diagnostic HUD</p>
-                            <div className="space-y-2">
-                                <p><span className="text-emerald-400">Class Target ID:</span> {classData?.id}</p>
-                                <p><span className="text-emerald-400">Assignments in State:</span> {classLessons.length}</p>
-                                
-                                {classLessons.length > 0 && (
-                                    <div className="pt-2 border-t border-slate-800 mt-2">
-                                        <p className="text-amber-400 mb-1">First Assignment Keys found:</p>
-                                        <div className="bg-black/30 p-2 rounded text-slate-400">
-                                            {JSON.stringify(Object.keys(classLessons[0]))}
-                                        </div>
-                                        <p className="mt-2 text-amber-400">Value of 'classId' in first assignment:</p>
-                                        <p className="text-white">"{classLessons[0].classId || classLessons[0].courseId || 'NOT FOUND'}"</p>
-                                    </div>
-                                )}
-                            </div>
+                            <p className="text-indigo-400 font-black mb-3 text-xs">DIAGNOSTIC HUD</p>
+                            <p className="mb-2">Target Class ID: <span className="text-white">{classData?.id || 'MISSING'}</span></p>
+                            <p className="mb-4">Total Assignments in App: <span className="text-white">{classLessons.length}</span></p>
+                            
+                            {classLessons.length > 0 && (
+                                <div className="p-3 bg-black/40 rounded-xl border border-slate-800">
+                                    <p className="text-emerald-400 mb-1">First Assignment Metadata:</p>
+                                    <pre className="text-slate-500 overflow-x-auto">
+                                        {JSON.stringify({
+                                            title: classLessons[0].title,
+                                            classId: classLessons[0].classId,
+                                            courseId: classLessons[0].courseId,
+                                            class: classLessons[0].class
+                                        }, null, 2)}
+                                    </pre>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
@@ -3453,104 +3425,70 @@ const handleFinishLesson = useCallback(async (lessonId: string, xp: number, titl
       return <InstructorDashboard user={user} userData={{...userData, classes: enrolledClasses}} allDecks={allDecks} lessons={libraryLessons} {...commonHandlers} onLogout={() => signOut(auth)} />;
   }
 
-function StudentClassView({ 
-  classData, 
-  onBack, 
-  onSelectLesson, 
-  onSelectDeck, 
-  userData, 
-  allLessons = [], 
-  classLessons = [], 
-  setActiveTab, 
-  setSelectedLessonId 
-}: any) {
-    
-    const currentClassId = classData?.id || classData?.uid;
+const renderStudentView = () => {
+    let content: React.ReactNode = null;
+    let viewKey: string = "default";
 
-    const resolvedLessons = useMemo(() => {
-        // 1. Filter assignments for this specific class
-        const matches = classLessons.filter((a: any) => 
-            a.classId === currentClassId || 
-            a.courseId === currentClassId || 
-            a.class === currentClassId
-        );
-
-        // 2. Map them to full lesson data
-        return matches.map((assignment: any) => {
-            const lessonId = assignment.lessonId || assignment.id;
-            const fullContent = allLessons.find((l: any) => l.id === lessonId);
-            
-            // If we find the full content, merge it. 
-            // If NOT, we keep the assignment info so it at least shows up!
-            return fullContent 
-                ? { ...fullContent, ...assignment, resolved: true } 
-                : { ...assignment, title: assignment.title || `Unresolved: ${lessonId}`, resolved: false };
-        });
-    }, [classData, allLessons, classLessons]);
-
-    return (
-        <div className="h-full flex flex-col bg-slate-50">
-            <div className="bg-white px-6 pt-12 pb-6 border-b border-slate-100 shadow-sm">
-                <button onClick={onBack} className="flex items-center gap-2 text-slate-400 font-bold text-sm mb-4"><ChevronLeft size={18} /> Back</button>
-                <h1 className="text-3xl font-black text-slate-900 tracking-tight">{classData?.name}</h1>
-                <p className="text-slate-500 font-medium">{resolvedLessons.length} lessons found</p>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                {resolvedLessons.length > 0 ? resolvedLessons.map((lesson: any) => (
-                    <div key={lesson.id} className={`bg-white p-5 rounded-[2rem] border flex items-center justify-between shadow-sm ${!lesson.resolved ? 'border-amber-200 bg-amber-50/30' : 'border-slate-100'}`}>
-                        <div className="flex-1 pr-4">
-                            <h3 className="font-bold text-slate-800 text-lg leading-tight">{lesson.title}</h3>
-                            {!lesson.resolved && (
-                                <p className="text-[9px] text-amber-600 font-black uppercase mt-1">⚠️ Lesson content missing from library</p>
-                            )}
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={() => onSelectLesson(lesson)} className="px-4 py-2 bg-white text-slate-600 rounded-xl font-bold text-xs border border-slate-200">Open</button>
-                            {userData?.role === 'instructor' && (
-                                <button 
-                                    onClick={() => {
-                                        setSelectedLessonId(lesson.lessonId || lesson.id);
-                                        setActiveTab('presentation');
-                                    }}
-                                    className="p-3 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100"
-                                >
-                                    <Monitor size={18} />
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                )) : (
-                    <div className="bg-slate-900 text-slate-300 p-8 rounded-[2.5rem] font-mono text-[10px] space-y-4">
-                        <p className="text-indigo-400 font-black text-xs uppercase tracking-widest">Handshake Troubleshooter</p>
-                        
-                        <div>
-                            <p className="text-emerald-400">1. Target Class ID:</p>
-                            <p className="text-white text-xs">{currentClassId || 'NULL'}</p>
-                        </div>
-
-                        <div>
-                            <p className="text-emerald-400">2. Assignment Count in State:</p>
-                            <p className="text-white text-xs">{classLessons.length} assignments total</p>
-                        </div>
-
-                        {classLessons.length > 0 && (
-                            <div>
-                                <p className="text-emerald-400">3. First Assignment Check:</p>
-                                <p>Class Link ID: <span className="text-amber-400">{classLessons[0].classId || classLessons[0].courseId || 'MISSING'}</span></p>
-                                <p>Lesson Link ID: <span className="text-amber-400">{classLessons[0].lessonId || classLessons[0].id}</span></p>
-                            </div>
-                        )}
-
-                        <div className="pt-4 border-t border-slate-800 text-[9px] leading-relaxed italic">
-                            If 'Target Class ID' doesn't match 'Class Link ID', the list will be empty.
-                        </div>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-}
+    // 1. PRESENTATION MODE
+    if (activeTab === 'presentation') {
+      viewKey = `presentation-${selectedLessonId}`;
+      content = <ClassView lessonId={selectedLessonId} lessons={lessons} />;
+    } 
+    // 2. LESSON PLAYER
+    else if (activeLesson) {
+      viewKey = `lesson-${activeLesson.id}`;
+      const isTeacher = userData?.role === 'instructor';
+      content = <LessonView lesson={activeLesson} onFinish={handleFinishLesson} isInstructor={isTeacher} />;
+    } 
+    // 3. CLASS DASHBOARD
+    else if (activeTab === 'home' && activeStudentClass) {
+      viewKey = `class-${activeStudentClass.id}`;
+      content = (
+        <StudentClassView 
+            classData={activeStudentClass} 
+            onBack={() => setActiveStudentClass(null)} 
+            onSelectLesson={handleContentSelection} 
+            onSelectDeck={handleContentSelection} 
+            userData={userData} 
+            setActiveTab={setActiveTab}
+            setSelectedLessonId={setSelectedLessonId}
+            allLessons={lessons} 
+            classLessons={classLessons} 
+        />
+      );
+    } 
+    // 4. MAIN TABS
+    else {
+      viewKey = `tab-${activeTab || 'home'}`;
+      switch (activeTab) {
+        case 'home':
+          content = (
+            <HomeView 
+              setActiveTab={setActiveTab} 
+              allDecks={allDecks} 
+              lessons={lessons} 
+              assignments={classLessons} 
+              classes={enrolledClasses} 
+              onSelectClass={(c: any) => setActiveStudentClass(c)} 
+              onSelectLesson={handleContentSelection} 
+              onSelectDeck={handleContentSelection} 
+              userData={userData} 
+              user={user} 
+            />
+          );
+          break;
+        case 'flashcards':
+          content = <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} activeDeckOverride={null} onComplete={handleFinishLesson} userData={userData} user={user} />;
+          break;
+        case 'create':
+          content = <BuilderHub onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />;
+          break;
+        case 'profile':
+          content = <ProfileView user={user} userData={userData} />;
+          break;
+        default:
+          content = <div className="p-10 text-slate-400">Select a tab.</div>;
+      }
     }
 
     return (
@@ -3558,43 +3496,24 @@ function StudentClassView({
         {content}
       </div>
     );
-  };
-  // --- PLACE IT HERE ---
-    // This logic runs every time the App renders to decide if we are in "Class Mode"
-    const isPresentation = activeTab === 'presentation';
+  }; // <--- Closes renderStudentView
 
-    return (
-        <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-start relative overflow-hidden">
-            {/* The container expands to full screen if isPresentation is true */}
-            <div className={`w-full transition-all duration-500 bg-white relative overflow-hidden flex flex-col ${
-                isPresentation ? 'h-screen' : 'max-w-md h-[100dvh] shadow-2xl'
-            }`}>
-                
-                {toast && <JuicyToast message={toast} onClose={() => setToast(null)} />} 
-
-                {/* VIEWPORT CONTENT */}
-                <div className="flex-1 h-full overflow-hidden relative">
-                    {renderStudentView()}
-                </div>
-
-                {/* NAVIGATION: Hidden during lessons and presentations */}
-                {!activeLesson && !isPresentation && (
-                    <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
-                )}
+  // MAIN APP RETURN
+  return (
+    <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-start relative overflow-hidden">
+        <div className={`w-full transition-all duration-500 bg-white relative overflow-hidden flex flex-col ${
+            activeTab === 'presentation' ? 'h-screen' : 'max-w-md h-[100dvh] shadow-2xl'
+        }`}>
+            <div className="flex-1 h-full overflow-hidden relative">
+                {renderStudentView()}
             </div>
 
-            <style>{` 
-                .perspective-1000 { perspective: 1000px; } 
-                .preserve-3d { transform-style: preserve-3d; } 
-                .backface-hidden { backface-visibility: hidden; } 
-                .rotate-y-180 { transform: rotateY(180deg); } 
-                .custom-scrollbar::-webkit-scrollbar { width: 4px; } 
-                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; } 
-                .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-            `}</style>
+            {(!activeLesson && activeTab !== 'presentation') && (
+                <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
+            )}
         </div>
-    );
-}
+    </div>
+  ); // <--- Closes Main Return
+} // <--- Closes function App()
 
 export default App;
