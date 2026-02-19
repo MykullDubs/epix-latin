@@ -337,20 +337,12 @@ lessons: any[]; // Replace 'any' with your Lesson type if defined
 function ClassView({ lessonId, lessons, classLessons }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
 
-  // 1. THE HYDRATION LOOKUP
-  // Finds the version of the lesson that contains the 'blocks' array.
   const lesson = useMemo(() => {
-    // Search master library first (System + Custom)
     let found = lessons.find((l: any) => l.id === lessonId || l.originalId === lessonId);
-    
-    // Fallback: Check the assignments list for a direct match if library hasn't synced
-    if (!found || !found.blocks) {
-      found = classLessons?.find((l: any) => l.id === lessonId);
-    }
+    if (!found || !found.blocks) found = classLessons?.find((l: any) => l.id === lessonId);
     return found;
   }, [lessonId, lessons, classLessons]);
 
-  // 2. SMART PAGING (Logic must match LessonView exactly for sync)
   const pages = useMemo(() => {
     if (!lesson || !lesson.blocks) return [];
     const rawBlocks = lesson.blocks;
@@ -358,71 +350,39 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
     let currentBuffer: any[] = [];
 
     rawBlocks.forEach((block: any) => {
-      const isInteractive = ['quiz', 'flashcard', 'scenario'].includes(block.type);
-      if (isInteractive) {
-        if (currentBuffer.length > 0) {
-          groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
-          currentBuffer = [];
-        }
+      if (['quiz', 'flashcard', 'scenario'].includes(block.type)) {
+        if (currentBuffer.length > 0) groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
         groupedPages.push({ type: 'interact', blocks: [block] });
+        currentBuffer = [];
       } else {
         currentBuffer.push(block);
       }
     });
-
-    if (currentBuffer.length > 0) {
-      groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
-    }
+    if (currentBuffer.length > 0) groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
     return groupedPages;
   }, [lesson]);
 
-  // 3. REMOTE CONTROL SYNC
-  // Listens to Firestore for navigation commands from the Instructor's phone.
   useEffect(() => {
     if (!lessonId) return;
-    const docRef = doc(db, 'live_sessions', lessonId);
-    const unsub = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (typeof data.activePageIdx === 'number') {
-          setActivePageIdx(data.activePageIdx);
-        }
+    return onSnapshot(doc(db, 'live_sessions', lessonId), (snap) => {
+      if (snap.exists() && typeof snap.data().activePageIdx === 'number') {
+        setActivePageIdx(snap.data().activePageIdx);
       }
     });
-    return () => unsub();
   }, [lessonId]);
 
-  // 4. KEYBOARD NAVIGATION (For Manual Testing/Desktop Override)
-  useEffect(() => {
-    const handleKeys = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') setActivePageIdx(p => Math.min(pages.length - 1, p + 1));
-      if (e.key === 'ArrowLeft') setActivePageIdx(p => Math.max(0, p - 1));
-    };
-    window.addEventListener('keydown', handleKeys);
-    return () => window.removeEventListener('keydown', handleKeys);
-  }, [pages.length]);
-
-  if (!lesson) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center bg-white text-slate-300">
-        <Loader className="animate-spin mb-4" size={48} />
-        <p className="text-2xl font-black uppercase tracking-widest">Hydrating Content...</p>
-      </div>
-    );
-  }
+  if (!lesson) return <div className="h-screen flex items-center justify-center font-black text-slate-300">PREPARING STAGE...</div>;
 
   const currentPage = pages[activePageIdx];
 
-// --- BIG SCREEN RENDERER (Squish-to-Fit Logic) ---
-  const renderBigBlock = (block: any, idx: number) => {
-    const baseClasses = "flex flex-col items-center justify-center w-full min-h-0 flex-1 overflow-hidden";
-    
+  // --- THE STAGE RENDERER ---
+  const renderBlockOnStage = (block: any, idx: number) => {
     switch (block.type) {
       case 'text':
         return (
-          <div key={idx} className={`${baseClasses} py-[2vh]`}>
-            {block.title && <h3 className="text-[3vh] font-black text-indigo-600 uppercase tracking-tighter mb-2 shrink-0">{block.title}</h3>}
-            <p className="text-[5vh] lg:text-[6.5vh] leading-tight text-slate-800 font-bold max-w-5xl mx-auto whitespace-pre-wrap tracking-tight text-center overflow-hidden">
+          <div key={idx} className="w-full flex flex-col justify-center items-center py-4 min-h-0">
+            {block.title && <h3 className="text-[3.5vh] font-black text-indigo-600 uppercase tracking-widest mb-4 shrink-0">{block.title}</h3>}
+            <p className="text-[5.5vh] lg:text-[6.5vh] leading-[1.2] text-slate-800 font-bold max-w-5xl whitespace-pre-wrap tracking-tight text-center">
               {block.content}
             </p>
           </div>
@@ -430,23 +390,23 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
 
       case 'image':
         return (
-          <div key={idx} className={`${baseClasses} py-[2vh]`}>
+          <div key={idx} className="w-full h-full flex flex-col items-center justify-center min-h-0 p-4">
             <img 
               src={block.url} 
-              className="max-h-full max-w-full w-auto h-auto object-contain rounded-[2rem] shadow-2xl border-[1vw] border-white" 
-              alt="Slide Visual" 
+              className="max-h-[60vh] max-w-full object-contain rounded-[2.5rem] shadow-2xl border-[12px] border-white shrink" 
+              alt="Visual" 
             />
-            {block.caption && <p className="mt-2 text-[2.5vh] font-bold text-slate-400 italic shrink-0">{block.caption}</p>}
+            {block.caption && <p className="mt-4 text-[2.5vh] font-bold text-slate-400 italic shrink-0">{block.caption}</p>}
           </div>
         );
 
       case 'vocab-list':
         return (
-          <div key={idx} className="grid grid-cols-2 gap-[2vh] w-full max-w-6xl mx-auto flex-1 min-h-0 py-[2vh]">
+          <div key={idx} className="grid grid-cols-2 gap-6 w-full max-w-6xl py-6 min-h-0">
             {(block.items || []).map((item: any, i: number) => (
-              <div key={i} className="bg-slate-50 p-[2vh] rounded-[2rem] border-4 border-slate-100 flex flex-col justify-center items-center overflow-hidden">
-                <p className="text-[4vh] font-black text-indigo-600 leading-none mb-1">{item.term}</p>
-                <p className="text-[2.5vh] text-slate-500 font-bold leading-tight text-center">{item.definition}</p>
+              <div key={i} className="bg-slate-50 p-8 rounded-[2.5rem] border-4 border-slate-100 flex flex-col justify-center items-center shadow-sm">
+                <p className="text-[4.5vh] font-black text-indigo-600 mb-1">{item.term}</p>
+                <p className="text-[2.8vh] text-slate-500 font-bold text-center">{item.definition}</p>
               </div>
             ))}
           </div>
@@ -454,12 +414,12 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
 
       case 'dialogue':
         return (
-          <div key={idx} className="space-y-[1.5vh] w-full max-w-4xl mx-auto flex flex-col justify-center flex-1 min-h-0 py-[2vh]">
+          <div key={idx} className="space-y-4 w-full max-w-4xl py-6 min-h-0">
             {(block.lines || []).map((line: any, i: number) => (
-              <div key={i} className={`flex ${line.side === 'right' ? 'justify-end' : 'justify-start'} min-h-0`}>
-                <div className={`p-[2vh] px-[3vh] rounded-[2.5rem] max-w-[80%] shadow-lg border-2 ${line.side === 'right' ? 'bg-indigo-600 text-white border-indigo-500 rounded-tr-none' : 'bg-white text-slate-800 border-slate-100 rounded-tl-none'}`}>
-                  <p className="text-[3vh] font-bold leading-tight">{line.text}</p>
-                  {line.translation && <p className={`text-[1.8vh] mt-1 pt-1 border-t ${line.side === 'right' ? 'border-white/20 text-indigo-100' : 'border-slate-100 text-slate-400'} italic`}>{line.translation}</p>}
+              <div key={i} className={`flex ${line.side === 'right' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`p-6 px-8 rounded-[2.5rem] max-w-[85%] shadow-lg border-2 ${line.side === 'right' ? 'bg-indigo-600 text-white border-indigo-500 rounded-tr-none' : 'bg-white text-slate-800 border-slate-100 rounded-tl-none'}`}>
+                  <p className="text-[3.2vh] font-bold leading-tight">{line.text}</p>
+                  {line.translation && <p className={`text-[1.8vh] mt-2 pt-2 border-t ${line.side === 'right' ? 'border-white/20 text-indigo-100' : 'border-slate-100 text-slate-400'} italic`}>{line.translation}</p>}
                 </div>
               </div>
             ))}
@@ -468,61 +428,58 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
 
       case 'note':
         return (
-          <div key={idx} className="p-[3vh] bg-amber-50 rounded-[3rem] border-4 border-amber-100 max-w-4xl mx-auto flex gap-6 items-center shadow-lg flex-1 min-h-0">
-             <div className="bg-white p-[1.5vh] rounded-full shadow-md shrink-0"><Zap size={40} className="text-amber-500 fill-amber-500" /></div>
-             <div className="text-left overflow-hidden">
-                <h4 className="text-[1.8vh] font-black text-amber-600 uppercase tracking-widest mb-1">{block.title || "Note"}</h4>
-                <p className="text-[3.5vh] font-bold text-amber-900 leading-tight">{block.content}</p>
+          <div key={idx} className="p-10 bg-amber-50 rounded-[3rem] border-4 border-amber-100 max-w-5xl flex gap-8 items-center shadow-lg my-4">
+             <div className="bg-white p-4 rounded-full shadow-md shrink-0"><Zap size={48} className="text-amber-500 fill-amber-500" /></div>
+             <div className="text-left">
+                <h4 className="text-[2vh] font-black text-amber-600 uppercase tracking-widest mb-1">{block.title || "Note"}</h4>
+                <p className="text-[4vh] font-bold text-amber-900 leading-tight">{block.content}</p>
              </div>
           </div>
         );
 
       default:
         return (
-          <div key={idx} className="flex-1 flex flex-col justify-center items-center py-[5vh] px-[5vw] bg-indigo-50 rounded-[4rem] border-4 border-indigo-100/50">
-            <p className="text-[6vh] font-black text-indigo-600 uppercase tracking-tighter">Participation</p>
-            <p className="text-[2.5vh] font-bold text-indigo-400">Check mobile devices!</p>
+          <div key={idx} className="py-20 px-12 bg-indigo-50 rounded-[4rem] border-4 border-indigo-100/50 text-center animate-pulse">
+            <p className="text-[7vh] font-black text-indigo-600 uppercase mb-4 tracking-tighter">Interaction</p>
+            <p className="text-[3vh] font-bold text-indigo-400 uppercase tracking-widest">Submit on your phone!</p>
           </div>
         );
     }
   };
+
   return (
-    <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col p-16 lg:p-24 overflow-hidden select-none font-sans">
-      {/* Visual Ambience */}
-      <div className="absolute top-[-15%] right-[-10%] w-[60vw] h-[60vw] bg-indigo-50 rounded-full blur-[150px] opacity-50 -z-10" />
+    <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col overflow-hidden select-none">
       
-      {/* Top Navigation Bar */}
-      <div className="flex items-center gap-12 mb-20 relative z-10">
-        <div className="h-3 flex-1 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+      {/* 1. TOP BAR (Fixed Height) */}
+      <div className="h-[12vh] w-full px-16 flex items-center gap-10 shrink-0">
+        <div className="h-2 flex-1 bg-slate-100 rounded-full overflow-hidden shadow-inner">
           <div 
-            className="h-full bg-indigo-600 transition-all duration-1000 ease-out shadow-[0_0_30px_rgba(79,70,229,0.6)]" 
+            className="h-full bg-indigo-600 transition-all duration-1000 ease-out" 
             style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} 
           />
         </div>
-        <span className="text-5xl font-black text-slate-200 tabular-nums">
-          {activePageIdx + 1} <span className="text-slate-100">/</span> {pages.length}
-        </span>
+        <span className="text-[3vh] font-black text-slate-300 tabular-nums">{activePageIdx + 1} / {pages.length}</span>
       </div>
 
-      {/* Primary Slide Content */}
-      <div className="flex-1 flex flex-col justify-center items-center text-center w-full min-h-0 overflow-hidden relative z-10">
-    {currentPage?.blocks.map((block: any, idx: number) => renderBigBlock(block, idx))}
-    </div>
-
-      {/* Professional Footer */}
-      <div className="mt-12 pt-10 border-t-4 border-slate-50 flex justify-between items-end relative z-10">
-        <div className="flex items-center gap-8">
-          <div className="flex items-center gap-4">
-             <div className="w-6 h-6 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_30px_rgba(16,185,129,0.8)]" />
-             <span className="font-black text-3xl tracking-[0.3em] text-slate-300 uppercase">Live Class</span>
-          </div>
-          <div className="h-10 w-px bg-slate-100" />
-          <h2 className="text-4xl font-black text-slate-900 opacity-20 uppercase tracking-[0.4em]">{lesson.title}</h2>
-        </div>
-        <div className="bg-slate-900 text-white px-10 py-4 rounded-[2rem] font-black text-2xl shadow-2xl tracking-tighter">
-          LLLMS <span className="text-indigo-400">PRO</span>
+      {/* 2. THE MAIN STAGE (Auto-scaling zone) */}
+      <div className="flex-1 w-full px-16 flex flex-col justify-center items-center overflow-hidden">
+        <div className="w-full flex flex-col items-center justify-center gap-4 max-h-full">
+          {currentPage?.blocks.map((block: any, idx: number) => renderBlockOnStage(block, idx))}
         </div>
       </div>
+
+      {/* 3. FOOTER (Fixed Height) */}
+      <div className="h-[12vh] w-full px-16 border-t-2 border-slate-50 flex justify-between items-center shrink-0">
+        <div className="flex items-center gap-4">
+           <div className="w-4 h-4 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_20px_rgba(16,185,129,0.5)]" />
+           <span className="font-black text-[2vh] tracking-[0.3em] text-slate-400 uppercase">Live Presentation</span>
+        </div>
+        <div className="flex items-center gap-6">
+           <h2 className="text-[2.5vh] font-black text-slate-900 opacity-20 uppercase tracking-[0.2em]">{lesson.title}</h2>
+           <div className="bg-slate-900 text-white px-6 py-2 rounded-2xl font-black text-[2vh]">LLLMS PRO</div>
+        </div>
+      </div>
+
     </div>
   );
 }
