@@ -413,14 +413,15 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
 
   const currentPage = pages[activePageIdx];
 
-  // 5. BIG SCREEN BLOCK RENDERER
+// --- BIG SCREEN RENDERER (Optimized for Auto-Fit) ---
   const renderBigBlock = (block: any, idx: number) => {
+    // We use 'vh' (viewport height) so text scales with the window size
     switch (block.type) {
       case 'text':
         return (
-          <div key={idx} className="space-y-8 mb-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
-            {block.title && <h3 className="text-5xl font-black text-indigo-600 uppercase tracking-tighter">{block.title}</h3>}
-            <p className="text-6xl lg:text-8xl leading-[1.1] text-slate-800 font-bold max-w-6xl mx-auto whitespace-pre-wrap tracking-tight">
+          <div key={idx} className="flex flex-col justify-center items-center h-full max-h-[70vh] px-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {block.title && <h3 className="text-[4vh] font-black text-indigo-600 uppercase tracking-tighter mb-[2vh]">{block.title}</h3>}
+            <p className="text-[6vh] lg:text-[7.5vh] leading-[1.1] text-slate-800 font-bold max-w-5xl mx-auto whitespace-pre-wrap tracking-tight">
               {block.content}
             </p>
           </div>
@@ -428,19 +429,19 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
 
       case 'image':
         return (
-          <div key={idx} className="flex flex-col items-center my-10 animate-in zoom-in-95 duration-700">
-            <img src={block.url} className="max-h-[60vh] rounded-[4rem] shadow-2xl border-[20px] border-white" alt="Slide Visual" />
-            {block.caption && <p className="mt-8 text-3xl font-bold text-slate-400 italic">{block.caption}</p>}
+          <div key={idx} className="flex flex-col items-center justify-center h-full max-h-[70vh] animate-in zoom-in-95 duration-500">
+            <img src={block.url} className="max-h-[55vh] w-auto object-contain rounded-[3rem] shadow-2xl border-[1vw] border-white" alt="Slide Visual" />
+            {block.caption && <p className="mt-[2vh] text-[3vh] font-bold text-slate-400 italic">{block.caption}</p>}
           </div>
         );
 
       case 'vocab-list':
         return (
-          <div key={idx} className="grid grid-cols-2 gap-10 w-full max-w-6xl mx-auto mt-12">
+          <div key={idx} className="grid grid-cols-2 gap-[2vw] w-full max-w-6xl mx-auto items-center justify-center py-[2vh]">
             {block.items.map((item: any, i: number) => (
-              <div key={i} className="bg-slate-50 p-12 rounded-[4rem] border-4 border-slate-100 animate-in fade-in slide-in-from-left-6" style={{ animationDelay: `${i * 150}ms` }}>
-                <p className="text-6xl font-black text-indigo-600 mb-4">{item.term}</p>
-                <p className="text-4xl text-slate-500 font-bold">{item.definition}</p>
+              <div key={i} className="bg-slate-50 p-[3vh] rounded-[2.5rem] border-4 border-slate-100 flex flex-col justify-center items-center shadow-sm">
+                <p className="text-[5vh] font-black text-indigo-600 leading-none mb-[1vh]">{item.term}</p>
+                <p className="text-[3vh] text-slate-500 font-bold leading-tight">{item.definition}</p>
               </div>
             ))}
           </div>
@@ -448,12 +449,12 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
 
       case 'dialogue':
         return (
-          <div key={idx} className="space-y-8 w-full max-w-5xl mx-auto mt-12">
+          <div key={idx} className="space-y-[2vh] w-full max-w-5xl mx-auto flex flex-col justify-center py-[2vh]">
             {block.lines.map((line: any, i: number) => (
-              <div key={i} className={`flex ${line.side === 'right' ? 'justify-end' : 'justify-start'} animate-in fade-in duration-700`}>
-                <div className={`p-10 rounded-[3.5rem] max-w-[85%] shadow-2xl border-4 ${line.side === 'right' ? 'bg-indigo-600 text-white border-indigo-500 rounded-tr-none' : 'bg-white text-slate-800 border-slate-100 rounded-tl-none'}`}>
-                  <p className="text-5xl font-bold leading-tight">{line.text}</p>
-                  {line.translation && <p className={`text-2xl mt-6 pt-6 border-t ${line.side === 'right' ? 'border-white/20 text-indigo-100' : 'border-slate-100 text-slate-400'} italic`}>{line.translation}</p>}
+              <div key={i} className={`flex ${line.side === 'right' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`p-[3vh] px-[4vh] rounded-[3rem] max-w-[85%] shadow-xl border-4 ${line.side === 'right' ? 'bg-indigo-600 text-white border-indigo-500 rounded-tr-none' : 'bg-white text-slate-800 border-slate-100 rounded-tl-none'}`}>
+                  <p className="text-[4vh] font-bold leading-tight">{line.text}</p>
+                  {line.translation && <p className={`text-[2vh] mt-[1.5vh] pt-[1.5vh] border-t ${line.side === 'right' ? 'border-white/20 text-indigo-100' : 'border-slate-100 text-slate-400'} italic`}>{line.translation}</p>}
                 </div>
               </div>
             ))}
@@ -462,25 +463,24 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
 
       case 'note':
         return (
-          <div key={idx} className="my-12 p-16 bg-amber-50 rounded-[5rem] border-[12px] border-amber-100 max-w-6xl mx-auto flex gap-12 items-center animate-in zoom-in-95">
-             <div className="bg-white p-8 rounded-full shadow-2xl"><Zap size={80} className="text-amber-500 fill-amber-500" /></div>
+          <div key={idx} className="p-[4vh] bg-amber-50 rounded-[4rem] border-8 border-amber-100 max-w-5xl mx-auto flex gap-10 items-center shadow-lg">
+             <div className="bg-white p-[2vh] rounded-full shadow-md"><Zap size={60} className="text-amber-500 fill-amber-500" /></div>
              <div className="text-left">
-                <h4 className="text-3xl font-black text-amber-600 uppercase tracking-[0.2em] mb-4">{block.title || "Pro-Tip"}</h4>
-                <p className="text-6xl font-bold text-amber-900 leading-tight tracking-tight">{block.content}</p>
+                <h4 className="text-[2vh] font-black text-amber-600 uppercase tracking-widest mb-1">{block.title || "Note"}</h4>
+                <p className="text-[5vh] font-bold text-amber-900 leading-tight">{block.content}</p>
              </div>
           </div>
         );
 
       default:
         return (
-          <div key={idx} className="py-32 px-20 bg-indigo-50 rounded-[6rem] border-[16px] border-indigo-100/50 text-center animate-in pulse duration-[2000ms] infinite">
-            <p className="text-8xl font-black text-indigo-600 uppercase mb-8 tracking-tighter">Participation</p>
-            <p className="text-4xl font-bold text-indigo-400">Please answer on your mobile device!</p>
+          <div key={idx} className="py-[10vh] px-[5vw] bg-indigo-50 rounded-[5rem] border-8 border-indigo-100/50 text-center">
+            <p className="text-[8vh] font-black text-indigo-600 uppercase tracking-tighter">Participation</p>
+            <p className="text-[3vh] font-bold text-indigo-400">Check mobile devices!</p>
           </div>
         );
     }
   };
-
   return (
     <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col p-16 lg:p-24 overflow-hidden select-none font-sans">
       {/* Visual Ambience */}
