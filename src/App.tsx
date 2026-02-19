@@ -336,6 +336,7 @@ lessons: any[]; // Replace 'any' with your Lesson type if defined
 
 function ClassView({ lessonId, lessons, classLessons }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
+  const stageRef = useRef<HTMLDivElement>(null);
 
   const lesson = useMemo(() => {
     let found = lessons.find((l: any) => l.id === lessonId || l.originalId === lessonId);
@@ -344,13 +345,125 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
   }, [lessonId, lessons, classLessons]);
 
   const pages = useMemo(() => {
-    if (!lesson || !lesson.blocks) return [];
-    const rawBlocks = lesson.blocks;
+    if (!lesson?.blocks) return [];
     const groupedPages: any[] = [];
     let currentBuffer: any[] = [];
 
-    rawBlocks.forEach((block: any) => {
+    lesson.blocks.forEach((block: any) => {
       if (['quiz', 'flashcard', 'scenario'].includes(block.type)) {
+        if (currentBuffer.length > 0) groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
+        groupedPages.push({ type: 'interact', blocks: [block] });
+        currentBuffer = [];
+      } else { currentBuffer.push(block); }
+    });
+    if (currentBuffer.length > 0) groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
+    return groupedPages;
+  }, [lesson]);
+
+  // SYNC LISTENER (Page + Scroll)
+  useEffect(() => {
+    const syncId = lesson?.originalId || lesson?.id;
+    if (!syncId) return;
+
+    return onSnapshot(doc(db, 'live_sessions', syncId), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (typeof data.activePageIdx === 'number') setActivePageIdx(data.activePageIdx);
+        
+        if (typeof data.scrollPercent === 'number' && stageRef.current) {
+          const s = stageRef.current;
+          const target = data.scrollPercent * (s.scrollHeight - s.clientHeight);
+          s.scrollTo({ top: target, behavior: 'smooth' });
+        }
+      }
+    });
+  }, [lesson?.id, lesson?.originalId]);
+
+  if (!lesson) return <div className="h-screen flex items-center justify-center font-black text-slate-300">PREPARING STAGE...</div>;
+
+  const renderBlock = (block: any, idx: number) => {
+    const base = "w-full flex flex-col items-center py-6";
+    switch (block.type) {
+      case 'text': return (
+        <div key={idx} className={base}>
+          {block.title && <h3 className="text-[3vh] font-black text-indigo-600 uppercase mb-4">{block.title}</h3>}
+          <p className="text-[5.5vh] leading-tight text-slate-800 font-bold max-w-5xl text-center">{block.content}</p>
+        </div>
+      );
+      case 'image': return (
+        <div key={idx} className={base}>
+          <img src={block.url} className="max-h-[55vh] object-contain rounded-[3rem] shadow-2xl border-[12px] border-white" alt="visual" />
+        </div>
+      );
+      case 'vocab-list': return (
+        <div key={idx} className="grid grid-cols-2 gap-6 w-full py-10">
+          {block.items.map((item: any, i: number) => (
+            <div key={i} className="bg-slate-50 p-10 rounded-[3rem] border-4 border-slate-100 flex flex-col items-center">
+              <p className="text-[4.5vh] font-black text-indigo-600 mb-1">{item.term}</p>
+              <p className="text-[2.5vh] text-slate-500 font-bold">{item.definition}</p>
+            </div>
+          ))}
+        </div>
+      );
+      case 'dialogue': return (
+        <div key={idx} className="space-y-4 w-full max-w-4xl py-10">
+          {block.lines.map((l: any, i: number) => (
+            <div key={i} className={`flex ${l.side === 'right' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`p-8 rounded-[2.5rem] max-w-[80%] shadow-lg border-2 ${l.side === 'right' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-800 border-slate-100'}`}>
+                <p className="text-[3.5vh] font-bold">{l.text}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+      default: return (
+        <div key={idx} className="py-20 bg-indigo-50 rounded-[4rem] w-full text-center">
+          <p className="text-[7vh] font-black text-indigo-600 uppercase">Interaction Mode</p>
+          <p className="text-[2.5vh] font-bold text-indigo-400">Please check your mobile device!</p>
+        </div>
+      );
+    }
+  };
+
+  return (
+    <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col overflow-hidden">
+      <div className="h-[12vh] px-16 flex items-center gap-10 shrink-0 border-b">
+        <div className="h-2 flex-1 bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-full bg-indigo-600 transition-all duration-1000" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} />
+        </div>
+        <span className="text-[3vh] font-black text-slate-300">{activePageIdx + 1} / {pages.length}</span>
+      </div>
+
+      <div ref={stageRef} className="flex-1 px-16 py-12 overflow-y-auto custom-scrollbar flex flex-col items-center">
+        <div className="w-full max-w-7xl flex flex-col gap-4">{pages[activePageIdx]?.blocks.map((b: any, i: number) => renderBlock(b, i))}</div>
+      </div>
+
+      <div className="h-[12vh] px-16 border-t flex justify-between items-center shrink-0">
+        <div className="flex items-center gap-3"><div className="w-4 h-4 bg-emerald-500 rounded-full animate-pulse" /><span className="font-black text-[2vh] text-slate-400 uppercase">Live</span></div>
+        <h2 className="text-[2.5vh] font-black text-slate-900 opacity-20 uppercase tracking-widest">{lesson.title}</h2>
+      </div>
+    </div>
+  );
+}
+// ============================================================================
+//  LESSON VIEW (Modern "Story" Style)
+// ============================================================================
+function LessonView({ lesson, onFinish, isInstructor = false }: any) {
+  useLearningTimer(auth.currentUser, lesson.id, 'lesson', lesson.title);
+
+  const [currentPageIdx, setCurrentPageIdx] = useState(0);
+  const [isLiveSynced, setIsLiveSynced] = useState(false);
+  const [lastScrollTime, setLastScrollTime] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const pages = useMemo(() => {
+    if (!lesson?.blocks) return [];
+    const groupedPages: any[] = [];
+    let currentBuffer: any[] = [];
+
+    lesson.blocks.forEach((block: any) => {
+      const isInteractive = ['quiz', 'flashcard', 'scenario'].includes(block.type);
+      if (isInteractive) {
         if (currentBuffer.length > 0) groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
         groupedPages.push({ type: 'interact', blocks: [block] });
         currentBuffer = [];
@@ -362,208 +475,36 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
     return groupedPages;
   }, [lesson]);
 
-useEffect(() => {
-    // THE SYNC FIX: We always listen to the 'originalId' (the base content)
-    // so that the remote and projector are on the same channel.
-    const syncId = lesson?.originalId || lesson?.id;
-    if (!syncId) return;
-
-    const docRef = doc(db, 'live_sessions', syncId);
-    const unsub = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (typeof data.activePageIdx === 'number') {
-          setActivePageIdx(data.activePageIdx);
-        }
-      }
-    });
-    return () => unsub();
-  }, [lesson?.id, lesson?.originalId]);
-
-  if (!lesson) return <div className="h-screen flex items-center justify-center font-black text-slate-300">CLEANING THE STAGE...</div>;
-
-  const currentPage = pages[activePageIdx];
-
-  // --- THE NATURAL RENDERER ---
-  // No absolute positioning here! Just normal vertical flow.
-  const renderBlockNaturally = (block: any, idx: number) => {
-    switch (block.type) {
-      case 'text':
-        return (
-          <div key={idx} className="w-full space-y-4 mb-8">
-            {block.title && <h3 className="text-[3vh] font-black text-indigo-600 uppercase tracking-[0.2em]">{block.title}</h3>}
-            <p className="text-[5vh] lg:text-[6vh] leading-tight text-slate-800 font-bold max-w-5xl mx-auto whitespace-pre-wrap tracking-tight">
-              {block.content}
-            </p>
-          </div>
-        );
-
-      case 'image':
-        return (
-          <div key={idx} className="w-full flex flex-col items-center py-6">
-            <img 
-              src={block.url} 
-              className="max-h-[50vh] max-w-[80%] object-contain rounded-[3rem] shadow-2xl border-[12px] border-white" 
-              alt="Visual" 
-            />
-            {block.caption && <p className="mt-4 text-[2.5vh] font-bold text-slate-400 italic">{block.caption}</p>}
-          </div>
-        );
-
-      case 'vocab-list':
-        return (
-          <div key={idx} className="grid grid-cols-2 gap-6 w-full max-w-6xl mx-auto py-8">
-            {(block.items || []).map((item: any, i: number) => (
-              <div key={i} className="bg-slate-50 p-8 rounded-[3rem] border-4 border-slate-100 flex flex-col justify-center items-center shadow-sm">
-                <p className="text-[4vh] font-black text-indigo-600 mb-1">{item.term}</p>
-                <p className="text-[2.5vh] text-slate-500 font-bold text-center">{item.definition}</p>
-              </div>
-            ))}
-          </div>
-        );
-
-      case 'dialogue':
-        return (
-          <div key={idx} className="space-y-6 w-full max-w-4xl mx-auto py-8">
-            {(block.lines || []).map((line: any, i: number) => (
-              <div key={i} className={`flex ${line.side === 'right' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`p-8 px-10 rounded-[3rem] max-w-[80%] shadow-lg border-2 ${line.side === 'right' ? 'bg-indigo-600 text-white border-indigo-500 rounded-tr-none' : 'bg-white text-slate-800 border-slate-100 rounded-tl-none'}`}>
-                  <p className="text-[3.5vh] font-bold leading-tight">{line.text}</p>
-                  {line.translation && <p className={`text-[2vh] mt-3 pt-3 border-t ${line.side === 'right' ? 'border-white/20 text-indigo-100' : 'border-slate-100 text-slate-400'} italic`}>{line.translation}</p>}
-                </div>
-              </div>
-            ))}
-          </div>
-        );
-
-      case 'note':
-        return (
-          <div key={idx} className="p-10 bg-amber-50 rounded-[4rem] border-4 border-amber-100 max-w-5xl mx-auto flex gap-10 items-center shadow-lg my-10">
-             <div className="bg-white p-6 rounded-full shadow-md shrink-0"><Zap size={48} className="text-amber-500 fill-amber-500" /></div>
-             <div className="text-left">
-                <h4 className="text-[2vh] font-black text-amber-600 uppercase tracking-widest mb-1">{block.title || "Note"}</h4>
-                <p className="text-[4.5vh] font-bold text-amber-900 leading-tight">{block.content}</p>
-             </div>
-          </div>
-        );
-
-      default:
-        return (
-          <div key={idx} className="py-24 px-16 bg-indigo-50 rounded-[5rem] border-8 border-indigo-100/50 text-center animate-pulse flex flex-col items-center justify-center">
-            <p className="text-[8vh] font-black text-indigo-600 uppercase mb-4 tracking-tighter">Participation</p>
-            <p className="text-[3.5vh] font-bold text-indigo-400">Interaction required on mobile!</p>
-          </div>
-        );
-    }
-  };
-
-  return (
-    <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col overflow-hidden text-center select-none">
-      
-      {/* 1. HEADER (Top) */}
-      <div className="h-[12vh] w-full px-16 flex items-center gap-12 shrink-0 border-b border-slate-50">
-        <div className="h-2 flex-1 bg-slate-100 rounded-full overflow-hidden shadow-inner">
-          <div 
-            className="h-full bg-indigo-600 transition-all duration-1000 ease-out" 
-            style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} 
-          />
-        </div>
-        <span className="text-[3.5vh] font-black text-slate-300 tabular-nums">{activePageIdx + 1} / {pages.length}</span>
-      </div>
-
-      {/* 2. THE STAGE (Middle - Scrollable if content is massive) */}
-      <div className="flex-1 w-full px-16 py-12 overflow-y-auto custom-scrollbar flex flex-col items-center">
-        <div className="w-full max-w-7xl flex flex-col gap-4">
-          {currentPage?.blocks.map((block: any, idx: number) => renderBlockNaturally(block, idx))}
-        </div>
-      </div>
-
-      {/* 3. FOOTER (Bottom) */}
-      <div className="h-[12vh] w-full px-16 border-t-2 border-slate-50 flex justify-between items-center shrink-0 bg-white">
-        <div className="flex items-center gap-4">
-           <div className="w-5 h-5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_20px_rgba(16,185,129,0.5)]" />
-           <span className="font-black text-[2.2vh] tracking-[0.3em] text-slate-400 uppercase">Live Presentation</span>
-        </div>
-        <div className="flex items-center gap-8">
-           <h2 className="text-[2.8vh] font-black text-slate-900 opacity-20 uppercase tracking-[0.2em]">{lesson.title}</h2>
-           <div className="bg-slate-900 text-white px-8 py-3 rounded-[2rem] font-black text-[2.2vh] shadow-xl">LLLMS PRO</div>
-        </div>
-      </div>
-
-    </div>
-  );
-}
-// ============================================================================
-//  LESSON VIEW (Modern "Story" Style)
-// ============================================================================
-function LessonView({ lesson, onFinish, isInstructor = false }: any) {
-  useLearningTimer(auth.currentUser, lesson.id, 'lesson', lesson.title);
-
-  // 1. SMART PAGING ALGORITHM
-  // This groups static text/images together and creates separate pages for interactions.
-  const pages = useMemo(() => {
-    const rawBlocks = lesson.blocks || [];
-    const groupedPages: any[] = [];
-    let currentBuffer: any[] = [];
-
-    rawBlocks.forEach((block: any) => {
-      const isInteractive = ['quiz', 'flashcard', 'scenario'].includes(block.type);
-      if (isInteractive) {
-        if (currentBuffer.length > 0) {
-          groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
-          currentBuffer = [];
-        }
-        groupedPages.push({ type: 'interact', blocks: [block] });
-      } else {
-        currentBuffer.push(block);
-      }
-    });
-
-    if (currentBuffer.length > 0) {
-      groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
-    }
-    return groupedPages;
-  }, [lesson]);
-
-  // 2. STATE & SYNC
-  const [currentPageIdx, setCurrentPageIdx] = useState(0);
-  const [isLiveSynced, setIsLiveSynced] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-
- const broadcastNavigation = async (index: number) => {
+  const broadcastNavigation = async (index: number, scrollPct: number = 0) => {
     if (!isLiveSynced) return; 
-    
-    // THE REMOTE FIX: Use originalId so the channel matches the projector
     const syncId = lesson?.originalId || lesson?.id;
     if (!syncId) return;
 
     try {
-      const docRef = doc(db, 'live_sessions', syncId);
-      await setDoc(docRef, {
+      await setDoc(doc(db, 'live_sessions', syncId), {
         activePageIdx: index,
+        scrollPercent: scrollPct,
         updatedAt: Date.now()
       }, { merge: true });
-    } catch (e) {
-      console.error("Broadcast failed:", e);
-    }
+    } catch (e) { console.error("Sync error:", e); }
   };
 
-  // SCROLL RESET: Jump to top on page change
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }, [currentPageIdx]);
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (!isLiveSynced) return;
+    const now = Date.now();
+    if (now - lastScrollTime < 50) return; // 20fps throttle
+    setLastScrollTime(now);
 
-  const currentPage = pages[currentPageIdx];
-  const isLastPage = currentPageIdx >= pages.length - 1;
+    const t = e.currentTarget;
+    const pct = t.scrollTop / (t.scrollHeight - t.clientHeight || 1);
+    broadcastNavigation(currentPageIdx, pct);
+  };
 
-  // 3. NAVIGATION HANDLERS
   const handleNext = () => {
-    if (!isLastPage) {
-      const nextIdx = currentPageIdx + 1;
-      setCurrentPageIdx(nextIdx);
-      broadcastNavigation(nextIdx);
+    if (currentPageIdx < pages.length - 1) {
+      const next = currentPageIdx + 1;
+      setCurrentPageIdx(next);
+      broadcastNavigation(next, 0);
     } else {
       onFinish(lesson.id, lesson.xp || 150, lesson.title);
     }
@@ -571,145 +512,79 @@ function LessonView({ lesson, onFinish, isInstructor = false }: any) {
 
   const handlePrev = () => {
     if (currentPageIdx > 0) {
-      const prevIdx = currentPageIdx - 1;
-      setCurrentPageIdx(prevIdx);
-      broadcastNavigation(prevIdx);
+      const prev = currentPageIdx - 1;
+      setCurrentPageIdx(prev);
+      broadcastNavigation(prev, 0);
     }
   };
 
-  // 4. BLOCK RENDERER
   const renderBlock = (block: any, idx: number) => {
     switch (block.type) {
       case 'text': return (
-        <div key={idx} className="my-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          {block.title && <h2 className="text-3xl font-black text-slate-800 mb-4 tracking-tight">{block.title}</h2>}
-          <div className="text-xl text-slate-600 leading-relaxed font-serif antialiased">{block.content}</div>
+        <div key={idx} className="my-8 animate-in fade-in slide-in-from-bottom-4">
+          {block.title && <h2 className="text-2xl font-black text-slate-800 mb-3">{block.title}</h2>}
+          <div className="text-lg text-slate-600 leading-relaxed font-serif">{block.content}</div>
         </div>
       );
       case 'image': return (
-        <div key={idx} className="my-8 space-y-3 animate-in zoom-in-95 duration-500">
-          <div className="rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-white relative">
-            <img src={block.url} alt="Lesson content" className="w-full object-cover" />
-          </div>
-          {block.caption && <p className="text-center text-sm font-bold text-slate-400 italic">{block.caption}</p>}
+        <div key={idx} className="my-8 animate-in zoom-in-95">
+          <img src={block.url} className="w-full rounded-3xl shadow-xl border-4 border-white" alt="content" />
+          {block.caption && <p className="text-center text-xs font-bold text-slate-400 mt-2 italic">{block.caption}</p>}
         </div>
       );
-      case 'vocab-list': return <div key={idx} className="my-8"><JuicyDeckBlock items={block.items} title="Vocabulary" /></div>;
-      case 'dialogue': return <div key={idx} className="my-8"><ChatDialogueBlock lines={block.lines} /></div>;
-      case 'note': {
-        const styles: any = {
-          tip: { bg: 'bg-emerald-50', border: 'border-emerald-100', icon: <Zap size={24} className="text-emerald-600 fill-emerald-600" />, text: 'text-emerald-900' },
-          warning: { bg: 'bg-amber-50', border: 'border-amber-100', icon: <AlertTriangle size={24} className="text-amber-600" />, text: 'text-amber-900' },
-          info: { bg: 'bg-indigo-50', border: 'border-indigo-100', icon: <Info size={24} className="text-indigo-600" />, text: 'text-indigo-900' }
-        };
-        const s = styles[block.variant || 'info'] || styles.info;
-        return (
-          <div key={idx} className={`rounded-[2rem] border-2 ${s.border} ${s.bg} p-8 my-10 flex gap-6 items-start`}>
-            <div className="shrink-0 bg-white p-3 rounded-2xl shadow-sm">{s.icon}</div>
-            <div>
-              <h4 className={`font-black text-xs uppercase tracking-widest mb-1 opacity-60 ${s.text}`}>{block.title || "Note"}</h4>
-              <p className={`text-lg font-medium leading-relaxed ${s.text}`}>{block.content}</p>
-            </div>
-          </div>
-        );
-      }
+      case 'vocab-list': return <div key={idx} className="my-6"><JuicyDeckBlock items={block.items} title="Vocabulary" /></div>;
+      case 'dialogue': return <div key={idx} className="my-6"><ChatDialogueBlock lines={block.lines} /></div>;
       default: return null;
     }
   };
 
-  const isInteractivePage = currentPage?.type === 'interact';
+  const currentPage = pages[currentPageIdx];
 
   return (
     <div className="h-full flex flex-col bg-white">
-      
-      {/* --- FLOATING STATUS HEADER --- */}
+      {/* Header */}
       <div className="bg-white/95 backdrop-blur-xl border-b border-slate-100 sticky top-0 z-50 pt-12 pb-4 px-6">
-        <div className="flex gap-1.5 mb-4">
-          {pages.map((_, idx) => (
-            <div key={idx} className="h-1.5 flex-1 rounded-full bg-slate-100 overflow-hidden">
-              <div
-                className={`h-full transition-all duration-500 ${idx <= currentPageIdx ? 'bg-indigo-600' : 'bg-transparent'}`}
-                style={{ width: idx <= currentPageIdx ? '100%' : '0%' }}
-              ></div>
-            </div>
+        <div className="flex gap-1 mb-4">
+          {pages.map((_, i) => (
+            <div key={i} className={`h-1 flex-1 rounded-full ${i <= currentPageIdx ? 'bg-indigo-600' : 'bg-slate-100'}`} />
           ))}
         </div>
-
         <div className="flex justify-between items-center">
-          <button onClick={() => onFinish(null, 0)} className="p-2 -ml-2 rounded-full text-slate-300 hover:text-rose-500 transition-colors">
-            <X size={24} />
-          </button>
-
+          <button onClick={() => onFinish(null, 0)} className="p-2 text-slate-300"><X size={24} /></button>
           <div className="text-center">
-            <h2 className="text-sm font-black text-slate-800 tracking-tight">{lesson.title}</h2>
-            <div className="flex items-center gap-2 justify-center">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                {isInteractivePage ? 'Interaction' : `Step ${currentPageIdx + 1}`}
-              </p>
-              
-              {/* REMOTE SYNC TOGGLE */}
-              <button
-                onClick={() => {
-                  const newState = !isLiveSynced;
-                  setIsLiveSynced(newState);
-                  if (newState) broadcastNavigation(currentPageIdx);
-                }}
-                className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase transition-all shadow-sm ${
-                  isLiveSynced ? 'bg-emerald-500 text-white ring-4 ring-emerald-100' : 'bg-slate-100 text-slate-400'
-                }`}
-              >
-                {isLiveSynced ? '● Sync On' : 'Sync Off'}
-              </button>
-            </div>
-          </div>
-          <div className="w-8"></div>
-        </div>
-      </div>
-
-      {/* --- SCROLLABLE CONTENT --- */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto bg-white custom-scrollbar">
-        <div className="px-8 py-6 max-w-3xl mx-auto w-full pb-44 flex flex-col min-h-full">
-          {currentPage?.blocks.map((block: any, idx: number) => (
-            isInteractivePage ? (
-              <div key={idx} className="flex-1 flex flex-col justify-center animate-in zoom-in-95 duration-500">
-                {block.type === 'quiz' && <QuizBlock block={block} onComplete={handleNext} />}
-                {block.type === 'flashcard' && (
-                  <div className="flex flex-col items-center">
-                    <ConceptCardBlock front={block.front} back={block.back} context={block.title} />
-                    <button onClick={handleNext} className="mt-12 px-12 py-5 bg-indigo-600 text-white rounded-full font-black shadow-xl shadow-indigo-200 flex items-center gap-3">
-                      Got it <ChevronRight size={24} strokeWidth={3}/>
-                    </button>
-                  </div>
-                )}
-                {block.type === 'scenario' && <ScenarioBlock block={block} onComplete={handleNext} />}
-              </div>
-            ) : renderBlock(block, idx)
-          ))}
-        </div>
-      </div>
-
-      {/* --- REMOTE NAV FOOTER --- */}
-      <div className="fixed bottom-8 left-0 right-0 px-8 z-40 flex justify-center pointer-events-none">
-        <div className="pointer-events-auto flex items-center gap-3 bg-white/80 backdrop-blur-2xl p-2 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-slate-100">
-          {currentPageIdx > 0 && (
-            <button 
-              onClick={handlePrev} 
-              className="p-4 bg-slate-50 text-slate-400 rounded-full hover:bg-slate-100 transition-colors"
+            <h2 className="text-xs font-black text-slate-800 uppercase tracking-tighter">{lesson.title}</h2>
+            <button
+              onClick={() => { setIsLiveSynced(!isLiveSynced); if (!isLiveSynced) broadcastNavigation(currentPageIdx, 0); }}
+              className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase transition-all ${isLiveSynced ? 'bg-emerald-500 text-white shadow-md' : 'bg-slate-100 text-slate-400'}`}
             >
-              <ArrowLeft size={24} />
+              {isLiveSynced ? '● Sync Active' : 'Sync Off'}
             </button>
-          )}
-          
-          <button
-            onClick={handleNext}
-            className="shadow-2xl bg-indigo-600 text-white px-10 py-5 rounded-full font-black text-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3"
-          >
-            {isLastPage ? "Finish" : "Continue"}
-            {isLastPage ? <Check size={24} strokeWidth={3} /> : <ArrowRight size={24} strokeWidth={3} />}
+          </div>
+          <div className="w-8" />
+        </div>
+      </div>
+
+      {/* Content */}
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-6 py-4 pb-32">
+        {currentPage?.blocks.map((b: any, i: number) => (
+          currentPage.type === 'interact' ? (
+             <div key={i} className="flex-1 flex flex-col justify-center min-h-[50vh]">
+               {b.type === 'quiz' && <QuizBlock block={b} onComplete={handleNext} />}
+               {b.type === 'flashcard' && <div className="flex flex-col items-center"><ConceptCardBlock front={b.front} back={b.back} /><button onClick={handleNext} className="mt-8 px-8 py-3 bg-indigo-600 text-white rounded-full font-black">Next</button></div>}
+             </div>
+          ) : renderBlock(b, i)
+        ))}
+      </div>
+
+      {/* Controls */}
+      <div className="fixed bottom-8 left-0 right-0 px-8 flex justify-center pointer-events-none">
+        <div className="pointer-events-auto flex items-center gap-2 bg-white/90 backdrop-blur-lg p-1.5 rounded-full shadow-2xl border border-slate-100">
+          {currentPageIdx > 0 && <button onClick={handlePrev} className="p-4 bg-slate-50 text-slate-400 rounded-full"><ArrowLeft size={20} /></button>}
+          <button onClick={handleNext} className="bg-indigo-600 text-white px-8 py-4 rounded-full font-black flex items-center gap-2">
+            {currentPageIdx === pages.length - 1 ? "Finish" : "Continue"} <ArrowRight size={20} />
           </button>
         </div>
       </div>
-
     </div>
   );
 }
