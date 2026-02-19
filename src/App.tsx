@@ -3436,150 +3436,66 @@ const renderStudentView = () => {
     let content: React.ReactNode = null;
     let viewKey: string = "default";
 
-    // 1. PRIORITY 1: Presentation Mode (The Projector View)
-    // We check this first so that launching a class presentation 
-    // takes over the screen immediately, even if a lesson is open.
     if (activeTab === 'presentation') {
       viewKey = `presentation-${selectedLessonId}`;
-      content = (
-        <ClassView 
-          lessonId={selectedLessonId} 
-          lessons={lessons} 
-        />
-      );
+      content = <ClassView lessonId={selectedLessonId} lessons={lessons} />;
     } 
-    
-    // 2. PRIORITY 2: Active Lesson Player
-    // This is the individual student view OR the instructor's handheld remote.
     else if (activeLesson) {
       viewKey = `lesson-${activeLesson.id}`;
-      
       const handleFinish = (id: string, xp: number, title: string, score: any) => {
         handleFinishLesson(activeLesson.id, xp, title, score);
       };
-
-      // Determine if the user is an instructor to enable the remote control UI
       const isTeacher = userData?.role === 'instructor';
-
       if (activeLesson.type === 'test' || activeLesson.type === 'exam') {
         content = <ExamPlayerView exam={activeLesson} onFinish={handleFinish} />;
       } else {
-        content = (
-          <LessonView 
-            lesson={activeLesson} 
-            onFinish={handleFinish} 
-            isInstructor={isTeacher} 
-          />
-        );
+        content = <LessonView lesson={activeLesson} onFinish={handleFinish} isInstructor={isTeacher} />;
       }
     } 
-    
-    // 3. PRIORITY 3: Specific Class Dashboard (Where your bug is!)
-    // We pass classLessons here because that is the array containing the 6 assigned items.
     else if (activeTab === 'home' && activeStudentClass) {
       viewKey = `class-${activeStudentClass.id}`;
       content = (
         <StudentClassView 
-          classData={activeStudentClass} 
-          onBack={() => setActiveStudentClass(null)} 
-          onSelectLesson={handleContentSelection} 
-          onSelectDeck={handleContentSelection} 
-          userData={userData} 
-          user={user} 
-          displayName={displayName}
-          // The following props are required for the "Present" button to work
-          setActiveTab={setActiveTab}
-          setSelectedLessonId={setSelectedLessonId}
-          // --- DATA SYNC ---
-          allLessons={lessons}       // Master library of lesson content
-          classLessons={assignments} // The array holding your 6 assigned lessons
+            classData={activeStudentClass} 
+            onBack={() => setActiveStudentClass(null)} 
+            onSelectLesson={handleContentSelection} 
+            onSelectDeck={handleContentSelection} 
+            userData={userData} 
+            user={user} 
+            displayName={displayName}
+            setActiveTab={setActiveTab}
+            setSelectedLessonId={setSelectedLessonId}
+            allLessons={lessons} 
+            classLessons={classLessons} 
         />
       );
     } 
-    
-    // 4. PRIORITY 4: Standard Tab Navigation
     else {
       viewKey = `tab-${activeTab || 'home'}`;
-      
       switch (activeTab) {
         case 'discovery':
-          content = (
-            <DiscoveryView 
-              allDecks={allDecks} 
-              user={user} 
-              onSelectDeck={handleContentSelection} 
-              userData={userData}
-              onLogActivity={(type: string) => checkDailyQuests(type)} 
-            />
-          );
+          content = <DiscoveryView allDecks={allDecks} user={user} onSelectDeck={handleContentSelection} userData={userData} onLogActivity={(type: string) => checkDailyQuests(type)} />;
           break;
-
         case 'flashcards':
-          // Attempt to find a class-assigned deck first
           const assignedDeck = classLessons.find((l: any) => l.id === selectedDeckKey && l.contentType === 'deck');
-          content = (
-            <FlashcardView 
-              allDecks={allDecks} 
-              selectedDeckKey={selectedDeckKey} 
-              onSelectDeck={setSelectedDeckKey} 
-              onSaveCard={handleCreateCard} 
-              activeDeckOverride={assignedDeck || allDecks[selectedDeckKey]} 
-              onComplete={handleFinishLesson} 
-              onLogActivity={handleLogSelfStudy} 
-              userData={userData} 
-              user={user} 
-              onUpdatePrefs={handleUpdatePreferences} 
-              onDeleteDeck={handleDeleteDeck} 
-            />
-          );
+          content = <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} onSaveCard={handleCreateCard} activeDeckOverride={assignedDeck || allDecks[selectedDeckKey]} onComplete={handleFinishLesson} onLogActivity={handleLogSelfStudy} userData={userData} user={user} onUpdatePrefs={handleUpdatePreferences} onDeleteDeck={handleDeleteDeck} />;
           break;
-
         case 'create':
-          content = (
-            <BuilderHub 
-              onSaveCard={handleCreateCard} 
-              onUpdateCard={handleUpdateCard} 
-              onDeleteCard={handleDeleteCard} 
-              onSaveLesson={handleCreateLesson} 
-              allDecks={allDecks} 
-              lessons={lessons} 
-            />
-          );
+          content = <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />;
           break;
-
         case 'profile':
           content = <ProfileView user={user} userData={userData} />;
           break;
-
         case 'home':
         default:
-          content = (
-            <HomeView 
-              setActiveTab={setActiveTab} 
-              allDecks={allDecks} 
-              lessons={lessons} 
-              assignments={classLessons} 
-              classes={enrolledClasses} 
-              onSelectClass={(c: any) => setActiveStudentClass(c)} 
-              onSelectLesson={handleContentSelection} 
-              onSelectDeck={handleContentSelection} 
-              userData={userData} 
-              user={user} 
-            />
-          );
+          content = <HomeView setActiveTab={setActiveTab} allDecks={allDecks} lessons={lessons} assignments={classLessons} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} user={user} />;
           break;
       }
     }
 
-    // Final render wrapper with transition animation
     return (
       <div key={viewKey} className="h-full w-full animate-in fade-in duration-500">
-        {content || (
-          <div className="flex flex-col items-center justify-center h-full text-slate-400 font-bold bg-white">
-            <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="animate-pulse tracking-widest uppercase text-[10px]">Syncing Workspace...</p>
-          </div>
-        )}
+        {content || <div className="p-10 text-slate-400">Loading Workspace...</div>}
       </div>
     );
   };
