@@ -3224,27 +3224,39 @@ function App() {
   const [activeLesson, setActiveLesson] = useState<any>(null);
   const [selectedDeckKey, setSelectedDeckKey] = useState('salutationes');
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
-  const [classLessons, setClassLessons] = useState<any[]>([]);
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  // --- 2. AUTH SYNC ---
+  // --- 2. THE HANDSHAKE (The Fix) ---
+  // Instead of a state variable that can fail to update, we 'derive' 
+  // classLessons directly from enrolledClasses.
+  const classLessons = useMemo(() => {
+    let all: any[] = [];
+    enrolledClasses.forEach((cls: any) => {
+      if (cls.assignments && Array.isArray(cls.assignments)) {
+        all.push(...cls.assignments.map((a: any) => ({
+          ...a,
+          classId: cls.id, // THE HANDSHAKE KEY
+          className: cls.name
+        })));
+      }
+    });
+    console.log("Calculated classLessons:", all.length);
+    return all;
+  }, [enrolledClasses]);
+
+  // --- 3. AUTH & PROFILE SYNC ---
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      if (!u) {
-        setUserData(null);
-        setAuthChecked(true);
-      }
+      if (!u) { setUserData(null); setAuthChecked(true); }
     });
     return () => unsubAuth();
   }, []);
 
-  // --- 3. PROFILE SYNC ---
   useEffect(() => {
     if (!user?.uid) return;
-    const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main');
-    const unsubProfile = onSnapshot(profileRef, (snap) => {
+    const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
       if (snap.exists()) setUserData(snap.data());
       else setUserData(DEFAULT_USER_DATA);
       setAuthChecked(true);
@@ -3252,71 +3264,43 @@ function App() {
     return () => unsubProfile();
   }, [user?.uid]);
 
-  // --- 4. THE UNIFIED DATA SYNC (Force Assignments to HUD) ---
+  // --- 4. DATA FETCHING ---
   useEffect(() => {
     if (!user?.uid || !userData?.role) return;
 
     setSystemDecks(INITIAL_SYSTEM_DECKS);
     setSystemLessons(INITIAL_SYSTEM_LESSONS);
 
-    // A. Fetch Library
     const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => 
       setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     
     const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => 
       setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-    // B. Fetch Classes (The 0-to-6 Fix)
-    // We search the entire database for any class Michael's email is in.
-    const qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
+    const q = userData.role === 'instructor' 
+      ? query(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'))
+      : query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
 
-    const unsubClasses = onSnapshot(qClasses, (snapshot) => {
-      const fetchedClasses = snapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data() 
-      }));
-      
-      setEnrolledClasses(fetchedClasses);
-
-      // C. THE CRITICAL FLATTENING
-      // This part turns the nested Firestore data into the flat list the list needs.
-      let allAssignments: any[] = [];
-      fetchedClasses.forEach((cls: any) => {
-        if (cls.assignments && Array.isArray(cls.assignments)) {
-          const mapped = cls.assignments.map((a: any) => ({
-            ...a,
-            classId: cls.id, // THE HANDSHAKE: Must match "wGCmJD..."
-            className: cls.name
-          }));
-          allAssignments = [...allAssignments, ...mapped];
-        }
-      });
-
-      console.log(`HUD DEBUG: Extracted ${allAssignments.length} assignments from ${fetchedClasses.length} classes.`);
-      setClassLessons(allAssignments);
+    const unsubClasses = onSnapshot(q, (snapshot) => {
+      setEnrolledClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
     return () => { unsubCards(); unsubLessons(); unsubClasses(); };
-  }, [user?.email, userData?.role]);
+  }, [user?.uid, userData?.role, user?.email]);
 
-  // --- 5. DATA HYDRATION (Memos) ---
-  const displayName = useMemo(() => {
-    if (userData?.name && userData.name !== 'Student' && userData.name !== 'User') return userData.name;
-    return user?.email?.split('@')[0] || 'Learner';
-  }, [userData, user]);
-
+  // --- 5. DERIVED DATA ---
+  const displayName = useMemo(() => userData?.name || user?.email?.split('@')[0] || 'Scholar', [userData, user]);
+  const lessons = useMemo(() => [...systemLessons, ...customLessons], [systemLessons, customLessons]);
   const allDecks = useMemo(() => {
-    const decks: any = { ...systemDecks, custom: { title: "✍️ Card Builder", cards: [] } };
+    const decks: any = { ...systemDecks, custom: { title: "✍️ Builder", cards: [] } };
     customCards.forEach(card => {
         const target = card.deckId || 'custom';
-        if (!decks[target]) decks[target] = { title: card.deckTitle || "Custom Deck", cards: [] };
+        if (!decks[target]) decks[target] = { title: card.deckTitle || "Custom", cards: [] };
         if (!decks[target].cards) decks[target].cards = [];
         decks[target].cards.push(card);
     });
     return decks;
   }, [systemDecks, customCards]);
-
-  const lessons = useMemo(() => [...systemLessons, ...customLessons], [systemLessons, customLessons]);
 
   // --- 6. HANDLERS ---
   const handleContentSelection = (item: any) => {
@@ -3331,8 +3315,7 @@ function App() {
   };
 
   const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title: string = 'Lesson', score: any = null) => { 
-    setActiveLesson(null); 
-    setActiveTab('home'); 
+    setActiveLesson(null); setActiveTab('home'); 
     if (xp > 0 && user) { 
       try { 
         await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp), completedAssignments: arrayUnion(lessonId) }); 
@@ -3341,14 +3324,8 @@ function App() {
     } 
   }, [user, displayName]);
 
-  // Placeholders for build safety
-  const handleLogActivity = () => {};
-  const handleCreateCard = (c: any) => {};
-  const handleUpdateCard = (id: string, d: any) => {};
-  const handleDeleteCard = (id: string) => {};
-  const handleCreateLesson = (l: any) => {};
-  const handleDeleteDeck = (id: string) => {};
-  const handleLogSelfStudy = (id: string, xp: number, t: string) => {};
+  // Placeholders for build stability
+  const handleLogActivity = () => {}; const handleCreateCard = (c: any) => {}; const handleUpdateCard = (id: string, d: any) => {}; const handleDeleteCard = (id: string) => {}; const handleCreateLesson = (l: any) => {}; const handleDeleteDeck = (id: string) => {}; const handleLogSelfStudy = (id: string, xp: number, t: string) => {};
 
   // --- 7. RENDERING ---
   if (!authChecked || (user && !userData)) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
@@ -3361,21 +3338,9 @@ function App() {
   const renderStudentView = () => {
     if (activeTab === 'presentation') return <ClassView lessonId={selectedLessonId} lessons={lessons} />;
     if (activeLesson) return <LessonView lesson={activeLesson} onFinish={handleFinishLesson} isInstructor={false} />;
-    
     if (activeTab === 'home' && activeStudentClass) {
-      return <StudentClassView 
-                classData={activeStudentClass} 
-                onBack={() => setActiveStudentClass(null)} 
-                onSelectLesson={handleContentSelection} 
-                onSelectDeck={handleContentSelection} 
-                userData={userData} 
-                setActiveTab={setActiveTab} 
-                setSelectedLessonId={setSelectedLessonId} 
-                allLessons={lessons} 
-                classLessons={classLessons} 
-             />;
+      return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} setActiveTab={setActiveTab} setSelectedLessonId={setSelectedLessonId} allLessons={lessons} classLessons={classLessons} />;
     }
-
     switch (activeTab) {
       case 'discovery': return <DiscoveryView allDecks={allDecks} lessons={lessons} user={user} onSelectDeck={handleContentSelection} onSelectLesson={handleContentSelection} userData={userData} onLogActivity={handleLogActivity} />;
       case 'flashcards': return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} activeDeckOverride={null} onComplete={handleFinishLesson} userData={userData} user={user} onDeleteDeck={handleDeleteDeck} />;
