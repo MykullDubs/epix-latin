@@ -334,61 +334,93 @@ lessonId: string | null;
 lessons: any[]; // Replace 'any' with your Lesson type if defined
 }
 
-function ClassView({ lessonId, lessons }: any) {
+function ClassView({ lessonId, lessons, classLessons }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
 
+  // 1. THE HYDRATION LOOKUP
+  // Finds the version of the lesson that contains the 'blocks' array.
   const lesson = useMemo(() => {
-  // Look in the master list first
-  let found = lessons.find((l: any) => l.id === lessonId || l.originalId === lessonId);
-  
-  // FALLBACK: If Michael's class assignments are the only thing we have, use them
-  if (!found || !found.blocks) {
-    // We look for 'classLessons' which we know MICHAEL'S class is populated with
-    found = classLessons?.find((l: any) => l.id === lessonId);
-  }
-  
-  return found;
-}, [lessonId, lessons, classLessons]);
+    // Search master library first (System + Custom)
+    let found = lessons.find((l: any) => l.id === lessonId || l.originalId === lessonId);
+    
+    // Fallback: Check the assignments list for a direct match if library hasn't synced
+    if (!found || !found.blocks) {
+      found = classLessons?.find((l: any) => l.id === lessonId);
+    }
+    return found;
+  }, [lessonId, lessons, classLessons]);
+
+  // 2. SMART PAGING (Logic must match LessonView exactly for sync)
   const pages = useMemo(() => {
-    if (!lesson) return [];
-    const rawBlocks = lesson.blocks || [];
+    if (!lesson || !lesson.blocks) return [];
+    const rawBlocks = lesson.blocks;
     const groupedPages: any[] = [];
     let currentBuffer: any[] = [];
 
     rawBlocks.forEach((block: any) => {
-      if (['quiz', 'flashcard', 'scenario'].includes(block.type)) {
-        if (currentBuffer.length > 0) groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
+      const isInteractive = ['quiz', 'flashcard', 'scenario'].includes(block.type);
+      if (isInteractive) {
+        if (currentBuffer.length > 0) {
+          groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
+          currentBuffer = [];
+        }
         groupedPages.push({ type: 'interact', blocks: [block] });
-        currentBuffer = [];
       } else {
         currentBuffer.push(block);
       }
     });
-    if (currentBuffer.length > 0) groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
+
+    if (currentBuffer.length > 0) {
+      groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
+    }
     return groupedPages;
   }, [lesson]);
 
+  // 3. REMOTE CONTROL SYNC
+  // Listens to Firestore for navigation commands from the Instructor's phone.
   useEffect(() => {
     if (!lessonId) return;
-    return onSnapshot(doc(db, 'live_sessions', lessonId), (snap) => {
-      if (snap.exists() && typeof snap.data().activePageIdx === 'number') {
-        setActivePageIdx(snap.data().activePageIdx);
+    const docRef = doc(db, 'live_sessions', lessonId);
+    const unsub = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (typeof data.activePageIdx === 'number') {
+          setActivePageIdx(data.activePageIdx);
+        }
       }
     });
+    return () => unsub();
   }, [lessonId]);
 
-  if (!lesson) return <div className="h-screen flex items-center justify-center font-black text-slate-300 animate-pulse">SYNCING CLASSROOM DATA...</div>;
+  // 4. KEYBOARD NAVIGATION (For Manual Testing/Desktop Override)
+  useEffect(() => {
+    const handleKeys = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') setActivePageIdx(p => Math.min(pages.length - 1, p + 1));
+      if (e.key === 'ArrowLeft') setActivePageIdx(p => Math.max(0, p - 1));
+    };
+    window.addEventListener('keydown', handleKeys);
+    return () => window.removeEventListener('keydown', handleKeys);
+  }, [pages.length]);
+
+  if (!lesson) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-white text-slate-300">
+        <Loader className="animate-spin mb-4" size={48} />
+        <p className="text-2xl font-black uppercase tracking-widest">Hydrating Content...</p>
+      </div>
+    );
+  }
 
   const currentPage = pages[activePageIdx];
 
-  // --- BIG SCREEN RENDERER ---
+  // 5. BIG SCREEN BLOCK RENDERER
   const renderBigBlock = (block: any, idx: number) => {
     switch (block.type) {
       case 'text':
         return (
-          <div key={idx} className="space-y-6 mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {block.title && <h3 className="text-4xl font-black text-indigo-600 uppercase tracking-tighter">{block.title}</h3>}
-            <p className="text-6xl lg:text-7xl leading-tight text-slate-800 font-bold max-w-5xl mx-auto whitespace-pre-wrap">
+          <div key={idx} className="space-y-8 mb-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+            {block.title && <h3 className="text-5xl font-black text-indigo-600 uppercase tracking-tighter">{block.title}</h3>}
+            <p className="text-6xl lg:text-8xl leading-[1.1] text-slate-800 font-bold max-w-6xl mx-auto whitespace-pre-wrap tracking-tight">
               {block.content}
             </p>
           </div>
@@ -396,37 +428,32 @@ function ClassView({ lessonId, lessons }: any) {
 
       case 'image':
         return (
-          <div key={idx} className="flex flex-col items-center my-10 animate-in zoom-in-95 duration-500">
-            <img src={block.url} className="max-h-[60vh] rounded-[4rem] shadow-2xl border-[16px] border-white" alt="Slide" />
-            {block.caption && <p className="mt-6 text-3xl font-bold text-slate-400 italic">{block.caption}</p>}
+          <div key={idx} className="flex flex-col items-center my-10 animate-in zoom-in-95 duration-700">
+            <img src={block.url} className="max-h-[60vh] rounded-[4rem] shadow-2xl border-[20px] border-white" alt="Slide Visual" />
+            {block.caption && <p className="mt-8 text-3xl font-bold text-slate-400 italic">{block.caption}</p>}
           </div>
         );
 
-case 'vocab-list':
-  return (
-    <div key={idx} className="grid grid-cols-2 gap-8 w-full max-w-6xl mx-auto mt-10">
-      {(block.items || []).map((item: any, i: number) => (
-        <div 
-          key={i} 
-          className="bg-slate-50 p-10 rounded-[3rem] border-4 border-slate-100 animate-in fade-in slide-in-from-left-4" 
-          // --- THE FIX: Change 'delay' to 'animationDelay' ---
-          style={{ animationDelay: `${i * 100}ms` }} 
-        >
-          <p className="text-5xl font-black text-indigo-600 mb-2">{item.term}</p>
-          <p className="text-3xl text-slate-500 font-bold">{item.definition}</p>
-        </div>
-      ))}
-    </div>
-  );
+      case 'vocab-list':
+        return (
+          <div key={idx} className="grid grid-cols-2 gap-10 w-full max-w-6xl mx-auto mt-12">
+            {block.items.map((item: any, i: number) => (
+              <div key={i} className="bg-slate-50 p-12 rounded-[4rem] border-4 border-slate-100 animate-in fade-in slide-in-from-left-6" style={{ animationDelay: `${i * 150}ms` }}>
+                <p className="text-6xl font-black text-indigo-600 mb-4">{item.term}</p>
+                <p className="text-4xl text-slate-500 font-bold">{item.definition}</p>
+              </div>
+            ))}
+          </div>
+        );
 
       case 'dialogue':
         return (
-          <div key={idx} className="space-y-6 w-full max-w-5xl mx-auto mt-10">
+          <div key={idx} className="space-y-8 w-full max-w-5xl mx-auto mt-12">
             {block.lines.map((line: any, i: number) => (
-              <div key={i} className={`flex ${line.side === 'right' ? 'justify-end' : 'justify-start'} animate-in fade-in duration-500`}>
-                <div className={`p-8 rounded-[2.5rem] max-w-[80%] shadow-lg border-4 ${line.side === 'right' ? 'bg-indigo-600 text-white border-indigo-500 rounded-tr-none' : 'bg-white text-slate-800 border-slate-100 rounded-tl-none'}`}>
-                  <p className="text-4xl font-bold leading-tight">{line.text}</p>
-                  {line.translation && <p className={`text-xl mt-4 pt-4 border-t ${line.side === 'right' ? 'border-white/20 text-indigo-100' : 'border-slate-100 text-slate-400'} italic`}>{line.translation}</p>}
+              <div key={i} className={`flex ${line.side === 'right' ? 'justify-end' : 'justify-start'} animate-in fade-in duration-700`}>
+                <div className={`p-10 rounded-[3.5rem] max-w-[85%] shadow-2xl border-4 ${line.side === 'right' ? 'bg-indigo-600 text-white border-indigo-500 rounded-tr-none' : 'bg-white text-slate-800 border-slate-100 rounded-tl-none'}`}>
+                  <p className="text-5xl font-bold leading-tight">{line.text}</p>
+                  {line.translation && <p className={`text-2xl mt-6 pt-6 border-t ${line.side === 'right' ? 'border-white/20 text-indigo-100' : 'border-slate-100 text-slate-400'} italic`}>{line.translation}</p>}
                 </div>
               </div>
             ))}
@@ -435,53 +462,61 @@ case 'vocab-list':
 
       case 'note':
         return (
-          <div key={idx} className="my-10 p-12 bg-amber-50 rounded-[4rem] border-8 border-amber-100 max-w-5xl mx-auto flex gap-10 items-center animate-in zoom-in-95">
-             <div className="bg-white p-6 rounded-full shadow-xl"><Zap size={64} className="text-amber-500 fill-amber-500" /></div>
+          <div key={idx} className="my-12 p-16 bg-amber-50 rounded-[5rem] border-[12px] border-amber-100 max-w-6xl mx-auto flex gap-12 items-center animate-in zoom-in-95">
+             <div className="bg-white p-8 rounded-full shadow-2xl"><Zap size={80} className="text-amber-500 fill-amber-500" /></div>
              <div className="text-left">
-                <h4 className="text-2xl font-black text-amber-600 uppercase tracking-widest mb-2">{block.title || "Note"}</h4>
-                <p className="text-5xl font-bold text-amber-900 leading-tight">{block.content}</p>
+                <h4 className="text-3xl font-black text-amber-600 uppercase tracking-[0.2em] mb-4">{block.title || "Pro-Tip"}</h4>
+                <p className="text-6xl font-bold text-amber-900 leading-tight tracking-tight">{block.content}</p>
              </div>
           </div>
         );
 
       default:
         return (
-          <div key={idx} className="py-24 px-16 bg-indigo-50 rounded-[5rem] border-8 border-indigo-100/50 text-center animate-in pulse duration-1000">
-            <p className="text-6xl font-black text-indigo-600 uppercase mb-6">Participation Mode</p>
-            <p className="text-3xl font-bold text-indigo-400">Interaction required on mobile devices.</p>
+          <div key={idx} className="py-32 px-20 bg-indigo-50 rounded-[6rem] border-[16px] border-indigo-100/50 text-center animate-in pulse duration-[2000ms] infinite">
+            <p className="text-8xl font-black text-indigo-600 uppercase mb-8 tracking-tighter">Participation</p>
+            <p className="text-4xl font-bold text-indigo-400">Please answer on your mobile device!</p>
           </div>
         );
     }
   };
 
   return (
-    <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col p-12 lg:p-20 overflow-hidden select-none">
-      {/* Ambience */}
-      <div className="absolute top-[-10%] right-[-5%] w-[50vw] h-[50vw] bg-indigo-50 rounded-full blur-[120px] opacity-40 -z-10" />
+    <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col p-16 lg:p-24 overflow-hidden select-none font-sans">
+      {/* Visual Ambience */}
+      <div className="absolute top-[-15%] right-[-10%] w-[60vw] h-[60vw] bg-indigo-50 rounded-full blur-[150px] opacity-50 -z-10" />
       
-      {/* Header */}
-      <div className="flex items-center gap-8 mb-16">
-        <div className="h-2.5 flex-1 bg-slate-100 rounded-full overflow-hidden">
-          <div className="h-full bg-indigo-600 transition-all duration-1000 ease-out shadow-[0_0_20px_rgba(79,70,229,0.4)]" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} />
+      {/* Top Navigation Bar */}
+      <div className="flex items-center gap-12 mb-20 relative z-10">
+        <div className="h-3 flex-1 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+          <div 
+            className="h-full bg-indigo-600 transition-all duration-1000 ease-out shadow-[0_0_30px_rgba(79,70,229,0.6)]" 
+            style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} 
+          />
         </div>
-        <span className="text-3xl font-black text-slate-300 tabular-nums">{activePageIdx + 1} / {pages.length}</span>
+        <span className="text-5xl font-black text-slate-200 tabular-nums">
+          {activePageIdx + 1} <span className="text-slate-100">/</span> {pages.length}
+        </span>
       </div>
 
-      {/* Dynamic Content */}
-      <div className="flex-1 flex flex-col justify-center overflow-y-auto custom-scrollbar">
+      {/* Primary Slide Content */}
+      <div className="flex-1 flex flex-col justify-center text-center max-w-[90vw] mx-auto w-full relative z-10">
         {currentPage?.blocks.map((block: any, idx: number) => renderBigBlock(block, idx))}
       </div>
 
-      {/* Footer */}
-      <div className="mt-12 pt-8 border-t border-slate-100 flex justify-between items-center">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-3">
-             <div className="w-5 h-5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_20px_rgba(16,185,129,0.5)]" />
-             <span className="font-black text-2xl tracking-[0.2em] text-slate-400 uppercase">Live</span>
+      {/* Professional Footer */}
+      <div className="mt-12 pt-10 border-t-4 border-slate-50 flex justify-between items-end relative z-10">
+        <div className="flex items-center gap-8">
+          <div className="flex items-center gap-4">
+             <div className="w-6 h-6 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_30px_rgba(16,185,129,0.8)]" />
+             <span className="font-black text-3xl tracking-[0.3em] text-slate-300 uppercase">Live Class</span>
           </div>
-          <h2 className="text-3xl font-black text-slate-900 opacity-10 uppercase tracking-[0.3em]">{lesson.title}</h2>
+          <div className="h-10 w-px bg-slate-100" />
+          <h2 className="text-4xl font-black text-slate-900 opacity-20 uppercase tracking-[0.4em]">{lesson.title}</h2>
         </div>
-        <div className="bg-slate-900 text-white px-8 py-3 rounded-3xl font-black text-xl shadow-xl">LLLMS PRO</div>
+        <div className="bg-slate-900 text-white px-10 py-4 rounded-[2rem] font-black text-2xl shadow-2xl tracking-tighter">
+          LLLMS <span className="text-indigo-400">PRO</span>
+        </div>
       </div>
     </div>
   );
@@ -3259,7 +3294,7 @@ function ExamPlayerView({ exam, onFinish }: any) {
 }
 
 function App() {
-  // --- 1. STATE ---
+  // --- 1. STATE DECLARATIONS ---
   const [activeTab, setActiveTab] = useState('home');
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
@@ -3275,14 +3310,17 @@ function App() {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  // --- 2. DERIVED DATA (The Presentation Fix) ---
+  // --- 2. DERIVED DATA (The "Handshake" Logic) ---
+  // We calculate these based on the state above so components always have fresh data.
+  
+  // A. Flattened assignments for Michael's Class filter
   const classLessons = useMemo(() => {
     let all: any[] = [];
     enrolledClasses.forEach((cls: any) => {
       if (cls.assignments && Array.isArray(cls.assignments)) {
         all.push(...cls.assignments.map((a: any) => ({
           ...a,
-          classId: cls.id,
+          classId: cls.id, 
           className: cls.name
         })));
       }
@@ -3290,6 +3328,7 @@ function App() {
     return all;
   }, [enrolledClasses]);
 
+  // B. Hydrated lesson list (System + Custom + Assigned)
   const lessons = useMemo(() => {
     const library = [...systemLessons, ...customLessons];
     return [...library, ...classLessons];
@@ -3308,7 +3347,7 @@ function App() {
     return decks;
   }, [systemDecks, customCards]);
 
-  // --- 3. SYNC ENGINE ---
+  // --- 3. MASTER SYNC ENGINE ---
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -3316,45 +3355,47 @@ function App() {
     });
 
     if (user?.uid) {
-      onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
+      // Sync Profile
+      const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
         if (snap.exists()) setUserData(snap.data());
         setAuthChecked(true);
       });
 
+      // Sync Classes
       const qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
-      onSnapshot(qClasses, (snapshot) => {
+      const unsubClasses = onSnapshot(qClasses, (snapshot) => {
         setEnrolledClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       });
 
+      // Sync Library Content
       setSystemDecks(INITIAL_SYSTEM_DECKS);
       setSystemLessons(INITIAL_SYSTEM_LESSONS);
-      onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-      onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+      const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+      const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+      return () => { unsubAuth(); unsubProfile(); unsubClasses(); unsubCards(); unsubLessons(); };
     }
+    
     return () => unsubAuth();
   }, [user?.uid, user?.email]);
 
-  // --- 4. HANDLERS ---
-const handleContentSelection = (item: any) => {
-  // 1. Save the ID for Michael's class tracking
-  const targetId = item.lessonId || item.id || item.originalId;
-  if (targetId) setSelectedLessonId(targetId);
+  // --- 4. NAVIGATION HANDLERS ---
+  const handleContentSelection = (item: any) => {
+    const targetId = item.lessonId || item.id || item.originalId;
+    if (targetId) setSelectedLessonId(targetId);
 
-  // 2. HYDRATION: Find the version of this lesson that actually has 'blocks'
-  // We search both the system library and custom lessons
-  const fullContent = [...systemLessons, ...customLessons].find(l => 
-    l.id === targetId || l.id === item.originalId
-  );
+    // HYDRATION: Swap "hollow" assignment metadata for the "full" lesson that has blocks
+    const fullContent = [...systemLessons, ...customLessons].find(l => 
+      l.id === targetId || l.id === item.originalId
+    );
 
-  // 3. Routing
-  if (item.contentType === 'lesson' || item.type === 'lesson' || fullContent) {
-    setActiveLesson(fullContent || item);
-    // If we are already in Michael's class, this ensures the projector sees the full blocks
-  } else {
-    setSelectedDeckKey(item.id);
-    setActiveTab('flashcards');
-  }
-};
+    if (item.contentType === 'lesson' || item.type === 'lesson' || fullContent) {
+      setActiveLesson(fullContent || item);
+    } else if (item.contentType === 'deck' || item.type === 'deck') {
+      setSelectedDeckKey(item.id);
+      setActiveTab('flashcards');
+    }
+  };
 
   const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title: string = 'Lesson', score: any = null) => { 
     setActiveLesson(null); setActiveTab('home'); 
@@ -3366,30 +3407,69 @@ const handleContentSelection = (item: any) => {
     } 
   }, [user, displayName]);
 
-  // --- 5. RENDER HELPER ---
+  // --- 5. RENDER STUDENT VIEW HELPER ---
   const renderStudentView = () => {
-    if (activeTab === 'presentation') return <ClassView lessonId={selectedLessonId} lessons={lessons} />;
-    if (activeLesson) return <LessonView lesson={activeLesson} onFinish={handleFinishLesson} isInstructor={false} />;
-    
-    if (activeTab === 'home' && activeStudentClass) {
-      return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} setActiveTab={setActiveTab} setSelectedLessonId={setSelectedLessonId} allLessons={lessons} classLessons={classLessons} />;
+    // A. PRESENTATION MODE (Big Screen)
+    if (activeTab === 'presentation') {
+      return (
+        <ClassView 
+          lessonId={selectedLessonId} 
+          lessons={lessons} 
+          classLessons={classLessons} 
+        />
+      );
     }
 
+    // B. ACTIVE LESSON PLAYER (Mobile Story Mode)
+    if (activeLesson) {
+      return <LessonView lesson={activeLesson} onFinish={handleFinishLesson} isInstructor={false} />;
+    }
+    
+    // C. SPECIFIC CLASS VIEW (Michael's Class)
+    if (activeTab === 'home' && activeStudentClass) {
+      return (
+        <StudentClassView 
+          classData={activeStudentClass} 
+          onBack={() => setActiveStudentClass(null)} 
+          onSelectLesson={handleContentSelection} 
+          onSelectDeck={handleContentSelection} 
+          userData={userData} 
+          setActiveTab={setActiveTab} 
+          setSelectedLessonId={setSelectedLessonId} 
+          allLessons={lessons} 
+          classLessons={classLessons} 
+        />
+      );
+    }
+
+    // D. MAIN NAVIGATION TABS
     switch (activeTab) {
-      case 'discovery': return <DiscoveryView allDecks={allDecks} lessons={lessons} user={user} onSelectDeck={handleContentSelection} onSelectLesson={handleContentSelection} userData={userData} onLogActivity={() => {}} />;
-      case 'flashcards': return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} activeDeckOverride={null} onComplete={handleFinishLesson} userData={userData} user={user} onDeleteDeck={() => {}} />;
-      case 'create': return <BuilderHub onSaveCard={() => {}} onUpdateCard={() => {}} onDeleteCard={() => {}} onSaveLesson={() => {}} allDecks={allDecks} lessons={lessons} />;
-      case 'profile': return <ProfileView user={user} userData={userData} />;
-      default: return <HomeView setActiveTab={setActiveTab} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} userData={userData} user={user} />;
+      case 'discovery': 
+        return <DiscoveryView allDecks={allDecks} lessons={lessons} user={user} onSelectDeck={handleContentSelection} onSelectLesson={handleContentSelection} userData={userData} onLogActivity={() => {}} />;
+      case 'flashcards': 
+        return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} activeDeckOverride={null} onComplete={handleFinishLesson} userData={userData} user={user} onDeleteDeck={() => {}} />;
+      case 'profile': 
+        return <ProfileView user={user} userData={userData} />;
+      case 'home':
+      default: 
+        return (
+          <HomeView 
+            setActiveTab={setActiveTab} 
+            classes={enrolledClasses} 
+            onSelectClass={(c: any) => setActiveStudentClass(c)} 
+            userData={userData} 
+            user={user} 
+          />
+        );
     }
   };
 
-  // --- 6. FINAL OUTPUT ---
+  // --- 6. FINAL RENDER LOGIC ---
   if (!authChecked) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
   if (!user) return <AuthView />;
 
-  const isInstructor = userData?.role === 'instructor';
-  if (isInstructor) {
+  // Redirect to Instructor Dashboard if role matches
+  if (userData?.role === 'instructor') {
       return <InstructorDashboard user={user} userData={{...userData, classes: enrolledClasses}} allDecks={allDecks} lessons={lessons} onLogout={() => signOut(auth)} />;
   }
 
@@ -3398,8 +3478,14 @@ const handleContentSelection = (item: any) => {
         <div className={`w-full transition-all duration-500 bg-white relative overflow-hidden flex flex-col ${
             activeTab === 'presentation' ? 'h-screen' : 'max-w-md h-[100dvh] shadow-2xl'
         }`}>
-            <div className="flex-1 h-full overflow-hidden relative">{renderStudentView()}</div>
-            {(!activeLesson && activeTab !== 'presentation') && <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />}
+            <div className="flex-1 h-full overflow-hidden relative">
+                {renderStudentView()}
+            </div>
+
+            {/* Hide Nav Bar when presenting or in a lesson */}
+            {(!activeLesson && activeTab !== 'presentation') && (
+                <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
+            )}
         </div>
         {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </div>
