@@ -337,8 +337,7 @@ lessons: any[]; // Replace 'any' with your Lesson type if defined
 function ClassView({ lessonId, lessons }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
 
-  // --- THE SMART MATCH FIX ---
-  // We check for the ID, the originalId, OR a fallback match to Michael's class data
+  // 1. Find the specific lesson data (Smart Match for Michael's Class)
   const lesson = useMemo(() => {
     return lessons.find((l: any) => 
       l.id === lessonId || 
@@ -347,12 +346,7 @@ function ClassView({ lessonId, lessons }: any) {
     );
   }, [lessonId, lessons]);
 
-  // 2. Smart Paging (Matches student view logic)
-  const pages = useMemo(() => {
-    if (!lesson) return [];
-    // ... (rest of your paging logic remains the same)
-
-  // 2. Smart Paging (Matches student view logic)
+  // 2. SMART PAGING (Must match LessonView logic for sync to work)
   const pages = useMemo(() => {
     if (!lesson) return [];
     const rawBlocks = lesson.blocks || [];
@@ -360,60 +354,128 @@ function ClassView({ lessonId, lessons }: any) {
     let currentBuffer: any[] = [];
 
     rawBlocks.forEach((block: any) => {
-      if (['quiz', 'flashcard', 'scenario'].includes(block.type)) {
-        if (currentBuffer.length > 0) groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
+      const isInteractive = ['quiz', 'flashcard', 'scenario'].includes(block.type);
+      if (isInteractive) {
+        if (currentBuffer.length > 0) {
+          groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
+          currentBuffer = [];
+        }
         groupedPages.push({ type: 'interact', blocks: [block] });
-        currentBuffer = [];
       } else {
         currentBuffer.push(block);
       }
     });
-    if (currentBuffer.length > 0) groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
+
+    if (currentBuffer.length > 0) {
+      groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
+    }
     return groupedPages;
   }, [lesson]);
 
-  // 3. Remote Control Listener
+  // 3. LISTEN FOR INSTRUCTOR REMOTE
   useEffect(() => {
     if (!lessonId) return;
-    const unsub = onSnapshot(doc(db, 'live_sessions', lessonId), (snap) => {
-      if (snap.exists() && typeof snap.data().activePageIdx === 'number') {
-        setActivePageIdx(snap.data().activePageIdx);
+    // We look for the session using the ID provided
+    const docRef = doc(db, 'live_sessions', lessonId);
+    const unsub = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (typeof data.activePageIdx === 'number') {
+          setActivePageIdx(data.activePageIdx);
+        }
       }
     });
     return () => unsub();
   }, [lessonId]);
 
-  if (!lesson) return <div className="h-screen flex items-center justify-center text-slate-400 font-bold">Syncing Lesson Data...</div>;
+  if (!lesson) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-400 font-bold">
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
+        Searching for Class Data...
+      </div>
+    );
+  }
 
   const currentPage = pages[activePageIdx];
 
+  // 4. BIG SCREEN BLOCK RENDERER
+  const renderBigBlock = (block: any, idx: number) => {
+    switch (block.type) {
+      case 'text':
+        return (
+          <div key={idx} className="space-y-6 mb-10">
+            {block.title && <h3 className="text-4xl font-black text-indigo-600 tracking-tight">{block.title}</h3>}
+            <p className="text-6xl leading-tight text-slate-800 font-medium whitespace-pre-wrap antialiased">
+              {block.content || block.text}
+            </p>
+          </div>
+        );
+      case 'image':
+        return (
+          <div key={idx} className="flex justify-center my-10">
+            <img src={block.url} className="max-h-[60vh] rounded-[3rem] shadow-2xl border-[12px] border-white" alt="Slide content" />
+          </div>
+        );
+      case 'vocab-list':
+        return (
+          <div key={idx} className="grid grid-cols-2 gap-8 mt-10">
+            {(block.items || []).map((item: any, i: number) => (
+              <div key={i} className="bg-slate-50 p-8 rounded-[2rem] border-2 border-slate-100">
+                <p className="text-4xl font-black text-slate-900">{item.term}</p>
+                <p className="text-2xl text-slate-500 font-medium mt-2">{item.definition}</p>
+              </div>
+            ))}
+          </div>
+        );
+      default:
+        return (
+          <div key={idx} className="py-20 bg-indigo-50 rounded-[4rem] text-center">
+            <p className="text-4xl font-black text-indigo-600 uppercase tracking-widest">
+               {block.type} Mode
+            </p>
+            <p className="text-2xl text-indigo-400 mt-4 font-bold">Check your mobile device for interaction</p>
+          </div>
+        );
+    }
+  };
+
   return (
-    <div className="h-screen w-screen bg-white flex flex-col items-center justify-center p-24 fixed inset-0 z-[100] overflow-hidden">
-      <div className="w-full max-w-7xl animate-in fade-in zoom-in duration-700">
-        {/* Progress bar for the wall */}
-        <div className="h-1.5 w-full bg-slate-100 rounded-full mb-16 overflow-hidden">
-           <div className="h-full bg-indigo-600 transition-all duration-1000" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} />
+    <div className="h-screen w-screen bg-white flex flex-col items-center justify-center p-24 z-[100] fixed inset-0 overflow-hidden">
+      <div className="absolute top-[-10%] right-[-5%] w-[40vw] h-[40vw] bg-indigo-50 rounded-full blur-[120px] opacity-60" />
+      
+      <div className="relative z-10 w-full max-w-7xl animate-in fade-in zoom-in duration-700">
+        <div className="flex items-center gap-6 mb-16">
+          <div className="h-1 flex-1 bg-slate-100 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-indigo-600 transition-all duration-1000" 
+              style={{ width: `${((activePageIdx + 1) / (pages.length || 1)) * 100}%` }}
+            />
+          </div>
+          <span className="text-xl font-black text-slate-300 tabular-nums">
+            {activePageIdx + 1} / {pages.length}
+          </span>
         </div>
 
-        <div className="min-h-[60vh] flex flex-col justify-center text-center">
-          {currentPage?.blocks.map((block: any, idx: number) => (
-            <div key={idx} className="space-y-8">
-              {block.title && <h3 className="text-4xl font-black text-indigo-600 uppercase tracking-tighter mb-4">{block.title}</h3>}
-              <p className="text-7xl leading-tight text-slate-800 font-medium whitespace-pre-wrap">{block.content || block.text}</p>
-              {block.url && <img src={block.url} className="max-h-[50vh] mx-auto rounded-[3rem] shadow-2xl border-[12px] border-white" />}
-            </div>
-          ))}
+        <div className="min-h-[50vh] flex flex-col justify-center">
+          {currentPage?.blocks.map((block: any, idx: number) => renderBigBlock(block, idx))}
         </div>
       </div>
 
-      <div className="absolute bottom-16 left-24 flex items-center gap-4 opacity-30">
-        <div className="w-4 h-4 bg-emerald-500 rounded-full animate-pulse" />
-        <span className="font-black text-xl tracking-widest text-slate-900 uppercase">Live: {lesson.title}</span>
+      <div className="absolute bottom-16 left-24 right-24 flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <div className="w-4 h-4 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_15px_rgba(16,185,129,0.5)]" />
+          <span className="font-black text-lg tracking-[0.2em] text-slate-400 uppercase">
+            Live Class Active
+          </span>
+        </div>
+        <h2 className="text-2xl font-black text-slate-900 opacity-20 uppercase tracking-widest">
+          {lesson.title}
+        </h2>
       </div>
     </div>
   );
 }
-
 // ============================================================================
 //  LESSON VIEW (Modern "Story" Style)
 // ============================================================================
