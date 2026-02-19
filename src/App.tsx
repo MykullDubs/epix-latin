@@ -3210,10 +3210,8 @@ function ExamPlayerView({ exam, onFinish }: any) {
     );
 }
 
-// ============================================================================
-//  MAIN APP COMPONENT
-// ============================================================================
-// --- 1. STATE DECLARATIONS ---
+function App() {
+  // --- 1. STATE ---
   const [activeTab, setActiveTab] = useState('home');
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
@@ -3230,7 +3228,7 @@ function ExamPlayerView({ exam, onFinish }: any) {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  // --- 2. EFFECT: AUTH & PROFILE SYNC ---
+  // --- 2. AUTH SYNC ---
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -3242,31 +3240,27 @@ function ExamPlayerView({ exam, onFinish }: any) {
     return () => unsubAuth();
   }, []);
 
+  // --- 3. PROFILE & CONTENT SYNC ---
   useEffect(() => {
     if (!user?.uid) return;
-    const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main');
-    const unsubProfile = onSnapshot(profileRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setUserData(docSnap.data());
-      } else {
-        setUserData(DEFAULT_USER_DATA);
-      }
-      setAuthChecked(true);
-    });
-    return () => unsubProfile();
-  }, [user?.uid]);
 
-  // --- 3. EFFECT: CONTENT LIBRARY SYNC (Cards & Lessons) ---
-  useEffect(() => {
-    if (!user?.uid) return;
+    // Load Local Data
     setSystemDecks(INITIAL_SYSTEM_DECKS);
     setSystemLessons(INITIAL_SYSTEM_LESSONS);
 
+    // Sync Profile
+    const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
+      if (snap.exists()) setUserData(snap.data());
+      else setUserData(DEFAULT_USER_DATA);
+      setAuthChecked(true);
+    });
+
+    // Sync Library
     const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => 
-        setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+      setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     
     const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => 
-        setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+      setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
     const unsubSysDecks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_decks'), (snap) => {
       const d: any = {}; snap.docs.forEach(doc => { d[doc.id] = doc.data(); });
@@ -3278,14 +3272,14 @@ function ExamPlayerView({ exam, onFinish }: any) {
       if (l.length > 0) setSystemLessons(l);
     });
 
-    return () => { unsubCards(); unsubLessons(); unsubSysDecks(); unsubSysLessons(); };
+    return () => { unsubProfile(); unsubCards(); unsubLessons(); unsubSysDecks(); unsubSysLessons(); };
   }, [user?.uid]);
 
-  // --- 4. EFFECT: CLASSROOM SYNC (Flattening Assignments) ---
+  // --- 4. CLASSROOM SYNC (Flattening Assignments) ---
   useEffect(() => {
     if (!user?.uid || !userData?.role) return;
 
-    // Determine query based on role
+    // Build query based on role
     const q = userData.role === 'instructor' 
       ? query(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'))
       : query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
@@ -3294,21 +3288,23 @@ function ExamPlayerView({ exam, onFinish }: any) {
       const fetchedClasses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setEnrolledClasses(fetchedClasses);
 
-      // FLATTEN: This ensures Michaels's class has its 6 lessons
+      // FLATTEN: Combine all assignments from all classes into one list
       let allAssignments: any[] = [];
       fetchedClasses.forEach((cls: any) => {
         if (cls.assignments && Array.isArray(cls.assignments)) {
           const mapped = cls.assignments.map((a: any) => ({
             ...a,
-            classId: cls.id, // INJECT: This links the lesson to the class ID
+            classId: cls.id, // Linked for StudentClassView filter
             className: cls.name
           }));
           allAssignments = [...allAssignments, ...mapped];
         }
       });
 
-      console.log(`✅ Success: Synced ${allAssignments.length} total assignments.`);
+      console.log(`✅ Classroom Sync: Found ${allAssignments.length} assignments.`);
       setClassLessons(allAssignments);
+    }, (error) => {
+      console.error("❌ Class sync error:", error);
     });
 
     return () => unsubClasses();
