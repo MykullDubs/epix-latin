@@ -362,14 +362,23 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
     return groupedPages;
   }, [lesson]);
 
-  useEffect(() => {
-    if (!lessonId) return;
-    return onSnapshot(doc(db, 'live_sessions', lessonId), (snap) => {
-      if (snap.exists() && typeof snap.data().activePageIdx === 'number') {
-        setActivePageIdx(snap.data().activePageIdx);
+useEffect(() => {
+    // THE SYNC FIX: We always listen to the 'originalId' (the base content)
+    // so that the remote and projector are on the same channel.
+    const syncId = lesson?.originalId || lesson?.id;
+    if (!syncId) return;
+
+    const docRef = doc(db, 'live_sessions', syncId);
+    const unsub = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (typeof data.activePageIdx === 'number') {
+          setActivePageIdx(data.activePageIdx);
+        }
       }
     });
-  }, [lessonId]);
+    return () => unsub();
+  }, [lesson?.id, lesson?.originalId]);
 
   if (!lesson) return <div className="h-screen flex items-center justify-center font-black text-slate-300">CLEANING THE STAGE...</div>;
 
@@ -521,11 +530,15 @@ function LessonView({ lesson, onFinish, isInstructor = false }: any) {
   const [isLiveSynced, setIsLiveSynced] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // BROADCAST: Send current page to the Big Screen (ClassView)
-  const broadcastNavigation = async (index: number) => {
+ const broadcastNavigation = async (index: number) => {
     if (!isLiveSynced) return; 
+    
+    // THE REMOTE FIX: Use originalId so the channel matches the projector
+    const syncId = lesson?.originalId || lesson?.id;
+    if (!syncId) return;
+
     try {
-      const docRef = doc(db, 'live_sessions', lesson.id);
+      const docRef = doc(db, 'live_sessions', syncId);
       await setDoc(docRef, {
         activePageIdx: index,
         updatedAt: Date.now()
