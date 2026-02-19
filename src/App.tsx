@@ -360,7 +360,6 @@ function ClassView({ lessonId, lessons }: any) {
     return groupedPages;
   }, [lesson]);
 
-  // SYNC: Listen for Instructor Remote
   useEffect(() => {
     if (!lessonId) return;
     return onSnapshot(doc(db, 'live_sessions', lessonId), (snap) => {
@@ -370,73 +369,64 @@ function ClassView({ lessonId, lessons }: any) {
     });
   }, [lessonId]);
 
-  // TEST OVERRIDE: Allow Arrow Keys to navigate if testing on one screen
-  useEffect(() => {
-    const handleKeys = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') setActivePageIdx(p => Math.min(pages.length - 1, p + 1));
-      if (e.key === 'ArrowLeft') setActivePageIdx(p => Math.max(0, p - 1));
-    };
-    window.addEventListener('keydown', handleKeys);
-    return () => window.removeEventListener('keydown', handleKeys);
-  }, [pages.length]);
-
   if (!lesson) return <div className="h-screen flex items-center justify-center font-black text-slate-300 animate-pulse">SYNCING CLASSROOM DATA...</div>;
 
   const currentPage = pages[activePageIdx];
 
   return (
-    <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col p-12 lg:p-24 overflow-hidden select-none">
-      {/* Background Ambience */}
+    <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col p-12 lg:p-20 overflow-hidden">
+      {/* Background Decor */}
       <div className="absolute top-[-10%] right-[-5%] w-[50vw] h-[50vw] bg-indigo-50 rounded-full blur-[120px] opacity-40 -z-10" />
       
-      {/* Top Header / Progress */}
-      <div className="flex items-center gap-8 mb-20">
+      {/* Header */}
+      <div className="flex items-center gap-8 mb-12">
         <div className="h-2 flex-1 bg-slate-100 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-indigo-600 transition-all duration-700 ease-out" 
-            style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }}
-          />
+          <div className="h-full bg-indigo-600 transition-all duration-700" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} />
         </div>
-        <span className="text-3xl font-black text-slate-200 tabular-nums">
-          {activePageIdx + 1} <span className="text-slate-100">/</span> {pages.length}
-        </span>
+        <span className="text-2xl font-black text-slate-200 tabular-nums">{activePageIdx + 1} / {pages.length}</span>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col justify-center max-w-6xl mx-auto w-full">
-        {currentPage?.blocks.map((block: any, idx: number) => (
-          <div key={idx} className="animate-in fade-in zoom-in-95 duration-500 space-y-10">
-            {block.title && (
-              <h3 className="text-5xl font-black text-indigo-600 tracking-tighter uppercase">
-                {block.title}
-              </h3>
-            )}
-            
-            <div className="text-7xl lg:text-8xl leading-[1.1] text-slate-800 font-bold whitespace-pre-wrap tracking-tight">
-              {block.content || block.text || (block.type === 'interact' && "Check your mobile device!")}
+      {/* Main Content: Organized Grid */}
+      <div className="flex-1 flex flex-col justify-center items-center text-center max-w-7xl mx-auto w-full overflow-hidden">
+        <div className="space-y-10 w-full">
+          {currentPage?.blocks.map((block: any, idx: number) => (
+            <div key={idx} className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+              {block.title && <h3 className="text-4xl lg:text-5xl font-black text-indigo-600 uppercase tracking-tighter mb-6">{block.title}</h3>}
+              
+              {/* Organized Text Block */}
+              {block.content && (
+                <p className="text-5xl lg:text-7xl leading-[1.15] text-slate-800 font-bold max-w-5xl mx-auto">
+                  {block.content}
+                </p>
+              )}
+
+              {/* Organized Image Block */}
+              {block.url && (
+                <div className="relative inline-block mt-4">
+                  <img src={block.url} className="max-h-[50vh] w-auto rounded-[3rem] shadow-2xl border-[16px] border-white" alt="Slide content" />
+                  {block.caption && <p className="mt-4 text-2xl font-bold text-slate-400 italic">{block.caption}</p>}
+                </div>
+              )}
+
+              {/* Interaction Placeholder */}
+              {['quiz', 'flashcard', 'scenario'].includes(block.type) && (
+                <div className="py-16 px-12 bg-indigo-50 rounded-[4rem] border-4 border-indigo-100/50">
+                   <p className="text-5xl font-black text-indigo-600 uppercase mb-4">Interactive Mode</p>
+                   <p className="text-2xl font-bold text-indigo-400">Please check your mobile device to participate!</p>
+                </div>
+              )}
             </div>
-
-            {block.url && (
-              <img 
-                src={block.url} 
-                className="max-h-[55vh] object-contain rounded-[4rem] shadow-2xl border-[16px] border-white" 
-                alt="Slide"
-              />
-            )}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
-      {/* Footer Status */}
-      <div className="flex justify-between items-end mt-12 border-t border-slate-100 pt-8">
+      {/* Footer */}
+      <div className="mt-auto pt-8 border-t border-slate-100 flex justify-between items-end">
         <div className="flex items-center gap-4">
-          <div className="w-5 h-5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_20px_rgba(16,185,129,0.4)]" />
-          <span className="font-black text-xl tracking-[0.2em] text-slate-300 uppercase">Live Session</span>
+          <div className="w-4 h-4 bg-emerald-500 rounded-full animate-pulse" />
+          <span className="font-black text-lg text-slate-300 uppercase tracking-widest">Live: {lesson.title}</span>
         </div>
-        <div className="text-right">
-          <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">Current Unit</p>
-          <h2 className="text-3xl font-black text-slate-900 opacity-20">{lesson.title}</h2>
-        </div>
+        <div className="bg-slate-900 text-white px-6 py-2 rounded-2xl font-bold text-lg">LLLMS PRO</div>
       </div>
     </div>
   );
@@ -590,25 +580,22 @@ function LessonView({ lesson, onFinish, isInstructor = false }: any) {
             <X size={24} />
           </button>
 
-          <div className="text-center">
-            <h2 className="text-sm font-black text-slate-800 tracking-tight">{lesson.title}</h2>
-            <div className="flex items-center gap-2 justify-center">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                {isInteractivePage ? 'Interactive' : `Part ${currentPageIdx + 1}`}
-              </p>
-              {isInstructor && (
-                <button
-                  onClick={() => setIsLiveSynced(!isLiveSynced)}
-                  className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase transition-all ${isLiveSynced ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-slate-100 text-slate-400'}`}
-                >
-                  {isLiveSynced ? '● Sync Active' : 'Sync Off'}
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="w-8"></div>
-        </div>
-      </div>
+        <div className="text-center">
+  <h2 className="text-sm font-black text-slate-800 tracking-tight">{lesson.title}</h2>
+  <div className="flex items-center gap-2 justify-center">
+    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+      {isInteractivePage ? 'Interactive' : `Part ${currentPageIdx + 1}`}
+    </p>
+    
+    {/* FORCE THE SYNC BUTTON TO APPEAR FOR TESTING */}
+    <button
+      onClick={() => setIsLiveSynced(!isLiveSynced)}
+      className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase transition-all ${isLiveSynced ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-100 text-slate-400'}`}
+    >
+      {isLiveSynced ? '● Sync Active' : 'Sync Off'}
+    </button>
+  </div>
+</div>
 
       {/* CONTENT AREA */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto bg-white custom-scrollbar">
