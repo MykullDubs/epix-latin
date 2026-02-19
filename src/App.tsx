@@ -3493,15 +3493,18 @@ const renderStudentView = () => {
     let content: React.ReactNode = null;
     let viewKey: string = "default";
 
+    // 1. PRESENTATION MODE
     if (activeTab === 'presentation') {
       viewKey = `presentation-${selectedLessonId}`;
       content = <ClassView lessonId={selectedLessonId} lessons={lessons} />;
     } 
+    // 2. ACTIVE LESSON PLAYER
     else if (activeLesson) {
       viewKey = `lesson-${activeLesson.id}`;
       const isTeacher = userData?.role === 'instructor';
       content = <LessonView lesson={activeLesson} onFinish={handleFinishLesson} isInstructor={isTeacher} />;
     } 
+    // 3. SPECIFIC CLASS VIEW (Michael's Class)
     else if (activeTab === 'home' && activeStudentClass) {
       viewKey = `class-${activeStudentClass.id}`;
       content = (
@@ -3518,10 +3521,24 @@ const renderStudentView = () => {
         />
       );
     } 
+    // 4. MAIN NAVIGATION TABS
     else {
       viewKey = `tab-${activeTab || 'home'}`;
       switch (activeTab) {
+        case 'discovery':
+          content = <DiscoveryView allDecks={allDecks} lessons={lessons} user={user} onSelectDeck={handleContentSelection} onSelectLesson={handleContentSelection} userData={userData} onLogActivity={handleLogActivity} />;
+          break;
+        case 'flashcards':
+          content = <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} activeDeckOverride={null} onComplete={handleFinishLesson} onLogActivity={handleLogSelfStudy} userData={userData} user={user} onDeleteDeck={handleDeleteDeck} />;
+          break;
+        case 'create':
+          content = <BuilderHub onSaveCard={handleCreateCard} onUpdateCard={handleUpdateCard} onDeleteCard={handleDeleteCard} onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />;
+          break;
+        case 'profile':
+          content = <ProfileView user={user} userData={userData} />;
+          break;
         case 'home':
+        default:
           content = (
             <HomeView 
               setActiveTab={setActiveTab} 
@@ -3537,27 +3554,17 @@ const renderStudentView = () => {
             />
           );
           break;
-        case 'flashcards':
-          content = <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} activeDeckOverride={null} onComplete={handleFinishLesson} userData={userData} user={user} />;
-          break;
-        case 'create':
-          content = <BuilderHub onSaveLesson={handleCreateLesson} allDecks={allDecks} lessons={lessons} />;
-          break;
-        case 'profile':
-          content = <ProfileView user={user} userData={userData} />;
-          break;
-        default:
-          content = <div className="p-10 text-slate-400">Loading workspace...</div>;
       }
     }
 
     return (
       <div key={viewKey} className="h-full w-full animate-in fade-in duration-300">
-        {content}
+        {content || <div className="p-10 text-slate-400">Loading workspace...</div>}
       </div>
     );
-  }; // This closes renderStudentView
+  }; // This brace closes renderStudentView
 
+  // --- FINAL APP RENDER ---
   return (
     <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-start relative overflow-hidden">
         <div className={`w-full transition-all duration-500 bg-white relative overflow-hidden flex flex-col ${
@@ -3571,8 +3578,9 @@ const renderStudentView = () => {
                 <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
             )}
         </div>
+        {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </div>
   );
-} // This closes function App()
+} // This brace closes function App()
 
 export default App;
