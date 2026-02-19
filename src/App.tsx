@@ -337,10 +337,10 @@ lessons: any[]; // Replace 'any' with your Lesson type if defined
 function ClassView({ lessonId, lessons }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
 
-  // 1. Find the specific lesson data
-  const lesson = lessons.find((l: any) => l.id === lessonId);
+  // 1. Find lesson content
+  const lesson = lessons.find((l: any) => l.id === lessonId || l.originalId === lessonId);
 
-  // 2. SMART PAGING (Must match LessonView logic for sync to work)
+  // 2. Smart Paging (Matches student view logic)
   const pages = useMemo(() => {
     if (!lesson) return [];
     const rawBlocks = lesson.blocks || [];
@@ -348,127 +348,55 @@ function ClassView({ lessonId, lessons }: any) {
     let currentBuffer: any[] = [];
 
     rawBlocks.forEach((block: any) => {
-      const isInteractive = ['quiz', 'flashcard', 'scenario'].includes(block.type);
-      if (isInteractive) {
-        if (currentBuffer.length > 0) {
-          groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
-          currentBuffer = [];
-        }
+      if (['quiz', 'flashcard', 'scenario'].includes(block.type)) {
+        if (currentBuffer.length > 0) groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
         groupedPages.push({ type: 'interact', blocks: [block] });
+        currentBuffer = [];
       } else {
         currentBuffer.push(block);
       }
     });
-
-    if (currentBuffer.length > 0) {
-      groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
-    }
+    if (currentBuffer.length > 0) groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
     return groupedPages;
   }, [lesson]);
 
-  // 3. LISTEN FOR INSTRUCTOR REMOTE
+  // 3. Remote Control Listener
   useEffect(() => {
     if (!lessonId) return;
-
-    const docRef = doc(db, 'live_sessions', lessonId);
-    const unsub = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        // We look for 'activePageIdx' which is what LessonView broadcasts
-        if (typeof data.activePageIdx === 'number') {
-          setActivePageIdx(data.activePageIdx);
-        }
+    const unsub = onSnapshot(doc(db, 'live_sessions', lessonId), (snap) => {
+      if (snap.exists() && typeof snap.data().activePageIdx === 'number') {
+        setActivePageIdx(snap.data().activePageIdx);
       }
     });
     return () => unsub();
   }, [lessonId]);
 
-  if (!lesson) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-400 font-bold">
-        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
-        Searching for Lesson Data...
-      </div>
-    );
-  }
+  if (!lesson) return <div className="h-screen flex items-center justify-center text-slate-400 font-bold">Syncing Lesson Data...</div>;
 
   const currentPage = pages[activePageIdx];
 
-  // 4. BIG SCREEN BLOCK RENDERER
-  const renderBigBlock = (block: any, idx: number) => {
-    switch (block.type) {
-      case 'text':
-        return (
-          <div key={idx} className="space-y-6 mb-10">
-            {block.title && <h3 className="text-4xl font-black text-indigo-600 tracking-tight">{block.title}</h3>}
-            <p className="text-6xl leading-tight text-slate-800 font-medium whitespace-pre-wrap antialiased">
-              {block.content}
-            </p>
-          </div>
-        );
-      case 'image':
-        return (
-          <div key={idx} className="flex justify-center my-10">
-            <img src={block.url} className="max-h-[60vh] rounded-[3rem] shadow-2xl border-[12px] border-white" alt="Slide content" />
-          </div>
-        );
-      case 'vocab-list':
-        return (
-          <div key={idx} className="grid grid-cols-2 gap-8 mt-10">
-            {block.items.map((item: any, i: number) => (
-              <div key={i} className="bg-slate-50 p-8 rounded-[2rem] border-2 border-slate-100">
-                <p className="text-4xl font-black text-slate-900">{item.term}</p>
-                <p className="text-2xl text-slate-500 font-medium mt-2">{item.definition}</p>
-              </div>
-            ))}
-          </div>
-        );
-      default:
-        return (
-          <div key={idx} className="py-20 bg-indigo-50 rounded-[4rem] text-center">
-            <p className="text-4xl font-black text-indigo-600 uppercase tracking-widest">
-               {block.type} Mode
-            </p>
-            <p className="text-2xl text-indigo-400 mt-4 font-bold">Check your mobile device for interaction</p>
-          </div>
-        );
-    }
-  };
-
   return (
-    <div className="h-screen w-screen bg-white flex flex-col items-center justify-center p-24 z-[100] fixed inset-0 overflow-hidden">
-      {/* BACKGROUND DECOR */}
-      <div className="absolute top-[-10%] right-[-5%] w-[40vw] h-[40vw] bg-indigo-50 rounded-full blur-[120px] opacity-60" />
-      
-      <div className="relative z-10 w-full max-w-7xl animate-in fade-in zoom-in duration-700">
-        <div className="flex items-center gap-6 mb-16">
-          <div className="h-1 flex-1 bg-slate-100 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-indigo-600 transition-all duration-1000" 
-              style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }}
-            />
-          </div>
-          <span className="text-xl font-black text-slate-300 tabular-nums">
-            {activePageIdx + 1} / {pages.length}
-          </span>
+    <div className="h-screen w-screen bg-white flex flex-col items-center justify-center p-24 fixed inset-0 z-[100] overflow-hidden">
+      <div className="w-full max-w-7xl animate-in fade-in zoom-in duration-700">
+        {/* Progress bar for the wall */}
+        <div className="h-1.5 w-full bg-slate-100 rounded-full mb-16 overflow-hidden">
+           <div className="h-full bg-indigo-600 transition-all duration-1000" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} />
         </div>
 
-        <div className="min-h-[50vh] flex flex-col justify-center">
-          {currentPage?.blocks.map((block: any, idx: number) => renderBigBlock(block, idx))}
+        <div className="min-h-[60vh] flex flex-col justify-center text-center">
+          {currentPage?.blocks.map((block: any, idx: number) => (
+            <div key={idx} className="space-y-8">
+              {block.title && <h3 className="text-4xl font-black text-indigo-600 uppercase tracking-tighter mb-4">{block.title}</h3>}
+              <p className="text-7xl leading-tight text-slate-800 font-medium whitespace-pre-wrap">{block.content || block.text}</p>
+              {block.url && <img src={block.url} className="max-h-[50vh] mx-auto rounded-[3rem] shadow-2xl border-[12px] border-white" />}
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* STATUS BAR */}
-      <div className="absolute bottom-16 left-24 right-24 flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <div className="w-4 h-4 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_15px_rgba(16,185,129,0.5)]" />
-          <span className="font-black text-lg tracking-[0.2em] text-slate-400 uppercase">
-            Live Stream Active
-          </span>
-        </div>
-        <h2 className="text-2xl font-black text-slate-900 opacity-20 uppercase tracking-widest">
-          {lesson.title}
-        </h2>
+      <div className="absolute bottom-16 left-24 flex items-center gap-4 opacity-30">
+        <div className="w-4 h-4 bg-emerald-500 rounded-full animate-pulse" />
+        <span className="font-black text-xl tracking-widest text-slate-900 uppercase">Live: {lesson.title}</span>
       </div>
     </div>
   );
@@ -3306,51 +3234,39 @@ function App() {
   // Inside function App() { ...
 
 useEffect(() => {
-  // SAFETY GATE: Wait until we know who the user is and what their role is
-  if (!user?.uid || !userData?.role) {
-    console.log("⏳ Waiting for user profile to load...");
-    return;
-  }
+  if (!user?.uid || !userData?.role) return;
 
-  console.log("🚀 Fetching classes for role:", userData.role);
-
-  // 1. Build the Query
+  // 1. Unified Query Logic
   const q = userData.role === 'instructor' 
-    ? query(collection(db, "classes"), where("instructorId", "==", user.uid))
-    : query(collection(db, "classes"), where("studentEmails", "array-contains", user.email));
+    ? query(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'))
+    : query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
 
-  // 2. Start the Real-time Listener
   const unsub = onSnapshot(q, (snapshot) => {
-    const fetchedClasses = snapshot.docs.map(doc => ({ 
-      id: doc.id, 
-      ...doc.data() 
-    }));
-    
-    console.log(`✅ Found ${fetchedClasses.length} classes.`);
+    const fetchedClasses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     setEnrolledClasses(fetchedClasses);
 
-    // 3. FLATTEN ASSIGNMENTS
-    let allAssignments: any[] = [];
+    // 2. THE FLATTENING (The part that was missing the ID)
+    let allAssignedItems: any[] = [];
     fetchedClasses.forEach((cls: any) => {
       if (cls.assignments && Array.isArray(cls.assignments)) {
         const mapped = cls.assignments.map((a: any) => ({
           ...a,
-          classId: cls.id,
+          classId: cls.id, // <--- THE MISSING LINK
           className: cls.name
         }));
-        allAssignments = [...allAssignments, ...mapped];
+        allAssignedItems = [...allAssignedItems, ...mapped];
       }
     });
 
-    console.log(`📋 Total assignments extracted: ${allAssignments.length}`);
-    setClassLessons(allAssignments);
+    console.log(`✅ Sync Complete: ${fetchedClasses.length} classes, ${allAssignedItems.length} assignments.`);
+    setClassLessons(allAssignedItems);
   }, (error) => {
-    console.error("❌ Firestore Error:", error);
+    console.error("❌ Class sync error:", error);
   });
 
   return () => unsub();
-}, [user?.uid, user?.email, userData?.role]); // We watch specific IDs/Roles to prevent flickering
-
+}, [user?.uid, user?.email, userData?.role]);
+  
   // --- MEMOS ---
   const allDecks = useMemo(() => {
     const decks: any = { ...systemDecks, custom: { title: "✍️ Card Builder", cards: [] } };
@@ -3390,34 +3306,7 @@ const handleContentSelection = (item: any) => {
   // --- EFFECTS ---
   useEffect(() => { const unsubscribe = onAuthStateChanged(auth, (u) => { setUser(u); setAuthChecked(true); }); return () => unsubscribe(); }, []);
   
-  useEffect(() => {
-    if (!user) { setUserData(null); return; }
-    setSystemDecks(INITIAL_SYSTEM_DECKS); setSystemLessons(INITIAL_SYSTEM_LESSONS);
-    
-    const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (docSnap) => { if (docSnap.exists()) setUserData(docSnap.data()); else setUserData(DEFAULT_USER_DATA); });
-    const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubSysDecks = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_decks'), (snap) => { const d: any = {}; snap.docs.forEach(doc => { d[doc.id] = doc.data(); }); if (Object.keys(d).length > 0) setSystemDecks(d); });
-    const unsubSysLessons = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'system_lessons'), (snap) => { const l = snap.docs.map(d => ({ id: d.id, ...d.data() })); if (l.length > 0) setSystemLessons(l); });
-
-    let qClasses;
-    if (userData?.role === 'instructor') {
-         qClasses = query(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'));
-    } else {
-         qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
-    }
-
-    const unsubClasses = onSnapshot(qClasses, (snapshot) => { 
-        const cls = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); 
-        setEnrolledClasses(cls); 
-        const newAssignments: any[] = []; 
-        cls.forEach((c: any) => { if (c.assignments && Array.isArray(c.assignments)) { newAssignments.push(...c.assignments); } }); 
-        setClassLessons(newAssignments); 
-        setUserData((prev: any) => ({...prev, classes: cls, classAssignments: newAssignments})); 
-    }, (error) => { console.log("Class sync error:", error); setUserData((prev: any) => ({...prev, classSyncError: true})); });
-    
-    return () => { unsubProfile(); unsubCards(); unsubLessons(); unsubSysDecks(); unsubSysLessons(); unsubClasses(); };
-  }, [user, userData?.role]);
+ 
 
   // --- HANDLERS ---
   // --- QUEST ENGINE ---
