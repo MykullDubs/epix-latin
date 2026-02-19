@@ -3306,37 +3306,50 @@ function App() {
   // Inside function App() { ...
 
 useEffect(() => {
-  if (!user || !userData) return;
+  // SAFETY GATE: Wait until we know who the user is and what their role is
+  if (!user?.uid || !userData?.role) {
+    console.log("⏳ Waiting for user profile to load...");
+    return;
+  }
 
+  console.log("🚀 Fetching classes for role:", userData.role);
+
+  // 1. Build the Query
   const q = userData.role === 'instructor' 
     ? query(collection(db, "classes"), where("instructorId", "==", user.uid))
-    : query(collection(db, "classes"), where("studentEmails", "array-contains", user.email || ""));
+    : query(collection(db, "classes"), where("studentEmails", "array-contains", user.email));
 
+  // 2. Start the Real-time Listener
   const unsub = onSnapshot(q, (snapshot) => {
-    const fetchedClasses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const fetchedClasses = snapshot.docs.map(doc => ({ 
+      id: doc.id, 
+      ...doc.data() 
+    }));
+    
+    console.log(`✅ Found ${fetchedClasses.length} classes.`);
     setEnrolledClasses(fetchedClasses);
 
-    // This logic extracts the lessons from the classes so the dashboard can see them
-    let flattenedAssignments: any[] = [];
+    // 3. FLATTEN ASSIGNMENTS
+    let allAssignments: any[] = [];
     fetchedClasses.forEach((cls: any) => {
       if (cls.assignments && Array.isArray(cls.assignments)) {
-        const mapped = cls.assignments.map((assignment: any) => ({
-          ...assignment,
-          classId: cls.id, // Handshake link
+        const mapped = cls.assignments.map((a: any) => ({
+          ...a,
+          classId: cls.id,
           className: cls.name
         }));
-        flattenedAssignments = [...flattenedAssignments, ...mapped];
+        allAssignments = [...allAssignments, ...mapped];
       }
     });
 
-    // This updates the HUD from 0 to 6
-    setClassLessons(flattenedAssignments);
+    console.log(`📋 Total assignments extracted: ${allAssignments.length}`);
+    setClassLessons(allAssignments);
+  }, (error) => {
+    console.error("❌ Firestore Error:", error);
   });
 
   return () => unsub();
-}, [user, userData]);
-
-// ... rest of your code
+}, [user?.uid, user?.email, userData?.role]); // We watch specific IDs/Roles to prevent flickering
 
   // --- MEMOS ---
   const allDecks = useMemo(() => {
