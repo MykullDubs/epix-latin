@@ -2068,28 +2068,21 @@ function StudentClassView({
   onSelectDeck, 
   userData, 
   allLessons = [], 
-  classLessons = [], 
+  classLessons = [], // This will now receive the 'assignments' array
   setActiveTab, 
   setSelectedLessonId 
 }: any) {
     
-    // THE UNIVERSAL FILTER
     const resolvedLessons = useMemo(() => {
-        const currentClassId = classData?.id || classData?.uid || classData?.docId;
+        const currentClassId = classData?.id || classData?.uid;
 
-        // Try to filter by Class ID
-        const filtered = classLessons.filter((assignment: any) => {
+        // Filter assignments by the current class ID
+        return classLessons.filter((assignment: any) => {
             return assignment.classId === currentClassId || 
                    assignment.courseId === currentClassId ||
-                   assignment.class === currentClassId ||
-                   assignment.class_id === currentClassId;
-        });
-
-        // If filtering results in 0, but we know there are 6 due, 
-        // let's just show ALL assignments for now so you aren't stuck.
-        const listToMap = filtered.length > 0 ? filtered : classLessons;
-
-        return listToMap.map((assignment: any) => {
+                   assignment.class === currentClassId;
+        }).map((assignment: any) => {
+            // Find full details from the master library
             const lessonId = assignment.lessonId || assignment.id;
             const fullLesson = allLessons.find((l: any) => l.id === lessonId);
             return fullLesson ? { ...fullLesson, ...assignment } : assignment;
@@ -2098,47 +2091,59 @@ function StudentClassView({
 
     return (
         <div className="h-full flex flex-col bg-slate-50">
-            <div className="bg-white px-6 pt-12 pb-6 border-b border-slate-100">
+            {/* Header */}
+            <div className="bg-white px-6 pt-12 pb-6 border-b border-slate-100 shadow-sm">
                 <button onClick={onBack} className="flex items-center gap-2 text-slate-400 font-bold text-sm mb-4">
                     <ChevronLeft size={18} /> Back
                 </button>
-                <h1 className="text-3xl font-black text-slate-900 tracking-tight">{classData?.name || "Class Dashboard"}</h1>
-                <p className="text-slate-500 font-medium">{resolvedLessons.length} Items Detected</p>
+                <h1 className="text-3xl font-black text-slate-900 tracking-tight">{classData?.name}</h1>
+                <p className="text-slate-500 font-medium">
+                    {resolvedLessons.length} lessons available
+                </p>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                {/* DEBUG PANEL - Visible to everyone for troubleshooting */}
-                <div className="p-4 bg-slate-900 rounded-2xl text-[10px] font-mono text-slate-300 mb-6">
-                    <p className="text-indigo-400 font-black mb-1">SYSTEM DEBUG:</p>
-                    <p>Class ID: <span className="text-white">{classData?.id || "NULL"}</span></p>
-                    <p>Total assignments in state: <span className="text-white">{classLessons.length}</span></p>
-                    {classLessons[0] && (
-                        <p className="mt-2 text-emerald-400">Sample Key: {Object.keys(classLessons[0]).join(', ')}</p>
-                    )}
-                </div>
-
-                {resolvedLessons.map((lesson: any) => (
-                    <div key={lesson.id} className="bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm flex items-center justify-between">
-                        <div className="flex-1 min-w-0 mr-4">
-                            <h3 className="font-bold text-slate-800 truncate">{lesson.title || "Untitled Lesson"}</h3>
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                {resolvedLessons.length > 0 ? resolvedLessons.map((lesson: any) => (
+                    <div key={lesson.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-bottom-2">
+                        <div className="flex-1 pr-4">
+                            <h3 className="font-bold text-slate-800 text-lg leading-tight">{lesson.title}</h3>
+                            <p className="text-[10px] text-slate-400 font-black uppercase mt-1 tracking-widest">
+                                {lesson.type || 'Lesson'}
+                            </p>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <button onClick={() => onSelectLesson(lesson)} className="px-4 py-2 bg-slate-50 text-slate-600 rounded-xl font-bold text-xs">
+                        <div className="flex gap-2">
+                            {/* Student View Button */}
+                            <button 
+                                onClick={() => onSelectLesson(lesson)} 
+                                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                            >
                                 Open
                             </button>
-                            <button 
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedLessonId(lesson.lessonId || lesson.id);
-                                    setActiveTab('presentation');
-                                }}
-                                className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-lg"
-                            >
-                                <Monitor size={18} />
-                            </button>
+                            
+                            {/* Instructor Presentation Button */}
+                            {userData?.role === 'instructor' && (
+                                <button 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedLessonId(lesson.lessonId || lesson.id);
+                                        setActiveTab('presentation');
+                                    }}
+                                    className="p-3 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                                    title="Present to Class"
+                                >
+                                    <Monitor size={18} />
+                                </button>
+                            )}
                         </div>
                     </div>
-                ))}
+                )) : (
+                    <div className="text-center py-20 bg-white/50 border-2 border-dashed border-slate-200 rounded-[3rem]">
+                        <p className="text-slate-400 font-bold">No assignments matched for this class.</p>
+                        <p className="text-[10px] text-slate-300 mt-2 font-mono uppercase tracking-widest">
+                            Class ID: {classData?.id}
+                        </p>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -3487,7 +3492,7 @@ const renderStudentView = () => {
           setSelectedLessonId={setSelectedLessonId}
           // --- DATA SYNC ---
           allLessons={lessons}       // Master library of lesson content
-          classLessons={classLessons} // The array holding your 6 assigned lessons
+          classLessons={assignments} // The array holding your 6 assigned lessons
         />
       );
     } 
