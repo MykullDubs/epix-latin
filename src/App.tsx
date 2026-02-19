@@ -3211,7 +3211,7 @@ function ExamPlayerView({ exam, onFinish }: any) {
 }
 
 function App() {
-  // --- 1. STATE DECLARATIONS ---
+  // --- 1. STATE ---
   const [activeTab, setActiveTab] = useState('home');
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
@@ -3228,7 +3228,7 @@ function App() {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  // --- 2. AUTH & PROFILE SYNC ---
+  // --- 2. AUTH SYNC ---
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -3240,67 +3240,73 @@ function App() {
     return () => unsubAuth();
   }, []);
 
+  // --- 3. PROFILE SYNC ---
   useEffect(() => {
     if (!user?.uid) return;
     const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main');
-    const unsubProfile = onSnapshot(profileRef, (docSnap) => {
-      if (docSnap.exists()) setUserData(docSnap.data());
+    const unsubProfile = onSnapshot(profileRef, (snap) => {
+      if (snap.exists()) setUserData(snap.data());
       else setUserData(DEFAULT_USER_DATA);
       setAuthChecked(true);
     });
     return () => unsubProfile();
   }, [user?.uid]);
 
-  // --- 3. THE MASTER DATA HANDSHAKE (Classes & Lessons) ---
+  // --- 4. THE UNIFIED DATA SYNC (Force Assignments to HUD) ---
   useEffect(() => {
     if (!user?.uid || !userData?.role) return;
 
     setSystemDecks(INITIAL_SYSTEM_DECKS);
     setSystemLessons(INITIAL_SYSTEM_LESSONS);
 
-    // A. Sync Library (Lessons & Cards)
+    // A. Fetch Library
     const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => 
       setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     
     const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => 
       setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-    // B. Sync Classes (The Multi-Path Fix)
-    // We query for any class containing Michael's email
-    const q = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
+    // B. Fetch Classes (The 0-to-6 Fix)
+    // We search the entire database for any class Michael's email is in.
+    const qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
 
-    const unsubClasses = onSnapshot(q, (snapshot) => {
-      const fetchedClasses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const unsubClasses = onSnapshot(qClasses, (snapshot) => {
+      const fetchedClasses = snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data() 
+      }));
+      
       setEnrolledClasses(fetchedClasses);
 
+      // C. THE CRITICAL FLATTENING
+      // This part turns the nested Firestore data into the flat list the list needs.
       let allAssignments: any[] = [];
       fetchedClasses.forEach((cls: any) => {
         if (cls.assignments && Array.isArray(cls.assignments)) {
-          allAssignments.push(...cls.assignments.map((a: any) => ({
+          const mapped = cls.assignments.map((a: any) => ({
             ...a,
-            classId: cls.id, // THE CRITICAL KEY for the Diagnostic HUD
+            classId: cls.id, // THE HANDSHAKE: Must match "wGCmJD..."
             className: cls.name
-          })));
+          }));
+          allAssignments = [...allAssignments, ...mapped];
         }
       });
 
-      console.log(`HUD SYNC: Found ${allAssignments.length} assignments in ${fetchedClasses.length} classes.`);
+      console.log(`HUD DEBUG: Extracted ${allAssignments.length} assignments from ${fetchedClasses.length} classes.`);
       setClassLessons(allAssignments);
-    }, (error) => {
-      console.error("Firestore Query Error:", error);
     });
 
     return () => { unsubCards(); unsubLessons(); unsubClasses(); };
   }, [user?.email, userData?.role]);
 
-  // --- 4. DATA MEMOS ---
+  // --- 5. DATA HYDRATION (Memos) ---
   const displayName = useMemo(() => {
     if (userData?.name && userData.name !== 'Student' && userData.name !== 'User') return userData.name;
-    return user?.email?.split('@')[0] || 'Scholar';
+    return user?.email?.split('@')[0] || 'Learner';
   }, [userData, user]);
 
   const allDecks = useMemo(() => {
-    const decks: any = { ...systemDecks, custom: { title: "✍️ Builder", cards: [] } };
+    const decks: any = { ...systemDecks, custom: { title: "✍️ Card Builder", cards: [] } };
     customCards.forEach(card => {
         const target = card.deckId || 'custom';
         if (!decks[target]) decks[target] = { title: card.deckTitle || "Custom Deck", cards: [] };
@@ -3312,7 +3318,7 @@ function App() {
 
   const lessons = useMemo(() => [...systemLessons, ...customLessons], [systemLessons, customLessons]);
 
-  // --- 5. HANDLERS ---
+  // --- 6. HANDLERS ---
   const handleContentSelection = (item: any) => {
     if (item.id) setSelectedLessonId(item.id);
     if (item.contentType === 'lesson' || item.type === 'lesson') {
@@ -3335,7 +3341,8 @@ function App() {
     } 
   }, [user, displayName]);
 
-  const handleLogActivity = (itemId: string, xpEarned: number, title: string) => {};
+  // Placeholders for build safety
+  const handleLogActivity = () => {};
   const handleCreateCard = (c: any) => {};
   const handleUpdateCard = (id: string, d: any) => {};
   const handleDeleteCard = (id: string) => {};
@@ -3343,7 +3350,7 @@ function App() {
   const handleDeleteDeck = (id: string) => {};
   const handleLogSelfStudy = (id: string, xp: number, t: string) => {};
 
-  // --- 6. RENDER ---
+  // --- 7. RENDERING ---
   if (!authChecked || (user && !userData)) return <div className="h-full flex items-center justify-center text-indigo-500"><Loader className="animate-spin" size={32}/></div>;
   if (!user) return <AuthView />;
 
@@ -3356,7 +3363,17 @@ function App() {
     if (activeLesson) return <LessonView lesson={activeLesson} onFinish={handleFinishLesson} isInstructor={false} />;
     
     if (activeTab === 'home' && activeStudentClass) {
-      return <StudentClassView classData={activeStudentClass} onBack={() => setActiveStudentClass(null)} onSelectLesson={handleContentSelection} onSelectDeck={handleContentSelection} userData={userData} setActiveTab={setActiveTab} setSelectedLessonId={setSelectedLessonId} allLessons={lessons} classLessons={classLessons} />;
+      return <StudentClassView 
+                classData={activeStudentClass} 
+                onBack={() => setActiveStudentClass(null)} 
+                onSelectLesson={handleContentSelection} 
+                onSelectDeck={handleContentSelection} 
+                userData={userData} 
+                setActiveTab={setActiveTab} 
+                setSelectedLessonId={setSelectedLessonId} 
+                allLessons={lessons} 
+                classLessons={classLessons} 
+             />;
     }
 
     switch (activeTab) {
