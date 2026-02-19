@@ -3303,6 +3303,40 @@ function App() {
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [classLessons, setClassLessons] = useState<any[]>([]);
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
+  // Inside function App() { ...
+
+useEffect(() => {
+  if (!user || !userData) return;
+
+  const q = userData.role === 'instructor' 
+    ? query(collection(db, "classes"), where("instructorId", "==", user.uid))
+    : query(collection(db, "classes"), where("studentEmails", "array-contains", user.email || ""));
+
+  const unsub = onSnapshot(q, (snapshot) => {
+    const fetchedClasses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    setEnrolledClasses(fetchedClasses);
+
+    // This logic extracts the lessons from the classes so the dashboard can see them
+    let flattenedAssignments: any[] = [];
+    fetchedClasses.forEach((cls: any) => {
+      if (cls.assignments && Array.isArray(cls.assignments)) {
+        const mapped = cls.assignments.map((assignment: any) => ({
+          ...assignment,
+          classId: cls.id, // Handshake link
+          className: cls.name
+        }));
+        flattenedAssignments = [...flattenedAssignments, ...mapped];
+      }
+    });
+
+    // This updates the HUD from 0 to 6
+    setClassLessons(flattenedAssignments);
+  });
+
+  return () => unsub();
+}, [user, userData]);
+
+// ... rest of your code
 
   // --- MEMOS ---
   const allDecks = useMemo(() => {
