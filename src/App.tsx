@@ -3862,6 +3862,7 @@ function App() {
   const [systemLessons] = useState([]); 
   const [customLessons, setCustomLessons] = useState<any[]>([]);
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
+  const [instructorClasses, setInstructorClasses] = useState<any[]>([]); // ADD THIS LINE
   const [allDecks, setAllDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
   
   // --- 3. UI NAVIGATION STATE (DECOUPLED) ---
@@ -3870,11 +3871,13 @@ function App() {
   const [presentationLessonId, setPresentationLessonId] = useState<string | null>(null); // Triggers Projector
   const [activeDeckKey, setActiveDeckKey] = useState<string | null>(null); // Triggers Flashcards
 
-  // --- 4. DATA CONSOLIDATION ---
+ // --- 4. DATA CONSOLIDATION ---
   const lessons = useMemo(() => {
-    const assignments = enrolledClasses.flatMap(c => c.assignments || []);
+    // Combine both lists to find assignments
+    const allActiveClasses = [...instructorClasses, ...enrolledClasses]; 
+    const assignments = allActiveClasses.flatMap(c => c.assignments || []);
     return [...systemLessons, ...customLessons, ...assignments];
-  }, [systemLessons, customLessons, enrolledClasses]);
+  }, [systemLessons, customLessons, enrolledClasses, instructorClasses]);
 
   // --- 5. FIREBASE REAL-TIME SYNC ---
   useEffect(() => {
@@ -3909,8 +3912,12 @@ function App() {
       const unsubClasses = onSnapshot(qClasses, (snap) => {
         setEnrolledClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
+      // ADD THIS NEW BLOCK: Instructor Cohort Sync
+      const unsubInstructorClasses = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), (snap) => {
+        setInstructorClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
 
-      return () => { unsubAuth(); unsubProfile(); unsubLessons(); unsubCards(); unsubClasses(); };
+      return () => { unsubAuth(); unsubProfile(); unsubLessons(); unsubCards(); unsubClasses(); unsubInstructorclasses(); };
     }
     return () => unsubAuth();
   }, [user?.uid, user?.email]);
