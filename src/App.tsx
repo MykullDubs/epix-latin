@@ -3862,11 +3862,12 @@ function App() {
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [allDecks, setAllDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
   
-  // --- 3. UI NAVIGATION STATE (Student Routing) ---
-  const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
+  // --- 3. UI NAVIGATION STATE ---
+  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [activeLesson, setActiveLesson] = useState<any>(null);
+  const [activeStudentClass, setActiveStudentClass] = useState<any>(null); // Passed to HomeView
 
-  // --- 4. DATA CONSOLIDATION (The Unit Engine) ---
+  // --- 4. DATA CONSOLIDATION ---
   const lessons = useMemo(() => {
     const assignments = enrolledClasses.flatMap(c => c.assignments || []);
     return [...systemLessons, ...customLessons, ...assignments];
@@ -3883,7 +3884,6 @@ function App() {
     });
 
     if (user?.uid) {
-      // Profile & Magister Unlock
       const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
         if (snap.exists()) {
           const data = snap.data();
@@ -3893,7 +3893,6 @@ function App() {
         setAuthChecked(true);
       });
 
-      // Instructor Studio Content
       const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => {
         setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
@@ -3903,7 +3902,6 @@ function App() {
         setAllDecks((prev: any) => ({ ...prev, custom: { ...prev.custom, cards } }));
       });
 
-      // Cohort Enrollment Sync
       const qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
       const unsubClasses = onSnapshot(qClasses, (snap) => {
         setEnrolledClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -3914,18 +3912,13 @@ function App() {
     return () => unsubAuth();
   }, [user?.uid, user?.email]);
 
-  // --- 6. MAGISTER DATABASE HANDLERS (TS-Error Free) ---
-  
+  // --- 6. MAGISTER DATABASE HANDLERS ---
   const handleCreateClass = async (className: string) => {
     if (!user) return { success: false };
     try {
       await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), {
-        name: className,
-        code: Math.random().toString(36).substring(2, 8).toUpperCase(),
-        students: [],
-        studentEmails: [],
-        assignments: [],
-        created: Date.now()
+        name: className, code: Math.random().toString(36).substring(2, 8).toUpperCase(),
+        students: [], studentEmails: [], assignments: [], created: Date.now()
       });
       return { success: true };
     } catch (e) { return { success: false }; }
@@ -3996,7 +3989,6 @@ function App() {
   };
 
   // --- 7. ROUTING & RENDERING ---
-
   if (!authChecked) {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50">
@@ -4044,40 +4036,35 @@ function App() {
       )}
 
       {/* Mobile-Optimized Student Viewport */}
-      <div className="w-full transition-all duration-700 bg-white relative overflow-hidden flex flex-col max-w-md h-[100dvh] shadow-2xl">
-        
+      <div className={`w-full transition-all duration-700 bg-white relative overflow-hidden flex flex-col ${
+        activeTab === 'presentation' ? 'h-screen w-screen fixed inset-0 z-50' : 'max-w-md h-[100dvh] shadow-2xl'
+      }`}>
         <div className="flex-1 h-full overflow-hidden relative">
-          {/* STUDENT ROUTER STACK 
-            1. Taking a Lesson (Highest Priority)
-            2. Viewing a Class (Middle Priority)
-            3. Home Dashboard (Base Priority)
-          */}
-          {activeLesson ? (
-            <LessonView 
-              lesson={activeLesson} 
-              onFinish={() => setActiveLesson(null)} 
-              isInstructor={userData?.role === 'instructor'} 
-            />
-          ) : activeStudentClass ? (
-            <ClassView 
-              classData={activeStudentClass} 
-              onBack={() => setActiveStudentClass(null)} 
-              setActiveLesson={setActiveLesson}
-              userData={userData}
-            />
+          
+          {/* THE FIXED ROUTING STACK */}
+          {activeTab === 'presentation' ? (
+            // Presentation mode expects a 'lesson' prop.
+            <ClassView lesson={lessons.find(l => l.id === selectedLessonId)} userData={userData} />
+          ) : activeLesson ? (
+            <LessonView lesson={activeLesson} onFinish={() => setActiveLesson(null)} isInstructor={userData?.role === 'instructor'} />
+          ) : activeTab === 'profile' ? (
+            <div className="p-10">Profile View</div>
           ) : (
+            // HomeView handles the activeStudentClass rendering internally.
             <HomeView 
               setActiveTab={setActiveTab} 
               classes={enrolledClasses} 
-              onSelectClass={setActiveStudentClass} // RESTORED: Passes class tap up to App state
+              onSelectClass={setActiveStudentClass} 
+              activeStudentClass={activeStudentClass}
               userData={userData} 
               user={user} 
+              setSelectedLessonId={setSelectedLessonId}
+              setActiveLesson={setActiveLesson}
             />
           )}
         </div>
         
-        {/* Hide Nav during deep focus modes (Lesson or Class View) */}
-        {(!activeLesson && !activeStudentClass) && (
+        {(!activeLesson && activeTab !== 'presentation') && (
           <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
         )}
       </div>
