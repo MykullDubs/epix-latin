@@ -473,19 +473,7 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // --- 1. SYNC LOGIC (Page & Scroll) ---
-  const changePage = (newIdx: number) => {
-    setActivePageIdx(newIdx);
-    if (isInstructor) {
-      const syncId = lesson.originalId || lesson.id;
-      updateDoc(doc(db, 'live_sessions', syncId), {
-        activePageIdx: newIdx,
-        lastUpdate: Date.now()
-      }).catch(e => console.error("Page sync failed:", e));
-    }
-    containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
+  // --- SCROLL SYNC (Michael's Remote Control) ---
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !isInstructor) return;
@@ -501,7 +489,96 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
     return () => container.removeEventListener('scroll', handleScroll);
   }, [lesson, isInstructor]);
 
-  // --- 2. BLOCK GROUPING ---
+  // --- BLOCK RENDERER (The Enchilada) ---
+  const renderBlock = (block: any, idx: number) => {
+    switch (block.type) {
+      case 'text':
+        return (
+          <div key={idx} className="py-6 text-center animate-in fade-in slide-in-from-bottom-2">
+            <p className="text-3xl font-black text-slate-900 leading-tight tracking-tighter">
+              {block.content}
+            </p>
+          </div>
+        );
+
+      case 'essay':
+        return (
+          <div key={idx} className="py-4 space-y-6 animate-in fade-in">
+            <h2 className="text-2xl font-black text-indigo-600 tracking-tight">{block.title}</h2>
+            <div className="space-y-4">
+              {block.content?.split('\n\n').map((p: string, j: number) => (
+                <p key={j} className="text-base text-slate-600 font-serif leading-relaxed text-justify">
+                  {p.trim()}
+                </p>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 'dialogue':
+        return (
+          <div key={idx} className="py-6 space-y-6">
+            {block.lines?.map((line: any, j: number) => (
+              <div key={j} className={`flex items-end gap-3 ${line.side === 'right' ? 'flex-row-reverse' : ''}`}>
+                {/* Speaker Avatar */}
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black text-white shrink-0 shadow-lg ${line.side === 'right' ? 'bg-indigo-600' : 'bg-slate-800'}`}>
+                  {line.speaker?.[0].toUpperCase()}
+                </div>
+                {/* Speech Bubble */}
+                <div className={`max-w-[80%] p-4 rounded-[1.8rem] shadow-sm text-sm font-medium leading-relaxed ${
+                  line.side === 'right' 
+                    ? 'bg-indigo-500 text-white rounded-br-none' 
+                    : 'bg-white border border-slate-100 text-slate-800 rounded-bl-none'
+                }`}>
+                  {line.text}
+                  {line.translation && (
+                    <p className={`text-[10px] mt-2 italic opacity-60 font-bold border-t pt-2 ${line.side === 'right' ? 'border-white/20' : 'border-slate-100'}`}>
+                      {line.translation}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'vocab-list':
+        return (
+          <div key={idx} className="py-4 grid grid-cols-1 gap-4">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] px-2">Essential Lexicon</h3>
+            {block.items?.map((item: any, j: number) => (
+              <div key={j} className="bg-white p-5 rounded-[2rem] border-2 border-slate-50 shadow-sm flex flex-col gap-1 hover:border-indigo-100 transition-colors">
+                <span className="text-lg font-black text-indigo-600">{item.term}</span>
+                <div className="h-px w-8 bg-slate-100 my-1" />
+                <span className="text-xs font-bold text-slate-500 leading-normal">{item.definition}</span>
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'quiz':
+        return (
+          <div key={idx} className="my-8 bg-slate-900 rounded-[3rem] p-8 text-white shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 blur-3xl" />
+            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block mb-4">Knowledge Check</span>
+            <h3 className="text-xl font-bold mb-8 leading-tight">{block.question}</h3>
+            <div className="space-y-3">
+              {block.options?.map((opt: any, j: number) => (
+                <button key={j} className="w-full p-5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-left text-sm font-bold transition-all active:scale-95">
+                  <span className="inline-block w-6 h-6 rounded-lg bg-white/10 text-center leading-6 mr-3 text-[10px]">{opt.id.toUpperCase()}</span>
+                  {opt.text}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
+      default:
+        return <div key={idx} className="p-8 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-100 text-center text-xs text-slate-400 font-bold uppercase tracking-widest">Unsupported Module</div>;
+    }
+  };
+
+  // --- PAGINATION LOGIC (The Handshake) ---
   const pages = useMemo(() => {
     if (!lesson?.blocks) return [];
     const grouped: any[] = [];
@@ -517,135 +594,57 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
     return grouped;
   }, [lesson]);
 
-  // --- 3. THE "ENCHILADA" RENDERER ---
-  const renderBlock = (block: any, idx: number) => {
-    switch (block.type) {
-      case 'text':
-        return (
-          <div key={idx} className="space-y-2">
-            {block.title && <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{block.title}</p>}
-            <p className="text-2xl font-black text-slate-800 leading-tight">{block.content}</p>
-          </div>
-        );
-
-      case 'essay':
-        return (
-          <div key={idx} className="space-y-6 py-4">
-            <h2 className="text-3xl font-black text-slate-900 leading-tight">{block.title}</h2>
-            <div className="space-y-4 border-l-4 border-slate-100 pl-4">
-              {block.content?.split('\n\n').map((p: string, j: number) => (
-                <p key={j} className="text-sm text-slate-600 leading-relaxed font-serif">{p.trim()}</p>
-              ))}
-            </div>
-          </div>
-        );
-
-      case 'dialogue':
-        return (
-          <div key={idx} className="space-y-4 py-4">
-            {block.lines?.map((line: any, j: number) => (
-              <div key={j} className={`flex items-end gap-3 ${line.side === 'right' ? 'flex-row-reverse' : 'flex-row'}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-[10px] font-black text-white ${line.side === 'right' ? 'bg-indigo-600' : 'bg-slate-800'}`}>
-                  {line.speaker?.[0]}
-                </div>
-                <div className={`p-4 rounded-2xl text-sm font-medium shadow-sm ${line.side === 'right' ? 'bg-indigo-50 text-indigo-900 rounded-br-none' : 'bg-slate-100 text-slate-800 rounded-bl-none'}`}>
-                  {line.text}
-                </div>
-              </div>
-            ))}
-          </div>
-        );
-
-      case 'vocab-list':
-        return (
-          <div key={idx} className="grid grid-cols-1 gap-3 py-4">
-            {block.items?.map((item: any, j: number) => (
-              <div key={j} className="p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl flex justify-between items-center">
-                <span className="font-black text-indigo-600">{item.term}</span>
-                <span className="text-xs font-bold text-slate-400">{item.definition}</span>
-              </div>
-            ))}
-          </div>
-        );
-
-      case 'quiz':
-        return (
-          <div key={idx} className="bg-slate-900 p-8 rounded-[2.5rem] text-white my-6">
-            <p className="text-indigo-400 text-[10px] font-black uppercase mb-2">Check for Understanding</p>
-            <h3 className="text-xl font-bold mb-6">{block.question}</h3>
-            <div className="space-y-3">
-              {block.options?.map((opt: string, j: number) => (
-                <button key={j} className="w-full p-4 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-left text-sm font-bold transition-all">
-                  {opt}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-
-      case 'flashcard':
-        return (
-          <div key={idx} className="py-10 flex justify-center">
-            <div className="w-full aspect-[3/4] bg-indigo-600 rounded-[3rem] p-8 flex flex-col items-center justify-center text-center shadow-2xl shadow-indigo-200">
-               <p className="text-white/50 text-[10px] font-black uppercase mb-4">Vocabulary Focus</p>
-               <h2 className="text-3xl font-black text-white">{block.front}</h2>
-               <div className="mt-8 px-6 py-2 bg-white/20 rounded-full text-white text-[10px] font-black">TAP TO REVEAL</div>
-            </div>
-          </div>
-        );
-
-      default:
-        return <div key={idx} className="p-6 bg-slate-50 rounded-2xl text-slate-400 italic text-center text-xs">Unsupported content block</div>;
-    }
-  };
-
-  // --- 4. NAVIGATION RENDER ---
   if (!pages[activePageIdx]) return null;
 
   return (
-    <div className="flex flex-col h-full bg-white overflow-hidden">
-      {/* Header Info */}
-      <div className="px-6 pt-12 pb-4 shrink-0 border-b border-slate-50">
-        <h1 className="text-xs font-black text-indigo-600 uppercase tracking-[0.3em] mb-1">{lesson.title}</h1>
-        <div className="flex items-center gap-2">
-           <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-           <p className="text-[10px] font-bold text-slate-400">SYNC ACTIVE • {isInstructor ? "INSTRUCTOR MODE" : "STUDENT MODE"}</p>
+    <div className="flex flex-col h-full bg-slate-50/30 overflow-hidden font-sans">
+      {/* Dynamic Header */}
+      <div className="px-8 pt-14 pb-6 bg-white border-b border-slate-100 shrink-0">
+        <div className="flex justify-between items-end">
+          <div>
+            <h1 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.4em] mb-1">{lesson.title}</h1>
+            <p className="text-lg font-black text-slate-900 tracking-tighter">Current Session</p>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 rounded-full border border-emerald-100">
+            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+            <span className="text-[9px] font-black text-emerald-600 uppercase">Synced</span>
+          </div>
         </div>
       </div>
 
-      {/* Main Content Pane */}
-      <div ref={containerRef} className="flex-1 overflow-y-auto px-6 pt-6 pb-40 custom-scrollbar">
-        <div className="max-w-md mx-auto space-y-8">
+      {/* Main Content Area */}
+      <div ref={containerRef} className="flex-1 overflow-y-auto px-6 py-8 pb-40 custom-scrollbar scroll-smooth">
+        <div className="max-w-md mx-auto space-y-12">
           {pages[activePageIdx].blocks.map((block: any, i: number) => renderBlock(block, i))}
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="p-6 pb-10 bg-white border-t flex justify-between items-center shadow-[0_-10px_40px_rgba(0,0,0,0.05)] relative z-20">
+      {/* Navigation Dock */}
+      <div className="p-8 pb-10 bg-white/80 backdrop-blur-xl border-t border-slate-100 flex justify-between items-center fixed bottom-0 left-0 right-0 z-50">
         <button 
-          onClick={() => changePage(Math.max(0, activePageIdx - 1))}
-          className="p-5 bg-slate-100 text-slate-400 rounded-[2rem] disabled:opacity-20 active:scale-90 transition-all"
+          onClick={() => { setActivePageIdx(Math.max(0, activePageIdx - 1)); containerRef.current?.scrollTo(0,0); }}
+          className="p-5 bg-slate-100 text-slate-400 rounded-3xl disabled:opacity-20 active:scale-90 transition-all shadow-sm"
           disabled={activePageIdx === 0}
         >
-          <ArrowLeft size={24} />
+          <ArrowLeft size={24} strokeWidth={3} />
         </button>
         
-        <div className="flex flex-col items-center">
-          <span className="text-[10px] font-black text-slate-300 uppercase">Page</span>
-          <span className="text-lg font-black text-slate-900">{activePageIdx + 1} / {pages.length}</span>
+        <div className="text-center">
+          <span className="text-[10px] font-black text-slate-300 uppercase block mb-1">Slide</span>
+          <span className="text-xl font-black text-slate-900">{activePageIdx + 1} <span className="text-slate-200">/</span> {pages.length}</span>
         </div>
 
         {activePageIdx < pages.length - 1 ? (
           <button 
-            onClick={() => changePage(activePageIdx + 1)} 
-            className="p-5 bg-indigo-600 text-white rounded-[2rem] shadow-lg shadow-indigo-100 active:scale-90 transition-all"
+            onClick={() => { setActivePageIdx(activePageIdx + 1); containerRef.current?.scrollTo(0,0); }} 
+            className="p-5 bg-indigo-600 text-white rounded-3xl shadow-xl shadow-indigo-200 active:scale-90 transition-all"
           >
-            <ArrowRight size={24} />
+            <ArrowRight size={24} strokeWidth={3} />
           </button>
         ) : (
           <button 
             onClick={onFinish} 
-            className="px-8 py-5 bg-emerald-500 text-white font-black rounded-[2rem] shadow-lg shadow-emerald-100 active:scale-90 transition-all"
+            className="px-8 py-5 bg-emerald-500 text-white font-black rounded-3xl shadow-xl shadow-emerald-200 active:scale-95 transition-all text-xs tracking-widest"
           >
             FINISH
           </button>
