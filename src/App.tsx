@@ -3853,8 +3853,10 @@ function App() {
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  
+  // High-Level View Controllers
   const [viewMode, setViewMode] = useState<'student' | 'instructor'>('student');
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTab] = useState('home'); // Controls Bottom Nav
   
   // --- 2. DATA REPOSITORIES ---
   const [systemLessons] = useState([]); 
@@ -3862,10 +3864,10 @@ function App() {
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [allDecks, setAllDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
   
-  // --- 3. UI NAVIGATION STATE ---
-  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
-  const [activeLesson, setActiveLesson] = useState<any>(null);
-  const [activeStudentClass, setActiveStudentClass] = useState<any>(null); // State for the selected class
+  // --- 3. UI NAVIGATION STATE (The Fixes) ---
+  const [activeLesson, setActiveLesson] = useState<any>(null); // Triggers LessonView
+  const [activeStudentClass, setActiveStudentClass] = useState<any>(null); // Triggers StudentClassView
+  const [presentationLessonId, setPresentationLessonId] = useState<string | null>(null); // Triggers ClassView (Projector)
 
   // --- 4. DATA CONSOLIDATION ---
   const lessons = useMemo(() => {
@@ -3873,7 +3875,7 @@ function App() {
     return [...systemLessons, ...customLessons, ...assignments];
   }, [systemLessons, customLessons, enrolledClasses]);
 
-  // --- 5. FIREBASE SYNC ---
+  // --- 5. FIREBASE REAL-TIME SYNC ---
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -3884,6 +3886,7 @@ function App() {
     });
 
     if (user?.uid) {
+      // Profile Sync
       const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
         if (snap.exists()) {
           const data = snap.data();
@@ -3893,6 +3896,7 @@ function App() {
         setAuthChecked(true);
       });
 
+      // Instructor Content Sync
       const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => {
         setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
@@ -3902,6 +3906,7 @@ function App() {
         setAllDecks((prev: any) => ({ ...prev, custom: { ...prev.custom, cards } }));
       });
 
+      // Student Cohort Sync
       const qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
       const unsubClasses = onSnapshot(qClasses, (snap) => {
         setEnrolledClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -3912,7 +3917,7 @@ function App() {
     return () => unsubAuth();
   }, [user?.uid, user?.email]);
 
-  // --- 6. MAGISTER HANDLERS ---
+  // --- 6. MAGISTER DATABASE HANDLERS ---
   const handleCreateClass = async (className: string) => {
     if (!user) return { success: false };
     try {
@@ -3988,11 +3993,35 @@ function App() {
     });
   };
 
-  // --- 7. ROUTING ---
-  if (!authChecked) return <div className="h-screen flex items-center justify-center">Loading...</div>;
+  // --- 7. GLOBAL ROUTING ENGINE ---
+  if (!authChecked) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-50">
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin shadow-lg" />
+      </div>
+    );
+  }
+
   if (!user) return <AuthView />;
 
-  // MAGISTER MODE
+  // ROUTE 1: GLOBAL PRESENTATION MODE (Overrides everything else)
+  if (presentationLessonId || activeTab === 'presentation') {
+    const lessonToPresent = lessons.find(l => l.id === presentationLessonId) || lessons[0];
+    return (
+      <div className="fixed inset-0 z-[5000] bg-white w-screen h-screen">
+        {/* Floating exit button so Michael can drop out of Presentation mode */}
+        <button 
+          onClick={() => { setPresentationLessonId(null); setActiveTab('home'); }} 
+          className="absolute top-6 left-6 z-[5010] bg-slate-900/80 backdrop-blur text-white px-6 py-3 rounded-full font-black text-[10px] uppercase tracking-widest shadow-2xl hover:bg-rose-600 transition-colors"
+        >
+          End Session
+        </button>
+        <ClassView lesson={lessonToPresent} userData={userData} />
+      </div>
+    );
+  }
+
+  // ROUTE 2: MAGISTER COMMAND CENTER
   if (viewMode === 'instructor' && userData?.role === 'instructor') {
     return (
       <InstructorDashboard 
@@ -4000,6 +4029,8 @@ function App() {
         userData={{ ...userData, classes: enrolledClasses }} 
         allDecks={allDecks} 
         lessons={lessons} 
+        
+        // Magister Actions
         onSaveLesson={handleSaveLesson} 
         onSaveCard={handleSaveCard}
         onAssign={handleAssign}
@@ -4008,58 +4039,64 @@ function App() {
         onDeleteClass={handleDeleteClass}
         onRenameClass={handleRenameClass}
         onAddStudent={handleAddStudent}
+        
+        // Critical: Passing the presentation trigger down to the Dashboard
+        onStartPresentation={(lessonId: string) => setPresentationLessonId(lessonId)}
+        
         onSwitchView={() => setViewMode('student')}
         onLogout={() => signOut(auth)} 
       />
     );
   }
 
-  // STUDENT MODE
+  // ROUTE 3: STUDENT VIEWPORT
   return (
     <div className="bg-slate-50 min-h-screen w-full flex flex-col items-center relative font-sans overflow-hidden">
+      
+      {/* Instructor Backdoor Toggle */}
       {userData?.role === 'instructor' && (
-        <button onClick={() => setViewMode('instructor')} className="fixed top-6 right-6 z-[1000] bg-slate-900 text-white px-8 py-3 rounded-full font-black text-xs uppercase shadow-2xl">🎓 Magister Mode</button>
+        <button 
+          onClick={() => setViewMode('instructor')} 
+          className="fixed top-6 right-6 z-[1000] bg-slate-900 text-white px-8 py-3 rounded-full font-black text-xs uppercase tracking-widest shadow-2xl transition-all hover:scale-105 active:scale-95"
+        >
+          🎓 Magister Command
+        </button>
       )}
 
-      <div className={`w-full transition-all duration-700 bg-white relative overflow-hidden flex flex-col ${
-        activeTab === 'presentation' ? 'h-screen w-screen fixed inset-0 z-50' : 'max-w-md h-[100dvh] shadow-2xl'
-      }`}>
+      {/* Mobile-Optimized Student Viewport */}
+      <div className="w-full transition-all duration-700 bg-white relative overflow-hidden flex flex-col max-w-md h-[100dvh] shadow-2xl">
         <div className="flex-1 h-full overflow-hidden relative">
           
           {/* --- STUDENT ROUTING STACK --- */}
-          {activeTab === 'presentation' ? (
-            // 1. Projector Mode
-            <ClassView lesson={lessons.find(l => l.id === selectedLessonId)} userData={userData} />
-          ) : activeLesson ? (
-            // 2. Taking a Lesson
-            <LessonView lesson={activeLesson} onFinish={() => setActiveLesson(null)} isInstructor={userData?.role === 'instructor'} />
+          {activeLesson ? (
+            <LessonView 
+              lesson={activeLesson} 
+              onFinish={() => setActiveLesson(null)} 
+              isInstructor={userData?.role === 'instructor'} 
+            />
           ) : activeStudentClass ? (
-            // 3. Viewing a Specific Cohort (THE FIX)
             <StudentClassView 
                classData={activeStudentClass} 
                onBack={() => setActiveStudentClass(null)} 
-               onOpenLesson={(lesson: any) => setActiveLesson(lesson)} // Passing the launcher
+               setActiveLesson={setActiveLesson} // Passes click handler to cohort assignments
                userData={userData}
             />
           ) : activeTab === 'profile' ? (
-            // 4. Profile
             <div className="p-10">Profile View</div>
           ) : (
-            // 5. Home Feed (Default)
             <HomeView 
               setActiveTab={setActiveTab} 
               classes={enrolledClasses} 
-              // This sets the state that triggers StudentClassView
-              onSelectClass={setActiveStudentClass} 
+              onSelectClass={setActiveStudentClass} // Passes click handler to open cohort
+              setActiveLesson={setActiveLesson} // Passes click handler to start standard lesson
               userData={userData} 
               user={user} 
-              setSelectedLessonId={setSelectedLessonId}
             />
           )}
         </div>
         
         {/* Hide Nav during deep focus modes */}
-        {(!activeLesson && !activeStudentClass && activeTab !== 'presentation') && (
+        {(!activeLesson && !activeStudentClass) && (
           <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
         )}
       </div>
