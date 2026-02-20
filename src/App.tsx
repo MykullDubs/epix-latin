@@ -335,30 +335,11 @@ lessons: any[]; // Replace 'any' with your Lesson type if defined
 }
 
 function ClassView({ lesson, classId, userData }: any) {
-  // --- 1. LOCAL STATE ---
   const [activePageIdx, setActivePageIdx] = useState(0);
   const [showForum, setShowForum] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
 
-  // --- 2. SAFE SYNC ---
-  useEffect(() => {
-    // Use optional chaining (?.) so it NEVER crashes if lesson is null
-    const syncId = lesson?.originalId || lesson?.id;
-    if (!syncId) return;
-
-    // Listen to Firebase for page changes from the remote
-    const unsub = onSnapshot(doc(db, 'live_sessions', syncId), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        if (typeof data.activePageIdx === 'number') {
-           setActivePageIdx(data.activePageIdx);
-        }
-      }
-    });
-    return () => unsub();
-  }, [lesson]); // Only restart this if the lesson object changes
-
-  // --- 3. PAGE LOGIC ---
+  // --- 1. SAFE DATA PROCESSING ---
   const pages = useMemo(() => {
     if (!lesson?.blocks) return [];
     const grouped: any[] = [];
@@ -375,39 +356,101 @@ function ClassView({ lesson, classId, userData }: any) {
     return grouped;
   }, [lesson]);
 
-  // --- 4. RENDERER ---
+  // --- 2. REMOTE SYNC ---
+  useEffect(() => {
+    const syncId = lesson?.originalId || lesson?.id;
+    if (!syncId) return;
+
+    const unsub = onSnapshot(doc(db, 'live_sessions', syncId), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (typeof data.activePageIdx === 'number') setActivePageIdx(data.activePageIdx);
+      }
+    });
+    return () => unsub();
+  }, [lesson]);
+
+  // --- 3. RENDER HELPERS ---
+  const renderBlock = (block: any, idx: number) => {
+    switch (block.type) {
+      case 'text': return (
+        <div key={idx} className="py-10 px-12">
+          {block.title && <h3 className="text-[3.5vh] font-black text-indigo-600 uppercase mb-4">{block.title}</h3>}
+          <p className="text-[5.5vh] leading-tight text-slate-800 font-bold max-w-5xl">{block.content}</p>
+        </div>
+      );
+      case 'essay': return (
+        <div key={idx} className="w-full max-w-4xl mx-auto py-16">
+          <h1 className="text-[7vh] font-black text-slate-900 leading-tight mb-8 text-center">{block.title}</h1>
+          <div className="space-y-[4vh]">
+            {block.content?.split('\n\n').map((para: string, pIdx: number) => (
+              <p key={pIdx} className="text-[4vh] leading-[1.6] text-slate-700 font-serif text-justify first-letter:text-[6vh] first-letter:font-black first-letter:text-indigo-600 first-letter:mr-3">{para.trim()}</p>
+            ))}
+          </div>
+        </div>
+      );
+      case 'image': return (
+        <div key={idx} className="py-12 flex flex-col items-center">
+          <img src={block.url} className="max-h-[60vh] object-contain rounded-[4rem] shadow-2xl border-[16px] border-white" />
+        </div>
+      );
+      case 'vocab-list': return (
+        <div key={idx} className="grid grid-cols-2 gap-8 w-full py-12">
+          {block.items?.map((item: any, i: number) => (
+            <div key={i} className="bg-slate-50 p-12 rounded-[4rem] border-4 border-slate-100 text-center">
+              <p className="text-[5.5vh] font-black text-indigo-600 mb-2">{item.term}</p>
+              <p className="text-[3vh] text-slate-500 font-bold">{item.definition}</p>
+            </div>
+          ))}
+        </div>
+      );
+      default: return (
+        <div key={idx} className="py-32 bg-indigo-50 rounded-[5rem] w-full text-center">
+          <Smartphone size={80} className="mx-auto text-indigo-200 mb-8" />
+          <p className="text-[7vh] font-black text-indigo-600 uppercase">Interaction Mode</p>
+        </div>
+      );
+    }
+  };
+
   if (!lesson || !pages[activePageIdx]) return null;
 
   return (
-    <div className="h-screen w-screen bg-white fixed inset-0 z-[500] flex flex-col overflow-hidden">
-      {/* Presentation Header */}
-      <div className="h-[10vh] px-10 border-b flex items-center justify-between">
-        <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">{lesson.title}</h1>
-        <div className="flex items-center gap-4">
-           <span className="text-slate-300 font-black">{activePageIdx + 1} / {pages.length}</span>
-           <button onClick={() => window.location.reload()} className="p-2 text-slate-200"><X size={20} /></button>
+    <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="h-[12vh] px-16 flex items-center justify-between border-b bg-white relative z-20">
+        <div className="h-3 flex-1 bg-slate-100 rounded-full mr-12">
+          <div className="h-full bg-indigo-600 transition-all duration-1000" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} />
         </div>
+        <span className="text-[3vh] font-black text-slate-300">{activePageIdx + 1} / {pages.length}</span>
       </div>
 
-      {/* Presentation Stage */}
-      <div ref={stageRef} className="flex-1 overflow-y-auto p-20 flex flex-col items-center">
-        <div className="w-full max-w-5xl space-y-10">
-          {pages[activePageIdx].blocks.map((block: any, i: number) => (
-            <div key={i} className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-               {block.type === 'text' && <p className="text-[5.5vh] font-bold text-slate-800 leading-tight text-center">{block.content}</p>}
-               {block.type === 'image' && <img src={block.url} className="max-h-[60vh] mx-auto rounded-[3rem] shadow-2xl border-[12px] border-white" />}
-               {block.type === 'vocab-list' && (
-                 <div className="grid grid-cols-2 gap-6">
-                   {block.items.map((item: any, j: number) => (
-                     <div key={j} className="bg-slate-50 p-10 rounded-[2.5rem] border-4 border-slate-100 text-center">
-                       <p className="text-[4vh] font-black text-indigo-600 mb-2">{item.term}</p>
-                       <p className="text-[2.5vh] text-slate-500 font-bold">{item.definition}</p>
-                     </div>
-                   ))}
-                 </div>
-               )}
-            </div>
-          ))}
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Stage */}
+        <div ref={stageRef} className={`flex-1 overflow-y-auto px-16 py-12 flex flex-col items-center transition-all ${showForum ? 'mr-[400px]' : ''}`}>
+          <div className="w-full max-w-7xl flex flex-col gap-10">
+            {pages[activePageIdx].blocks.map((b: any, i: number) => renderBlock(b, i))}
+          </div>
+        </div>
+
+        {/* Sidebar Forum */}
+        {showForum && (
+          <div className="absolute top-0 right-0 h-full w-[400px] bg-slate-50 border-l p-8 z-10 animate-in slide-in-from-right duration-300">
+            <h3 className="text-2xl font-black text-slate-900 mb-6 flex items-center gap-2"><MessageSquare className="text-indigo-600" /> DISCUSSION</h3>
+            <ClassForum classId={classId} userData={userData} />
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="h-[12vh] px-16 border-t flex justify-between items-center shrink-0 bg-white relative z-20">
+        <span className="font-black text-[2vh] text-slate-400 uppercase tracking-widest">Live Presentation</span>
+        <div className="flex items-center gap-6">
+          <button onClick={() => setShowForum(!showForum)} className={`px-8 py-3 rounded-2xl font-black text-[2vh] ${showForum ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+            {showForum ? "CLOSE CHAT" : "OPEN CHAT"}
+          </button>
+          <div className="h-12 w-px bg-slate-100 mx-2" />
+          <h2 className="text-[2.5vh] font-black text-slate-900 opacity-20 uppercase tracking-widest">{lesson.title}</h2>
         </div>
       </div>
     </div>
@@ -3208,7 +3251,7 @@ function ExamPlayerView({ exam, onFinish }: any) {
 
 
 function App() {
-  // --- 1. CORE STATE ---
+  // --- CORE STATE ---
   const [activeTab, setActiveTab] = useState('home');
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
@@ -3226,44 +3269,21 @@ function App() {
   // Classroom State
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
-  const [toast, setToast] = useState<string | null>(null);
 
-  // --- 2. DATA HYDRATION (The "Handshake") ---
-  // A. Extracts assignments from Michael's classes
+  // --- DATA HYDRATION ---
   const classLessons = useMemo(() => {
     let all: any[] = [];
     enrolledClasses.forEach((cls: any) => {
-      if (cls.assignments && Array.isArray(cls.assignments)) {
-        all.push(...cls.assignments.map((a: any) => ({
-          ...a,
-          classId: cls.id,
-          className: cls.name
-        })));
-      }
+      if (cls.assignments) all.push(...cls.assignments.map((a: any) => ({ ...a, classId: cls.id })));
     });
     return all;
   }, [enrolledClasses]);
 
-  // B. The Master Library (System + Custom + Assigned)
   const lessons = useMemo(() => {
-    const library = [...systemLessons, ...customLessons];
-    return [...library, ...classLessons];
-  }, [systemLessons, customLessons, classLessons]);
+    return [...systemLessons, ...customLessons, ...classLessons];
+  }, [systemDecks, customLessons, classLessons]);
 
-  const allDecks = useMemo(() => {
-    const decks: any = { ...systemDecks, custom: { title: "✍️ Builder", cards: [] } };
-    customCards.forEach(card => {
-        const target = card.deckId || 'custom';
-        if (!decks[target]) decks[target] = { title: card.deckTitle || "Custom", cards: [] };
-        if (!decks[target].cards) decks[target].cards = [];
-        decks[target].cards.push(card);
-    });
-    return decks;
-  }, [systemDecks, customCards]);
-
-  const displayName = useMemo(() => userData?.name || user?.email?.split('@')[0] || 'Scholar', [userData, user]);
-
-  // --- 3. MASTER SYNC ENGINE (Firebase) ---
+  // --- FIREBASE SYNC ---
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -3271,164 +3291,93 @@ function App() {
     });
 
     if (user?.uid) {
-      // Sync Profile & Role
       const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
         if (snap.exists()) setUserData(snap.data());
         setAuthChecked(true);
       });
 
-      // Sync Enrolled Classes
       const qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
       const unsubClasses = onSnapshot(qClasses, (snapshot) => {
         setEnrolledClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       });
 
-      // Sync Library
-      setSystemDecks(INITIAL_SYSTEM_DECKS);
       setSystemLessons(INITIAL_SYSTEM_LESSONS);
-      const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-      const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+      const unsubCustom = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => {
+        setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
 
-      return () => { unsubAuth(); unsubProfile(); unsubClasses(); unsubCards(); unsubLessons(); };
+      return () => { unsubAuth(); unsubProfile(); unsubClasses(); unsubCustom(); };
     }
     return () => unsubAuth();
   }, [user?.uid, user?.email]);
 
-  // --- 4. NAVIGATION HANDLERS ---
-  const handleContentSelection = (item: any) => {
-    const targetId = item.originalId || item.lessonId || item.id;
-    if (targetId) setSelectedLessonId(targetId);
-
-    // HYDRATION: Swap "hollow" metadata for the "full" lesson that has blocks
-    const fullContent = [...systemLessons, ...customLessons].find(l => 
-      l.id === targetId || l.id === item.originalId
-    );
-
-    if (item.contentType === 'lesson' || item.type === 'lesson' || fullContent) {
-      setActiveLesson(fullContent || item);
-    } else if (item.contentType === 'deck' || item.type === 'deck') {
-      setSelectedDeckKey(item.id);
-      setActiveTab('flashcards');
-    }
-  };
-
-  const handleFinishLesson = useCallback(async (lessonId: string, xp: number, title: string = 'Lesson', score: any = null) => { 
-    setActiveLesson(null); setActiveTab('home'); 
-    if (xp > 0 && user) { 
-      try { 
-        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp), completedAssignments: arrayUnion(lessonId) }); 
-        await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { studentName: displayName, studentEmail: user.email, itemTitle: title, xp, timestamp: Date.now(), type: 'completion', scoreDetail: score });
-      } catch (e) { console.error(e); } 
-    } 
-  }, [user, displayName]);
-
-  // --- 5. RENDER STUDENT VIEW (The Router) ---
-const renderStudentView = () => {
-    // --- THE PRESENTATION BOUNCER ---
+  // --- ROUTER LOGIC ---
+  const renderStudentView = () => {
+    // 1. PRESENTATION MODE (The Projector)
     if (activeTab === 'presentation') {
-      // 1. We search the library for the FULL lesson object
-      const fullLesson = lessons?.find(l => 
-        l && (l.id === selectedLessonId || l.originalId === selectedLessonId)
-      );
+      const lessonToPresent = lessons.find(l => l && (l.id === selectedLessonId || l.originalId === selectedLessonId));
 
-      // 2. CRITICAL GUARD: If we haven't found the lesson yet, 
-      // OR if the lesson found doesn't have blocks (content), 
-      // we show a hard-coded black screen. This stops the "id" error.
-      if (!fullLesson || !fullLesson.blocks) {
+      // CRITICAL GUARD: Only render if we have the lesson AND it has blocks
+      if (!lessonToPresent || !lessonToPresent.blocks) {
         return (
-          <div className="fixed inset-0 z-[999] bg-slate-950 flex flex-col items-center justify-center text-white">
+          <div className="fixed inset-0 z-[500] bg-slate-900 flex flex-col items-center justify-center text-white p-10">
             <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-6" />
-            <h2 className="text-xl font-black uppercase tracking-tighter">Initializing Projector...</h2>
-            <p className="text-slate-600 text-[10px] font-mono mt-4">Target ID: {selectedLessonId || 'None'}</p>
-            <button onClick={() => setActiveTab('home')} className="mt-10 px-6 py-2 bg-slate-800 rounded-full text-[10px] font-black uppercase">Cancel</button>
+            <p className="font-black uppercase tracking-widest opacity-50">Hydrating Lesson Data...</p>
+            <button onClick={() => setActiveTab('home')} className="mt-8 text-[10px] underline uppercase">Cancel</button>
           </div>
         );
       }
 
-      // 3. We ONLY render ClassView if the data is 100% verified.
-      // We pass the WHOLE lesson object as a prop named 'lesson'
       return (
         <ClassView 
-          lesson={fullLesson} 
+          lesson={lessonToPresent} 
           classId={activeStudentClass?.id} 
           userData={userData} 
         />
       );
     }
-      // If we made it here, lessonToPresent is GUARANTEED to have data.
-      return (
-    <ClassView 
-  lesson={lessonToPresent} // This is the FULL OBJECT found in App.tsx
-  classId={activeStudentClass?.id} 
-  userData={userData}
-/>
-      );
+
+    // 2. MOBILE LESSON (The Remote)
+    if (activeLesson) {
+      return <LessonView lesson={activeLesson} onFinish={() => setActiveLesson(null)} />;
     }
 
-    // B. ACTIVE LESSON (Mobile Player)
-    if (activeLesson) {
-      return <LessonView lesson={activeLesson} onFinish={handleFinishLesson} isInstructor={false} />;
-    }
-    
-    // C. CLASS PORTAL (Michael's Class View)
+    // 3. CLASS PORTAL
     if (activeTab === 'home' && activeStudentClass) {
       return (
         <StudentClassView 
           classData={activeStudentClass} 
           onBack={() => setActiveStudentClass(null)} 
-          onSelectLesson={handleContentSelection} 
-          userData={userData} 
-          setActiveTab={setActiveTab} 
-          setSelectedLessonId={setSelectedLessonId} 
+          onSelectLesson={(item: any) => setActiveLesson(item)} 
+          userData={userData}
+          setActiveTab={setActiveTab}
+          setSelectedLessonId={setSelectedLessonId}
         />
       );
     }
 
-    // D. MAIN TABS
+    // 4. MAIN NAV TABS
     switch (activeTab) {
-      case 'discovery': return <DiscoveryView allDecks={allDecks} lessons={lessons} user={user} onSelectDeck={handleContentSelection} onSelectLesson={handleContentSelection} userData={userData} onLogActivity={() => {}} />;
-      case 'flashcards': return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} activeDeckOverride={null} onComplete={handleFinishLesson} userData={userData} user={user} onDeleteDeck={() => {}} />;
       case 'profile': return <ProfileView user={user} userData={userData} />;
-      default: return (
-        <HomeView 
-          setActiveTab={setActiveTab} 
-          classes={enrolledClasses} 
-          onSelectClass={(c: any) => setActiveStudentClass(c)} 
-          userData={userData} 
-          user={user} 
-        />
-      );
+      default: return <HomeView setActiveTab={setActiveTab} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} userData={userData} user={user} />;
     }
   };
 
-  // --- 6. FINAL RENDER (Z-Index Guard) ---
-  if (!authChecked) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-white">
-        <Loader className="animate-spin text-indigo-600" size={32} />
-      </div>
-    );
-  }
-
+  if (!authChecked) return <div className="h-screen flex items-center justify-center bg-white"><Loader className="animate-spin text-indigo-600" /></div>;
   if (!user) return <AuthView />;
 
-  if (userData?.role === 'instructor') {
-      return <InstructorDashboard user={user} userData={{...userData, classes: enrolledClasses}} allDecks={allDecks} lessons={lessons} onLogout={() => signOut(auth)} />;
-  }
-
   return (
-    <div className="bg-slate-50 min-h-screen w-full font-sans text-slate-900 flex justify-center items-start overflow-hidden">
-        <div className={`w-full transition-all duration-500 bg-white relative overflow-hidden flex flex-col ${
-            activeTab === 'presentation' ? 'h-screen w-screen fixed inset-0 z-[200]' : 'max-w-md h-[100dvh] shadow-2xl'
-        }`}>
-            <div className="flex-1 h-full overflow-hidden relative">
-                {renderStudentView()}
-            </div>
-            {(!activeLesson && activeTab !== 'presentation') && (
-                <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
-            )}
+    <div className="bg-slate-50 min-h-screen w-full flex justify-center items-start overflow-hidden">
+      <div className={`transition-all duration-500 bg-white relative overflow-hidden flex flex-col ${
+        activeTab === 'presentation' ? 'h-screen w-screen fixed inset-0 z-[200]' : 'max-w-md h-[100dvh] shadow-2xl'
+      }`}>
+        <div className="flex-1 h-full overflow-hidden relative">
+          {renderStudentView()}
         </div>
-        {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+        {(!activeLesson && activeTab !== 'presentation') && (
+          <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
+        )}
+      </div>
     </div>
   );
 }
