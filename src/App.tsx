@@ -395,27 +395,71 @@ function ClassView({ lessonId, lessons, classLessons }: any) {
           <img src={block.url} className="max-h-[55vh] object-contain rounded-[3rem] shadow-2xl border-[12px] border-white" alt="visual" />
         </div>
       );
-      case 'vocab-list': return (
-        <div key={idx} className="grid grid-cols-2 gap-6 w-full py-10">
-          {block.items.map((item: any, i: number) => (
-            <div key={i} className="bg-slate-50 p-10 rounded-[3rem] border-4 border-slate-100 flex flex-col items-center">
-              <p className="text-[4.5vh] font-black text-indigo-600 mb-1">{item.term}</p>
-              <p className="text-[2.5vh] text-slate-500 font-bold">{item.definition}</p>
+case 'vocab-list':
+        return (
+          <div key={idx} className="w-full max-w-7xl mx-auto py-12 px-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+              {(block.items || []).map((item: any, i: number) => (
+                <div 
+                  key={i} 
+                  className="group bg-white p-10 rounded-[3rem] border-4 border-slate-100 shadow-xl hover:border-indigo-200 transition-all duration-500 animate-in fade-in slide-in-from-bottom-8"
+                  style={{ animationDelay: `${i * 150}ms` }}
+                >
+                  <div className="flex flex-col items-center text-center">
+                    <span className="text-[2vh] font-black text-indigo-400 uppercase tracking-widest mb-4">Vocabulary</span>
+                    <p className="text-[6vh] font-black text-slate-900 leading-none mb-4 group-hover:scale-110 transition-transform">
+                      {item.term}
+                    </p>
+                    <div className="h-1.5 w-16 bg-indigo-100 rounded-full mb-6 group-hover:w-32 transition-all" />
+                    <p className="text-[3.5vh] text-slate-500 font-medium leading-tight">
+                      {item.definition}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      );
-      case 'dialogue': return (
-        <div key={idx} className="space-y-4 w-full max-w-4xl py-10">
-          {block.lines.map((l: any, i: number) => (
-            <div key={i} className={`flex ${l.side === 'right' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`p-8 rounded-[2.5rem] max-w-[80%] shadow-lg border-2 ${l.side === 'right' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-800 border-slate-100'}`}>
-                <p className="text-[3.5vh] font-bold">{l.text}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      );
+          </div>
+        );
+
+      case 'dialogue':
+        return (
+          <div key={idx} className="w-full max-w-6xl mx-auto py-12 space-y-12">
+            {(block.lines || []).map((line: any, i: number) => {
+              const isRight = line.side === 'right';
+              return (
+                <div key={i} className={`flex items-end gap-6 ${isRight ? 'flex-row-reverse' : 'flex-row'} animate-in fade-in slide-in-from-${isRight ? 'right' : 'left'}-12 duration-1000`}>
+                  {/* Speaker Avatar Circle */}
+                  <div className={`w-24 h-24 rounded-full flex items-center justify-center shrink-0 shadow-lg border-4 border-white ${isRight ? 'bg-indigo-600' : 'bg-slate-800'}`}>
+                    <span className="text-white text-3xl font-black uppercase">{line.speaker?.[0] || '?'}</span>
+                  </div>
+
+                  {/* Message Bubble */}
+                  <div className={`relative flex flex-col ${isRight ? 'items-end' : 'items-start'} max-w-[75%]`}>
+                    <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest mb-2 px-4">
+                      {line.speaker || "Speaker"}
+                    </span>
+                    <div className={`p-10 rounded-[3.5rem] shadow-2xl border-4 ${
+                      isRight 
+                        ? 'bg-indigo-600 text-white border-indigo-500 rounded-tr-none' 
+                        : 'bg-white text-slate-800 border-slate-100 rounded-tl-none'
+                    }`}>
+                      <p className="text-[4.5vh] font-bold leading-tight tracking-tight">
+                        {line.text}
+                      </p>
+                      {line.translation && (
+                        <p className={`text-[2.5vh] mt-6 pt-6 border-t font-medium italic ${
+                          isRight ? 'border-white/20 text-indigo-100' : 'border-slate-100 text-slate-400'
+                        }`}>
+                          {line.translation}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
       default: return (
         <div key={idx} className="py-20 bg-indigo-50 rounded-[4rem] w-full text-center">
           <p className="text-[7vh] font-black text-indigo-600 uppercase">Interaction Mode</p>
