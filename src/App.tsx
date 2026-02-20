@@ -783,7 +783,7 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
           </div>
         );
         
-        case 'fill-blank':
+case 'fill-blank':
         return <FillBlankBlock key={idx} block={block} onComplete={handleAutoAdvance} />;
 
       case 'essay':
