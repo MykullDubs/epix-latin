@@ -3729,6 +3729,12 @@ function App() {
         user={user} 
         userData={{...userData, classes: enrolledClasses}} 
         lessons={lessons} 
+        onSaveLesson={handleSaveLesson} 
+      onSaveCard={handleSaveCard}
+      onUpdateCard={handleUpdateCard}
+      onDeleteCard={handleDeleteCard}
+      onSwitchView={() => setViewMode('student')}
+      onLogout={() => signOut(auth)}
         onSwitchView={() => setViewMode('student')}
         onLogout={() => signOut(auth)} 
       />
