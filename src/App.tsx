@@ -2967,34 +2967,20 @@ const THEMES: any = {
  */
 function LessonBuilderView({ data, setData, onSave }: any) {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [jsonMode, setJsonMode] = useState(false);
+  const [jsonInput, setJsonInput] = useState(JSON.stringify(data, null, 2));
 
-  // --- 1. THE CORE LOGIC (SCOPED) ---
+  // --- 1. THE ENGINE ---
   const updateBlock = (index: number, field: string, value: any) => {
     const newBlocks = [...(data.blocks || [])];
     newBlocks[index] = { ...newBlocks[index], [field]: value };
     setData({ ...data, blocks: newBlocks });
   };
 
-  const updateDialogueLine = (blockIndex: number, lineIndex: number, field: string, value: any) => {
-    const newBlocks = [...(data.blocks || [])];
-    const newLines = [...newBlocks[blockIndex].lines];
-    newLines[lineIndex] = { ...newLines[lineIndex], [field]: value };
-    newBlocks[blockIndex].lines = newLines;
-    setData({ ...data, blocks: newBlocks });
-  };
-
-  const updateVocabItem = (blockIndex: number, itemIndex: number, field: string, value: any) => {
-    const newBlocks = [...(data.blocks || [])];
-    const newItems = [...newBlocks[blockIndex].items];
-    newItems[itemIndex] = { ...newItems[itemIndex], [field]: value };
-    newBlocks[blockIndex].items = newItems;
-    setData({ ...data, blocks: newBlocks });
-  };
-
   const addBlock = (type: string) => {
     const templates: any = {
-      text: { type: 'text', title: '', content: 'Enter core concept...' },
-      essay: { type: 'essay', title: 'Deep Dive', content: 'First Paragraph...\n\nSecond Paragraph...' },
+      text: { type: 'text', title: '', content: 'New Core Concept...' },
+      essay: { type: 'essay', title: 'Deep Dive', content: 'Paragraph 1...\n\nParagraph 2...' },
       dialogue: { type: 'dialogue', lines: [{ speaker: 'A', text: '', side: 'left' }] },
       'vocab-list': { type: 'vocab-list', items: [{ term: '', definition: '' }] },
       quiz: { type: 'quiz', question: '', options: [{id:'a',text:''},{id:'b',text:''}], correctId: 'a' },
@@ -3008,137 +2994,137 @@ function LessonBuilderView({ data, setData, onSave }: any) {
     setData({ ...data, blocks: newBlocks });
   };
 
-  const moveBlock = (index: number, direction: 'up' | 'down') => {
-    const newBlocks = [...(data.blocks || [])];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= newBlocks.length) return;
-    [newBlocks[index], newBlocks[targetIndex]] = [newBlocks[targetIndex], newBlocks[index]];
-    setData({ ...data, blocks: newBlocks });
+  const handleImportJson = () => {
+    try {
+      const parsed = JSON.parse(jsonInput);
+      setData(parsed);
+      setJsonMode(false);
+      setToastMsg("Unit Injected!");
+    } catch (e) {
+      setToastMsg("Syntax Error in JSON");
+    }
   };
 
-  // --- 2. RENDERER ---
+  // --- 2. THE RENDERER ---
   return (
-    <div className="max-w-3xl mx-auto space-y-12 pb-64 animate-in fade-in duration-700">
+    <div className="max-w-3xl mx-auto space-y-12 pb-64 animate-in fade-in duration-500">
       
-      {/* 1. UNIT METADATA (High Impact) */}
-      <div className="space-y-6">
-        <input 
-          className="text-5xl md:text-6xl font-black border-none w-full focus:ring-0 p-0 placeholder:text-slate-100 tracking-tighter bg-transparent" 
-          placeholder="Unit Title..." 
-          value={data.title} 
-          onChange={e => setData({...data, title: e.target.value})} 
-        />
-        <input 
-          className="text-xl md:text-2xl font-bold text-slate-300 border-none w-full focus:ring-0 p-0 tracking-tight bg-transparent" 
-          placeholder="Subtitle or Lesson Order..." 
-          value={data.subtitle} 
-          onChange={e => setData({...data, subtitle: e.target.value})} 
-        />
+      {/* TOOLBAR: THEME & MODE TOGGLES */}
+      <div className="flex justify-between items-center bg-slate-100/50 p-2 rounded-[2rem] border border-slate-200">
+         <button 
+           onClick={() => setJsonMode(!jsonMode)}
+           className={`flex items-center gap-2 px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+             jsonMode ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-400'
+           }`}
+         >
+           <Code size={14} /> {jsonMode ? 'Exit JSON' : 'Advanced JSON'}
+         </button>
+         
+         <div className="flex gap-2 pr-2">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Editor Active</span>
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mt-0.5" />
+         </div>
       </div>
 
-      {/* 2. DYNAMIC BLOCKS STACK */}
-      <div className="space-y-6">
-        {(data.blocks || []).map((block: any, idx: number) => (
-          <div 
-            key={idx} 
-            className="group bg-white p-6 md:p-8 rounded-[2.5rem] border-2 border-slate-50 hover:border-indigo-100 hover:shadow-2xl hover:shadow-indigo-900/5 transition-all relative"
-          >
-            {/* Tablet-Friendly Drag/Order Controls */}
-            <div className="absolute -left-12 top-1/2 -translate-y-1/2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity hidden lg:flex">
-              <button onClick={() => moveBlock(idx, 'up')} className="p-2 bg-white rounded-full shadow-md text-slate-400 hover:text-indigo-600"><ChevronUp size={16}/></button>
-              <button onClick={() => moveBlock(idx, 'down')} className="p-2 bg-white rounded-full shadow-md text-slate-400 hover:text-indigo-600"><ChevronDown size={16}/></button>
+      {jsonMode ? (
+        /* --- JSON INJECTOR VIEW --- */
+        <div className="space-y-6 animate-in zoom-in-95 duration-300">
+          <div className="bg-slate-950 rounded-[3rem] p-8 shadow-2xl relative">
+            <div className="absolute top-6 right-8 flex gap-2">
+               <div className="w-3 h-3 rounded-full bg-rose-500/20" />
+               <div className="w-3 h-3 rounded-full bg-amber-500/20" />
+               <div className="w-3 h-3 rounded-full bg-emerald-500/20" />
             </div>
-
-            {/* Action Toolbar */}
-            <div className="flex justify-between items-center mb-6">
-               <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">{block.type} Block</span>
-               <button 
-                 onClick={() => removeBlock(idx)} 
-                 className="p-2 bg-rose-50 text-rose-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all active:scale-90"
-               >
-                 <Trash2 size={16} />
-               </button>
-            </div>
-
-            {/* BLOCK EDITORS */}
-            {block.type === 'text' && (
-              <textarea 
-                className="w-full bg-transparent font-black text-2xl border-none focus:ring-0 p-0 placeholder:text-slate-200 resize-none" 
-                placeholder="Core concept text..." 
-                rows={2}
-                value={block.content} 
-                onChange={e => updateBlock(idx, 'content', e.target.value)} 
-              />
-            )}
-
-            {block.type === 'essay' && (
-              <div className="space-y-4">
-                <input 
-                  className="w-full font-black text-slate-800 bg-slate-50 border-none px-5 py-3 rounded-2xl text-sm" 
-                  placeholder="Essay Title" 
-                  value={block.title} 
-                  onChange={e => updateBlock(idx, 'title', e.target.value)} 
-                />
-                <textarea 
-                  className="w-full h-48 bg-slate-50 border-none p-5 rounded-3xl text-xs font-serif leading-relaxed resize-none focus:ring-2 focus:ring-indigo-100 transition-all" 
-                  placeholder="Deep dive paragraphs..." 
-                  value={block.content} 
-                  onChange={e => updateBlock(idx, 'content', e.target.value)} 
-                />
-              </div>
-            )}
-
-            {block.type === 'vocab-list' && (
-              <div className="space-y-4">
-                {block.items?.map((item: any, i: number) => (
-                  <div key={i} className="flex gap-3">
-                    <input className="flex-1 bg-slate-50 border-none p-4 rounded-2xl text-xs font-black text-indigo-600" placeholder="Term" value={item.term} onChange={e => updateVocabItem(idx, i, 'term', e.target.value)} />
-                    <input className="flex-[2] bg-slate-50 border-none p-4 rounded-2xl text-xs text-slate-400 font-bold" placeholder="Definition" value={item.definition} onChange={e => updateVocabItem(idx, i, 'definition', e.target.value)} />
-                  </div>
-                ))}
-                <button 
-                  onClick={() => updateBlock(idx, 'items', [...block.items, {term: '', definition: ''}])}
-                  className="w-full py-3 border-2 border-dashed border-slate-100 rounded-2xl text-[10px] font-black text-slate-300 uppercase hover:border-indigo-200 hover:text-indigo-400 transition-all"
-                >
-                  + Add Vocabulary Term
-                </button>
-              </div>
-            )}
-            
-            {/* Additional block editors for Dialogue, Image, etc. would go here */}
+            <textarea 
+              value={jsonInput}
+              onChange={(e) => setJsonInput(e.target.value)}
+              className="w-full h-[50vh] bg-transparent text-emerald-400 font-mono text-sm outline-none resize-none leading-relaxed custom-scrollbar"
+              placeholder="Paste your 'Looksmaxing' JSON here..."
+            />
           </div>
-        ))}
-      </div>
-
-      {/* 3. TABLET-OPTIMIZED BLOCK INJECTOR */}
-      <div className="pt-10 border-t border-slate-100">
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-8 text-center">Inject Narrative Components</p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-           <InjectorButton icon={<AlignLeft/>} label="Big Text" onClick={() => addBlock('text')} />
-           <InjectorButton icon={<FileText/>} label="Essay" onClick={() => addBlock('essay')} />
-           <InjectorButton icon={<MessageSquare/>} label="Dialogue" onClick={() => addBlock('dialogue')} />
-           <InjectorButton icon={<List/>} label="Vocab" onClick={() => addBlock('vocab-list')} />
-           <InjectorButton icon={<HelpCircle/>} label="Quiz" onClick={() => addBlock('quiz')} />
-           <InjectorButton icon={<Image/>} label="Visual" onClick={() => addBlock('image')} />
+          <button 
+            onClick={handleImportJson}
+            className="w-full py-6 bg-emerald-500 text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.3em] shadow-xl active:scale-95 transition-all"
+          >
+            Inject Unit Architecture
+          </button>
         </div>
-      </div>
+      ) : (
+        /* --- VISUAL BLOCK VIEW --- */
+        <div className="space-y-12">
+          {/* Unit Meta */}
+          <div className="space-y-4 px-2">
+            <input 
+              className="text-5xl md:text-6xl font-black border-none w-full focus:ring-0 p-0 placeholder:text-slate-100 tracking-tighter bg-transparent" 
+              placeholder="Unit Title..." 
+              value={data.title} 
+              onChange={e => setData({...data, title: e.target.value})} 
+            />
+            <input 
+              className="text-xl md:text-2xl font-bold text-slate-300 border-none w-full focus:ring-0 p-0 tracking-tight bg-transparent" 
+              placeholder="Lesson Subtitle..." 
+              value={data.subtitle} 
+              onChange={e => setData({...data, subtitle: e.target.value})} 
+            />
+          </div>
+
+          {/* Blocks */}
+          <div className="space-y-6">
+            {(data.blocks || []).map((block: any, idx: number) => (
+              <div key={idx} className="group bg-white p-6 md:p-10 rounded-[3rem] border-2 border-slate-50 hover:border-indigo-100 hover:shadow-2xl transition-all relative">
+                <div className="flex justify-between items-center mb-6">
+                   <div className="flex items-center gap-3">
+                      <span className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400">{idx + 1}</span>
+                      <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">{block.type}</span>
+                   </div>
+                   <button onClick={() => removeBlock(idx)} className="p-2 bg-rose-50 text-rose-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all">
+                     <Trash2 size={16} />
+                   </button>
+                </div>
+
+                {block.type === 'text' && (
+                  <textarea 
+                    className="w-full bg-transparent font-black text-2xl border-none focus:ring-0 p-0 placeholder:text-slate-200 resize-none" 
+                    value={block.content} 
+                    onChange={e => updateBlock(idx, 'content', e.target.value)} 
+                  />
+                )}
+
+                {block.type === 'essay' && (
+                  <div className="space-y-4">
+                    <input className="w-full font-black text-slate-800 bg-slate-50 border-none px-5 py-3 rounded-2xl text-sm" placeholder="Essay Title" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} />
+                    <textarea className="w-full h-48 bg-slate-50 border-none p-5 rounded-3xl text-xs font-serif leading-relaxed" value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
+                  </div>
+                )}
+
+                {/* Other Blocks... */}
+              </div>
+            ))}
+          </div>
+
+          {/* Injector Button Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-10 border-t border-slate-100">
+             <InjectorButton icon={<AlignLeft/>} label="Text" onClick={() => addBlock('text')} />
+             <InjectorButton icon={<FileText/>} label="Essay" onClick={() => addBlock('essay')} />
+             <InjectorButton icon={<MessageSquare/>} label="Dialogue" onClick={() => addBlock('dialogue')} />
+             <InjectorButton icon={<List/>} label="Vocab" onClick={() => addBlock('vocab-list')} />
+             <InjectorButton icon={<HelpCircle/>} label="Quiz" onClick={() => addBlock('quiz')} />
+             <InjectorButton icon={<Image/>} label="Visual" onClick={() => addBlock('image')} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// Sub-component for clean mapping
 function InjectorButton({ icon, label, onClick }: any) {
   return (
-    <button 
-      onClick={onClick} 
-      className="h-28 bg-white border-2 border-slate-50 rounded-[2.5rem] flex flex-col items-center justify-center gap-3 hover:border-indigo-600 hover:text-indigo-600 hover:shadow-xl transition-all active:scale-90 group"
-    >
+    <button onClick={onClick} className="h-28 bg-white border-2 border-slate-50 rounded-[2.5rem] flex flex-col items-center justify-center gap-3 hover:border-indigo-600 hover:text-indigo-600 hover:shadow-xl transition-all active:scale-90 group">
       <div className="text-slate-300 group-hover:text-indigo-600 transition-colors scale-125">{icon}</div>
       <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
     </button>
   );
 }
-
 function BuilderHub({ 
   onSaveCard, 
   onUpdateCard, 
