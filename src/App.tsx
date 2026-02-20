@@ -3470,11 +3470,11 @@ const renderStudentView = () => {
 
       // If we made it here, lessonToPresent is GUARANTEED to have data.
       return (
-        <ClassView 
-          lesson={lessonToPresent} // Pass the full object, not just the ID
-          classId={activeStudentClass?.id} 
-          userData={userData}
-        />
+    <ClassView 
+  lesson={lessonToPresent} // This is the FULL OBJECT found in App.tsx
+  classId={activeStudentClass?.id} 
+  userData={userData}
+/>
       );
     }
 
