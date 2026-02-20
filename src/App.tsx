@@ -3822,27 +3822,26 @@ function ExamPlayerView({ exam, onFinish }: any) {
 
 
 function App() {
-  // --- 1. CORE SYSTEM STATE ---
+  // --- 1. GLOBAL SYSTEM STATE ---
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [viewMode, setViewMode] = useState<'student' | 'instructor'>('student');
   const [activeTab, setActiveTab] = useState('home');
   
-  // --- 2. DATA REPOSITORIES ---
-  const [systemLessons] = useState(INITIAL_SYSTEM_LESSONS); // Static assets
-  const [customLessons, setCustomLessons] = useState<any[]>([]); // User created
+  // --- 2. CONTENT REPOSITORIES ---
+  const [systemLessons] = useState([]); // Static pre-loaded content
+  const [customLessons, setCustomLessons] = useState<any[]>([]);
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [allDecks, setAllDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
   
-  // --- 3. UI/NAVIGATION STATE ---
+  // --- 3. UI & NAVIGATION STATE ---
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [activeLesson, setActiveLesson] = useState<any>(null);
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
 
-  // --- 4. DATA CONSOLIDATION (The Handshake) ---
+  // --- 4. DATA CONSOLIDATION (The Unit Relay) ---
   const lessons = useMemo(() => {
-    // Merge system content, custom creator content, and assigned class content
     const assignments = enrolledClasses.flatMap(c => c.assignments || []);
     return [...systemLessons, ...customLessons, ...assignments];
   }, [systemLessons, customLessons, enrolledClasses]);
@@ -3858,32 +3857,27 @@ function App() {
     });
 
     if (user?.uid) {
-      // A. Sync User Profile & Role
+      // Profile & Role Sync
       const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
         if (snap.exists()) {
           const data = snap.data();
           setUserData(data);
-          // Auto-trigger Instructor Mode for Magister users
           if (data.role === 'instructor') setViewMode('instructor');
         }
         setAuthChecked(true);
       });
 
-      // B. Sync Instructor's Custom Lessons
+      // Instructor Content Sync
       const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => {
         setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
-      // C. Sync Instructor's Custom Cards (The Scriptorium)
       const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => {
         const cards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setAllDecks((prev: any) => ({
-          ...prev,
-          custom: { ...prev.custom, cards: cards }
-        }));
+        setAllDecks((prev: any) => ({ ...prev, custom: { ...prev.custom, cards } }));
       });
 
-      // D. Sync Enrolled/Managed Classes
+      // Student/Class Sync
       const qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
       const unsubClasses = onSnapshot(qClasses, (snap) => {
         setEnrolledClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -3894,186 +3888,132 @@ function App() {
     return () => unsubAuth();
   }, [user?.uid, user?.email]);
 
-  // Inside your App component in App.tsx
+  // --- 6. MAGISTER COMMAND HANDLERS (Prop Relay Source) ---
 
-// 1. CREATE CLASS
-const handleCreateClass = async (className: string) => {
-  if (!user) return { success: false };
-  try {
-    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), {
-      name: className,
-      code: Math.random().toString(36).substring(2, 8).toUpperCase(),
-      students: [],
-      studentEmails: [],
-      assignments: [],
-      created: Date.now()
-    });
-    return { success: true };
-  } catch (error) {
-    console.error("Create class failed:", error);
-    return { success: false };
-  }
-};
+  const handleCreateClass = async (className: string) => {
+    if (!user) return { success: false };
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), {
+        name: className,
+        code: Math.random().toString(36).substring(2, 8).toUpperCase(),
+        students: [],
+        studentEmails: [],
+        assignments: [],
+        created: Date.now()
+      });
+      return { success: true };
+    } catch (e) { return { success: false }; }
+  };
 
-// 2. ADD STUDENT
-const handleAddStudent = async (classId: string, email: string) => {
-  if (!user) return { success: false };
-  const normalizedEmail = email.toLowerCase().trim();
-  try {
-    const classRef = doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId);
-    await updateDoc(classRef, {
-      students: arrayUnion(normalizedEmail),
-      studentEmails: arrayUnion(normalizedEmail)
-    });
-    return { success: true };
-  } catch (error) {
-    console.error("Add student failed:", error);
-    return { success: false };
-  }
-};
+  const handleDeleteClass = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id));
+      return { success: true };
+    } catch (e) { return { success: false }; }
+  };
 
-// 3. ASSIGN & REVOKE (Prop Relay)
-const handleAssign = async (classId: string, assignment: any) => {
-  try {
-    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), {
-      assignments: arrayUnion(assignment)
-    });
-    return { success: true };
-  } catch (e) { return { success: false }; }
-};
+  const handleRenameClass = async (id: string, newName: string) => {
+    try {
+      await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id), { name: newName });
+      return { success: true };
+    } catch (e) { return { success: false }; }
+  };
 
-const handleRevoke = async (classId: string, assignment: any) => {
-  try {
-    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), {
-      assignments: arrayRemove(assignment)
-    });
-    return { success: true };
-  } catch (e) { return { success: false }; }
-};
+  const handleAddStudent = async (classId: string, email: string) => {
+    try {
+      const classRef = doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId);
+      await updateDoc(classRef, {
+        students: arrayUnion(email.toLowerCase().trim()),
+        studentEmails: arrayUnion(email.toLowerCase().trim())
+      });
+      return { success: true };
+    } catch (e) { return { success: false }; }
+  };
 
-  // --- 6. MAGISTER ACTION HANDLERS (The Juice) ---
+  const handleAssign = async (classId: string, assignment: any) => {
+    try {
+      await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), {
+        assignments: arrayUnion(assignment)
+      });
+      return { success: true };
+    } catch (e) { return { success: false }; }
+  };
+
+  const handleRevoke = async (classId: string, assignment: any) => {
+    try {
+      await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), {
+        assignments: arrayRemove(assignment)
+      });
+      return { success: true };
+    } catch (e) { return { success: false }; }
+  };
+
   const handleSaveLesson = async (lessonData: any) => {
     if (!user) return;
-    try {
-      const lessonId = lessonData.id || `lesson_${Date.now()}`;
-      await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', lessonId), {
-        ...lessonData,
-        id: lessonId,
-        instructorId: user.uid,
-        instructorName: user.email.split('@')[0],
-        updatedAt: Date.now()
-      });
-      console.log("Unit Archived Successfully.");
-    } catch (e) {
-      console.error("Critical Save Failure:", e);
-    }
+    const lessonId = lessonData.id || `lesson_${Date.now()}`;
+    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', lessonId), {
+      ...lessonData,
+      id: lessonId,
+      instructorId: user.uid,
+      updatedAt: Date.now()
+    });
   };
 
   const handleSaveCard = async (cardData: any) => {
     if (!user) return;
-    try {
-      const cardId = `card_${Date.now()}`;
-      await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), {
-        ...cardData,
-        id: cardId,
-        owner: user.uid,
-        createdAt: Date.now()
-      });
-    } catch (e) {
-      console.error("Card sync failed:", e);
-    }
+    const cardId = `card_${Date.now()}`;
+    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), { ...cardData, id: cardId, owner: user.uid });
   };
 
-  const handleUpdateCard = async (cardId: string, cardData: any) => {
-    if (!user) return;
-    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), cardData);
-  };
-
-  const handleDeleteCard = async (cardId: string) => {
-    if (!user) return;
-    await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId));
-  };
-
-  // --- 7. ROUTING LOGIC ---
-  const renderStudentView = () => {
-    // Presentation Mode (Projector)
-    if (activeTab === 'presentation') {
-      const target = lessons.find(l => l && (l.id === selectedLessonId || l.originalId === selectedLessonId));
-      if (!target || !target.blocks) return <div className="h-screen bg-slate-900 flex items-center justify-center text-white font-black animate-pulse uppercase tracking-widest">Hydrating Session...</div>;
-      return <ClassView lesson={target} classId={activeStudentClass?.id} userData={userData} />;
-    }
-
-    // Interactive Mode (Remote)
-    if (activeLesson) {
-      return <LessonView lesson={activeLesson} onFinish={() => setActiveLesson(null)} isInstructor={userData?.role === 'instructor'} />;
-    }
-
-    // Class Dashboard
-    if (activeTab === 'home' && activeStudentClass) {
-      return (
-        <StudentClassView 
-          classData={activeStudentClass} 
-          onBack={() => setActiveStudentClass(null)} 
-          onSelectLesson={setActiveLesson} 
-          userData={userData}
-          setActiveTab={setActiveTab}
-          setSelectedLessonId={setSelectedLessonId}
-        />
-      );
-    }
-
-    // Core Tabs
-    switch (activeTab) {
-      case 'profile': return <ProfileView user={user} userData={userData} />;
-      default: return <HomeView setActiveTab={setActiveTab} classes={enrolledClasses} onSelectClass={setActiveStudentClass} userData={userData} user={user} />;
-    }
-  };
-
-  // --- 8. FINAL OUTPUT ---
+  // --- 7. ROUTING ---
   if (!authChecked) return <div className="h-screen flex items-center justify-center bg-white"><div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>;
   if (!user) return <AuthView />;
 
-  // Toggle to Instructor View
   if (viewMode === 'instructor' && userData?.role === 'instructor') {
     return (
       <InstructorDashboard 
         user={user} 
-        userData={{...userData, classes: enrolledClasses}} 
+        userData={{ ...userData, classes: enrolledClasses }} 
         allDecks={allDecks} 
         lessons={lessons} 
         onSaveLesson={handleSaveLesson} 
         onSaveCard={handleSaveCard}
-        onUpdateCard={handleUpdateCard}
-        onDeleteCard={handleDeleteCard}
+        onAssign={handleAssign}
+        onRevoke={handleRevoke}
+        onCreateClass={handleCreateClass}
+        onDeleteClass={handleDeleteClass}
+        onRenameClass={handleRenameClass}
+        onAddStudent={handleAddStudent}
         onSwitchView={() => setViewMode('student')}
         onLogout={() => signOut(auth)} 
       />
     );
   }
 
-  // Toggle to Student View
   return (
     <div className="bg-slate-50 min-h-screen w-full flex justify-center items-start overflow-hidden relative">
+      {/* Magister Toggle */}
       {userData?.role === 'instructor' && (
-        <button 
-          onClick={() => setViewMode('instructor')}
-          className="fixed top-6 right-6 z-[1000] bg-slate-900 text-white px-8 py-3 rounded-full font-black text-xs uppercase tracking-[0.2em] shadow-2xl hover:scale-105 active:scale-95 transition-all"
-        >
-          🎓 Magister Mode
-        </button>
+        <button onClick={() => setViewMode('instructor')} className="fixed top-6 right-6 z-[1000] bg-slate-900 text-white px-8 py-3 rounded-full font-black text-xs uppercase tracking-widest shadow-2xl transition-all hover:scale-105 active:scale-95">🎓 Magister Mode</button>
       )}
 
-      <div className={`w-full transition-all duration-700 bg-white relative overflow-hidden flex flex-col ${
-        activeTab === 'presentation' ? 'h-screen w-screen fixed inset-0 z-[200]' : 'max-w-md h-[100dvh] shadow-2xl'
-      }`}>
+      {/* Mobile Student Viewport */}
+      <div className={`w-full transition-all duration-700 bg-white relative overflow-hidden flex flex-col ${activeTab === 'presentation' ? 'h-screen w-screen fixed inset-0 z-[200]' : 'max-w-md h-[100dvh] shadow-2xl'}`}>
         <div className="flex-1 h-full overflow-hidden relative">
-          {renderStudentView()}
+          {activeTab === 'presentation' ? (
+            <ClassView lesson={lessons.find(l => l.id === selectedLessonId)} userData={userData} />
+          ) : activeLesson ? (
+            <LessonView lesson={activeLesson} onFinish={() => setActiveLesson(null)} isInstructor={userData?.role === 'instructor'} />
+          ) : activeTab === 'profile' ? (
+            <div className="p-10">Profile View</div>
+          ) : (
+            <HomeView setActiveTab={setActiveTab} classes={enrolledClasses} onSelectClass={setActiveStudentClass} userData={userData} user={user} />
+          )}
         </div>
-        {(!activeLesson && activeTab !== 'presentation') && (
-          <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
-        )}
+        {(!activeLesson && activeTab !== 'presentation') && <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />}
       </div>
     </div>
   );
 }
+
 export default App;
