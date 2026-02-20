@@ -3094,32 +3094,109 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
   const [mode, setMode] = useState<'card' | 'lesson' | 'exam'>(initialMode || 'card'); 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
+  // Auto-switch mode if initialMode is provided (e.g., from a quick-action button)
   useEffect(() => { if (initialMode) setMode(initialMode); }, [initialMode]);
 
   const handleSaveExam = (examData: any) => {
       onSaveLesson(examData); 
-      setToastMsg("Exam Saved Successfully!");
+      setToastMsg("Assessment Exported to Library!");
   };
 
+  // Config for the "Juice"
+  const modes = [
+    { id: 'card', label: 'Scriptorium', sub: 'Card Architect', icon: <Layers size={18}/>, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { id: 'lesson', label: 'Curriculum', sub: 'Unit Designer', icon: <BookOpen size={18}/>, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { id: 'exam', label: 'Assessment', sub: 'Exam Builder', icon: <FileText size={18}/>, color: 'text-rose-600', bg: 'bg-rose-50' }
+  ];
+
+  const activeMode = modes.find(m => m.id === mode) || modes[0];
+
   return ( 
-    <div className="pb-24 h-full bg-slate-50 overflow-y-auto custom-scrollbar">
-        {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
+    <div className="h-full bg-slate-50 flex flex-col overflow-hidden font-sans">
+        {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
         
-        {mode === 'card' && <Header title="Scriptorium" subtitle="Card Builder" rightAction={initialMode && <button onClick={onClearMode}><X/></button>}/>}
-        {mode === 'lesson' && <Header title="Curriculum" subtitle="Lesson Builder" rightAction={initialMode && <button onClick={onClearMode}><X/></button>}/>}
-        {mode === 'exam' && <Header title="Assessment" subtitle="Exam Builder" rightAction={initialMode && <button onClick={onClearMode}><X/></button>}/>}
-        
-        <div className="px-6 mt-2">
-            <div className="flex bg-slate-200 p-1 rounded-xl">
-                <button onClick={() => setMode('card')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${mode === 'card' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Card</button>
-                <button onClick={() => setMode('lesson')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${mode === 'lesson' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Lesson</button>
-                <button onClick={() => setMode('exam')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${mode === 'exam' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}>Exam</button>
+        {/* --- 1. THE CINEMATIC HEADER --- */}
+        <div className="bg-white px-8 pt-10 pb-6 border-b border-slate-200 shrink-0 relative overflow-hidden">
+            {/* Background Accent Blur */}
+            <div className={`absolute -right-20 -top-20 w-64 h-64 rounded-full blur-[100px] opacity-20 transition-colors duration-700 ${activeMode.bg}`} />
+            
+            <div className="flex justify-between items-end relative z-10">
+                <div className="animate-in slide-in-from-left-4 duration-500">
+                    <div className="flex items-center gap-3 mb-1">
+                        <div className={`p-2 rounded-xl ${activeMode.bg} ${activeMode.color} shadow-sm`}>
+                            {activeMode.icon}
+                        </div>
+                        <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.3em]">{activeMode.label}</h2>
+                    </div>
+                    <h1 className="text-4xl font-black text-slate-900 tracking-tighter">{activeMode.sub}</h1>
+                </div>
+
+                {initialMode && (
+                  <button 
+                    onClick={onClearMode} 
+                    className="p-3 bg-slate-100 text-slate-400 rounded-2xl hover:bg-rose-50 hover:text-rose-500 transition-all active:scale-90"
+                  >
+                    <X size={20} strokeWidth={3} />
+                  </button>
+                )}
+            </div>
+
+            {/* --- 2. THE PRO TOGGLE --- */}
+            <div className="mt-8 flex bg-slate-100 p-1.5 rounded-[2rem] w-fit border border-slate-200 shadow-inner">
+                {modes.map((m) => (
+                    <button 
+                        key={m.id}
+                        onClick={() => setMode(m.id as any)} 
+                        className={`flex items-center gap-2 px-8 py-3 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all duration-300 ${
+                            mode === m.id 
+                                ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 scale-105' 
+                                : 'text-slate-400 hover:text-slate-600'
+                        }`}
+                    >
+                        {m.id === mode && <span className={`${m.color} animate-in zoom-in`}>{m.icon}</span>}
+                        {m.id}
+                    </button>
+                ))}
             </div>
         </div>
 
-        {mode === 'card' && <CardBuilderView onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} availableDecks={allDecks} />}
-        {mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onSave={onSaveLesson} availableDecks={allDecks} />}
-        {mode === 'exam' && <ExamBuilderView onSave={handleSaveExam} />}
+        {/* --- 3. THE BUILDER CANVAS --- */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                {mode === 'card' && (
+                    <CardBuilderView 
+                        onSaveCard={onSaveCard} 
+                        onUpdateCard={onUpdateCard} 
+                        onDeleteCard={onDeleteCard} 
+                        availableDecks={allDecks} 
+                    />
+                )}
+                {mode === 'lesson' && (
+                    <LessonBuilderView 
+                        data={lessonData} 
+                        setData={setLessonData} 
+                        onSave={onSaveLesson} 
+                        availableDecks={allDecks} 
+                    />
+                )}
+                {mode === 'exam' && (
+                    <div className="p-8">
+                         {/* Assuming ExamBuilderView exists or is wrapped in onSave */}
+                        <ExamBuilderView onSave={handleSaveExam} />
+                    </div>
+                )}
+            </div>
+
+            {/* Contextual Tips Footer */}
+            <div className="p-10 text-center">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900/5 rounded-full">
+                    <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse" />
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        {mode === 'lesson' ? 'Pro Tip: Use double breaks for cinematic paragraphs' : 'Pro Tip: Add IPA for better student pronunciation'}
+                    </p>
+                </div>
+            </div>
+        </div>
     </div> 
   );
 }
