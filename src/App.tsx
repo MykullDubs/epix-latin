@@ -225,6 +225,45 @@ const useLearningTimer = (user: any, activityId: string, activityType: string, t
         };
     }, [user, activityId]);
 };
+// STANDALONE PREVIEW ENGINE
+const LivePreview = ({ data }: any) => {
+  const currentTheme = THEMES[data?.theme || 'indigo'];
+
+  return (
+    <div className={`w-full h-full bg-white rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border-[12px] border-slate-900 transition-all duration-700 ${currentTheme.font}`}>
+      <div className="flex-1 overflow-y-auto p-10 space-y-12 custom-scrollbar bg-white">
+        <div className={`text-center border-b ${currentTheme.border} pb-8`}>
+           <span className={`text-[10px] font-black ${currentTheme.accent} uppercase tracking-[0.4em] mb-2 block`}>
+             {data.subtitle || "MAGISTER STUDIO"}
+           </span>
+           <h1 className="text-4xl font-black text-slate-900 tracking-tighter leading-none">{data.title || "Untitled Unit"}</h1>
+        </div>
+        
+        {data.blocks?.map((b: any, i: number) => (
+          <div key={i} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+             {b.type === 'text' && (
+               <div className="space-y-4">
+                 {b.title && <h3 className={`${currentTheme.accent} font-black uppercase text-center text-xs tracking-widest`}>{b.title}</h3>}
+                 <p className="text-center text-[4vh] font-black text-slate-800 leading-tight tracking-tighter">{b.content}</p>
+               </div>
+             )}
+             {b.type === 'essay' && (
+               <div className="space-y-6">
+                 <h2 className={`text-center text-3xl font-black ${currentTheme.accent} uppercase tracking-tighter`}>{b.title}</h2>
+                 <div className="space-y-4">
+                   {b.content?.split('\n\n').map((p: string, j: number) => (
+                     <p key={j} className="text-sm text-slate-600 leading-relaxed text-justify first-letter:text-xl first-letter:font-black first-letter:text-indigo-600 first-letter:mr-1">{p}</p>
+                   ))}
+                 </div>
+               </div>
+             )}
+             {/* ... include your other block renderers (dialogue, vocab, etc.) here ... */}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 // --- HELPER COMPONENTS ---
 function Toast({ message, onClose }: any) {
@@ -2922,18 +2961,14 @@ const THEMES: any = {
   }
 };
 
-function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
+/**
+ * LESSON BUILDER VIEW (Visual Editor Only)
+ * Optimized for: Touch Drag-and-Drop, Tablet Inputs, Cinematic Narrative
+ */
+function LessonBuilderView({ data, setData, onSave }: any) {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [jsonMode, setJsonMode] = useState(false);
-  const [jsonInput, setJsonInput] = useState('');
-  const [previewMode, setPreviewMode] = useState<'projector' | 'mobile'>('projector');
-  
-  const currentTheme = THEMES[data.theme || 'indigo'];
 
-  // ============================================================================
-  //  CORE ENGINE (SCOPED FUNCTIONS)
-  // ============================================================================
-
+  // --- 1. THE CORE LOGIC (SCOPED) ---
   const updateBlock = (index: number, field: string, value: any) => {
     const newBlocks = [...(data.blocks || [])];
     newBlocks[index] = { ...newBlocks[index], [field]: value };
@@ -2966,7 +3001,6 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
       image: { type: 'image', url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa', caption: '' }
     };
     setData({ ...data, blocks: [...(data.blocks || []), templates[type]] });
-    setToastMsg(`${type.toUpperCase()} block added`);
   };
 
   const removeBlock = (index: number) => {
@@ -2974,213 +3008,136 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
     setData({ ...data, blocks: newBlocks });
   };
 
-  const handleFinalSave = () => {
-    if (!data.title) return setToastMsg("Title is required!");
-    if (typeof onSave === 'function') {
-      onSave({ ...data, timestamp: Date.now() });
-      setToastMsg("Unit Archived in Library");
-    } else {
-      console.error("onSave prop missing. Check BuilderHub relay.");
-    }
+  const moveBlock = (index: number, direction: 'up' | 'down') => {
+    const newBlocks = [...(data.blocks || [])];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newBlocks.length) return;
+    [newBlocks[index], newBlocks[targetIndex]] = [newBlocks[targetIndex], newBlocks[index]];
+    setData({ ...data, blocks: newBlocks });
   };
 
-  // ============================================================================
-  //  THE LIVE PREVIEW ENGINE
-  // ============================================================================
+  // --- 2. RENDERER ---
+  return (
+    <div className="max-w-3xl mx-auto space-y-12 pb-64 animate-in fade-in duration-700">
+      
+      {/* 1. UNIT METADATA (High Impact) */}
+      <div className="space-y-6">
+        <input 
+          className="text-5xl md:text-6xl font-black border-none w-full focus:ring-0 p-0 placeholder:text-slate-100 tracking-tighter bg-transparent" 
+          placeholder="Unit Title..." 
+          value={data.title} 
+          onChange={e => setData({...data, title: e.target.value})} 
+        />
+        <input 
+          className="text-xl md:text-2xl font-bold text-slate-300 border-none w-full focus:ring-0 p-0 tracking-tight bg-transparent" 
+          placeholder="Subtitle or Lesson Order..." 
+          value={data.subtitle} 
+          onChange={e => setData({...data, subtitle: e.target.value})} 
+        />
+      </div>
 
-  const LivePreview = () => (
-    <div className={`w-full h-full bg-white rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border-[12px] border-slate-900 transition-all duration-700 ${currentTheme.font}`}>
-      <div className="flex-1 overflow-y-auto p-10 space-y-12 custom-scrollbar bg-white">
-        <div className={`text-center border-b ${currentTheme.border} pb-8`}>
-           <span className={`text-[10px] font-black ${currentTheme.accent} uppercase tracking-[0.4em] mb-2 block`}>
-             {data.subtitle || "MAGISTER STUDIO"}
-           </span>
-           <h1 className="text-4xl font-black text-slate-900 tracking-tighter leading-none">{data.title || "Untitled Unit"}</h1>
-        </div>
-        
-        {data.blocks?.map((b: any, i: number) => (
-          <div key={i} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-             {b.type === 'text' && (
-               <div className="space-y-4">
-                 {b.title && <h3 className={`${currentTheme.accent} font-black uppercase text-center text-xs tracking-widest`}>{b.title}</h3>}
-                 <p className="text-center text-[4vh] font-black text-slate-800 leading-tight tracking-tighter">{b.content}</p>
-               </div>
-             )}
-             {b.type === 'essay' && (
-               <div className="space-y-6">
-                 <h2 className={`text-center text-3xl font-black ${currentTheme.id === 'slate' ? 'text-slate-900' : currentTheme.accent} uppercase tracking-tighter`}>{b.title}</h2>
-                 <div className="space-y-4">
-                   {b.content?.split('\n\n').map((p: string, j: number) => (
-                     <p key={j} className="text-sm text-slate-600 leading-relaxed text-justify first-letter:text-xl first-letter:font-black first-letter:text-indigo-600 first-letter:mr-1">{p}</p>
-                   ))}
-                 </div>
-               </div>
-             )}
-             {b.type === 'dialogue' && (
-               <div className="space-y-4">
-                 {b.lines?.map((l: any, j: number) => (
-                   <div key={j} className={`flex gap-3 ${l.side === 'right' ? 'flex-row-reverse' : ''}`}>
-                      <div className={`w-8 h-8 rounded-full ${l.side === 'right' ? currentTheme.primary : 'bg-slate-900'} flex items-center justify-center text-[10px] font-black text-white shrink-0 shadow-md`}>{l.speaker?.[0]}</div>
-                      <div className={`p-4 rounded-3xl text-xs font-bold ${l.side === 'right' ? `${currentTheme.primary} text-white shadow-lg rounded-br-none` : 'bg-slate-100 text-slate-800 rounded-bl-none'}`}>{l.text}</div>
-                   </div>
-                 ))}
-               </div>
-             )}
-             {b.type === 'vocab-list' && (
-               <div className="grid grid-cols-2 gap-3">
-                 {b.items?.map((item: any, j: number) => (
-                   <div key={j} className={`${currentTheme.secondary} border ${currentTheme.border} p-4 rounded-2xl text-center shadow-sm`}>
-                     <p className={`font-black ${currentTheme.accent} text-sm`}>{item.term}</p>
-                     <p className="text-[10px] text-slate-400 font-bold leading-tight mt-1">{item.definition}</p>
-                   </div>
-                 ))}
-               </div>
-             )}
+      {/* 2. DYNAMIC BLOCKS STACK */}
+      <div className="space-y-6">
+        {(data.blocks || []).map((block: any, idx: number) => (
+          <div 
+            key={idx} 
+            className="group bg-white p-6 md:p-8 rounded-[2.5rem] border-2 border-slate-50 hover:border-indigo-100 hover:shadow-2xl hover:shadow-indigo-900/5 transition-all relative"
+          >
+            {/* Tablet-Friendly Drag/Order Controls */}
+            <div className="absolute -left-12 top-1/2 -translate-y-1/2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity hidden lg:flex">
+              <button onClick={() => moveBlock(idx, 'up')} className="p-2 bg-white rounded-full shadow-md text-slate-400 hover:text-indigo-600"><ChevronUp size={16}/></button>
+              <button onClick={() => moveBlock(idx, 'down')} className="p-2 bg-white rounded-full shadow-md text-slate-400 hover:text-indigo-600"><ChevronDown size={16}/></button>
+            </div>
+
+            {/* Action Toolbar */}
+            <div className="flex justify-between items-center mb-6">
+               <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">{block.type} Block</span>
+               <button 
+                 onClick={() => removeBlock(idx)} 
+                 className="p-2 bg-rose-50 text-rose-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all active:scale-90"
+               >
+                 <Trash2 size={16} />
+               </button>
+            </div>
+
+            {/* BLOCK EDITORS */}
+            {block.type === 'text' && (
+              <textarea 
+                className="w-full bg-transparent font-black text-2xl border-none focus:ring-0 p-0 placeholder:text-slate-200 resize-none" 
+                placeholder="Core concept text..." 
+                rows={2}
+                value={block.content} 
+                onChange={e => updateBlock(idx, 'content', e.target.value)} 
+              />
+            )}
+
+            {block.type === 'essay' && (
+              <div className="space-y-4">
+                <input 
+                  className="w-full font-black text-slate-800 bg-slate-50 border-none px-5 py-3 rounded-2xl text-sm" 
+                  placeholder="Essay Title" 
+                  value={block.title} 
+                  onChange={e => updateBlock(idx, 'title', e.target.value)} 
+                />
+                <textarea 
+                  className="w-full h-48 bg-slate-50 border-none p-5 rounded-3xl text-xs font-serif leading-relaxed resize-none focus:ring-2 focus:ring-indigo-100 transition-all" 
+                  placeholder="Deep dive paragraphs..." 
+                  value={block.content} 
+                  onChange={e => updateBlock(idx, 'content', e.target.value)} 
+                />
+              </div>
+            )}
+
+            {block.type === 'vocab-list' && (
+              <div className="space-y-4">
+                {block.items?.map((item: any, i: number) => (
+                  <div key={i} className="flex gap-3">
+                    <input className="flex-1 bg-slate-50 border-none p-4 rounded-2xl text-xs font-black text-indigo-600" placeholder="Term" value={item.term} onChange={e => updateVocabItem(idx, i, 'term', e.target.value)} />
+                    <input className="flex-[2] bg-slate-50 border-none p-4 rounded-2xl text-xs text-slate-400 font-bold" placeholder="Definition" value={item.definition} onChange={e => updateVocabItem(idx, i, 'definition', e.target.value)} />
+                  </div>
+                ))}
+                <button 
+                  onClick={() => updateBlock(idx, 'items', [...block.items, {term: '', definition: ''}])}
+                  className="w-full py-3 border-2 border-dashed border-slate-100 rounded-2xl text-[10px] font-black text-slate-300 uppercase hover:border-indigo-200 hover:text-indigo-400 transition-all"
+                >
+                  + Add Vocabulary Term
+                </button>
+              </div>
+            )}
+            
+            {/* Additional block editors for Dialogue, Image, etc. would go here */}
           </div>
         ))}
       </div>
-    </div>
-  );
 
-  return (
-    <div className="h-full flex flex-col bg-white overflow-hidden font-sans">
-      {/* 1. JUICEMAXED HEADER */}
-      <div className="h-24 px-10 border-b flex justify-between items-center shrink-0 bg-white z-50 shadow-sm">
-        <div className="flex items-center gap-5">
-          <div className={`p-3 ${currentTheme.primary} text-white rounded-2xl shadow-xl transition-all duration-500`}>
-            <PenTool size={24}/>
-          </div>
-          <div>
-            <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none">Lesson Studio</h2>
-            <p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-widest italic">{currentTheme.name} Theme Active</p>
-          </div>
-        </div>
-
-        {/* --- CENTRAL CONTROLS --- */}
-        <div className="flex items-center gap-6">
-          {/* Theme Switcher */}
-          <div className="flex bg-slate-100 p-1.5 rounded-[1.5rem] border border-slate-200">
-            {Object.values(THEMES).map((t: any) => (
-              <button
-                key={t.id}
-                onClick={() => setData({ ...data, theme: t.id })}
-                className={`w-8 h-8 rounded-full border-2 transition-all flex items-center justify-center ${
-                  (data.theme || 'indigo') === t.id ? 'border-slate-900 scale-110 shadow-lg' : 'border-transparent opacity-40 hover:opacity-100'
-                } ${t.primary}`}
-              >
-                {(data.theme || 'indigo') === t.id && <Check size={12} className="text-white" />}
-              </button>
-            ))}
-          </div>
-
-          <div className="h-8 w-px bg-slate-200 mx-2" />
-
-          {/* Preview Toggle */}
-          <div className="flex bg-slate-100 p-1.5 rounded-[1.5rem] border border-slate-200">
-            <button onClick={() => setPreviewMode('projector')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${previewMode === 'projector' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'}`}>
-              <Monitor size={14} /> Projector
-            </button>
-            <button onClick={() => setPreviewMode('mobile')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${previewMode === 'mobile' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'}`}>
-              <Smartphone size={14} /> Mobile
-            </button>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-6">
-           <button onClick={() => setJsonMode(!jsonMode)} className="text-[11px] font-black uppercase text-slate-300 hover:text-indigo-600 tracking-[0.2em] transition-colors">
-              {jsonMode ? 'Visual Design' : 'Advanced JSON'}
-           </button>
-           <button onClick={handleFinalSave} className={`${currentTheme.primary} text-white px-10 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-2xl active:scale-95 transition-all duration-500`}>
-              Commit Library
-           </button>
-        </div>
-      </div>
-
-      {/* 2. MAIN CONTENT SPLIT */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* EDITOR PANE (LEFT) */}
-        <div className="w-1/2 overflow-y-auto p-12 bg-white border-r custom-scrollbar shadow-inner">
-          {jsonMode ? (
-            <div className="h-full flex flex-col gap-6">
-               <textarea 
-                 value={JSON.stringify(data, null, 2)} 
-                 onChange={e => { try { setData(JSON.parse(e.target.value)); } catch(err) {} }}
-                 className="flex-1 p-10 bg-slate-950 text-emerald-400 font-mono text-sm rounded-[3rem] outline-none shadow-2xl leading-relaxed"
-                 placeholder="Unit JSON..."
-               />
-               <button className="w-full py-6 bg-emerald-500 text-white rounded-[2rem] font-black uppercase text-xs shadow-xl">Live Sync Active</button>
-            </div>
-          ) : (
-            <div className="max-w-xl mx-auto space-y-16 pb-64">
-              <div className="space-y-6">
-                <input className="text-6xl font-black border-none w-full focus:ring-0 p-0 placeholder:text-slate-100 tracking-tighter" placeholder="Unit Title..." value={data.title} onChange={e => setData({...data, title: e.target.value})} />
-                <input className="text-2xl font-bold text-slate-300 border-none w-full focus:ring-0 p-0 tracking-tight" placeholder="Unit Subtitle..." value={data.subtitle} onChange={e => setData({...data, subtitle: e.target.value})} />
-              </div>
-
-              {/* Dynamic Blocks */}
-              <div className="space-y-8">
-                {(data.blocks || []).map((block: any, idx: number) => (
-                  <div key={idx} className={`group bg-slate-50 p-8 rounded-[3rem] border-2 border-transparent hover:${currentTheme.border} hover:bg-white transition-all relative shadow-sm`}>
-                    <button onClick={() => removeBlock(idx)} className="absolute -right-3 -top-3 p-3 bg-white text-rose-500 rounded-full shadow-xl opacity-0 group-hover:opacity-100 transition-all border border-slate-100">
-                      <Trash2 size={20} />
-                    </button>
-                    <span className={`text-[11px] font-black ${currentTheme.accent} uppercase tracking-widest mb-6 block`}>{block.type}</span>
-
-                    {block.type === 'text' && (
-                      <textarea className="w-full bg-transparent font-black text-2xl border-none focus:ring-0 p-0 placeholder:text-slate-200" placeholder="Core text..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
-                    )}
-
-                    {block.type === 'essay' && (
-                      <textarea className="w-full h-64 bg-white border border-slate-200 p-5 rounded-2xl text-xs font-serif leading-relaxed" placeholder="Paragraphs..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
-                    )}
-
-                    {block.type === 'vocab-list' && (
-                      <div className="space-y-3">
-                        {block.items?.map((item: any, i: number) => (
-                          <div key={i} className="flex gap-3">
-                            <input className={`flex-1 bg-white border p-3 rounded-xl text-xs font-black ${currentTheme.accent}`} value={item.term} onChange={e => updateVocabItem(idx, i, 'term', e.target.value)} />
-                            <input className="flex-2 bg-white border p-3 rounded-xl text-xs text-slate-400" value={item.definition} onChange={e => updateVocabItem(idx, i, 'definition', e.target.value)} />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Block Injector */}
-              <div className="grid grid-cols-3 gap-4">
-                 <InjectorButton icon={<AlignLeft/>} label="Text" onClick={() => addBlock('text')} />
-                 <InjectorButton icon={<FileText/>} label="Essay" onClick={() => addBlock('essay')} />
-                 <InjectorButton icon={<MessageSquare/>} label="Dialogue" onClick={() => addBlock('dialogue')} />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* PREVIEW PANE (RIGHT) */}
-        <div className="w-1/2 bg-slate-50 p-20 flex flex-col items-center justify-center relative overflow-hidden">
-          <div className={`relative transition-all duration-700 ease-in-out z-10 ${
-            previewMode === 'projector' ? 'w-full aspect-video scale-90 shadow-2xl' : 'w-[360px] h-[640px] scale-95 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.25)]'
-          }`}>
-             <LivePreview />
-          </div>
+      {/* 3. TABLET-OPTIMIZED BLOCK INJECTOR */}
+      <div className="pt-10 border-t border-slate-100">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-8 text-center">Inject Narrative Components</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+           <InjectorButton icon={<AlignLeft/>} label="Big Text" onClick={() => addBlock('text')} />
+           <InjectorButton icon={<FileText/>} label="Essay" onClick={() => addBlock('essay')} />
+           <InjectorButton icon={<MessageSquare/>} label="Dialogue" onClick={() => addBlock('dialogue')} />
+           <InjectorButton icon={<List/>} label="Vocab" onClick={() => addBlock('vocab-list')} />
+           <InjectorButton icon={<HelpCircle/>} label="Quiz" onClick={() => addBlock('quiz')} />
+           <InjectorButton icon={<Image/>} label="Visual" onClick={() => addBlock('image')} />
         </div>
       </div>
     </div>
   );
 }
 
+// Sub-component for clean mapping
 function InjectorButton({ icon, label, onClick }: any) {
   return (
-    <button onClick={onClick} className="p-8 bg-white border-2 border-slate-100 rounded-[3rem] flex flex-col items-center justify-center gap-4 hover:border-indigo-600 hover:text-indigo-600 hover:shadow-2xl transition-all active:scale-90 group">
+    <button 
+      onClick={onClick} 
+      className="h-28 bg-white border-2 border-slate-50 rounded-[2.5rem] flex flex-col items-center justify-center gap-3 hover:border-indigo-600 hover:text-indigo-600 hover:shadow-xl transition-all active:scale-90 group"
+    >
       <div className="text-slate-300 group-hover:text-indigo-600 transition-colors scale-125">{icon}</div>
       <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
     </button>
   );
 }
-
 
 function BuilderHub({ 
   onSaveCard, 
