@@ -2876,18 +2876,62 @@ function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard, availableDeck
     </div>
   );
 }
+// ============================================================================
+//  THEME DEFINITIONS (THE AURA ENGINE)
+// ============================================================================
+const THEMES: any = {
+  indigo: {
+    id: 'indigo',
+    name: 'Cyberpunk',
+    primary: 'bg-indigo-600',
+    secondary: 'bg-indigo-50',
+    accent: 'text-indigo-600',
+    border: 'border-indigo-100',
+    shadow: 'shadow-indigo-100',
+    font: 'font-sans'
+  },
+  emerald: {
+    id: 'emerald',
+    name: 'Bio-Digital',
+    primary: 'bg-emerald-600',
+    secondary: 'bg-emerald-50',
+    accent: 'text-emerald-600',
+    border: 'border-emerald-100',
+    shadow: 'shadow-emerald-100',
+    font: 'font-sans'
+  },
+  rose: {
+    id: 'rose',
+    name: 'High-Alert',
+    primary: 'bg-rose-600',
+    secondary: 'bg-rose-50',
+    accent: 'text-rose-600',
+    border: 'border-rose-100',
+    shadow: 'shadow-rose-100',
+    font: 'font-sans'
+  },
+  slate: {
+    id: 'slate',
+    name: 'Oxford',
+    primary: 'bg-slate-900',
+    secondary: 'bg-slate-50',
+    accent: 'text-slate-900',
+    border: 'border-slate-200',
+    shadow: 'shadow-slate-200',
+    font: 'font-serif'
+  }
+};
 
-// ============================================================================
-//  LESSON BUILDER (Now with JSON Import/Export)
-// ============================================================================
 function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [jsonMode, setJsonMode] = useState(false);
   const [jsonInput, setJsonInput] = useState('');
   const [previewMode, setPreviewMode] = useState<'projector' | 'mobile'>('projector');
+  
+  const currentTheme = THEMES[data.theme || 'indigo'];
 
   // ============================================================================
-  //  1. CORE ENGINE (SCOPED FUNCTIONS)
+  //  CORE ENGINE (SCOPED FUNCTIONS)
   // ============================================================================
 
   const updateBlock = (index: number, field: string, value: any) => {
@@ -2930,36 +2974,27 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
     setData({ ...data, blocks: newBlocks });
   };
 
-  const handleImportJson = () => {
-    try {
-      const parsed = JSON.parse(jsonInput);
-      setData(parsed);
-      setJsonMode(false);
-      setToastMsg("Unit Injected Successfully!");
-    } catch (e) {
-      setToastMsg("Invalid JSON Syntax");
-    }
-  };
-
   const handleFinalSave = () => {
     if (!data.title) return setToastMsg("Title is required!");
     if (typeof onSave === 'function') {
       onSave({ ...data, timestamp: Date.now() });
       setToastMsg("Unit Archived in Library");
     } else {
-      console.error("onSave prop is missing. Check your BuilderHub relay.");
+      console.error("onSave prop missing. Check BuilderHub relay.");
     }
   };
 
   // ============================================================================
-  //  2. LIVE PREVIEW RENDERER
+  //  THE LIVE PREVIEW ENGINE
   // ============================================================================
 
   const LivePreview = () => (
-    <div className="w-full h-full bg-white rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border-[12px] border-slate-900 transition-all duration-500">
+    <div className={`w-full h-full bg-white rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border-[12px] border-slate-900 transition-all duration-700 ${currentTheme.font}`}>
       <div className="flex-1 overflow-y-auto p-10 space-y-12 custom-scrollbar bg-white">
-        <div className="text-center border-b border-slate-100 pb-8">
-           <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-2 block">{data.subtitle || "MAGISTER STUDIO"}</span>
+        <div className={`text-center border-b ${currentTheme.border} pb-8`}>
+           <span className={`text-[10px] font-black ${currentTheme.accent} uppercase tracking-[0.4em] mb-2 block`}>
+             {data.subtitle || "MAGISTER STUDIO"}
+           </span>
            <h1 className="text-4xl font-black text-slate-900 tracking-tighter leading-none">{data.title || "Untitled Unit"}</h1>
         </div>
         
@@ -2967,16 +3002,16 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
           <div key={i} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
              {b.type === 'text' && (
                <div className="space-y-4">
-                 {b.title && <h3 className="text-indigo-600 font-black uppercase text-center text-xs tracking-widest">{b.title}</h3>}
+                 {b.title && <h3 className={`${currentTheme.accent} font-black uppercase text-center text-xs tracking-widest`}>{b.title}</h3>}
                  <p className="text-center text-[4vh] font-black text-slate-800 leading-tight tracking-tighter">{b.content}</p>
                </div>
              )}
              {b.type === 'essay' && (
                <div className="space-y-6">
-                 <h2 className="text-center text-3xl font-black text-slate-900 uppercase tracking-tighter">{b.title}</h2>
+                 <h2 className={`text-center text-3xl font-black ${currentTheme.id === 'slate' ? 'text-slate-900' : currentTheme.accent} uppercase tracking-tighter`}>{b.title}</h2>
                  <div className="space-y-4">
                    {b.content?.split('\n\n').map((p: string, j: number) => (
-                     <p key={j} className="text-sm text-slate-600 font-serif leading-relaxed text-justify first-letter:text-xl first-letter:font-black first-letter:text-indigo-600 first-letter:mr-1">{p}</p>
+                     <p key={j} className="text-sm text-slate-600 leading-relaxed text-justify first-letter:text-xl first-letter:font-black first-letter:text-indigo-600 first-letter:mr-1">{p}</p>
                    ))}
                  </div>
                </div>
@@ -2985,8 +3020,8 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
                <div className="space-y-4">
                  {b.lines?.map((l: any, j: number) => (
                    <div key={j} className={`flex gap-3 ${l.side === 'right' ? 'flex-row-reverse' : ''}`}>
-                      <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-[10px] font-black text-white shrink-0 shadow-md">{l.speaker?.[0]}</div>
-                      <div className={`p-4 rounded-3xl text-xs font-bold ${l.side === 'right' ? 'bg-indigo-600 text-white shadow-lg rounded-br-none' : 'bg-slate-100 text-slate-800 rounded-bl-none'}`}>{l.text}</div>
+                      <div className={`w-8 h-8 rounded-full ${l.side === 'right' ? currentTheme.primary : 'bg-slate-900'} flex items-center justify-center text-[10px] font-black text-white shrink-0 shadow-md`}>{l.speaker?.[0]}</div>
+                      <div className={`p-4 rounded-3xl text-xs font-bold ${l.side === 'right' ? `${currentTheme.primary} text-white shadow-lg rounded-br-none` : 'bg-slate-100 text-slate-800 rounded-bl-none'}`}>{l.text}</div>
                    </div>
                  ))}
                </div>
@@ -2994,8 +3029,8 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
              {b.type === 'vocab-list' && (
                <div className="grid grid-cols-2 gap-3">
                  {b.items?.map((item: any, j: number) => (
-                   <div key={j} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center shadow-sm">
-                     <p className="font-black text-indigo-600 text-sm">{item.term}</p>
+                   <div key={j} className={`${currentTheme.secondary} border ${currentTheme.border} p-4 rounded-2xl text-center shadow-sm`}>
+                     <p className={`font-black ${currentTheme.accent} text-sm`}>{item.term}</p>
                      <p className="text-[10px] text-slate-400 font-bold leading-tight mt-1">{item.definition}</p>
                    </div>
                  ))}
@@ -3007,68 +3042,77 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
     </div>
   );
 
-  // ============================================================================
-  //  3. MAIN RENDER (VISUAL STUDIO)
-  // ============================================================================
-
   return (
     <div className="h-full flex flex-col bg-white overflow-hidden font-sans">
-      {/* 1. STUDIO HEADER */}
+      {/* 1. JUICEMAXED HEADER */}
       <div className="h-24 px-10 border-b flex justify-between items-center shrink-0 bg-white z-50 shadow-sm">
         <div className="flex items-center gap-5">
-          <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-100"><PenTool size={24}/></div>
+          <div className={`p-3 ${currentTheme.primary} text-white rounded-2xl shadow-xl transition-all duration-500`}>
+            <PenTool size={24}/>
+          </div>
           <div>
             <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none">Lesson Studio</h2>
-            <p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-widest">Aura-Sync Active</p>
+            <p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-widest italic">{currentTheme.name} Theme Active</p>
           </div>
         </div>
 
-        {/* --- CENTRAL PREVIEW TOGGLE --- */}
-        <div className="flex bg-slate-100 p-1.5 rounded-[1.5rem] border border-slate-200 shadow-inner">
-          <button 
-            onClick={() => setPreviewMode('projector')} 
-            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${
-              previewMode === 'projector' ? 'bg-white text-indigo-600 shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            <Monitor size={14} /> Projector
-          </button>
-          <button 
-            onClick={() => setPreviewMode('mobile')} 
-            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${
-              previewMode === 'mobile' ? 'bg-white text-indigo-600 shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            <Smartphone size={14} /> Mobile
-          </button>
+        {/* --- CENTRAL CONTROLS --- */}
+        <div className="flex items-center gap-6">
+          {/* Theme Switcher */}
+          <div className="flex bg-slate-100 p-1.5 rounded-[1.5rem] border border-slate-200">
+            {Object.values(THEMES).map((t: any) => (
+              <button
+                key={t.id}
+                onClick={() => setData({ ...data, theme: t.id })}
+                className={`w-8 h-8 rounded-full border-2 transition-all flex items-center justify-center ${
+                  (data.theme || 'indigo') === t.id ? 'border-slate-900 scale-110 shadow-lg' : 'border-transparent opacity-40 hover:opacity-100'
+                } ${t.primary}`}
+              >
+                {(data.theme || 'indigo') === t.id && <Check size={12} className="text-white" />}
+              </button>
+            ))}
+          </div>
+
+          <div className="h-8 w-px bg-slate-200 mx-2" />
+
+          {/* Preview Toggle */}
+          <div className="flex bg-slate-100 p-1.5 rounded-[1.5rem] border border-slate-200">
+            <button onClick={() => setPreviewMode('projector')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${previewMode === 'projector' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'}`}>
+              <Monitor size={14} /> Projector
+            </button>
+            <button onClick={() => setPreviewMode('mobile')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${previewMode === 'mobile' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'}`}>
+              <Smartphone size={14} /> Mobile
+            </button>
+          </div>
         </div>
 
+        {/* Actions */}
         <div className="flex items-center gap-6">
            <button onClick={() => setJsonMode(!jsonMode)} className="text-[11px] font-black uppercase text-slate-300 hover:text-indigo-600 tracking-[0.2em] transition-colors">
               {jsonMode ? 'Visual Design' : 'Advanced JSON'}
            </button>
-           <button onClick={handleFinalSave} className="bg-slate-900 text-white px-10 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-2xl active:scale-95 transition-all">
+           <button onClick={handleFinalSave} className={`${currentTheme.primary} text-white px-10 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-2xl active:scale-95 transition-all duration-500`}>
               Commit Library
            </button>
         </div>
       </div>
 
+      {/* 2. MAIN CONTENT SPLIT */}
       <div className="flex-1 flex overflow-hidden">
-        {/* --- 2. EDITOR PANE (LEFT) --- */}
+        {/* EDITOR PANE (LEFT) */}
         <div className="w-1/2 overflow-y-auto p-12 bg-white border-r custom-scrollbar shadow-inner">
           {jsonMode ? (
             <div className="h-full flex flex-col gap-6">
                <textarea 
-                 value={jsonInput} 
-                 onChange={e => setJsonInput(e.target.value)}
+                 value={JSON.stringify(data, null, 2)} 
+                 onChange={e => { try { setData(JSON.parse(e.target.value)); } catch(err) {} }}
                  className="flex-1 p-10 bg-slate-950 text-emerald-400 font-mono text-sm rounded-[3rem] outline-none shadow-2xl leading-relaxed"
-                 placeholder="Paste lesson JSON here..."
+                 placeholder="Unit JSON..."
                />
-               <button onClick={handleImportJson} className="w-full py-6 bg-emerald-500 text-white rounded-[2rem] font-black uppercase tracking-widest text-xs shadow-xl active:scale-95 transition-all">Inject Unit Data</button>
+               <button className="w-full py-6 bg-emerald-500 text-white rounded-[2rem] font-black uppercase text-xs shadow-xl">Live Sync Active</button>
             </div>
           ) : (
             <div className="max-w-xl mx-auto space-y-16 pb-64">
-              {/* Metadata */}
               <div className="space-y-6">
                 <input className="text-6xl font-black border-none w-full focus:ring-0 p-0 placeholder:text-slate-100 tracking-tighter" placeholder="Unit Title..." value={data.title} onChange={e => setData({...data, title: e.target.value})} />
                 <input className="text-2xl font-bold text-slate-300 border-none w-full focus:ring-0 p-0 tracking-tight" placeholder="Unit Subtitle..." value={data.subtitle} onChange={e => setData({...data, subtitle: e.target.value})} />
@@ -3077,86 +3121,50 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
               {/* Dynamic Blocks */}
               <div className="space-y-8">
                 {(data.blocks || []).map((block: any, idx: number) => (
-                  <div key={idx} className="group bg-slate-50 p-8 rounded-[3rem] border-2 border-transparent hover:border-indigo-100 hover:bg-white transition-all relative shadow-sm">
-                    <button onClick={() => removeBlock(idx)} className="absolute -right-3 -top-3 p-3 bg-white text-rose-500 rounded-full shadow-xl opacity-0 group-hover:opacity-100 transition-all active:scale-90 border border-slate-100">
+                  <div key={idx} className={`group bg-slate-50 p-8 rounded-[3rem] border-2 border-transparent hover:${currentTheme.border} hover:bg-white transition-all relative shadow-sm`}>
+                    <button onClick={() => removeBlock(idx)} className="absolute -right-3 -top-3 p-3 bg-white text-rose-500 rounded-full shadow-xl opacity-0 group-hover:opacity-100 transition-all border border-slate-100">
                       <Trash2 size={20} />
                     </button>
-                    
-                    <span className="text-[11px] font-black text-indigo-400 uppercase tracking-widest mb-6 block">{block.type} Block</span>
+                    <span className={`text-[11px] font-black ${currentTheme.accent} uppercase tracking-widest mb-6 block`}>{block.type}</span>
 
                     {block.type === 'text' && (
-                      <div className="space-y-4">
-                        <input className="w-full font-bold text-slate-800 bg-slate-100/50 px-5 py-3 rounded-2xl text-sm outline-none" placeholder="Block Header (Optional)" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} />
-                        <textarea className="w-full bg-transparent font-black text-2xl border-none focus:ring-0 p-0 placeholder:text-slate-200" placeholder="Type core text..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
-                      </div>
+                      <textarea className="w-full bg-transparent font-black text-2xl border-none focus:ring-0 p-0 placeholder:text-slate-200" placeholder="Core text..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
                     )}
 
                     {block.type === 'essay' && (
-                      <div className="space-y-4">
-                        <input className="w-full font-black text-slate-800 bg-white border border-slate-200 px-5 py-3 rounded-2xl text-sm" placeholder="Essay Header" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} />
-                        <textarea className="w-full h-64 bg-white border border-slate-200 p-5 rounded-2xl text-xs font-serif leading-relaxed outline-none" placeholder="First paragraph...\n\nSecond paragraph..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
-                      </div>
-                    )}
-
-                    {block.type === 'dialogue' && (
-                      <div className="space-y-4">
-                        {block.lines?.map((line: any, lIdx: number) => (
-                          <div key={lIdx} className="flex gap-2">
-                            <input className="w-12 bg-white border rounded-xl text-center text-[10px] font-black p-2" value={line.speaker} placeholder="Spk" onChange={e => updateDialogueLine(idx, lIdx, 'speaker', e.target.value)} />
-                            <input className="flex-1 bg-white border p-3 rounded-xl text-xs font-bold" value={line.text} placeholder="Text..." onChange={e => updateDialogueLine(idx, lIdx, 'text', e.target.value)} />
-                            <select className="bg-slate-200 rounded-xl text-[10px] font-black px-2 outline-none" value={line.side} onChange={e => updateDialogueLine(idx, lIdx, 'side', e.target.value)}>
-                              <option value="left">Left</option>
-                              <option value="right">Right</option>
-                            </select>
-                          </div>
-                        ))}
-                        <button onClick={() => updateBlock(idx, 'lines', [...block.lines, {speaker: 'A', text: '', side: 'left'}])} className="text-[10px] font-black text-indigo-500 uppercase">+ Add Line</button>
-                      </div>
+                      <textarea className="w-full h-64 bg-white border border-slate-200 p-5 rounded-2xl text-xs font-serif leading-relaxed" placeholder="Paragraphs..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
                     )}
 
                     {block.type === 'vocab-list' && (
                       <div className="space-y-3">
                         {block.items?.map((item: any, i: number) => (
                           <div key={i} className="flex gap-3">
-                            <input className="flex-1 bg-white border p-3 rounded-xl text-xs font-black text-indigo-600" placeholder="Term" value={item.term} onChange={e => updateVocabItem(idx, i, 'term', e.target.value)} />
-                            <input className="flex-2 bg-white border p-3 rounded-xl text-xs text-slate-400" placeholder="Definition" value={item.definition} onChange={e => updateVocabItem(idx, i, 'definition', e.target.value)} />
+                            <input className={`flex-1 bg-white border p-3 rounded-xl text-xs font-black ${currentTheme.accent}`} value={item.term} onChange={e => updateVocabItem(idx, i, 'term', e.target.value)} />
+                            <input className="flex-2 bg-white border p-3 rounded-xl text-xs text-slate-400" value={item.definition} onChange={e => updateVocabItem(idx, i, 'definition', e.target.value)} />
                           </div>
                         ))}
-                        <button onClick={() => updateBlock(idx, 'items', [...block.items, {term: '', definition: ''}])} className="text-[10px] font-black text-indigo-500 uppercase">+ Add Term</button>
                       </div>
                     )}
                   </div>
                 ))}
               </div>
 
-              {/* Injector Button Grid */}
+              {/* Block Injector */}
               <div className="grid grid-cols-3 gap-4">
                  <InjectorButton icon={<AlignLeft/>} label="Text" onClick={() => addBlock('text')} />
                  <InjectorButton icon={<FileText/>} label="Essay" onClick={() => addBlock('essay')} />
                  <InjectorButton icon={<MessageSquare/>} label="Dialogue" onClick={() => addBlock('dialogue')} />
-                 <InjectorButton icon={<List/>} label="Vocab" onClick={() => addBlock('vocab-list')} />
-                 <InjectorButton icon={<HelpCircle/>} label="Quiz" onClick={() => addBlock('quiz')} />
-                 <InjectorButton icon={<Image/>} label="Visual" onClick={() => addBlock('image')} />
               </div>
             </div>
           )}
         </div>
 
-        {/* --- 3. THE CLEAN STAGE (RIGHT) --- */}
+        {/* PREVIEW PANE (RIGHT) */}
         <div className="w-1/2 bg-slate-50 p-20 flex flex-col items-center justify-center relative overflow-hidden">
-          <div className={`absolute inset-0 transition-colors duration-1000 ${previewMode === 'projector' ? 'bg-slate-50' : 'bg-slate-100'}`} />
-          
           <div className={`relative transition-all duration-700 ease-in-out z-10 ${
-            previewMode === 'projector' 
-              ? 'w-full aspect-video scale-90 shadow-2xl' 
-              : 'w-[360px] h-[640px] scale-95 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.25)]'
+            previewMode === 'projector' ? 'w-full aspect-video scale-90 shadow-2xl' : 'w-[360px] h-[640px] scale-95 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.25)]'
           }`}>
              <LivePreview />
-             <div className="absolute -bottom-12 left-0 right-0 text-center">
-                <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.5em] animate-pulse">
-                  {previewMode === 'projector' ? 'Cinematic Render' : 'Interactive Remote'}
-                </span>
-             </div>
           </div>
         </div>
       </div>
