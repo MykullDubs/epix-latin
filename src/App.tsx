@@ -3917,7 +3917,7 @@ function App() {
         setInstructorClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
-      return () => { unsubAuth(); unsubProfile(); unsubLessons(); unsubCards(); unsubClasses(); unsubInstructorclasses(); };
+      return () => { unsubAuth(); unsubProfile(); unsubLessons(); unsubCards(); unsubClasses(); unsubInstructorClasses(); };
     }
     return () => unsubAuth();
   }, [user?.uid, user?.email]);
@@ -4064,7 +4064,7 @@ function App() {
     return (
       <InstructorDashboard 
         user={user} 
-        userData={{ ...userData, classes: enrolledClasses }} 
+        userData={{ ...userData, classes: instructorClasses }} 
         allDecks={allDecks} 
         lessons={lessons} 
         
