@@ -20,7 +20,7 @@ import {
   Maximize2, BarChart2, Timer, Megaphone, Inbox, XCircle, ChevronUp, Send,
   ArrowUp, ArrowDown, Eye, EyeOff, MessageCircle, AlignLeft, ClipboardList, Table, Calendar,
   Trophy, Flame, Settings, BarChart3, CornerDownRight, MoreHorizontal, Dumbbell, Map, Sparkles, Star, TrendingUp, Target,
-  Filter, SlidersHorizontal, Hash, Gauge, ChevronLeft, Monitor, Smartphone, PenTool, Menu, Code  // <--- ADDED MISSING ICONS
+  Filter, SlidersHorizontal, Hash, Gauge, ChevronLeft, Monitor, Smartphone, PenTool, Menu, Code, Puzzle  // <--- ADDED MISSING ICONS
 } from 'lucide-react';
 
 
@@ -248,6 +248,22 @@ const LivePreview = ({ data }: any) => {
                  <p className="text-[3vh] font-black text-slate-800 leading-tight tracking-tighter">{b.content}</p>
                </div>
              )}
+
+            {b.type === 'fill-blank' && (
+                <div className="bg-white border-2 border-indigo-100 p-5 rounded-2xl shadow-sm">
+                  <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest block mb-2">Fill in the Blank</span>
+                  <h3 className="font-bold text-sm mb-4">{b.question}</h3>
+                  <div className="text-sm font-medium leading-relaxed text-slate-700 bg-slate-50 p-4 rounded-xl">
+                      {/* Quick visual preview of the text with brackets rendered as blanks */}
+                      {b.text?.split(/\[(.*?)\]/g).map((part: string, i: number) => 
+                          i % 2 === 0 ? part : <span key={i} className="inline-block w-16 h-6 border-b-2 border-slate-300 mx-1 border-dashed"></span>
+                      )}
+                  </div>
+                  <div className="mt-4 flex gap-2 flex-wrap opacity-60">
+                      {b.distractors?.map((d: string, i: number) => <span key={i} className="px-3 py-1 bg-slate-100 rounded-lg text-xs font-bold text-slate-500">{d}</span>)}
+                  </div>
+                </div>
+             )}
              
              {b.type === 'essay' && (
                <div className="space-y-6">
@@ -397,6 +413,156 @@ const ScenarioBlock = ({ block, onComplete }: any) => {
             <div className="p-4 border-b border-white/10 flex justify-between items-center relative z-20"><span className="text-xs font-bold uppercase tracking-widest text-white/70 flex items-center gap-2">{currentNode.speaker ? <User size={14}/> : <Brain size={14}/>} {currentNode.speaker || 'Scene'}</span>{history.length > 0 && <button onClick={() => { setCurrentNodeId(block.nodes[0].id); setHistory([]); }} className="text-xs text-white/50 hover:text-white flex items-center gap-1"><RotateCcw size={12}/> Restart</button>}</div>
             <div className="p-6 relative z-20 min-h-[100px] flex items-center"><p className="text-xl font-serif leading-relaxed animate-in fade-in slide-in-from-bottom-2 duration-500">"{currentNode.text}"</p></div>
             <div className="bg-black/20 p-2 grid gap-2 backdrop-blur-sm">{!isEnd ? currentNode.options.map((opt:any, i:number) => (<button key={i} onClick={() => { setHistory([...history, currentNode.text]); setCurrentNodeId(opt.nextNodeId); }} className="w-full p-4 text-left bg-white/10 hover:bg-white/20 rounded-xl transition-all font-bold text-sm border border-white/5 hover:border-white/30 flex justify-between items-center group"><span>{opt.text}</span><ArrowRight size={16} className="opacity-50 group-hover:opacity-100 transition-opacity"/></button>)) : (<button onClick={onComplete} className="w-full p-4 bg-white text-slate-900 hover:bg-emerald-400 rounded-xl font-bold flex items-center justify-center gap-2 animate-pulse shadow-lg">Complete Scenario <Check size={16}/></button>)}</div>
+        </div>
+    );
+};
+// ============================================================================
+//  FILL-IN-THE-BLANK (Tap-to-Drop Word Bank)
+// ============================================================================
+const FillBlankBlock = ({ block, onComplete }: any) => {
+    // 1. Parse the text: "I wake up [at] 7 AM." -> ["I wake up ", "at", " 7 AM."]
+    // Even indices are text, odd indices are the answers.
+    const parts = block.text ? block.text.split(/\[(.*?)\]/g) : [];
+    const blankCount = Math.floor(parts.length / 2);
+
+    const [answers, setAnswers] = useState<string[]>(Array(blankCount).fill(null));
+    const [selectedWord, setSelectedWord] = useState<string | null>(null);
+    const [submitted, setSubmitted] = useState(false);
+    const [isCorrect, setIsCorrect] = useState(false);
+
+    // 2. Generate Word Bank (Correct words + Distractors, Shuffled)
+    const wordBank = useMemo(() => {
+        const correctWords = parts.filter((_, i) => i % 2 !== 0);
+        const distractors = block.distractors || [];
+        return [...correctWords, ...distractors].sort(() => 0.5 - Math.random());
+    }, [block.text, block.distractors]);
+
+    // Handle tapping a blank slot
+    const handleBlankClick = (index: number) => {
+        if (submitted) return;
+        
+        const newAnswers = [...answers];
+        // If they have a word selected, drop it in
+        if (selectedWord) {
+            newAnswers[index] = selectedWord;
+            setAnswers(newAnswers);
+            setSelectedWord(null);
+        } 
+        // If they click a filled blank, remove the word back to the bank
+        else if (newAnswers[index]) {
+            newAnswers[index] = ''; // clear it
+            setAnswers(newAnswers);
+        }
+    };
+
+    const checkAnswers = () => {
+        const correctWords = parts.filter((_, i) => i % 2 !== 0);
+        const allMatch = answers.every((ans, i) => ans === correctWords[i]);
+        setIsCorrect(allMatch);
+        setSubmitted(true);
+    };
+
+    const reset = () => {
+        setAnswers(Array(blankCount).fill(null));
+        setSelectedWord(null);
+        setSubmitted(false);
+        setIsCorrect(false);
+    };
+
+    // Calculate which words are still available in the bank
+    const availableWords = wordBank.filter(word => {
+        // Count how many times this word appears in the bank vs how many times used in answers
+        const totalInBank = wordBank.filter(w => w === word).length;
+        const usedInAnswers = answers.filter(a => a === word).length;
+        return usedInAnswers < totalInBank;
+    });
+
+    // Deduplicate the display of available words so we don't show identical words unnecessarily, 
+    // unless multiple are actually needed.
+    const displayBank = Array.from(new Set(availableWords));
+
+    return (
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm my-8 animate-in zoom-in-95 duration-300">
+            <h3 className="font-bold text-lg text-slate-800 mb-6 flex items-start gap-2">
+                <span className="bg-indigo-100 text-indigo-600 p-1 rounded-lg mt-1 shrink-0"><Puzzle size={16}/></span>
+                {block.question || "Fill in the blanks"}
+            </h3>
+
+            {/* The Sentence Area */}
+            <div className="text-xl font-medium leading-loose text-slate-700 mb-10 flex flex-wrap items-center gap-y-3">
+                {parts.map((part: string, idx: number) => {
+                    if (idx % 2 === 0) {
+                        return <span key={idx} className="mr-1">{part}</span>;
+                    } else {
+                        const blankIdx = Math.floor(idx / 2);
+                        const filledWord = answers[blankIdx];
+                        const isChecking = submitted;
+                        const isRight = filledWord === part;
+
+                        let style = "bg-slate-100 border-slate-200 text-slate-400 border-dashed"; // Empty
+                        if (filledWord && !isChecking) style = "bg-indigo-50 border-indigo-300 text-indigo-700 border-solid shadow-sm"; // Filled
+                        if (isChecking && isRight) style = "bg-emerald-100 border-emerald-500 text-emerald-700 border-solid"; // Correct
+                        if (isChecking && !isRight) style = "bg-rose-100 border-rose-500 text-rose-700 border-solid"; // Wrong
+
+                        return (
+                            <button
+                                key={idx}
+                                onClick={() => handleBlankClick(blankIdx)}
+                                disabled={submitted}
+                                className={`min-w-[80px] h-10 px-4 mx-1 rounded-xl border-2 font-bold text-sm flex items-center justify-center transition-all active:scale-95 ${style} ${selectedWord && !filledWord && !submitted ? 'ring-2 ring-indigo-400 ring-offset-2 animate-pulse' : ''}`}
+                            >
+                                {filledWord || " "}
+                            </button>
+                        );
+                    }
+                })}
+            </div>
+
+            {/* The Word Bank */}
+            {!submitted && (
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">Word Bank</span>
+                    <div className="flex flex-wrap gap-2">
+                        {displayBank.map((word, idx) => (
+                            <button
+                                key={idx}
+                                onClick={() => setSelectedWord(word === selectedWord ? null : word)}
+                                className={`px-4 py-2 rounded-xl font-bold text-sm transition-all shadow-sm active:scale-95 ${selectedWord === word ? 'bg-indigo-600 text-white shadow-md -translate-y-1' : 'bg-white border-2 border-slate-200 text-slate-600 hover:border-indigo-300'}`}
+                            >
+                                {word}
+                            </button>
+                        ))}
+                        {displayBank.length === 0 && <span className="text-slate-400 text-sm italic">All words placed!</span>}
+                    </div>
+                </div>
+            )}
+
+            {/* Actions */}
+            {!submitted ? (
+                <button 
+                    onClick={checkAnswers} 
+                    disabled={answers.includes(null) || answers.includes('')} 
+                    className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold disabled:opacity-50 transition-all shadow-lg"
+                >
+                    Check Answers
+                </button>
+            ) : (
+                <div className={`p-4 rounded-2xl flex justify-between items-center animate-in zoom-in ${isCorrect ? 'bg-emerald-50 border border-emerald-100' : 'bg-rose-50 border border-rose-100'}`}>
+                    <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-full ${isCorrect ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                            {isCorrect ? <Check size={20} strokeWidth={3}/> : <X size={20} strokeWidth={3}/>}
+                        </div>
+                        <span className={`font-bold ${isCorrect ? 'text-emerald-800' : 'text-rose-800'}`}>
+                            {isCorrect ? "Perfectly placed!" : "Not quite right."}
+                        </span>
+                    </div>
+                    {isCorrect ? (
+                        <button onClick={onComplete} className="px-6 py-3 bg-emerald-500 text-white rounded-xl text-sm font-bold shadow-md hover:bg-emerald-600 active:scale-95 transition-all">Continue</button>
+                    ) : (
+                        <button onClick={reset} className="px-6 py-3 bg-white text-rose-600 border border-rose-200 rounded-xl text-sm font-bold shadow-sm hover:bg-rose-50 active:scale-95 transition-all">Try Again</button>
+                    )}
+                </div>
+            )}
         </div>
     );
 };
@@ -623,6 +789,9 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
             </p>
           </div>
         );
+        
+        case 'fill-blank':
+        return <FillBlankBlock key={idx} block={block} onComplete={handleAutoAdvance} />;
 
       case 'essay':
         return (
@@ -3176,7 +3345,9 @@ function LessonBuilderView({ data, setData, onSave }: any) {
       dialogue: { type: 'dialogue', lines: [{ speaker: 'A', text: '', side: 'left' }] },
       'vocab-list': { type: 'vocab-list', items: [{ term: '', definition: '' }] },
       quiz: { type: 'quiz', question: '', options: [{id:'a',text:''},{id:'b',text:''}], correctId: 'a' },
-      image: { type: 'image', url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa', caption: '' }
+      image: { type: 'image', url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa', caption: '' },
+      'fill-blank': { type: 'fill-blank', question: 'Fill in the blanks:', text: 'The [quick] brown [fox] jumps.', distractors: ['slow', 'dog'] }
+      
     };
     setData({ ...data, blocks: [...(data.blocks || []), templates[type]] });
   };
@@ -3370,6 +3541,42 @@ function LessonBuilderView({ data, setData, onSave }: any) {
                      </div>
                   </div>
                 )}
+                {/* FILL BLANK EDITOR */}
+                {block.type === 'fill-blank' && (
+                  <div className="space-y-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <div className="flex items-center gap-2 mb-2">
+                        <Puzzle size={16} className="text-indigo-500" />
+                        <span className="text-xs font-bold text-slate-600">Drag & Drop Configurator</span>
+                     </div>
+                     <input 
+                        className="w-full bg-white border border-slate-200 p-3 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-100" 
+                        placeholder="Instruction (e.g., Fill in the missing verbs)" 
+                        value={block.question || ''} 
+                        onChange={e => updateBlock(idx, 'question', e.target.value)} 
+                     />
+                     <div>
+                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Sentence (Use [brackets] for blanks)</label>
+                       <textarea 
+                          className="w-full bg-white border border-slate-200 p-3 rounded-xl text-sm font-mono resize-none h-24 focus:ring-2 focus:ring-indigo-100" 
+                          placeholder="I want to buy [apples] at the [store]." 
+                          value={block.text || ''} 
+                          onChange={e => updateBlock(idx, 'text', e.target.value)} 
+                       />
+                     </div>
+                     <div>
+                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Distractor Words (Comma separated)</label>
+                       <input 
+                          className="w-full bg-white border border-slate-200 p-3 rounded-xl text-sm focus:ring-2 focus:ring-indigo-100" 
+                          placeholder="oranges, bank, sell" 
+                          value={(block.distractors || []).join(', ')} 
+                          onChange={e => {
+                             const distArr = e.target.value.split(',').map((s:string) => s.trim()).filter((s:string) => s !== '');
+                             updateBlock(idx, 'distractors', distArr);
+                          }} 
+                       />
+                     </div>
+                  </div>
+                )}
 
               </div>
             ))}
@@ -3383,6 +3590,7 @@ function LessonBuilderView({ data, setData, onSave }: any) {
              <InjectorButton icon={<List/>} label="Vocab" onClick={() => addBlock('vocab-list')} />
              <InjectorButton icon={<HelpCircle/>} label="Quiz" onClick={() => addBlock('quiz')} />
              <InjectorButton icon={<Image/>} label="Visual" onClick={() => addBlock('image')} />
+            <InjectorButton icon={<Puzzle/>} label="Fill Blank" onClick={() => addBlock('fill-blank')} />
           </div>
         </div>
       )}
