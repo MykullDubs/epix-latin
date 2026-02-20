@@ -506,11 +506,37 @@ function ClassView({ lesson, classId, userData }: any) {
   );
 }
 // ============================================================================
-//  LESSON VIEW (Modern "Story" Style)
+//  LESSON VIEW (Modern "Story" Style - Fully Interactive)
 // ============================================================================
 function LessonView({ lesson, onFinish, isInstructor = true }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // --- PAGINATION LOGIC (Moved up so handleAutoAdvance can use it) ---
+  const pages = useMemo(() => {
+    if (!lesson?.blocks) return [];
+    const grouped: any[] = [];
+    let buffer: any[] = [];
+    lesson.blocks.forEach((b: any) => {
+      if (['quiz', 'flashcard', 'scenario'].includes(b.type)) {
+        if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
+        grouped.push({ type: 'interact', blocks: [b] });
+        buffer = [];
+      } else { buffer.push(b); }
+    });
+    if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
+    return grouped;
+  }, [lesson]);
+
+  // --- AUTO-ADVANCE HANDLER ---
+  const handleAutoAdvance = () => {
+      if (activePageIdx < pages.length - 1) {
+          setActivePageIdx(activePageIdx + 1);
+          containerRef.current?.scrollTo(0,0);
+      } else {
+          onFinish();
+      }
+  };
 
   // --- SCROLL SYNC (Michael's Remote Control) ---
   useEffect(() => {
@@ -534,6 +560,7 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
       case 'text':
         return (
           <div key={idx} className="py-6 text-center animate-in fade-in slide-in-from-bottom-2">
+            {block.title && <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4">{block.title}</h3>}
             <p className="text-3xl font-black text-slate-900 leading-tight tracking-tighter">
               {block.content}
             </p>
@@ -559,11 +586,9 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
           <div key={idx} className="py-6 space-y-6">
             {block.lines?.map((line: any, j: number) => (
               <div key={j} className={`flex items-end gap-3 ${line.side === 'right' ? 'flex-row-reverse' : ''}`}>
-                {/* Speaker Avatar */}
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black text-white shrink-0 shadow-lg ${line.side === 'right' ? 'bg-indigo-600' : 'bg-slate-800'}`}>
                   {line.speaker?.[0].toUpperCase()}
                 </div>
-                {/* Speech Bubble */}
                 <div className={`max-w-[80%] p-4 rounded-[1.8rem] shadow-sm text-sm font-medium leading-relaxed ${
                   line.side === 'right' 
                     ? 'bg-indigo-500 text-white rounded-br-none' 
@@ -595,43 +620,29 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
           </div>
         );
 
-      case 'quiz':
+      // --- NEW: Renders Visuals ---
+      case 'image':
         return (
-          <div key={idx} className="my-8 bg-slate-900 rounded-[3rem] p-8 text-white shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 blur-3xl" />
-            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block mb-4">Knowledge Check</span>
-            <h3 className="text-xl font-bold mb-8 leading-tight">{block.question}</h3>
-            <div className="space-y-3">
-              {block.options?.map((opt: any, j: number) => (
-                <button key={j} className="w-full p-5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-left text-sm font-bold transition-all active:scale-95">
-                  <span className="inline-block w-6 h-6 rounded-lg bg-white/10 text-center leading-6 mr-3 text-[10px]">{opt.id.toUpperCase()}</span>
-                  {opt.text}
-                </button>
-              ))}
-            </div>
+          <div key={idx} className="py-6 animate-in fade-in">
+             <div className="rounded-3xl overflow-hidden shadow-lg border border-slate-100">
+                <img src={block.url} alt="Lesson visual" className="w-full h-auto object-cover max-h-64" />
+             </div>
+             {block.caption && <p className="text-xs font-bold text-slate-400 text-center mt-3 px-4">{block.caption}</p>}
           </div>
         );
 
+      // --- FIXED: Uses your stateful Quiz component ---
+      case 'quiz':
+        return <QuizBlock key={idx} block={block} onComplete={handleAutoAdvance} />;
+
+      // --- FIXED: Uses your stateful Scenario component ---
+      case 'scenario':
+        return <ScenarioBlock key={idx} block={block} onComplete={handleAutoAdvance} />;
+
       default:
-        return <div key={idx} className="p-8 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-100 text-center text-xs text-slate-400 font-bold uppercase tracking-widest">Unsupported Module</div>;
+        return <div key={idx} className="p-8 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-100 text-center text-xs text-slate-400 font-bold uppercase tracking-widest">Unsupported Module: {block.type}</div>;
     }
   };
-
-  // --- PAGINATION LOGIC (The Handshake) ---
-  const pages = useMemo(() => {
-    if (!lesson?.blocks) return [];
-    const grouped: any[] = [];
-    let buffer: any[] = [];
-    lesson.blocks.forEach((b: any) => {
-      if (['quiz', 'flashcard', 'scenario'].includes(b.type)) {
-        if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
-        grouped.push({ type: 'interact', blocks: [b] });
-        buffer = [];
-      } else { buffer.push(b); }
-    });
-    if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
-    return grouped;
-  }, [lesson]);
 
   if (!pages[activePageIdx]) return null;
 
@@ -675,7 +686,7 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
 
         {activePageIdx < pages.length - 1 ? (
           <button 
-            onClick={() => { setActivePageIdx(activePageIdx + 1); containerRef.current?.scrollTo(0,0); }} 
+            onClick={handleAutoAdvance} 
             className="p-5 bg-indigo-600 text-white rounded-3xl shadow-xl shadow-indigo-200 active:scale-90 transition-all"
           >
             <ArrowRight size={24} strokeWidth={3} />
