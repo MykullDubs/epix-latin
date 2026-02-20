@@ -3820,32 +3820,25 @@ function ExamPlayerView({ exam, onFinish }: any) {
 
 
 function App() {
-  // --- 1. GLOBAL STATE ---
+  // --- 1. STATE ---
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [viewMode, setViewMode] = useState<'student' | 'instructor'>('student');
   const [activeTab, setActiveTab] = useState('home');
-  
-  // --- 2. DATA REPOSITORIES ---
-  const [systemLessons] = useState([]); 
   const [customLessons, setCustomLessons] = useState<any[]>([]);
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [allDecks, setAllDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
-  
-  // --- 3. UI NAVIGATION STATE ---
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [activeLesson, setActiveLesson] = useState<any>(null);
-  const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
 
-  // --- 4. DATA CONSOLIDATION (The Unit Relay) ---
+  // --- 2. DATA RELAY ---
   const lessons = useMemo(() => {
-    // Merges all source content into a single searchable array
     const assignments = enrolledClasses.flatMap(c => c.assignments || []);
-    return [...systemLessons, ...customLessons, ...assignments];
-  }, [systemLessons, customLessons, enrolledClasses]);
+    return [...customLessons, ...assignments];
+  }, [customLessons, enrolledClasses]);
 
-  // --- 5. FIREBASE SYNC ENGINE ---
+  // --- 3. FIREBASE SYNC ---
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -3856,7 +3849,6 @@ function App() {
     });
 
     if (user?.uid) {
-      // Profile & Role Sync (Determines if Magister Mode is available)
       const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
         if (snap.exists()) {
           const data = snap.data();
@@ -3866,29 +3858,23 @@ function App() {
         setAuthChecked(true);
       });
 
-      // Instructor Content Sync (Lessons & Flashcards)
       const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => {
         setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
-      const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => {
-        const cards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setAllDecks((prev: any) => ({ ...prev, custom: { ...prev.custom, cards } }));
-      });
-
-      // Cohort/Class Sync (Based on email membership)
       const qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
       const unsubClasses = onSnapshot(qClasses, (snap) => {
         setEnrolledClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
-      return () => { unsubAuth(); unsubProfile(); unsubLessons(); unsubCards(); unsubClasses(); };
+      return () => { unsubAuth(); unsubProfile(); unsubLessons(); unsubClasses(); };
     }
     return () => unsubAuth();
-  }, [user?.uid, user?.email]);
+  }, [user?.uid]);
 
-  // --- 6. MAGISTER HANDLERS (The Prop Relay Source) ---
-
+  // --- 4. THE MAGISTER HANDLERS (The Fix) ---
+  
+  // These functions define the logic and match the prop names in InstructorDashboard
   const handleCreateClass = async (className: string) => {
     if (!user) return { success: false };
     try {
@@ -3900,22 +3886,6 @@ function App() {
         assignments: [],
         created: Date.now()
       });
-      return { success: true };
-    } catch (e) { return { success: false }; }
-  };
-
-  const handleDeleteClass = async (id: string) => {
-    if (!user) return { success: false };
-    try {
-      await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id));
-      return { success: true };
-    } catch (e) { return { success: false }; }
-  };
-
-  const handleRenameClass = async (id: string, newName: string) => {
-    if (!user) return { success: false };
-    try {
-      await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id), { name: newName });
       return { success: true };
     } catch (e) { return { success: false }; }
   };
@@ -3933,7 +3903,6 @@ function App() {
   };
 
   const handleAssign = async (classId: string, assignment: any) => {
-    if (!user) return { success: false };
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), {
         assignments: arrayUnion(assignment)
@@ -3943,7 +3912,6 @@ function App() {
   };
 
   const handleRevoke = async (classId: string, assignment: any) => {
-    if (!user) return { success: false };
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), {
         assignments: arrayRemove(assignment)
@@ -3956,30 +3924,14 @@ function App() {
     if (!user) return;
     const lessonId = lessonData.id || `lesson_${Date.now()}`;
     await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', lessonId), {
-      ...lessonData,
-      id: lessonId,
-      instructorId: user.uid,
-      updatedAt: Date.now()
+      ...lessonData, id: lessonId, instructorId: user.uid, updatedAt: Date.now()
     });
   };
 
-  const handleSaveCard = async (cardData: any) => {
-    if (!user) return;
-    const cardId = `card_${Date.now()}`;
-    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), { ...cardData, id: cardId, owner: user.uid });
-  };
-
-  // --- 7. FINAL ROUTING ---
-
-  if (!authChecked) return (
-    <div className="h-screen flex items-center justify-center bg-white">
-      <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
-
+  // --- 5. RENDER ---
+  if (!authChecked) return <div className="h-screen flex items-center justify-center">Loading...</div>;
   if (!user) return <AuthView />;
 
-  // Magister Render
   if (viewMode === 'instructor' && userData?.role === 'instructor') {
     return (
       <InstructorDashboard 
@@ -3988,12 +3940,10 @@ function App() {
         allDecks={allDecks} 
         lessons={lessons} 
         onSaveLesson={handleSaveLesson} 
-        onSaveCard={handleSaveCard}
         onAssign={handleAssign}
         onRevoke={handleRevoke}
+        // FIX: Mapping the handlers to the correct props
         onCreateClass={handleCreateClass}
-        onDeleteClass={handleDeleteClass}
-        onRenameClass={handleRenameClass}
         onAddStudent={handleAddStudent}
         onSwitchView={() => setViewMode('student')}
         onLogout={() => signOut(auth)} 
@@ -4001,42 +3951,23 @@ function App() {
     );
   }
 
-  // Student Render
   return (
-    <div className="bg-slate-50 min-h-screen w-full flex justify-center items-start overflow-hidden relative font-sans">
+    <div className="bg-slate-50 min-h-screen w-full flex flex-col items-center relative font-sans">
       {userData?.role === 'instructor' && (
-        <button 
-          onClick={() => setViewMode('instructor')} 
-          className="fixed top-6 right-6 z-[1000] bg-slate-900 text-white px-8 py-3 rounded-full font-black text-xs uppercase tracking-widest shadow-2xl transition-all hover:scale-105 active:scale-95"
-        >
-          🎓 Magister Mode
-        </button>
+        <button onClick={() => setViewMode('instructor')} className="fixed top-6 right-6 z-[1000] bg-slate-900 text-white px-8 py-3 rounded-full font-black text-xs uppercase shadow-2xl">🎓 Magister Mode</button>
       )}
 
-      {/* Mobile-First Student Viewport */}
-      <div className={`w-full transition-all duration-700 bg-white relative overflow-hidden flex flex-col ${
-        activeTab === 'presentation' ? 'h-screen w-screen fixed inset-0 z-[200]' : 'max-w-md h-[100dvh] shadow-2xl'
-      }`}>
-        <div className="flex-1 h-full overflow-hidden relative">
+      <div className={`w-full bg-white relative overflow-hidden flex flex-col ${activeTab === 'presentation' ? 'h-screen w-screen fixed inset-0' : 'max-w-md h-[100dvh] shadow-2xl'}`}>
+        <div className="flex-1 overflow-hidden relative">
           {activeTab === 'presentation' ? (
             <ClassView lesson={lessons.find(l => l.id === selectedLessonId)} userData={userData} />
           ) : activeLesson ? (
             <LessonView lesson={activeLesson} onFinish={() => setActiveLesson(null)} isInstructor={userData?.role === 'instructor'} />
           ) : (
-            <HomeView 
-              setActiveTab={setActiveTab} 
-              classes={enrolledClasses} 
-              onSelectClass={setActiveStudentClass} 
-              userData={userData} 
-              user={user} 
-              setSelectedLessonId={setSelectedLessonId}
-            />
+            <HomeView setActiveTab={setActiveTab} classes={enrolledClasses} userData={userData} user={user} setSelectedLessonId={setSelectedLessonId} />
           )}
         </div>
-        
-        {(!activeLesson && activeTab !== 'presentation') && (
-          <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
-        )}
+        {(!activeLesson && activeTab !== 'presentation') && <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />}
       </div>
     </div>
   );
