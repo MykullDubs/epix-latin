@@ -2077,7 +2077,7 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
           {messages.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-slate-300 opacity-50">
               <MessageSquare size={48} className="mb-2" />
-              <p className="font-bold italic">No messages yet...</p>
+              <p className="font-bold italic text-center px-10">Start the conversation for {classData.name}!</p>
             </div>
           )}
           {messages.map((msg) => (
@@ -2108,46 +2108,68 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
     );
   };
 
+  // --- MAIN RENDER ---
   return (
     <div className="h-full flex flex-col bg-white overflow-hidden">
+      {/* 1. Header & Navigation */}
       <div className="p-8 pt-12 shrink-0">
         <button onClick={onBack} className="mb-4 flex items-center gap-2 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-black uppercase tracking-widest">
           <ArrowLeft size={16} /> Dashboard
         </button>
         <h2 className="text-3xl font-black text-slate-900 leading-tight mb-2">{classData.name}</h2>
+        <p className="text-slate-400 font-medium text-sm line-clamp-2">{classData.description || "Welcome to your class portal."}</p>
+        
         <div className="flex gap-2 mt-8 p-1.5 bg-slate-100 rounded-[1.5rem] w-fit">
-          <button onClick={() => setActiveSubTab('lessons')} className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all ${activeSubTab === 'lessons' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>Lessons</button>
-          <button onClick={() => setActiveSubTab('forum')} className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all ${activeSubTab === 'forum' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>Discussion</button>
+          <button 
+            onClick={() => setActiveSubTab('lessons')} 
+            className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all ${
+              activeSubTab === 'lessons' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            Lessons
+          </button>
+          <button 
+            onClick={() => setActiveSubTab('forum')} 
+            className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all ${
+              activeSubTab === 'forum' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            Discussion
+          </button>
         </div>
       </div>
 
+      {/* 2. Scrollable Content Area */}
       <div className="flex-1 overflow-y-auto px-8 pb-12">
         {activeSubTab === 'lessons' ? (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
             {classData.assignments?.map((item: any) => (
               <div 
                 key={item.id} 
-                className="group p-6 bg-white border-2 border-slate-100 rounded-[2.5rem] flex justify-between items-center hover:border-indigo-200 transition-all duration-300"
+                className="group p-5 bg-white border-2 border-slate-100 rounded-[2.5rem] flex justify-between items-center hover:border-indigo-200 transition-all duration-300"
               >
-                <div className="flex items-center gap-4 flex-1" onClick={() => onSelectLesson(item)}>
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors cursor-pointer">
+                {/* Play Lesson (Mobile View) */}
+                <div className="flex items-center gap-4 flex-1 cursor-pointer" onClick={() => onSelectLesson(item)}>
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                     <Play size={24} fill="currentColor" />
                   </div>
-                  <div className="cursor-pointer">
+                  <div>
                     <h4 className="font-black text-slate-800 text-lg leading-none mb-1">{item.title}</h4>
                     <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{item.type || 'Lesson'}</span>
                   </div>
                 </div>
 
-                {/* THE MONITOR BUTTON (REINSTATED) */}
+                {/* Present Lesson (Big Screen View) */}
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
-                    const targetId = item.lessonId || item.id || item.originalId;
+                    // CRITICAL: Pass the ID that points to the actual content blocks
+                    const targetId = item.originalId || item.lessonId || item.id;
                     setSelectedLessonId(targetId);
                     setActiveTab('presentation');
                   }}
-                  className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-amber-50 hover:text-amber-600 transition-all flex items-center justify-center shadow-sm active:scale-90"
+                  className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-amber-100 hover:text-amber-600 transition-all flex items-center justify-center shadow-sm active:scale-90"
+                  title="Launch Presentation Mode"
                 >
                   <Monitor size={24} />
                 </button>
@@ -2155,7 +2177,9 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
             ))}
           </div>
         ) : (
-          <ClassForum classId={classData.id} />
+          <div className="animate-in fade-in h-full">
+            <ClassForum classId={classData.id} />
+          </div>
         )}
       </div>
     </div>
