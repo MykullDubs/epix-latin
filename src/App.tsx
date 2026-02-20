@@ -3383,23 +3383,21 @@ function InstructorDashboard({
   userData, 
   allDecks, 
   lessons, 
-  onSaveCard, 
-  onUpdateCard, 
-  onDeleteCard, 
   onSaveLesson, 
-  onAssign,       // Prop Relay: Assignment Logic
-  onRevoke,       // Prop Relay: Removal Logic
-  onCreateClass,  // Prop Relay: Creation Logic
-  onRenameClass,  // Prop Relay: Update Logic
-  onDeleteClass,  // Prop Relay: Deletion Logic
-  onAddStudent,   // Prop Relay: Roster Logic
+  onSaveCard, 
+  onAssign,       // Aligned with handleAssign in App.tsx
+  onRevoke,       // Aligned with handleRevoke in App.tsx
+  onCreateClass,  // Aligned with handleCreateClass in App.tsx
+  onDeleteClass,  // Aligned with handleDeleteClass in App.tsx
+  onRenameClass,  // Aligned with handleRenameClass in App.tsx
+  onAddStudent,   // Aligned with handleAddStudent in App.tsx
   onSwitchView, 
   onLogout 
 }: any) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isRailExpanded, setIsRailExpanded] = useState(false);
 
-  // --- 1. THE NAV ITEM (FINGER-FRIENDLY) ---
+  // --- 1. THE NAV ITEM (FINGER-FRIENDLY & RESPONSIVE) ---
   const NavItem = ({ id, icon, label }: { id: string; icon: React.ReactNode; label: string }) => {
     const isActive = activeTab === id;
     
@@ -3412,7 +3410,7 @@ function InstructorDashboard({
             : 'text-slate-500 hover:bg-slate-800 hover:text-slate-200'
         }`}
       >
-        {/* The 80px "Rail" Zone - Perfectly centered for tablet thumbs */}
+        {/* The "Rail" Zone - Optimized for tablet thumb placement */}
         <div className="w-20 shrink-0 flex items-center justify-center">
           {React.cloneElement(icon as React.ReactElement, { 
             size: 22, 
@@ -3427,9 +3425,9 @@ function InstructorDashboard({
           {label}
         </span>
 
-        {/* Tablet Indicator Pip */}
+        {/* Active Indicator Pip (Tablet Rail Mode) */}
         {isActive && !isRailExpanded && (
-          <div className="absolute left-0 w-1 h-6 bg-white rounded-r-full animate-in slide-in-from-left-full" />
+          <div className="absolute left-0 w-1.5 h-6 bg-white rounded-r-full animate-in slide-in-from-left-full" />
         )}
       </button>
     );
@@ -3444,10 +3442,10 @@ function InstructorDashboard({
           isRailExpanded ? 'w-72' : 'w-20'
         }`}
       >
-        {/* Branding Header */}
+        {/* Branding & Interaction Header */}
         <div className="h-24 flex items-center border-b border-slate-900 overflow-hidden shrink-0">
           <div className="w-20 flex items-center justify-center shrink-0">
-            <div className={`w-11 h-11 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center text-white shadow-lg transition-transform duration-700 ${isRailExpanded ? 'rotate-0' : 'rotate-12 scale-90'}`}>
+            <div className={`w-11 h-11 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/20 transition-transform duration-700 ${isRailExpanded ? 'rotate-0' : 'rotate-12 scale-90'}`}>
               <GraduationCap size={24} strokeWidth={2.5} />
             </div>
           </div>
@@ -3462,7 +3460,7 @@ function InstructorDashboard({
             </button>
           </div>
 
-          {/* Floating Toggle for Tablet */}
+          {/* Floating Toggle (Mobile/Tablet Only) */}
           {!isRailExpanded && (
             <button 
               onClick={() => setIsRailExpanded(true)}
@@ -3473,17 +3471,17 @@ function InstructorDashboard({
           )}
         </div>
 
-        {/* Navigation Rail */}
+        {/* Main Navigation Stack */}
         <nav className="flex-1 px-3 py-10 space-y-4 overflow-y-auto custom-scrollbar">
           <NavItem id="dashboard" icon={<Activity />} label="Live Feed" />
           <NavItem id="studio" icon={<PenTool />} label="Studio Hub" />
-          <NavItem id="classes" icon={<School />} label="Classes" />
+          <NavItem id="classes" icon={<School />} label="Cohort Manager" />
           <NavItem id="inbox" icon={<Inbox />} label="Grading" />
           <NavItem id="analytics" icon={<BarChart2 />} label="Analytics" />
         </nav>
 
-        {/* User Utilities */}
-        <div className="p-3 border-t border-slate-900 space-y-2 shrink-0">
+        {/* Footer: User & Mode Switchers */}
+        <div className="p-3 border-t border-slate-900 space-y-2 shrink-0 bg-slate-950/50">
           <button 
             onClick={onSwitchView}
             className="flex items-center h-14 w-full rounded-2xl text-slate-500 hover:bg-slate-800 hover:text-indigo-400 transition-all active:scale-95"
@@ -3491,7 +3489,7 @@ function InstructorDashboard({
             <div className="w-14 flex items-center justify-center shrink-0 ml-1">
               <User size={20} />
             </div>
-            {isRailExpanded && <span className="text-[10px] font-black uppercase tracking-widest">Student Mode</span>}
+            {isRailExpanded && <span className="text-[10px] font-black uppercase tracking-widest">Student View</span>}
           </button>
 
           <button 
@@ -3506,7 +3504,7 @@ function InstructorDashboard({
         </div>
       </aside>
 
-      {/* --- MAIN STAGE --- */}
+      {/* --- MAIN STAGE: DYNAMIC CONTENT --- */}
       <main className="flex-1 overflow-hidden relative bg-slate-50">
         <div className="h-full w-full">
            {activeTab === 'studio' ? (
@@ -3514,20 +3512,18 @@ function InstructorDashboard({
                <BuilderHub 
                   onSaveLesson={onSaveLesson} 
                   onSaveCard={onSaveCard}
-                  onUpdateCard={onUpdateCard}
-                  onDeleteCard={onDeleteCard}
                   lessons={lessons} 
                   allDecks={allDecks} 
                />
              </div>
            ) : activeTab === 'classes' ? (
-             <div className="h-full p-8 md:p-12 overflow-y-auto custom-scrollbar">
+             <div className="h-full p-6 md:p-12 overflow-y-auto custom-scrollbar animate-in slide-in-from-right-6 duration-500">
                <ClassManagerView 
                   user={user}
                   classes={userData?.classes || []}
                   lessons={lessons}
                   allDecks={allDecks}
-                  // HANDLERS ALIGNED WITH APP.TSX PROPS
+                  // PROP RELAY ALIGNMENT
                   onAssign={onAssign}
                   onRevoke={onRevoke}
                   onCreateClass={onCreateClass}
@@ -3540,12 +3536,14 @@ function InstructorDashboard({
              <div className="h-full overflow-y-auto p-12 custom-scrollbar animate-in fade-in duration-700">
                 <header className="mb-12">
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse" />
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Magister Command</span>
                   </div>
                   <h2 className="text-6xl font-black text-slate-900 tracking-tighter uppercase leading-none">{activeTab}</h2>
+                  <div className="h-1.5 w-16 bg-indigo-600 rounded-full mt-4" />
                 </header>
                 
+                {/* Dynamic Views */}
                 {activeTab === 'dashboard' && <LiveActivityFeed />}
                 {activeTab === 'analytics' && <AnalyticsDashboard classes={userData?.classes} />}
                 {activeTab === 'inbox' && <InstructorInbox />}
