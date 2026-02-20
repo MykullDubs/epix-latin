@@ -3865,7 +3865,7 @@ function App() {
   // --- 3. UI NAVIGATION STATE ---
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [activeLesson, setActiveLesson] = useState<any>(null);
-  const [activeStudentClass, setActiveStudentClass] = useState<any>(null); // Controls StudentClassView
+  const [activeStudentClass, setActiveStudentClass] = useState<any>(null); // State for the selected class
 
   // --- 4. DATA CONSOLIDATION ---
   const lessons = useMemo(() => {
@@ -3873,7 +3873,7 @@ function App() {
     return [...systemLessons, ...customLessons, ...assignments];
   }, [systemLessons, customLessons, enrolledClasses]);
 
-  // --- 5. FIREBASE REAL-TIME SYNC ---
+  // --- 5. FIREBASE SYNC ---
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -3912,7 +3912,7 @@ function App() {
     return () => unsubAuth();
   }, [user?.uid, user?.email]);
 
-  // --- 6. MAGISTER DATABASE HANDLERS ---
+  // --- 6. MAGISTER HANDLERS ---
   const handleCreateClass = async (className: string) => {
     if (!user) return { success: false };
     try {
@@ -3988,18 +3988,11 @@ function App() {
     });
   };
 
-  // --- 7. ROUTING & RENDERING ---
-  if (!authChecked) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-slate-50">
-        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin shadow-lg" />
-      </div>
-    );
-  }
-
+  // --- 7. ROUTING ---
+  if (!authChecked) return <div className="h-screen flex items-center justify-center">Loading...</div>;
   if (!user) return <AuthView />;
 
-  // --- STAGE A: MAGISTER COMMAND CENTER ---
+  // MAGISTER MODE
   if (viewMode === 'instructor' && userData?.role === 'instructor') {
     return (
       <InstructorDashboard 
@@ -4021,50 +4014,46 @@ function App() {
     );
   }
 
-  // --- STAGE B: STUDENT EXPERIENCE ---
+  // STUDENT MODE
   return (
     <div className="bg-slate-50 min-h-screen w-full flex flex-col items-center relative font-sans overflow-hidden">
-      
-      {/* Instructor Backdoor Toggle */}
       {userData?.role === 'instructor' && (
-        <button 
-          onClick={() => setViewMode('instructor')} 
-          className="fixed top-6 right-6 z-[1000] bg-slate-900 text-white px-8 py-3 rounded-full font-black text-xs uppercase tracking-widest shadow-2xl transition-all hover:scale-105 active:scale-95"
-        >
-          🎓 Magister Command
-        </button>
+        <button onClick={() => setViewMode('instructor')} className="fixed top-6 right-6 z-[1000] bg-slate-900 text-white px-8 py-3 rounded-full font-black text-xs uppercase shadow-2xl">🎓 Magister Mode</button>
       )}
 
-      {/* Mobile-Optimized Student Viewport */}
       <div className={`w-full transition-all duration-700 bg-white relative overflow-hidden flex flex-col ${
         activeTab === 'presentation' ? 'h-screen w-screen fixed inset-0 z-50' : 'max-w-md h-[100dvh] shadow-2xl'
       }`}>
         <div className="flex-1 h-full overflow-hidden relative">
           
-          {/* THE FIXED ROUTING STACK */}
+          {/* --- STUDENT ROUTING STACK --- */}
           {activeTab === 'presentation' ? (
+            // 1. Projector Mode
             <ClassView lesson={lessons.find(l => l.id === selectedLessonId)} userData={userData} />
           ) : activeLesson ? (
+            // 2. Taking a Lesson
             <LessonView lesson={activeLesson} onFinish={() => setActiveLesson(null)} isInstructor={userData?.role === 'instructor'} />
           ) : activeStudentClass ? (
-            // RESTORED: The actual Student Dashboard for a specific class
+            // 3. Viewing a Specific Cohort (THE FIX)
             <StudentClassView 
                classData={activeStudentClass} 
                onBack={() => setActiveStudentClass(null)} 
-               setActiveLesson={setActiveLesson}
+               onOpenLesson={(lesson: any) => setActiveLesson(lesson)} // Passing the launcher
                userData={userData}
             />
           ) : activeTab === 'profile' ? (
+            // 4. Profile
             <div className="p-10">Profile View</div>
           ) : (
+            // 5. Home Feed (Default)
             <HomeView 
               setActiveTab={setActiveTab} 
               classes={enrolledClasses} 
-              onSelectClass={setActiveStudentClass} // Tapping a class here sets activeStudentClass to true
+              // This sets the state that triggers StudentClassView
+              onSelectClass={setActiveStudentClass} 
               userData={userData} 
               user={user} 
               setSelectedLessonId={setSelectedLessonId}
-              setActiveLesson={setActiveLesson}
             />
           )}
         </div>
