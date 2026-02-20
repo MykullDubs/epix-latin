@@ -2653,10 +2653,18 @@ function InstructorGradebook({ classData }: any) {
         </div>
     );
 }
-// ============================================================================
-//  CLASS MANAGER (With Juicy Revoke Modal)
-// ============================================================================
-function ClassManagerView({ user, classes, lessons, allDecks }: any) {
+function ClassManagerView({ 
+  user, 
+  classes, 
+  lessons, 
+  allDecks, 
+  onAssign,   // Passed from App.tsx
+  onRevoke,   // Passed from App.tsx
+  onCreateClass, 
+  onDeleteClass,
+  onRenameClass,
+  onAddStudent 
+}: any) {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [newClassName, setNewClassName] = useState('');
   const [newStudentEmail, setNewStudentEmail] = useState('');
@@ -2664,12 +2672,10 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
   // Modals & Feedback
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  
-  // NEW: State for the Revoke Modal
   const [assignmentToRemove, setAssignmentToRemove] = useState<any>(null);
 
   // Assignment Logic State
-  const [targetStudentMode, setTargetStudentMode] = useState('all'); 
+  const [targetStudentMode, setTargetStudentMode] = useState<'all' | 'specific'>('all'); 
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [assignType, setAssignType] = useState<'deck' | 'lesson' | 'exam'>('lesson');
   const [activeTab, setActiveTab] = useState<'overview' | 'gradebook'>('overview');
@@ -2679,145 +2685,149 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
   const availableExams = lessons.filter((l: any) => l.type === 'test' || l.type === 'exam');
   const availableLessons = lessons.filter((l: any) => l.type !== 'test' && l.type !== 'exam');
 
-  // --- ACTIONS ---
-  const createClass = async (e: any) => { e.preventDefault(); if (!newClassName.trim()) return; try { await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), { name: newClassName, code: Math.random().toString(36).substring(2, 8).toUpperCase(), students: [], studentEmails: [], assignments: [], created: Date.now() }); setNewClassName(''); setToastMsg("Class Created Successfully"); } catch (error) { console.error("Create class failed:", error); alert("Failed to create class."); } };
-  const handleDeleteClass = async (id: string) => { if (window.confirm("Delete this class?")) { try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id)); if (selectedClassId === id) setSelectedClassId(null); } catch (error) { console.error("Delete class failed:", error); alert("Failed to delete class."); } } };
-  const handleRenameClass = async (classId: string, currentName: string) => { const newName = prompt("Enter new class name:", currentName); if (newName && newName.trim() !== "" && newName !== currentName) { try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), { name: newName.trim() }); setToastMsg("Class renamed successfully"); } catch (error) { console.error("Rename failed", error); alert("Failed to rename class"); } } };
-  const addStudent = async (e: any) => { e.preventDefault(); if (!newStudentEmail || !selectedClass) return; const normalizedEmail = newStudentEmail.toLowerCase().trim(); try { await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { students: arrayUnion(normalizedEmail), studentEmails: arrayUnion(normalizedEmail) }); setNewStudentEmail(''); setToastMsg(`Added ${normalizedEmail}`); } catch (error) { console.error("Add student failed:", error); alert("Failed to add student."); } };
-  const toggleAssignee = (email: string) => { if (selectedAssignees.includes(email)) { setSelectedAssignees(selectedAssignees.filter(e => e !== email)); } else { setSelectedAssignees([...selectedAssignees, email]); } };
+  // --- 1. CORE HANDLERS (FIXED & JUICED) ---
   
-  const assignContent = async (item: any, type: string) => { 
-      if (!selectedClass) return; 
-      try { 
-          const assignment = JSON.parse(JSON.stringify({ 
-              ...item, 
-              id: `assign_${Date.now()}_${Math.random().toString(36).substr(2,5)}`, 
-              originalId: item.id, 
-              contentType: type, 
-              targetStudents: targetStudentMode === 'specific' ? selectedAssignees : null 
-          })); 
-          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), { assignments: arrayUnion(assignment) }); 
-          setAssignModalOpen(false); 
-          setTargetStudentMode('all'); 
-          setSelectedAssignees([]); 
-          setToastMsg(`Assigned: ${item.title}`); 
-      } catch (error) { console.error("Assign failed:", error); alert("Failed to assign."); } 
+  const handleAssignContent = async (item: any, type: string) => {
+    if (!selectedClass) return;
+    
+    // Prepare the payload
+    const assignment = {
+      ...item,
+      id: `assign_${Date.now()}`,
+      originalId: item.id,
+      contentType: type,
+      targetStudents: targetStudentMode === 'specific' ? selectedAssignees : null,
+      assignedAt: Date.now()
+    };
+
+    // Use the onAssign prop from App.tsx to handle the DB write
+    const result = await onAssign(selectedClass.id, assignment);
+
+    if (result.success) {
+      setToastMsg(`Unit "${item.title}" Deployed!`);
+      setAssignModalOpen(false);
+      setSelectedAssignees([]);
+      setTargetStudentMode('all');
+    } else {
+      setToastMsg("Deployment Failed: Check Console");
+    }
   };
 
-  // --- NEW REVOKE LOGIC ---
-  const initiateRemove = (assignment: any) => {
-      setAssignmentToRemove(assignment);
+  const confirmRevoke = async () => {
+    if (!selectedClass || !assignmentToRemove) return;
+    
+    const result = await onRevoke(selectedClass.id, assignmentToRemove);
+    
+    if (result.success) {
+      setToastMsg("Assignment Revoked");
+      setAssignmentToRemove(null);
+    } else {
+      setToastMsg("Error revoking access");
+    }
   };
 
-  const confirmRemove = async () => {
-      if (!selectedClass || !assignmentToRemove) return;
-      try {
-          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', selectedClass.id), {
-              assignments: arrayRemove(assignmentToRemove)
-          });
-          setToastMsg("Assignment Revoked");
-          setAssignmentToRemove(null);
-      } catch (e) {
-          console.error(e);
-          setToastMsg("Error removing assignment");
-      }
-  };
-
+  // --- 2. RENDERER: SINGLE CLASS VIEW ---
   if (selectedClass) {
     return (
-      <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-300 relative">
-        {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
+      <div className="flex flex-col h-full animate-in slide-in-from-right-6 duration-500 relative">
+        {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
         
-        {/* --- JUICY REVOKE MODAL --- */}
+        {/* --- THE JUICY REVOKE MODAL --- */}
         {assignmentToRemove && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
-                    <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Trash2 size={32} />
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+                <div className="bg-white w-full max-w-sm rounded-[3rem] shadow-2xl p-10 text-center animate-in zoom-in-95 duration-200">
+                    <div className="w-20 h-20 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Trash2 size={40} />
                     </div>
-                    <h3 className="text-xl font-black text-slate-900 mb-2">Revoke Access?</h3>
-                    <p className="text-slate-500 text-sm mb-6 leading-relaxed">
-                        Are you sure you want to remove <strong>"{assignmentToRemove.title}"</strong>? Students will no longer see it in their dashboard.
+                    <h3 className="text-3xl font-black text-slate-900 mb-2 tracking-tighter">Revoke Access?</h3>
+                    <p className="text-slate-500 text-sm mb-8 leading-relaxed">
+                        Are you sure you want to pull <strong>"{assignmentToRemove.title}"</strong> from this cohort's feed?
                     </p>
-                    <div className="flex gap-3">
-                        <button 
-                            onClick={() => setAssignmentToRemove(null)} 
-                            className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button 
-                            onClick={confirmRemove} 
-                            className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 shadow-lg shadow-rose-200 transition-all active:scale-95"
-                        >
-                            Revoke
-                        </button>
+                    <div className="flex flex-col gap-3">
+                        <button onClick={confirmRevoke} className="w-full py-4 bg-rose-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-rose-200 active:scale-95 transition-all">Revoke Now</button>
+                        <button onClick={() => setAssignmentToRemove(null)} className="w-full py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-200 transition-all">Keep it</button>
                     </div>
                 </div>
             </div>
         )}
 
-        {/* Class Header */}
-        <div className="pb-4 border-b border-slate-100 mb-6 bg-white sticky top-0 z-20">
-          <button onClick={() => setSelectedClassId(null)} className="flex items-center text-slate-500 hover:text-indigo-600 mb-4 text-sm font-bold"><ArrowLeft size={16} className="mr-1"/> Back to Classes</button>
-          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-4 mb-4">
-            <div><h1 className="text-3xl font-black text-slate-900">{selectedClass.name}</h1><p className="text-sm text-slate-500 font-mono bg-slate-100 inline-block px-2 py-0.5 rounded mt-1">Code: {selectedClass.code}</p></div>
-            <div className="flex flex-wrap gap-2">
-                <button onClick={() => { setAssignType('lesson'); setAssignModalOpen(true); }} className="bg-indigo-600 text-white px-3 py-2 rounded-lg font-bold text-xs flex items-center gap-2 shadow-sm hover:bg-indigo-700 active:scale-95 transition-all uppercase tracking-wider"><BookOpen size={16}/> Lesson</button>
-                <button onClick={() => { setAssignType('deck'); setAssignModalOpen(true); }} className="bg-orange-500 text-white px-3 py-2 rounded-lg font-bold text-xs flex items-center gap-2 shadow-sm hover:bg-orange-600 active:scale-95 transition-all uppercase tracking-wider"><Layers size={16}/> Deck</button>
-                <button onClick={() => { setAssignType('exam'); setAssignModalOpen(true); }} className="bg-rose-600 text-white px-3 py-2 rounded-lg font-bold text-xs flex items-center gap-2 shadow-sm hover:bg-rose-700 active:scale-95 transition-all uppercase tracking-wider"><FileText size={16}/> Exam</button>
+        {/* --- CLASS HEADER --- */}
+        <div className="pb-8 border-b border-slate-100 mb-8 bg-white/80 backdrop-blur-md sticky top-0 z-20">
+          <button onClick={() => setSelectedClassId(null)} className="flex items-center text-slate-400 hover:text-indigo-600 mb-6 text-xs font-black uppercase tracking-widest transition-colors"><ArrowLeft size={16} className="mr-2"/> Cohort Directory</button>
+          
+          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6">
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-indigo-100">Live Cohort</span>
+                <span className="text-xs text-slate-300 font-mono">ID: {selectedClass.code}</span>
+              </div>
+              <h1 className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{selectedClass.name}</h1>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex gap-3">
+                <ActionButton icon={<BookOpen/>} label="Unit" color="bg-indigo-600" onClick={() => { setAssignType('lesson'); setAssignModalOpen(true); }} />
+                <ActionButton icon={<Layers/>} label="Deck" color="bg-orange-500" onClick={() => { setAssignType('deck'); setAssignModalOpen(true); }} />
+                <ActionButton icon={<FileText/>} label="Exam" color="bg-rose-600" onClick={() => { setAssignType('exam'); setAssignModalOpen(true); }} />
             </div>
           </div>
-          <div className="flex gap-6">
-              <button onClick={() => setActiveTab('overview')} className={`pb-3 text-sm font-bold border-b-2 transition-all ${activeTab === 'overview' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Overview</button>
-              <button onClick={() => setActiveTab('gradebook')} className={`pb-3 text-sm font-bold border-b-2 transition-all ${activeTab === 'gradebook' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Gradebook</button>
+
+          <div className="flex gap-8 mt-10">
+              <TabButton active={activeTab === 'overview'} label="Overview" onClick={() => setActiveTab('overview')} />
+              <TabButton active={activeTab === 'gradebook'} label="Gradebook" onClick={() => setActiveTab('gradebook')} />
           </div>
         </div>
 
         {activeTab === 'overview' ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pb-20">
-                <div className="space-y-4">
-                    <h3 className="font-bold text-slate-800 flex items-center gap-2"><BookOpen size={18} className="text-indigo-600"/> Active Assignments</h3>
-                    {(!selectedClass.assignments || selectedClass.assignments.length === 0) && <div className="p-6 border-2 border-dashed border-slate-200 rounded-xl text-center text-slate-400 text-sm">No content assigned yet.</div>}
-                    
-                    {selectedClass.assignments?.map((l: any, idx: number) => ( 
-                        <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center group hover:border-indigo-200 transition-all">
-                            <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-lg ${l.contentType === 'deck' ? 'bg-orange-100 text-orange-600' : l.contentType === 'test' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                                    {l.contentType === 'deck' ? <Layers size={18} /> : l.contentType === 'test' ? <FileText size={18}/> : <BookOpen size={18} />}
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-slate-800 text-sm">{l.title}</h4>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] text-slate-500 uppercase font-bold">{l.contentType === 'test' ? 'Exam' : l.contentType === 'deck' ? 'Deck' : 'Unit'}</span>
-                                        {l.targetStudents && l.targetStudents.length > 0 && (<span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold flex items-center gap-1"><Users size={10}/> {l.targetStudents.length} Students</span>)}
-                                    </div>
-                                </div>
-                            </div>
-                            {/* REVOKE BUTTON (Triggers Modal) */}
-                            <button 
-                                onClick={() => initiateRemove(l)}
-                                className="text-slate-300 hover:text-rose-500 hover:bg-rose-50 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all" 
-                                title="Revoke Assignment"
-                            >
-                                <Trash2 size={18}/>
-                            </button>
-                        </div> 
-                    ))}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-12 pb-32">
+                {/* Assignments List */}
+                <div className="lg:col-span-3 space-y-6">
+                    <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em] mb-4">Active Deployments</h3>
+                    {(!selectedClass.assignments || selectedClass.assignments.length === 0) ? (
+                      <div className="p-12 border-2 border-dashed border-slate-100 rounded-[3rem] text-center">
+                        <p className="text-slate-300 font-bold italic">No units broadcasted yet.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {selectedClass.assignments.map((l: any, idx: number) => ( 
+                          <div key={idx} className="bg-white p-6 rounded-[2.5rem] border-2 border-slate-50 shadow-sm flex justify-between items-center group hover:border-indigo-100 transition-all">
+                              <div className="flex items-center gap-5">
+                                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600' : l.contentType === 'test' ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                                      {l.contentType === 'deck' ? <Layers size={24} /> : l.contentType === 'test' ? <FileText size={24}/> : <BookOpen size={24} />}
+                                  </div>
+                                  <div>
+                                      <h4 className="font-black text-slate-900 text-lg tracking-tight leading-none mb-1">{l.title}</h4>
+                                      <div className="flex items-center gap-3">
+                                          <span className="text-[9px] text-slate-400 uppercase font-black tracking-widest">{l.contentType}</span>
+                                          {l.targetStudents && <span className="flex items-center gap-1 text-[9px] font-black text-indigo-500 uppercase tracking-widest"><Users size={10}/> Targeted</span>}
+                                      </div>
+                                  </div>
+                              </div>
+                              <button onClick={() => setAssignmentToRemove(l)} className="p-4 text-slate-200 hover:text-rose-500 hover:bg-rose-50 rounded-2xl transition-all">
+                                  <Trash2 size={20}/>
+                              </button>
+                          </div> 
+                        ))}
+                      </div>
+                    )}
                 </div>
 
-                <div className="space-y-4">
-                    <h3 className="font-bold text-slate-800 flex items-center gap-2"><Users size={18} className="text-indigo-600"/> Roster</h3>
+                {/* Roster Section */}
+                <div className="lg:col-span-2 space-y-6">
+                    <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em] mb-4">Cohort Roster</h3>
                     <form onSubmit={addStudent} className="flex gap-2">
-                        <input value={newStudentEmail} onChange={e => setNewStudentEmail(e.target.value)} placeholder="Student Email" className="flex-1 p-2 rounded-lg border border-slate-200 text-sm" />
-                        <button type="submit" className="bg-slate-100 hover:bg-slate-200 text-slate-600 p-2 rounded-lg"><Plus size={18}/></button>
+                        <input value={newStudentEmail} onChange={e => setNewStudentEmail(e.target.value)} placeholder="student@email.com" className="flex-1 px-6 py-4 rounded-2xl bg-slate-50 border-none text-sm font-bold focus:ring-2 focus:ring-indigo-100 transition-all" />
+                        <button type="submit" className="bg-slate-900 text-white p-4 rounded-2xl active:scale-90 transition-all shadow-lg"><Plus size={24}/></button>
                     </form>
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden max-h-[400px] overflow-y-auto custom-scrollbar">
-                        {(!selectedClass.students || selectedClass.students.length === 0) && <div className="p-4 text-center text-slate-400 text-sm italic">No students joined yet.</div>}
+                    
+                    <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
                         {selectedClass.students?.map((s: string, i: number) => (
-                            <div key={i} className="p-3 border-b border-slate-50 last:border-0 flex items-center gap-3">
-                                <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs">{s.charAt(0).toUpperCase()}</div>
-                                <span className="text-sm font-medium text-slate-700">{s}</span>
+                            <div key={i} className="p-5 border-b border-slate-50 last:border-0 flex items-center justify-between group">
+                                <div className="flex items-center gap-4">
+                                  <div className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black text-xs">{s.charAt(0).toUpperCase()}</div>
+                                  <span className="text-sm font-bold text-slate-700">{s}</span>
+                                </div>
+                                <button className="opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-rose-500"><X size={16}/></button>
                             </div>
                         ))}
                     </div>
@@ -2827,24 +2837,44 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
             <div className="pb-20"><InstructorGradebook classData={selectedClass} /></div>
         )}
 
+        {/* --- ASSIGNMENT MODAL --- */}
         {assignModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in duration-200">
-              <div className="p-4 border-b border-slate-100 bg-slate-50">
-                  <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">Assign {assignType.charAt(0).toUpperCase() + assignType.slice(1)}</h3><button onClick={() => setAssignModalOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-600"/></button></div>
-                  <div className="bg-white p-1 rounded-lg border border-slate-200 flex mb-2"><button onClick={() => setTargetStudentMode('all')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${targetStudentMode === 'all' ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Entire Class</button><button onClick={() => setTargetStudentMode('specific')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${targetStudentMode === 'specific' ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>Specific Students</button></div>
-                  {targetStudentMode === 'specific' && (<div className="mt-2 max-h-32 overflow-y-auto border border-slate-200 rounded-lg bg-white p-2 custom-scrollbar">{(!selectedClass.students || selectedClass.students.length === 0) ? (<p className="text-xs text-slate-400 italic text-center p-2">No students in roster.</p>) : (selectedClass.students.map((studentEmail: string) => (<button key={studentEmail} onClick={() => toggleAssignee(studentEmail)} className="flex items-center gap-2 w-full p-2 hover:bg-slate-50 rounded text-left">{selectedAssignees.includes(studentEmail) ? <CheckCircle2 size={16} className="text-indigo-600"/> : <Circle size={16} className="text-slate-300"/>}<span className="text-xs font-medium text-slate-700 truncate">{studentEmail}</span></button>)))}</div>)}
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-6">
+            <div className="bg-white w-full max-w-xl rounded-[3rem] shadow-2xl overflow-hidden max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-300">
+              <div className="p-8 border-b border-slate-100 bg-slate-50/50">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-3xl font-black tracking-tighter uppercase italic">Deploy {assignType}</h3>
+                    <button onClick={() => setAssignModalOpen(false)} className="p-2 bg-white text-slate-300 rounded-xl"><X size={20}/></button>
+                  </div>
+                  
+                  {/* Student Mode Selector */}
+                  <div className="bg-slate-200/50 p-1.5 rounded-2xl flex gap-1 mb-4">
+                    <button onClick={() => setTargetStudentMode('all')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${targetStudentMode === 'all' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-500'}`}>Full Cohort</button>
+                    <button onClick={() => setTargetStudentMode('specific')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${targetStudentMode === 'specific' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-500'}`}>Specific Students</button>
+                  </div>
+
+                  {targetStudentMode === 'specific' && (
+                    <div className="max-h-32 overflow-y-auto space-y-1 mb-2 custom-scrollbar pr-2">
+                       {selectedClass.students?.map((email: string) => (
+                         <button key={email} onClick={() => toggleAssignee(email)} className="flex items-center gap-3 w-full p-3 bg-white rounded-xl border border-slate-100 text-left transition-all">
+                            {selectedAssignees.includes(email) ? <CheckCircle2 size={18} className="text-indigo-600"/> : <Circle size={18} className="text-slate-200"/>}
+                            <span className="text-xs font-bold text-slate-600">{email}</span>
+                         </button>
+                       ))}
+                    </div>
+                  )}
               </div>
-              <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                  {assignType === 'exam' && (
-                      <div className="space-y-2">{availableExams.length === 0 ? <p className="text-sm text-slate-400 italic">No exams found.</p> : availableExams.map((l: any) => (<button key={l.id} onClick={() => assignContent(l, 'test')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-rose-500 hover:bg-rose-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{l.title}</h4><p className="text-xs text-slate-500">{l.questions?.length || 0} Questions</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-rose-500"/></button>))}</div>
-                  )}
-                  {assignType === 'lesson' && (
-                      <div className="space-y-2">{availableLessons.length === 0 ? <p className="text-sm text-slate-400 italic">No lessons found.</p> : availableLessons.map((l: any) => (<button key={l.id} onClick={() => assignContent(l, 'lesson')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{l.title}</h4><p className="text-xs text-slate-500">{l.subtitle}</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-indigo-500"/></button>))}</div>
-                  )}
-                  {assignType === 'deck' && (
-                      <div className="space-y-2">{Object.keys(allDecks || {}).length === 0 ? <p className="text-sm text-slate-400 italic">No decks found.</p> : Object.entries(allDecks).map(([key, deck]: any) => (<button key={key} onClick={() => assignContent({ ...deck, id: key }, 'deck')} className="w-full p-3 text-left border border-slate-200 rounded-xl hover:border-orange-500 hover:bg-orange-50 transition-all group flex justify-between items-center"><div><h4 className="font-bold text-slate-800 text-sm">{deck.title}</h4><p className="text-xs text-slate-500">{deck.cards?.length || 0} Cards</p></div><PlusCircle size={18} className="text-slate-300 group-hover:text-orange-500"/></button>))}</div>
-                  )}
+
+              <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-3">
+                  {assignType === 'lesson' && availableLessons.map((l: any) => (
+                    <ContentRow key={l.id} item={l} icon={<BookOpen/>} color="text-indigo-600" onClick={() => handleAssignContent(l, 'lesson')} />
+                  ))}
+                  {assignType === 'deck' && Object.entries(allDecks || {}).map(([key, deck]: any) => (
+                    <ContentRow key={key} item={{...deck, id: key}} icon={<Layers/>} color="text-orange-500" onClick={() => handleAssignContent(deck, 'deck')} />
+                  ))}
+                  {assignType === 'exam' && availableExams.map((l: any) => (
+                    <ContentRow key={l.id} item={l} icon={<FileText/>} color="text-rose-600" onClick={() => handleAssignContent(l, 'test')} />
+                  ))}
               </div>
             </div>
           </div>
@@ -2852,16 +2882,81 @@ function ClassManagerView({ user, classes, lessons, allDecks }: any) {
       </div>
     );
   }
-  
+
+  // --- 3. RENDERER: MAIN GRID VIEW ---
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 relative">
-      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
-      <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-slate-800">My Classes</h2><form onSubmit={createClass} className="flex gap-2"><input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="New Class Name" className="p-2 rounded-lg border border-slate-200 text-sm w-64" /><button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2"><Plus size={16}/> Create</button></form></div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{classes.map((cls: any) => (<div key={cls.id} onClick={() => setSelectedClassId(cls.id)} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer relative group"><div className="absolute top-4 right-4 flex gap-2"><button onClick={(e) => {e.stopPropagation(); handleRenameClass(cls.id, cls.name);}} className="text-slate-300 hover:text-indigo-500"><Edit3 size={16}/></button><button onClick={(e) => {e.stopPropagation(); handleDeleteClass(cls.id);}} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button></div><div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-4 font-bold text-lg">{cls.name.charAt(0)}</div><h3 className="font-bold text-lg text-slate-900">{cls.name}</h3><p className="text-sm text-slate-500 mb-4">{(cls.students || []).length} Students</p><div className="flex items-center justify-between bg-slate-50 p-2 rounded-lg"><span className="text-xs font-mono font-bold text-slate-600 tracking-wider">{cls.code}</span><button className="text-indigo-600 text-xs font-bold flex items-center gap-1" onClick={(e) => {e.stopPropagation(); navigator.clipboard.writeText(cls.code);}}><Copy size={12}/> Copy</button></div></div>))}</div>
+    <div className="space-y-10 animate-in fade-in duration-700">
+      {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
+      
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+        <div>
+          <h2 className="text-6xl font-black text-slate-900 tracking-tighter uppercase leading-none">Cohorts</h2>
+          <p className="text-xs text-slate-400 font-bold mt-2 uppercase tracking-[0.3em]">Managed Learning Environments</p>
+        </div>
+        <form onSubmit={createClass} className="flex gap-2 bg-white p-2 rounded-[2rem] shadow-xl shadow-slate-200 border border-slate-100">
+          <input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="New Class Name" className="bg-transparent px-6 py-2 outline-none text-sm font-bold w-48 md:w-64" />
+          <button type="submit" className="bg-indigo-600 text-white px-8 py-3 rounded-full font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all">Establish</button>
+        </form>
+      </header>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {classes.map((cls: any) => (
+          <div key={cls.id} onClick={() => setSelectedClassId(cls.id)} className="bg-white p-8 rounded-[3rem] border-2 border-slate-50 shadow-sm hover:shadow-2xl hover:border-indigo-100 transition-all cursor-pointer relative group">
+            <div className="absolute top-8 right-8 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+              <button onClick={(e) => {e.stopPropagation(); onRenameClass(cls.id, cls.name);}} className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:bg-indigo-50 hover:text-indigo-600"><Edit3 size={18}/></button>
+              <button onClick={(e) => {e.stopPropagation(); onDeleteClass(cls.id);}} className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:bg-rose-50 hover:text-rose-500"><Trash2 size={18}/></button>
+            </div>
+
+            <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-[1.5rem] flex items-center justify-center mb-6 font-black text-2xl shadow-inner shadow-indigo-100/50">
+              {cls.name.charAt(0)}
+            </div>
+            
+            <h3 className="font-black text-2xl text-slate-900 tracking-tight mb-1">{cls.name}</h3>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">{(cls.students || []).length} Students Enrolled</p>
+            
+            <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
+              <span className="text-[10px] font-black font-mono text-slate-400 tracking-[0.2em]">{cls.code}</span>
+              <button className="text-indigo-600 text-[9px] font-black uppercase tracking-widest flex items-center gap-2 hover:underline" onClick={(e) => {e.stopPropagation(); navigator.clipboard.writeText(cls.code); setToastMsg("Code Copied!");}}><Copy size={12}/> Copy Code</button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
+// --- SUB-COMPONENTS ---
+
+function ActionButton({ icon, label, color, onClick }: any) {
+  return (
+    <button onClick={onClick} className={`${color} text-white px-5 py-3 rounded-2xl font-black text-[10px] flex items-center gap-3 shadow-xl active:scale-95 transition-all uppercase tracking-widest`}>
+      {React.cloneElement(icon, { size: 18 })} {label}
+    </button>
+  );
+}
+
+function TabButton({ active, label, onClick }: any) {
+  return (
+    <button onClick={onClick} className={`pb-4 text-xs font-black uppercase tracking-[0.3em] border-b-4 transition-all ${active ? 'border-indigo-600 text-slate-900' : 'border-transparent text-slate-300 hover:text-slate-500'}`}>
+      {label}
+    </button>
+  );
+}
+
+function ContentRow({ item, icon, color, onClick }: any) {
+  return (
+    <button onClick={onClick} className="w-full p-5 bg-slate-50 border-2 border-transparent rounded-[2rem] flex items-center justify-between hover:border-indigo-600 hover:bg-white transition-all group text-left">
+      <div className="flex items-center gap-4">
+        <div className={`p-3 bg-white rounded-xl ${color} shadow-sm group-hover:scale-110 transition-transform`}>{icon}</div>
+        <div>
+          <h4 className="font-black text-slate-900 text-sm tracking-tight">{item.title}</h4>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{item.subtitle || 'Unit module'}</p>
+        </div>
+      </div>
+      <PlusCircle size={24} className="text-slate-200 group-hover:text-indigo-600 transition-colors" />
+    </button>
+  );
+}
 // ============================================================================
 //  CREATOR TOOLS (Builders)
 // ============================================================================
