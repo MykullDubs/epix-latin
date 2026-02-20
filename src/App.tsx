@@ -3856,7 +3856,7 @@ function App() {
   
   // High-Level View Controllers
   const [viewMode, setViewMode] = useState<'student' | 'instructor'>('student');
-  const [activeTab, setActiveTab] = useState('home'); // Controls Bottom Nav
+  const [activeTab, setActiveTab] = useState('home'); // Controls Bottom Nav & Presentation Trigger
   
   // --- 2. DATA REPOSITORIES ---
   const [systemLessons] = useState([]); 
@@ -3864,10 +3864,10 @@ function App() {
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [allDecks, setAllDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
   
-  // --- 3. UI NAVIGATION STATE (The Fixes) ---
-  const [activeLesson, setActiveLesson] = useState<any>(null); // Triggers LessonView
+  // --- 3. UI NAVIGATION STATE ---
+  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null); // Triggers Lesson or Presentation
+  const [activeLesson, setActiveLesson] = useState<any>(null); // Triggers Lesson (Direct Object)
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null); // Triggers StudentClassView
-  const [presentationLessonId, setPresentationLessonId] = useState<string | null>(null); // Triggers ClassView (Projector)
 
   // --- 4. DATA CONSOLIDATION ---
   const lessons = useMemo(() => {
@@ -3993,6 +3993,12 @@ function App() {
     });
   };
 
+  // Helper to clear lesson states
+  const closeLessons = () => {
+    setActiveLesson(null);
+    setSelectedLessonId(null);
+  };
+
   // --- 7. GLOBAL ROUTING ENGINE ---
   if (!authChecked) {
     return (
@@ -4004,24 +4010,28 @@ function App() {
 
   if (!user) return <AuthView />;
 
-  // ROUTE 1: GLOBAL PRESENTATION MODE (Overrides everything else)
-  if (presentationLessonId || activeTab === 'presentation') {
-    const lessonToPresent = lessons.find(l => l.id === presentationLessonId) || lessons[0];
+  // --- ROUTE 1: GLOBAL PRESENTATION OVERRIDE ---
+  // If the active tab is presentation AND we have a lesson ID, overtake the screen.
+  if (activeTab === 'presentation' && selectedLessonId) {
+    const lessonToPresent = lessons.find(l => l.id === selectedLessonId) || lessons[0];
     return (
       <div className="fixed inset-0 z-[5000] bg-white w-screen h-screen">
-        {/* Floating exit button so Michael can drop out of Presentation mode */}
         <button 
-          onClick={() => { setPresentationLessonId(null); setActiveTab('home'); }} 
+          onClick={() => { setActiveTab('dashboard'); setSelectedLessonId(null); }} 
           className="absolute top-6 left-6 z-[5010] bg-slate-900/80 backdrop-blur text-white px-6 py-3 rounded-full font-black text-[10px] uppercase tracking-widest shadow-2xl hover:bg-rose-600 transition-colors"
         >
           End Session
         </button>
-        <ClassView lesson={lessonToPresent} userData={userData} />
+        {lessonToPresent ? (
+          <ClassView lesson={lessonToPresent} userData={userData} />
+        ) : (
+          <div className="flex h-full items-center justify-center text-slate-400 font-bold uppercase tracking-widest">Lesson Not Found</div>
+        )}
       </div>
     );
   }
 
-  // ROUTE 2: MAGISTER COMMAND CENTER
+  // --- ROUTE 2: MAGISTER COMMAND CENTER ---
   if (viewMode === 'instructor' && userData?.role === 'instructor') {
     return (
       <InstructorDashboard 
@@ -4030,7 +4040,6 @@ function App() {
         allDecks={allDecks} 
         lessons={lessons} 
         
-        // Magister Actions
         onSaveLesson={handleSaveLesson} 
         onSaveCard={handleSaveCard}
         onAssign={handleAssign}
@@ -4040,8 +4049,13 @@ function App() {
         onRenameClass={handleRenameClass}
         onAddStudent={handleAddStudent}
         
-        // Critical: Passing the presentation trigger down to the Dashboard
-        onStartPresentation={(lessonId: string) => setPresentationLessonId(lessonId)}
+        // Critical: Injects global setters so the Dashboard can trigger Presentation Mode
+        setActiveTab={setActiveTab}
+        setSelectedLessonId={setSelectedLessonId}
+        onStartPresentation={(lessonId: string) => {
+          setSelectedLessonId(lessonId);
+          setActiveTab('presentation');
+        }}
         
         onSwitchView={() => setViewMode('student')}
         onLogout={() => signOut(auth)} 
@@ -4049,7 +4063,10 @@ function App() {
     );
   }
 
-  // ROUTE 3: STUDENT VIEWPORT
+  // --- ROUTE 3: STUDENT VIEWPORT ---
+  // Determines which lesson object to pass to LessonView
+  const currentLessonToTake = activeLesson || lessons.find(l => l.id === selectedLessonId);
+
   return (
     <div className="bg-slate-50 min-h-screen w-full flex flex-col items-center relative font-sans overflow-hidden">
       
@@ -4067,18 +4084,19 @@ function App() {
       <div className="w-full transition-all duration-700 bg-white relative overflow-hidden flex flex-col max-w-md h-[100dvh] shadow-2xl">
         <div className="flex-1 h-full overflow-hidden relative">
           
-          {/* --- STUDENT ROUTING STACK --- */}
-          {activeLesson ? (
+          {/* --- THE UNIFIED STUDENT ROUTING STACK --- */}
+          {currentLessonToTake ? (
             <LessonView 
-              lesson={activeLesson} 
-              onFinish={() => setActiveLesson(null)} 
+              lesson={currentLessonToTake} 
+              onFinish={closeLessons} 
               isInstructor={userData?.role === 'instructor'} 
             />
           ) : activeStudentClass ? (
             <StudentClassView 
                classData={activeStudentClass} 
                onBack={() => setActiveStudentClass(null)} 
-               setActiveLesson={setActiveLesson} // Passes click handler to cohort assignments
+               setActiveLesson={setActiveLesson} 
+               setSelectedLessonId={setSelectedLessonId}
                userData={userData}
             />
           ) : activeTab === 'profile' ? (
@@ -4087,8 +4105,9 @@ function App() {
             <HomeView 
               setActiveTab={setActiveTab} 
               classes={enrolledClasses} 
-              onSelectClass={setActiveStudentClass} // Passes click handler to open cohort
-              setActiveLesson={setActiveLesson} // Passes click handler to start standard lesson
+              onSelectClass={setActiveStudentClass} 
+              setActiveLesson={setActiveLesson} 
+              setSelectedLessonId={setSelectedLessonId}
               userData={userData} 
               user={user} 
             />
@@ -4096,7 +4115,7 @@ function App() {
         </div>
         
         {/* Hide Nav during deep focus modes */}
-        {(!activeLesson && !activeStudentClass) && (
+        {(!currentLessonToTake && !activeStudentClass) && (
           <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
         )}
       </div>
