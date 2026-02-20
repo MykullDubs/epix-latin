@@ -3124,7 +3124,10 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
   );
 }
 
-function InstructorDashboard({ user, userData, lessons, onSwitchView, onLogout }: any) {
+function InstructorDashboard({ user, userData, lessons,onSaveCard,     // <--- Add these
+  onUpdateCard, 
+  onDeleteCard,
+  onSaveLesson, onSwitchView, onLogout }: any) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [toast, setToast] = useState<{msg: string, type: string} | null>(null);
 
