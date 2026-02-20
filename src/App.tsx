@@ -3154,10 +3154,6 @@ const THEMES: any = {
 };
 
 /**
- * LESSON BUILDER VIEW (Visual Editor Only)
- * Optimized for: Touch Drag-and-Drop, Tablet Inputs, Cinematic Narrative
- */
-/**
  * LESSON BUILDER VIEW (Visual Editor)
  * Fully wired to edit all block types
  */
