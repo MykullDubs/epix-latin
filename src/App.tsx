@@ -2887,7 +2887,7 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
   const [jsonInput, setJsonInput] = useState('');
   const [previewMode, setPreviewMode] = useState<'projector' | 'mobile'>('projector');
 
-  // --- EDITOR LOGIC ---
+  // --- 1. CORE ENGINE ---
   const updateBlock = (index: number, field: string, value: any) => {
     const newBlocks = [...(data.blocks || [])];
     newBlocks[index] = { ...newBlocks[index], [field]: value };
@@ -2895,189 +2895,196 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
   };
 
   const addBlock = (type: string) => {
-    const baseBlocks: any = {
-      text: { type: 'text', title: '', content: 'Enter your main teaching point here.' },
-      essay: { type: 'essay', title: 'Deep Read', content: 'First paragraph...\n\nSecond paragraph...' },
-      dialogue: { type: 'dialogue', lines: [{ speaker: 'A', text: '', translation: '', side: 'left' }] },
+    const templates: any = {
+      text: { type: 'text', title: '', content: 'Enter core concept...' },
+      essay: { type: 'essay', title: 'Deep Dive', content: 'Paragraph 1...\n\nParagraph 2...' },
+      dialogue: { type: 'dialogue', lines: [{ speaker: 'A', text: '', side: 'left' }] },
       'vocab-list': { type: 'vocab-list', items: [{ term: '', definition: '' }] },
       quiz: { type: 'quiz', question: '', options: [{id:'a',text:''},{id:'b',text:''}], correctId: 'a' },
-      image: { type: 'image', url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa', caption: '' }
+      image: { type: 'image', url: 'https://placehold.co/600x400', caption: '' }
     };
-    setData({ ...data, blocks: [...(data.blocks || []), baseBlocks[type]] });
+    setData({ ...data, blocks: [...(data.blocks || []), templates[type]] });
+    setToastMsg(`${type.toUpperCase()} block added`);
   };
 
-  const removeBlock = (index: number) => {
-    const newBlocks = [...(data.blocks || [])].filter((_, i) => i !== index);
-    setData({ ...data, blocks: newBlocks });
+  const handleImportJson = () => {
+    try {
+      const parsed = JSON.parse(jsonInput);
+      setData(parsed);
+      setJsonMode(false);
+      setToastMsg("Unit Injected Successfully!");
+    } catch (e) {
+      setToastMsg("Invalid JSON Syntax");
+    }
   };
 
-  // --- PREVIEW RENDERER (Simplified Projector View) ---
-  const PreviewScreen = () => (
-    <div className={`w-full h-full bg-white rounded-[2.5rem] shadow-inner overflow-y-auto custom-scrollbar border-8 border-slate-900 relative`}>
-      <div className="p-8 space-y-12">
-        <div className="text-center border-b pb-6 border-slate-100">
-           <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-1">{data.title || "Untitled Lesson"}</p>
-           <h1 className="text-3xl font-black text-slate-900">{data.subtitle || "Lesson Preview"}</h1>
+  const handleFinalSave = () => {
+    if (!data.title) return setToastMsg("Title is required!");
+    // The "n is not a function" fix: Ensure onSave exists before calling
+    if (typeof onSave === 'function') {
+      onSave({ ...data, timestamp: Date.now() });
+      setToastMsg("Unit Archived in Library");
+    } else {
+      console.error("onSave prop is missing in LessonBuilderView");
+    }
+  };
+
+  // --- 2. PREVIEW RENDERER ---
+  const LivePreview = () => (
+    <div className={`w-full h-full bg-white rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border-[12px] border-slate-900`}>
+      <div className="flex-1 overflow-y-auto p-10 space-y-12 custom-scrollbar bg-white">
+        <div className="text-center border-b border-slate-100 pb-8">
+           <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-2 block">{data.subtitle || "MAGISTER STUDIO"}</span>
+           <h1 className="text-4xl font-black text-slate-900 tracking-tighter leading-none">{data.title || "Untitled Unit"}</h1>
         </div>
         
-        {data.blocks?.map((block: any, i: number) => (
-          <div key={i} className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-            {block.type === 'text' && (
-              <div className="text-center space-y-4">
-                <h3 className="text-indigo-600 font-black uppercase text-xs tracking-widest">{block.title}</h3>
-                <p className="text-2xl font-bold leading-tight text-slate-800">{block.content}</p>
-              </div>
-            )}
-            {block.type === 'essay' && (
-              <div className="space-y-6">
-                <h2 className="text-4xl font-black text-slate-900 text-center leading-none">{block.title}</h2>
-                <div className="space-y-4">
-                  {block.content?.split('\n\n').map((p: string, j: number) => (
-                    <p key={j} className="text-sm text-slate-600 font-serif leading-relaxed first-letter:text-xl first-letter:font-black first-letter:text-indigo-600">{p}</p>
-                  ))}
-                </div>
-              </div>
-            )}
-            {block.type === 'dialogue' && (
-              <div className="space-y-4">
-                {block.lines?.map((l: any, j: number) => (
-                  <div key={j} className={`flex gap-2 ${l.side === 'right' ? 'flex-row-reverse' : ''}`}>
-                    <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center text-[8px] font-black text-white shrink-0">{l.speaker?.[0]}</div>
-                    <div className={`p-3 rounded-2xl text-xs font-bold ${l.side === 'right' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-800'}`}>{l.text}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {block.type === 'vocab-list' && (
-              <div className="grid grid-cols-2 gap-2">
-                {block.items?.map((item: any, j: number) => (
-                  <div key={j} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center">
-                    <p className="font-black text-indigo-600 text-sm">{item.term}</p>
-                    <p className="text-[10px] text-slate-400 font-bold">{item.definition}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-            {block.type === 'image' && <img src={block.url} className="rounded-3xl w-full h-40 object-cover shadow-lg" />}
+        {data.blocks?.length === 0 && (
+          <div className="h-64 flex flex-col items-center justify-center text-slate-200 italic">
+            <Monitor size={48} className="mb-4 opacity-20" />
+            <p>Canvas Empty</p>
+          </div>
+        )}
+
+        {data.blocks?.map((b: any, i: number) => (
+          <div key={i} className="animate-in fade-in slide-in-from-bottom-4">
+             {b.type === 'text' && (
+               <div className="space-y-4">
+                 <p className="text-center text-[5vh] font-black text-slate-800 leading-tight">{b.content}</p>
+               </div>
+             )}
+             {b.type === 'essay' && (
+               <div className="space-y-6">
+                 <h2 className="text-center text-3xl font-black text-indigo-600 uppercase tracking-tighter">{b.title}</h2>
+                 <div className="space-y-4">
+                   {b.content?.split('\n\n').map((p: string, j: number) => (
+                     <p key={j} className="text-sm text-slate-600 font-serif leading-relaxed text-justify">{p}</p>
+                   ))}
+                 </div>
+               </div>
+             )}
+             {b.type === 'dialogue' && (
+               <div className="space-y-4">
+                 {b.lines?.map((l: any, j: number) => (
+                   <div key={j} className={`flex gap-3 ${l.side === 'right' ? 'flex-row-reverse' : ''}`}>
+                      <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-[10px] font-black text-white shrink-0">{l.speaker?.[0]}</div>
+                      <div className={`p-4 rounded-3xl text-xs font-bold ${l.side === 'right' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-800'}`}>{l.text}</div>
+                   </div>
+                 ))}
+               </div>
+             )}
           </div>
         ))}
       </div>
+      <div className="h-4 bg-slate-900 w-1/3 mx-auto mb-4 rounded-full opacity-20" />
     </div>
   );
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 relative overflow-hidden">
+    <div className="h-full flex flex-col bg-white overflow-hidden">
       {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
       
-      {/* Header Studio Controls */}
-      <div className="p-6 bg-white border-b border-slate-200 flex justify-between items-center shrink-0 shadow-sm z-30">
-        <div>
-          <h2 className="text-xl font-black text-slate-900">Content Studio</h2>
-          <p className="text-xs text-slate-400 font-medium">Build cinematic units for the big screen.</p>
+      {/* Studio Header */}
+      <div className="h-20 px-8 border-b flex justify-between items-center shrink-0">
+        <div className="flex items-center gap-4">
+          <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100"><PenTool size={20}/></div>
+          <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Lesson Studio</h2>
         </div>
-        <div className="flex gap-3">
-          <button onClick={() => setJsonMode(!jsonMode)} className="px-4 py-2 text-xs font-black text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-widest border border-slate-100 rounded-xl">
-            {jsonMode ? 'Visual Editor' : 'JSON Import'}
-          </button>
-          <button onClick={() => onSave({...data, xp: 100})} className="px-6 py-2 bg-indigo-600 text-white text-xs font-black rounded-xl shadow-lg shadow-indigo-100 active:scale-95 transition-all uppercase tracking-widest">
-            Save Unit
-          </button>
+        <div className="flex items-center gap-4">
+           <button onClick={() => setJsonMode(!jsonMode)} className="text-[10px] font-black uppercase text-slate-400 hover:text-indigo-600 transition-colors">
+              {jsonMode ? 'Back to Visuals' : 'Advanced JSON'}
+           </button>
+           <button onClick={handleFinalSave} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all">
+              Commit to Library
+           </button>
         </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* LEFT: Editor Pane */}
-        <div className="w-1/2 overflow-y-auto p-8 border-r border-slate-200 bg-white/50 custom-scrollbar">
+        {/* --- THE CREATIVE PANE (LEFT) --- */}
+        <div className="w-1/2 overflow-y-auto p-12 bg-white border-r custom-scrollbar">
           {jsonMode ? (
-             <textarea 
-               className="w-full h-[70vh] p-6 bg-slate-900 text-emerald-400 font-mono text-xs rounded-[2rem] shadow-2xl outline-none"
-               value={JSON.stringify(data, null, 2)}
-               onChange={(e) => { try { setData(JSON.parse(e.target.value)); } catch(err) {} }}
-             />
+            <div className="h-full flex flex-col gap-6">
+               <textarea 
+                 value={jsonInput} 
+                 onChange={e => setJsonInput(e.target.value)}
+                 className="flex-1 p-8 bg-slate-950 text-emerald-400 font-mono text-xs rounded-[3rem] outline-none shadow-inner leading-relaxed"
+                 placeholder="Paste your 'Looksmaxing' JSON here..."
+               />
+               <button onClick={handleImportJson} className="w-full py-5 bg-emerald-500 text-white rounded-[2rem] font-black uppercase tracking-widest text-xs shadow-xl">Inject Unit Data</button>
+            </div>
           ) : (
-            <div className="space-y-10 max-w-2xl mx-auto pb-32">
-              {/* Metadata Group */}
+            <div className="max-w-xl mx-auto space-y-12 pb-40">
               <div className="space-y-4">
-                <input className="text-4xl font-black border-none w-full focus:ring-0 placeholder:text-slate-200 p-0" placeholder="Unit Title..." value={data.title} onChange={e => setData({...data, title: e.target.value})} />
-                <input className="text-xl font-bold text-slate-400 border-none w-full focus:ring-0 placeholder:text-slate-100 p-0" placeholder="Subtitle (e.g. Unit 4: The Past Tense)" value={data.subtitle} onChange={e => setData({...data, subtitle: e.target.value})} />
+                <input className="text-5xl font-black border-none w-full focus:ring-0 p-0 placeholder:text-slate-100" placeholder="New Unit Title..." value={data.title} onChange={e => setData({...data, title: e.target.value})} />
+                <input className="text-xl font-bold text-slate-300 border-none w-full focus:ring-0 p-0" placeholder="Subtitle or Unit #..." value={data.subtitle} onChange={e => setData({...data, subtitle: e.target.value})} />
               </div>
 
-              {/* Block List */}
               <div className="space-y-6">
                 {data.blocks?.map((block: any, idx: number) => (
-                  <div key={idx} className="bg-white p-6 rounded-[2rem] border-2 border-slate-100 shadow-sm group relative animate-in slide-in-from-left-4 duration-300">
-                    <div className="absolute -right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => removeBlock(idx)} className="p-2 bg-rose-50 text-rose-500 rounded-full hover:bg-rose-500 hover:text-white transition-colors">
-                        <Trash2 size={16} />
-                      </button>
+                  <div key={idx} className="group bg-slate-50 p-6 rounded-[2.5rem] border-2 border-transparent hover:border-indigo-100 hover:bg-white transition-all relative">
+                    <button onClick={() => removeBlock(idx)} className="absolute -right-2 top-2 p-2 bg-white text-rose-500 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Trash2 size={16} />
+                    </button>
+                    
+                    <div className="flex items-center gap-2 mb-4">
+                       <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{block.type}</span>
                     </div>
-                    
-                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4 block">{block.type} Block</span>
-                    
+
                     {block.type === 'text' && (
-                      <div className="space-y-4">
-                        <input className="w-full font-bold text-slate-700 bg-slate-50 px-4 py-2 rounded-xl text-sm" placeholder="Block Title" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} />
-                        <textarea className="w-full text-sm font-medium text-slate-600 bg-white border border-slate-100 rounded-xl p-4 min-h-[100px]" placeholder="Content..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
-                      </div>
+                      <textarea className="w-full bg-transparent font-bold text-lg border-none focus:ring-0 p-0" placeholder="Type core text..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
                     )}
 
                     {block.type === 'essay' && (
                       <div className="space-y-4">
-                        <input className="w-full font-bold text-slate-700 bg-slate-50 px-4 py-2 rounded-xl text-sm" placeholder="Essay Header" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} />
-                        <textarea className="w-full text-sm font-medium text-slate-600 bg-white border border-slate-100 rounded-xl p-4 min-h-[200px] font-serif" placeholder="Write paragraphs with double line breaks..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
+                        <input className="w-full font-black text-slate-800 bg-white border-2 border-slate-100 px-4 py-2 rounded-xl text-sm" placeholder="Essay Title" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} />
+                        <textarea className="w-full h-40 bg-white border-2 border-slate-100 p-4 rounded-xl text-xs font-serif leading-relaxed" placeholder="Paragraphs..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
                       </div>
                     )}
-
-                    {block.type === 'vocab-list' && (
-                      <div className="space-y-4">
-                        {block.items.map((item: any, i: number) => (
-                          <div key={i} className="flex gap-2">
-                             <input className="flex-1 font-bold text-indigo-600 bg-indigo-50/50 px-3 py-2 rounded-xl text-xs" placeholder="Term" value={item.term} onChange={e => {
-                               const newItems = [...block.items]; newItems[i].term = e.target.value; updateBlock(idx, 'items', newItems);
-                             }} />
-                             <input className="flex-2 text-slate-400 bg-slate-50 px-3 py-2 rounded-xl text-xs" placeholder="Meaning" value={item.definition} onChange={e => {
-                               const newItems = [...block.items]; newItems[i].definition = e.target.value; updateBlock(idx, 'items', newItems);
-                             }} />
-                          </div>
-                        ))}
-                        <button onClick={() => updateBlock(idx, 'items', [...block.items, {term: '', definition: ''}])} className="text-[10px] font-black text-indigo-400 uppercase">+ Add Term</button>
-                      </div>
-                    )}
+                    
+                    {/* Add other block editors here... */}
                   </div>
                 ))}
               </div>
 
-              {/* Add Block Menu */}
-              <div className="grid grid-cols-3 gap-3">
-                <StudioAddButton icon={<AlignLeft />} label="Text" onClick={() => addBlock('text')} />
-                <StudioAddButton icon={<FileText />} label="Essay" onClick={() => addBlock('essay')} />
-                <StudioAddButton icon={<MessageSquare />} label="Dialogue" onClick={() => addBlock('dialogue')} />
-                <StudioAddButton icon={<List />} label="Vocab" onClick={() => addBlock('vocab-list')} />
-                <StudioAddButton icon={<HelpCircle />} label="Quiz" onClick={() => addBlock('quiz')} />
-                <StudioAddButton icon={<Image />} label="Visual" onClick={() => addBlock('image')} />
+              {/* Block Injector */}
+              <div className="grid grid-cols-3 gap-4">
+                 <InjectorButton icon={<AlignLeft/>} label="Text" onClick={() => addBlock('text')} />
+                 <InjectorButton icon={<FileText/>} label="Essay" onClick={() => addBlock('essay')} />
+                 <InjectorButton icon={<MessageSquare/>} label="Dialogue" onClick={() => addBlock('dialogue')} />
+                 <InjectorButton icon={<List/>} label="Vocab" onClick={() => addBlock('vocab-list')} />
+                 <InjectorButton icon={<HelpCircle/>} label="Quiz" onClick={() => addBlock('quiz')} />
+                 <InjectorButton icon={<Image/>} label="Visual" onClick={() => addBlock('image')} />
               </div>
             </div>
           )}
         </div>
 
-        {/* RIGHT: Preview Pane */}
-        <div className="w-1/2 p-12 bg-slate-100 flex flex-col items-center justify-center relative">
-          <div className="absolute top-8 left-12 flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm z-10">
-            <button onClick={() => setPreviewMode('projector')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${previewMode === 'projector' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:text-slate-600'}`}>Projector View</button>
-            <button onClick={() => setPreviewMode('mobile')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${previewMode === 'mobile' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:text-slate-600'}`}>Mobile View</button>
+        {/* --- THE PREVIEW PANE (RIGHT) --- */}
+        <div className="w-1/2 bg-slate-50 p-16 flex flex-col items-center justify-center relative">
+          <div className="absolute top-10 left-16 flex gap-2 bg-white p-1.5 rounded-2xl border shadow-sm">
+             <button onClick={() => setPreviewMode('projector')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${previewMode === 'projector' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Projector</button>
+             <button onClick={() => setPreviewMode('mobile')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${previewMode === 'mobile' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Mobile</button>
           </div>
           
-          <div className={`transition-all duration-700 ${previewMode === 'projector' ? 'w-full aspect-video scale-90' : 'w-[375px] h-[667px] scale-75'}`}>
-            <PreviewScreen />
+          <div className={`transition-all duration-700 ease-in-out ${previewMode === 'projector' ? 'w-full aspect-video scale-90' : 'w-[320px] h-[580px] scale-95 shadow-2xl'}`}>
+             <LivePreview />
           </div>
-
-          <p className="mt-8 text-slate-300 font-bold text-xs uppercase tracking-[0.4em]">Live Preview Studio</p>
+          
+          <p className="mt-8 text-slate-300 font-black text-[10px] uppercase tracking-[0.5em] animate-pulse">Live Handshake Active</p>
         </div>
       </div>
     </div>
   );
 }
 
+function InjectorButton({ icon, label, onClick }: any) {
+  return (
+    <button onClick={onClick} className="p-6 bg-slate-50 border-2 border-slate-100 rounded-[2rem] flex flex-col items-center justify-center gap-3 hover:bg-white hover:border-indigo-600 hover:text-indigo-600 transition-all active:scale-90 group shadow-sm">
+      <div className="text-slate-300 group-hover:text-indigo-600 transition-colors">{icon}</div>
+      <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
+    </button>
+  );
+}
 // Sub-component for the Add buttons
 function StudioAddButton({ icon, label, onClick }: any) {
   return (
