@@ -3387,13 +3387,19 @@ function InstructorDashboard({
   onUpdateCard, 
   onDeleteCard, 
   onSaveLesson, 
+  onAssign,       // Prop Relay: Assignment Logic
+  onRevoke,       // Prop Relay: Removal Logic
+  onCreateClass,  // Prop Relay: Creation Logic
+  onRenameClass,  // Prop Relay: Update Logic
+  onDeleteClass,  // Prop Relay: Deletion Logic
+  onAddStudent,   // Prop Relay: Roster Logic
   onSwitchView, 
   onLogout 
 }: any) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isRailExpanded, setIsRailExpanded] = useState(false);
 
-  // --- 1. THE NAV ITEM (TOUCH-FIRST DESIGN) ---
+  // --- 1. THE NAV ITEM (FINGER-FRIENDLY) ---
   const NavItem = ({ id, icon, label }: { id: string; icon: React.ReactNode; label: string }) => {
     const isActive = activeTab === id;
     
@@ -3406,7 +3412,7 @@ function InstructorDashboard({
             : 'text-slate-500 hover:bg-slate-800 hover:text-slate-200'
         }`}
       >
-        {/* The 80px "Rail" Zone */}
+        {/* The 80px "Rail" Zone - Perfectly centered for tablet thumbs */}
         <div className="w-20 shrink-0 flex items-center justify-center">
           {React.cloneElement(icon as React.ReactElement, { 
             size: 22, 
@@ -3432,13 +3438,13 @@ function InstructorDashboard({
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden font-sans select-none">
       
-      {/* --- SIDE RAIL (THE COMMAND TOWER) --- */}
+      {/* --- SIDE RAIL / SIDEBAR --- */}
       <aside 
         className={`bg-slate-950 flex flex-col transition-all duration-500 ease-in-out z-50 shadow-2xl ${
           isRailExpanded ? 'w-72' : 'w-20'
         }`}
       >
-        {/* Branding & Interaction Header */}
+        {/* Branding Header */}
         <div className="h-24 flex items-center border-b border-slate-900 overflow-hidden shrink-0">
           <div className="w-20 flex items-center justify-center shrink-0">
             <div className={`w-11 h-11 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center text-white shadow-lg transition-transform duration-700 ${isRailExpanded ? 'rotate-0' : 'rotate-12 scale-90'}`}>
@@ -3456,7 +3462,7 @@ function InstructorDashboard({
             </button>
           </div>
 
-          {/* Floating Tablet Toggle: Appears when rail is thin */}
+          {/* Floating Toggle for Tablet */}
           {!isRailExpanded && (
             <button 
               onClick={() => setIsRailExpanded(true)}
@@ -3467,7 +3473,7 @@ function InstructorDashboard({
           )}
         </div>
 
-        {/* Main Navigation Stack */}
+        {/* Navigation Rail */}
         <nav className="flex-1 px-3 py-10 space-y-4 overflow-y-auto custom-scrollbar">
           <NavItem id="dashboard" icon={<Activity />} label="Live Feed" />
           <NavItem id="studio" icon={<PenTool />} label="Studio Hub" />
@@ -3476,7 +3482,7 @@ function InstructorDashboard({
           <NavItem id="analytics" icon={<BarChart2 />} label="Analytics" />
         </nav>
 
-        {/* Footer: Contextual Switchers */}
+        {/* User Utilities */}
         <div className="p-3 border-t border-slate-900 space-y-2 shrink-0">
           <button 
             onClick={onSwitchView}
@@ -3500,7 +3506,7 @@ function InstructorDashboard({
         </div>
       </aside>
 
-      {/* --- MAIN STAGE (DYNAMIC CONTENT) --- */}
+      {/* --- MAIN STAGE --- */}
       <main className="flex-1 overflow-hidden relative bg-slate-50">
         <div className="h-full w-full">
            {activeTab === 'studio' ? (
@@ -3514,6 +3520,22 @@ function InstructorDashboard({
                   allDecks={allDecks} 
                />
              </div>
+           ) : activeTab === 'classes' ? (
+             <div className="h-full p-8 md:p-12 overflow-y-auto custom-scrollbar">
+               <ClassManagerView 
+                  user={user}
+                  classes={userData?.classes || []}
+                  lessons={lessons}
+                  allDecks={allDecks}
+                  // HANDLERS ALIGNED WITH APP.TSX PROPS
+                  onAssign={onAssign}
+                  onRevoke={onRevoke}
+                  onCreateClass={onCreateClass}
+                  onDeleteClass={onDeleteClass}
+                  onRenameClass={onRenameClass}
+                  onAddStudent={onAddStudent}
+               />
+             </div>
            ) : (
              <div className="h-full overflow-y-auto p-12 custom-scrollbar animate-in fade-in duration-700">
                 <header className="mb-12">
@@ -3521,12 +3543,10 @@ function InstructorDashboard({
                     <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Magister Command</span>
                   </div>
-                  <h2 className="text-6xl font-black text-slate-900 tracking-tighter uppercase">{activeTab}</h2>
+                  <h2 className="text-6xl font-black text-slate-900 tracking-tighter uppercase leading-none">{activeTab}</h2>
                 </header>
                 
-                {/* Lazy-loaded components based on active tab */}
                 {activeTab === 'dashboard' && <LiveActivityFeed />}
-                {activeTab === 'classes' && <ClassManagerView classes={userData?.classes} lessons={lessons} />}
                 {activeTab === 'analytics' && <AnalyticsDashboard classes={userData?.classes} />}
                 {activeTab === 'inbox' && <InstructorInbox />}
              </div>
@@ -3873,6 +3893,63 @@ function App() {
     }
     return () => unsubAuth();
   }, [user?.uid, user?.email]);
+
+  // Inside your App component in App.tsx
+
+// 1. CREATE CLASS
+const handleCreateClass = async (className: string) => {
+  if (!user) return { success: false };
+  try {
+    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), {
+      name: className,
+      code: Math.random().toString(36).substring(2, 8).toUpperCase(),
+      students: [],
+      studentEmails: [],
+      assignments: [],
+      created: Date.now()
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("Create class failed:", error);
+    return { success: false };
+  }
+};
+
+// 2. ADD STUDENT
+const handleAddStudent = async (classId: string, email: string) => {
+  if (!user) return { success: false };
+  const normalizedEmail = email.toLowerCase().trim();
+  try {
+    const classRef = doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId);
+    await updateDoc(classRef, {
+      students: arrayUnion(normalizedEmail),
+      studentEmails: arrayUnion(normalizedEmail)
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("Add student failed:", error);
+    return { success: false };
+  }
+};
+
+// 3. ASSIGN & REVOKE (Prop Relay)
+const handleAssign = async (classId: string, assignment: any) => {
+  try {
+    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), {
+      assignments: arrayUnion(assignment)
+    });
+    return { success: true };
+  } catch (e) { return { success: false }; }
+};
+
+const handleRevoke = async (classId: string, assignment: any) => {
+  try {
+    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), {
+      assignments: arrayRemove(assignment)
+    });
+    return { success: true };
+  } catch (e) { return { success: false }; }
+};
 
   // --- 6. MAGISTER ACTION HANDLERS (The Juice) ---
   const handleSaveLesson = async (lessonData: any) => {
