@@ -2658,8 +2658,8 @@ function ClassManagerView({
   classes, 
   lessons, 
   allDecks, 
-  onAssign,   // Passed from App.tsx
-  onRevoke,   // Passed from App.tsx
+  onAssign,       
+  onRevoke,       
   onCreateClass, 
   onDeleteClass,
   onRenameClass,
@@ -2685,12 +2685,44 @@ function ClassManagerView({
   const availableExams = lessons.filter((l: any) => l.type === 'test' || l.type === 'exam');
   const availableLessons = lessons.filter((l: any) => l.type !== 'test' && l.type !== 'exam');
 
-  // --- 1. CORE HANDLERS (FIXED & JUICED) ---
-  
+  // --- 1. LOCAL FORM WRAPPERS (Fixes TS2552) ---
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newClassName.trim()) return;
+    const result = await onCreateClass(newClassName);
+    if (result && result.success) {
+      setNewClassName('');
+      setToastMsg("Cohort Established");
+    } else {
+      setToastMsg("Failed to create cohort");
+    }
+  };
+
+  const handleAddRoster = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStudentEmail.trim() || !selectedClass) return;
+    const result = await onAddStudent(selectedClass.id, newStudentEmail);
+    if (result && result.success) {
+      setNewStudentEmail('');
+      setToastMsg("Student Added to Roster");
+    } else {
+      setToastMsg("Failed to add student");
+    }
+  };
+
+  // --- 2. LOCAL UI STATE (Fixes TS2304) ---
+  const toggleAssignee = (email: string) => {
+    if (selectedAssignees.includes(email)) {
+      setSelectedAssignees(selectedAssignees.filter(e => e !== email));
+    } else {
+      setSelectedAssignees([...selectedAssignees, email]);
+    }
+  };
+
+  // --- 3. RELAY HANDLERS ---
   const handleAssignContent = async (item: any, type: string) => {
     if (!selectedClass) return;
     
-    // Prepare the payload
     const assignment = {
       ...item,
       id: `assign_${Date.now()}`,
@@ -2700,16 +2732,15 @@ function ClassManagerView({
       assignedAt: Date.now()
     };
 
-    // Use the onAssign prop from App.tsx to handle the DB write
     const result = await onAssign(selectedClass.id, assignment);
 
-    if (result.success) {
+    if (result && result.success) {
       setToastMsg(`Unit "${item.title}" Deployed!`);
       setAssignModalOpen(false);
       setSelectedAssignees([]);
       setTargetStudentMode('all');
     } else {
-      setToastMsg("Deployment Failed: Check Console");
+      setToastMsg("Deployment Failed");
     }
   };
 
@@ -2718,7 +2749,7 @@ function ClassManagerView({
     
     const result = await onRevoke(selectedClass.id, assignmentToRemove);
     
-    if (result.success) {
+    if (result && result.success) {
       setToastMsg("Assignment Revoked");
       setAssignmentToRemove(null);
     } else {
@@ -2726,13 +2757,13 @@ function ClassManagerView({
     }
   };
 
-  // --- 2. RENDERER: SINGLE CLASS VIEW ---
+  // --- 4. RENDERER: SINGLE CLASS VIEW ---
   if (selectedClass) {
     return (
       <div className="flex flex-col h-full animate-in slide-in-from-right-6 duration-500 relative">
         {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
         
-        {/* --- THE JUICY REVOKE MODAL --- */}
+        {/* REVOKE MODAL */}
         {assignmentToRemove && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
                 <div className="bg-white w-full max-w-sm rounded-[3rem] shadow-2xl p-10 text-center animate-in zoom-in-95 duration-200">
@@ -2751,7 +2782,7 @@ function ClassManagerView({
             </div>
         )}
 
-        {/* --- CLASS HEADER --- */}
+        {/* CLASS HEADER */}
         <div className="pb-8 border-b border-slate-100 mb-8 bg-white/80 backdrop-blur-md sticky top-0 z-20">
           <button onClick={() => setSelectedClassId(null)} className="flex items-center text-slate-400 hover:text-indigo-600 mb-6 text-xs font-black uppercase tracking-widest transition-colors"><ArrowLeft size={16} className="mr-2"/> Cohort Directory</button>
           
@@ -2764,7 +2795,6 @@ function ClassManagerView({
               <h1 className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{selectedClass.name}</h1>
             </div>
 
-            {/* Quick Actions */}
             <div className="flex gap-3">
                 <ActionButton icon={<BookOpen/>} label="Unit" color="bg-indigo-600" onClick={() => { setAssignType('lesson'); setAssignModalOpen(true); }} />
                 <ActionButton icon={<Layers/>} label="Deck" color="bg-orange-500" onClick={() => { setAssignType('deck'); setAssignModalOpen(true); }} />
@@ -2780,7 +2810,6 @@ function ClassManagerView({
 
         {activeTab === 'overview' ? (
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-12 pb-32">
-                {/* Assignments List */}
                 <div className="lg:col-span-3 space-y-6">
                     <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em] mb-4">Active Deployments</h3>
                     {(!selectedClass.assignments || selectedClass.assignments.length === 0) ? (
@@ -2812,15 +2841,17 @@ function ClassManagerView({
                     )}
                 </div>
 
-                {/* Roster Section */}
                 <div className="lg:col-span-2 space-y-6">
                     <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em] mb-4">Cohort Roster</h3>
-                    <form onSubmit={addStudent} className="flex gap-2">
+                    <form onSubmit={handleAddRoster} className="flex gap-2">
                         <input value={newStudentEmail} onChange={e => setNewStudentEmail(e.target.value)} placeholder="student@email.com" className="flex-1 px-6 py-4 rounded-2xl bg-slate-50 border-none text-sm font-bold focus:ring-2 focus:ring-indigo-100 transition-all" />
                         <button type="submit" className="bg-slate-900 text-white p-4 rounded-2xl active:scale-90 transition-all shadow-lg"><Plus size={24}/></button>
                     </form>
                     
                     <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+                        {(!selectedClass.students || selectedClass.students.length === 0) && (
+                           <div className="p-8 text-center text-slate-400 text-sm italic font-bold">No students have joined yet.</div>
+                        )}
                         {selectedClass.students?.map((s: string, i: number) => (
                             <div key={i} className="p-5 border-b border-slate-50 last:border-0 flex items-center justify-between group">
                                 <div className="flex items-center gap-4">
@@ -2837,7 +2868,7 @@ function ClassManagerView({
             <div className="pb-20"><InstructorGradebook classData={selectedClass} /></div>
         )}
 
-        {/* --- ASSIGNMENT MODAL --- */}
+        {/* ASSIGNMENT MODAL */}
         {assignModalOpen && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-6">
             <div className="bg-white w-full max-w-xl rounded-[3rem] shadow-2xl overflow-hidden max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-300">
@@ -2847,7 +2878,6 @@ function ClassManagerView({
                     <button onClick={() => setAssignModalOpen(false)} className="p-2 bg-white text-slate-300 rounded-xl"><X size={20}/></button>
                   </div>
                   
-                  {/* Student Mode Selector */}
                   <div className="bg-slate-200/50 p-1.5 rounded-2xl flex gap-1 mb-4">
                     <button onClick={() => setTargetStudentMode('all')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${targetStudentMode === 'all' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-500'}`}>Full Cohort</button>
                     <button onClick={() => setTargetStudentMode('specific')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${targetStudentMode === 'specific' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-500'}`}>Specific Students</button>
@@ -2883,7 +2913,7 @@ function ClassManagerView({
     );
   }
 
-  // --- 3. RENDERER: MAIN GRID VIEW ---
+  // --- 5. RENDERER: MAIN DIRECTORY GRID ---
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
       {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
@@ -2893,7 +2923,7 @@ function ClassManagerView({
           <h2 className="text-6xl font-black text-slate-900 tracking-tighter uppercase leading-none">Cohorts</h2>
           <p className="text-xs text-slate-400 font-bold mt-2 uppercase tracking-[0.3em]">Managed Learning Environments</p>
         </div>
-        <form onSubmit={createClass} className="flex gap-2 bg-white p-2 rounded-[2rem] shadow-xl shadow-slate-200 border border-slate-100">
+        <form onSubmit={handleCreate} className="flex gap-2 bg-white p-2 rounded-[2rem] shadow-xl shadow-slate-200 border border-slate-100">
           <input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="New Class Name" className="bg-transparent px-6 py-2 outline-none text-sm font-bold w-48 md:w-64" />
           <button type="submit" className="bg-indigo-600 text-white px-8 py-3 rounded-full font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all">Establish</button>
         </form>
@@ -2925,8 +2955,7 @@ function ClassManagerView({
   );
 }
 
-// --- SUB-COMPONENTS ---
-
+// Sub-components to keep renderer clean
 function ActionButton({ icon, label, color, onClick }: any) {
   return (
     <button onClick={onClick} className={`${color} text-white px-5 py-3 rounded-2xl font-black text-[10px] flex items-center gap-3 shadow-xl active:scale-95 transition-all uppercase tracking-widest`}>
@@ -3820,25 +3849,31 @@ function ExamPlayerView({ exam, onFinish }: any) {
 
 
 function App() {
-  // --- 1. STATE ---
+  // --- 1. CORE SYSTEM STATE ---
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [viewMode, setViewMode] = useState<'student' | 'instructor'>('student');
   const [activeTab, setActiveTab] = useState('home');
+  
+  // --- 2. DATA REPOSITORIES ---
+  const [systemLessons] = useState([]); // Static fallback if needed
   const [customLessons, setCustomLessons] = useState<any[]>([]);
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [allDecks, setAllDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
+  
+  // --- 3. UI NAVIGATION STATE ---
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [activeLesson, setActiveLesson] = useState<any>(null);
 
-  // --- 2. DATA RELAY ---
+  // --- 4. DATA CONSOLIDATION (The Unit Engine) ---
   const lessons = useMemo(() => {
+    // Merges all instructor custom lessons with active student assignments
     const assignments = enrolledClasses.flatMap(c => c.assignments || []);
-    return [...customLessons, ...assignments];
-  }, [customLessons, enrolledClasses]);
+    return [...systemLessons, ...customLessons, ...assignments];
+  }, [systemLessons, customLessons, enrolledClasses]);
 
-  // --- 3. FIREBASE SYNC ---
+  // --- 5. FIREBASE REAL-TIME SYNC ---
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -3849,6 +3884,7 @@ function App() {
     });
 
     if (user?.uid) {
+      // Sync Profile & determine if "Magister Mode" is unlocked
       const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
         if (snap.exists()) {
           const data = snap.data();
@@ -3858,23 +3894,29 @@ function App() {
         setAuthChecked(true);
       });
 
+      // Sync custom studio content
       const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => {
         setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
+      const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => {
+        const cards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setAllDecks((prev: any) => ({ ...prev, custom: { ...prev.custom, cards } }));
+      });
+
+      // Sync cohorts based on email
       const qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
       const unsubClasses = onSnapshot(qClasses, (snap) => {
         setEnrolledClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
-      return () => { unsubAuth(); unsubProfile(); unsubLessons(); unsubClasses(); };
+      return () => { unsubAuth(); unsubProfile(); unsubLessons(); unsubCards(); unsubClasses(); };
     }
     return () => unsubAuth();
-  }, [user?.uid]);
+  }, [user?.uid, user?.email]);
 
-  // --- 4. THE MAGISTER HANDLERS (The Fix) ---
+  // --- 6. MAGISTER DATABASE HANDLERS (The Prop Source) ---
   
-  // These functions define the logic and match the prop names in InstructorDashboard
   const handleCreateClass = async (className: string) => {
     if (!user) return { success: false };
     try {
@@ -3886,6 +3928,22 @@ function App() {
         assignments: [],
         created: Date.now()
       });
+      return { success: true };
+    } catch (e) { return { success: false }; }
+  };
+
+  const handleDeleteClass = async (id: string) => {
+    if (!user) return { success: false };
+    try {
+      await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id));
+      return { success: true };
+    } catch (e) { return { success: false }; }
+  };
+
+  const handleRenameClass = async (id: string, newName: string) => {
+    if (!user) return { success: false };
+    try {
+      await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id), { name: newName });
       return { success: true };
     } catch (e) { return { success: false }; }
   };
@@ -3903,6 +3961,7 @@ function App() {
   };
 
   const handleAssign = async (classId: string, assignment: any) => {
+    if (!user) return { success: false };
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), {
         assignments: arrayUnion(assignment)
@@ -3912,6 +3971,7 @@ function App() {
   };
 
   const handleRevoke = async (classId: string, assignment: any) => {
+    if (!user) return { success: false };
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), {
         assignments: arrayRemove(assignment)
@@ -3928,10 +3988,27 @@ function App() {
     });
   };
 
-  // --- 5. RENDER ---
-  if (!authChecked) return <div className="h-screen flex items-center justify-center">Loading...</div>;
+  const handleSaveCard = async (cardData: any) => {
+    if (!user) return;
+    const cardId = cardData.id || `card_${Date.now()}`;
+    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), { 
+      ...cardData, id: cardId, owner: user.uid 
+    });
+  };
+
+  // --- 7. ROUTING & RENDERING ---
+
+  if (!authChecked) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-50">
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin shadow-lg" />
+      </div>
+    );
+  }
+
   if (!user) return <AuthView />;
 
+  // --- MAGISTER MODE STAGE ---
   if (viewMode === 'instructor' && userData?.role === 'instructor') {
     return (
       <InstructorDashboard 
@@ -3940,10 +4017,13 @@ function App() {
         allDecks={allDecks} 
         lessons={lessons} 
         onSaveLesson={handleSaveLesson} 
+        onSaveCard={handleSaveCard}
+        // PERFECT PROP RELAY MAPPING
         onAssign={handleAssign}
         onRevoke={handleRevoke}
-        // FIX: Mapping the handlers to the correct props
         onCreateClass={handleCreateClass}
+        onDeleteClass={handleDeleteClass}
+        onRenameClass={handleRenameClass}
         onAddStudent={handleAddStudent}
         onSwitchView={() => setViewMode('student')}
         onLogout={() => signOut(auth)} 
@@ -3951,23 +4031,45 @@ function App() {
     );
   }
 
+  // --- STUDENT MODE STAGE ---
   return (
-    <div className="bg-slate-50 min-h-screen w-full flex flex-col items-center relative font-sans">
+    <div className="bg-slate-50 min-h-screen w-full flex flex-col items-center relative font-sans overflow-hidden">
+      
+      {/* Instructor Backdoor Toggle */}
       {userData?.role === 'instructor' && (
-        <button onClick={() => setViewMode('instructor')} className="fixed top-6 right-6 z-[1000] bg-slate-900 text-white px-8 py-3 rounded-full font-black text-xs uppercase shadow-2xl">🎓 Magister Mode</button>
+        <button 
+          onClick={() => setViewMode('instructor')} 
+          className="fixed top-6 right-6 z-[1000] bg-slate-900 text-white px-8 py-3 rounded-full font-black text-xs uppercase tracking-widest shadow-2xl transition-all hover:scale-105 active:scale-95"
+        >
+          🎓 Magister Command
+        </button>
       )}
 
-      <div className={`w-full bg-white relative overflow-hidden flex flex-col ${activeTab === 'presentation' ? 'h-screen w-screen fixed inset-0' : 'max-w-md h-[100dvh] shadow-2xl'}`}>
-        <div className="flex-1 overflow-hidden relative">
+      {/* Mobile-Optimized Student Viewport */}
+      <div className={`w-full transition-all duration-700 bg-white relative overflow-hidden flex flex-col ${
+        activeTab === 'presentation' ? 'h-screen w-screen fixed inset-0 z-50' : 'max-w-md h-[100dvh] shadow-2xl'
+      }`}>
+        <div className="flex-1 h-full overflow-hidden relative">
           {activeTab === 'presentation' ? (
             <ClassView lesson={lessons.find(l => l.id === selectedLessonId)} userData={userData} />
           ) : activeLesson ? (
             <LessonView lesson={activeLesson} onFinish={() => setActiveLesson(null)} isInstructor={userData?.role === 'instructor'} />
           ) : (
-            <HomeView setActiveTab={setActiveTab} classes={enrolledClasses} userData={userData} user={user} setSelectedLessonId={setSelectedLessonId} />
+            <HomeView 
+              setActiveTab={setActiveTab} 
+              classes={enrolledClasses} 
+              userData={userData} 
+              user={user} 
+              setSelectedLessonId={setSelectedLessonId}
+              setActiveLesson={setActiveLesson}
+            />
           )}
         </div>
-        {(!activeLesson && activeTab !== 'presentation') && <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />}
+        
+        {/* Hide Nav during deep focus modes */}
+        {(!activeLesson && activeTab !== 'presentation') && (
+          <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
+        )}
       </div>
     </div>
   );
