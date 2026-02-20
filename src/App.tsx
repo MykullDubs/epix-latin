@@ -3245,23 +3245,28 @@ function ExamPlayerView({ exam, onFinish }: any) {
 
 
 function App() {
-  // --- 1. STATE ---
+  // --- 1. CORE STATE ---
   const [activeTab, setActiveTab] = useState('home');
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
+  
+  // Content State
   const [systemDecks, setSystemDecks] = useState<any>({});
   const [systemLessons, setSystemLessons] = useState<any[]>([]);
   const [customCards, setCustomCards] = useState<any[]>([]);
   const [customLessons, setCustomLessons] = useState<any[]>([]);
   const [activeLesson, setActiveLesson] = useState<any>(null);
   const [selectedDeckKey, setSelectedDeckKey] = useState('salutationes');
+  
+  // Classroom State
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  // --- 2. DERIVED DATA (The Handshake) ---
+  // --- 2. DATA HYDRATION (The "Handshake") ---
+  // A. Extracts assignments from Michael's classes
   const classLessons = useMemo(() => {
     let all: any[] = [];
     enrolledClasses.forEach((cls: any) => {
@@ -3276,6 +3281,7 @@ function App() {
     return all;
   }, [enrolledClasses]);
 
+  // B. The Master Library (System + Custom + Assigned)
   const lessons = useMemo(() => {
     const library = [...systemLessons, ...customLessons];
     return [...library, ...classLessons];
@@ -3294,7 +3300,7 @@ function App() {
 
   const displayName = useMemo(() => userData?.name || user?.email?.split('@')[0] || 'Scholar', [userData, user]);
 
-  // --- 3. MASTER SYNC ENGINE ---
+  // --- 3. MASTER SYNC ENGINE (Firebase) ---
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -3302,16 +3308,19 @@ function App() {
     });
 
     if (user?.uid) {
+      // Sync Profile & Role
       const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
         if (snap.exists()) setUserData(snap.data());
         setAuthChecked(true);
       });
 
+      // Sync Enrolled Classes
       const qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
       const unsubClasses = onSnapshot(qClasses, (snapshot) => {
         setEnrolledClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       });
 
+      // Sync Library
       setSystemDecks(INITIAL_SYSTEM_DECKS);
       setSystemLessons(INITIAL_SYSTEM_LESSONS);
       const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => setCustomCards(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
@@ -3324,9 +3333,10 @@ function App() {
 
   // --- 4. NAVIGATION HANDLERS ---
   const handleContentSelection = (item: any) => {
-    const targetId = item.lessonId || item.id || item.originalId;
+    const targetId = item.originalId || item.lessonId || item.id;
     if (targetId) setSelectedLessonId(targetId);
 
+    // HYDRATION: Swap "hollow" metadata for the "full" lesson that has blocks
     const fullContent = [...systemLessons, ...customLessons].find(l => 
       l.id === targetId || l.id === item.originalId
     );
@@ -3349,41 +3359,69 @@ function App() {
     } 
   }, [user, displayName]);
 
-  // --- 5. RENDER STUDENT VIEW HELPER ---
+  // --- 5. RENDER STUDENT VIEW (The Router) ---
   const renderStudentView = () => {
+    // A. PRESENTATION (The Big Screen)
     if (activeTab === 'presentation') {
-      return <ClassView lessonId={selectedLessonId} lessons={lessons} classLessons={classLessons} />;
+      const fullLesson = lessons.find(l => l.id === selectedLessonId || l.originalId === selectedLessonId);
+      
+      if (!fullLesson) {
+        return (
+          <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white">
+            <Loader className="animate-spin mb-4 text-indigo-500" size={48} />
+            <p className="font-black tracking-widest uppercase opacity-50">Hydrating Presentation...</p>
+          </div>
+        );
+      }
+
+      return (
+        <ClassView 
+          lessonId={selectedLessonId} 
+          lessons={lessons} 
+          classLessons={classLessons} 
+          classId={activeStudentClass?.id} 
+          userData={userData}
+        />
+      );
     }
 
+    // B. ACTIVE LESSON (Mobile Player)
     if (activeLesson) {
       return <LessonView lesson={activeLesson} onFinish={handleFinishLesson} isInstructor={false} />;
     }
     
+    // C. CLASS PORTAL (Michael's Class View)
     if (activeTab === 'home' && activeStudentClass) {
       return (
         <StudentClassView 
           classData={activeStudentClass} 
           onBack={() => setActiveStudentClass(null)} 
           onSelectLesson={handleContentSelection} 
-          onSelectDeck={handleContentSelection} 
           userData={userData} 
           setActiveTab={setActiveTab} 
           setSelectedLessonId={setSelectedLessonId} 
-          allLessons={lessons} 
-          classLessons={classLessons} 
         />
       );
     }
 
+    // D. MAIN TABS
     switch (activeTab) {
       case 'discovery': return <DiscoveryView allDecks={allDecks} lessons={lessons} user={user} onSelectDeck={handleContentSelection} onSelectLesson={handleContentSelection} userData={userData} onLogActivity={() => {}} />;
       case 'flashcards': return <FlashcardView allDecks={allDecks} selectedDeckKey={selectedDeckKey} onSelectDeck={setSelectedDeckKey} activeDeckOverride={null} onComplete={handleFinishLesson} userData={userData} user={user} onDeleteDeck={() => {}} />;
       case 'profile': return <ProfileView user={user} userData={userData} />;
-      default: return <HomeView setActiveTab={setActiveTab} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} userData={userData} user={user} />;
+      default: return (
+        <HomeView 
+          setActiveTab={setActiveTab} 
+          classes={enrolledClasses} 
+          onSelectClass={(c: any) => setActiveStudentClass(c)} 
+          userData={userData} 
+          user={user} 
+        />
+      );
     }
   };
 
-  // --- 6. FINAL RENDER ---
+  // --- 6. FINAL RENDER (Z-Index Guard) ---
   if (!authChecked) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-white">
