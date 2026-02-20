@@ -3192,139 +3192,154 @@ function BuilderHub({
   initialMode, 
   onClearMode 
 }: any) {
-  // --- 1. SHARED STATE ---
-  // We keep lessonData here so it doesn't vanish if Michael switches to 'card' mode mid-build
-  const [lessonData, setLessonData] = useState({ 
-    title: '', 
-    subtitle: '', 
-    description: '', 
-    vocab: '', 
-    blocks: [] 
-  });
-  
+  const [lessonData, setLessonData] = useState({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
   const [mode, setMode] = useState<'card' | 'lesson' | 'exam'>(initialMode || 'card'); 
+  const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit'); // TABLET TOGGLE
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  // Sync mode if changed by a parent quick-action
-  useEffect(() => { 
-    if (initialMode) setMode(initialMode); 
-  }, [initialMode]);
+  useEffect(() => { if (initialMode) setMode(initialMode); }, [initialMode]);
 
-  // --- 2. RELAY HANDLERS ---
-  const handleSaveExam = (examData: any) => {
-      // Exams are saved using the same lesson infrastructure
-      if (typeof onSaveLesson === 'function') {
-        onSaveLesson(examData); 
-        setToastMsg("Assessment Exported to Library!");
-      }
-  };
-
-  // --- 3. UI CONFIG (THE JUICE) ---
+  // --- TAB CONFIG ---
   const modes = [
-    { id: 'card', label: 'Scriptorium', sub: 'Card Architect', icon: <Layers size={20}/>, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100' },
-    { id: 'lesson', label: 'Curriculum', sub: 'Unit Designer', icon: <BookOpen size={20}/>, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-    { id: 'exam', label: 'Assessment', sub: 'Exam Builder', icon: <FileText size={20}/>, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100' }
+    { id: 'card', label: 'Scriptorium', icon: <Layers size={18}/>, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { id: 'lesson', label: 'Curriculum', icon: <BookOpen size={18}/>, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { id: 'exam', label: 'Assessment', icon: <FileText size={18}/>, color: 'text-rose-600', bg: 'bg-rose-50' }
   ];
 
-  const activeMode = modes.find(m => m.id === mode) || modes[0];
+  const activeModeConfig = modes.find(m => m.id === mode) || modes[0];
 
   return ( 
-    <div className="h-full bg-slate-50 flex flex-col overflow-hidden font-sans relative">
-        {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
+    <div className="h-full flex flex-col bg-slate-50 overflow-hidden select-none">
+      {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
+      
+      {/* --- 1. THE ADAPTIVE HEADER --- */}
+      <header className="h-24 bg-white border-b border-slate-200 px-6 md:px-10 flex justify-between items-center shrink-0 z-30 shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className={`p-3 rounded-2xl ${activeModeConfig.bg} ${activeModeConfig.color} hidden sm:flex`}>
+            {activeModeConfig.icon}
+          </div>
+          <div>
+            <h2 className="text-xl font-black text-slate-900 tracking-tighter uppercase leading-none">{activeModeConfig.label}</h2>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1">Magister Studio</p>
+          </div>
+        </div>
+
+        {/* --- TABLET VIEW SWITCHER (Visible only on Tablet/Mobile) --- */}
+        <div className="flex bg-slate-100 p-1 rounded-2xl md:hidden border border-slate-200">
+          <button 
+            onClick={() => setViewMode('edit')}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+              viewMode === 'edit' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400'
+            }`}
+          >
+            <Edit3 size={14} /> Edit
+          </button>
+          <button 
+            onClick={() => setViewMode('preview')}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+              viewMode === 'preview' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400'
+            }`}
+          >
+            <Eye size={14} /> Preview
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {initialMode && (
+            <button onClick={onClearMode} className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:bg-rose-50 hover:text-rose-500 transition-all border border-slate-100">
+              <X size={20} />
+            </button>
+          )}
+          <button 
+            onClick={() => onSaveLesson(lessonData)}
+            className="hidden sm:flex bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+          >
+            Commit Unit
+          </button>
+        </div>
+      </header>
+
+      {/* --- 2. DYNAMIC WORKSPACE --- */}
+      <div className="flex-1 flex overflow-hidden relative">
         
-        {/* --- CINEMATIC STUDIO HEADER --- */}
-        <div className="bg-white px-10 pt-12 pb-8 border-b border-slate-200 shrink-0 relative overflow-hidden">
-            {/* Dynamic Ambient Glow */}
-            <div className={`absolute -right-20 -top-20 w-80 h-80 rounded-full blur-[120px] opacity-30 transition-colors duration-1000 ${activeMode.bg}`} />
+        {/* LEFT PANE: THE EDITOR */}
+        <div className={`h-full overflow-y-auto custom-scrollbar transition-all duration-500 ease-in-out ${
+          viewMode === 'edit' ? 'w-full md:w-1/2 opacity-100' : 'hidden md:block md:w-1/2 opacity-50 grayscale-[50%]'
+        }`}>
+          <div className="p-6 md:p-12 max-w-2xl mx-auto pb-40">
+            {/* MODE TOGGLE: Cards vs Lesson */}
+            <div className="mb-10 flex bg-slate-200/50 p-1.5 rounded-[2rem] w-fit mx-auto md:mx-0">
+              {modes.map((m) => (
+                <button 
+                  key={m.id}
+                  onClick={() => setMode(m.id as any)} 
+                  className={`px-8 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${
+                    mode === m.id ? 'bg-white text-slate-900 shadow-lg scale-105' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {m.id}
+                </button>
+              ))}
+            </div>
+
+            {/* THE BUILDER VIEWS */}
+            <div className="animate-in fade-in slide-in-from-bottom-4">
+              {mode === 'card' && (
+                <CardBuilderView 
+                  onSaveCard={onSaveCard} 
+                  onUpdateCard={onUpdateCard} 
+                  onDeleteCard={onDeleteCard} 
+                  availableDecks={allDecks} 
+                />
+              )}
+              {mode === 'lesson' && (
+                <LessonBuilderView 
+                  data={lessonData} 
+                  setData={setLessonData} 
+                  onSave={onSaveLesson} 
+                  availableDecks={allDecks} 
+                />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT PANE: THE LIVE PREVIEW (Projector/Mobile) */}
+        <div className={`h-full bg-slate-100 border-l border-slate-200 items-center justify-center p-6 md:p-12 transition-all duration-500 ${
+          viewMode === 'preview' ? 'flex w-full md:w-1/2' : 'hidden md:flex md:w-1/2'
+        }`}>
+          <div className="relative w-full h-full max-w-sm max-h-[750px] group">
+            {/* Aura Decoration for Tablet Preview */}
+            <div className="absolute -inset-4 bg-gradient-to-tr from-indigo-500/10 to-emerald-500/10 blur-2xl rounded-[4rem] opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
             
-            <div className="flex justify-between items-end relative z-10">
-                <div className="animate-in slide-in-from-left-6 duration-700">
-                    <div className="flex items-center gap-4 mb-2">
-                        <div className={`p-3 rounded-2xl ${activeMode.bg} ${activeMode.color} shadow-sm border ${activeMode.border} animate-in zoom-in duration-500`}>
-                            {activeMode.icon}
-                        </div>
-                        <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em]">{activeMode.label}</h2>
-                    </div>
-                    <h1 className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{activeMode.sub}</h1>
-                </div>
-
-                {initialMode && (
-                  <button 
-                    onClick={onClearMode} 
-                    className="p-4 bg-slate-50 text-slate-400 rounded-[1.5rem] hover:bg-rose-50 hover:text-rose-500 transition-all active:scale-90 border border-slate-100"
-                  >
-                    <X size={24} strokeWidth={3} />
-                  </button>
-                )}
+            {/* The Actual Preview Component */}
+            <div className="relative h-full w-full animate-in zoom-in-95 duration-500">
+              <LivePreview data={lessonData} />
             </div>
 
-            {/* --- PRO TAB TOGGLE --- */}
-            <div className="mt-10 flex bg-slate-100/80 p-1.5 rounded-[2.5rem] w-fit border border-slate-200/50 shadow-inner backdrop-blur-sm">
-                {modes.map((m) => (
-                    <button 
-                        key={m.id}
-                        onClick={() => setMode(m.id as any)} 
-                        className={`flex items-center gap-3 px-10 py-4 rounded-[2rem] text-[11px] font-black uppercase tracking-widest transition-all duration-500 ${
-                            mode === m.id 
-                                ? 'bg-white text-slate-900 shadow-2xl shadow-slate-300/50 scale-[1.05] z-10' 
-                                : 'text-slate-400 hover:text-slate-600 hover:bg-white/50'
-                        }`}
-                    >
-                        {m.id === mode && (
-                           <span className={`${m.color} animate-in zoom-in duration-300`}>
-                             {React.cloneElement(m.icon as React.ReactElement, { size: 16 })}
-                           </span>
-                        )}
-                        {m.id}
-                    </button>
-                ))}
-            </div>
+            {/* Quick-Save Floating Action (For Tablet Preview Mode) */}
+            <button 
+              onClick={() => onSaveLesson(lessonData)}
+              className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-10 py-5 rounded-[2rem] font-black text-[10px] uppercase tracking-[0.3em] shadow-2xl md:hidden flex items-center gap-3 active:scale-90 transition-all"
+            >
+              <Zap size={16} className="text-yellow-400" /> Commit to Library
+            </button>
+          </div>
         </div>
+      </div>
 
-        {/* --- THE BUILDER CANVAS --- */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar bg-white/50 relative">
-            <div className="h-full animate-in fade-in slide-in-from-bottom-6 duration-1000">
-                {mode === 'card' && (
-                    <CardBuilderView 
-                        onSaveCard={onSaveCard} 
-                        onUpdateCard={onUpdateCard} 
-                        onDeleteCard={onDeleteCard} 
-                        availableDecks={allDecks} 
-                    />
-                )}
-                
-                {mode === 'lesson' && (
-                    <LessonBuilderView 
-                        data={lessonData} 
-                        setData={setLessonData} 
-                        onSave={onSaveLesson} // THE CRITICAL RELAY: Corrects the "n is not a function" error
-                        availableDecks={allDecks} 
-                    />
-                )}
-                
-                {mode === 'exam' && (
-                    <div className="p-12 max-w-5xl mx-auto">
-                        <div className="bg-white rounded-[3rem] border-2 border-slate-100 p-12 shadow-sm">
-                            <ExamBuilderView onSave={handleSaveExam} />
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Floating Pro-Tip Bar */}
-            <div className="sticky bottom-10 left-0 right-0 flex justify-center pointer-events-none pb-10">
-                <div className="px-6 py-3 bg-slate-900 text-white rounded-full shadow-2xl flex items-center gap-3 animate-bounce pointer-events-auto">
-                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" />
-                    <p className="text-[10px] font-black uppercase tracking-widest">
-                        {mode === 'lesson' ? 'Projector Preview active in Unit Designer' : 'Linguistic X-Ray active in Scriptorium'}
-                    </p>
-                </div>
-            </div>
+      {/* --- 3. TABLET FOOTER (Quick Block Injector) --- */}
+      <div className={`md:hidden fixed bottom-10 left-1/2 -translate-x-1/2 transition-all duration-500 ${
+        viewMode === 'edit' ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'
+      }`}>
+        <div className="bg-white/80 backdrop-blur-xl border border-slate-200 px-6 py-3 rounded-full shadow-2xl flex items-center gap-4">
+          <div className="w-1 h-4 bg-indigo-500 rounded-full animate-pulse" />
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Editing Mode: {mode}</p>
         </div>
+      </div>
     </div> 
   );
 }
-
 function InstructorDashboard({ 
   user, 
   userData, 
