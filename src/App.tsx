@@ -3856,7 +3856,7 @@ function App() {
   
   // High-Level View Controllers
   const [viewMode, setViewMode] = useState<'student' | 'instructor'>('student');
-  const [activeTab, setActiveTab] = useState('home'); // Controls Bottom Nav & Presentation Trigger
+  const [activeTab, setActiveTab] = useState('home'); // Controls Bottom Nav
   
   // --- 2. DATA REPOSITORIES ---
   const [systemLessons] = useState([]); 
@@ -3864,10 +3864,11 @@ function App() {
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [allDecks, setAllDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
   
-  // --- 3. UI NAVIGATION STATE ---
-  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null); // Triggers Lesson or Presentation
-  const [activeLesson, setActiveLesson] = useState<any>(null); // Triggers Lesson (Direct Object)
-  const [activeStudentClass, setActiveStudentClass] = useState<any>(null); // Triggers StudentClassView
+  // --- 3. UI NAVIGATION STATE (DECOUPLED) ---
+  const [activeLesson, setActiveLesson] = useState<any>(null); // Triggers Lesson/Exam Player
+  const [activeStudentClass, setActiveStudentClass] = useState<any>(null); // Triggers Class Dashboard
+  const [presentationLessonId, setPresentationLessonId] = useState<string | null>(null); // Triggers Projector
+  const [activeDeckKey, setActiveDeckKey] = useState<string | null>(null); // Triggers Flashcards
 
   // --- 4. DATA CONSOLIDATION ---
   const lessons = useMemo(() => {
@@ -3886,7 +3887,6 @@ function App() {
     });
 
     if (user?.uid) {
-      // Profile Sync
       const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
         if (snap.exists()) {
           const data = snap.data();
@@ -3896,7 +3896,6 @@ function App() {
         setAuthChecked(true);
       });
 
-      // Instructor Content Sync
       const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => {
         setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
@@ -3906,7 +3905,6 @@ function App() {
         setAllDecks((prev: any) => ({ ...prev, custom: { ...prev.custom, cards } }));
       });
 
-      // Student Cohort Sync
       const qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
       const unsubClasses = onSnapshot(qClasses, (snap) => {
         setEnrolledClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -3993,13 +3991,37 @@ function App() {
     });
   };
 
-  // Helper to clear lesson states
-  const closeLessons = () => {
-    setActiveLesson(null);
-    setSelectedLessonId(null);
+  // --- 7. UNIFIED XP & ACTIVITY LOGGER ---
+  const handleLogActivity = async (itemId: string, xp: number, title: string, details: any = {}) => {
+    if (!user) return;
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
+        studentEmail: user.email,
+        studentName: userData?.name || user.email.split('@')[0],
+        type: itemId === 'explore_deck' ? 'explore' : 'completion',
+        activityType: details.mode || 'general',
+        itemTitle: title,
+        itemId: itemId, 
+        xp: xp,
+        timestamp: Date.now(),
+        ...details
+      });
+      if (xp > 0) {
+        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
+          xp: increment(xp)
+        });
+      }
+    } catch (e) { console.error("Log error", e); }
   };
 
-  // --- 7. GLOBAL ROUTING ENGINE ---
+  // Helper to exit any active lesson gracefully
+  const closeLessons = () => {
+    setActiveLesson(null);
+  };
+
+
+  // --- 8. GLOBAL ROUTING ENGINE ---
+  
   if (!authChecked) {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50">
@@ -4010,14 +4032,13 @@ function App() {
 
   if (!user) return <AuthView />;
 
-  // --- ROUTE 1: GLOBAL PRESENTATION OVERRIDE ---
-  // If the active tab is presentation AND we have a lesson ID, overtake the screen.
-  if (activeTab === 'presentation' && selectedLessonId) {
-    const lessonToPresent = lessons.find(l => l.id === selectedLessonId) || lessons[0];
+  // ROUTE 1: GLOBAL PRESENTATION OVERRIDE (Instructor Projector)
+  if (presentationLessonId || activeTab === 'presentation') {
+    const lessonToPresent = lessons.find(l => l.id === presentationLessonId) || activeLesson || lessons[0];
     return (
       <div className="fixed inset-0 z-[5000] bg-white w-screen h-screen">
         <button 
-          onClick={() => { setActiveTab('dashboard'); setSelectedLessonId(null); }} 
+          onClick={() => { setPresentationLessonId(null); setActiveTab('dashboard'); }} 
           className="absolute top-6 left-6 z-[5010] bg-slate-900/80 backdrop-blur text-white px-6 py-3 rounded-full font-black text-[10px] uppercase tracking-widest shadow-2xl hover:bg-rose-600 transition-colors"
         >
           End Session
@@ -4025,13 +4046,13 @@ function App() {
         {lessonToPresent ? (
           <ClassView lesson={lessonToPresent} userData={userData} />
         ) : (
-          <div className="flex h-full items-center justify-center text-slate-400 font-bold uppercase tracking-widest">Lesson Not Found</div>
+          <div className="flex h-full items-center justify-center text-slate-400 font-bold uppercase tracking-widest">Unit Not Found</div>
         )}
       </div>
     );
   }
 
-  // --- ROUTE 2: MAGISTER COMMAND CENTER ---
+  // ROUTE 2: MAGISTER COMMAND CENTER
   if (viewMode === 'instructor' && userData?.role === 'instructor') {
     return (
       <InstructorDashboard 
@@ -4049,13 +4070,8 @@ function App() {
         onRenameClass={handleRenameClass}
         onAddStudent={handleAddStudent}
         
-        // Critical: Injects global setters so the Dashboard can trigger Presentation Mode
-        setActiveTab={setActiveTab}
-        setSelectedLessonId={setSelectedLessonId}
-        onStartPresentation={(lessonId: string) => {
-          setSelectedLessonId(lessonId);
-          setActiveTab('presentation');
-        }}
+        // This triggers Route 1 above
+        onStartPresentation={(lessonId: string) => setPresentationLessonId(lessonId)}
         
         onSwitchView={() => setViewMode('student')}
         onLogout={() => signOut(auth)} 
@@ -4063,10 +4079,7 @@ function App() {
     );
   }
 
-  // --- ROUTE 3: STUDENT VIEWPORT ---
-  // Determines which lesson object to pass to LessonView
-  const currentLessonToTake = activeLesson || lessons.find(l => l.id === selectedLessonId);
-
+  // ROUTE 3: STUDENT VIEWPORT
   return (
     <div className="bg-slate-50 min-h-screen w-full flex flex-col items-center relative font-sans overflow-hidden">
       
@@ -4080,47 +4093,102 @@ function App() {
         </button>
       )}
 
-      {/* Mobile-Optimized Student Viewport */}
+      {/* Mobile-Optimized Student Frame */}
       <div className="w-full transition-all duration-700 bg-white relative overflow-hidden flex flex-col max-w-md h-[100dvh] shadow-2xl">
-        <div className="flex-1 h-full overflow-hidden relative">
+        <div className="flex-1 h-full overflow-hidden relative bg-slate-50">
           
-          {/* --- THE UNIFIED STUDENT ROUTING STACK --- */}
-          {currentLessonToTake ? (
-            <LessonView 
-              lesson={currentLessonToTake} 
-              onFinish={closeLessons} 
-              isInstructor={userData?.role === 'instructor'} 
-            />
+          {/* --- THE SOLID STUDENT ROUTING STACK --- */}
+          
+          {/* Layer 1: Is a Lesson Active? (Handles Exams, Decks, and Standard Lessons) */}
+          {activeLesson ? (
+            (activeLesson.type === 'test' || activeLesson.type === 'exam' || activeLesson.contentType === 'test') ? (
+              <ExamPlayerView 
+                exam={activeLesson}
+                onFinish={(examId: string, score: number, title: string, result: any) => {
+                  if (examId) handleLogActivity(examId, score, title, { scoreDetail: result });
+                  closeLessons();
+                }}
+              />
+            ) : (activeLesson.contentType === 'deck' || activeLesson.cards) ? (
+              <div className="h-full w-full bg-white relative z-50">
+                 <FlashcardView 
+                    allDecks={{ [activeLesson.id || 'temp']: activeLesson }}
+                    selectedDeckKey={activeLesson.id || 'temp'}
+                    onSelectDeck={closeLessons} // Closes the lesson when back is clicked inside FlashcardView
+                    onLogActivity={handleLogActivity}
+                    userData={userData}
+                    user={user}
+                 />
+              </div>
+            ) : (
+              <LessonView 
+                lesson={activeLesson} 
+                onFinish={() => {
+                  handleLogActivity(activeLesson.id, activeLesson.xp || 50, activeLesson.title, { mode: 'lesson' });
+                  closeLessons();
+                }} 
+                isInstructor={userData?.role === 'instructor'} 
+              />
+            )
+
+          // Layer 2: Is a specific Cohort Dashboard open?
           ) : activeStudentClass ? (
             <StudentClassView 
                classData={activeStudentClass} 
                onBack={() => setActiveStudentClass(null)} 
-               setActiveLesson={setActiveLesson} 
-               setSelectedLessonId={setSelectedLessonId}
+               onSelectLesson={setActiveLesson} // Safely passes the click up to trigger Layer 1
+               setActiveTab={setActiveTab}
+               setSelectedLessonId={setPresentationLessonId}
                userData={userData}
             />
+
+          // Layer 3: Bottom Navigation Tab Views
+          ) : activeTab === 'discovery' ? (
+            <DiscoveryView 
+               allDecks={allDecks} 
+               lessons={lessons} 
+               user={user} 
+               onSelectDeck={(deck: any) => { setActiveDeckKey(deck.id); setActiveTab('flashcards'); }} 
+               onSelectLesson={setActiveLesson} 
+               onLogActivity={handleLogActivity} 
+               userData={userData} 
+            />
+          ) : activeTab === 'flashcards' ? (
+            <FlashcardView 
+               allDecks={allDecks}
+               selectedDeckKey={activeDeckKey}
+               onSelectDeck={(key: string | null) => {
+                 setActiveDeckKey(key);
+                 if (!key) setActiveTab('home'); // Go home if deck library is closed
+               }}
+               onLogActivity={handleLogActivity}
+               onSaveCard={handleSaveCard}
+               userData={userData}
+               user={user}
+            />
           ) : activeTab === 'profile' ? (
-            <div className="p-10">Profile View</div>
+            <ProfileView 
+               user={user} 
+               userData={userData} 
+            />
           ) : (
+            // Default to HomeView
             <HomeView 
               setActiveTab={setActiveTab} 
               classes={enrolledClasses} 
               onSelectClass={setActiveStudentClass} 
-              setActiveLesson={setActiveLesson} 
-              setSelectedLessonId={setSelectedLessonId}
               userData={userData} 
               user={user} 
             />
           )}
+
         </div>
         
-        {/* Hide Nav during deep focus modes */}
-        {(!currentLessonToTake && !activeStudentClass) && (
+        {/* Nav Bar hides automatically when immersed in a lesson or class detail */}
+        {(!activeLesson && !activeStudentClass) && (
           <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
         )}
       </div>
     </div>
   );
 }
-
-export default App;
