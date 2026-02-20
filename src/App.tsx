@@ -3124,37 +3124,103 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
   );
 }
 
-function InstructorDashboard({ user, userData, allDecks, lessons, onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, onLogout }: any) {
+function InstructorDashboard({ user, userData, lessons, onSwitchView, onLogout }: any) {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [viewClassId, setViewClassId] = useState<string | null>(null);
-  const [builderInitMode, setBuilderInitMode] = useState<'card' | 'lesson' | 'test' | null>(null);
-  const [showBroadcast, setShowBroadcast] = useState(false);
   const [toast, setToast] = useState<{msg: string, type: string} | null>(null);
-  const showToast = (msg: string, type: string = 'success') => { setToast({ msg, type }); };
-  const handleQuickCreate = (type: 'card' | 'lesson' | 'test') => { setBuilderInitMode(type); setActiveTab('content'); };
-  const handleClassShortcut = (classId: string) => { setViewClassId(classId); setActiveTab('classes'); };
-  const handleGradeSubmission = async (logId: string, finalXP: number, feedback: string, scorePct: number) => { try { const logRef = doc(db, 'artifacts', appId, 'activity_logs', logId); await updateDoc(logRef, { 'scoreDetail.status': 'graded', 'scoreDetail.finalScorePct': scorePct, 'scoreDetail.instructorFeedback': feedback, xp: finalXP }); showToast(`Grade released! (+${finalXP} XP)`, 'success'); } catch (e) { console.error(e); showToast("Error saving grade", "error"); } };
+
+  // Helper for Sidebar links
+  const NavLink = ({ id, icon, label }: any) => (
+    <button 
+      onClick={() => setActiveTab(id)}
+      className={`w-full px-4 py-4 rounded-2xl flex items-center gap-4 transition-all font-black text-xs uppercase tracking-widest ${
+        activeTab === id 
+          ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-900/40' 
+          : 'text-slate-500 hover:bg-slate-800 hover:text-white'
+      }`}
+    >
+      {icon} {label}
+    </button>
+  );
 
   return (
-    <div className="flex h-screen bg-slate-100 overflow-hidden">
+    <div className="flex h-screen bg-slate-100 overflow-hidden font-sans">
       {toast && <JuicyToast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
-      {showBroadcast && <BroadcastModal classes={userData.classes || []} user={user} onClose={() => setShowBroadcast(false)} onToast={showToast}/>}
-      <div className="w-72 bg-slate-900 text-white flex-col hidden md:flex shrink-0 border-r border-slate-800 shadow-2xl relative z-20"><div className="p-6 border-b border-slate-800"><h1 className="text-xl font-bold flex items-center gap-2 text-white"><GraduationCap className="text-indigo-400" strokeWidth={2.5}/> <span>Magister</span></h1><div className="flex items-center gap-2 mt-3 bg-slate-800/50 p-2 rounded-lg border border-slate-700/50"><div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center font-bold text-xs">{user.email.charAt(0).toUpperCase()}</div><div className="overflow-hidden"><p className="text-xs font-bold text-slate-200 truncate w-40">{user.email}</p><p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Online</p></div></div></div><div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6"><div className="space-y-1"><p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 mb-2">Menu</p><button onClick={() => setActiveTab('dashboard')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Activity size={18} /> Live Feed</button><button onClick={() => setActiveTab('inbox')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'inbox' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Inbox size={18} /> Inbox</button><button onClick={() => setActiveTab('classes')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'classes' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><School size={18} /> Class Manager</button><button onClick={() => setActiveTab('content')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'content' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Library size={18} /> Library</button><button onClick={() => setActiveTab('analytics')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'analytics' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><BarChart2 size={18} /> Analytics</button><button onClick={() => setActiveTab('profile')} className={`w-full px-3 py-2.5 rounded-xl flex items-center gap-3 transition-all text-sm font-bold ${activeTab === 'profile' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><User size={18} /> Settings</button></div><div className="space-y-2"><p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 mb-1">Quick Create</p><div className="grid grid-cols-3 gap-2"><button onClick={() => handleQuickCreate('card')} className="flex flex-col items-center justify-center bg-slate-800 hover:bg-indigo-600 hover:text-white p-3 rounded-xl border border-slate-700 transition-all group"><Layers size={20} className="text-slate-400 group-hover:text-white mb-1"/><span className="text-[9px] font-bold text-slate-400 group-hover:text-white">Deck</span></button><button onClick={() => handleQuickCreate('test')} className="flex flex-col items-center justify-center bg-slate-800 hover:bg-rose-600 hover:text-white p-3 rounded-xl border border-slate-700 transition-all group"><HelpCircle size={20} className="text-slate-400 group-hover:text-white mb-1"/><span className="text-[9px] font-bold text-slate-400 group-hover:text-white">Quiz</span></button><button onClick={() => handleQuickCreate('lesson')} className="flex flex-col items-center justify-center bg-slate-800 hover:bg-emerald-600 hover:text-white p-3 rounded-xl border border-slate-700 transition-all group"><BookOpen size={20} className="text-slate-400 group-hover:text-white mb-1"/><span className="text-[9px] font-bold text-slate-400 group-hover:text-white">Unit</span></button></div></div><div className="px-1"><button onClick={() => setShowBroadcast(true)} className="w-full py-3 bg-gradient-to-r from-rose-600 to-orange-600 text-white rounded-xl font-bold shadow-lg hover:shadow-rose-900/50 active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider"><Megaphone size={16}/> Broadcast Alert</button></div><div className="space-y-1"><div className="flex justify-between items-center px-2 mb-2"><p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">My Classes</p><span className="text-[9px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">{userData.classes?.length || 0}</span></div><div className="space-y-1">{userData.classes?.length > 0 ? userData.classes.map((cls: any) => (<button key={cls.id} onClick={() => handleClassShortcut(cls.id)} className="w-full px-3 py-2 rounded-lg flex items-center justify-between group hover:bg-slate-800 transition-colors text-left"><div className="flex items-center gap-2 overflow-hidden"><div className="w-2 h-2 rounded-full bg-indigo-500 group-hover:animate-pulse shrink-0"></div><span className="text-xs font-medium text-slate-300 group-hover:text-white truncate">{cls.name}</span></div><ChevronRight size={12} className="text-slate-600 group-hover:text-slate-400"/></button>)) : <div className="px-3 py-4 text-center border border-dashed border-slate-800 rounded-xl"><p className="text-[10px] text-slate-500">No classes yet</p></div>}</div></div></div><div className="p-4 border-t border-slate-800"><button onClick={onLogout} className="w-full p-3 rounded-xl bg-slate-800 text-rose-400 flex items-center justify-center gap-2 hover:bg-rose-900/20 hover:text-rose-300 transition-colors font-bold text-xs uppercase tracking-wider"><LogOut size={16} /> Sign Out</button></div></div>
-      <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50 relative">
-         <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center shrink-0 z-50"><span className="font-bold flex items-center gap-2"><GraduationCap/> Magister</span><div className="flex gap-4"><button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'text-indigo-400' : 'text-slate-400'}><LayoutDashboard/></button><button onClick={() => setActiveTab('inbox')} className={activeTab === 'inbox' ? 'text-indigo-400' : 'text-slate-400'}><Inbox/></button><button onClick={() => setActiveTab('classes')} className={activeTab === 'classes' ? 'text-indigo-400' : 'text-slate-400'}><School/></button><button onClick={() => setActiveTab('content')} className={activeTab === 'content' ? 'text-indigo-400' : 'text-slate-400'}><Library/></button></div></div>
-         <div className="flex-1 overflow-hidden relative">
-            {activeTab === 'dashboard' && (<div className="h-full flex flex-col"><div className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shrink-0"><div><h2 className="text-lg font-bold text-slate-800">Live Command Center</h2><p className="text-xs text-slate-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> System Active • {new Date().toLocaleDateString()}</p></div><div className="flex gap-4 text-center"><div><span className="block text-lg font-black text-slate-800 leading-none">{userData.classes?.length || 0}</span><span className="text-[9px] font-bold text-slate-400 uppercase">Classes</span></div><div className="w-px h-8 bg-slate-100"></div><div><span className="block text-lg font-black text-indigo-600 leading-none">{allDecks.custom?.cards?.length || 0}</span><span className="text-[9px] font-bold text-slate-400 uppercase">Cards</span></div></div></div><div className="flex-1 overflow-hidden p-4 md:p-6 bg-slate-100/50"><LiveActivityFeed /></div></div>)}
-            {activeTab === 'inbox' && <div className="h-full overflow-hidden"><InstructorInbox onGradeSubmission={handleGradeSubmission} /></div>}
-            {activeTab === 'analytics' && <div className="h-full overflow-y-auto bg-slate-50"><AnalyticsDashboard classes={userData.classes || []} /></div>}
-            {activeTab === 'classes' && <div className="h-full overflow-y-auto p-4 md:p-8"><ClassManagerView user={user} classes={userData?.classes || []} lessons={lessons} allDecks={allDecks} initialClassId={viewClassId} onClearSelection={() => setViewClassId(null)} /></div>}
-            {activeTab === 'content' && <div className="h-full overflow-hidden flex flex-col bg-white"><BuilderHub onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} onSaveLesson={onSaveLesson} allDecks={allDecks} lessons={lessons} initialMode={builderInitMode} onClearMode={() => setBuilderInitMode(null)} /></div>}
-            {activeTab === 'profile' && <ProfileView user={user} userData={userData} />}
-         </div>
+      
+      {/* 1. SIDEBAR */}
+      <div className="w-80 bg-slate-900 text-white flex flex-col shrink-0 border-r border-slate-800 shadow-2xl z-20">
+        <div className="p-10 border-b border-slate-800 flex flex-col items-center">
+          <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white mb-6 shadow-2xl shadow-indigo-500/20">
+            <GraduationCap size={48} />
+          </div>
+          <h1 className="text-2xl font-black uppercase tracking-tighter">Magister</h1>
+          <p className="text-[10px] font-black text-slate-500 tracking-[0.4em] mt-2">Instructional Suite</p>
+        </div>
+
+        <nav className="flex-1 p-6 space-y-3">
+          <NavLink id="dashboard" icon={<Activity size={20}/>} label="Live Activity" />
+          <NavLink id="classes" icon={<School size={20}/>} label="Class Manager" />
+          <NavLink id="studio" icon={<PenTool size={20}/>} label="Lesson Studio" />
+          <NavLink id="inbox" icon={<Inbox size={20}/>} label="Grading Inbox" />
+          <NavLink id="analytics" icon={<BarChart2 size={20}/>} label="Analytics" />
+        </nav>
+
+        <div className="p-6 border-t border-slate-800 space-y-4">
+          <button 
+            onClick={onSwitchView}
+            className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all"
+          >
+            Switch to Student View
+          </button>
+          <button 
+            onClick={onLogout}
+            className="w-full py-4 bg-rose-900/20 text-rose-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-900/40 transition-all"
+          >
+            Logout Session
+          </button>
+        </div>
+      </div>
+
+      {/* 2. DYNAMIC CONTENT AREA */}
+      <div className="flex-1 overflow-hidden relative bg-slate-50">
+        {activeTab === 'dashboard' && (
+          <div className="h-full flex flex-col p-10">
+            <header className="mb-10">
+              <h2 className="text-5xl font-black text-slate-900 tracking-tighter">Live Feed</h2>
+              <p className="text-slate-400 font-bold mt-2 italic">Real-time student progress across all active units.</p>
+            </header>
+            <div className="flex-1 bg-white rounded-[3rem] shadow-xl border border-slate-100 overflow-hidden">
+               <LiveActivityFeed />
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'classes' && (
+          <div className="h-full overflow-y-auto p-10 custom-scrollbar">
+            <ClassManagerView user={user} classes={userData?.classes || []} lessons={lessons} />
+          </div>
+        )}
+
+        {activeTab === 'studio' && (
+          <div className="h-full overflow-hidden">
+            <BuilderHub initialMode="lesson" lessons={lessons} />
+          </div>
+        )}
+
+        {activeTab === 'inbox' && (
+          <div className="h-full overflow-hidden">
+            <InstructorInbox onGradeSubmission={() => {}} />
+          </div>
+        )}
+
+        {activeTab === 'analytics' && (
+          <div className="h-full overflow-y-auto p-10">
+            <AnalyticsDashboard classes={userData?.classes || []} />
+          </div>
+        )}
       </div>
     </div>
   );
 }
-
 // ============================================================================
 //  4-BUTTON NAVIGATION BAR
 // ============================================================================
@@ -3422,102 +3488,79 @@ function ExamPlayerView({ exam, onFinish }: any) {
 function App() {
   // --- CORE STATE ---
   const [activeTab, setActiveTab] = useState('home');
+  const [viewMode, setViewMode] = useState<'student' | 'instructor'>('student');
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   
-  // Content State
-  const [systemDecks, setSystemDecks] = useState<any>({});
+  // Data State
   const [systemLessons, setSystemLessons] = useState<any[]>([]);
-  const [customCards, setCustomCards] = useState<any[]>([]);
   const [customLessons, setCustomLessons] = useState<any[]>([]);
   const [activeLesson, setActiveLesson] = useState<any>(null);
-  const [selectedDeckKey, setSelectedDeckKey] = useState('salutationes');
-  
-  // Classroom State
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
 
-  // --- DATA HYDRATION ---
-  const classLessons = useMemo(() => {
-    let all: any[] = [];
-    enrolledClasses.forEach((cls: any) => {
-      if (cls.assignments) all.push(...cls.assignments.map((a: any) => ({ ...a, classId: cls.id })));
-    });
-    return all;
-  }, [enrolledClasses]);
-
+  // --- DATA HYDRATION (The Handshake) ---
   const lessons = useMemo(() => {
-    return [...systemLessons, ...customLessons, ...classLessons];
-  }, [systemDecks, customLessons, classLessons]);
+    // Combine all sources: System + User Created + Assignments from Michael
+    const assignments = enrolledClasses.flatMap(c => c.assignments || []);
+    return [...systemLessons, ...customLessons, ...assignments];
+  }, [systemLessons, customLessons, enrolledClasses]);
 
   // --- FIREBASE SYNC ---
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      if (!u) { setUserData(null); setAuthChecked(true); }
+      if (!u) setAuthChecked(true);
     });
 
     if (user?.uid) {
-      const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
-        if (snap.exists()) setUserData(snap.data());
+      // Sync Profile & Role
+      onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          setUserData(data);
+          // Auto-switch to instructor view if role matches
+          if (data.role === 'instructor') setViewMode('instructor');
+        }
         setAuthChecked(true);
       });
 
+      // Sync Classes
       const qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
-      const unsubClasses = onSnapshot(qClasses, (snapshot) => {
-        setEnrolledClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      onSnapshot(qClasses, (snap) => {
+        setEnrolledClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
+      // Sync Content
       setSystemLessons(INITIAL_SYSTEM_LESSONS);
-      const unsubCustom = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => {
+      onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => {
         setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
-
-      return () => { unsubAuth(); unsubProfile(); unsubClasses(); unsubCustom(); };
     }
-    return () => unsubAuth();
   }, [user?.uid, user?.email]);
 
-  // --- ROUTER LOGIC ---
+  // --- RENDER ROUTER ---
   const renderStudentView = () => {
-    // 1. PRESENTATION MODE (The Projector)
+    // 1. PRESENTATION (The Projector)
     if (activeTab === 'presentation') {
-      const lessonToPresent = lessons.find(l => l && (l.id === selectedLessonId || l.originalId === selectedLessonId));
-
-      // CRITICAL GUARD: Only render if we have the lesson AND it has blocks
-      if (!lessonToPresent || !lessonToPresent.blocks) {
-        return (
-          <div className="fixed inset-0 z-[500] bg-slate-900 flex flex-col items-center justify-center text-white p-10">
-            <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-6" />
-            <p className="font-black uppercase tracking-widest opacity-50">Hydrating Lesson Data...</p>
-            <button onClick={() => setActiveTab('home')} className="mt-8 text-[10px] underline uppercase">Cancel</button>
-          </div>
-        );
-      }
-
-      return (
-        <ClassView 
-          lesson={lessonToPresent} 
-          classId={activeStudentClass?.id} 
-          userData={userData} 
-        />
-      );
+      const target = lessons.find(l => l && (l.id === selectedLessonId || l.originalId === selectedLessonId));
+      if (!target || !target.blocks) return <div className="h-screen bg-slate-900 flex items-center justify-center text-white font-black animate-pulse">HYDRATING PROJECTOR...</div>;
+      
+      return <ClassView lesson={target} classId={activeStudentClass?.id} userData={userData} />;
     }
 
-    // 2. MOBILE LESSON (The Remote)
-    if (activeLesson) {
-      return <LessonView lesson={activeLesson} onFinish={() => setActiveLesson(null)} />;
-    }
+    // 2. ACTIVE LESSON (The Remote)
+    if (activeLesson) return <LessonView lesson={activeLesson} onFinish={() => setActiveLesson(null)} isInstructor={userData?.role === 'instructor'} />;
 
-    // 3. CLASS PORTAL
+    // 3. CLASS DASHBOARD
     if (activeTab === 'home' && activeStudentClass) {
       return (
         <StudentClassView 
           classData={activeStudentClass} 
           onBack={() => setActiveStudentClass(null)} 
-          onSelectLesson={(item: any) => setActiveLesson(item)} 
+          onSelectLesson={setActiveLesson} 
           userData={userData}
           setActiveTab={setActiveTab}
           setSelectedLessonId={setSelectedLessonId}
@@ -3525,19 +3568,42 @@ function App() {
       );
     }
 
-    // 4. MAIN NAV TABS
+    // 4. MAIN NAV
     switch (activeTab) {
       case 'profile': return <ProfileView user={user} userData={userData} />;
-      default: return <HomeView setActiveTab={setActiveTab} classes={enrolledClasses} onSelectClass={(c: any) => setActiveStudentClass(c)} userData={userData} user={user} />;
+      default: return <HomeView setActiveTab={setActiveTab} classes={enrolledClasses} onSelectClass={setActiveStudentClass} userData={userData} user={user} />;
     }
   };
 
   if (!authChecked) return <div className="h-screen flex items-center justify-center bg-white"><Loader className="animate-spin text-indigo-600" /></div>;
   if (!user) return <AuthView />;
 
+  // --- MASTER VIEW MODE SWITCH ---
+  if (viewMode === 'instructor' && userData?.role === 'instructor') {
+    return (
+      <InstructorDashboard 
+        user={user} 
+        userData={{...userData, classes: enrolledClasses}} 
+        lessons={lessons} 
+        onSwitchView={() => setViewMode('student')}
+        onLogout={() => signOut(auth)} 
+      />
+    );
+  }
+
   return (
-    <div className="bg-slate-50 min-h-screen w-full flex justify-center items-start overflow-hidden">
-      <div className={`transition-all duration-500 bg-white relative overflow-hidden flex flex-col ${
+    <div className="bg-slate-50 min-h-screen w-full flex justify-center items-start overflow-hidden relative">
+      {/* Floating Toggle for Instructors in Student View */}
+      {userData?.role === 'instructor' && (
+        <button 
+          onClick={() => setViewMode('instructor')}
+          className="fixed top-6 right-6 z-[1000] bg-slate-900 text-white px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest shadow-2xl border border-white/20 active:scale-95 transition-all"
+        >
+          🎓 Instructor Mode
+        </button>
+      )}
+
+      <div className={`w-full transition-all duration-500 bg-white relative overflow-hidden flex flex-col ${
         activeTab === 'presentation' ? 'h-screen w-screen fixed inset-0 z-[200]' : 'max-w-md h-[100dvh] shadow-2xl'
       }`}>
         <div className="flex-1 h-full overflow-hidden relative">
