@@ -2887,7 +2887,7 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
   const [previewMode, setPreviewMode] = useState<'projector' | 'mobile'>('projector');
 
   // ============================================================================
-  //  CORE LOGIC (THE ENGINE)
+  //  1. CORE ENGINE (SCOPED FUNCTIONS)
   // ============================================================================
 
   const updateBlock = (index: number, field: string, value: any) => {
@@ -2919,7 +2919,7 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
       dialogue: { type: 'dialogue', lines: [{ speaker: 'A', text: '', side: 'left' }] },
       'vocab-list': { type: 'vocab-list', items: [{ term: '', definition: '' }] },
       quiz: { type: 'quiz', question: '', options: [{id:'a',text:''},{id:'b',text:''}], correctId: 'a' },
-      image: { type: 'image', url: 'https://placehold.co/800x450', caption: '' }
+      image: { type: 'image', url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa', caption: '' }
     };
     setData({ ...data, blocks: [...(data.blocks || []), templates[type]] });
     setToastMsg(`${type.toUpperCase()} block added`);
@@ -2947,16 +2947,16 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
       onSave({ ...data, timestamp: Date.now() });
       setToastMsg("Unit Archived in Library");
     } else {
-      console.error("onSave prop is missing. Check your BuilderHub props.");
+      console.error("onSave prop is missing. Check your BuilderHub relay.");
     }
   };
 
   // ============================================================================
-  //  LIVE PREVIEW COMPONENT
+  //  2. LIVE PREVIEW RENDERER
   // ============================================================================
 
   const LivePreview = () => (
-    <div className="w-full h-full bg-white rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border-[12px] border-slate-900">
+    <div className="w-full h-full bg-white rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border-[12px] border-slate-900 transition-all duration-500">
       <div className="flex-1 overflow-y-auto p-10 space-y-12 custom-scrollbar bg-white">
         <div className="text-center border-b border-slate-100 pb-8">
            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-2 block">{data.subtitle || "MAGISTER STUDIO"}</span>
@@ -2967,8 +2967,8 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
           <div key={i} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
              {b.type === 'text' && (
                <div className="space-y-4">
-                 {b.title && <h3 className="text-indigo-600 font-black uppercase text-center text-xs">{b.title}</h3>}
-                 <p className="text-center text-[4vh] font-black text-slate-800 leading-tight">{b.content}</p>
+                 {b.title && <h3 className="text-indigo-600 font-black uppercase text-center text-xs tracking-widest">{b.title}</h3>}
+                 <p className="text-center text-[4vh] font-black text-slate-800 leading-tight tracking-tighter">{b.content}</p>
                </div>
              )}
              {b.type === 'essay' && (
@@ -2985,8 +2985,8 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
                <div className="space-y-4">
                  {b.lines?.map((l: any, j: number) => (
                    <div key={j} className={`flex gap-3 ${l.side === 'right' ? 'flex-row-reverse' : ''}`}>
-                      <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-[10px] font-black text-white shrink-0">{l.speaker?.[0]}</div>
-                      <div className={`p-4 rounded-3xl text-xs font-bold ${l.side === 'right' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 text-slate-800'}`}>{l.text}</div>
+                      <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-[10px] font-black text-white shrink-0 shadow-md">{l.speaker?.[0]}</div>
+                      <div className={`p-4 rounded-3xl text-xs font-bold ${l.side === 'right' ? 'bg-indigo-600 text-white shadow-lg rounded-br-none' : 'bg-slate-100 text-slate-800 rounded-bl-none'}`}>{l.text}</div>
                    </div>
                  ))}
                </div>
@@ -2994,9 +2994,9 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
              {b.type === 'vocab-list' && (
                <div className="grid grid-cols-2 gap-3">
                  {b.items?.map((item: any, j: number) => (
-                   <div key={j} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center">
+                   <div key={j} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center shadow-sm">
                      <p className="font-black text-indigo-600 text-sm">{item.term}</p>
-                     <p className="text-[10px] text-slate-400 font-bold">{item.definition}</p>
+                     <p className="text-[10px] text-slate-400 font-bold leading-tight mt-1">{item.definition}</p>
                    </div>
                  ))}
                </div>
@@ -3008,24 +3008,43 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
   );
 
   // ============================================================================
-  //  MAIN RENDER
+  //  3. MAIN RENDER (VISUAL STUDIO)
   // ============================================================================
 
   return (
     <div className="h-full flex flex-col bg-white overflow-hidden font-sans">
-      {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
-      
       {/* 1. STUDIO HEADER */}
-      <div className="h-24 px-10 border-b flex justify-between items-center shrink-0 bg-white">
+      <div className="h-24 px-10 border-b flex justify-between items-center shrink-0 bg-white z-50 shadow-sm">
         <div className="flex items-center gap-5">
           <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-100"><PenTool size={24}/></div>
           <div>
             <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none">Lesson Studio</h2>
-            <p className="text-xs text-slate-400 font-bold mt-1">Directing the Classroom Experience</p>
+            <p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-widest">Aura-Sync Active</p>
           </div>
         </div>
+
+        {/* --- CENTRAL PREVIEW TOGGLE --- */}
+        <div className="flex bg-slate-100 p-1.5 rounded-[1.5rem] border border-slate-200 shadow-inner">
+          <button 
+            onClick={() => setPreviewMode('projector')} 
+            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${
+              previewMode === 'projector' ? 'bg-white text-indigo-600 shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            <Monitor size={14} /> Projector
+          </button>
+          <button 
+            onClick={() => setPreviewMode('mobile')} 
+            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${
+              previewMode === 'mobile' ? 'bg-white text-indigo-600 shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            <Smartphone size={14} /> Mobile
+          </button>
+        </div>
+
         <div className="flex items-center gap-6">
-           <button onClick={() => setJsonMode(!jsonMode)} className="text-[11px] font-black uppercase text-slate-400 hover:text-indigo-600 tracking-widest transition-colors">
+           <button onClick={() => setJsonMode(!jsonMode)} className="text-[11px] font-black uppercase text-slate-300 hover:text-indigo-600 tracking-[0.2em] transition-colors">
               {jsonMode ? 'Visual Design' : 'Advanced JSON'}
            </button>
            <button onClick={handleFinalSave} className="bg-slate-900 text-white px-10 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-2xl active:scale-95 transition-all">
@@ -3049,13 +3068,13 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
             </div>
           ) : (
             <div className="max-w-xl mx-auto space-y-16 pb-64">
-              {/* Basic Meta */}
+              {/* Metadata */}
               <div className="space-y-6">
                 <input className="text-6xl font-black border-none w-full focus:ring-0 p-0 placeholder:text-slate-100 tracking-tighter" placeholder="Unit Title..." value={data.title} onChange={e => setData({...data, title: e.target.value})} />
                 <input className="text-2xl font-bold text-slate-300 border-none w-full focus:ring-0 p-0 tracking-tight" placeholder="Unit Subtitle..." value={data.subtitle} onChange={e => setData({...data, subtitle: e.target.value})} />
               </div>
 
-              {/* Blocks */}
+              {/* Dynamic Blocks */}
               <div className="space-y-8">
                 {(data.blocks || []).map((block: any, idx: number) => (
                   <div key={idx} className="group bg-slate-50 p-8 rounded-[3rem] border-2 border-transparent hover:border-indigo-100 hover:bg-white transition-all relative shadow-sm">
@@ -3067,8 +3086,8 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
 
                     {block.type === 'text' && (
                       <div className="space-y-4">
-                        <input className="w-full font-bold text-slate-800 bg-slate-100/50 px-5 py-3 rounded-2xl text-sm outline-none" placeholder="Block Header" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} />
-                        <textarea className="w-full bg-transparent font-black text-2xl border-none focus:ring-0 p-0 placeholder:text-slate-200" placeholder="Type content here..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
+                        <input className="w-full font-bold text-slate-800 bg-slate-100/50 px-5 py-3 rounded-2xl text-sm outline-none" placeholder="Block Header (Optional)" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} />
+                        <textarea className="w-full bg-transparent font-black text-2xl border-none focus:ring-0 p-0 placeholder:text-slate-200" placeholder="Type core text..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
                       </div>
                     )}
 
@@ -3083,9 +3102,9 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
                       <div className="space-y-4">
                         {block.lines?.map((line: any, lIdx: number) => (
                           <div key={lIdx} className="flex gap-2">
-                            <input className="w-12 bg-white border rounded-xl text-center text-[10px] font-black" value={line.speaker} onChange={e => updateDialogueLine(idx, lIdx, 'speaker', e.target.value)} />
-                            <input className="flex-1 bg-white border p-3 rounded-xl text-xs font-bold" value={line.text} onChange={e => updateDialogueLine(idx, lIdx, 'text', e.target.value)} />
-                            <select className="bg-slate-200 rounded-xl text-[10px] font-black px-2" value={line.side} onChange={e => updateDialogueLine(idx, lIdx, 'side', e.target.value)}>
+                            <input className="w-12 bg-white border rounded-xl text-center text-[10px] font-black p-2" value={line.speaker} placeholder="Spk" onChange={e => updateDialogueLine(idx, lIdx, 'speaker', e.target.value)} />
+                            <input className="flex-1 bg-white border p-3 rounded-xl text-xs font-bold" value={line.text} placeholder="Text..." onChange={e => updateDialogueLine(idx, lIdx, 'text', e.target.value)} />
+                            <select className="bg-slate-200 rounded-xl text-[10px] font-black px-2 outline-none" value={line.side} onChange={e => updateDialogueLine(idx, lIdx, 'side', e.target.value)}>
                               <option value="left">Left</option>
                               <option value="right">Right</option>
                             </select>
@@ -3100,7 +3119,7 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
                         {block.items?.map((item: any, i: number) => (
                           <div key={i} className="flex gap-3">
                             <input className="flex-1 bg-white border p-3 rounded-xl text-xs font-black text-indigo-600" placeholder="Term" value={item.term} onChange={e => updateVocabItem(idx, i, 'term', e.target.value)} />
-                            <input className="flex-2 bg-white border p-3 rounded-xl text-xs text-slate-400" placeholder="Def" value={item.definition} onChange={e => updateVocabItem(idx, i, 'definition', e.target.value)} />
+                            <input className="flex-2 bg-white border p-3 rounded-xl text-xs text-slate-400" placeholder="Definition" value={item.definition} onChange={e => updateVocabItem(idx, i, 'definition', e.target.value)} />
                           </div>
                         ))}
                         <button onClick={() => updateBlock(idx, 'items', [...block.items, {term: '', definition: ''}])} className="text-[10px] font-black text-indigo-500 uppercase">+ Add Term</button>
@@ -3123,28 +3142,31 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
           )}
         </div>
 
-        {/* --- 3. PREVIEW PANE (RIGHT) --- */}
-        <div className="w-1/2 bg-slate-100 p-20 flex flex-col items-center justify-center relative">
-          <div className="absolute top-10 left-16 flex gap-2 bg-white p-2 rounded-2xl border shadow-sm">
-             <button onClick={() => setPreviewMode('projector')} className={`px-6 py-2 rounded-xl text-[11px] font-black uppercase transition-all ${previewMode === 'projector' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Projector View</button>
-             <button onClick={() => setPreviewMode('mobile')} className={`px-6 py-2 rounded-xl text-[11px] font-black uppercase transition-all ${previewMode === 'mobile' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>Mobile View</button>
-          </div>
+        {/* --- 3. THE CLEAN STAGE (RIGHT) --- */}
+        <div className="w-1/2 bg-slate-50 p-20 flex flex-col items-center justify-center relative overflow-hidden">
+          <div className={`absolute inset-0 transition-colors duration-1000 ${previewMode === 'projector' ? 'bg-slate-50' : 'bg-slate-100'}`} />
           
-          <div className={`transition-all duration-700 ease-in-out ${previewMode === 'projector' ? 'w-full aspect-video scale-90' : 'w-[360px] h-[640px] scale-95 shadow-2xl'}`}>
+          <div className={`relative transition-all duration-700 ease-in-out z-10 ${
+            previewMode === 'projector' 
+              ? 'w-full aspect-video scale-90 shadow-2xl' 
+              : 'w-[360px] h-[640px] scale-95 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.25)]'
+          }`}>
              <LivePreview />
+             <div className="absolute -bottom-12 left-0 right-0 text-center">
+                <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.5em] animate-pulse">
+                  {previewMode === 'projector' ? 'Cinematic Render' : 'Interactive Remote'}
+                </span>
+             </div>
           </div>
-          
-          <p className="mt-10 text-slate-300 font-black text-[11px] uppercase tracking-[0.5em] animate-pulse">Live Rendering Engine Active</p>
         </div>
       </div>
     </div>
   );
 }
 
-// Sub-component for clean mapping
 function InjectorButton({ icon, label, onClick }: any) {
   return (
-    <button onClick={onClick} className="p-8 bg-white border-2 border-slate-100 rounded-[3rem] flex flex-col items-center justify-center gap-4 hover:border-indigo-600 hover:text-indigo-600 hover:shadow-2xl hover:shadow-indigo-50 transition-all active:scale-90 group">
+    <button onClick={onClick} className="p-8 bg-white border-2 border-slate-100 rounded-[3rem] flex flex-col items-center justify-center gap-4 hover:border-indigo-600 hover:text-indigo-600 hover:shadow-2xl transition-all active:scale-90 group">
       <div className="text-slate-300 group-hover:text-indigo-600 transition-colors scale-125">{icon}</div>
       <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
     </button>
