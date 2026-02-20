@@ -3338,156 +3338,149 @@ function InstructorDashboard({
   onLogout 
 }: any) {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [toast, setToast] = useState<{msg: string, type: string} | null>(null);
+  const [isRailExpanded, setIsRailExpanded] = useState(false);
 
-  // --- INTERNAL HELPER: SIDEBAR LINKS ---
-  const NavLink = ({ id, icon, label }: { id: string, icon: React.ReactNode, label: string }) => (
-    <button 
-      onClick={() => setActiveTab(id)}
-      className={`w-full px-4 py-4 rounded-2xl flex items-center gap-4 transition-all duration-300 font-black text-[11px] uppercase tracking-[0.2em] ${
-        activeTab === id 
-          ? 'bg-indigo-600 text-white shadow-2xl shadow-indigo-900/40 scale-[1.02]' 
-          : 'text-slate-500 hover:bg-slate-800 hover:text-slate-200'
-      }`}
-    >
-      <span className={activeTab === id ? 'text-white' : 'text-slate-600'}>{icon}</span>
-      {label}
-    </button>
-  );
+  // --- 1. THE NAV ITEM (TOUCH-FIRST DESIGN) ---
+  const NavItem = ({ id, icon, label }: { id: string; icon: React.ReactNode; label: string }) => {
+    const isActive = activeTab === id;
+    
+    return (
+      <button 
+        onClick={() => setActiveTab(id)}
+        className={`relative flex items-center h-14 w-full rounded-2xl transition-all duration-300 group ${
+          isActive 
+            ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-900/20 scale-[1.02]' 
+            : 'text-slate-500 hover:bg-slate-800 hover:text-slate-200'
+        }`}
+      >
+        {/* The 80px "Rail" Zone */}
+        <div className="w-20 shrink-0 flex items-center justify-center">
+          {React.cloneElement(icon as React.ReactElement, { 
+            size: 22, 
+            strokeWidth: isActive ? 2.5 : 2 
+          })}
+        </div>
+
+        {/* The Expanding Label Zone */}
+        <span className={`font-black text-[11px] uppercase tracking-[0.2em] whitespace-nowrap transition-all duration-500 ease-in-out ${
+          isRailExpanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4 pointer-events-none'
+        }`}>
+          {label}
+        </span>
+
+        {/* Tablet Indicator Pip */}
+        {isActive && !isRailExpanded && (
+          <div className="absolute left-0 w-1 h-6 bg-white rounded-r-full animate-in slide-in-from-left-full" />
+        )}
+      </button>
+    );
+  };
 
   return (
-    <div className="flex h-screen bg-slate-100 overflow-hidden font-sans">
-      {/* 1. JUICY NOTIFICATIONS */}
-      {toast && (
-        <JuicyToast 
-          message={toast.msg} 
-          type={toast.type} 
-          onClose={() => setToast(null)} 
-        />
-      )}
+    <div className="flex h-screen bg-slate-100 overflow-hidden font-sans select-none">
       
-      {/* 2. THE MAGISTER SIDEBAR */}
-      <div className="w-80 bg-slate-900 text-white flex flex-col shrink-0 border-r border-slate-800 shadow-2xl z-20">
-        {/* Branding Area */}
-        <div className="p-10 border-b border-slate-800 flex flex-col items-center">
-          <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-[2.2rem] flex items-center justify-center text-white mb-6 shadow-2xl shadow-indigo-500/20 animate-in zoom-in duration-500">
-            <GraduationCap size={44} strokeWidth={2.5} />
-          </div>
-          <h1 className="text-2xl font-black uppercase tracking-tighter italic">Magister</h1>
-          <div className="h-1 w-8 bg-indigo-500 rounded-full mt-2 opacity-50" />
-        </div>
-
-        {/* Navigation Links */}
-        <nav className="flex-1 p-6 space-y-3 overflow-y-auto custom-scrollbar">
-          <p className="text-[9px] font-black text-slate-600 uppercase tracking-[0.4em] px-4 mb-4">Command</p>
-          <NavLink id="dashboard" icon={<Activity size={20}/>} label="Live Feed" />
-          <NavLink id="classes" icon={<School size={20}/>} label="Class Manager" />
-          <NavLink id="studio" icon={<PenTool size={20}/>} label="Lesson Studio" />
-          <NavLink id="inbox" icon={<Inbox size={20}/>} label="Grading Inbox" />
-          <NavLink id="analytics" icon={<BarChart2 size={20}/>} label="Analytics" />
-        </nav>
-
-        {/* Utility Footer */}
-        <div className="p-6 border-t border-slate-800 space-y-4">
-          <button 
-            onClick={onSwitchView}
-            className="w-full py-4 bg-slate-800 hover:bg-indigo-600/20 text-indigo-400 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-3 border border-indigo-500/10"
-          >
-            <User size={16} /> 
-            <span>Switch to Student View</span>
-          </button>
-          
-          <button 
-            onClick={onLogout}
-            className="w-full py-4 bg-rose-900/10 text-rose-500 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center gap-3"
-          >
-            <LogOut size={16} /> 
-            <span>End Session</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 3. DYNAMIC CONTENT AREA */}
-      <div className="flex-1 overflow-hidden relative bg-slate-50">
-        
-        {/* DASHBOARD: LIVE ACTIVITY */}
-        {activeTab === 'dashboard' && (
-          <div className="h-full flex flex-col p-12 animate-in fade-in slide-in-from-right-4 duration-500">
-            <header className="mb-10 flex justify-between items-end">
-              <div>
-                <h2 className="text-5xl font-black text-slate-900 tracking-tighter">Live Activity</h2>
-                <p className="text-slate-400 font-bold mt-2 uppercase text-[10px] tracking-widest">
-                  Real-time synchronization across all student devices
-                </p>
-              </div>
-              <div className="flex gap-2 bg-emerald-50 text-emerald-600 px-4 py-2 rounded-full border border-emerald-100">
-                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping mt-1" />
-                <span className="text-[10px] font-black uppercase tracking-widest">System Online</span>
-              </div>
-            </header>
-            <div className="flex-1 bg-white rounded-[3.5rem] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
-               <LiveActivityFeed />
+      {/* --- SIDE RAIL (THE COMMAND TOWER) --- */}
+      <aside 
+        className={`bg-slate-950 flex flex-col transition-all duration-500 ease-in-out z-50 shadow-2xl ${
+          isRailExpanded ? 'w-72' : 'w-20'
+        }`}
+      >
+        {/* Branding & Interaction Header */}
+        <div className="h-24 flex items-center border-b border-slate-900 overflow-hidden shrink-0">
+          <div className="w-20 flex items-center justify-center shrink-0">
+            <div className={`w-11 h-11 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center text-white shadow-lg transition-transform duration-700 ${isRailExpanded ? 'rotate-0' : 'rotate-12 scale-90'}`}>
+              <GraduationCap size={24} strokeWidth={2.5} />
             </div>
           </div>
-        )}
-
-        {/* CLASSES: MANAGEMENT & ROSTERS */}
-        {activeTab === 'classes' && (
-          <div className="h-full overflow-y-auto p-12 custom-scrollbar animate-in fade-in duration-500">
-            <ClassManagerView 
-              user={user} 
-              classes={userData?.classes || []} 
-              lessons={lessons} 
-              allDecks={allDecks} 
-            />
+          
+          <div className={`flex-1 flex items-center justify-between pr-4 transition-opacity duration-300 ${isRailExpanded ? 'opacity-100' : 'opacity-0'}`}>
+            <span className="text-white font-black text-lg tracking-tighter uppercase italic">Magister</span>
+            <button 
+              onClick={() => setIsRailExpanded(false)}
+              className="p-2 text-slate-500 hover:text-white transition-colors active:scale-90"
+            >
+              <ChevronLeft size={20} />
+            </button>
           </div>
-        )}
 
-        {/* STUDIO: CONTENT BUILDER HUB */}
-        {activeTab === 'studio' && (
-          <div className="h-full overflow-hidden animate-in zoom-in-95 duration-500">
-            <BuilderHub 
-              initialMode="lesson" 
-              allDecks={allDecks}
-              lessons={lessons}
-              onSaveLesson={onSaveLesson}  // THE RELAY POINT
-              onSaveCard={onSaveCard}      // THE RELAY POINT
-              onUpdateCard={onUpdateCard} 
-              onDeleteCard={onDeleteCard}
-            />
-          </div>
-        )}
+          {/* Floating Tablet Toggle: Appears when rail is thin */}
+          {!isRailExpanded && (
+            <button 
+              onClick={() => setIsRailExpanded(true)}
+              className="absolute -right-3 top-10 w-6 h-12 bg-slate-800 rounded-full flex items-center justify-center text-slate-400 hover:text-indigo-400 border border-slate-700 active:scale-95 shadow-lg md:hidden"
+            >
+              <Menu size={12} />
+            </button>
+          )}
+        </div>
 
-        {/* INBOX: GRADING & FEEDBACK */}
-        {activeTab === 'inbox' && (
-          <div className="h-full overflow-hidden animate-in fade-in duration-500">
-            <InstructorInbox 
-              onGradeSubmission={async (logId: string, finalXP: number, feedback: string, scorePct: number) => {
-                try {
-                  const logRef = doc(db, 'artifacts', appId, 'activity_logs', logId);
-                  await updateDoc(logRef, { 
-                    'scoreDetail.status': 'graded', 
-                    'scoreDetail.finalScorePct': scorePct, 
-                    'scoreDetail.instructorFeedback': feedback, 
-                    xp: finalXP 
-                  });
-                  setToast({ msg: `Grade Released: +${finalXP} XP`, type: 'success' });
-                } catch (e) {
-                  setToast({ msg: "Error saving grade", type: 'error' });
-                }
-              }} 
-            />
-          </div>
-        )}
+        {/* Main Navigation Stack */}
+        <nav className="flex-1 px-3 py-10 space-y-4 overflow-y-auto custom-scrollbar">
+          <NavItem id="dashboard" icon={<Activity />} label="Live Feed" />
+          <NavItem id="studio" icon={<PenTool />} label="Studio Hub" />
+          <NavItem id="classes" icon={<School />} label="Classes" />
+          <NavItem id="inbox" icon={<Inbox />} label="Grading" />
+          <NavItem id="analytics" icon={<BarChart2 />} label="Analytics" />
+        </nav>
 
-        {/* ANALYTICS: STUDENT PERFORMANCE */}
-        {activeTab === 'analytics' && (
-          <div className="h-full overflow-y-auto p-12 custom-scrollbar animate-in fade-in duration-500">
-            <AnalyticsDashboard classes={userData?.classes || []} />
-          </div>
-        )}
+        {/* Footer: Contextual Switchers */}
+        <div className="p-3 border-t border-slate-900 space-y-2 shrink-0">
+          <button 
+            onClick={onSwitchView}
+            className="flex items-center h-14 w-full rounded-2xl text-slate-500 hover:bg-slate-800 hover:text-indigo-400 transition-all active:scale-95"
+          >
+            <div className="w-14 flex items-center justify-center shrink-0 ml-1">
+              <User size={20} />
+            </div>
+            {isRailExpanded && <span className="text-[10px] font-black uppercase tracking-widest">Student Mode</span>}
+          </button>
 
-      </div>
+          <button 
+            onClick={onLogout}
+            className="flex items-center h-14 w-full rounded-2xl text-slate-500 hover:bg-rose-900/20 hover:text-rose-500 transition-all active:scale-95"
+          >
+            <div className="w-14 flex items-center justify-center shrink-0 ml-1">
+              <LogOut size={20} />
+            </div>
+            {isRailExpanded && <span className="text-[10px] font-black uppercase tracking-widest">Logout</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* --- MAIN STAGE (DYNAMIC CONTENT) --- */}
+      <main className="flex-1 overflow-hidden relative bg-slate-50">
+        <div className="h-full w-full">
+           {activeTab === 'studio' ? (
+             <div className="h-full animate-in zoom-in-95 duration-500">
+               <BuilderHub 
+                  onSaveLesson={onSaveLesson} 
+                  onSaveCard={onSaveCard}
+                  onUpdateCard={onUpdateCard}
+                  onDeleteCard={onDeleteCard}
+                  lessons={lessons} 
+                  allDecks={allDecks} 
+               />
+             </div>
+           ) : (
+             <div className="h-full overflow-y-auto p-12 custom-scrollbar animate-in fade-in duration-700">
+                <header className="mb-12">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Magister Command</span>
+                  </div>
+                  <h2 className="text-6xl font-black text-slate-900 tracking-tighter uppercase">{activeTab}</h2>
+                </header>
+                
+                {/* Lazy-loaded components based on active tab */}
+                {activeTab === 'dashboard' && <LiveActivityFeed />}
+                {activeTab === 'classes' && <ClassManagerView classes={userData?.classes} lessons={lessons} />}
+                {activeTab === 'analytics' && <AnalyticsDashboard classes={userData?.classes} />}
+                {activeTab === 'inbox' && <InstructorInbox />}
+             </div>
+           )}
+        </div>
+      </main>
+
     </div>
   );
 }
