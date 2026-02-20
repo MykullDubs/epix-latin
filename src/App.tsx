@@ -343,23 +343,33 @@ function ClassView({ lessonId, lessons, classLessons, classId, userData }: any) 
 
   // --- 1. ROBUST DATA LOOKUP ---
   const lesson = useMemo(() => {
-    if (!lessonId || !lessons) return null;
-    // Look for the lesson in the master list using either ID or OriginalID
+    // Safety check: if inputs are missing, don't even try
+    if (!lessonId || !lessons || !Array.isArray(lessons)) return null;
+    
     return lessons.find((l: any) => 
-      (l.id === lessonId) || 
-      (l.originalId === lessonId) ||
-      (l.id === lessonId.toString())
-    );
+      l && (l.id === lessonId || l.originalId === lessonId)
+    ) || null;
   }, [lessonId, lessons]);
 
-  // --- 2. SAFE PAGE GROUPING ---
+  // --- 2. THE CIRCUIT BREAKER ---
+  // If we don't have a lesson yet, STOP HERE. Do not run any logic below.
+  if (!lesson) {
+    return (
+      <div className="h-screen w-screen bg-slate-900 flex flex-col items-center justify-center text-white p-10 text-center">
+        <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-6" />
+        <p className="font-black uppercase tracking-widest opacity-80">Locating Content...</p>
+        <p className="text-[10px] text-slate-500 mt-4 font-mono">Searching ID: {lessonId}</p>
+      </div>
+    );
+  }
+
+  // --- 3. PAGE GROUPING (Only runs if lesson exists) ---
   const pages = useMemo(() => {
-    if (!lesson?.blocks) return [];
+    if (!lesson.blocks) return [];
     const groupedPages: any[] = [];
     let currentBuffer: any[] = [];
 
     lesson.blocks.forEach((block: any) => {
-      // Split pages at interactive blocks
       if (['quiz', 'flashcard', 'scenario'].includes(block.type)) {
         if (currentBuffer.length > 0) groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
         groupedPages.push({ type: 'interact', blocks: [block] });
@@ -372,25 +382,19 @@ function ClassView({ lessonId, lessons, classLessons, classId, userData }: any) 
     return groupedPages;
   }, [lesson]);
 
-  // --- 3. MASTER SYNC LISTENER ---
+  // --- 4. MASTER SYNC LISTENER (Only runs if lesson exists) ---
   useEffect(() => {
+    // Optional chaining just in case
     const syncId = lesson?.originalId || lesson?.id;
     if (!syncId) return;
 
     const unsub = onSnapshot(doc(db, 'live_sessions', syncId), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
-        
-        // Sync Page Index
-        if (typeof data.activePageIdx === 'number') {
-          setActivePageIdx(data.activePageIdx);
-        }
-
-        // Sync Spotlight & Blackout
+        if (typeof data.activePageIdx === 'number') setActivePageIdx(data.activePageIdx);
         setIsBlackout(!!data.isBlackout);
         setSpotlightIdx(data.spotlightIdx ?? null);
         
-        // Sync Scroll Position
         if (typeof data.scrollPercent === 'number' && stageRef.current) {
           const s = stageRef.current;
           const target = data.scrollPercent * (s.scrollHeight - s.clientHeight);
@@ -402,27 +406,7 @@ function ClassView({ lessonId, lessons, classLessons, classId, userData }: any) 
     return () => unsub();
   }, [lesson?.id, lesson?.originalId]);
 
-  // --- 4. RENDER GUARDS (The "Grey Screen" Killers) ---
-  if (!lessonId) {
-    return (
-      <div className="h-screen w-screen bg-slate-900 flex flex-col items-center justify-center text-white p-10">
-        <div className="text-indigo-500 mb-4"><Monitor size={48} /></div>
-        <p className="font-black uppercase tracking-widest opacity-50">No Lesson Selected</p>
-      </div>
-    );
-  }
-
-  if (!lesson) {
-    return (
-      <div className="h-screen w-screen bg-slate-900 flex flex-col items-center justify-center text-white p-10 text-center">
-        <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-6" />
-        <p className="font-black uppercase tracking-widest opacity-80">Searching Library...</p>
-        <p className="text-[10px] text-slate-500 mt-4 font-mono">REQ_ID: {lessonId}</p>
-      </div>
-    );
-  }
-
-  // --- 5. COMPONENT RENDERERS ---
+  // --- 5. BLOCK RENDERER ---
   const renderBlock = (block: any, idx: number) => {
     const isDimmed = spotlightIdx !== null && spotlightIdx !== idx;
     const baseClass = `transition-all duration-700 w-full ${isDimmed ? 'opacity-10 blur-md grayscale scale-95' : 'opacity-100 blur-0 grayscale-0 scale-100'}`;
@@ -430,13 +414,13 @@ function ClassView({ lessonId, lessons, classLessons, classId, userData }: any) 
     switch (block.type) {
       case 'text': return (
         <div key={idx} className={baseClass + " py-8 px-12"}>
-          {block.title && <h3 className="text-[3.5vh] font-black text-indigo-600 uppercase mb-6 tracking-tight">{block.title}</h3>}
+          {block.title && <h3 className="text-[3.5vh] font-black text-indigo-600 uppercase mb-6">{block.title}</h3>}
           <p className="text-[5.5vh] leading-[1.15] text-slate-800 font-bold max-w-6xl">{block.content}</p>
         </div>
       );
       case 'essay': return (
         <div key={idx} className={baseClass + " w-full max-w-5xl mx-auto py-16"}>
-          <h1 className="text-[8vh] font-black text-slate-900 leading-none mb-12 text-center tracking-tighter">{block.title}</h1>
+          <h1 className="text-[8vh] font-black text-slate-900 leading-none mb-12 text-center">{block.title}</h1>
           <div className="space-y-[5vh]">
             {block.content.split('\n\n').map((para: string, pIdx: number) => (
               <p key={pIdx} className="text-[4.2vh] leading-[1.6] text-slate-700 font-serif text-justify first-letter:text-[7vh] first-letter:font-black first-letter:text-indigo-600 first-letter:mr-3">{para.trim()}</p>
@@ -447,16 +431,14 @@ function ClassView({ lessonId, lessons, classLessons, classId, userData }: any) 
       case 'image': return (
         <div key={idx} className={baseClass + " py-12 flex flex-col items-center"}>
           <img src={block.url} className="max-h-[60vh] object-contain rounded-[4rem] shadow-2xl border-[16px] border-white" alt="visual" />
-          {block.caption && <p className="mt-6 text-[2vh] font-black text-slate-300 uppercase tracking-widest">{block.caption}</p>}
         </div>
       );
       case 'vocab-list': return (
         <div key={idx} className={baseClass + " grid grid-cols-2 gap-8 w-full py-12 px-12"}>
           {block.items?.map((item: any, i: number) => (
-            <div key={i} className="bg-slate-50 p-12 rounded-[4rem] border-4 border-slate-100 flex flex-col items-center text-center shadow-xl">
-              <p className="text-[5.5vh] font-black text-indigo-600 mb-2 leading-none">{item.term}</p>
-              <div className="h-1.5 w-16 bg-indigo-100 rounded-full mb-6" />
-              <p className="text-[3vh] text-slate-500 font-bold leading-tight">{item.definition}</p>
+            <div key={i} className="bg-slate-50 p-12 rounded-[4rem] border-4 border-slate-100 flex flex-col items-center text-center">
+              <p className="text-[5.5vh] font-black text-indigo-600 mb-2">{item.term}</p>
+              <p className="text-[3vh] text-slate-500 font-bold">{item.definition}</p>
             </div>
           ))}
         </div>
@@ -478,51 +460,33 @@ function ClassView({ lessonId, lessons, classLessons, classId, userData }: any) 
           })}
         </div>
       );
-      default: return (
-        <div key={idx} className="py-32 bg-indigo-50 rounded-[5rem] w-full text-center border-4 border-dashed border-indigo-100">
-          <Smartphone size={80} className="mx-auto text-indigo-200 mb-8" />
-          <p className="text-[8vh] font-black text-indigo-600 uppercase tracking-tighter">Interaction Mode</p>
-          <p className="text-[3vh] font-bold text-indigo-400">Activity active on your mobile device</p>
-        </div>
-      );
+      default: return null;
     }
   };
 
-  // --- 6. MAIN JSX ---
   return (
     <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col overflow-hidden">
-      
-      {/* Blackout Overlay */}
-      <div className={`fixed inset-0 z-[300] bg-slate-950 transition-all duration-1000 flex items-center justify-center ${isBlackout ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+      <div className={`fixed inset-0 z-[300] bg-slate-950 transition-all duration-1000 flex items-center justify-center ${isBlackout ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
          <div className="text-indigo-500/10 animate-pulse"><Monitor size={300} /></div>
       </div>
 
-      {/* Presentation Header */}
       <div className="h-[12vh] px-16 flex items-center gap-12 shrink-0 border-b bg-white relative z-20">
         <div className="h-3 flex-1 bg-slate-100 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-indigo-600 transition-all duration-1000 ease-out" 
-            style={{ width: `${((activePageIdx + 1) / (pages.length || 1)) * 100}%` }} 
-          />
+          <div className="h-full bg-indigo-600 transition-all duration-1000" style={{ width: `${((activePageIdx + 1) / (pages.length || 1)) * 100}%` }} />
         </div>
-        <span className="text-[3.5vh] font-black text-slate-300 tabular-nums">
-          {activePageIdx + 1} <span className="opacity-30">/</span> {pages.length}
+        <span className="text-[3.5vh] font-black text-slate-300">
+          {activePageIdx + 1} / {pages.length}
         </span>
       </div>
 
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Main Presentation Stage */}
-        <div 
-          ref={stageRef} 
-          className={`flex-1 px-16 py-12 overflow-y-auto custom-scrollbar flex flex-col items-center transition-all duration-700 ${showForum ? 'mr-[450px]' : 'mr-0'}`}
-        >
+        <div ref={stageRef} className={`flex-1 px-16 py-12 overflow-y-auto flex flex-col items-center transition-all duration-700 ${showForum ? 'mr-[450px]' : 'mr-0'}`}>
           <div className="w-full max-w-7xl flex flex-col gap-12 pb-32">
             {pages[activePageIdx]?.blocks?.map((b: any, i: number) => renderBlock(b, i))}
           </div>
         </div>
 
-        {/* Forum Sidebar */}
-        <div className={`absolute top-0 right-0 h-full w-[450px] bg-slate-50 border-l border-slate-100 transition-transform duration-500 ease-in-out z-10 ${showForum ? 'translate-x-0 shadow-2xl' : 'translate-x-full'}`}>
+        <div className={`absolute top-0 right-0 h-full w-[450px] bg-slate-50 border-l border-slate-100 transition-transform duration-500 z-10 ${showForum ? 'translate-x-0' : 'translate-x-full'}`}>
           <div className="h-full flex flex-col p-8">
             <h3 className="text-2xl font-black text-slate-900 mb-8 flex items-center gap-3">
               <MessageSquare className="text-indigo-600" size={28} /> CLASS CHAT
@@ -534,24 +498,21 @@ function ClassView({ lessonId, lessons, classLessons, classId, userData }: any) 
         </div>
       </div>
 
-      {/* Presentation Footer */}
       <div className="h-[12vh] px-16 border-t flex justify-between items-center shrink-0 bg-white relative z-20">
         <div className="flex items-center gap-4">
-          <div className="w-5 h-5 bg-emerald-500 rounded-full animate-ping absolute" />
-          <div className="w-5 h-5 bg-emerald-500 rounded-full relative" />
-          <span className="font-black text-[2.2vh] text-slate-400 uppercase tracking-[0.2em] ml-2">Live Session</span>
+          <div className="w-5 h-5 bg-emerald-500 rounded-full animate-ping" />
+          <span className="font-black text-[2.2vh] text-slate-400 uppercase tracking-widest">Live Presentation</span>
         </div>
         
         <div className="flex items-center gap-8">
           <button 
             onClick={() => setShowForum(!showForum)}
-            className={`flex items-center gap-4 px-10 py-4 rounded-3xl font-black text-[2.2vh] transition-all duration-300 ${showForum ? 'bg-indigo-600 text-white shadow-2xl scale-105' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+            className={`flex items-center gap-4 px-10 py-4 rounded-3xl font-black text-[2.2vh] transition-all ${showForum ? 'bg-indigo-600 text-white shadow-2xl' : 'bg-slate-100 text-slate-400'}`}
           >
-            <MessageSquare size={28} /> 
-            {showForum ? "CLOSE CHAT" : "OPEN CHAT"}
+            <MessageSquare size={28} /> {showForum ? "CLOSE CHAT" : "OPEN CHAT"}
           </button>
           <div className="h-12 w-px bg-slate-100 mx-2" />
-          <h2 className="text-[2.8vh] font-black text-slate-900 opacity-20 uppercase tracking-widest truncate max-w-md">{lesson?.title}</h2>
+          <h2 className="text-[2.8vh] font-black text-slate-900 opacity-20 uppercase tracking-widest">{lesson.title}</h2>
         </div>
       </div>
     </div>
@@ -3438,32 +3399,22 @@ function App() {
   }, [user, displayName]);
 
   // --- 5. RENDER STUDENT VIEW (The Router) ---
-  const renderStudentView = () => {
-// A. PRESENTATION (The Big Screen)
+const renderStudentView = () => {
     if (activeTab === 'presentation') {
-      // THE FIX: Aggressive search for the lesson blocks
-      const fullLesson = lessons.find(l => 
-        (l.id === selectedLessonId && l.blocks) || 
-        (l.originalId === selectedLessonId && l.blocks)
+      // 1. Deep search before allowing the switch
+      const found = lessons.find(l => 
+        l && (l.id === selectedLessonId || l.originalId === selectedLessonId)
       );
-      
-      if (!fullLesson) {
-        return (
-          <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white p-10 text-center">
-            <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-6" />
-            <p className="font-black tracking-widest uppercase opacity-80">Searching Library...</p>
-            <p className="text-xs text-slate-500 mt-2 max-w-xs">
-              ID: {selectedLessonId} <br/>
-              Checking {lessons.length} total lessons for blocks.
-            </p>
-            <button 
-               onClick={() => setActiveTab('home')}
-               className="mt-8 px-6 py-2 bg-slate-800 rounded-full text-[10px] font-black uppercase"
-            >
-              Cancel & Return
-            </button>
-          </div>
-        );
+
+      // 2. If not found, stay in a loading state OR go back
+      if (!found) {
+         return (
+           <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white">
+             <Loader className="animate-spin mb-4 text-indigo-500" size={48} />
+             <p className="font-black tracking-widest uppercase opacity-50">Syncing Library...</p>
+             <button onClick={() => setActiveTab('home')} className="mt-8 text-xs underline">Cancel</button>
+           </div>
+         );
       }
 
       return (
@@ -3476,6 +3427,8 @@ function App() {
         />
       );
     }
+    
+    // ... rest of the router (activeLesson, home, etc.)
 
     // B. ACTIVE LESSON (Mobile Player)
     if (activeLesson) {
