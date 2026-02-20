@@ -2033,8 +2033,7 @@ function ClassForum({ classData, user }: any) {
         </div>
     );
 }
-function StudentClassView({ classData, onBack, onSelectLesson, userData }: any) {
-  // Toggle between the list of lessons and the class discussion
+function StudentClassView({ classData, onBack, onSelectLesson, userData, setActiveTab, setSelectedLessonId }: any) {
   const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'forum'>('lessons');
 
   // --- INTERNAL FORUM COMPONENT ---
@@ -2044,7 +2043,6 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData }: any) 
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-      // Connect to the specific sub-collection for this class
       const q = query(
         collection(db, 'artifacts', appId, 'classes', classId, 'forum'),
         orderBy('timestamp', 'asc'),
@@ -2053,7 +2051,6 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData }: any) 
 
       return onSnapshot(q, (snap) => {
         setMessages(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        // Auto-scroll to the latest message
         setTimeout(() => scrollRef.current?.scrollTo({ 
           top: scrollRef.current.scrollHeight, 
           behavior: 'smooth' 
@@ -2064,7 +2061,6 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData }: any) 
     const handleSendMessage = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!newMessage.trim()) return;
-
       await addDoc(collection(db, 'artifacts', appId, 'classes', classId, 'forum'), {
         text: newMessage,
         senderName: userData?.name || 'Scholar',
@@ -2077,7 +2073,6 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData }: any) 
 
     return (
       <div className="flex flex-col h-[60vh] bg-slate-50 rounded-[2.5rem] overflow-hidden border-2 border-slate-100 shadow-inner">
-        {/* Message Feed */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4">
           {messages.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-slate-300 opacity-50">
@@ -2086,25 +2081,18 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData }: any) 
             </div>
           )}
           {messages.map((msg) => (
-            <div 
-              key={msg.id} 
-              className={`flex flex-col ${msg.senderId === auth.currentUser?.uid ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2`}
-            >
+            <div key={msg.id} className={`flex flex-col ${msg.senderId === auth.currentUser?.uid ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2`}>
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mb-1 px-2">
                 {msg.senderName} {msg.role === 'instructor' && '🎓'}
               </span>
               <div className={`p-4 rounded-[1.5rem] text-sm font-medium leading-relaxed max-w-[85%] shadow-sm ${
-                msg.senderId === auth.currentUser?.uid 
-                  ? 'bg-indigo-600 text-white rounded-tr-none' 
-                  : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'
+                msg.senderId === auth.currentUser?.uid ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'
               }`}>
                 {msg.text}
               </div>
             </div>
           ))}
         </div>
-
-        {/* Message Input */}
         <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-100 flex gap-2">
           <input 
             value={newMessage} 
@@ -2120,72 +2108,54 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData }: any) 
     );
   };
 
-  // --- MAIN VIEW RENDER ---
   return (
     <div className="h-full flex flex-col bg-white overflow-hidden">
-      {/* Header Section */}
       <div className="p-8 pt-12 shrink-0">
-        <button 
-          onClick={onBack} 
-          className="mb-4 flex items-center gap-2 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-black uppercase tracking-widest"
-        >
+        <button onClick={onBack} className="mb-4 flex items-center gap-2 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-black uppercase tracking-widest">
           <ArrowLeft size={16} /> Dashboard
         </button>
-        
         <h2 className="text-3xl font-black text-slate-900 leading-tight mb-2">{classData.name}</h2>
-        <p className="text-slate-400 font-medium text-sm line-clamp-2">{classData.description || "Welcome to your class portal."}</p>
-
-        {/* Tab Switcher */}
         <div className="flex gap-2 mt-8 p-1.5 bg-slate-100 rounded-[1.5rem] w-fit">
-          <button 
-            onClick={() => setActiveSubTab('lessons')}
-            className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all ${
-              activeSubTab === 'lessons' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            Lessons
-          </button>
-          <button 
-            onClick={() => setActiveSubTab('forum')}
-            className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all ${
-              activeSubTab === 'forum' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            Discussion
-          </button>
+          <button onClick={() => setActiveSubTab('lessons')} className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all ${activeSubTab === 'lessons' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>Lessons</button>
+          <button onClick={() => setActiveSubTab('forum')} className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all ${activeSubTab === 'forum' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>Discussion</button>
         </div>
       </div>
 
-      {/* Dynamic Content Body */}
       <div className="flex-1 overflow-y-auto px-8 pb-12">
         {activeSubTab === 'lessons' ? (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
-            {classData.assignments?.length === 0 && (
-              <p className="py-20 text-center text-slate-300 italic">No lessons assigned yet.</p>
-            )}
             {classData.assignments?.map((item: any) => (
               <div 
                 key={item.id} 
-                onClick={() => onSelectLesson(item)}
-                className="group p-6 bg-white border-2 border-slate-100 rounded-[2rem] flex justify-between items-center cursor-pointer hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-50/50 active:scale-95 transition-all duration-300"
+                className="group p-6 bg-white border-2 border-slate-100 rounded-[2.5rem] flex justify-between items-center hover:border-indigo-200 transition-all duration-300"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                <div className="flex items-center gap-4 flex-1" onClick={() => onSelectLesson(item)}>
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors cursor-pointer">
                     <Play size={24} fill="currentColor" />
                   </div>
-                  <div>
+                  <div className="cursor-pointer">
                     <h4 className="font-black text-slate-800 text-lg leading-none mb-1">{item.title}</h4>
                     <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{item.type || 'Lesson'}</span>
                   </div>
                 </div>
-                <ChevronRight size={24} className="text-slate-200 group-hover:text-indigo-300 group-hover:translate-x-1 transition-all" />
+
+                {/* THE MONITOR BUTTON (REINSTATED) */}
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const targetId = item.lessonId || item.id || item.originalId;
+                    setSelectedLessonId(targetId);
+                    setActiveTab('presentation');
+                  }}
+                  className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-amber-50 hover:text-amber-600 transition-all flex items-center justify-center shadow-sm active:scale-90"
+                >
+                  <Monitor size={24} />
+                </button>
               </div>
             ))}
           </div>
         ) : (
-          <div className="animate-in fade-in slide-in-from-bottom-4 h-full">
-            <ClassForum classId={classData.id} />
-          </div>
+          <ClassForum classId={classData.id} />
         )}
       </div>
     </div>
