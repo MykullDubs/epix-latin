@@ -227,7 +227,7 @@ const useLearningTimer = (user: any, activityId: string, activityType: string, t
 };
 // STANDALONE PREVIEW ENGINE
 const LivePreview = ({ data }: any) => {
-  const currentTheme = THEMES[data?.theme || 'indigo'];
+  const currentTheme = THEMES[data?.theme || 'indigo'] || THEMES['indigo'];
 
   return (
     <div className={`w-full h-full bg-white rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border-[12px] border-slate-900 transition-all duration-700 ${currentTheme.font}`}>
@@ -241,15 +241,17 @@ const LivePreview = ({ data }: any) => {
         
         {data.blocks?.map((b: any, i: number) => (
           <div key={i} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+             
              {b.type === 'text' && (
-               <div className="space-y-4">
-                 {b.title && <h3 className={`${currentTheme.accent} font-black uppercase text-center text-xs tracking-widest`}>{b.title}</h3>}
-                 <p className="text-center text-[4vh] font-black text-slate-800 leading-tight tracking-tighter">{b.content}</p>
+               <div className="space-y-4 text-center">
+                 {b.title && <h3 className={`${currentTheme.accent} font-black uppercase text-xs tracking-widest`}>{b.title}</h3>}
+                 <p className="text-[3vh] font-black text-slate-800 leading-tight tracking-tighter">{b.content}</p>
                </div>
              )}
+             
              {b.type === 'essay' && (
                <div className="space-y-6">
-                 <h2 className={`text-center text-3xl font-black ${currentTheme.accent} uppercase tracking-tighter`}>{b.title}</h2>
+                 <h2 className={`text-center text-2xl font-black ${currentTheme.accent} tracking-tighter`}>{b.title}</h2>
                  <div className="space-y-4">
                    {b.content?.split('\n\n').map((p: string, j: number) => (
                      <p key={j} className="text-sm text-slate-600 leading-relaxed text-justify first-letter:text-xl first-letter:font-black first-letter:text-indigo-600 first-letter:mr-1">{p}</p>
@@ -257,14 +259,69 @@ const LivePreview = ({ data }: any) => {
                  </div>
                </div>
              )}
-             {/* ... include your other block renderers (dialogue, vocab, etc.) here ... */}
+
+             {b.type === 'image' && (
+               <div className="rounded-2xl overflow-hidden border border-slate-100 shadow-sm">
+                  <img src={b.url} alt="preview" className="w-full object-cover" />
+                  {b.caption && <p className="text-[10px] text-center p-2 text-slate-500 font-bold bg-slate-50">{b.caption}</p>}
+               </div>
+             )}
+
+             {b.type === 'vocab-list' && (
+                <div className="space-y-2">
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center mb-4">Vocabulary</h3>
+                  {b.items?.map((item: any, j: number) => (
+                    <div key={j} className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col gap-1">
+                      <span className="font-black text-indigo-600 text-sm">{item.term}</span>
+                      <span className="text-xs font-medium text-slate-600">{item.definition}</span>
+                    </div>
+                  ))}
+                </div>
+             )}
+
+             {b.type === 'dialogue' && (
+                <div className="space-y-3">
+                  {b.lines?.map((line: any, j: number) => (
+                    <div key={j} className={`flex items-end gap-2 ${line.side === 'right' ? 'flex-row-reverse' : ''}`}>
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-black text-white shrink-0 ${line.side === 'right' ? 'bg-indigo-600' : 'bg-slate-800'}`}>
+                        {line.speaker?.[0].toUpperCase()}
+                      </div>
+                      <div className={`max-w-[80%] p-3 rounded-xl text-xs font-medium ${line.side === 'right' ? 'bg-indigo-500 text-white rounded-br-none' : 'bg-slate-100 text-slate-800 rounded-bl-none'}`}>
+                        {line.text}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+             )}
+
+             {b.type === 'quiz' && (
+                <div className="bg-slate-900 p-5 rounded-2xl text-white shadow-lg">
+                  <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest block mb-2">Quiz Preview</span>
+                  <h3 className="font-bold text-sm mb-4">{b.question}</h3>
+                  <div className="space-y-2">
+                    {b.options?.map((opt: any, j: number) => (
+                      <div key={j} className={`p-3 rounded-lg text-xs font-bold ${b.correctId === opt.id ? 'bg-emerald-500 border-emerald-400' : 'bg-white/10 text-slate-300'}`}>
+                        {opt.text} {b.correctId === opt.id && "✓"}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+             )}
+
+             {b.type === 'scenario' && (
+                <div className="bg-emerald-900 p-5 rounded-2xl text-white shadow-lg border-2 border-emerald-500">
+                  <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest block mb-2">Interactive Scenario</span>
+                  <h3 className="font-bold text-sm italic">"{b.nodes?.[0]?.text || 'Scenario starting point...'}"</h3>
+                  <p className="text-xs text-emerald-200 mt-2">({b.nodes?.length} branching nodes configured)</p>
+                </div>
+             )}
+
           </div>
         ))}
       </div>
     </div>
   );
 };
-
 // --- HELPER COMPONENTS ---
 function Toast({ message, onClose }: any) {
   useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
@@ -3100,6 +3157,10 @@ const THEMES: any = {
  * LESSON BUILDER VIEW (Visual Editor Only)
  * Optimized for: Touch Drag-and-Drop, Tablet Inputs, Cinematic Narrative
  */
+/**
+ * LESSON BUILDER VIEW (Visual Editor)
+ * Fully wired to edit all block types
+ */
 function LessonBuilderView({ data, setData, onSave }: any) {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [jsonMode, setJsonMode] = useState(false);
@@ -3140,6 +3201,11 @@ function LessonBuilderView({ data, setData, onSave }: any) {
     }
   };
 
+  // Keep JSON string updated if visual editor changes
+  useEffect(() => {
+    if (!jsonMode) setJsonInput(JSON.stringify(data, null, 2));
+  }, [data, jsonMode]);
+
   // --- 2. THE RENDERER ---
   return (
     <div className="max-w-3xl mx-auto space-y-12 pb-64 animate-in fade-in duration-500">
@@ -3173,13 +3239,13 @@ function LessonBuilderView({ data, setData, onSave }: any) {
             <textarea 
               value={jsonInput}
               onChange={(e) => setJsonInput(e.target.value)}
-              className="w-full h-[50vh] bg-transparent text-emerald-400 font-mono text-sm outline-none resize-none leading-relaxed custom-scrollbar"
+              className="w-full h-[60vh] bg-transparent text-emerald-400 font-mono text-sm outline-none resize-none leading-relaxed custom-scrollbar"
               placeholder="Paste your 'Looksmaxing' JSON here..."
             />
           </div>
           <button 
             onClick={handleImportJson}
-            className="w-full py-6 bg-emerald-500 text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.3em] shadow-xl active:scale-95 transition-all"
+            className="w-full py-6 bg-emerald-500 text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.3em] shadow-xl active:scale-95 transition-all hover:bg-emerald-400"
           >
             Inject Unit Architecture
           </button>
@@ -3190,15 +3256,15 @@ function LessonBuilderView({ data, setData, onSave }: any) {
           {/* Unit Meta */}
           <div className="space-y-4 px-2">
             <input 
-              className="text-5xl md:text-6xl font-black border-none w-full focus:ring-0 p-0 placeholder:text-slate-100 tracking-tighter bg-transparent" 
+              className="text-5xl md:text-6xl font-black border-none w-full focus:ring-0 p-0 placeholder:text-slate-200 tracking-tighter bg-transparent" 
               placeholder="Unit Title..." 
-              value={data.title} 
+              value={data.title || ''} 
               onChange={e => setData({...data, title: e.target.value})} 
             />
             <input 
-              className="text-xl md:text-2xl font-bold text-slate-300 border-none w-full focus:ring-0 p-0 tracking-tight bg-transparent" 
+              className="text-xl md:text-2xl font-bold text-slate-400 border-none w-full focus:ring-0 p-0 tracking-tight bg-transparent" 
               placeholder="Lesson Subtitle..." 
-              value={data.subtitle} 
+              value={data.subtitle || ''} 
               onChange={e => setData({...data, subtitle: e.target.value})} 
             />
           </div>
@@ -3206,33 +3272,109 @@ function LessonBuilderView({ data, setData, onSave }: any) {
           {/* Blocks */}
           <div className="space-y-6">
             {(data.blocks || []).map((block: any, idx: number) => (
-              <div key={idx} className="group bg-white p-6 md:p-10 rounded-[3rem] border-2 border-slate-50 hover:border-indigo-100 hover:shadow-2xl transition-all relative">
+              <div key={idx} className="group bg-white p-6 md:p-8 rounded-[2.5rem] border-2 border-slate-100 hover:border-indigo-200 hover:shadow-xl transition-all relative">
                 <div className="flex justify-between items-center mb-6">
                    <div className="flex items-center gap-3">
-                      <span className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400">{idx + 1}</span>
-                      <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">{block.type}</span>
+                      <span className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-[10px] font-black text-indigo-600">{idx + 1}</span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">{block.type}</span>
                    </div>
-                   <button onClick={() => removeBlock(idx)} className="p-2 bg-rose-50 text-rose-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all">
+                   <button onClick={() => removeBlock(idx)} className="p-2 bg-rose-50 text-rose-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500 hover:text-white">
                      <Trash2 size={16} />
                    </button>
                 </div>
 
+                {/* TEXT EDITOR */}
                 {block.type === 'text' && (
                   <textarea 
-                    className="w-full bg-transparent font-black text-2xl border-none focus:ring-0 p-0 placeholder:text-slate-200 resize-none" 
+                    className="w-full bg-slate-50 rounded-xl p-4 font-black text-xl border-none focus:ring-2 focus:ring-indigo-100 resize-none h-32" 
+                    placeholder="Punchy text content..."
                     value={block.content} 
                     onChange={e => updateBlock(idx, 'content', e.target.value)} 
                   />
                 )}
 
+                {/* ESSAY EDITOR */}
                 {block.type === 'essay' && (
                   <div className="space-y-4">
-                    <input className="w-full font-black text-slate-800 bg-slate-50 border-none px-5 py-3 rounded-2xl text-sm" placeholder="Essay Title" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} />
-                    <textarea className="w-full h-48 bg-slate-50 border-none p-5 rounded-3xl text-xs font-serif leading-relaxed" value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
+                    <input className="w-full font-black text-slate-800 bg-slate-50 border-none px-5 py-3 rounded-xl text-sm focus:ring-2 focus:ring-indigo-100" placeholder="Essay Title" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} />
+                    <textarea className="w-full h-48 bg-slate-50 border-none p-5 rounded-xl text-xs font-serif leading-relaxed focus:ring-2 focus:ring-indigo-100" placeholder="Paragraph 1...\n\nParagraph 2..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
                   </div>
                 )}
 
-                {/* Other Blocks... */}
+                {/* IMAGE EDITOR */}
+                {block.type === 'image' && (
+                  <div className="space-y-3">
+                    <input className="w-full bg-slate-50 border-none p-3 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-100" placeholder="Unsplash Image URL" value={block.url || ''} onChange={e => updateBlock(idx, 'url', e.target.value)} />
+                    <input className="w-full bg-slate-50 border-none p-3 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-100" placeholder="Image Caption (Optional)" value={block.caption || ''} onChange={e => updateBlock(idx, 'caption', e.target.value)} />
+                  </div>
+                )}
+
+                {/* VOCAB LIST EDITOR */}
+                {block.type === 'vocab-list' && (
+                  <div className="space-y-3">
+                    {(block.items || []).map((item: any, iIdx: number) => (
+                       <div key={iIdx} className="flex gap-2">
+                          <input className="w-1/3 bg-slate-50 border-none p-3 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-100" placeholder="Term" value={item.term} onChange={e => { const newItems = [...block.items]; newItems[iIdx].term = e.target.value; updateBlock(idx, 'items', newItems); }} />
+                          <input className="flex-1 bg-slate-50 border-none p-3 rounded-xl text-sm focus:ring-2 focus:ring-indigo-100" placeholder="Definition" value={item.definition} onChange={e => { const newItems = [...block.items]; newItems[iIdx].definition = e.target.value; updateBlock(idx, 'items', newItems); }} />
+                          <button onClick={() => { const newItems = block.items.filter((_:any, i:number) => i !== iIdx); updateBlock(idx, 'items', newItems); }} className="p-3 text-slate-300 hover:text-rose-500"><X size={16}/></button>
+                       </div>
+                    ))}
+                    <button onClick={() => updateBlock(idx, 'items', [...(block.items||[]), {term:'', definition:''}])} className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-xs font-bold text-slate-400 hover:text-indigo-600 hover:border-indigo-200 transition-colors">+ Add Word</button>
+                  </div>
+                )}
+
+                {/* QUIZ EDITOR */}
+                {block.type === 'quiz' && (
+                  <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                     <textarea className="w-full bg-white border border-slate-200 p-3 rounded-xl text-sm font-bold resize-none h-20" placeholder="Quiz Question..." value={block.question || ''} onChange={e => updateBlock(idx, 'question', e.target.value)} />
+                     <div className="space-y-2 mt-4">
+                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Options (Select Correct)</span>
+                       {(block.options || []).map((opt: any, oIdx: number) => (
+                          <div key={oIdx} className="flex items-center gap-2">
+                             <input type="radio" className="w-4 h-4 text-indigo-600" checked={block.correctId === opt.id} onChange={() => updateBlock(idx, 'correctId', opt.id)} />
+                             <input className="w-12 bg-white border border-slate-200 p-2 rounded-lg text-xs font-mono text-center" placeholder="ID" value={opt.id} onChange={e => { const newOpts = [...block.options]; newOpts[oIdx].id = e.target.value; updateBlock(idx, 'options', newOpts); }} />
+                             <input className="flex-1 bg-white border border-slate-200 p-2 rounded-lg text-sm" placeholder="Answer Text" value={opt.text} onChange={e => { const newOpts = [...block.options]; newOpts[oIdx].text = e.target.value; updateBlock(idx, 'options', newOpts); }} />
+                          </div>
+                       ))}
+                       <button onClick={() => updateBlock(idx, 'options', [...(block.options||[]), {id: String.fromCharCode(97 + (block.options?.length || 0)), text: ''}])} className="text-xs font-bold text-indigo-500 mt-2 hover:underline">+ Add Option</button>
+                     </div>
+                  </div>
+                )}
+
+                {/* DIALOGUE EDITOR */}
+                {block.type === 'dialogue' && (
+                  <div className="space-y-3">
+                     {(block.lines || []).map((line: any, lIdx: number) => (
+                        <div key={lIdx} className="p-4 bg-slate-50 rounded-2xl space-y-2 border border-slate-100 relative">
+                           <button onClick={() => { const newLines = block.lines.filter((_:any, i:number) => i !== lIdx); updateBlock(idx, 'lines', newLines); }} className="absolute top-2 right-2 text-slate-300 hover:text-rose-500"><X size={14}/></button>
+                           <div className="flex gap-2 pr-6">
+                             <input className="w-1/4 bg-white border border-slate-200 p-2 rounded-lg text-xs font-bold" placeholder="Speaker" value={line.speaker} onChange={e => { const newLines = [...block.lines]; newLines[lIdx].speaker = e.target.value; updateBlock(idx, 'lines', newLines); }} />
+                             <select className="bg-white border border-slate-200 p-2 rounded-lg text-xs font-bold text-slate-500" value={line.side} onChange={e => { const newLines = [...block.lines]; newLines[lIdx].side = e.target.value; updateBlock(idx, 'lines', newLines); }}>
+                                <option value="left">Left Side</option><option value="right">Right Side</option>
+                             </select>
+                           </div>
+                           <textarea className="w-full bg-white border border-slate-200 p-3 rounded-lg text-sm resize-none" placeholder="What are they saying?" value={line.text} onChange={e => { const newLines = [...block.lines]; newLines[lIdx].text = e.target.value; updateBlock(idx, 'lines', newLines); }} />
+                           <input className="w-full bg-white border border-slate-200 p-2 rounded-lg text-xs italic text-slate-500" placeholder="Translation / Context note" value={line.translation || ''} onChange={e => { const newLines = [...block.lines]; newLines[lIdx].translation = e.target.value; updateBlock(idx, 'lines', newLines); }} />
+                        </div>
+                     ))}
+                     <button onClick={() => updateBlock(idx, 'lines', [...(block.lines||[]), {speaker:'A', text:'', side:'left'}])} className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-xs font-bold text-slate-400 hover:text-indigo-600 hover:border-indigo-200 transition-colors">+ Add Dialogue Line</button>
+                  </div>
+                )}
+
+                {/* SCENARIO EDITOR (Read-Only Status for complex trees) */}
+                {block.type === 'scenario' && (
+                  <div className="p-6 bg-slate-900 rounded-2xl flex items-center justify-between shadow-inner">
+                     <div>
+                       <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Complex Block</span>
+                       <p className="text-white font-bold mt-1 text-sm">Interactive Branching Scenario</p>
+                       <p className="text-slate-400 text-xs mt-1">{block.nodes?.length || 0} logic nodes configured.</p>
+                     </div>
+                     <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-emerald-400">
+                       <Code size={20} />
+                     </div>
+                  </div>
+                )}
+
               </div>
             ))}
           </div>
@@ -3249,15 +3391,6 @@ function LessonBuilderView({ data, setData, onSave }: any) {
         </div>
       )}
     </div>
-  );
-}
-
-function InjectorButton({ icon, label, onClick }: any) {
-  return (
-    <button onClick={onClick} className="h-28 bg-white border-2 border-slate-50 rounded-[2.5rem] flex flex-col items-center justify-center gap-3 hover:border-indigo-600 hover:text-indigo-600 hover:shadow-xl transition-all active:scale-90 group">
-      <div className="text-slate-300 group-hover:text-indigo-600 transition-colors scale-125">{icon}</div>
-      <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
-    </button>
   );
 }
 function BuilderHub({ 
