@@ -335,233 +335,79 @@ lessons: any[]; // Replace 'any' with your Lesson type if defined
 }
 
 function ClassView({ lesson, classId, userData }: any) {
+  // --- 1. LOCAL STATE ---
   const [activePageIdx, setActivePageIdx] = useState(0);
   const [showForum, setShowForum] = useState(false);
-  const [isBlackout, setIsBlackout] = useState(false);
-  const [spotlightIdx, setSpotlightIdx] = useState<number | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
 
-  // --- 1. SAFE PAGE GROUPING ---
-  // This logic only runs if 'lesson' exists, thanks to the App-level bouncer.
-  const pages = useMemo(() => {
-    if (!lesson?.blocks) return [];
-    const groupedPages: any[] = [];
-    let currentBuffer: any[] = [];
-
-    lesson.blocks.forEach((block: any) => {
-      // Logic: Start a new page whenever we hit an interactive element
-      if (['quiz', 'flashcard', 'scenario'].includes(block?.type)) {
-        if (currentBuffer.length > 0) groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
-        groupedPages.push({ type: 'interact', blocks: [block] });
-        currentBuffer = [];
-      } else { 
-        currentBuffer.push(block); 
-      }
-    });
-    if (currentBuffer.length > 0) groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
-    return groupedPages;
-  }, [lesson]);
-
-  // --- 2. MASTER SYNC LISTENER ---
+  // --- 2. SAFE SYNC ---
   useEffect(() => {
-    // The ? ensures we never read 'id' of undefined
+    // Use optional chaining (?.) so it NEVER crashes if lesson is null
     const syncId = lesson?.originalId || lesson?.id;
     if (!syncId) return;
 
+    // Listen to Firebase for page changes from the remote
     const unsub = onSnapshot(doc(db, 'live_sessions', syncId), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
-        
-        // Update Page
         if (typeof data.activePageIdx === 'number') {
-          setActivePageIdx(data.activePageIdx);
-        }
-
-        // Update Tactical States
-        setIsBlackout(!!data.isBlackout);
-        setSpotlightIdx(data.spotlightIdx ?? null);
-        
-        // Update Scroll Mirroring
-        if (typeof data.scrollPercent === 'number' && stageRef.current) {
-          const s = stageRef.current;
-          const target = data.scrollPercent * (s.scrollHeight - s.clientHeight);
-          s.scrollTo({ top: target, behavior: 'smooth' });
+           setActivePageIdx(data.activePageIdx);
         }
       }
     });
-
     return () => unsub();
-  }, [lesson?.id, lesson?.originalId]);
+  }, [lesson]); // Only restart this if the lesson object changes
 
-  // --- 3. BLOCK RENDERER HELPER ---
-  const renderBlock = (block: any, idx: number) => {
-    const isDimmed = spotlightIdx !== null && spotlightIdx !== idx;
-    const baseClass = `transition-all duration-700 w-full ${
-      isDimmed ? 'opacity-10 blur-md grayscale scale-95' : 'opacity-100 blur-0 grayscale-0 scale-100'
-    }`;
+  // --- 3. PAGE LOGIC ---
+  const pages = useMemo(() => {
+    if (!lesson?.blocks) return [];
+    const grouped: any[] = [];
+    let buffer: any[] = [];
 
-    switch (block?.type) {
-      case 'text': 
-        return (
-          <div key={idx} className={baseClass + " py-8 px-12"}>
-            {block.title && <h3 className="text-[3.5vh] font-black text-indigo-600 uppercase mb-6 tracking-tight">{block.title}</h3>}
-            <p className="text-[5.5vh] leading-[1.15] text-slate-800 font-bold max-w-6xl">{block.content}</p>
-          </div>
-        );
+    lesson.blocks.forEach((b: any) => {
+      if (['quiz', 'flashcard', 'scenario'].includes(b.type)) {
+        if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
+        grouped.push({ type: 'interact', blocks: [b] });
+        buffer = [];
+      } else { buffer.push(b); }
+    });
+    if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
+    return grouped;
+  }, [lesson]);
 
-      case 'essay': 
-        return (
-          <div key={idx} className={baseClass + " w-full max-w-5xl mx-auto py-16"}>
-            <h1 className="text-[8vh] font-black text-slate-900 leading-none mb-12 text-center tracking-tighter">{block.title}</h1>
-            <div className="space-y-[5vh]">
-              {block.content?.split('\n\n').map((para: string, pIdx: number) => (
-                <p key={pIdx} className="text-[4.2vh] leading-[1.6] text-slate-700 font-serif text-justify first-letter:text-[7vh] first-letter:font-black first-letter:text-indigo-600 first-letter:mr-3">
-                  {para.trim()}
-                </p>
-              ))}
-            </div>
-          </div>
-        );
+  // --- 4. RENDERER ---
+  if (!lesson || !pages[activePageIdx]) return null;
 
-      case 'image': 
-        return (
-          <div key={idx} className={baseClass + " py-12 flex flex-col items-center"}>
-            <img src={block.url} className="max-h-[60vh] object-contain rounded-[4rem] shadow-2xl border-[16px] border-white" alt="visual" />
-            {block.caption && <p className="mt-6 text-[2vh] font-black text-slate-300 uppercase tracking-widest">{block.caption}</p>}
-          </div>
-        );
-
-      case 'vocab-list': 
-        return (
-          <div key={idx} className={baseClass + " grid grid-cols-2 gap-8 w-full py-12 px-12"}>
-            {block.items?.map((item: any, i: number) => (
-              <div key={i} className="bg-slate-50 p-12 rounded-[4rem] border-4 border-slate-100 flex flex-col items-center text-center shadow-xl">
-                <p className="text-[5.5vh] font-black text-indigo-600 mb-2 leading-none">{item.term}</p>
-                <div className="h-1.5 w-16 bg-indigo-100 rounded-full mb-6" />
-                <p className="text-[3vh] text-slate-500 font-bold leading-tight">{item.definition}</p>
-              </div>
-            ))}
-          </div>
-        );
-
-      case 'dialogue': 
-        return (
-          <div key={idx} className={baseClass + " w-full max-w-5xl mx-auto py-12 space-y-10"}>
-            {block.lines?.map((line: any, i: number) => {
-              const isRight = line.side === 'right';
-              return (
-                <div key={i} className={`flex items-end gap-8 ${isRight ? 'flex-row-reverse' : 'flex-row'}`}>
-                  <div className={`w-24 h-24 rounded-full flex items-center justify-center shrink-0 shadow-xl border-4 border-white text-white text-3xl font-black ${isRight ? 'bg-indigo-600' : 'bg-slate-800'}`}>
-                    {line.speaker?.[0]}
-                  </div>
-                  <div className={`p-10 rounded-[4rem] shadow-2xl max-w-[75%] border-4 ${
-                    isRight ? 'bg-indigo-600 text-white border-indigo-500 rounded-br-none' : 'bg-white text-slate-800 border-slate-50 rounded-bl-none'
-                  }`}>
-                    <p className="text-[4.5vh] font-black leading-tight">{line.text}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        );
-
-      default: 
-        return (
-          <div key={idx} className="py-32 bg-indigo-50 rounded-[5rem] w-full text-center border-4 border-dashed border-indigo-100">
-            <Smartphone size={80} className="mx-auto text-indigo-200 mb-8" />
-            <p className="text-[8vh] font-black text-indigo-600 uppercase tracking-tighter">Interaction Mode</p>
-            <p className="text-[3vh] font-bold text-indigo-400">Activity active on your mobile device</p>
-          </div>
-        );
-    }
-  };
-
-  // --- 4. FINAL RENDER ---
   return (
-    <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col overflow-hidden">
-      
-      {/* Blackout Curtain Overlay */}
-      <div className={`fixed inset-0 z-[300] bg-slate-950 transition-all duration-1000 flex items-center justify-center ${
-        isBlackout ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-      }`}>
-         <div className="text-indigo-500/10 animate-pulse"><Monitor size={300} /></div>
-      </div>
-
-      {/* Progress Bar Header */}
-      <div className="h-[12vh] px-16 flex items-center gap-12 shrink-0 border-b bg-white relative z-20">
-        <div className="h-3 flex-1 bg-slate-100 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-indigo-600 transition-all duration-1000 ease-out" 
-            style={{ width: `${((activePageIdx + 1) / (pages.length || 1)) * 100}%` }} 
-          />
-        </div>
-        <span className="text-[3.5vh] font-black text-slate-300 tabular-nums">
-          {activePageIdx + 1} <span className="opacity-30">/</span> {pages.length}
-        </span>
-      </div>
-
-      <div className="flex-1 flex overflow-hidden relative">
-        {/* Main Content Stage */}
-        <div 
-          ref={stageRef} 
-          className={`flex-1 px-16 py-12 overflow-y-auto custom-scrollbar flex flex-col items-center transition-all duration-700 ${
-            showForum ? 'mr-[450px]' : 'mr-0'
-          }`}
-        >
-          <div className="w-full max-w-7xl flex flex-col gap-12 pb-32">
-            {pages[activePageIdx]?.blocks?.map((b: any, i: number) => renderBlock(b, i))}
-          </div>
-        </div>
-
-        {/* Real-time Discussion Sidebar */}
-        <div className={`absolute top-0 right-0 h-full w-[450px] bg-slate-50 border-l border-slate-100 transition-transform duration-500 ease-in-out z-10 ${
-          showForum ? 'translate-x-0 shadow-2xl' : 'translate-x-full'
-        }`}>
-          <div className="h-full flex flex-col p-8">
-            <h3 className="text-2xl font-black text-slate-900 mb-8 flex items-center gap-3">
-              <MessageSquare className="text-indigo-600" size={28} /> CLASS CHAT
-            </h3>
-            <div className="flex-1 overflow-hidden rounded-[3rem] bg-white shadow-inner">
-               <ClassForum classId={classId} userData={userData} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Control Footer */}
-      <div className="h-[12vh] px-16 border-t flex justify-between items-center shrink-0 bg-white relative z-20">
+    <div className="h-screen w-screen bg-white fixed inset-0 z-[500] flex flex-col overflow-hidden">
+      {/* Presentation Header */}
+      <div className="h-[10vh] px-10 border-b flex items-center justify-between">
+        <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">{lesson.title}</h1>
         <div className="flex items-center gap-4">
-          <div className="w-5 h-5 bg-emerald-500 rounded-full animate-ping absolute" />
-          <div className="w-5 h-5 bg-emerald-500 rounded-full relative" />
-          <span className="font-black text-[2.2vh] text-slate-400 uppercase tracking-[0.2em] ml-2">Live Session</span>
+           <span className="text-slate-300 font-black">{activePageIdx + 1} / {pages.length}</span>
+           <button onClick={() => window.location.reload()} className="p-2 text-slate-200"><X size={20} /></button>
         </div>
-        
-        <div className="flex items-center gap-8">
-          {/* Forum Toggle */}
-          <button 
-            onClick={() => setShowForum(!showForum)}
-            className={`flex items-center gap-4 px-10 py-4 rounded-3xl font-black text-[2.2vh] transition-all duration-300 ${
-              showForum ? 'bg-indigo-600 text-white shadow-2xl scale-105' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-            }`}
-          >
-            <MessageSquare size={28} /> 
-            {showForum ? "CLOSE CHAT" : "OPEN CHAT"}
-          </button>
-          
-          <div className="h-12 w-px bg-slate-100 mx-2" />
-          
-          {/* Lesson Title (Now safely accessed via prop) */}
-          <h2 className="text-[2.8vh] font-black text-slate-900 opacity-20 uppercase tracking-widest truncate max-w-md">
-            {lesson?.title}
-          </h2>
+      </div>
 
-          {/* Emergency Back Button */}
-          <button 
-            onClick={() => window.location.reload()} // Quickest way to exit and reset state
-            className="p-4 text-slate-300 hover:text-rose-500 transition-colors"
-          >
-            <X size={32} />
-          </button>
+      {/* Presentation Stage */}
+      <div ref={stageRef} className="flex-1 overflow-y-auto p-20 flex flex-col items-center">
+        <div className="w-full max-w-5xl space-y-10">
+          {pages[activePageIdx].blocks.map((block: any, i: number) => (
+            <div key={i} className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+               {block.type === 'text' && <p className="text-[5.5vh] font-bold text-slate-800 leading-tight text-center">{block.content}</p>}
+               {block.type === 'image' && <img src={block.url} className="max-h-[60vh] mx-auto rounded-[3rem] shadow-2xl border-[12px] border-white" />}
+               {block.type === 'vocab-list' && (
+                 <div className="grid grid-cols-2 gap-6">
+                   {block.items.map((item: any, j: number) => (
+                     <div key={j} className="bg-slate-50 p-10 rounded-[2.5rem] border-4 border-slate-100 text-center">
+                       <p className="text-[4vh] font-black text-indigo-600 mb-2">{item.term}</p>
+                       <p className="text-[2.5vh] text-slate-500 font-bold">{item.definition}</p>
+                     </div>
+                   ))}
+                 </div>
+               )}
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -2131,6 +1977,7 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+      // Points to the specific sub-collection for Michael's class
       const q = query(
         collection(db, 'artifacts', appId, 'classes', classId, 'forum'),
         orderBy('timestamp', 'asc'),
@@ -2139,6 +1986,7 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
 
       return onSnapshot(q, (snap) => {
         setMessages(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        // Smooth scroll to bottom on new message
         setTimeout(() => scrollRef.current?.scrollTo({ 
           top: scrollRef.current.scrollHeight, 
           behavior: 'smooth' 
@@ -2149,6 +1997,7 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
     const handleSendMessage = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!newMessage.trim()) return;
+
       await addDoc(collection(db, 'artifacts', appId, 'classes', classId, 'forum'), {
         text: newMessage,
         senderName: userData?.name || 'Scholar',
@@ -2161,26 +2010,35 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
 
     return (
       <div className="flex flex-col h-[60vh] bg-slate-50 rounded-[2.5rem] overflow-hidden border-2 border-slate-100 shadow-inner">
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4">
+        {/* Discussion Feed */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
           {messages.length === 0 && (
-            <div className="h-full flex flex-col items-center justify-center text-slate-300 opacity-50">
-              <MessageSquare size={48} className="mb-2" />
-              <p className="font-bold italic text-center px-10">Start the conversation for {classData.name}!</p>
+            <div className="h-full flex flex-col items-center justify-center text-slate-300 opacity-50 p-10 text-center">
+              <MessageSquare size={40} className="mb-4" />
+              <p className="font-black uppercase tracking-tighter text-xs">No questions yet.</p>
+              <p className="text-[10px] font-bold mt-1 italic">Be the first to say hello to the class!</p>
             </div>
           )}
           {messages.map((msg) => (
-            <div key={msg.id} className={`flex flex-col ${msg.senderId === auth.currentUser?.uid ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2`}>
+            <div 
+              key={msg.id} 
+              className={`flex flex-col ${msg.senderId === auth.currentUser?.uid ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2`}
+            >
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mb-1 px-2">
                 {msg.senderName} {msg.role === 'instructor' && '🎓'}
               </span>
               <div className={`p-4 rounded-[1.5rem] text-sm font-medium leading-relaxed max-w-[85%] shadow-sm ${
-                msg.senderId === auth.currentUser?.uid ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'
+                msg.senderId === auth.currentUser?.uid 
+                  ? 'bg-indigo-600 text-white rounded-tr-none' 
+                  : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'
               }`}>
                 {msg.text}
               </div>
             </div>
           ))}
         </div>
+
+        {/* Input Bar */}
         <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-100 flex gap-2">
           <input 
             value={newMessage} 
@@ -2196,30 +2054,35 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
     );
   };
 
-  // --- MAIN RENDER ---
+  // --- MAIN CLASS PORTAL RENDER ---
   return (
-    <div className="h-full flex flex-col bg-white overflow-hidden">
+    <div className="h-full flex flex-col bg-white overflow-hidden animate-in fade-in duration-500">
       {/* 1. Header & Navigation */}
-      <div className="p-8 pt-12 shrink-0">
-        <button onClick={onBack} className="mb-4 flex items-center gap-2 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-black uppercase tracking-widest">
-          <ArrowLeft size={16} /> Dashboard
+      <div className="p-8 pt-12 shrink-0 bg-white">
+        <button 
+          onClick={onBack} 
+          className="mb-4 flex items-center gap-2 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-black uppercase tracking-widest"
+        >
+          <ArrowLeft size={16} /> BACK TO DASHBOARD
         </button>
-        <h2 className="text-3xl font-black text-slate-900 leading-tight mb-2">{classData.name}</h2>
-        <p className="text-slate-400 font-medium text-sm line-clamp-2">{classData.description || "Welcome to your class portal."}</p>
         
+        <h2 className="text-3xl font-black text-slate-900 leading-tight mb-2">{classData.name}</h2>
+        <p className="text-slate-400 font-medium text-sm line-clamp-1">{classData.description || "Welcome to Michael's Class."}</p>
+
+        {/* Tab Switcher */}
         <div className="flex gap-2 mt-8 p-1.5 bg-slate-100 rounded-[1.5rem] w-fit">
           <button 
-            onClick={() => setActiveSubTab('lessons')} 
+            onClick={() => setActiveSubTab('lessons')}
             className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all ${
-              activeSubTab === 'lessons' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+              activeSubTab === 'lessons' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'
             }`}
           >
             Lessons
           </button>
           <button 
-            onClick={() => setActiveSubTab('forum')} 
+            onClick={() => setActiveSubTab('forum')}
             className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all ${
-              activeSubTab === 'forum' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+              activeSubTab === 'forum' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'
             }`}
           >
             Discussion
@@ -2227,17 +2090,29 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
         </div>
       </div>
 
-      {/* 2. Scrollable Content Area */}
-      <div className="flex-1 overflow-y-auto px-8 pb-12">
+      {/* 2. Content Body */}
+      <div className="flex-1 overflow-y-auto px-8 pb-12 custom-scrollbar">
         {activeSubTab === 'lessons' ? (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            {(!classData.assignments || classData.assignments.length === 0) && (
+              <div className="py-20 text-center flex flex-col items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-200">
+                  <Play size={32} />
+                </div>
+                <p className="text-slate-300 italic font-bold">No assignments posted yet.</p>
+              </div>
+            )}
+            
             {classData.assignments?.map((item: any) => (
               <div 
                 key={item.id} 
-                className="group p-5 bg-white border-2 border-slate-100 rounded-[2.5rem] flex justify-between items-center hover:border-indigo-200 transition-all duration-300"
+                className="group p-5 bg-white border-2 border-slate-100 rounded-[2.5rem] flex justify-between items-center hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-50/20 transition-all duration-300"
               >
-                {/* Play Lesson (Mobile View) */}
-                <div className="flex items-center gap-4 flex-1 cursor-pointer" onClick={() => onSelectLesson(item)}>
+                {/* PART A: PLAY (Self-Paced) */}
+                <div 
+                  className="flex items-center gap-4 flex-1 cursor-pointer" 
+                  onClick={() => onSelectLesson(item)}
+                >
                   <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                     <Play size={24} fill="currentColor" />
                   </div>
@@ -2247,17 +2122,17 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
                   </div>
                 </div>
 
-                {/* Present Lesson (Big Screen View) */}
+                {/* PART B: PRESENT (Big Screen Mode) */}
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
-                    // CRITICAL: Pass the ID that points to the actual content blocks
+                    // We target the ORIGINAL ID to ensure blocks are hydrated
                     const targetId = item.originalId || item.lessonId || item.id;
                     setSelectedLessonId(targetId);
                     setActiveTab('presentation');
                   }}
                   className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-amber-100 hover:text-amber-600 transition-all flex items-center justify-center shadow-sm active:scale-90"
-                  title="Launch Presentation Mode"
+                  title="Launch Presentation"
                 >
                   <Monitor size={24} />
                 </button>
@@ -3449,25 +3324,37 @@ function App() {
 
   // --- 5. RENDER STUDENT VIEW (The Router) ---
 const renderStudentView = () => {
-    // 1. THE PRESENTATION ROUTE (The Bouncer)
+    // --- THE PRESENTATION BOUNCER ---
     if (activeTab === 'presentation') {
-      // Look for the lesson object HERE, before we even touch ClassView
-      const lessonToPresent = lessons?.find(l => 
+      // 1. We search the library for the FULL lesson object
+      const fullLesson = lessons?.find(l => 
         l && (l.id === selectedLessonId || l.originalId === selectedLessonId)
       );
 
-      // CRITICAL: If the lesson is missing OR has no content blocks, 
-      // do NOT render ClassView. Show a loader instead.
-      if (!lessonToPresent || !lessonToPresent.blocks) {
+      // 2. CRITICAL GUARD: If we haven't found the lesson yet, 
+      // OR if the lesson found doesn't have blocks (content), 
+      // we show a hard-coded black screen. This stops the "id" error.
+      if (!fullLesson || !fullLesson.blocks) {
         return (
-          <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white">
+          <div className="fixed inset-0 z-[999] bg-slate-950 flex flex-col items-center justify-center text-white">
             <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-6" />
-            <p className="font-black tracking-widest uppercase opacity-50">Hydrating Lesson Data...</p>
-            <button onClick={() => setActiveTab('home')} className="mt-8 text-[10px] text-slate-500 underline uppercase">Cancel</button>
+            <h2 className="text-xl font-black uppercase tracking-tighter">Initializing Projector...</h2>
+            <p className="text-slate-600 text-[10px] font-mono mt-4">Target ID: {selectedLessonId || 'None'}</p>
+            <button onClick={() => setActiveTab('home')} className="mt-10 px-6 py-2 bg-slate-800 rounded-full text-[10px] font-black uppercase">Cancel</button>
           </div>
         );
       }
 
+      // 3. We ONLY render ClassView if the data is 100% verified.
+      // We pass the WHOLE lesson object as a prop named 'lesson'
+      return (
+        <ClassView 
+          lesson={fullLesson} 
+          classId={activeStudentClass?.id} 
+          userData={userData} 
+        />
+      );
+    }
       // If we made it here, lessonToPresent is GUARANTEED to have data.
       return (
     <ClassView 
