@@ -3857,18 +3857,17 @@ function App() {
   const [activeTab, setActiveTab] = useState('home');
   
   // --- 2. DATA REPOSITORIES ---
-  const [systemLessons] = useState([]); // Static fallback if needed
+  const [systemLessons] = useState([]); 
   const [customLessons, setCustomLessons] = useState<any[]>([]);
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [allDecks, setAllDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
   
-  // --- 3. UI NAVIGATION STATE ---
-  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
+  // --- 3. UI NAVIGATION STATE (Student Routing) ---
+  const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
   const [activeLesson, setActiveLesson] = useState<any>(null);
 
   // --- 4. DATA CONSOLIDATION (The Unit Engine) ---
   const lessons = useMemo(() => {
-    // Merges all instructor custom lessons with active student assignments
     const assignments = enrolledClasses.flatMap(c => c.assignments || []);
     return [...systemLessons, ...customLessons, ...assignments];
   }, [systemLessons, customLessons, enrolledClasses]);
@@ -3884,7 +3883,7 @@ function App() {
     });
 
     if (user?.uid) {
-      // Sync Profile & determine if "Magister Mode" is unlocked
+      // Profile & Magister Unlock
       const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
         if (snap.exists()) {
           const data = snap.data();
@@ -3894,7 +3893,7 @@ function App() {
         setAuthChecked(true);
       });
 
-      // Sync custom studio content
+      // Instructor Studio Content
       const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => {
         setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
@@ -3904,7 +3903,7 @@ function App() {
         setAllDecks((prev: any) => ({ ...prev, custom: { ...prev.custom, cards } }));
       });
 
-      // Sync cohorts based on email
+      // Cohort Enrollment Sync
       const qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
       const unsubClasses = onSnapshot(qClasses, (snap) => {
         setEnrolledClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -3915,7 +3914,7 @@ function App() {
     return () => unsubAuth();
   }, [user?.uid, user?.email]);
 
-  // --- 6. MAGISTER DATABASE HANDLERS (The Prop Source) ---
+  // --- 6. MAGISTER DATABASE HANDLERS (TS-Error Free) ---
   
   const handleCreateClass = async (className: string) => {
     if (!user) return { success: false };
@@ -4008,7 +4007,7 @@ function App() {
 
   if (!user) return <AuthView />;
 
-  // --- MAGISTER MODE STAGE ---
+  // --- STAGE A: MAGISTER COMMAND CENTER ---
   if (viewMode === 'instructor' && userData?.role === 'instructor') {
     return (
       <InstructorDashboard 
@@ -4018,7 +4017,6 @@ function App() {
         lessons={lessons} 
         onSaveLesson={handleSaveLesson} 
         onSaveCard={handleSaveCard}
-        // PERFECT PROP RELAY MAPPING
         onAssign={handleAssign}
         onRevoke={handleRevoke}
         onCreateClass={handleCreateClass}
@@ -4031,7 +4029,7 @@ function App() {
     );
   }
 
-  // --- STUDENT MODE STAGE ---
+  // --- STAGE B: STUDENT EXPERIENCE ---
   return (
     <div className="bg-slate-50 min-h-screen w-full flex flex-col items-center relative font-sans overflow-hidden">
       
@@ -4046,28 +4044,40 @@ function App() {
       )}
 
       {/* Mobile-Optimized Student Viewport */}
-      <div className={`w-full transition-all duration-700 bg-white relative overflow-hidden flex flex-col ${
-        activeTab === 'presentation' ? 'h-screen w-screen fixed inset-0 z-50' : 'max-w-md h-[100dvh] shadow-2xl'
-      }`}>
+      <div className="w-full transition-all duration-700 bg-white relative overflow-hidden flex flex-col max-w-md h-[100dvh] shadow-2xl">
+        
         <div className="flex-1 h-full overflow-hidden relative">
-          {activeTab === 'presentation' ? (
-            <ClassView lesson={lessons.find(l => l.id === selectedLessonId)} userData={userData} />
-          ) : activeLesson ? (
-            <LessonView lesson={activeLesson} onFinish={() => setActiveLesson(null)} isInstructor={userData?.role === 'instructor'} />
+          {/* STUDENT ROUTER STACK 
+            1. Taking a Lesson (Highest Priority)
+            2. Viewing a Class (Middle Priority)
+            3. Home Dashboard (Base Priority)
+          */}
+          {activeLesson ? (
+            <LessonView 
+              lesson={activeLesson} 
+              onFinish={() => setActiveLesson(null)} 
+              isInstructor={userData?.role === 'instructor'} 
+            />
+          ) : activeStudentClass ? (
+            <ClassView 
+              classData={activeStudentClass} 
+              onBack={() => setActiveStudentClass(null)} 
+              setActiveLesson={setActiveLesson}
+              userData={userData}
+            />
           ) : (
             <HomeView 
               setActiveTab={setActiveTab} 
               classes={enrolledClasses} 
+              onSelectClass={setActiveStudentClass} // RESTORED: Passes class tap up to App state
               userData={userData} 
               user={user} 
-              setSelectedLessonId={setSelectedLessonId}
-              setActiveLesson={setActiveLesson}
             />
           )}
         </div>
         
-        {/* Hide Nav during deep focus modes */}
-        {(!activeLesson && activeTab !== 'presentation') && (
+        {/* Hide Nav during deep focus modes (Lesson or Class View) */}
+        {(!activeLesson && !activeStudentClass) && (
           <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
         )}
       </div>
