@@ -3235,14 +3235,15 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                         availableDecks={allDecks} 
                     />
                 )}
-                {mode === 'lesson' && (
-                    <LessonBuilderView 
-                        data={lessonData} 
-                        setData={setLessonData} 
-                        onSave={onSaveLesson} 
-                        availableDecks={allDecks} 
-                    />
-                )}
+               {mode === 'lesson' && (
+            <LessonBuilderView 
+              data={lessonData} 
+              setData={setLessonData} 
+              // THE FINAL HANDSHAKE:
+              onSave={onSaveLesson} 
+              availableDecks={allDecks} 
+            />
+          )}
                 {mode === 'exam' && (
                     <div className="p-8">
                          {/* Assuming ExamBuilderView exists or is wrapped in onSave */}
@@ -3344,9 +3345,18 @@ function InstructorDashboard({ user, userData, lessons,onSaveCard,     // <--- A
           </div>
         )}
 
-        {activeTab === 'studio' && (
+{activeTab === 'studio' && (
           <div className="h-full overflow-hidden">
-            <BuilderHub initialMode="lesson" lessons={lessons} />
+            <BuilderHub 
+              initialMode="lesson" 
+              allDecks={allDecks}
+              lessons={lessons} 
+              // PASS THE WIRE DOWN:
+              onSaveLesson={onSaveLesson} 
+              onSaveCard={onSaveCard}
+              onUpdateCard={onUpdateCard}
+              onDeleteCard={onDeleteCard}
+            />
           </div>
         )}
 
