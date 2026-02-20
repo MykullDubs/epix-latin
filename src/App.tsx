@@ -3389,6 +3389,20 @@ function LessonBuilderView({ data, setData, onSave }: any) {
     </div>
   );
 }
+function InjectorButton({ icon, label, onClick }: any) {
+  return (
+    <button 
+      onClick={onClick} 
+      className="h-28 bg-white border-2 border-slate-50 rounded-[2.5rem] flex flex-col items-center justify-center gap-3 hover:border-indigo-600 hover:text-indigo-600 hover:shadow-xl transition-all active:scale-90 group"
+    >
+      <div className="text-slate-300 group-hover:text-indigo-600 transition-colors scale-125">
+        {icon}
+      </div>
+      <span className="text-[10px] font-black uppercase tracking-widest">
+        {label}
+      </span>
+    </button>
+  );
 function BuilderHub({ 
   onSaveCard, 
   onUpdateCard, 
