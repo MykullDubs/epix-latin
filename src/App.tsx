@@ -421,42 +421,40 @@ const ScenarioBlock = ({ block, onComplete }: any) => {
 // ============================================================================
 const FillBlankBlock = ({ block, onComplete }: any) => {
     // 1. Parse the text: "I wake up [at] 7 AM." -> ["I wake up ", "at", " 7 AM."]
-    // Even indices are text, odd indices are the answers.
     const parts = block.text ? block.text.split(/\[(.*?)\]/g) : [];
     const blankCount = Math.floor(parts.length / 2);
 
-    const [answers, setAnswers] = useState<string[]>(Array(blankCount).fill(null));
+    // FIX: Explicitly type the state to allow null values
+    const [answers, setAnswers] = useState<(string | null)[]>(Array(blankCount).fill(null));
     const [selectedWord, setSelectedWord] = useState<string | null>(null);
     const [submitted, setSubmitted] = useState(false);
     const [isCorrect, setIsCorrect] = useState(false);
 
-    // 2. Generate Word Bank (Correct words + Distractors, Shuffled)
+    // 2. Generate Word Bank
     const wordBank = useMemo(() => {
-        const correctWords = parts.filter((_, i) => i % 2 !== 0);
+        // FIX: Add explicit types to filter arguments
+        const correctWords = parts.filter((_: string, i: number) => i % 2 !== 0);
         const distractors = block.distractors || [];
         return [...correctWords, ...distractors].sort(() => 0.5 - Math.random());
     }, [block.text, block.distractors]);
 
-    // Handle tapping a blank slot
     const handleBlankClick = (index: number) => {
         if (submitted) return;
         
         const newAnswers = [...answers];
-        // If they have a word selected, drop it in
         if (selectedWord) {
             newAnswers[index] = selectedWord;
             setAnswers(newAnswers);
             setSelectedWord(null);
-        } 
-        // If they click a filled blank, remove the word back to the bank
-        else if (newAnswers[index]) {
-            newAnswers[index] = ''; // clear it
+        } else if (newAnswers[index]) {
+            newAnswers[index] = null; // Revert to null instead of empty string
             setAnswers(newAnswers);
         }
     };
 
     const checkAnswers = () => {
-        const correctWords = parts.filter((_, i) => i % 2 !== 0);
+        // FIX: Add explicit types to filter arguments
+        const correctWords = parts.filter((_: string, i: number) => i % 2 !== 0);
         const allMatch = answers.every((ans, i) => ans === correctWords[i]);
         setIsCorrect(allMatch);
         setSubmitted(true);
@@ -469,16 +467,12 @@ const FillBlankBlock = ({ block, onComplete }: any) => {
         setIsCorrect(false);
     };
 
-    // Calculate which words are still available in the bank
-    const availableWords = wordBank.filter(word => {
-        // Count how many times this word appears in the bank vs how many times used in answers
-        const totalInBank = wordBank.filter(w => w === word).length;
-        const usedInAnswers = answers.filter(a => a === word).length;
+    const availableWords = wordBank.filter((word: string) => {
+        const totalInBank = wordBank.filter((w: string) => w === word).length;
+        const usedInAnswers = answers.filter((a: string | null) => a === word).length;
         return usedInAnswers < totalInBank;
     });
 
-    // Deduplicate the display of available words so we don't show identical words unnecessarily, 
-    // unless multiple are actually needed.
     const displayBank = Array.from(new Set(availableWords));
 
     return (
@@ -523,13 +517,13 @@ const FillBlankBlock = ({ block, onComplete }: any) => {
                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">Word Bank</span>
                     <div className="flex flex-wrap gap-2">
-                        {displayBank.map((word, idx) => (
+                        {displayBank.map((word: unknown, idx: number) => (
                             <button
                                 key={idx}
-                                onClick={() => setSelectedWord(word === selectedWord ? null : word)}
+                                onClick={() => setSelectedWord(word === selectedWord ? null : word as string)}
                                 className={`px-4 py-2 rounded-xl font-bold text-sm transition-all shadow-sm active:scale-95 ${selectedWord === word ? 'bg-indigo-600 text-white shadow-md -translate-y-1' : 'bg-white border-2 border-slate-200 text-slate-600 hover:border-indigo-300'}`}
                             >
-                                {word}
+                                {word as string}
                             </button>
                         ))}
                         {displayBank.length === 0 && <span className="text-slate-400 text-sm italic">All words placed!</span>}
@@ -541,7 +535,7 @@ const FillBlankBlock = ({ block, onComplete }: any) => {
             {!submitted ? (
                 <button 
                     onClick={checkAnswers} 
-                    disabled={answers.includes(null) || answers.includes('')} 
+                    disabled={answers.includes(null)} 
                     className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold disabled:opacity-50 transition-all shadow-lg"
                 >
                     Check Answers
@@ -566,7 +560,6 @@ const FillBlankBlock = ({ block, onComplete }: any) => {
         </div>
     );
 };
-
 // 4. QUIZ BLOCK
 const QuizBlock = ({ block, onComplete }: any) => {
     const [selected, setSelected] = useState<string | null>(null);
