@@ -2033,92 +2033,163 @@ function ClassForum({ classData, user }: any) {
         </div>
     );
 }
-// ============================================================================
-//  STUDENT CLASS VIEW (Categorized Tabs)
-// ============================================================================
-// ============================================================================
-//  STUDENT CLASS VIEW (Revamped UI)
-// ============================================================================
-function StudentClassView({ 
-  classData, 
-  onBack, 
-  onSelectLesson, 
-  onSelectDeck, 
-  userData, 
-  allLessons = [], 
-  classLessons = [], 
-  setActiveTab, 
-  setSelectedLessonId 
-}: any) {
-    
-    const resolvedLessons = useMemo(() => {
-        const currentClassId = classData?.id || classData?.uid;
-        if (!currentClassId) return [];
+function StudentClassView({ classData, onBack, onSelectLesson, userData }: any) {
+  // Toggle between the list of lessons and the class discussion
+  const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'forum'>('lessons');
 
-        // 1. FILTER: Find assignments for this class
-        const matches = classLessons.filter((a: any) => {
-            const aID = String(a.classId || a.courseId || a.class || a.class_id);
-            return aID === String(currentClassId);
-        });
+  // --- INTERNAL FORUM COMPONENT ---
+  const ClassForum = ({ classId }: { classId: string }) => {
+    const [messages, setMessages] = useState<any[]>([]);
+    const [newMessage, setNewMessage] = useState("");
+    const scrollRef = useRef<HTMLDivElement>(null);
 
-        // 2. RESOLVE: Match them to content
-        return matches.map((assignment: any) => {
-            const lessonId = assignment.lessonId || assignment.id;
-            const fullLesson = allLessons.find((l: any) => String(l.id) === String(lessonId));
-            return fullLesson ? { ...fullLesson, ...assignment, resolved: true } : { ...assignment, resolved: false };
-        }).filter(Boolean);
-    }, [classData, allLessons, classLessons]);
+    useEffect(() => {
+      // Connect to the specific sub-collection for this class
+      const q = query(
+        collection(db, 'artifacts', appId, 'classes', classId, 'forum'),
+        orderBy('timestamp', 'asc'),
+        limit(100)
+      );
+
+      return onSnapshot(q, (snap) => {
+        setMessages(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        // Auto-scroll to the latest message
+        setTimeout(() => scrollRef.current?.scrollTo({ 
+          top: scrollRef.current.scrollHeight, 
+          behavior: 'smooth' 
+        }), 100);
+      });
+    }, [classId]);
+
+    const handleSendMessage = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!newMessage.trim()) return;
+
+      await addDoc(collection(db, 'artifacts', appId, 'classes', classId, 'forum'), {
+        text: newMessage,
+        senderName: userData?.name || 'Scholar',
+        senderId: auth.currentUser?.uid,
+        role: userData?.role || 'student',
+        timestamp: Date.now()
+      });
+      setNewMessage("");
+    };
 
     return (
-        <div className="h-full flex flex-col bg-slate-50">
-            <div className="bg-white px-6 pt-12 pb-6 border-b border-slate-100 shadow-sm">
-                <button onClick={onBack} className="flex items-center gap-2 text-slate-400 font-bold text-sm mb-4"><ChevronLeft size={18} /> Back</button>
-                <h1 className="text-3xl font-black text-slate-900 tracking-tight">{classData?.name}</h1>
-                <p className="text-slate-500 font-medium">{resolvedLessons.length} lessons found</p>
+      <div className="flex flex-col h-[60vh] bg-slate-50 rounded-[2.5rem] overflow-hidden border-2 border-slate-100 shadow-inner">
+        {/* Message Feed */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4">
+          {messages.length === 0 && (
+            <div className="h-full flex flex-col items-center justify-center text-slate-300 opacity-50">
+              <MessageSquare size={48} className="mb-2" />
+              <p className="font-bold italic">No messages yet...</p>
             </div>
-
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                {resolvedLessons.length > 0 ? resolvedLessons.map((lesson: any) => (
-                    <div key={lesson.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 flex items-center justify-between shadow-sm">
-                        <div className="flex-1 pr-4">
-                            <h3 className="font-bold text-slate-800 text-lg leading-tight">{lesson.title || "Untitled Lesson"}</h3>
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={() => onSelectLesson(lesson)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs">Open</button>
-                            <button onClick={() => { setSelectedLessonId(lesson.id); setActiveTab('presentation'); }} className="p-3 bg-indigo-600 text-white rounded-xl"><Monitor size={18} /></button>
-                        </div>
-                    </div>
-                )) : (
-                    <div className="space-y-4">
-                        <div className="text-center py-10 bg-white/50 border-2 border-dashed border-slate-200 rounded-[3rem]">
-                            <p className="text-slate-400 font-bold">No matches found.</p>
-                        </div>
-
-                        {/* THE TRUTH SEEKER: DIAGNOSTIC BOX */}
-                        <div className="bg-slate-900 rounded-[2rem] p-6 font-mono text-[10px] text-slate-300">
-                            <p className="text-indigo-400 font-black mb-3 text-xs">DIAGNOSTIC HUD</p>
-                            <p className="mb-2">Target Class ID: <span className="text-white">{classData?.id || 'MISSING'}</span></p>
-                            <p className="mb-4">Total Assignments in App: <span className="text-white">{classLessons.length}</span></p>
-                            
-                            {classLessons.length > 0 && (
-                                <div className="p-3 bg-black/40 rounded-xl border border-slate-800">
-                                    <p className="text-emerald-400 mb-1">First Assignment Metadata:</p>
-                                    <pre className="text-slate-500 overflow-x-auto">
-                                        {JSON.stringify({
-                                            title: classLessons[0].title,
-                                            classId: classLessons[0].classId,
-                                            courseId: classLessons[0].courseId,
-                                            class: classLessons[0].class
-                                        }, null, 2)}
-                                    </pre>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
+          )}
+          {messages.map((msg) => (
+            <div 
+              key={msg.id} 
+              className={`flex flex-col ${msg.senderId === auth.currentUser?.uid ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2`}
+            >
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mb-1 px-2">
+                {msg.senderName} {msg.role === 'instructor' && '🎓'}
+              </span>
+              <div className={`p-4 rounded-[1.5rem] text-sm font-medium leading-relaxed max-w-[85%] shadow-sm ${
+                msg.senderId === auth.currentUser?.uid 
+                  ? 'bg-indigo-600 text-white rounded-tr-none' 
+                  : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'
+              }`}>
+                {msg.text}
+              </div>
             </div>
+          ))}
         </div>
+
+        {/* Message Input */}
+        <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-100 flex gap-2">
+          <input 
+            value={newMessage} 
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder="Ask a question..."
+            className="flex-1 bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl px-5 py-3 text-sm font-medium outline-none transition-all"
+          />
+          <button type="submit" className="p-4 bg-indigo-600 text-white rounded-2xl shadow-lg active:scale-90 transition-transform">
+            <Send size={20} />
+          </button>
+        </form>
+      </div>
     );
+  };
+
+  // --- MAIN VIEW RENDER ---
+  return (
+    <div className="h-full flex flex-col bg-white overflow-hidden">
+      {/* Header Section */}
+      <div className="p-8 pt-12 shrink-0">
+        <button 
+          onClick={onBack} 
+          className="mb-4 flex items-center gap-2 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-black uppercase tracking-widest"
+        >
+          <ArrowLeft size={16} /> Dashboard
+        </button>
+        
+        <h2 className="text-3xl font-black text-slate-900 leading-tight mb-2">{classData.name}</h2>
+        <p className="text-slate-400 font-medium text-sm line-clamp-2">{classData.description || "Welcome to your class portal."}</p>
+
+        {/* Tab Switcher */}
+        <div className="flex gap-2 mt-8 p-1.5 bg-slate-100 rounded-[1.5rem] w-fit">
+          <button 
+            onClick={() => setActiveSubTab('lessons')}
+            className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all ${
+              activeSubTab === 'lessons' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            Lessons
+          </button>
+          <button 
+            onClick={() => setActiveSubTab('forum')}
+            className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all ${
+              activeSubTab === 'forum' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            Discussion
+          </button>
+        </div>
+      </div>
+
+      {/* Dynamic Content Body */}
+      <div className="flex-1 overflow-y-auto px-8 pb-12">
+        {activeSubTab === 'lessons' ? (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            {classData.assignments?.length === 0 && (
+              <p className="py-20 text-center text-slate-300 italic">No lessons assigned yet.</p>
+            )}
+            {classData.assignments?.map((item: any) => (
+              <div 
+                key={item.id} 
+                onClick={() => onSelectLesson(item)}
+                className="group p-6 bg-white border-2 border-slate-100 rounded-[2rem] flex justify-between items-center cursor-pointer hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-50/50 active:scale-95 transition-all duration-300"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                    <Play size={24} fill="currentColor" />
+                  </div>
+                  <div>
+                    <h4 className="font-black text-slate-800 text-lg leading-none mb-1">{item.title}</h4>
+                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{item.type || 'Lesson'}</span>
+                  </div>
+                </div>
+                <ChevronRight size={24} className="text-slate-200 group-hover:text-indigo-300 group-hover:translate-x-1 transition-all" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="animate-in fade-in slide-in-from-bottom-4 h-full">
+            <ClassForum classId={classData.id} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 // ============================================================================
 //  JUICY TOAST NOTIFICATION (Now supports types!)
