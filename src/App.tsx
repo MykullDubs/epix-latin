@@ -3727,75 +3727,136 @@ function ExamPlayerView({ exam, onFinish }: any) {
 
 
 function App() {
-  // --- CORE STATE ---
-  const [activeTab, setActiveTab] = useState('home');
-  const [viewMode, setViewMode] = useState<'student' | 'instructor'>('student');
+  // --- 1. CORE SYSTEM STATE ---
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'student' | 'instructor'>('student');
+  const [activeTab, setActiveTab] = useState('home');
   
-  // Data State
-  const [systemLessons, setSystemLessons] = useState<any[]>([]);
-  const [customLessons, setCustomLessons] = useState<any[]>([]);
-  const [activeLesson, setActiveLesson] = useState<any>(null);
+  // --- 2. DATA REPOSITORIES ---
+  const [systemLessons] = useState(INITIAL_SYSTEM_LESSONS); // Static assets
+  const [customLessons, setCustomLessons] = useState<any[]>([]); // User created
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
+  const [allDecks, setAllDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
+  
+  // --- 3. UI/NAVIGATION STATE ---
+  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
+  const [activeLesson, setActiveLesson] = useState<any>(null);
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
 
-  // --- DATA HYDRATION (The Handshake) ---
+  // --- 4. DATA CONSOLIDATION (The Handshake) ---
   const lessons = useMemo(() => {
-    // Combine all sources: System + User Created + Assignments from Michael
+    // Merge system content, custom creator content, and assigned class content
     const assignments = enrolledClasses.flatMap(c => c.assignments || []);
     return [...systemLessons, ...customLessons, ...assignments];
   }, [systemLessons, customLessons, enrolledClasses]);
 
-  // --- FIREBASE SYNC ---
+  // --- 5. FIREBASE SYNC ENGINE ---
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      if (!u) setAuthChecked(true);
+      if (!u) {
+        setUserData(null);
+        setAuthChecked(true);
+      }
     });
 
     if (user?.uid) {
-      // Sync Profile & Role
-      onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
+      // A. Sync User Profile & Role
+      const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
         if (snap.exists()) {
           const data = snap.data();
           setUserData(data);
-          // Auto-switch to instructor view if role matches
+          // Auto-trigger Instructor Mode for Magister users
           if (data.role === 'instructor') setViewMode('instructor');
         }
         setAuthChecked(true);
       });
 
-      // Sync Classes
+      // B. Sync Instructor's Custom Lessons
+      const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => {
+        setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+
+      // C. Sync Instructor's Custom Cards (The Scriptorium)
+      const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => {
+        const cards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setAllDecks((prev: any) => ({
+          ...prev,
+          custom: { ...prev.custom, cards: cards }
+        }));
+      });
+
+      // D. Sync Enrolled/Managed Classes
       const qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
-      onSnapshot(qClasses, (snap) => {
+      const unsubClasses = onSnapshot(qClasses, (snap) => {
         setEnrolledClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
-      // Sync Content
-      setSystemLessons(INITIAL_SYSTEM_LESSONS);
-      onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => {
-        setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      });
+      return () => { unsubAuth(); unsubProfile(); unsubLessons(); unsubCards(); unsubClasses(); };
     }
+    return () => unsubAuth();
   }, [user?.uid, user?.email]);
 
-  // --- RENDER ROUTER ---
+  // --- 6. MAGISTER ACTION HANDLERS (The Juice) ---
+  const handleSaveLesson = async (lessonData: any) => {
+    if (!user) return;
+    try {
+      const lessonId = lessonData.id || `lesson_${Date.now()}`;
+      await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', lessonId), {
+        ...lessonData,
+        id: lessonId,
+        instructorId: user.uid,
+        instructorName: user.email.split('@')[0],
+        updatedAt: Date.now()
+      });
+      console.log("Unit Archived Successfully.");
+    } catch (e) {
+      console.error("Critical Save Failure:", e);
+    }
+  };
+
+  const handleSaveCard = async (cardData: any) => {
+    if (!user) return;
+    try {
+      const cardId = `card_${Date.now()}`;
+      await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), {
+        ...cardData,
+        id: cardId,
+        owner: user.uid,
+        createdAt: Date.now()
+      });
+    } catch (e) {
+      console.error("Card sync failed:", e);
+    }
+  };
+
+  const handleUpdateCard = async (cardId: string, cardData: any) => {
+    if (!user) return;
+    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), cardData);
+  };
+
+  const handleDeleteCard = async (cardId: string) => {
+    if (!user) return;
+    await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId));
+  };
+
+  // --- 7. ROUTING LOGIC ---
   const renderStudentView = () => {
-    // 1. PRESENTATION (The Projector)
+    // Presentation Mode (Projector)
     if (activeTab === 'presentation') {
       const target = lessons.find(l => l && (l.id === selectedLessonId || l.originalId === selectedLessonId));
-      if (!target || !target.blocks) return <div className="h-screen bg-slate-900 flex items-center justify-center text-white font-black animate-pulse">HYDRATING PROJECTOR...</div>;
-      
+      if (!target || !target.blocks) return <div className="h-screen bg-slate-900 flex items-center justify-center text-white font-black animate-pulse uppercase tracking-widest">Hydrating Session...</div>;
       return <ClassView lesson={target} classId={activeStudentClass?.id} userData={userData} />;
     }
 
-    // 2. ACTIVE LESSON (The Remote)
-    if (activeLesson) return <LessonView lesson={activeLesson} onFinish={() => setActiveLesson(null)} isInstructor={userData?.role === 'instructor'} />;
+    // Interactive Mode (Remote)
+    if (activeLesson) {
+      return <LessonView lesson={activeLesson} onFinish={() => setActiveLesson(null)} isInstructor={userData?.role === 'instructor'} />;
+    }
 
-    // 3. CLASS DASHBOARD
+    // Class Dashboard
     if (activeTab === 'home' && activeStudentClass) {
       return (
         <StudentClassView 
@@ -3809,44 +3870,48 @@ function App() {
       );
     }
 
-    // 4. MAIN NAV
+    // Core Tabs
     switch (activeTab) {
       case 'profile': return <ProfileView user={user} userData={userData} />;
       default: return <HomeView setActiveTab={setActiveTab} classes={enrolledClasses} onSelectClass={setActiveStudentClass} userData={userData} user={user} />;
     }
   };
 
-  if (!authChecked) return <div className="h-screen flex items-center justify-center bg-white"><Loader className="animate-spin text-indigo-600" /></div>;
+  // --- 8. FINAL OUTPUT ---
+  if (!authChecked) return <div className="h-screen flex items-center justify-center bg-white"><div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>;
   if (!user) return <AuthView />;
 
-  // --- MASTER VIEW MODE SWITCH ---
-if (viewMode === 'instructor' && userData?.role === 'instructor') {
+  // Toggle to Instructor View
+  if (viewMode === 'instructor' && userData?.role === 'instructor') {
     return (
       <InstructorDashboard 
         user={user} 
         userData={{...userData, classes: enrolledClasses}} 
-        lessons={[...systemLessons, ...customLessons]} 
-        onSaveLesson={handleSaveLesson} // THE WIRE
-        onSaveCard={handleSaveCard}     // THE WIRE
+        allDecks={allDecks} 
+        lessons={lessons} 
+        onSaveLesson={handleSaveLesson} 
+        onSaveCard={handleSaveCard}
+        onUpdateCard={handleUpdateCard}
+        onDeleteCard={handleDeleteCard}
         onSwitchView={() => setViewMode('student')}
         onLogout={() => signOut(auth)} 
       />
     );
   }
 
+  // Toggle to Student View
   return (
     <div className="bg-slate-50 min-h-screen w-full flex justify-center items-start overflow-hidden relative">
-      {/* Floating Toggle for Instructors in Student View */}
       {userData?.role === 'instructor' && (
         <button 
           onClick={() => setViewMode('instructor')}
-          className="fixed top-6 right-6 z-[1000] bg-slate-900 text-white px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest shadow-2xl border border-white/20 active:scale-95 transition-all"
+          className="fixed top-6 right-6 z-[1000] bg-slate-900 text-white px-8 py-3 rounded-full font-black text-xs uppercase tracking-[0.2em] shadow-2xl hover:scale-105 active:scale-95 transition-all"
         >
-          🎓 Instructor Mode
+          🎓 Magister Mode
         </button>
       )}
 
-      <div className={`w-full transition-all duration-500 bg-white relative overflow-hidden flex flex-col ${
+      <div className={`w-full transition-all duration-700 bg-white relative overflow-hidden flex flex-col ${
         activeTab === 'presentation' ? 'h-screen w-screen fixed inset-0 z-[200]' : 'max-w-md h-[100dvh] shadow-2xl'
       }`}>
         <div className="flex-1 h-full overflow-hidden relative">
