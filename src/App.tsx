@@ -336,41 +336,61 @@ lessons: any[]; // Replace 'any' with your Lesson type if defined
 
 function ClassView({ lessonId, lessons, classLessons, classId, userData }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
-  const [showForum, setShowForum] = useState(false); // Toggle for sidebar
+  const [showForum, setShowForum] = useState(false);
+  const [isBlackout, setIsBlackout] = useState(false);
+  const [spotlightIdx, setSpotlightIdx] = useState<number | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
 
+  // --- 1. ROBUST DATA LOOKUP ---
   const lesson = useMemo(() => {
-    let found = lessons.find((l: any) => l.id === lessonId || l.originalId === lessonId);
-    if (!found || !found.blocks) found = classLessons?.find((l: any) => l.id === lessonId);
-    return found;
-  }, [lessonId, lessons, classLessons]);
+    if (!lessonId || !lessons) return null;
+    // Look for the lesson in the master list using either ID or OriginalID
+    return lessons.find((l: any) => 
+      (l.id === lessonId) || 
+      (l.originalId === lessonId) ||
+      (l.id === lessonId.toString())
+    );
+  }, [lessonId, lessons]);
 
+  // --- 2. SAFE PAGE GROUPING ---
   const pages = useMemo(() => {
     if (!lesson?.blocks) return [];
     const groupedPages: any[] = [];
     let currentBuffer: any[] = [];
 
     lesson.blocks.forEach((block: any) => {
+      // Split pages at interactive blocks
       if (['quiz', 'flashcard', 'scenario'].includes(block.type)) {
         if (currentBuffer.length > 0) groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
         groupedPages.push({ type: 'interact', blocks: [block] });
         currentBuffer = [];
-      } else { currentBuffer.push(block); }
+      } else { 
+        currentBuffer.push(block); 
+      }
     });
     if (currentBuffer.length > 0) groupedPages.push({ type: 'read', blocks: [...currentBuffer] });
     return groupedPages;
   }, [lesson]);
 
-  // SYNC LISTENER (Page + Scroll)
+  // --- 3. MASTER SYNC LISTENER ---
   useEffect(() => {
     const syncId = lesson?.originalId || lesson?.id;
     if (!syncId) return;
 
-    return onSnapshot(doc(db, 'live_sessions', syncId), (snap) => {
+    const unsub = onSnapshot(doc(db, 'live_sessions', syncId), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
-        if (typeof data.activePageIdx === 'number') setActivePageIdx(data.activePageIdx);
         
+        // Sync Page Index
+        if (typeof data.activePageIdx === 'number') {
+          setActivePageIdx(data.activePageIdx);
+        }
+
+        // Sync Spotlight & Blackout
+        setIsBlackout(!!data.isBlackout);
+        setSpotlightIdx(data.spotlightIdx ?? null);
+        
+        // Sync Scroll Position
         if (typeof data.scrollPercent === 'number' && stageRef.current) {
           const s = stageRef.current;
           const target = data.scrollPercent * (s.scrollHeight - s.clientHeight);
@@ -378,102 +398,160 @@ function ClassView({ lessonId, lessons, classLessons, classId, userData }: any) 
         }
       }
     });
+
+    return () => unsub();
   }, [lesson?.id, lesson?.originalId]);
 
-  if (!lesson) return <div className="h-screen flex items-center justify-center font-black text-slate-300">PREPARING STAGE...</div>;
+  // --- 4. RENDER GUARDS (The "Grey Screen" Killers) ---
+  if (!lessonId) {
+    return (
+      <div className="h-screen w-screen bg-slate-900 flex flex-col items-center justify-center text-white p-10">
+        <div className="text-indigo-500 mb-4"><Monitor size={48} /></div>
+        <p className="font-black uppercase tracking-widest opacity-50">No Lesson Selected</p>
+      </div>
+    );
+  }
 
+  if (!lesson) {
+    return (
+      <div className="h-screen w-screen bg-slate-900 flex flex-col items-center justify-center text-white p-10 text-center">
+        <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-6" />
+        <p className="font-black uppercase tracking-widest opacity-80">Searching Library...</p>
+        <p className="text-[10px] text-slate-500 mt-4 font-mono">REQ_ID: {lessonId}</p>
+      </div>
+    );
+  }
+
+  // --- 5. COMPONENT RENDERERS ---
   const renderBlock = (block: any, idx: number) => {
-    const base = "w-full flex flex-col items-center py-6";
+    const isDimmed = spotlightIdx !== null && spotlightIdx !== idx;
+    const baseClass = `transition-all duration-700 w-full ${isDimmed ? 'opacity-10 blur-md grayscale scale-95' : 'opacity-100 blur-0 grayscale-0 scale-100'}`;
+
     switch (block.type) {
       case 'text': return (
-        <div key={idx} className={base}>
-          {block.title && <h3 className="text-[3vh] font-black text-indigo-600 uppercase mb-4">{block.title}</h3>}
-          <p className="text-[5.5vh] leading-tight text-slate-800 font-bold max-w-5xl text-center">{block.content}</p>
-        </div>
-      );
-      case 'image': return (
-        <div key={idx} className={base}>
-          <img src={block.url} className="max-h-[55vh] object-contain rounded-[3rem] shadow-2xl border-[12px] border-white" alt="visual" />
-        </div>
-      );
-      case 'vocab-list': return (
-        <div key={idx} className="grid grid-cols-2 gap-6 w-full py-10">
-          {block.items.map((item: any, i: number) => (
-            <div key={i} className="bg-slate-50 p-10 rounded-[3rem] border-4 border-slate-100 flex flex-col items-center">
-              <p className="text-[4.5vh] font-black text-indigo-600 mb-1">{item.term}</p>
-              <p className="text-[2.5vh] text-slate-500 font-bold">{item.definition}</p>
-            </div>
-          ))}
+        <div key={idx} className={baseClass + " py-8 px-12"}>
+          {block.title && <h3 className="text-[3.5vh] font-black text-indigo-600 uppercase mb-6 tracking-tight">{block.title}</h3>}
+          <p className="text-[5.5vh] leading-[1.15] text-slate-800 font-bold max-w-6xl">{block.content}</p>
         </div>
       );
       case 'essay': return (
-        <div key={idx} className="w-full max-w-4xl mx-auto py-16">
-          <h1 className="text-[7vh] font-black text-slate-900 leading-tight mb-8 text-center">{block.title}</h1>
-          <div className="space-y-[4vh]">
+        <div key={idx} className={baseClass + " w-full max-w-5xl mx-auto py-16"}>
+          <h1 className="text-[8vh] font-black text-slate-900 leading-none mb-12 text-center tracking-tighter">{block.title}</h1>
+          <div className="space-y-[5vh]">
             {block.content.split('\n\n').map((para: string, pIdx: number) => (
-              <p key={pIdx} className="text-[4vh] leading-[1.6] text-slate-700 font-serif text-justify first-letter:text-[6vh] first-letter:font-black first-letter:text-indigo-600">{para.trim()}</p>
+              <p key={pIdx} className="text-[4.2vh] leading-[1.6] text-slate-700 font-serif text-justify first-letter:text-[7vh] first-letter:font-black first-letter:text-indigo-600 first-letter:mr-3">{para.trim()}</p>
             ))}
           </div>
         </div>
       );
+      case 'image': return (
+        <div key={idx} className={baseClass + " py-12 flex flex-col items-center"}>
+          <img src={block.url} className="max-h-[60vh] object-contain rounded-[4rem] shadow-2xl border-[16px] border-white" alt="visual" />
+          {block.caption && <p className="mt-6 text-[2vh] font-black text-slate-300 uppercase tracking-widest">{block.caption}</p>}
+        </div>
+      );
+      case 'vocab-list': return (
+        <div key={idx} className={baseClass + " grid grid-cols-2 gap-8 w-full py-12 px-12"}>
+          {block.items?.map((item: any, i: number) => (
+            <div key={i} className="bg-slate-50 p-12 rounded-[4rem] border-4 border-slate-100 flex flex-col items-center text-center shadow-xl">
+              <p className="text-[5.5vh] font-black text-indigo-600 mb-2 leading-none">{item.term}</p>
+              <div className="h-1.5 w-16 bg-indigo-100 rounded-full mb-6" />
+              <p className="text-[3vh] text-slate-500 font-bold leading-tight">{item.definition}</p>
+            </div>
+          ))}
+        </div>
+      );
+      case 'dialogue': return (
+        <div key={idx} className={baseClass + " w-full max-w-5xl mx-auto py-12 space-y-10"}>
+          {block.lines?.map((line: any, i: number) => {
+            const isRight = line.side === 'right';
+            return (
+              <div key={i} className={`flex items-end gap-8 ${isRight ? 'flex-row-reverse' : 'flex-row'}`}>
+                <div className={`w-24 h-24 rounded-full flex items-center justify-center shrink-0 shadow-xl border-4 border-white text-white text-3xl font-black ${isRight ? 'bg-indigo-600' : 'bg-slate-800'}`}>
+                  {line.speaker?.[0]}
+                </div>
+                <div className={`p-10 rounded-[4rem] shadow-2xl max-w-[75%] border-4 ${isRight ? 'bg-indigo-600 text-white border-indigo-500 rounded-br-none' : 'bg-white text-slate-800 border-slate-50 rounded-bl-none'}`}>
+                  <p className="text-[4.5vh] font-black leading-tight">{line.text}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
       default: return (
-        <div key={idx} className="py-20 bg-indigo-50 rounded-[4rem] w-full text-center">
-          <p className="text-[7vh] font-black text-indigo-600 uppercase">Interaction Mode</p>
-          <p className="text-[2.5vh] font-bold text-indigo-400">Please check your mobile device!</p>
+        <div key={idx} className="py-32 bg-indigo-50 rounded-[5rem] w-full text-center border-4 border-dashed border-indigo-100">
+          <Smartphone size={80} className="mx-auto text-indigo-200 mb-8" />
+          <p className="text-[8vh] font-black text-indigo-600 uppercase tracking-tighter">Interaction Mode</p>
+          <p className="text-[3vh] font-bold text-indigo-400">Activity active on your mobile device</p>
         </div>
       );
     }
   };
 
+  // --- 6. MAIN JSX ---
   return (
     <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col overflow-hidden">
       
-      {/* 1. HEADER */}
-      <div className="h-[12vh] px-16 flex items-center gap-10 shrink-0 border-b relative z-20">
-        <div className="h-2 flex-1 bg-slate-100 rounded-full overflow-hidden">
-          <div className="h-full bg-indigo-600 transition-all duration-1000" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} />
+      {/* Blackout Overlay */}
+      <div className={`fixed inset-0 z-[300] bg-slate-950 transition-all duration-1000 flex items-center justify-center ${isBlackout ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+         <div className="text-indigo-500/10 animate-pulse"><Monitor size={300} /></div>
+      </div>
+
+      {/* Presentation Header */}
+      <div className="h-[12vh] px-16 flex items-center gap-12 shrink-0 border-b bg-white relative z-20">
+        <div className="h-3 flex-1 bg-slate-100 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-indigo-600 transition-all duration-1000 ease-out" 
+            style={{ width: `${((activePageIdx + 1) / (pages.length || 1)) * 100}%` }} 
+          />
         </div>
-        <span className="text-[3vh] font-black text-slate-300">{activePageIdx + 1} / {pages.length}</span>
+        <span className="text-[3.5vh] font-black text-slate-300 tabular-nums">
+          {activePageIdx + 1} <span className="opacity-30">/</span> {pages.length}
+        </span>
       </div>
 
       <div className="flex-1 flex overflow-hidden relative">
-        {/* 2. MAIN STAGE */}
-        <div ref={stageRef} className={`flex-1 px-16 py-12 overflow-y-auto custom-scrollbar flex flex-col items-center transition-all duration-500 ${showForum ? 'mr-[400px]' : 'mr-0'}`}>
-          <div className="w-full max-w-7xl flex flex-col gap-4">
-            {pages[activePageIdx]?.blocks.map((b: any, i: number) => renderBlock(b, i))}
+        {/* Main Presentation Stage */}
+        <div 
+          ref={stageRef} 
+          className={`flex-1 px-16 py-12 overflow-y-auto custom-scrollbar flex flex-col items-center transition-all duration-700 ${showForum ? 'mr-[450px]' : 'mr-0'}`}
+        >
+          <div className="w-full max-w-7xl flex flex-col gap-12 pb-32">
+            {pages[activePageIdx]?.blocks?.map((b: any, i: number) => renderBlock(b, i))}
           </div>
         </div>
 
-        {/* 3. FORUM SIDEBAR */}
-        <div className={`absolute top-0 right-0 h-full w-[400px] bg-slate-50 border-l border-slate-100 transition-transform duration-500 z-10 ${showForum ? 'translate-x-0 shadow-2xl' : 'translate-x-full'}`}>
-          <div className="h-full flex flex-col p-6">
-            <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
-              <MessageSquare className="text-indigo-600" /> CLASS DISCUSSION
+        {/* Forum Sidebar */}
+        <div className={`absolute top-0 right-0 h-full w-[450px] bg-slate-50 border-l border-slate-100 transition-transform duration-500 ease-in-out z-10 ${showForum ? 'translate-x-0 shadow-2xl' : 'translate-x-full'}`}>
+          <div className="h-full flex flex-col p-8">
+            <h3 className="text-2xl font-black text-slate-900 mb-8 flex items-center gap-3">
+              <MessageSquare className="text-indigo-600" size={28} /> CLASS CHAT
             </h3>
-            <div className="flex-1 overflow-hidden">
-              <ClassForum classId={classId} userData={userData} />
+            <div className="flex-1 overflow-hidden rounded-[3rem] bg-white shadow-inner">
+               <ClassForum classId={classId} userData={userData} />
             </div>
           </div>
         </div>
       </div>
 
-      {/* 4. FOOTER */}
+      {/* Presentation Footer */}
       <div className="h-[12vh] px-16 border-t flex justify-between items-center shrink-0 bg-white relative z-20">
-        <div className="flex items-center gap-3">
-          <div className="w-4 h-4 bg-emerald-500 rounded-full animate-pulse" />
-          <span className="font-black text-[2vh] text-slate-400 uppercase tracking-widest">Live Presentation</span>
+        <div className="flex items-center gap-4">
+          <div className="w-5 h-5 bg-emerald-500 rounded-full animate-ping absolute" />
+          <div className="w-5 h-5 bg-emerald-500 rounded-full relative" />
+          <span className="font-black text-[2.2vh] text-slate-400 uppercase tracking-[0.2em] ml-2">Live Session</span>
         </div>
         
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-8">
           <button 
             onClick={() => setShowForum(!showForum)}
-            className={`flex items-center gap-3 px-8 py-3 rounded-2xl font-black text-[2vh] transition-all ${showForum ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400'}`}
+            className={`flex items-center gap-4 px-10 py-4 rounded-3xl font-black text-[2.2vh] transition-all duration-300 ${showForum ? 'bg-indigo-600 text-white shadow-2xl scale-105' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
           >
-            <MessageSquare size={24} /> 
-            {showForum ? "HIDE CHAT" : "SHOW CHAT"}
+            <MessageSquare size={28} /> 
+            {showForum ? "CLOSE CHAT" : "OPEN CHAT"}
           </button>
-          <div className="h-10 w-px bg-slate-100 mx-2" />
-          <h2 className="text-[2.5vh] font-black text-slate-900 opacity-20 uppercase tracking-widest">{lesson.title}</h2>
+          <div className="h-12 w-px bg-slate-100 mx-2" />
+          <h2 className="text-[2.8vh] font-black text-slate-900 opacity-20 uppercase tracking-widest truncate max-w-md">{lesson?.title}</h2>
         </div>
       </div>
     </div>
