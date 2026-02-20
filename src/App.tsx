@@ -3153,80 +3153,108 @@ function InjectorButton({ icon, label, onClick }: any) {
 }
 
 
-function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allDecks, lessons, initialMode, onClearMode }: any) {
-  const [lessonData, setLessonData] = useState({ title: '', subtitle: '', description: '', vocab: '', blocks: [] });
+function BuilderHub({ 
+  onSaveCard, 
+  onUpdateCard, 
+  onDeleteCard, 
+  onSaveLesson, 
+  allDecks, 
+  lessons, 
+  initialMode, 
+  onClearMode 
+}: any) {
+  // --- 1. SHARED STATE ---
+  // We keep lessonData here so it doesn't vanish if Michael switches to 'card' mode mid-build
+  const [lessonData, setLessonData] = useState({ 
+    title: '', 
+    subtitle: '', 
+    description: '', 
+    vocab: '', 
+    blocks: [] 
+  });
+  
   const [mode, setMode] = useState<'card' | 'lesson' | 'exam'>(initialMode || 'card'); 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  // Auto-switch mode if initialMode is provided (e.g., from a quick-action button)
-  useEffect(() => { if (initialMode) setMode(initialMode); }, [initialMode]);
+  // Sync mode if changed by a parent quick-action
+  useEffect(() => { 
+    if (initialMode) setMode(initialMode); 
+  }, [initialMode]);
 
+  // --- 2. RELAY HANDLERS ---
   const handleSaveExam = (examData: any) => {
-      onSaveLesson(examData); 
-      setToastMsg("Assessment Exported to Library!");
+      // Exams are saved using the same lesson infrastructure
+      if (typeof onSaveLesson === 'function') {
+        onSaveLesson(examData); 
+        setToastMsg("Assessment Exported to Library!");
+      }
   };
 
-  // Config for the "Juice"
+  // --- 3. UI CONFIG (THE JUICE) ---
   const modes = [
-    { id: 'card', label: 'Scriptorium', sub: 'Card Architect', icon: <Layers size={18}/>, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-    { id: 'lesson', label: 'Curriculum', sub: 'Unit Designer', icon: <BookOpen size={18}/>, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { id: 'exam', label: 'Assessment', sub: 'Exam Builder', icon: <FileText size={18}/>, color: 'text-rose-600', bg: 'bg-rose-50' }
+    { id: 'card', label: 'Scriptorium', sub: 'Card Architect', icon: <Layers size={20}/>, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100' },
+    { id: 'lesson', label: 'Curriculum', sub: 'Unit Designer', icon: <BookOpen size={20}/>, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+    { id: 'exam', label: 'Assessment', sub: 'Exam Builder', icon: <FileText size={20}/>, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100' }
   ];
 
   const activeMode = modes.find(m => m.id === mode) || modes[0];
 
   return ( 
-    <div className="h-full bg-slate-50 flex flex-col overflow-hidden font-sans">
+    <div className="h-full bg-slate-50 flex flex-col overflow-hidden font-sans relative">
         {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
         
-        {/* --- 1. THE CINEMATIC HEADER --- */}
-        <div className="bg-white px-8 pt-10 pb-6 border-b border-slate-200 shrink-0 relative overflow-hidden">
-            {/* Background Accent Blur */}
-            <div className={`absolute -right-20 -top-20 w-64 h-64 rounded-full blur-[100px] opacity-20 transition-colors duration-700 ${activeMode.bg}`} />
+        {/* --- CINEMATIC STUDIO HEADER --- */}
+        <div className="bg-white px-10 pt-12 pb-8 border-b border-slate-200 shrink-0 relative overflow-hidden">
+            {/* Dynamic Ambient Glow */}
+            <div className={`absolute -right-20 -top-20 w-80 h-80 rounded-full blur-[120px] opacity-30 transition-colors duration-1000 ${activeMode.bg}`} />
             
             <div className="flex justify-between items-end relative z-10">
-                <div className="animate-in slide-in-from-left-4 duration-500">
-                    <div className="flex items-center gap-3 mb-1">
-                        <div className={`p-2 rounded-xl ${activeMode.bg} ${activeMode.color} shadow-sm`}>
+                <div className="animate-in slide-in-from-left-6 duration-700">
+                    <div className="flex items-center gap-4 mb-2">
+                        <div className={`p-3 rounded-2xl ${activeMode.bg} ${activeMode.color} shadow-sm border ${activeMode.border} animate-in zoom-in duration-500`}>
                             {activeMode.icon}
                         </div>
-                        <h2 className="text-sm font-black text-slate-400 uppercase tracking-[0.3em]">{activeMode.label}</h2>
+                        <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em]">{activeMode.label}</h2>
                     </div>
-                    <h1 className="text-4xl font-black text-slate-900 tracking-tighter">{activeMode.sub}</h1>
+                    <h1 className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{activeMode.sub}</h1>
                 </div>
 
                 {initialMode && (
                   <button 
                     onClick={onClearMode} 
-                    className="p-3 bg-slate-100 text-slate-400 rounded-2xl hover:bg-rose-50 hover:text-rose-500 transition-all active:scale-90"
+                    className="p-4 bg-slate-50 text-slate-400 rounded-[1.5rem] hover:bg-rose-50 hover:text-rose-500 transition-all active:scale-90 border border-slate-100"
                   >
-                    <X size={20} strokeWidth={3} />
+                    <X size={24} strokeWidth={3} />
                   </button>
                 )}
             </div>
 
-            {/* --- 2. THE PRO TOGGLE --- */}
-            <div className="mt-8 flex bg-slate-100 p-1.5 rounded-[2rem] w-fit border border-slate-200 shadow-inner">
+            {/* --- PRO TAB TOGGLE --- */}
+            <div className="mt-10 flex bg-slate-100/80 p-1.5 rounded-[2.5rem] w-fit border border-slate-200/50 shadow-inner backdrop-blur-sm">
                 {modes.map((m) => (
                     <button 
                         key={m.id}
                         onClick={() => setMode(m.id as any)} 
-                        className={`flex items-center gap-2 px-8 py-3 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all duration-300 ${
+                        className={`flex items-center gap-3 px-10 py-4 rounded-[2rem] text-[11px] font-black uppercase tracking-widest transition-all duration-500 ${
                             mode === m.id 
-                                ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 scale-105' 
-                                : 'text-slate-400 hover:text-slate-600'
+                                ? 'bg-white text-slate-900 shadow-2xl shadow-slate-300/50 scale-[1.05] z-10' 
+                                : 'text-slate-400 hover:text-slate-600 hover:bg-white/50'
                         }`}
                     >
-                        {m.id === mode && <span className={`${m.color} animate-in zoom-in`}>{m.icon}</span>}
+                        {m.id === mode && (
+                           <span className={`${m.color} animate-in zoom-in duration-300`}>
+                             {React.cloneElement(m.icon as React.ReactElement, { size: 16 })}
+                           </span>
+                        )}
                         {m.id}
                     </button>
                 ))}
             </div>
         </div>
 
-        {/* --- 3. THE BUILDER CANVAS --- */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar relative">
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+        {/* --- THE BUILDER CANVAS --- */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar bg-white/50 relative">
+            <div className="h-full animate-in fade-in slide-in-from-bottom-6 duration-1000">
                 {mode === 'card' && (
                     <CardBuilderView 
                         onSaveCard={onSaveCard} 
@@ -3235,29 +3263,31 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
                         availableDecks={allDecks} 
                     />
                 )}
-               {mode === 'lesson' && (
-            <LessonBuilderView 
-              data={lessonData} 
-              setData={setLessonData} 
-              // THE FINAL HANDSHAKE:
-              onSave={onSaveLesson} 
-              availableDecks={allDecks} 
-            />
-          )}
+                
+                {mode === 'lesson' && (
+                    <LessonBuilderView 
+                        data={lessonData} 
+                        setData={setLessonData} 
+                        onSave={onSaveLesson} // THE CRITICAL RELAY: Corrects the "n is not a function" error
+                        availableDecks={allDecks} 
+                    />
+                )}
+                
                 {mode === 'exam' && (
-                    <div className="p-8">
-                         {/* Assuming ExamBuilderView exists or is wrapped in onSave */}
-                        <ExamBuilderView onSave={handleSaveExam} />
+                    <div className="p-12 max-w-5xl mx-auto">
+                        <div className="bg-white rounded-[3rem] border-2 border-slate-100 p-12 shadow-sm">
+                            <ExamBuilderView onSave={handleSaveExam} />
+                        </div>
                     </div>
                 )}
             </div>
 
-            {/* Contextual Tips Footer */}
-            <div className="p-10 text-center">
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900/5 rounded-full">
-                    <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse" />
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        {mode === 'lesson' ? 'Pro Tip: Use double breaks for cinematic paragraphs' : 'Pro Tip: Add IPA for better student pronunciation'}
+            {/* Floating Pro-Tip Bar */}
+            <div className="sticky bottom-10 left-0 right-0 flex justify-center pointer-events-none pb-10">
+                <div className="px-6 py-3 bg-slate-900 text-white rounded-full shadow-2xl flex items-center gap-3 animate-bounce pointer-events-auto">
+                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" />
+                    <p className="text-[10px] font-black uppercase tracking-widest">
+                        {mode === 'lesson' ? 'Projector Preview active in Unit Designer' : 'Linguistic X-Ray active in Scriptorium'}
                     </p>
                 </div>
             </div>
@@ -3266,111 +3296,168 @@ function BuilderHub({ onSaveCard, onUpdateCard, onDeleteCard, onSaveLesson, allD
   );
 }
 
-function InstructorDashboard({ user, userData, lessons,onSaveCard,     // <--- Add these
+function InstructorDashboard({ 
+  user, 
+  userData, 
+  allDecks, 
+  lessons, 
+  onSaveCard, 
   onUpdateCard, 
-  onDeleteCard,
-  onSaveLesson, onSwitchView, onLogout }: any) {
+  onDeleteCard, 
+  onSaveLesson, 
+  onSwitchView, 
+  onLogout 
+}: any) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [toast, setToast] = useState<{msg: string, type: string} | null>(null);
 
-  // Helper for Sidebar links
-  const NavLink = ({ id, icon, label }: any) => (
+  // --- INTERNAL HELPER: SIDEBAR LINKS ---
+  const NavLink = ({ id, icon, label }: { id: string, icon: React.ReactNode, label: string }) => (
     <button 
       onClick={() => setActiveTab(id)}
-      className={`w-full px-4 py-4 rounded-2xl flex items-center gap-4 transition-all font-black text-xs uppercase tracking-widest ${
+      className={`w-full px-4 py-4 rounded-2xl flex items-center gap-4 transition-all duration-300 font-black text-[11px] uppercase tracking-[0.2em] ${
         activeTab === id 
-          ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-900/40' 
-          : 'text-slate-500 hover:bg-slate-800 hover:text-white'
+          ? 'bg-indigo-600 text-white shadow-2xl shadow-indigo-900/40 scale-[1.02]' 
+          : 'text-slate-500 hover:bg-slate-800 hover:text-slate-200'
       }`}
     >
-      {icon} {label}
+      <span className={activeTab === id ? 'text-white' : 'text-slate-600'}>{icon}</span>
+      {label}
     </button>
   );
 
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden font-sans">
-      {toast && <JuicyToast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+      {/* 1. JUICY NOTIFICATIONS */}
+      {toast && (
+        <JuicyToast 
+          message={toast.msg} 
+          type={toast.type} 
+          onClose={() => setToast(null)} 
+        />
+      )}
       
-      {/* 1. SIDEBAR */}
+      {/* 2. THE MAGISTER SIDEBAR */}
       <div className="w-80 bg-slate-900 text-white flex flex-col shrink-0 border-r border-slate-800 shadow-2xl z-20">
+        {/* Branding Area */}
         <div className="p-10 border-b border-slate-800 flex flex-col items-center">
-          <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white mb-6 shadow-2xl shadow-indigo-500/20">
-            <GraduationCap size={48} />
+          <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-[2.2rem] flex items-center justify-center text-white mb-6 shadow-2xl shadow-indigo-500/20 animate-in zoom-in duration-500">
+            <GraduationCap size={44} strokeWidth={2.5} />
           </div>
-          <h1 className="text-2xl font-black uppercase tracking-tighter">Magister</h1>
-          <p className="text-[10px] font-black text-slate-500 tracking-[0.4em] mt-2">Instructional Suite</p>
+          <h1 className="text-2xl font-black uppercase tracking-tighter italic">Magister</h1>
+          <div className="h-1 w-8 bg-indigo-500 rounded-full mt-2 opacity-50" />
         </div>
 
-        <nav className="flex-1 p-6 space-y-3">
-          <NavLink id="dashboard" icon={<Activity size={20}/>} label="Live Activity" />
+        {/* Navigation Links */}
+        <nav className="flex-1 p-6 space-y-3 overflow-y-auto custom-scrollbar">
+          <p className="text-[9px] font-black text-slate-600 uppercase tracking-[0.4em] px-4 mb-4">Command</p>
+          <NavLink id="dashboard" icon={<Activity size={20}/>} label="Live Feed" />
           <NavLink id="classes" icon={<School size={20}/>} label="Class Manager" />
           <NavLink id="studio" icon={<PenTool size={20}/>} label="Lesson Studio" />
           <NavLink id="inbox" icon={<Inbox size={20}/>} label="Grading Inbox" />
           <NavLink id="analytics" icon={<BarChart2 size={20}/>} label="Analytics" />
         </nav>
 
+        {/* Utility Footer */}
         <div className="p-6 border-t border-slate-800 space-y-4">
           <button 
             onClick={onSwitchView}
-            className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all"
+            className="w-full py-4 bg-slate-800 hover:bg-indigo-600/20 text-indigo-400 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-3 border border-indigo-500/10"
           >
-            Switch to Student View
+            <User size={16} /> 
+            <span>Switch to Student View</span>
           </button>
+          
           <button 
             onClick={onLogout}
-            className="w-full py-4 bg-rose-900/20 text-rose-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-900/40 transition-all"
+            className="w-full py-4 bg-rose-900/10 text-rose-500 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center gap-3"
           >
-            Logout Session
+            <LogOut size={16} /> 
+            <span>End Session</span>
           </button>
         </div>
       </div>
 
-      {/* 2. DYNAMIC CONTENT AREA */}
+      {/* 3. DYNAMIC CONTENT AREA */}
       <div className="flex-1 overflow-hidden relative bg-slate-50">
+        
+        {/* DASHBOARD: LIVE ACTIVITY */}
         {activeTab === 'dashboard' && (
-          <div className="h-full flex flex-col p-10">
-            <header className="mb-10">
-              <h2 className="text-5xl font-black text-slate-900 tracking-tighter">Live Feed</h2>
-              <p className="text-slate-400 font-bold mt-2 italic">Real-time student progress across all active units.</p>
+          <div className="h-full flex flex-col p-12 animate-in fade-in slide-in-from-right-4 duration-500">
+            <header className="mb-10 flex justify-between items-end">
+              <div>
+                <h2 className="text-5xl font-black text-slate-900 tracking-tighter">Live Activity</h2>
+                <p className="text-slate-400 font-bold mt-2 uppercase text-[10px] tracking-widest">
+                  Real-time synchronization across all student devices
+                </p>
+              </div>
+              <div className="flex gap-2 bg-emerald-50 text-emerald-600 px-4 py-2 rounded-full border border-emerald-100">
+                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping mt-1" />
+                <span className="text-[10px] font-black uppercase tracking-widest">System Online</span>
+              </div>
             </header>
-            <div className="flex-1 bg-white rounded-[3rem] shadow-xl border border-slate-100 overflow-hidden">
+            <div className="flex-1 bg-white rounded-[3.5rem] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
                <LiveActivityFeed />
             </div>
           </div>
         )}
 
+        {/* CLASSES: MANAGEMENT & ROSTERS */}
         {activeTab === 'classes' && (
-          <div className="h-full overflow-y-auto p-10 custom-scrollbar">
-            <ClassManagerView user={user} classes={userData?.classes || []} lessons={lessons} />
+          <div className="h-full overflow-y-auto p-12 custom-scrollbar animate-in fade-in duration-500">
+            <ClassManagerView 
+              user={user} 
+              classes={userData?.classes || []} 
+              lessons={lessons} 
+              allDecks={allDecks} 
+            />
           </div>
         )}
 
-{activeTab === 'studio' && (
-          <div className="h-full overflow-hidden">
+        {/* STUDIO: CONTENT BUILDER HUB */}
+        {activeTab === 'studio' && (
+          <div className="h-full overflow-hidden animate-in zoom-in-95 duration-500">
             <BuilderHub 
               initialMode="lesson" 
               allDecks={allDecks}
-              lessons={lessons} 
-              // PASS THE WIRE DOWN:
-              onSaveLesson={onSaveLesson} 
-              onSaveCard={onSaveCard}
-              onUpdateCard={onUpdateCard}
+              lessons={lessons}
+              onSaveLesson={onSaveLesson}  // THE RELAY POINT
+              onSaveCard={onSaveCard}      // THE RELAY POINT
+              onUpdateCard={onUpdateCard} 
               onDeleteCard={onDeleteCard}
             />
           </div>
         )}
 
+        {/* INBOX: GRADING & FEEDBACK */}
         {activeTab === 'inbox' && (
-          <div className="h-full overflow-hidden">
-            <InstructorInbox onGradeSubmission={() => {}} />
+          <div className="h-full overflow-hidden animate-in fade-in duration-500">
+            <InstructorInbox 
+              onGradeSubmission={async (logId: string, finalXP: number, feedback: string, scorePct: number) => {
+                try {
+                  const logRef = doc(db, 'artifacts', appId, 'activity_logs', logId);
+                  await updateDoc(logRef, { 
+                    'scoreDetail.status': 'graded', 
+                    'scoreDetail.finalScorePct': scorePct, 
+                    'scoreDetail.instructorFeedback': feedback, 
+                    xp: finalXP 
+                  });
+                  setToast({ msg: `Grade Released: +${finalXP} XP`, type: 'success' });
+                } catch (e) {
+                  setToast({ msg: "Error saving grade", type: 'error' });
+                }
+              }} 
+            />
           </div>
         )}
 
+        {/* ANALYTICS: STUDENT PERFORMANCE */}
         {activeTab === 'analytics' && (
-          <div className="h-full overflow-y-auto p-10">
+          <div className="h-full overflow-y-auto p-12 custom-scrollbar animate-in fade-in duration-500">
             <AnalyticsDashboard classes={userData?.classes || []} />
           </div>
         )}
+
       </div>
     </div>
   );
@@ -3733,18 +3820,14 @@ function App() {
   if (!user) return <AuthView />;
 
   // --- MASTER VIEW MODE SWITCH ---
-  if (viewMode === 'instructor' && userData?.role === 'instructor') {
+if (viewMode === 'instructor' && userData?.role === 'instructor') {
     return (
       <InstructorDashboard 
         user={user} 
         userData={{...userData, classes: enrolledClasses}} 
-        lessons={lessons} 
-        onSaveLesson={handleSaveLesson} 
-      onSaveCard={handleSaveCard}
-      onUpdateCard={handleUpdateCard}
-      onDeleteCard={handleDeleteCard}
-      onSwitchView={() => setViewMode('student')}
-      onLogout={() => signOut(auth)}
+        lessons={[...systemLessons, ...customLessons]} 
+        onSaveLesson={handleSaveLesson} // THE WIRE
+        onSaveCard={handleSaveCard}     // THE WIRE
         onSwitchView={() => setViewMode('student')}
         onLogout={() => signOut(auth)} 
       />
