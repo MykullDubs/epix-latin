@@ -3403,6 +3403,7 @@ function InjectorButton({ icon, label, onClick }: any) {
       </span>
     </button>
   );
+}
 function BuilderHub({ 
   onSaveCard, 
   onUpdateCard, 
