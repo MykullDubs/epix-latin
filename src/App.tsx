@@ -2885,92 +2885,206 @@ function LessonBuilderView({ data, setData, onSave, availableDecks }: any) {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [jsonMode, setJsonMode] = useState(false);
   const [jsonInput, setJsonInput] = useState('');
+  const [previewMode, setPreviewMode] = useState<'projector' | 'mobile'>('projector');
 
-  // Sync data to JSON input when switching to JSON mode (Export)
-  useEffect(() => {
-      if (jsonMode) {
-          setJsonInput(JSON.stringify(data, null, 2));
-      }
-  }, [jsonMode, data]);
-
-  // Handle JSON Import
-  const handleImport = () => {
-      try {
-          const parsed = JSON.parse(jsonInput);
-          // Basic validation could go here
-          setData({ ...parsed });
-          setJsonMode(false);
-          setToastMsg("JSON Imported Successfully");
-      } catch (e) {
-          alert("Invalid JSON format. Please check your syntax.");
-      }
+  // --- EDITOR LOGIC ---
+  const updateBlock = (index: number, field: string, value: any) => {
+    const newBlocks = [...(data.blocks || [])];
+    newBlocks[index] = { ...newBlocks[index], [field]: value };
+    setData({ ...data, blocks: newBlocks });
   };
 
-  // --- Visual Editor Helpers ---
-  const updateBlock = (index: number, field: string, value: any) => { const newBlocks = [...(data.blocks || [])]; newBlocks[index] = { ...newBlocks[index], [field]: value }; setData({ ...data, blocks: newBlocks }); };
-  const updateDialogueLine = (blockIndex: number, lineIndex: number, field: string, value: any) => { const newBlocks = [...(data.blocks || [])]; newBlocks[blockIndex].lines[lineIndex][field] = value; setData({ ...data, blocks: newBlocks }); };
-  const updateVocabItem = (blockIndex: number, itemIndex: number, field: string, value: any) => { const newBlocks = [...(data.blocks || [])]; newBlocks[blockIndex].items[itemIndex][field] = value; setData({ ...data, blocks: newBlocks }); };
-  const addBlock = (type: string) => { const baseBlock = type === 'dialogue' ? { type: 'dialogue', lines: [{ speaker: 'A', text: '', translation: '', side: 'left' }] } : type === 'quiz' ? { type: 'quiz', question: '', options: [{id:'a',text:''},{id:'b',text:''}], correctId: 'a' } : type === 'vocab-list' ? { type: 'vocab-list', items: [{ term: '', definition: '' }] } : type === 'flashcard' ? { type: 'flashcard', front: '', back: '' } : type === 'image' ? { type: 'image', url: '', caption: '' } : type === 'note' ? { type: 'note', title: '', content: '' } : type === 'scenario' ? { type: 'scenario', nodes: [{id: 'start', text: 'Start node...', options: []}] } : { type: 'text', title: '', content: '' }; setData({ ...data, blocks: [...(data.blocks || []), baseBlock] }); };
-  const removeBlock = (index: number) => { const newBlocks = [...(data.blocks || [])].filter((_, i) => i !== index); setData({ ...data, blocks: newBlocks }); };
-  const handleSave = () => { if (!data.title) return alert("Title required"); const processedVocab = Array.isArray(data.vocab) ? data.vocab : (typeof data.vocab === 'string' ? data.vocab.split(',').map((s: string) => s.trim()) : []); onSave({ ...data, vocab: processedVocab, xp: 100 }); setToastMsg("Lesson Saved Successfully"); };
-  
-  const deckOptions = availableDecks ? Object.entries(availableDecks).map(([key, deck]: any) => ({ id: key, title: deck.title })) : [];
+  const addBlock = (type: string) => {
+    const baseBlocks: any = {
+      text: { type: 'text', title: '', content: 'Enter your main teaching point here.' },
+      essay: { type: 'essay', title: 'Deep Read', content: 'First paragraph...\n\nSecond paragraph...' },
+      dialogue: { type: 'dialogue', lines: [{ speaker: 'A', text: '', translation: '', side: 'left' }] },
+      'vocab-list': { type: 'vocab-list', items: [{ term: '', definition: '' }] },
+      quiz: { type: 'quiz', question: '', options: [{id:'a',text:''},{id:'b',text:''}], correctId: 'a' },
+      image: { type: 'image', url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa', caption: '' }
+    };
+    setData({ ...data, blocks: [...(data.blocks || []), baseBlocks[type]] });
+  };
+
+  const removeBlock = (index: number) => {
+    const newBlocks = [...(data.blocks || [])].filter((_, i) => i !== index);
+    setData({ ...data, blocks: newBlocks });
+  };
+
+  // --- PREVIEW RENDERER (Simplified Projector View) ---
+  const PreviewScreen = () => (
+    <div className={`w-full h-full bg-white rounded-[2.5rem] shadow-inner overflow-y-auto custom-scrollbar border-8 border-slate-900 relative`}>
+      <div className="p-8 space-y-12">
+        <div className="text-center border-b pb-6 border-slate-100">
+           <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-1">{data.title || "Untitled Lesson"}</p>
+           <h1 className="text-3xl font-black text-slate-900">{data.subtitle || "Lesson Preview"}</h1>
+        </div>
+        
+        {data.blocks?.map((block: any, i: number) => (
+          <div key={i} className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+            {block.type === 'text' && (
+              <div className="text-center space-y-4">
+                <h3 className="text-indigo-600 font-black uppercase text-xs tracking-widest">{block.title}</h3>
+                <p className="text-2xl font-bold leading-tight text-slate-800">{block.content}</p>
+              </div>
+            )}
+            {block.type === 'essay' && (
+              <div className="space-y-6">
+                <h2 className="text-4xl font-black text-slate-900 text-center leading-none">{block.title}</h2>
+                <div className="space-y-4">
+                  {block.content?.split('\n\n').map((p: string, j: number) => (
+                    <p key={j} className="text-sm text-slate-600 font-serif leading-relaxed first-letter:text-xl first-letter:font-black first-letter:text-indigo-600">{p}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+            {block.type === 'dialogue' && (
+              <div className="space-y-4">
+                {block.lines?.map((l: any, j: number) => (
+                  <div key={j} className={`flex gap-2 ${l.side === 'right' ? 'flex-row-reverse' : ''}`}>
+                    <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center text-[8px] font-black text-white shrink-0">{l.speaker?.[0]}</div>
+                    <div className={`p-3 rounded-2xl text-xs font-bold ${l.side === 'right' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-800'}`}>{l.text}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {block.type === 'vocab-list' && (
+              <div className="grid grid-cols-2 gap-2">
+                {block.items?.map((item: any, j: number) => (
+                  <div key={j} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center">
+                    <p className="font-black text-indigo-600 text-sm">{item.term}</p>
+                    <p className="text-[10px] text-slate-400 font-bold">{item.definition}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {block.type === 'image' && <img src={block.url} className="rounded-3xl w-full h-40 object-cover shadow-lg" />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
-    <div className="px-6 mt-4 space-y-8 pb-20 relative">
-      {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
+    <div className="h-full flex flex-col bg-slate-50 relative overflow-hidden">
+      {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
       
-      {/* Mode Toggle */}
-      <div className="flex justify-end">
-          <button onClick={() => setJsonMode(!jsonMode)} className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100 shadow-sm hover:bg-indigo-100 transition-colors">
-              {jsonMode ? 'Switch to Visual Editor' : 'Switch to JSON Import'}
+      {/* Header Studio Controls */}
+      <div className="p-6 bg-white border-b border-slate-200 flex justify-between items-center shrink-0 shadow-sm z-30">
+        <div>
+          <h2 className="text-xl font-black text-slate-900">Content Studio</h2>
+          <p className="text-xs text-slate-400 font-medium">Build cinematic units for the big screen.</p>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={() => setJsonMode(!jsonMode)} className="px-4 py-2 text-xs font-black text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-widest border border-slate-100 rounded-xl">
+            {jsonMode ? 'Visual Editor' : 'JSON Import'}
           </button>
+          <button onClick={() => onSave({...data, xp: 100})} className="px-6 py-2 bg-indigo-600 text-white text-xs font-black rounded-xl shadow-lg shadow-indigo-100 active:scale-95 transition-all uppercase tracking-widest">
+            Save Unit
+          </button>
+        </div>
       </div>
 
-      {jsonMode ? (
-          // --- JSON MODE ---
-          <div className="animate-in fade-in slide-in-from-top-2">
-              <div className="mb-4">
-                  <h3 className="font-bold text-slate-800 text-lg mb-1">JSON Editor</h3>
-                  <p className="text-xs text-slate-500">Paste your LLM-generated lesson JSON here.</p>
+      <div className="flex-1 flex overflow-hidden">
+        {/* LEFT: Editor Pane */}
+        <div className="w-1/2 overflow-y-auto p-8 border-r border-slate-200 bg-white/50 custom-scrollbar">
+          {jsonMode ? (
+             <textarea 
+               className="w-full h-[70vh] p-6 bg-slate-900 text-emerald-400 font-mono text-xs rounded-[2rem] shadow-2xl outline-none"
+               value={JSON.stringify(data, null, 2)}
+               onChange={(e) => { try { setData(JSON.parse(e.target.value)); } catch(err) {} }}
+             />
+          ) : (
+            <div className="space-y-10 max-w-2xl mx-auto pb-32">
+              {/* Metadata Group */}
+              <div className="space-y-4">
+                <input className="text-4xl font-black border-none w-full focus:ring-0 placeholder:text-slate-200 p-0" placeholder="Unit Title..." value={data.title} onChange={e => setData({...data, title: e.target.value})} />
+                <input className="text-xl font-bold text-slate-400 border-none w-full focus:ring-0 placeholder:text-slate-100 p-0" placeholder="Subtitle (e.g. Unit 4: The Past Tense)" value={data.subtitle} onChange={e => setData({...data, subtitle: e.target.value})} />
               </div>
-              <textarea 
-                  className="w-full h-[60vh] p-4 bg-slate-900 text-emerald-400 font-mono text-xs rounded-xl shadow-inner border-2 border-slate-700 focus:border-emerald-500 outline-none resize-none leading-relaxed" 
-                  value={jsonInput} 
-                  onChange={e => setJsonInput(e.target.value)} 
-                  placeholder='{ "title": "My Lesson", "blocks": [...] }' 
-              />
-              <button onClick={handleImport} className="w-full mt-4 bg-emerald-600 hover:bg-emerald-700 text-white p-4 rounded-xl font-bold shadow-lg transition-transform active:scale-[0.98] flex items-center justify-center gap-2">
-                  <UploadCloud size={20}/> Import & Preview
-              </button>
-          </div>
-      ) : (
-          // --- VISUAL MODE ---
-          <>
-            <section className="space-y-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm"><h3 className="font-bold text-slate-800 flex items-center gap-2"><FileText size={18} className="text-indigo-600"/> Lesson Metadata</h3><input className="w-full p-3 rounded-lg border border-slate-200 font-bold" placeholder="Title" value={data.title} onChange={e => setData({...data, title: e.target.value})} /><textarea className="w-full p-3 rounded-lg border border-slate-200 text-sm" placeholder="Description" value={data.description} onChange={e => setData({...data, description: e.target.value})} /><input className="w-full p-3 rounded-lg border border-slate-200 text-sm" placeholder="Vocab (comma separated)" value={data.vocab} onChange={e => setData({...data, vocab: e.target.value})} /><div className="mt-2"><label className="text-xs font-bold text-slate-400 uppercase block mb-1">Linked Flashcard Deck</label><select className="w-full p-3 rounded-lg border border-slate-200 bg-white" value={data.relatedDeckId || ''} onChange={e => setData({...data, relatedDeckId: e.target.value})}><option value="">None (No Deck)</option>{deckOptions.map(d => (<option key={d.id} value={d.id}>{d.title}</option>))}</select></div></section>
-            
-            <div className="space-y-4">
-                <div className="flex items-center justify-between px-1"><h3 className="font-bold text-slate-800 flex items-center gap-2"><Layers size={18} className="text-indigo-600"/> Content Blocks</h3><span className="text-xs text-slate-400">{(data.blocks || []).length} Blocks</span></div>
-                
-                {(data.blocks || []).map((block: any, idx: number) => (
-                <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative group"><div className="absolute right-4 top-4 flex gap-2"><span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-2 py-1 rounded">{block.type}</span><button onClick={() => removeBlock(idx)} className="text-slate-300 hover:text-rose-500"><Trash2 size={16}/></button></div>
-                    {block.type === 'text' && (<div className="space-y-3 mt-4"><input className="w-full p-2 border-b border-slate-100 font-bold text-sm focus:outline-none" placeholder="Section Title" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} /><textarea className="w-full p-2 bg-slate-50 rounded-lg text-sm min-h-[80px]" placeholder="Content..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} /></div>)}
-                    {block.type === 'note' && (<div className="space-y-3 mt-4"><div className="flex gap-2"><Info size={18} className="text-amber-500"/><input className="flex-1 p-2 border-b border-slate-100 font-bold text-sm focus:outline-none" placeholder="Note Title (e.g. Grammar Tip)" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} /></div><textarea className="w-full p-2 bg-amber-50 border border-amber-100 rounded-lg text-sm min-h-[80px] text-amber-800" placeholder="Tip content..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} /></div>)}
-                    {block.type === 'image' && (<div className="space-y-3 mt-4"><div className="flex gap-2 items-center"><Image size={18} className="text-slate-400"/><input className="flex-1 p-2 border-b border-slate-100 text-sm" placeholder="Image URL (e.g., https://placehold.co/400x200)" value={block.url} onChange={e => updateBlock(idx, 'url', e.target.value)} /></div><input className="w-full p-2 bg-slate-50 rounded-lg text-sm" placeholder="Caption" value={block.caption} onChange={e => updateBlock(idx, 'caption', e.target.value)} /></div>)}
-                    {block.type === 'vocab-list' && (<div className="space-y-3 mt-6"><p className="text-xs font-bold text-slate-400 uppercase">Vocabulary List</p>{block.items.map((item: any, i: number) => (<div key={i} className="flex gap-2"><input className="flex-1 p-2 bg-slate-50 rounded border border-slate-100 text-sm font-bold" placeholder="Term" value={item.term} onChange={e => updateVocabItem(idx, i, 'term', e.target.value)} /><input className="flex-1 p-2 border-b border-slate-100 text-sm" placeholder="Definition" value={item.definition} onChange={e => updateVocabItem(idx, i, 'definition', e.target.value)} /></div>))}<button onClick={() => { const newItems = [...block.items, { term: '', definition: '' }]; updateBlock(idx, 'items', newItems); }} className="text-xs font-bold text-indigo-600 flex items-center gap-1"><Plus size={14}/> Add Term</button></div>)}
-                    {block.type === 'flashcard' && (<div className="space-y-3 mt-4"><div className="flex gap-2"><FlipVertical size={18} className="text-indigo-500"/><span className="text-sm font-bold text-slate-700">Embedded Flashcard</span></div><input className="w-full p-2 border rounded text-sm font-bold" placeholder="Front (Latin)" value={block.front} onChange={e => updateBlock(idx, 'front', e.target.value)} /><input className="w-full p-2 border rounded text-sm" placeholder="Back (English)" value={block.back} onChange={e => updateBlock(idx, 'back', e.target.value)} /></div>)}
-                    {block.type === 'dialogue' && (<div className="space-y-3 mt-6">{block.lines.map((line: any, lIdx: number) => (<div key={lIdx} className="flex gap-2 text-sm"><input className="w-16 p-1 bg-slate-50 rounded border border-slate-100 text-xs font-bold" placeholder="Speaker" value={line.speaker} onChange={e => updateDialogueLine(idx, lIdx, 'speaker', e.target.value)} /><div className="flex-1 space-y-1"><input className="w-full p-1 border-b border-slate-100" placeholder="Latin" value={line.text} onChange={e => updateDialogueLine(idx, lIdx, 'text', e.target.value)} /><input className="w-full p-1 text-xs text-slate-500 italic" placeholder="English" value={line.translation} onChange={e => updateDialogueLine(idx, lIdx, 'translation', e.target.value)} /></div></div>))}<button onClick={() => { const newLines = [...block.lines, { speaker: 'B', text: '', translation: '', side: 'right' }]; updateBlock(idx, 'lines', newLines); }} className="text-xs font-bold text-indigo-600 flex items-center gap-1"><Plus size={14}/> Add Line</button></div>)}
-                    {block.type === 'quiz' && (<div className="space-y-3 mt-4"><input className="w-full p-2 bg-slate-50 rounded-lg font-bold text-sm" placeholder="Question" value={block.question} onChange={e => updateBlock(idx, 'question', e.target.value)} /><div className="space-y-1"><p className="text-[10px] font-bold text-slate-400 uppercase">Options (ID, Text)</p>{block.options.map((opt: any, oIdx: number) => (<div key={oIdx} className="flex gap-2"><input className="w-8 p-1 bg-slate-50 text-center text-xs" value={opt.id} readOnly /><input className="flex-1 p-1 border-b border-slate-100 text-sm" value={opt.text} onChange={(e) => { const newOpts = [...block.options]; newOpts[oIdx].text = e.target.value; updateBlock(idx, 'options', newOpts); }} /></div>))}</div><div className="flex items-center gap-2 text-sm mt-2"><span className="text-slate-500">Correct ID:</span><input className="w-10 p-1 bg-green-50 border border-green-200 rounded text-center font-bold text-green-700" value={block.correctId} onChange={e => updateBlock(idx, 'correctId', e.target.value)} /></div></div>)}
-                    {block.type === 'scenario' && (<div className="p-4 bg-slate-50 text-slate-400 text-xs italic text-center rounded-lg border border-dashed border-slate-300">Scenario Block (JSON Edit Recommended)</div>)}
-                </div>
+
+              {/* Block List */}
+              <div className="space-y-6">
+                {data.blocks?.map((block: any, idx: number) => (
+                  <div key={idx} className="bg-white p-6 rounded-[2rem] border-2 border-slate-100 shadow-sm group relative animate-in slide-in-from-left-4 duration-300">
+                    <div className="absolute -right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => removeBlock(idx)} className="p-2 bg-rose-50 text-rose-500 rounded-full hover:bg-rose-500 hover:text-white transition-colors">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                    
+                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4 block">{block.type} Block</span>
+                    
+                    {block.type === 'text' && (
+                      <div className="space-y-4">
+                        <input className="w-full font-bold text-slate-700 bg-slate-50 px-4 py-2 rounded-xl text-sm" placeholder="Block Title" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} />
+                        <textarea className="w-full text-sm font-medium text-slate-600 bg-white border border-slate-100 rounded-xl p-4 min-h-[100px]" placeholder="Content..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
+                      </div>
+                    )}
+
+                    {block.type === 'essay' && (
+                      <div className="space-y-4">
+                        <input className="w-full font-bold text-slate-700 bg-slate-50 px-4 py-2 rounded-xl text-sm" placeholder="Essay Header" value={block.title} onChange={e => updateBlock(idx, 'title', e.target.value)} />
+                        <textarea className="w-full text-sm font-medium text-slate-600 bg-white border border-slate-100 rounded-xl p-4 min-h-[200px] font-serif" placeholder="Write paragraphs with double line breaks..." value={block.content} onChange={e => updateBlock(idx, 'content', e.target.value)} />
+                      </div>
+                    )}
+
+                    {block.type === 'vocab-list' && (
+                      <div className="space-y-4">
+                        {block.items.map((item: any, i: number) => (
+                          <div key={i} className="flex gap-2">
+                             <input className="flex-1 font-bold text-indigo-600 bg-indigo-50/50 px-3 py-2 rounded-xl text-xs" placeholder="Term" value={item.term} onChange={e => {
+                               const newItems = [...block.items]; newItems[i].term = e.target.value; updateBlock(idx, 'items', newItems);
+                             }} />
+                             <input className="flex-2 text-slate-400 bg-slate-50 px-3 py-2 rounded-xl text-xs" placeholder="Meaning" value={item.definition} onChange={e => {
+                               const newItems = [...block.items]; newItems[i].definition = e.target.value; updateBlock(idx, 'items', newItems);
+                             }} />
+                          </div>
+                        ))}
+                        <button onClick={() => updateBlock(idx, 'items', [...block.items, {term: '', definition: ''}])} className="text-[10px] font-black text-indigo-400 uppercase">+ Add Term</button>
+                      </div>
+                    )}
+                  </div>
                 ))}
+              </div>
+
+              {/* Add Block Menu */}
+              <div className="grid grid-cols-3 gap-3">
+                <StudioAddButton icon={<AlignLeft />} label="Text" onClick={() => addBlock('text')} />
+                <StudioAddButton icon={<FileText />} label="Essay" onClick={() => addBlock('essay')} />
+                <StudioAddButton icon={<MessageSquare />} label="Dialogue" onClick={() => addBlock('dialogue')} />
+                <StudioAddButton icon={<List />} label="Vocab" onClick={() => addBlock('vocab-list')} />
+                <StudioAddButton icon={<HelpCircle />} label="Quiz" onClick={() => addBlock('quiz')} />
+                <StudioAddButton icon={<Image />} label="Visual" onClick={() => addBlock('image')} />
+              </div>
             </div>
-            
-            <div className="grid grid-cols-3 gap-2"><button onClick={() => addBlock('text')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><AlignLeft size={20}/> <span className="text-[10px] font-bold">Text</span></button><button onClick={() => addBlock('dialogue')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><MessageSquare size={20}/> <span className="text-[10px] font-bold">Dialogue</span></button><button onClick={() => addBlock('quiz')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><HelpCircle size={20}/> <span className="text-[10px] font-bold">Quiz</span></button><button onClick={() => addBlock('vocab-list')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><List size={20}/> <span className="text-[10px] font-bold">Vocab List</span></button><button onClick={() => addBlock('flashcard')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><FlipVertical size={20}/> <span className="text-[10px] font-bold">Flashcard</span></button><button onClick={() => addBlock('image')} className="p-3 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50"><Image size={20}/> <span className="text-[10px] font-bold">Image</span></button></div>
-            <div className="pt-4 border-t border-slate-100"><button onClick={handleSave} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform"><Save size={20} /> Save Lesson to Library</button></div>
-          </>
-      )}
+          )}
+        </div>
+
+        {/* RIGHT: Preview Pane */}
+        <div className="w-1/2 p-12 bg-slate-100 flex flex-col items-center justify-center relative">
+          <div className="absolute top-8 left-12 flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm z-10">
+            <button onClick={() => setPreviewMode('projector')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${previewMode === 'projector' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:text-slate-600'}`}>Projector View</button>
+            <button onClick={() => setPreviewMode('mobile')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${previewMode === 'mobile' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:text-slate-600'}`}>Mobile View</button>
+          </div>
+          
+          <div className={`transition-all duration-700 ${previewMode === 'projector' ? 'w-full aspect-video scale-90' : 'w-[375px] h-[667px] scale-75'}`}>
+            <PreviewScreen />
+          </div>
+
+          <p className="mt-8 text-slate-300 font-bold text-xs uppercase tracking-[0.4em]">Live Preview Studio</p>
+        </div>
+      </div>
     </div>
+  );
+}
+
+// Sub-component for the Add buttons
+function StudioAddButton({ icon, label, onClick }: any) {
+  return (
+    <button onClick={onClick} className="flex flex-col items-center justify-center p-4 bg-white border border-slate-100 rounded-[2rem] shadow-sm hover:border-indigo-600 hover:text-indigo-600 transition-all active:scale-95 group">
+      <div className="text-slate-300 group-hover:text-indigo-500 transition-colors mb-2">{icon}</div>
+      <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
+    </button>
   );
 }
 
