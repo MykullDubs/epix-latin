@@ -3865,7 +3865,7 @@ function App() {
   // --- 3. UI NAVIGATION STATE ---
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [activeLesson, setActiveLesson] = useState<any>(null);
-  const [activeStudentClass, setActiveStudentClass] = useState<any>(null); // Passed to HomeView
+  const [activeStudentClass, setActiveStudentClass] = useState<any>(null); // Controls StudentClassView
 
   // --- 4. DATA CONSOLIDATION ---
   const lessons = useMemo(() => {
@@ -4043,19 +4043,24 @@ function App() {
           
           {/* THE FIXED ROUTING STACK */}
           {activeTab === 'presentation' ? (
-            // Presentation mode expects a 'lesson' prop.
             <ClassView lesson={lessons.find(l => l.id === selectedLessonId)} userData={userData} />
           ) : activeLesson ? (
             <LessonView lesson={activeLesson} onFinish={() => setActiveLesson(null)} isInstructor={userData?.role === 'instructor'} />
+          ) : activeStudentClass ? (
+            // RESTORED: The actual Student Dashboard for a specific class
+            <StudentClassView 
+               classData={activeStudentClass} 
+               onBack={() => setActiveStudentClass(null)} 
+               setActiveLesson={setActiveLesson}
+               userData={userData}
+            />
           ) : activeTab === 'profile' ? (
             <div className="p-10">Profile View</div>
           ) : (
-            // HomeView handles the activeStudentClass rendering internally.
             <HomeView 
               setActiveTab={setActiveTab} 
               classes={enrolledClasses} 
-              onSelectClass={setActiveStudentClass} 
-              activeStudentClass={activeStudentClass}
+              onSelectClass={setActiveStudentClass} // Tapping a class here sets activeStudentClass to true
               userData={userData} 
               user={user} 
               setSelectedLessonId={setSelectedLessonId}
@@ -4064,7 +4069,8 @@ function App() {
           )}
         </div>
         
-        {(!activeLesson && activeTab !== 'presentation') && (
+        {/* Hide Nav during deep focus modes */}
+        {(!activeLesson && !activeStudentClass && activeTab !== 'presentation') && (
           <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
         )}
       </div>
