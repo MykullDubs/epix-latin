@@ -722,19 +722,19 @@ function ClassView({ lesson, classId, userData }: any) {
   );
 }
 // ============================================================================
-//  LESSON VIEW (Modern "Story" Style - Fully Interactive)
+//  LESSON VIEW (Modern "Story" Style - Fully Interactive & Remote Synced)
 // ============================================================================
 function LessonView({ lesson, onFinish, isInstructor = true }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // --- PAGINATION LOGIC (Moved up so handleAutoAdvance can use it) ---
+  // --- PAGINATION LOGIC ---
   const pages = useMemo(() => {
     if (!lesson?.blocks) return [];
     const grouped: any[] = [];
     let buffer: any[] = [];
     lesson.blocks.forEach((b: any) => {
-      if (['quiz', 'flashcard', 'scenario'].includes(b.type)) {
+      if (['quiz', 'flashcard', 'scenario', 'fill-blank'].includes(b.type)) {
         if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
         grouped.push({ type: 'interact', blocks: [b] });
         buffer = [];
@@ -744,33 +744,59 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
     return grouped;
   }, [lesson]);
 
-  // --- AUTO-ADVANCE HANDLER ---
-  const handleAutoAdvance = () => {
-      if (activePageIdx < pages.length - 1) {
-          setActivePageIdx(activePageIdx + 1);
-          containerRef.current?.scrollTo(0,0);
-      } else {
-          onFinish();
-      }
-  };
+  // --- THE SYNC ENGINE (Fixes the Remote) ---
+  // Sends page changes to the Projector
+  const syncToProjector = useCallback((newIdx: number) => {
+    if (!isInstructor) return;
+    const syncId = lesson.originalId || lesson.id;
+    // We use setDoc with { merge: true } to guarantee the room is created if it doesn't exist
+    setDoc(doc(db, 'live_sessions', syncId), {
+      activePageIdx: newIdx,
+      lastUpdate: Date.now()
+    }, { merge: true }).catch(console.error);
+  }, [lesson, isInstructor]);
 
-  // --- SCROLL SYNC (Michael's Remote Control) ---
+  // Initialize sync when the lesson opens
+  useEffect(() => {
+    if (isInstructor) syncToProjector(0);
+  }, [isInstructor, syncToProjector]);
+
+  // Sends scroll position to the Projector
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !isInstructor) return;
     const handleScroll = () => {
       const scrollPercent = container.scrollTop / (container.scrollHeight - container.clientHeight);
       const syncId = lesson.originalId || lesson.id;
-      updateDoc(doc(db, 'live_sessions', syncId), {
+      setDoc(doc(db, 'live_sessions', syncId), {
         scrollPercent: scrollPercent || 0,
         lastUpdate: Date.now()
-      }).catch(e => {});
+      }, { merge: true }).catch(e => {});
     };
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => container.removeEventListener('scroll', handleScroll);
   }, [lesson, isInstructor]);
 
-  // --- BLOCK RENDERER (The Enchilada) ---
+  // --- NAVIGATION HANDLERS ---
+  const handlePrev = () => {
+      const newIdx = Math.max(0, activePageIdx - 1);
+      setActivePageIdx(newIdx);
+      syncToProjector(newIdx); // FIREBASE SYNC
+      containerRef.current?.scrollTo(0,0);
+  };
+
+  const handleNext = () => {
+      if (activePageIdx < pages.length - 1) {
+          const newIdx = activePageIdx + 1;
+          setActivePageIdx(newIdx);
+          syncToProjector(newIdx); // FIREBASE SYNC
+          containerRef.current?.scrollTo(0,0);
+      } else {
+          onFinish();
+      }
+  };
+
+  // --- BLOCK RENDERER ---
   const renderBlock = (block: any, idx: number) => {
     switch (block.type) {
       case 'text':
@@ -782,9 +808,6 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
             </p>
           </div>
         );
-        
-case 'fill-blank':
-        return <FillBlankBlock key={idx} block={block} onComplete={handleAutoAdvance} />;
 
       case 'essay':
         return (
@@ -839,7 +862,6 @@ case 'fill-blank':
           </div>
         );
 
-      // --- NEW: Renders Visuals ---
       case 'image':
         return (
           <div key={idx} className="py-6 animate-in fade-in">
@@ -850,13 +872,14 @@ case 'fill-blank':
           </div>
         );
 
-      // --- FIXED: Uses your stateful Quiz component ---
       case 'quiz':
-        return <QuizBlock key={idx} block={block} onComplete={handleAutoAdvance} />;
+        return <QuizBlock key={idx} block={block} onComplete={handleNext} />;
 
-      // --- FIXED: Uses your stateful Scenario component ---
       case 'scenario':
-        return <ScenarioBlock key={idx} block={block} onComplete={handleAutoAdvance} />;
+        return <ScenarioBlock key={idx} block={block} onComplete={handleNext} />;
+
+      case 'fill-blank':
+        return <FillBlankBlock key={idx} block={block} onComplete={handleNext} />;
 
       default:
         return <div key={idx} className="p-8 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-100 text-center text-xs text-slate-400 font-bold uppercase tracking-widest">Unsupported Module: {block.type}</div>;
@@ -891,7 +914,7 @@ case 'fill-blank':
       {/* Navigation Dock */}
       <div className="p-8 pb-10 bg-white/80 backdrop-blur-xl border-t border-slate-100 flex justify-between items-center fixed bottom-0 left-0 right-0 z-50">
         <button 
-          onClick={() => { setActivePageIdx(Math.max(0, activePageIdx - 1)); containerRef.current?.scrollTo(0,0); }}
+          onClick={handlePrev}
           className="p-5 bg-slate-100 text-slate-400 rounded-3xl disabled:opacity-20 active:scale-90 transition-all shadow-sm"
           disabled={activePageIdx === 0}
         >
@@ -905,7 +928,7 @@ case 'fill-blank':
 
         {activePageIdx < pages.length - 1 ? (
           <button 
-            onClick={handleAutoAdvance} 
+            onClick={handleNext} 
             className="p-5 bg-indigo-600 text-white rounded-3xl shadow-xl shadow-indigo-200 active:scale-90 transition-all"
           >
             <ArrowRight size={24} strokeWidth={3} />
