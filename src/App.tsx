@@ -860,7 +860,8 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
     const grouped: any[] = [];
     let buffer: any[] = [];
     lesson.blocks.forEach((b: any) => {
-      if (['quiz', 'flashcard', 'scenario', 'fill-blank'].includes(b.type)) {
+      // ADDED 'discussion' HERE so it gets its own dedicated slide!
+      if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion'].includes(b.type)) {
         if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
         grouped.push({ type: 'interact', blocks: [b] });
         buffer = [];
@@ -870,24 +871,20 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
     return grouped;
   }, [lesson]);
 
-  // --- THE SYNC ENGINE (Fixes the Remote) ---
-  // Sends page changes to the Projector
+  // --- THE SYNC ENGINE ---
   const syncToProjector = useCallback((newIdx: number) => {
     if (!isInstructor) return;
     const syncId = lesson.originalId || lesson.id;
-    // We use setDoc with { merge: true } to guarantee the room is created if it doesn't exist
     setDoc(doc(db, 'live_sessions', syncId), {
       activePageIdx: newIdx,
       lastUpdate: Date.now()
     }, { merge: true }).catch(console.error);
   }, [lesson, isInstructor]);
 
-  // Initialize sync when the lesson opens
   useEffect(() => {
     if (isInstructor) syncToProjector(0);
   }, [isInstructor, syncToProjector]);
 
-  // Sends scroll position to the Projector
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !isInstructor) return;
@@ -907,7 +904,7 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
   const handlePrev = () => {
       const newIdx = Math.max(0, activePageIdx - 1);
       setActivePageIdx(newIdx);
-      syncToProjector(newIdx); // FIREBASE SYNC
+      syncToProjector(newIdx);
       containerRef.current?.scrollTo(0,0);
   };
 
@@ -915,7 +912,7 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
       if (activePageIdx < pages.length - 1) {
           const newIdx = activePageIdx + 1;
           setActivePageIdx(newIdx);
-          syncToProjector(newIdx); // FIREBASE SYNC
+          syncToProjector(newIdx); 
           containerRef.current?.scrollTo(0,0);
       } else {
           onFinish();
@@ -932,25 +929,6 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
             <p className="text-3xl font-black text-slate-900 leading-tight tracking-tighter">
               {block.content}
             </p>
-          </div>
-        );
-        case 'discussion':
-        return (
-          <div key={idx} className="py-6 animate-in fade-in">
-            <div className="bg-indigo-50 border-2 border-indigo-100 rounded-[2rem] p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 bg-indigo-600 text-white rounded-xl shadow-md"><MessageCircle size={20} /></div>
-                <h3 className="text-xl font-black text-indigo-900">{block.title || "Discussion"}</h3>
-              </div>
-              <div className="space-y-4">
-                {(block.questions || []).map((q: string, qIdx: number) => (
-                  <div key={qIdx} className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 flex gap-4">
-                     <span className="text-indigo-300 font-black text-lg">{qIdx + 1}</span>
-                     <p className="text-slate-700 font-medium leading-snug">{q}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         );
 
@@ -1014,6 +992,27 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
                 <img src={block.url} alt="Lesson visual" className="w-full h-auto object-cover max-h-64" />
              </div>
              {block.caption && <p className="text-xs font-bold text-slate-400 text-center mt-3 px-4">{block.caption}</p>}
+          </div>
+        );
+
+      // --- ADDED: THE MISSING DISCUSSION BLOCK ---
+      case 'discussion':
+        return (
+          <div key={idx} className="py-6 animate-in fade-in">
+            <div className="bg-indigo-50 border-2 border-indigo-100 rounded-[2rem] p-6 shadow-sm">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-3 bg-indigo-600 text-white rounded-xl shadow-md"><MessageCircle size={20} /></div>
+                <h3 className="text-xl font-black text-indigo-900">{block.title || "Discussion"}</h3>
+              </div>
+              <div className="space-y-4">
+                {(block.questions || []).map((q: string, qIdx: number) => (
+                  <div key={qIdx} className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 flex gap-4">
+                     <span className="text-indigo-300 font-black text-lg">{qIdx + 1}</span>
+                     <p className="text-slate-700 font-medium leading-snug">{q}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         );
 
