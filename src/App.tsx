@@ -845,26 +845,30 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
       }
   };
 
-  // --- BLOCK RENDERER ---
+ // --- BLOCK RENDERER ---
   const renderBlock = (block: any, idx: number) => {
+    // THE FIX: Combine the page index and block index. 
+    // This forces React to mount a brand new component when you change pages!
+    const blockKey = `page_${activePageIdx}_block_${idx}`;
+
     switch (block.type) {
       case 'text':
         return (
-          <div key={idx} className="py-6 text-center animate-in fade-in slide-in-from-bottom-2">
+          <div key={blockKey} className="py-6 text-center animate-in fade-in slide-in-from-bottom-2">
             {block.title && <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4">{block.title}</h3>}
             <p className="text-3xl font-black text-slate-900 leading-tight tracking-tighter">{block.content}</p>
           </div>
         );
       case 'essay':
         return (
-          <div key={idx} className="py-4 space-y-6 animate-in fade-in">
+          <div key={blockKey} className="py-4 space-y-6 animate-in fade-in">
             <h2 className="text-2xl font-black text-indigo-600 tracking-tight">{block.title}</h2>
             <div className="space-y-4">{block.content?.split('\n\n').map((p: string, j: number) => <p key={j} className="text-base text-slate-600 font-serif leading-relaxed text-justify">{p.trim()}</p>)}</div>
           </div>
         );
       case 'dialogue':
         return (
-          <div key={idx} className="py-6 space-y-6">
+          <div key={blockKey} className="py-6 space-y-6">
             {block.lines?.map((line: any, j: number) => (
               <div key={j} className={`flex items-end gap-3 ${line.side === 'right' ? 'flex-row-reverse' : ''}`}>
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black text-white shrink-0 shadow-lg ${line.side === 'right' ? 'bg-indigo-600' : 'bg-slate-800'}`}>{line.speaker?.[0].toUpperCase()}</div>
@@ -878,7 +882,7 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
         );
       case 'vocab-list':
         return (
-          <div key={idx} className="py-4 grid grid-cols-1 gap-4">
+          <div key={blockKey} className="py-4 grid grid-cols-1 gap-4">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] px-2">Essential Lexicon</h3>
             {block.items?.map((item: any, j: number) => (
               <div key={j} className="bg-white p-5 rounded-[2rem] border-2 border-slate-50 shadow-sm flex flex-col gap-1 hover:border-indigo-100 transition-colors">
@@ -890,14 +894,14 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
         );
       case 'image':
         return (
-          <div key={idx} className="py-6 animate-in fade-in">
+          <div key={blockKey} className="py-6 animate-in fade-in">
              <div className="rounded-3xl overflow-hidden shadow-lg border border-slate-100"><img src={block.url} alt="Lesson visual" className="w-full h-auto object-cover max-h-64" /></div>
              {block.caption && <p className="text-xs font-bold text-slate-400 text-center mt-3 px-4">{block.caption}</p>}
           </div>
         );
       case 'discussion':
         return (
-          <div key={idx} className="py-6 animate-in fade-in">
+          <div key={blockKey} className="py-6 animate-in fade-in">
             <div className="bg-indigo-50 border-2 border-indigo-100 rounded-[2rem] p-6 shadow-sm">
               <div className="flex items-center gap-3 mb-6"><div className="p-3 bg-indigo-600 text-white rounded-xl shadow-md"><MessageCircle size={20} /></div><h3 className="text-xl font-black text-indigo-900">{block.title || "Discussion"}</h3></div>
               <div className="space-y-4">
@@ -910,14 +914,14 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
         );
 
       case 'quiz':
-        return <QuizBlock key={idx} block={block} onComplete={handleNext} onStateChange={handleLiveInteraction} />;
+        return <QuizBlock key={blockKey} block={block} onComplete={handleNext} onStateChange={handleLiveInteraction} />;
       case 'scenario':
-        return <ScenarioBlock key={idx} block={block} onComplete={handleNext} onStateChange={handleLiveInteraction} />;
+        return <ScenarioBlock key={blockKey} block={block} onComplete={handleNext} onStateChange={handleLiveInteraction} />;
       case 'fill-blank':
-        return <FillBlankBlock key={idx} block={block} onComplete={handleNext} onStateChange={handleLiveInteraction} />;
+        return <FillBlankBlock key={blockKey} block={block} onComplete={handleNext} onStateChange={handleLiveInteraction} />;
       
       default:
-        return <div key={idx} className="p-8 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-100 text-center text-xs text-slate-400 font-bold uppercase tracking-widest">Unsupported Module: {block.type}</div>;
+        return <div key={blockKey} className="p-8 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-100 text-center text-xs text-slate-400 font-bold uppercase tracking-widest">Unsupported Module: {block.type}</div>;
     }
   };
 
