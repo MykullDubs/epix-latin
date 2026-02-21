@@ -408,15 +408,18 @@ const JuicyDeckBlock = ({ items, title }: any) => {
 };
 
 // 3. SCENARIO BLOCK (Branching)
-const ScenarioBlock = ({ block, onComplete }: any) => {
+const ScenarioBlock = ({ block, onComplete, onStateChange }: any) => {
     const [currentNodeId, setCurrentNodeId] = useState(block?.nodes?.[0]?.id);
     const [history, setHistory] = useState<string[]>([]);
     
-    // Safety check if nodes are missing
-    if (!block?.nodes || block.nodes.length === 0) return <div className="p-4 bg-red-50 text-red-500">Error: Invalid Scenario Data</div>;
+    // Broadcast state to projector
+    useEffect(() => {
+        if (onStateChange) onStateChange({ currentNodeId });
+    }, [currentNodeId, onStateChange]);
 
+    if (!block?.nodes || block.nodes.length === 0) return <div className="p-4 bg-red-50 text-red-500">Error: Invalid Scenario</div>;
     const currentNode = block.nodes.find((n:any) => n.id === currentNodeId);
-    if (!currentNode) return <div className="p-4 bg-red-50 text-red-500">Error: Broken Scenario Link</div>;
+    if (!currentNode) return <div className="p-4 bg-red-50 text-red-500">Error: Broken Link</div>;
 
     const isEnd = !currentNode.options || currentNode.options.length === 0 || currentNode.options[0].nextNodeId === 'end';
     const bgColors: any = { neutral: 'bg-slate-900', success: 'bg-emerald-900', failure: 'bg-rose-900', critical: 'bg-amber-900' };
@@ -431,155 +434,18 @@ const ScenarioBlock = ({ block, onComplete }: any) => {
         </div>
     );
 };
-// ============================================================================
-//  FILL-IN-THE-BLANK (Tap-to-Drop Word Bank)
-// ============================================================================
-const FillBlankBlock = ({ block, onComplete }: any) => {
-    // 1. Parse the text: "I wake up [at] 7 AM." -> ["I wake up ", "at", " 7 AM."]
-    const parts = block.text ? block.text.split(/\[(.*?)\]/g) : [];
-    const blankCount = Math.floor(parts.length / 2);
 
-    // FIX: Explicitly type the state to allow null values
-    const [answers, setAnswers] = useState<(string | null)[]>(Array(blankCount).fill(null));
-    const [selectedWord, setSelectedWord] = useState<string | null>(null);
-    const [submitted, setSubmitted] = useState(false);
-    const [isCorrect, setIsCorrect] = useState(false);
-
-    // 2. Generate Word Bank
-    const wordBank = useMemo(() => {
-        // FIX: Add explicit types to filter arguments
-        const correctWords = parts.filter((_: string, i: number) => i % 2 !== 0);
-        const distractors = block.distractors || [];
-        return [...correctWords, ...distractors].sort(() => 0.5 - Math.random());
-    }, [block.text, block.distractors]);
-
-    const handleBlankClick = (index: number) => {
-        if (submitted) return;
-        
-        const newAnswers = [...answers];
-        if (selectedWord) {
-            newAnswers[index] = selectedWord;
-            setAnswers(newAnswers);
-            setSelectedWord(null);
-        } else if (newAnswers[index]) {
-            newAnswers[index] = null; // Revert to null instead of empty string
-            setAnswers(newAnswers);
-        }
-    };
-
-    const checkAnswers = () => {
-        // FIX: Add explicit types to filter arguments
-        const correctWords = parts.filter((_: string, i: number) => i % 2 !== 0);
-        const allMatch = answers.every((ans, i) => ans === correctWords[i]);
-        setIsCorrect(allMatch);
-        setSubmitted(true);
-    };
-
-    const reset = () => {
-        setAnswers(Array(blankCount).fill(null));
-        setSelectedWord(null);
-        setSubmitted(false);
-        setIsCorrect(false);
-    };
-
-    const availableWords = wordBank.filter((word: string) => {
-        const totalInBank = wordBank.filter((w: string) => w === word).length;
-        const usedInAnswers = answers.filter((a: string | null) => a === word).length;
-        return usedInAnswers < totalInBank;
-    });
-
-    const displayBank = Array.from(new Set(availableWords));
-
-    return (
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm my-8 animate-in zoom-in-95 duration-300">
-            <h3 className="font-bold text-lg text-slate-800 mb-6 flex items-start gap-2">
-                <span className="bg-indigo-100 text-indigo-600 p-1 rounded-lg mt-1 shrink-0"><Puzzle size={16}/></span>
-                {block.question || "Fill in the blanks"}
-            </h3>
-
-            {/* The Sentence Area */}
-            <div className="text-xl font-medium leading-loose text-slate-700 mb-10 flex flex-wrap items-center gap-y-3">
-                {parts.map((part: string, idx: number) => {
-                    if (idx % 2 === 0) {
-                        return <span key={idx} className="mr-1">{part}</span>;
-                    } else {
-                        const blankIdx = Math.floor(idx / 2);
-                        const filledWord = answers[blankIdx];
-                        const isChecking = submitted;
-                        const isRight = filledWord === part;
-
-                        let style = "bg-slate-100 border-slate-200 text-slate-400 border-dashed"; // Empty
-                        if (filledWord && !isChecking) style = "bg-indigo-50 border-indigo-300 text-indigo-700 border-solid shadow-sm"; // Filled
-                        if (isChecking && isRight) style = "bg-emerald-100 border-emerald-500 text-emerald-700 border-solid"; // Correct
-                        if (isChecking && !isRight) style = "bg-rose-100 border-rose-500 text-rose-700 border-solid"; // Wrong
-
-                        return (
-                            <button
-                                key={idx}
-                                onClick={() => handleBlankClick(blankIdx)}
-                                disabled={submitted}
-                                className={`min-w-[80px] h-10 px-4 mx-1 rounded-xl border-2 font-bold text-sm flex items-center justify-center transition-all active:scale-95 ${style} ${selectedWord && !filledWord && !submitted ? 'ring-2 ring-indigo-400 ring-offset-2 animate-pulse' : ''}`}
-                            >
-                                {filledWord || " "}
-                            </button>
-                        );
-                    }
-                })}
-            </div>
-
-            {/* The Word Bank */}
-            {!submitted && (
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">Word Bank</span>
-                    <div className="flex flex-wrap gap-2">
-                        {displayBank.map((word: unknown, idx: number) => (
-                            <button
-                                key={idx}
-                                onClick={() => setSelectedWord(word === selectedWord ? null : word as string)}
-                                className={`px-4 py-2 rounded-xl font-bold text-sm transition-all shadow-sm active:scale-95 ${selectedWord === word ? 'bg-indigo-600 text-white shadow-md -translate-y-1' : 'bg-white border-2 border-slate-200 text-slate-600 hover:border-indigo-300'}`}
-                            >
-                                {word as string}
-                            </button>
-                        ))}
-                        {displayBank.length === 0 && <span className="text-slate-400 text-sm italic">All words placed!</span>}
-                    </div>
-                </div>
-            )}
-
-            {/* Actions */}
-            {!submitted ? (
-                <button 
-                    onClick={checkAnswers} 
-                    disabled={answers.includes(null)} 
-                    className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold disabled:opacity-50 transition-all shadow-lg"
-                >
-                    Check Answers
-                </button>
-            ) : (
-                <div className={`p-4 rounded-2xl flex justify-between items-center animate-in zoom-in ${isCorrect ? 'bg-emerald-50 border border-emerald-100' : 'bg-rose-50 border border-rose-100'}`}>
-                    <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-full ${isCorrect ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
-                            {isCorrect ? <Check size={20} strokeWidth={3}/> : <X size={20} strokeWidth={3}/>}
-                        </div>
-                        <span className={`font-bold ${isCorrect ? 'text-emerald-800' : 'text-rose-800'}`}>
-                            {isCorrect ? "Perfectly placed!" : "Not quite right."}
-                        </span>
-                    </div>
-                    {isCorrect ? (
-                        <button onClick={onComplete} className="px-6 py-3 bg-emerald-500 text-white rounded-xl text-sm font-bold shadow-md hover:bg-emerald-600 active:scale-95 transition-all">Continue</button>
-                    ) : (
-                        <button onClick={reset} className="px-6 py-3 bg-white text-rose-600 border border-rose-200 rounded-xl text-sm font-bold shadow-sm hover:bg-rose-50 active:scale-95 transition-all">Try Again</button>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-};
 // 4. QUIZ BLOCK
-const QuizBlock = ({ block, onComplete }: any) => {
+const QuizBlock = ({ block, onComplete, onStateChange }: any) => {
     const [selected, setSelected] = useState<string | null>(null);
     const [submitted, setSubmitted] = useState(false);
     const isCorrect = selected === block.correctId;
+
+    // Broadcast state to projector
+    useEffect(() => {
+        if (onStateChange) onStateChange({ selected, submitted, isCorrect });
+    }, [selected, submitted, isCorrect, onStateChange]);
+
     return (
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm my-8">
             <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-start gap-2"><span className="bg-indigo-100 text-indigo-600 p-1 rounded-lg mt-1 shrink-0"><HelpCircle size={16}/></span>{block.question}</h3>
@@ -589,6 +455,63 @@ const QuizBlock = ({ block, onComplete }: any) => {
     );
 };
 
+// 5. FILL-IN-THE-BLANK BLOCK
+const FillBlankBlock = ({ block, onComplete, onStateChange }: any) => {
+    const parts = block.text ? block.text.split(/\[(.*?)\]/g) : [];
+    const blankCount = Math.floor(parts.length / 2);
+
+    const [answers, setAnswers] = useState<(string | null)[]>(Array(blankCount).fill(null));
+    const [selectedWord, setSelectedWord] = useState<string | null>(null);
+    const [submitted, setSubmitted] = useState(false);
+    const [isCorrect, setIsCorrect] = useState(false);
+
+    // Broadcast state to projector
+    useEffect(() => {
+        if (onStateChange) onStateChange({ answers, submitted, isCorrect });
+    }, [answers, submitted, isCorrect, onStateChange]);
+
+    const wordBank = useMemo(() => {
+        const correctWords = parts.filter((_: string, i: number) => i % 2 !== 0);
+        const distractors = block.distractors || [];
+        return [...correctWords, ...distractors].sort(() => 0.5 - Math.random());
+    }, [block.text, block.distractors]);
+
+    const handleBlankClick = (index: number) => {
+        if (submitted) return;
+        const newAnswers = [...answers];
+        if (selectedWord) { newAnswers[index] = selectedWord; setAnswers(newAnswers); setSelectedWord(null); } 
+        else if (newAnswers[index]) { newAnswers[index] = null; setAnswers(newAnswers); }
+    };
+
+    const checkAnswers = () => {
+        const correctWords = parts.filter((_: string, i: number) => i % 2 !== 0);
+        const allMatch = answers.every((ans, i) => ans === correctWords[i]);
+        setIsCorrect(allMatch); setSubmitted(true);
+    };
+
+    const reset = () => { setAnswers(Array(blankCount).fill(null)); setSelectedWord(null); setSubmitted(false); setIsCorrect(false); };
+    const availableWords = wordBank.filter((word: string) => { const totalInBank = wordBank.filter((w: string) => w === word).length; const usedInAnswers = answers.filter((a: string | null) => a === word).length; return usedInAnswers < totalInBank; });
+    const displayBank = Array.from(new Set(availableWords));
+
+    return (
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm my-8 animate-in zoom-in-95 duration-300">
+            <h3 className="font-bold text-lg text-slate-800 mb-6 flex items-start gap-2"><span className="bg-indigo-100 text-indigo-600 p-1 rounded-lg mt-1 shrink-0"><Puzzle size={16}/></span>{block.question || "Fill in the blanks"}</h3>
+            <div className="text-xl font-medium leading-loose text-slate-700 mb-10 flex flex-wrap items-center gap-y-3">
+                {parts.map((part: string, idx: number) => {
+                    if (idx % 2 === 0) return <span key={idx} className="mr-1">{part}</span>;
+                    const blankIdx = Math.floor(idx / 2); const filledWord = answers[blankIdx]; const isRight = filledWord === part;
+                    let style = "bg-slate-100 border-slate-200 text-slate-400 border-dashed"; 
+                    if (filledWord && !submitted) style = "bg-indigo-50 border-indigo-300 text-indigo-700 border-solid shadow-sm"; 
+                    if (submitted && isRight) style = "bg-emerald-100 border-emerald-500 text-emerald-700 border-solid"; 
+                    if (submitted && !isRight) style = "bg-rose-100 border-rose-500 text-rose-700 border-solid"; 
+                    return <button key={idx} onClick={() => handleBlankClick(blankIdx)} disabled={submitted} className={`min-w-[80px] h-10 px-4 mx-1 rounded-xl border-2 font-bold text-sm flex items-center justify-center transition-all active:scale-95 ${style} ${selectedWord && !filledWord && !submitted ? 'ring-2 ring-indigo-400 ring-offset-2 animate-pulse' : ''}`}>{filledWord || " "}</button>;
+                })}
+            </div>
+            {!submitted && (<div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">Word Bank</span><div className="flex flex-wrap gap-2">{displayBank.map((word, idx) => (<button key={idx} onClick={() => setSelectedWord(word === selectedWord ? null : word as string)} className={`px-4 py-2 rounded-xl font-bold text-sm transition-all shadow-sm active:scale-95 ${selectedWord === word ? 'bg-indigo-600 text-white shadow-md -translate-y-1' : 'bg-white border-2 border-slate-200 text-slate-600 hover:border-indigo-300'}`}>{word as string}</button>))}{displayBank.length === 0 && <span className="text-slate-400 text-sm italic">All words placed!</span>}</div></div>)}
+            {!submitted ? (<button onClick={checkAnswers} disabled={answers.includes(null)} className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold disabled:opacity-50 transition-all shadow-lg">Check Answers</button>) : (<div className={`p-4 rounded-2xl flex justify-between items-center animate-in zoom-in ${isCorrect ? 'bg-emerald-50 border border-emerald-100' : 'bg-rose-50 border border-rose-100'}`}><div className="flex items-center gap-3"><div className={`p-2 rounded-full ${isCorrect ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>{isCorrect ? <Check size={20} strokeWidth={3}/> : <X size={20} strokeWidth={3}/>}</div><span className={`font-bold ${isCorrect ? 'text-emerald-800' : 'text-rose-800'}`}>{isCorrect ? "Perfectly placed!" : "Not quite right."}</span></div>{isCorrect ? <button onClick={onComplete} className="px-6 py-3 bg-emerald-500 text-white rounded-xl text-sm font-bold shadow-md hover:bg-emerald-600 active:scale-95 transition-all">Continue</button> : <button onClick={reset} className="px-6 py-3 bg-white text-rose-600 border border-rose-200 rounded-xl text-sm font-bold shadow-sm hover:bg-rose-50 active:scale-95 transition-all">Try Again</button>}</div>)}
+        </div>
+    );
+};
 // 5. CHAT DIALOGUE
 const ChatDialogueBlock = ({ lines }: any) => (
     <div className="space-y-4 my-8 bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
@@ -605,14 +528,14 @@ lessons: any[]; // Replace 'any' with your Lesson type if defined
 }
 
 // ============================================================================
-//  CLASS VIEW (The Projector / Big Screen Mode)
+//  CLASS VIEW (The Projector / Big Screen Mode with Live Sync!)
 // ============================================================================
 function ClassView({ lesson, classId, userData }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
   const [showForum, setShowForum] = useState(false);
+  const [liveState, setLiveState] = useState<any>(null); // NEW: Holds live interactions
   const stageRef = useRef<HTMLDivElement>(null);
 
-  // 1. PAGE & SCROLL SYNC: Listen for updates from the Remote
   useEffect(() => {
     const syncId = lesson?.originalId || lesson?.id;
     if (!syncId) return;
@@ -620,33 +543,30 @@ function ClassView({ lesson, classId, userData }: any) {
     const unsub = onSnapshot(doc(db, 'live_sessions', syncId), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
+        if (typeof data.activePageIdx === 'number') setActivePageIdx(data.activePageIdx);
         
-        // Update Page Index
-        if (typeof data.activePageIdx === 'number') {
-          setActivePageIdx(data.activePageIdx);
+        // Capture interaction state from remote
+        if (data.liveBlockState !== undefined) {
+            setLiveState(data.liveBlockState);
+        } else {
+            setLiveState(null);
         }
 
-        // Apply Scroll Percentage to the big screen
         if (typeof data.scrollPercent === 'number' && stageRef.current) {
           const s = stageRef.current;
-          const target = data.scrollPercent * (s.scrollHeight - s.clientHeight);
-          s.scrollTo({
-            top: target,
-            behavior: 'smooth' 
-          });
+          s.scrollTo({ top: data.scrollPercent * (s.scrollHeight - s.clientHeight), behavior: 'smooth' });
         }
       }
     });
     return () => unsub();
   }, [lesson]);
 
-  // Page grouping logic (Must match LessonView exactly for 1:1 sync)
   const pages = useMemo(() => {
     if (!lesson?.blocks) return [];
     const grouped: any[] = [];
     let buffer: any[] = [];
     lesson.blocks.forEach((b: any) => {
-      if (['quiz', 'flashcard', 'scenario', 'fill-blank'].includes(b.type)) {
+      if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion'].includes(b.type)) {
         if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
         grouped.push({ type: 'interact', blocks: [b] });
         buffer = [];
@@ -660,135 +580,75 @@ function ClassView({ lesson, classId, userData }: any) {
 
   return (
     <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col overflow-hidden">
-      {/* Header */}
       <div className="h-[12vh] px-16 flex items-center justify-between border-b">
-        <div className="h-3 flex-1 bg-slate-100 rounded-full mr-12 overflow-hidden">
-          <div 
-            className="h-full bg-indigo-600 transition-all duration-1000" 
-            style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} 
-          />
-        </div>
+        <div className="h-3 flex-1 bg-slate-100 rounded-full mr-12 overflow-hidden"><div className="h-full bg-indigo-600 transition-all duration-1000" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} /></div>
         <span className="text-[3vh] font-black text-slate-300">{activePageIdx + 1} / {pages.length}</span>
       </div>
 
       <div className="flex-1 flex overflow-hidden relative">
-        {/* THE STAGE: This is the div that scrolls */}
-        <div 
-          ref={stageRef} 
-          className={`flex-1 overflow-y-auto px-16 py-12 flex flex-col items-center transition-all duration-500 ${showForum ? 'mr-[450px]' : ''}`}
-        >
+        <div ref={stageRef} className={`flex-1 overflow-y-auto px-16 py-12 flex flex-col items-center transition-all duration-500 ${showForum ? 'mr-[450px]' : ''}`}>
           <div className="w-full max-w-7xl space-y-20 pb-40">
             {pages[activePageIdx].blocks.map((block: any, i: number) => (
               <div key={i} className="animate-in fade-in duration-700 w-full">
                 
-                {/* TEXT BLOCK */}
-                {block.type === 'text' && (
-                  <div className="text-center">
-                    {block.title && <h3 className="text-[3vh] font-black text-indigo-400 uppercase tracking-widest mb-6">{block.title}</h3>}
-                    <p className="text-[6vh] font-bold text-slate-800 leading-tight">{block.content}</p>
-                  </div>
-                )}
-                
-                {/* ESSAY BLOCK */}
-                {block.type === 'essay' && (
-                  <div className="w-full max-w-5xl mx-auto space-y-[4vh]">
-                    <h1 className="text-[8vh] font-black text-slate-900 leading-none mb-12 text-center">{block.title}</h1>
-                    {block.content?.split('\n\n').map((para: string, pIdx: number) => (
-                      <p key={pIdx} className="text-[4vh] leading-[1.6] text-slate-700 font-serif text-justify first-letter:text-[6vh] first-letter:font-black first-letter:text-indigo-600 first-letter:mr-3">
-                        {para.trim()}
-                      </p>
-                    ))}
-                  </div>
-                )}
+                {block.type === 'text' && (<div className="text-center">{block.title && <h3 className="text-[3vh] font-black text-indigo-400 uppercase tracking-widest mb-6">{block.title}</h3>}<p className="text-[6vh] font-bold text-slate-800 leading-tight">{block.content}</p></div>)}
+                {block.type === 'essay' && (<div className="w-full max-w-5xl mx-auto space-y-[4vh]"><h1 className="text-[8vh] font-black text-slate-900 leading-none mb-12 text-center">{block.title}</h1>{block.content?.split('\n\n').map((para: string, pIdx: number) => (<p key={pIdx} className="text-[4vh] leading-[1.6] text-slate-700 font-serif text-justify first-letter:text-[6vh] first-letter:font-black first-letter:text-indigo-600 first-letter:mr-3">{para.trim()}</p>))}</div>)}
+                {block.type === 'image' && (<div className="w-full flex flex-col items-center"><img src={block.url} alt="presentation" className="max-h-[60vh] rounded-[3rem] shadow-2xl object-cover border-8 border-slate-50" />{block.caption && <p className="text-[3vh] text-slate-500 font-bold mt-8 text-center max-w-4xl">{block.caption}</p>}</div>)}
+                {block.type === 'dialogue' && (<div className="w-full max-w-5xl mx-auto space-y-12">{block.lines?.map((line: any, j: number) => (<div key={j} className={`flex items-end gap-6 ${line.side === 'right' ? 'flex-row-reverse' : ''}`}><div className={`w-20 h-20 rounded-full flex items-center justify-center text-[3vh] font-black text-white shrink-0 shadow-2xl ${line.side === 'right' ? 'bg-indigo-600' : 'bg-slate-800'}`}>{line.speaker?.[0].toUpperCase()}</div><div className={`max-w-[80%] p-10 rounded-[3rem] shadow-lg text-[4vh] font-medium leading-relaxed ${line.side === 'right' ? 'bg-indigo-500 text-white rounded-br-none' : 'bg-white border-4 border-slate-100 text-slate-800 rounded-bl-none'}`}>{line.text}{line.translation && (<p className={`text-[2.5vh] mt-6 italic opacity-70 font-bold border-t pt-4 ${line.side === 'right' ? 'border-white/20' : 'border-slate-100'}`}>{line.translation}</p>)}</div></div>))}</div>)}
+                {block.type === 'vocab-list' && (<div className="grid grid-cols-2 gap-8">{block.items.map((item: any, j: number) => (<div key={j} className="bg-slate-50 p-12 rounded-[3rem] border-4 border-slate-100 text-center shadow-xl"><p className="text-[5vh] font-black text-indigo-600 mb-2">{item.term}</p><p className="text-[2.5vh] text-slate-500 font-bold">{item.definition}</p></div>))}</div>)}
+                {block.type === 'discussion' && (<div className="w-full max-w-5xl mx-auto bg-indigo-50 rounded-[4rem] p-16 border-8 border-indigo-100 shadow-2xl"><div className="flex items-center gap-6 mb-12 justify-center"><div className="p-6 bg-indigo-600 text-white rounded-3xl shadow-xl"><MessageCircle size={48} /></div><h3 className="text-[5vh] font-black text-indigo-900">{block.title || "Let's Discuss"}</h3></div><div className="space-y-8">{(block.questions || []).map((q: string, j: number) => (<div key={j} className="bg-white p-8 rounded-[2rem] shadow-md border-4 border-indigo-50 flex gap-6 items-start"><span className="text-[4vh] font-black text-indigo-300">{j + 1}</span><p className="text-[4vh] font-bold text-slate-800 leading-tight">{q}</p></div>))}</div></div>)}
 
-                {/* IMAGE BLOCK */}
-                {block.type === 'image' && (
-                  <div className="w-full flex flex-col items-center">
-                    <img src={block.url} alt="presentation" className="max-h-[60vh] rounded-[3rem] shadow-2xl object-cover border-8 border-slate-50" />
-                    {block.caption && <p className="text-[3vh] text-slate-500 font-bold mt-8 text-center max-w-4xl">{block.caption}</p>}
-                  </div>
-                )}
-
-                {/* DIALOGUE BLOCK */}
-                {block.type === 'dialogue' && (
-                  <div className="w-full max-w-5xl mx-auto space-y-12">
-                    {block.lines?.map((line: any, j: number) => (
-                      <div key={j} className={`flex items-end gap-6 ${line.side === 'right' ? 'flex-row-reverse' : ''}`}>
-                        <div className={`w-20 h-20 rounded-full flex items-center justify-center text-[3vh] font-black text-white shrink-0 shadow-2xl ${line.side === 'right' ? 'bg-indigo-600' : 'bg-slate-800'}`}>
-                          {line.speaker?.[0].toUpperCase()}
-                        </div>
-                        <div className={`max-w-[80%] p-10 rounded-[3rem] shadow-lg text-[4vh] font-medium leading-relaxed ${
-                          line.side === 'right' ? 'bg-indigo-500 text-white rounded-br-none' : 'bg-white border-4 border-slate-100 text-slate-800 rounded-bl-none'
-                        }`}>
-                          {line.text}
-                          {line.translation && (
-                            <p className={`text-[2.5vh] mt-6 italic opacity-70 font-bold border-t pt-4 ${line.side === 'right' ? 'border-white/20' : 'border-slate-100'}`}>
-                              {line.translation}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {/* DISCUSSION BLOCK */}
-                {block.type === 'discussion' && (
-                  <div className="w-full max-w-5xl mx-auto bg-indigo-50 rounded-[4rem] p-16 border-8 border-indigo-100 shadow-2xl">
-                    <div className="flex items-center gap-6 mb-12 justify-center">
-                      <div className="p-6 bg-indigo-600 text-white rounded-3xl shadow-xl"><MessageCircle size={48} /></div>
-                      <h3 className="text-[5vh] font-black text-indigo-900">{block.title || "Let's Discuss"}</h3>
-                    </div>
-                    <div className="space-y-8">
-                      {(block.questions || []).map((q: string, j: number) => (
-                        <div key={j} className="bg-white p-8 rounded-[2rem] shadow-md border-4 border-indigo-50 flex gap-6 items-start">
-                          <span className="text-[4vh] font-black text-indigo-300">{j + 1}</span>
-                          <p className="text-[4vh] font-bold text-slate-800 leading-tight">{q}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* VOCAB LIST BLOCK */}
-                {block.type === 'vocab-list' && (
-                  <div className="grid grid-cols-2 gap-8">
-                    {block.items.map((item: any, j: number) => (
-                      <div key={j} className="bg-slate-50 p-12 rounded-[3rem] border-4 border-slate-100 text-center shadow-xl">
-                        <p className="text-[5vh] font-black text-indigo-600 mb-2">{item.term}</p>
-                        <p className="text-[2.5vh] text-slate-500 font-bold">{item.definition}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* QUIZ BLOCK (Display Mode) */}
+                {/* --- SYNCED QUIZ BLOCK --- */}
                 {block.type === 'quiz' && (
-                  <div className="w-full max-w-5xl mx-auto bg-slate-900 rounded-[4rem] p-16 text-white shadow-2xl">
+                  <div className="w-full max-w-5xl mx-auto bg-slate-900 rounded-[4rem] p-16 text-white shadow-2xl transition-colors duration-500">
                     <span className="text-[2vh] font-black text-indigo-400 uppercase tracking-widest block mb-6">Class Question</span>
                     <h3 className="text-[5vh] font-bold mb-12 leading-tight">{block.question}</h3>
                     <div className="grid grid-cols-2 gap-6">
-                      {block.options?.map((opt: any, j: number) => (
-                        <div key={j} className="p-8 bg-white/10 border-2 border-white/20 rounded-[2rem] flex items-center gap-6 text-[3vh] font-bold">
-                          <span className="inline-block w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">{opt.id.toUpperCase()}</span>
-                          <span className="text-left">{opt.text}</span>
+                      {block.options?.map((opt: any, j: number) => {
+                        const isSelected = liveState?.selected === opt.id;
+                        const isSubmitted = liveState?.submitted;
+                        const isCorrectOption = block.correctId === opt.id;
+
+                        let style = "bg-white/10 border-white/20"; 
+                        if (isSelected && !isSubmitted) style = "bg-indigo-500 border-indigo-400 ring-8 ring-indigo-500/50 scale-105 transition-all";
+                        if (isSubmitted) {
+                            if (isCorrectOption) style = "bg-emerald-500 border-emerald-400 scale-105 transition-all";
+                            else if (isSelected) style = "bg-rose-500 border-rose-400 opacity-50 scale-95";
+                            else style = "opacity-30 grayscale";
+                        }
+
+                        return (
+                          <div key={j} className={`p-8 border-4 rounded-[2rem] flex items-center gap-6 text-[3vh] font-bold duration-300 ${style}`}>
+                            <span className="inline-block w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center shrink-0 shadow-inner">{opt.id.toUpperCase()}</span>
+                            <span className="text-left">{opt.text}</span>
+                            {isSubmitted && isCorrectOption && <CheckCircle2 size={48} className="ml-auto text-white animate-in zoom-in" />}
+                            {isSubmitted && isSelected && !isCorrectOption && <X size={48} className="ml-auto text-white animate-in zoom-in" />}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* --- SYNCED SCENARIO BLOCK --- */}
+                {block.type === 'scenario' && (() => {
+                    const activeNodeId = liveState?.currentNodeId || block.nodes?.[0]?.id;
+                    const currentNode = block.nodes?.find((n:any) => n.id === activeNodeId) || block.nodes?.[0];
+                    const bgColors: any = { neutral: 'bg-emerald-900 border-emerald-500', success: 'bg-indigo-900 border-indigo-500', failure: 'bg-rose-900 border-rose-500' };
+                    const style = bgColors[currentNode?.color || 'neutral'];
+
+                    return (
+                        <div className={`w-full max-w-5xl mx-auto rounded-[4rem] p-16 text-white shadow-2xl border-8 text-center transition-colors duration-500 ${style}`}>
+                           <span className="text-[2vh] font-black uppercase tracking-widest block mb-8 opacity-70">Interactive Scenario • {currentNode?.speaker || 'Character'}</span>
+                           <h3 className="text-[5vh] font-serif italic mb-12 leading-tight">"{currentNode?.text}"</h3>
+                           <div className="inline-block px-8 py-4 bg-black/20 rounded-full border-2 border-white/20 backdrop-blur-md">
+                             <p className="text-[3vh] font-bold text-white">Look at your device to make a choice!</p>
+                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                    );
+                })()}
 
-                {/* SCENARIO BLOCK (Display Mode) */}
-                {block.type === 'scenario' && (
-                  <div className="w-full max-w-5xl mx-auto bg-emerald-900 rounded-[4rem] p-16 text-white shadow-2xl border-8 border-emerald-500 text-center">
-                    <span className="text-[2vh] font-black text-emerald-400 uppercase tracking-widest block mb-8">Interactive Scenario</span>
-                    <h3 className="text-[5vh] font-serif italic mb-12 leading-tight">"{block.nodes?.[0]?.text}"</h3>
-                    <div className="inline-block px-8 py-4 bg-emerald-800 rounded-full border-2 border-emerald-400/50">
-                      <p className="text-[3vh] font-bold text-emerald-200">Look at your device to make a choice!</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* FILL IN THE BLANK BLOCK (Display Mode) */}
+                {/* --- SYNCED FILL IN THE BLANK BLOCK --- */}
                 {block.type === 'fill-blank' && (
                   <div className="w-full max-w-6xl mx-auto bg-white p-16 rounded-[4rem] border-4 border-slate-100 shadow-2xl">
                     <h3 className="text-[4vh] font-bold text-slate-800 mb-12 flex items-center gap-4">
@@ -796,22 +656,43 @@ function ClassView({ lesson, classId, userData }: any) {
                        {block.question}
                     </h3>
                     <div className="text-[6vh] font-medium leading-loose text-slate-700 flex flex-wrap items-center gap-y-6 justify-center text-center">
-                        {/* Render brackets as empty dashed boxes for the class to guess */}
-                        {block.text?.split(/\[(.*?)\]/g).map((part: string, idx: number) => (
-                            idx % 2 === 0 ? 
-                            <span key={idx} className="mx-2">{part}</span> : 
-                            <span key={idx} className="min-w-[150px] h-20 px-8 mx-3 rounded-2xl border-4 border-slate-300 border-dashed bg-slate-50 text-slate-400 flex items-center justify-center text-[4vh] font-bold shadow-inner">?</span>
-                        ))}
+                        {block.text?.split(/\[(.*?)\]/g).map((part: string, idx: number) => {
+                            if (idx % 2 === 0) return <span key={idx} className="mx-2">{part}</span>;
+                            
+                            const blankIdx = Math.floor(idx / 2);
+                            const filledWord = liveState?.answers?.[blankIdx];
+                            const isChecking = liveState?.submitted;
+                            const isRight = filledWord === part;
+
+                            let style = "border-dashed border-slate-300 bg-slate-50 text-slate-400";
+                            if (filledWord && !isChecking) style = "border-solid border-indigo-400 bg-indigo-100 text-indigo-700 shadow-lg scale-110 -translate-y-2";
+                            if (isChecking && isRight) style = "border-solid border-emerald-500 bg-emerald-100 text-emerald-700 shadow-lg";
+                            if (isChecking && !isRight) style = "border-solid border-rose-500 bg-rose-100 text-rose-700 shadow-lg";
+
+                            return (
+                                <span key={idx} className={`min-w-[150px] h-20 px-8 mx-3 rounded-2xl border-4 flex items-center justify-center text-[4vh] font-bold transition-all duration-300 ${style}`}>
+                                    {filledWord || "?"}
+                                </span>
+                            );
+                        })}
                     </div>
                     
-                    {/* Render word bank at the bottom */}
-                    <div className="mt-16 flex flex-wrap gap-4 justify-center">
-                        {block.distractors?.concat(block.text?.match(/\[(.*?)\]/g)?.map((s:string) => s.replace(/\[|\]/g, '')) || [])
-                        .sort(() => 0.5 - Math.random()) // Shuffle
-                        .map((word: string, i: number) => (
-                            <span key={i} className="px-6 py-3 bg-slate-100 rounded-xl border-2 border-slate-200 text-[3vh] font-bold text-slate-500">{word}</span>
-                        ))}
-                    </div>
+                    {/* Hide Wordbank once submitted so the class can focus on the final sentence */}
+                    {!liveState?.submitted && (
+                      <div className="mt-16 flex flex-wrap gap-4 justify-center">
+                          {block.distractors?.concat(block.text?.match(/\[(.*?)\]/g)?.map((s:string) => s.replace(/\[|\]/g, '')) || [])
+                          .sort(() => 0.5 - Math.random()) 
+                          .map((word: string, i: number) => {
+                              // Optional: Dim words that are currently selected in a blank
+                              const isUsed = liveState?.answers?.includes(word);
+                              return (
+                                <span key={i} className={`px-6 py-3 rounded-xl border-2 text-[3vh] font-bold transition-all duration-300 ${isUsed ? 'bg-slate-50 border-slate-100 text-slate-300 scale-95' : 'bg-slate-100 border-slate-200 text-slate-500'}`}>
+                                  {word}
+                                </span>
+                              );
+                          })}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -820,24 +701,18 @@ function ClassView({ lesson, classId, userData }: any) {
           </div>
         </div>
 
-        {/* Forum Sidebar (Optional toggle) */}
         {showForum && (
           <div className="absolute right-0 top-0 bottom-0 w-[450px] bg-slate-50 border-l p-8 z-10 animate-in slide-in-from-right">
              <h3 className="text-2xl font-black mb-6 flex items-center gap-2"><MessageSquare className="text-indigo-600" /> FORUM</h3>
-             {/* Make sure ClassForum doesn't crash if classId is missing */}
              {classId ? <ClassForum classId={classId} userData={userData} /> : <p className="text-slate-400">Class chat unavailable.</p>}
           </div>
         )}
       </div>
 
-      {/* Footer Controls */}
       <div className="h-[12vh] px-16 border-t flex justify-between items-center bg-white">
         <span className="font-black text-[2.5vh] text-slate-400 uppercase tracking-widest">Live Presentation</span>
         <div className="flex items-center gap-6">
-          <button 
-            onClick={() => setShowForum(!showForum)} 
-            className={`px-8 py-4 rounded-2xl font-black text-[2.5vh] transition-all shadow-md ${showForum ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
-          >
+          <button onClick={() => setShowForum(!showForum)} className={`px-8 py-4 rounded-2xl font-black text-[2.5vh] transition-all shadow-md ${showForum ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>
             {showForum ? "HIDE CHAT" : "SHOW CHAT"}
           </button>
           <div className="h-16 w-1 bg-slate-100 mx-4 rounded-full" />
@@ -854,13 +729,11 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // --- PAGINATION LOGIC ---
   const pages = useMemo(() => {
     if (!lesson?.blocks) return [];
     const grouped: any[] = [];
     let buffer: any[] = [];
     lesson.blocks.forEach((b: any) => {
-      // ADDED 'discussion' HERE so it gets its own dedicated slide!
       if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion'].includes(b.type)) {
         if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
         grouped.push({ type: 'interact', blocks: [b] });
@@ -877,6 +750,17 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
     const syncId = lesson.originalId || lesson.id;
     setDoc(doc(db, 'live_sessions', syncId), {
       activePageIdx: newIdx,
+      liveBlockState: null, // Clear interactive state on page turn
+      lastUpdate: Date.now()
+    }, { merge: true }).catch(console.error);
+  }, [lesson, isInstructor]);
+
+  // Handles live interactions from blocks
+  const handleLiveInteraction = useCallback((state: any) => {
+    if (!isInstructor) return;
+    const syncId = lesson.originalId || lesson.id;
+    setDoc(doc(db, 'live_sessions', syncId), {
+      liveBlockState: state,
       lastUpdate: Date.now()
     }, { merge: true }).catch(console.error);
   }, [lesson, isInstructor]);
@@ -900,7 +784,6 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
     return () => container.removeEventListener('scroll', handleScroll);
   }, [lesson, isInstructor]);
 
-  // --- NAVIGATION HANDLERS ---
   const handlePrev = () => {
       const newIdx = Math.max(0, activePageIdx - 1);
       setActivePageIdx(newIdx);
@@ -926,105 +809,70 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
         return (
           <div key={idx} className="py-6 text-center animate-in fade-in slide-in-from-bottom-2">
             {block.title && <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4">{block.title}</h3>}
-            <p className="text-3xl font-black text-slate-900 leading-tight tracking-tighter">
-              {block.content}
-            </p>
+            <p className="text-3xl font-black text-slate-900 leading-tight tracking-tighter">{block.content}</p>
           </div>
         );
-
       case 'essay':
         return (
           <div key={idx} className="py-4 space-y-6 animate-in fade-in">
             <h2 className="text-2xl font-black text-indigo-600 tracking-tight">{block.title}</h2>
-            <div className="space-y-4">
-              {block.content?.split('\n\n').map((p: string, j: number) => (
-                <p key={j} className="text-base text-slate-600 font-serif leading-relaxed text-justify">
-                  {p.trim()}
-                </p>
-              ))}
-            </div>
+            <div className="space-y-4">{block.content?.split('\n\n').map((p: string, j: number) => <p key={j} className="text-base text-slate-600 font-serif leading-relaxed text-justify">{p.trim()}</p>)}</div>
           </div>
         );
-
       case 'dialogue':
         return (
           <div key={idx} className="py-6 space-y-6">
             {block.lines?.map((line: any, j: number) => (
               <div key={j} className={`flex items-end gap-3 ${line.side === 'right' ? 'flex-row-reverse' : ''}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black text-white shrink-0 shadow-lg ${line.side === 'right' ? 'bg-indigo-600' : 'bg-slate-800'}`}>
-                  {line.speaker?.[0].toUpperCase()}
-                </div>
-                <div className={`max-w-[80%] p-4 rounded-[1.8rem] shadow-sm text-sm font-medium leading-relaxed ${
-                  line.side === 'right' 
-                    ? 'bg-indigo-500 text-white rounded-br-none' 
-                    : 'bg-white border border-slate-100 text-slate-800 rounded-bl-none'
-                }`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black text-white shrink-0 shadow-lg ${line.side === 'right' ? 'bg-indigo-600' : 'bg-slate-800'}`}>{line.speaker?.[0].toUpperCase()}</div>
+                <div className={`max-w-[80%] p-4 rounded-[1.8rem] shadow-sm text-sm font-medium leading-relaxed ${line.side === 'right' ? 'bg-indigo-500 text-white rounded-br-none' : 'bg-white border border-slate-100 text-slate-800 rounded-bl-none'}`}>
                   {line.text}
-                  {line.translation && (
-                    <p className={`text-[10px] mt-2 italic opacity-60 font-bold border-t pt-2 ${line.side === 'right' ? 'border-white/20' : 'border-slate-100'}`}>
-                      {line.translation}
-                    </p>
-                  )}
+                  {line.translation && <p className={`text-[10px] mt-2 italic opacity-60 font-bold border-t pt-2 ${line.side === 'right' ? 'border-white/20' : 'border-slate-100'}`}>{line.translation}</p>}
                 </div>
               </div>
             ))}
           </div>
         );
-
       case 'vocab-list':
         return (
           <div key={idx} className="py-4 grid grid-cols-1 gap-4">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] px-2">Essential Lexicon</h3>
             {block.items?.map((item: any, j: number) => (
               <div key={j} className="bg-white p-5 rounded-[2rem] border-2 border-slate-50 shadow-sm flex flex-col gap-1 hover:border-indigo-100 transition-colors">
-                <span className="text-lg font-black text-indigo-600">{item.term}</span>
-                <div className="h-px w-8 bg-slate-100 my-1" />
+                <span className="text-lg font-black text-indigo-600">{item.term}</span><div className="h-px w-8 bg-slate-100 my-1" />
                 <span className="text-xs font-bold text-slate-500 leading-normal">{item.definition}</span>
               </div>
             ))}
           </div>
         );
-
       case 'image':
         return (
           <div key={idx} className="py-6 animate-in fade-in">
-             <div className="rounded-3xl overflow-hidden shadow-lg border border-slate-100">
-                <img src={block.url} alt="Lesson visual" className="w-full h-auto object-cover max-h-64" />
-             </div>
+             <div className="rounded-3xl overflow-hidden shadow-lg border border-slate-100"><img src={block.url} alt="Lesson visual" className="w-full h-auto object-cover max-h-64" /></div>
              {block.caption && <p className="text-xs font-bold text-slate-400 text-center mt-3 px-4">{block.caption}</p>}
           </div>
         );
-
-      // --- ADDED: THE MISSING DISCUSSION BLOCK ---
       case 'discussion':
         return (
           <div key={idx} className="py-6 animate-in fade-in">
             <div className="bg-indigo-50 border-2 border-indigo-100 rounded-[2rem] p-6 shadow-sm">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 bg-indigo-600 text-white rounded-xl shadow-md"><MessageCircle size={20} /></div>
-                <h3 className="text-xl font-black text-indigo-900">{block.title || "Discussion"}</h3>
-              </div>
+              <div className="flex items-center gap-3 mb-6"><div className="p-3 bg-indigo-600 text-white rounded-xl shadow-md"><MessageCircle size={20} /></div><h3 className="text-xl font-black text-indigo-900">{block.title || "Discussion"}</h3></div>
               <div className="space-y-4">
                 {(block.questions || []).map((q: string, qIdx: number) => (
-                  <div key={qIdx} className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 flex gap-4">
-                     <span className="text-indigo-300 font-black text-lg">{qIdx + 1}</span>
-                     <p className="text-slate-700 font-medium leading-snug">{q}</p>
-                  </div>
+                  <div key={qIdx} className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 flex gap-4"><span className="text-indigo-300 font-black text-lg">{qIdx + 1}</span><p className="text-slate-700 font-medium leading-snug">{q}</p></div>
                 ))}
               </div>
             </div>
           </div>
         );
 
+      // THESE NOW PASS THE SYNC HANDLER!
       case 'quiz':
-        return <QuizBlock key={idx} block={block} onComplete={handleNext} />;
-
+        return <QuizBlock key={idx} block={block} onComplete={handleNext} onStateChange={handleLiveInteraction} />;
       case 'scenario':
-        return <ScenarioBlock key={idx} block={block} onComplete={handleNext} />;
-
+        return <ScenarioBlock key={idx} block={block} onComplete={handleNext} onStateChange={handleLiveInteraction} />;
       case 'fill-blank':
-        return <FillBlankBlock key={idx} block={block} onComplete={handleNext} />;
-
+        return <FillBlankBlock key={idx} block={block} onComplete={handleNext} onStateChange={handleLiveInteraction} />;
       default:
         return <div key={idx} className="p-8 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-100 text-center text-xs text-slate-400 font-bold uppercase tracking-widest">Unsupported Module: {block.type}</div>;
     }
@@ -1034,56 +882,24 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
 
   return (
     <div className="flex flex-col h-full bg-slate-50/30 overflow-hidden font-sans">
-      {/* Dynamic Header */}
       <div className="px-8 pt-14 pb-6 bg-white border-b border-slate-100 shrink-0">
         <div className="flex justify-between items-end">
-          <div>
-            <h1 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.4em] mb-1">{lesson.title}</h1>
-            <p className="text-lg font-black text-slate-900 tracking-tighter">Current Session</p>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 rounded-full border border-emerald-100">
-            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-[9px] font-black text-emerald-600 uppercase">Synced</span>
-          </div>
+          <div><h1 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.4em] mb-1">{lesson.title}</h1><p className="text-lg font-black text-slate-900 tracking-tighter">Current Session</p></div>
+          <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 rounded-full border border-emerald-100"><span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /><span className="text-[9px] font-black text-emerald-600 uppercase">Synced</span></div>
         </div>
       </div>
-
-      {/* Main Content Area */}
       <div ref={containerRef} className="flex-1 overflow-y-auto px-6 py-8 pb-40 custom-scrollbar scroll-smooth">
         <div className="max-w-md mx-auto space-y-12">
           {pages[activePageIdx].blocks.map((block: any, i: number) => renderBlock(block, i))}
         </div>
       </div>
-
-      {/* Navigation Dock */}
       <div className="p-8 pb-10 bg-white/80 backdrop-blur-xl border-t border-slate-100 flex justify-between items-center fixed bottom-0 left-0 right-0 z-50">
-        <button 
-          onClick={handlePrev}
-          className="p-5 bg-slate-100 text-slate-400 rounded-3xl disabled:opacity-20 active:scale-90 transition-all shadow-sm"
-          disabled={activePageIdx === 0}
-        >
-          <ArrowLeft size={24} strokeWidth={3} />
-        </button>
-        
-        <div className="text-center">
-          <span className="text-[10px] font-black text-slate-300 uppercase block mb-1">Slide</span>
-          <span className="text-xl font-black text-slate-900">{activePageIdx + 1} <span className="text-slate-200">/</span> {pages.length}</span>
-        </div>
-
+        <button onClick={handlePrev} className="p-5 bg-slate-100 text-slate-400 rounded-3xl disabled:opacity-20 active:scale-90 transition-all shadow-sm" disabled={activePageIdx === 0}><ArrowLeft size={24} strokeWidth={3} /></button>
+        <div className="text-center"><span className="text-[10px] font-black text-slate-300 uppercase block mb-1">Slide</span><span className="text-xl font-black text-slate-900">{activePageIdx + 1} <span className="text-slate-200">/</span> {pages.length}</span></div>
         {activePageIdx < pages.length - 1 ? (
-          <button 
-            onClick={handleNext} 
-            className="p-5 bg-indigo-600 text-white rounded-3xl shadow-xl shadow-indigo-200 active:scale-90 transition-all"
-          >
-            <ArrowRight size={24} strokeWidth={3} />
-          </button>
+          <button onClick={handleNext} className="p-5 bg-indigo-600 text-white rounded-3xl shadow-xl shadow-indigo-200 active:scale-90 transition-all"><ArrowRight size={24} strokeWidth={3} /></button>
         ) : (
-          <button 
-            onClick={onFinish} 
-            className="px-8 py-5 bg-emerald-500 text-white font-black rounded-3xl shadow-xl shadow-emerald-200 active:scale-95 transition-all text-xs tracking-widest"
-          >
-            FINISH
-          </button>
+          <button onClick={onFinish} className="px-8 py-5 bg-emerald-500 text-white font-black rounded-3xl shadow-xl shadow-emerald-200 active:scale-95 transition-all text-xs tracking-widest">FINISH</button>
         )}
       </div>
     </div>
