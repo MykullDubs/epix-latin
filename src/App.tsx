@@ -275,6 +275,21 @@ const LivePreview = ({ data }: any) => {
                  </div>
                </div>
              )}
+            {b.type === 'discussion' && (
+                <div className="bg-indigo-50 border-2 border-indigo-100 p-5 rounded-2xl shadow-sm">
+                  <h3 className="font-black text-indigo-900 text-sm mb-4 flex items-center gap-2">
+                    <MessageCircle size={16}/> {b.title || "Discussion"}
+                  </h3>
+                  <div className="space-y-3">
+                    {b.questions?.map((q: string, j: number) => (
+                      <div key={j} className="bg-white p-3 rounded-xl shadow-sm border border-indigo-50 flex gap-3">
+                        <span className="text-indigo-300 font-bold text-xs">{j + 1}</span>
+                        <p className="text-slate-700 font-medium text-xs">{q}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+             )}
 
              {b.type === 'image' && (
                <div className="rounded-2xl overflow-hidden border border-slate-100 shadow-sm">
@@ -716,6 +731,23 @@ function ClassView({ lesson, classId, userData }: any) {
                     ))}
                   </div>
                 )}
+                {/* DISCUSSION BLOCK */}
+                {block.type === 'discussion' && (
+                  <div className="w-full max-w-5xl mx-auto bg-indigo-50 rounded-[4rem] p-16 border-8 border-indigo-100 shadow-2xl">
+                    <div className="flex items-center gap-6 mb-12 justify-center">
+                      <div className="p-6 bg-indigo-600 text-white rounded-3xl shadow-xl"><MessageCircle size={48} /></div>
+                      <h3 className="text-[5vh] font-black text-indigo-900">{block.title || "Let's Discuss"}</h3>
+                    </div>
+                    <div className="space-y-8">
+                      {(block.questions || []).map((q: string, j: number) => (
+                        <div key={j} className="bg-white p-8 rounded-[2rem] shadow-md border-4 border-indigo-50 flex gap-6 items-start">
+                          <span className="text-[4vh] font-black text-indigo-300">{j + 1}</span>
+                          <p className="text-[4vh] font-bold text-slate-800 leading-tight">{q}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* VOCAB LIST BLOCK */}
                 {block.type === 'vocab-list' && (
@@ -900,6 +932,25 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
             <p className="text-3xl font-black text-slate-900 leading-tight tracking-tighter">
               {block.content}
             </p>
+          </div>
+        );
+        case 'discussion':
+        return (
+          <div key={idx} className="py-6 animate-in fade-in">
+            <div className="bg-indigo-50 border-2 border-indigo-100 rounded-[2rem] p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-3 bg-indigo-600 text-white rounded-xl shadow-md"><MessageCircle size={20} /></div>
+                <h3 className="text-xl font-black text-indigo-900">{block.title || "Discussion"}</h3>
+              </div>
+              <div className="space-y-4">
+                {(block.questions || []).map((q: string, qIdx: number) => (
+                  <div key={qIdx} className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 flex gap-4">
+                     <span className="text-indigo-300 font-black text-lg">{qIdx + 1}</span>
+                     <p className="text-slate-700 font-medium leading-snug">{q}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         );
 
@@ -3456,7 +3507,8 @@ function LessonBuilderView({ data, setData, onSave }: any) {
       'vocab-list': { type: 'vocab-list', items: [{ term: '', definition: '' }] },
       quiz: { type: 'quiz', question: '', options: [{id:'a',text:''},{id:'b',text:''}], correctId: 'a' },
       image: { type: 'image', url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa', caption: '' },
-      'fill-blank': { type: 'fill-blank', question: 'Fill in the blanks:', text: 'The [quick] brown [fox] jumps.', distractors: ['slow', 'dog'] }
+      'fill-blank': { type: 'fill-blank', question: 'Fill in the blanks:', text: 'The [quick] brown [fox] jumps.', distractors: ['slow', 'dog'] },
+      'discussion': { type: 'discussion', title: 'Discussion Time', questions: ['Question 1?', 'Question 2?', 'Question 3?'] }
       
     };
     setData({ ...data, blocks: [...(data.blocks || []), templates[type]] });
@@ -3651,6 +3703,38 @@ function LessonBuilderView({ data, setData, onSave }: any) {
                      </div>
                   </div>
                 )}
+                {/* DISCUSSION EDITOR */}
+                {block.type === 'discussion' && (
+                  <div className="space-y-4 bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100">
+                     <div className="flex items-center gap-2 mb-2">
+                        <MessageCircle size={16} className="text-indigo-600" />
+                        <span className="text-xs font-bold text-indigo-900">Discussion Block</span>
+                     </div>
+                     <input 
+                        className="w-full bg-white border border-slate-200 p-3 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-200" 
+                        placeholder="Title (e.g. Talk about it!)" 
+                        value={block.title || ''} 
+                        onChange={e => updateBlock(idx, 'title', e.target.value)} 
+                     />
+                     <div className="space-y-3">
+                       {(block.questions || []).map((q: string, qIdx: number) => (
+                          <div key={qIdx} className="flex gap-2">
+                            <span className="flex-none p-3 text-xs font-bold text-slate-400 bg-slate-100 rounded-xl">{qIdx + 1}</span>
+                            <input 
+                              className="flex-1 bg-white border border-slate-200 p-3 rounded-xl text-sm focus:ring-2 focus:ring-indigo-200" 
+                              placeholder={`Question ${qIdx + 1}`} 
+                              value={q} 
+                              onChange={e => {
+                                 const newQs = [...block.questions];
+                                 newQs[qIdx] = e.target.value;
+                                 updateBlock(idx, 'questions', newQs);
+                              }} 
+                            />
+                          </div>
+                       ))}
+                     </div>
+                  </div>
+                )}
                 {/* FILL BLANK EDITOR */}
                 {block.type === 'fill-blank' && (
                   <div className="space-y-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
@@ -3701,6 +3785,7 @@ function LessonBuilderView({ data, setData, onSave }: any) {
              <InjectorButton icon={<HelpCircle/>} label="Quiz" onClick={() => addBlock('quiz')} />
              <InjectorButton icon={<Image/>} label="Visual" onClick={() => addBlock('image')} />
             <InjectorButton icon={<Puzzle/>} label="Fill Blank" onClick={() => addBlock('fill-blank')} />
+            <InjectorButton icon={<MessageCircle/>} label="Discussion" onClick={() => addBlock('discussion')} />
           </div>
         </div>
       )}
