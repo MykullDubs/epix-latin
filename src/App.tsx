@@ -528,14 +528,15 @@ lessons: any[]; // Replace 'any' with your Lesson type if defined
 }
 
 // ============================================================================
-//  CLASS VIEW (The Projector / Big Screen Mode with Live Sync!)
+//  CLASS VIEW (The Projector / Big Screen Mode with Live Sync & Fast Scroll)
 // ============================================================================
 function ClassView({ lesson, classId, userData }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
   const [showForum, setShowForum] = useState(false);
-  const [liveState, setLiveState] = useState<any>(null); // NEW: Holds live interactions
+  const [liveState, setLiveState] = useState<any>(null); // Holds live interactions
   const stageRef = useRef<HTMLDivElement>(null);
 
+  // 1. PAGE & SCROLL SYNC: Listen for updates from the Remote
   useEffect(() => {
     const syncId = lesson?.originalId || lesson?.id;
     if (!syncId) return;
@@ -543,8 +544,11 @@ function ClassView({ lesson, classId, userData }: any) {
     const unsub = onSnapshot(doc(db, 'live_sessions', syncId), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
-        if (typeof data.activePageIdx === 'number') setActivePageIdx(data.activePageIdx);
         
+        if (typeof data.activePageIdx === 'number') {
+          setActivePageIdx(data.activePageIdx);
+        }
+
         // Capture interaction state from remote
         if (data.liveBlockState !== undefined) {
             setLiveState(data.liveBlockState);
@@ -552,9 +556,18 @@ function ClassView({ lesson, classId, userData }: any) {
             setLiveState(null);
         }
 
+        // --- FAST SCROLL FIX (30% Faster) ---
         if (typeof data.scrollPercent === 'number' && stageRef.current) {
           const s = stageRef.current;
-          s.scrollTo({ top: data.scrollPercent * (s.scrollHeight - s.clientHeight), behavior: 'smooth' });
+          // Multiply the phone's scroll by 1.3. Math.min keeps it from breaking 100%.
+          const speedMultiplier = 1.3;
+          const targetPercent = Math.min(data.scrollPercent * speedMultiplier, 1);
+          const target = targetPercent * (s.scrollHeight - s.clientHeight);
+          
+          s.scrollTo({
+            top: target,
+            behavior: 'smooth' 
+          });
         }
       }
     });
@@ -581,7 +594,9 @@ function ClassView({ lesson, classId, userData }: any) {
   return (
     <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col overflow-hidden">
       <div className="h-[12vh] px-16 flex items-center justify-between border-b">
-        <div className="h-3 flex-1 bg-slate-100 rounded-full mr-12 overflow-hidden"><div className="h-full bg-indigo-600 transition-all duration-1000" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} /></div>
+        <div className="h-3 flex-1 bg-slate-100 rounded-full mr-12 overflow-hidden">
+          <div className="h-full bg-indigo-600 transition-all duration-1000" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} />
+        </div>
         <span className="text-[3vh] font-black text-slate-300">{activePageIdx + 1} / {pages.length}</span>
       </div>
 
@@ -596,7 +611,23 @@ function ClassView({ lesson, classId, userData }: any) {
                 {block.type === 'image' && (<div className="w-full flex flex-col items-center"><img src={block.url} alt="presentation" className="max-h-[60vh] rounded-[3rem] shadow-2xl object-cover border-8 border-slate-50" />{block.caption && <p className="text-[3vh] text-slate-500 font-bold mt-8 text-center max-w-4xl">{block.caption}</p>}</div>)}
                 {block.type === 'dialogue' && (<div className="w-full max-w-5xl mx-auto space-y-12">{block.lines?.map((line: any, j: number) => (<div key={j} className={`flex items-end gap-6 ${line.side === 'right' ? 'flex-row-reverse' : ''}`}><div className={`w-20 h-20 rounded-full flex items-center justify-center text-[3vh] font-black text-white shrink-0 shadow-2xl ${line.side === 'right' ? 'bg-indigo-600' : 'bg-slate-800'}`}>{line.speaker?.[0].toUpperCase()}</div><div className={`max-w-[80%] p-10 rounded-[3rem] shadow-lg text-[4vh] font-medium leading-relaxed ${line.side === 'right' ? 'bg-indigo-500 text-white rounded-br-none' : 'bg-white border-4 border-slate-100 text-slate-800 rounded-bl-none'}`}>{line.text}{line.translation && (<p className={`text-[2.5vh] mt-6 italic opacity-70 font-bold border-t pt-4 ${line.side === 'right' ? 'border-white/20' : 'border-slate-100'}`}>{line.translation}</p>)}</div></div>))}</div>)}
                 {block.type === 'vocab-list' && (<div className="grid grid-cols-2 gap-8">{block.items.map((item: any, j: number) => (<div key={j} className="bg-slate-50 p-12 rounded-[3rem] border-4 border-slate-100 text-center shadow-xl"><p className="text-[5vh] font-black text-indigo-600 mb-2">{item.term}</p><p className="text-[2.5vh] text-slate-500 font-bold">{item.definition}</p></div>))}</div>)}
-                {block.type === 'discussion' && (<div className="w-full max-w-5xl mx-auto bg-indigo-50 rounded-[4rem] p-16 border-8 border-indigo-100 shadow-2xl"><div className="flex items-center gap-6 mb-12 justify-center"><div className="p-6 bg-indigo-600 text-white rounded-3xl shadow-xl"><MessageCircle size={48} /></div><h3 className="text-[5vh] font-black text-indigo-900">{block.title || "Let's Discuss"}</h3></div><div className="space-y-8">{(block.questions || []).map((q: string, j: number) => (<div key={j} className="bg-white p-8 rounded-[2rem] shadow-md border-4 border-indigo-50 flex gap-6 items-start"><span className="text-[4vh] font-black text-indigo-300">{j + 1}</span><p className="text-[4vh] font-bold text-slate-800 leading-tight">{q}</p></div>))}</div></div>)}
+                
+                {block.type === 'discussion' && (
+                  <div className="w-full max-w-5xl mx-auto bg-indigo-50 rounded-[4rem] p-16 border-8 border-indigo-100 shadow-2xl">
+                    <div className="flex items-center gap-6 mb-12 justify-center">
+                      <div className="p-6 bg-indigo-600 text-white rounded-3xl shadow-xl"><MessageCircle size={48} /></div>
+                      <h3 className="text-[5vh] font-black text-indigo-900">{block.title || "Let's Discuss"}</h3>
+                    </div>
+                    <div className="space-y-8">
+                      {(block.questions || []).map((q: string, j: number) => (
+                        <div key={j} className="bg-white p-8 rounded-[2rem] shadow-md border-4 border-indigo-50 flex gap-6 items-start">
+                          <span className="text-[4vh] font-black text-indigo-300">{j + 1}</span>
+                          <p className="text-[4vh] font-bold text-slate-800 leading-tight">{q}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* --- SYNCED QUIZ BLOCK --- */}
                 {block.type === 'quiz' && (
@@ -677,13 +708,11 @@ function ClassView({ lesson, classId, userData }: any) {
                         })}
                     </div>
                     
-                    {/* Hide Wordbank once submitted so the class can focus on the final sentence */}
                     {!liveState?.submitted && (
                       <div className="mt-16 flex flex-wrap gap-4 justify-center">
                           {block.distractors?.concat(block.text?.match(/\[(.*?)\]/g)?.map((s:string) => s.replace(/\[|\]/g, '')) || [])
                           .sort(() => 0.5 - Math.random()) 
                           .map((word: string, i: number) => {
-                              // Optional: Dim words that are currently selected in a blank
                               const isUsed = liveState?.answers?.includes(word);
                               return (
                                 <span key={i} className={`px-6 py-3 rounded-xl border-2 text-[3vh] font-bold transition-all duration-300 ${isUsed ? 'bg-slate-50 border-slate-100 text-slate-300 scale-95' : 'bg-slate-100 border-slate-200 text-slate-500'}`}>
@@ -728,12 +757,15 @@ function ClassView({ lesson, classId, userData }: any) {
 function LessonView({ lesson, onFinish, isInstructor = true }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollTimeout = useRef<any>(null); // Throttles network requests
 
+  // --- PAGINATION LOGIC ---
   const pages = useMemo(() => {
     if (!lesson?.blocks) return [];
     const grouped: any[] = [];
     let buffer: any[] = [];
     lesson.blocks.forEach((b: any) => {
+      // Breaks pages on interactive and discussion blocks
       if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion'].includes(b.type)) {
         if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
         grouped.push({ type: 'interact', blocks: [b] });
@@ -755,7 +787,7 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
     }, { merge: true }).catch(console.error);
   }, [lesson, isInstructor]);
 
-  // Handles live interactions from blocks
+  // Handles live interactions from blocks (Quizzes, Drag & Drop)
   const handleLiveInteraction = useCallback((state: any) => {
     if (!isInstructor) return;
     const syncId = lesson.originalId || lesson.id;
@@ -769,21 +801,32 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
     if (isInstructor) syncToProjector(0);
   }, [isInstructor, syncToProjector]);
 
+  // --- THROTTLED SCROLL SYNC ---
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !isInstructor) return;
+    
     const handleScroll = () => {
-      const scrollPercent = container.scrollTop / (container.scrollHeight - container.clientHeight);
-      const syncId = lesson.originalId || lesson.id;
-      setDoc(doc(db, 'live_sessions', syncId), {
-        scrollPercent: scrollPercent || 0,
-        lastUpdate: Date.now()
-      }, { merge: true }).catch(e => {});
+      if (scrollTimeout.current) return; // Prevent spamming
+      
+      scrollTimeout.current = setTimeout(() => {
+        const scrollPercent = container.scrollTop / (container.scrollHeight - container.clientHeight);
+        const syncId = lesson.originalId || lesson.id;
+        
+        setDoc(doc(db, 'live_sessions', syncId), {
+          scrollPercent: scrollPercent || 0,
+          lastUpdate: Date.now()
+        }, { merge: true }).catch(e => {});
+        
+        scrollTimeout.current = null;
+      }, 50); // 50ms network throttle makes the UI buttery smooth
     };
+
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => container.removeEventListener('scroll', handleScroll);
   }, [lesson, isInstructor]);
 
+  // --- NAVIGATION HANDLERS ---
   const handlePrev = () => {
       const newIdx = Math.max(0, activePageIdx - 1);
       setActivePageIdx(newIdx);
@@ -866,13 +909,13 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
           </div>
         );
 
-      // THESE NOW PASS THE SYNC HANDLER!
       case 'quiz':
         return <QuizBlock key={idx} block={block} onComplete={handleNext} onStateChange={handleLiveInteraction} />;
       case 'scenario':
         return <ScenarioBlock key={idx} block={block} onComplete={handleNext} onStateChange={handleLiveInteraction} />;
       case 'fill-blank':
         return <FillBlankBlock key={idx} block={block} onComplete={handleNext} onStateChange={handleLiveInteraction} />;
+      
       default:
         return <div key={idx} className="p-8 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-100 text-center text-xs text-slate-400 font-bold uppercase tracking-widest">Unsupported Module: {block.type}</div>;
     }
