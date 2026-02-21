@@ -589,6 +589,9 @@ lessonId: string | null;
 lessons: any[]; // Replace 'any' with your Lesson type if defined
 }
 
+// ============================================================================
+//  CLASS VIEW (The Projector / Big Screen Mode)
+// ============================================================================
 function ClassView({ lesson, classId, userData }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
   const [showForum, setShowForum] = useState(false);
@@ -614,7 +617,7 @@ function ClassView({ lesson, classId, userData }: any) {
           const target = data.scrollPercent * (s.scrollHeight - s.clientHeight);
           s.scrollTo({
             top: target,
-            behavior: 'smooth' // Smooth scroll for that cinematic feel
+            behavior: 'smooth' 
           });
         }
       }
@@ -622,13 +625,13 @@ function ClassView({ lesson, classId, userData }: any) {
     return () => unsub();
   }, [lesson]);
 
-  // Page grouping logic
+  // Page grouping logic (Must match LessonView exactly for 1:1 sync)
   const pages = useMemo(() => {
     if (!lesson?.blocks) return [];
     const grouped: any[] = [];
     let buffer: any[] = [];
     lesson.blocks.forEach((b: any) => {
-      if (['quiz', 'flashcard', 'scenario'].includes(b.type)) {
+      if (['quiz', 'flashcard', 'scenario', 'fill-blank'].includes(b.type)) {
         if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
         grouped.push({ type: 'interact', blocks: [b] });
         buffer = [];
@@ -661,15 +664,19 @@ function ClassView({ lesson, classId, userData }: any) {
         >
           <div className="w-full max-w-7xl space-y-20 pb-40">
             {pages[activePageIdx].blocks.map((block: any, i: number) => (
-              <div key={i} className="animate-in fade-in duration-700">
-                {/* Text Block */}
+              <div key={i} className="animate-in fade-in duration-700 w-full">
+                
+                {/* TEXT BLOCK */}
                 {block.type === 'text' && (
-                  <p className="text-[5.5vh] font-bold text-slate-800 leading-tight text-center">{block.content}</p>
+                  <div className="text-center">
+                    {block.title && <h3 className="text-[3vh] font-black text-indigo-400 uppercase tracking-widest mb-6">{block.title}</h3>}
+                    <p className="text-[6vh] font-bold text-slate-800 leading-tight">{block.content}</p>
+                  </div>
                 )}
                 
-                {/* Essay Block with Paragraph Breaks */}
+                {/* ESSAY BLOCK */}
                 {block.type === 'essay' && (
-                  <div className="w-full max-w-4xl mx-auto space-y-[4vh]">
+                  <div className="w-full max-w-5xl mx-auto space-y-[4vh]">
                     <h1 className="text-[8vh] font-black text-slate-900 leading-none mb-12 text-center">{block.title}</h1>
                     {block.content?.split('\n\n').map((para: string, pIdx: number) => (
                       <p key={pIdx} className="text-[4vh] leading-[1.6] text-slate-700 font-serif text-justify first-letter:text-[6vh] first-letter:font-black first-letter:text-indigo-600 first-letter:mr-3">
@@ -679,7 +686,38 @@ function ClassView({ lesson, classId, userData }: any) {
                   </div>
                 )}
 
-                {/* Vocab List */}
+                {/* IMAGE BLOCK */}
+                {block.type === 'image' && (
+                  <div className="w-full flex flex-col items-center">
+                    <img src={block.url} alt="presentation" className="max-h-[60vh] rounded-[3rem] shadow-2xl object-cover border-8 border-slate-50" />
+                    {block.caption && <p className="text-[3vh] text-slate-500 font-bold mt-8 text-center max-w-4xl">{block.caption}</p>}
+                  </div>
+                )}
+
+                {/* DIALOGUE BLOCK */}
+                {block.type === 'dialogue' && (
+                  <div className="w-full max-w-5xl mx-auto space-y-12">
+                    {block.lines?.map((line: any, j: number) => (
+                      <div key={j} className={`flex items-end gap-6 ${line.side === 'right' ? 'flex-row-reverse' : ''}`}>
+                        <div className={`w-20 h-20 rounded-full flex items-center justify-center text-[3vh] font-black text-white shrink-0 shadow-2xl ${line.side === 'right' ? 'bg-indigo-600' : 'bg-slate-800'}`}>
+                          {line.speaker?.[0].toUpperCase()}
+                        </div>
+                        <div className={`max-w-[80%] p-10 rounded-[3rem] shadow-lg text-[4vh] font-medium leading-relaxed ${
+                          line.side === 'right' ? 'bg-indigo-500 text-white rounded-br-none' : 'bg-white border-4 border-slate-100 text-slate-800 rounded-bl-none'
+                        }`}>
+                          {line.text}
+                          {line.translation && (
+                            <p className={`text-[2.5vh] mt-6 italic opacity-70 font-bold border-t pt-4 ${line.side === 'right' ? 'border-white/20' : 'border-slate-100'}`}>
+                              {line.translation}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* VOCAB LIST BLOCK */}
                 {block.type === 'vocab-list' && (
                   <div className="grid grid-cols-2 gap-8">
                     {block.items.map((item: any, j: number) => (
@@ -690,6 +728,61 @@ function ClassView({ lesson, classId, userData }: any) {
                     ))}
                   </div>
                 )}
+
+                {/* QUIZ BLOCK (Display Mode) */}
+                {block.type === 'quiz' && (
+                  <div className="w-full max-w-5xl mx-auto bg-slate-900 rounded-[4rem] p-16 text-white shadow-2xl">
+                    <span className="text-[2vh] font-black text-indigo-400 uppercase tracking-widest block mb-6">Class Question</span>
+                    <h3 className="text-[5vh] font-bold mb-12 leading-tight">{block.question}</h3>
+                    <div className="grid grid-cols-2 gap-6">
+                      {block.options?.map((opt: any, j: number) => (
+                        <div key={j} className="p-8 bg-white/10 border-2 border-white/20 rounded-[2rem] flex items-center gap-6 text-[3vh] font-bold">
+                          <span className="inline-block w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">{opt.id.toUpperCase()}</span>
+                          <span className="text-left">{opt.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* SCENARIO BLOCK (Display Mode) */}
+                {block.type === 'scenario' && (
+                  <div className="w-full max-w-5xl mx-auto bg-emerald-900 rounded-[4rem] p-16 text-white shadow-2xl border-8 border-emerald-500 text-center">
+                    <span className="text-[2vh] font-black text-emerald-400 uppercase tracking-widest block mb-8">Interactive Scenario</span>
+                    <h3 className="text-[5vh] font-serif italic mb-12 leading-tight">"{block.nodes?.[0]?.text}"</h3>
+                    <div className="inline-block px-8 py-4 bg-emerald-800 rounded-full border-2 border-emerald-400/50">
+                      <p className="text-[3vh] font-bold text-emerald-200">Look at your device to make a choice!</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* FILL IN THE BLANK BLOCK (Display Mode) */}
+                {block.type === 'fill-blank' && (
+                  <div className="w-full max-w-6xl mx-auto bg-white p-16 rounded-[4rem] border-4 border-slate-100 shadow-2xl">
+                    <h3 className="text-[4vh] font-bold text-slate-800 mb-12 flex items-center gap-4">
+                       <span className="bg-indigo-100 text-indigo-600 p-4 rounded-2xl"><Puzzle size={40}/></span>
+                       {block.question}
+                    </h3>
+                    <div className="text-[6vh] font-medium leading-loose text-slate-700 flex flex-wrap items-center gap-y-6 justify-center text-center">
+                        {/* Render brackets as empty dashed boxes for the class to guess */}
+                        {block.text?.split(/\[(.*?)\]/g).map((part: string, idx: number) => (
+                            idx % 2 === 0 ? 
+                            <span key={idx} className="mx-2">{part}</span> : 
+                            <span key={idx} className="min-w-[150px] h-20 px-8 mx-3 rounded-2xl border-4 border-slate-300 border-dashed bg-slate-50 text-slate-400 flex items-center justify-center text-[4vh] font-bold shadow-inner">?</span>
+                        ))}
+                    </div>
+                    
+                    {/* Render word bank at the bottom */}
+                    <div className="mt-16 flex flex-wrap gap-4 justify-center">
+                        {block.distractors?.concat(block.text?.match(/\[(.*?)\]/g)?.map((s:string) => s.replace(/\[|\]/g, '')) || [])
+                        .sort(() => 0.5 - Math.random()) // Shuffle
+                        .map((word: string, i: number) => (
+                            <span key={i} className="px-6 py-3 bg-slate-100 rounded-xl border-2 border-slate-200 text-[3vh] font-bold text-slate-500">{word}</span>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
               </div>
             ))}
           </div>
@@ -699,23 +792,24 @@ function ClassView({ lesson, classId, userData }: any) {
         {showForum && (
           <div className="absolute right-0 top-0 bottom-0 w-[450px] bg-slate-50 border-l p-8 z-10 animate-in slide-in-from-right">
              <h3 className="text-2xl font-black mb-6 flex items-center gap-2"><MessageSquare className="text-indigo-600" /> FORUM</h3>
-             <ClassForum classId={classId} userData={userData} />
+             {/* Make sure ClassForum doesn't crash if classId is missing */}
+             {classId ? <ClassForum classId={classId} userData={userData} /> : <p className="text-slate-400">Class chat unavailable.</p>}
           </div>
         )}
       </div>
 
       {/* Footer Controls */}
       <div className="h-[12vh] px-16 border-t flex justify-between items-center bg-white">
-        <span className="font-black text-[2vh] text-slate-400 uppercase tracking-widest">Live Presentation</span>
+        <span className="font-black text-[2.5vh] text-slate-400 uppercase tracking-widest">Live Presentation</span>
         <div className="flex items-center gap-6">
           <button 
             onClick={() => setShowForum(!showForum)} 
-            className={`px-8 py-3 rounded-2xl font-black text-[2vh] transition-all ${showForum ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}
+            className={`px-8 py-4 rounded-2xl font-black text-[2.5vh] transition-all shadow-md ${showForum ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
           >
             {showForum ? "HIDE CHAT" : "SHOW CHAT"}
           </button>
-          <div className="h-12 w-px bg-slate-100 mx-2" />
-          <h2 className="text-[2.5vh] font-black text-slate-900 opacity-20 uppercase tracking-widest">{lesson.title}</h2>
+          <div className="h-16 w-1 bg-slate-100 mx-4 rounded-full" />
+          <h2 className="text-[3vh] font-black text-slate-900 opacity-20 uppercase tracking-widest">{lesson.title}</h2>
         </div>
       </div>
     </div>
