@@ -2888,13 +2888,12 @@ function LiveActivityFeed() {
 }
 
 // ============================================================================
-//  INSTRUCTOR GRADEBOOK (Glow-up: Filtered, Color-Coded & Action-Oriented)
+//  INSTRUCTOR GRADEBOOK (Fixed: Explicit Types for GPA Loop)
 // ============================================================================
 function InstructorGradebook({ classData }: any) {
     const [logs, setLogs] = useState<any[]>([]);
-    const [viewType, setViewType] = useState<'exams' | 'all'>('exams'); // Default to high-stakes only
+    const [viewType, setViewType] = useState<'exams' | 'all'>('exams'); 
     
-    // UI State for Grading & Toasts
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     const [editingCell, setEditingCell] = useState<{ student: string; assignId: string; logId: string } | null>(null);
     const [scoreInput, setScoreInput] = useState<string>("");
@@ -2916,7 +2915,6 @@ function InstructorGradebook({ classData }: any) {
         return () => unsub();
     }, [classData]);
 
-    // --- FILTER LOGIC ---
     const displayedAssignments = classData.assignments.filter((a: any) => 
         viewType === 'all' || a.contentType === 'test' || a.contentType === 'exam'
     );
@@ -2998,7 +2996,6 @@ function InstructorGradebook({ classData }: any) {
         <div className="relative animate-in fade-in duration-500">
             {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
 
-            {/* --- CONTROLS --- */}
             <div className="flex justify-between items-center mb-6">
                 <div className="flex bg-slate-200/50 p-1 rounded-2xl">
                     <button 
@@ -3014,10 +3011,8 @@ function InstructorGradebook({ classData }: any) {
                         Show Lessons
                     </button>
                 </div>
-                <div className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Cohort Size: {classData.students.length}</div>
             </div>
 
-            {/* --- THE TABLE --- */}
             <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden overflow-x-auto custom-scrollbar">
                 <table className="w-full text-left border-collapse">
                     <thead>
@@ -3049,7 +3044,8 @@ function InstructorGradebook({ classData }: any) {
                                 <td className="p-5 text-right sticky right-0 bg-white group-hover:bg-slate-50 border-l border-slate-100 shadow-[-4px_0_10px_rgba(0,0,0,0.02)] z-10">
                                     {(() => {
                                         let total = 0, count = 0;
-                                        displayedAssignments.forEach(a => {
+                                        // --- FIX APPLIED HERE: (a: any) ---
+                                        displayedAssignments.forEach((a: any) => {
                                             const log = logs.find(l => l.studentEmail === student && (l.itemId === a.id || l.itemTitle === a.title));
                                             if (log) {
                                                 const p = log.scoreDetail?.finalScorePct ?? (log.scoreDetail?.total > 0 ? Math.round((log.scoreDetail.score / log.scoreDetail.total) * 100) : 0);
