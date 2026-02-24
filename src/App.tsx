@@ -225,9 +225,14 @@ const useLearningTimer = (user: any, activityId: string, activityType: string, t
         };
     }, [user, activityId]);
 };
-// STANDALONE PREVIEW ENGINE
 const LivePreview = ({ data }: any) => {
   const currentTheme = THEMES[data?.theme || 'indigo'] || THEMES['indigo'];
+
+  // --- AUTOMATIC VOCABULARY EXTRACTOR ---
+  // Scrapes the entire lesson architecture to find vocab-lists for the game
+  const lessonVocab = data?.blocks
+    ?.filter((b: any) => b.type === 'vocab-list')
+    ?.flatMap((b: any) => b.items) || [];
 
   return (
     <div className={`w-full h-full bg-white rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border-[12px] border-slate-900 transition-all duration-700 ${currentTheme.font}`}>
@@ -254,7 +259,6 @@ const LivePreview = ({ data }: any) => {
                   <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest block mb-2">Fill in the Blank</span>
                   <h3 className="font-bold text-sm mb-4">{b.question}</h3>
                   <div className="text-sm font-medium leading-relaxed text-slate-700 bg-slate-50 p-4 rounded-xl">
-                      {/* Quick visual preview of the text with brackets rendered as blanks */}
                       {b.text?.split(/\[(.*?)\]/g).map((part: string, i: number) => 
                           i % 2 === 0 ? part : <span key={i} className="inline-block w-16 h-6 border-b-2 border-slate-300 mx-1 border-dashed"></span>
                       )}
@@ -275,6 +279,7 @@ const LivePreview = ({ data }: any) => {
                  </div>
                </div>
              )}
+             
             {b.type === 'discussion' && (
                 <div className="bg-indigo-50 border-2 border-indigo-100 p-5 rounded-2xl shadow-sm">
                   <h3 className="font-black text-indigo-900 text-sm mb-4 flex items-center gap-2">
@@ -345,6 +350,21 @@ const LivePreview = ({ data }: any) => {
                   <h3 className="font-bold text-sm italic">"{b.nodes?.[0]?.text || 'Scenario starting point...'}"</h3>
                   <p className="text-xs text-emerald-200 mt-2">({b.nodes?.length} branching nodes configured)</p>
                 </div>
+             )}
+
+             {/* --- NEW GAME DEPLOYMENT --- */}
+             {b.type === 'game' && b.gameType === 'connect-three' && (
+                 <div className="my-8 animate-in fade-in slide-in-from-bottom-4">
+                     <div className="text-center mb-6">
+                         <h3 className="text-2xl font-black text-slate-800">{b.title || "Vocabulary Battle"}</h3>
+                         <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">Pass & Play • Connect 3</p>
+                     </div>
+                     
+                     {/* Scale down slightly to ensure it looks flawless in the mobile preview container */}
+                     <div className="scale-95 origin-top">
+                        <ConnectThreeVocab vocabList={lessonVocab} />
+                     </div>
+                 </div>
              )}
 
           </div>
