@@ -5274,7 +5274,7 @@ function ExamPlayerView({ exam, onFinish }: any) {
 // ============================================================================
 //  ARCADE BUILDER (Phase 1: Game Template Configurator)
 // ============================================================================
-export default function ArcadeBuilderView({ data, setData, availableDecks = [] }: any) {
+function ArcadeBuilderView({ data, setData, availableDecks = [] }: any) {
     
     // Ensure data has default structure if fresh
     const gameData = {
