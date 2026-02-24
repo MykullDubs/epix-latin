@@ -3556,10 +3556,6 @@ const THEMES: any = {
   }
 };
 
-/**
- * LESSON BUILDER VIEW (Visual Editor)
- * Fully wired to edit all block types
- */
 function LessonBuilderView({ data, setData, onSave }: any) {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [jsonMode, setJsonMode] = useState(false);
@@ -3581,8 +3577,9 @@ function LessonBuilderView({ data, setData, onSave }: any) {
       quiz: { type: 'quiz', question: '', options: [{id:'a',text:''},{id:'b',text:''}], correctId: 'a' },
       image: { type: 'image', url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa', caption: '' },
       'fill-blank': { type: 'fill-blank', question: 'Fill in the blanks:', text: 'The [quick] brown [fox] jumps.', distractors: ['slow', 'dog'] },
-      'discussion': { type: 'discussion', title: 'Discussion Time', questions: ['Question 1?', 'Question 2?', 'Question 3?'] }
-      
+      discussion: { type: 'discussion', title: 'Discussion Time', questions: ['Question 1?', 'Question 2?', 'Question 3?'] },
+      // --- NEW GAME TEMPLATE ---
+      game: { type: 'game', gameType: 'connect-three', title: 'Vocabulary Battle' }
     };
     setData({ ...data, blocks: [...(data.blocks || []), templates[type]] });
   };
@@ -3743,7 +3740,6 @@ function LessonBuilderView({ data, setData, onSave }: any) {
                   </div>
                 )}
 
-                
                 {/* DIALOGUE EDITOR */}
                 {block.type === 'dialogue' && (
                   <div className="space-y-3">
@@ -3777,6 +3773,7 @@ function LessonBuilderView({ data, setData, onSave }: any) {
                      </div>
                   </div>
                 )}
+
                 {/* DISCUSSION EDITOR */}
                 {block.type === 'discussion' && (
                   <div className="space-y-4 bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100">
@@ -3809,6 +3806,7 @@ function LessonBuilderView({ data, setData, onSave }: any) {
                      </div>
                   </div>
                 )}
+
                 {/* FILL BLANK EDITOR */}
                 {block.type === 'fill-blank' && (
                   <div className="space-y-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
@@ -3846,11 +3844,32 @@ function LessonBuilderView({ data, setData, onSave }: any) {
                   </div>
                 )}
 
+                {/* --- NEW GAME EDITOR VISUAL --- */}
+                {block.type === 'game' && (
+                  <div className="p-6 bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-100 rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative overflow-hidden">
+                      <Gamepad2 size={120} className="absolute -right-10 -bottom-10 text-indigo-500/5 rotate-12" />
+                      
+                      <div className="flex items-center gap-5 relative z-10">
+                          <div className="w-16 h-16 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
+                              <Gamepad2 size={32} />
+                          </div>
+                          <div>
+                              <h4 className="text-xl font-black text-indigo-950 mb-1">{block.title || 'Connect Three'}</h4>
+                              <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-white/60 px-2 py-1 rounded-md inline-block">Interactive Module</p>
+                          </div>
+                      </div>
+                      
+                      <div className="relative z-10 text-left md:text-right max-w-xs">
+                          <p className="text-sm font-bold text-indigo-800 leading-tight">
+                              This game will automatically populate words from the lesson's vocab list block.
+                          </p>
+                      </div>
+                  </div>
+                )}
+
               </div>
             ))}
           </div>
-
-          
 
           {/* Injector Button Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-10 border-t border-slate-100">
@@ -3860,8 +3879,10 @@ function LessonBuilderView({ data, setData, onSave }: any) {
              <InjectorButton icon={<List/>} label="Vocab" onClick={() => addBlock('vocab-list')} />
              <InjectorButton icon={<HelpCircle/>} label="Quiz" onClick={() => addBlock('quiz')} />
              <InjectorButton icon={<Image/>} label="Visual" onClick={() => addBlock('image')} />
-            <InjectorButton icon={<Puzzle/>} label="Fill Blank" onClick={() => addBlock('fill-blank')} />
-            <InjectorButton icon={<MessageCircle/>} label="Discussion" onClick={() => addBlock('discussion')} />
+             <InjectorButton icon={<Puzzle/>} label="Fill Blank" onClick={() => addBlock('fill-blank')} />
+             <InjectorButton icon={<MessageCircle/>} label="Discussion" onClick={() => addBlock('discussion')} />
+             {/* NEW GAME INJECTOR BUTTON */}
+             <InjectorButton icon={<Gamepad2/>} label="Game" onClick={() => addBlock('game')} />
           </div>
         </div>
       )}
