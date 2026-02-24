@@ -2406,15 +2406,15 @@ function ClassForum({ classData, user }: any) {
     );
 }
 // ============================================================================
-//  STUDENT CLASS VIEW (Dashboard with Tabs & Filtered Activity Feed)
+//  STUDENT CLASS VIEW (Dashboard with Tabs & Reviewable Feed)
 // ============================================================================
 function StudentClassView({ classData, onBack, onSelectLesson, userData, setActiveTab, setSelectedLessonId }: any) {
   const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'forum' | 'grades'>('lessons');
   
-  // --- NEW: STATE TO TRACK COMPLETED ASSIGNMENTS ---
+  // STATE TO TRACK COMPLETED ASSIGNMENTS
   const [completedItems, setCompletedItems] = useState<string[]>([]);
 
-  // --- NEW: FETCH COMPLETIONS TO FILTER THE FEED ---
+  // FETCH COMPLETIONS TO STYLE THE FEED
   useEffect(() => {
       const studentEmail = userData?.email || auth?.currentUser?.email;
       if (!classData?.assignments || !studentEmail) return;
@@ -2426,7 +2426,6 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
       );
 
       const unsub = onSnapshot(q, (snapshot) => {
-          // We collect EVERY possible identifier (id, originalId, title) to ensure fuzzy matching works perfectly
           const completedIdentifiers = snapshot.docs.flatMap(d => {
               const data = d.data();
               return [data.itemId, data.originalId, data.itemTitle].filter(Boolean);
@@ -2436,14 +2435,6 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
 
       return () => unsub();
   }, [classData, userData]);
-
-  // Filter out any assignments that match a completed identifier
-  const activeAssignments = classData?.assignments?.filter((assign: any) => {
-      const isCompleted = completedItems.includes(assign.id) || 
-                          (assign.originalId && completedItems.includes(assign.originalId)) || 
-                          completedItems.includes(assign.title);
-      return !isCompleted; // Only keep it if it is NOT completed
-  }) || [];
 
   // --- INTERNAL FORUM COMPONENT ---
   const ClassForum = ({ classId }: { classId: string }) => {
@@ -2567,46 +2558,57 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
         {activeSubTab === 'lessons' && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
             
-            {/* UPDATED: If there are NO active assignments left to do, show the caught-up message! */}
-            {activeAssignments.length === 0 && (
+            {(!classData.assignments || classData.assignments.length === 0) && (
               <div className="py-20 text-center flex flex-col items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500">
-                  <CheckCircle2 size={32} />
+                <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-200">
+                  <Play size={32} />
                 </div>
-                <p className="text-slate-400 font-bold">You're all caught up! 🎉</p>
-                <p className="text-xs text-slate-300">Check the Grades tab to review your past work.</p>
+                <p className="text-slate-300 italic font-bold">No assignments posted yet.</p>
               </div>
             )}
             
-            {/* UPDATED: Map over activeAssignments instead of classData.assignments */}
-            {activeAssignments.map((item: any) => (
-              <div key={item.id} className="group p-5 bg-white border-2 border-slate-100 rounded-[2.5rem] flex justify-between items-center hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-50/20 transition-all duration-300">
-                <div className="flex items-center gap-4 flex-1 cursor-pointer" onClick={() => onSelectLesson(item)}>
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                    <Play size={24} fill="currentColor" />
-                  </div>
-                  <div>
-                    <h4 className="font-black text-slate-800 text-lg leading-none mb-1">{item.title}</h4>
-                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{item.type || 'Lesson'}</span>
-                  </div>
-                </div>
+            {classData.assignments?.map((item: any) => {
+              // Check if this specific item is in the completed array
+              const isCompleted = completedItems.includes(item.id) || 
+                                  (item.originalId && completedItems.includes(item.originalId)) || 
+                                  completedItems.includes(item.title);
 
-                {item.contentType !== 'test' && item.contentType !== 'exam' && (
-                    <button 
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        const targetId = item.originalId || item.lessonId || item.id;
-                        setSelectedLessonId(targetId);
-                        setActiveTab('presentation');
-                    }}
-                    className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-amber-100 hover:text-amber-600 transition-all flex items-center justify-center shadow-sm active:scale-90"
-                    title="Launch Presentation"
-                    >
-                    <Monitor size={24} />
-                    </button>
-                )}
-              </div>
-            ))}
+              // Styling changes dynamically if it's finished!
+              const borderStyle = isCompleted ? 'border-emerald-100 bg-emerald-50/20' : 'border-slate-100 bg-white';
+              const iconBoxStyle = isCompleted ? 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-600' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600';
+              const labelColor = isCompleted ? 'text-emerald-500' : 'text-indigo-400';
+
+              return (
+                <div key={item.id} className={`group p-5 border-2 ${borderStyle} rounded-[2.5rem] flex justify-between items-center hover:shadow-xl hover:shadow-indigo-50/20 transition-all duration-300`}>
+                  <div className="flex items-center gap-4 flex-1 cursor-pointer" onClick={() => onSelectLesson(item)}>
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center group-hover:text-white transition-colors ${iconBoxStyle}`}>
+                      {isCompleted ? <CheckCircle2 size={24} /> : <Play size={24} fill="currentColor" />}
+                    </div>
+                    <div>
+                      <h4 className="font-black text-slate-800 text-lg leading-none mb-1">{item.title}</h4>
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${labelColor}`}>
+                        {isCompleted ? 'Completed • Review' : (item.type || 'Lesson')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {item.contentType !== 'test' && item.contentType !== 'exam' && (
+                      <button 
+                      onClick={(e) => {
+                          e.stopPropagation();
+                          const targetId = item.originalId || item.lessonId || item.id;
+                          setSelectedLessonId(targetId);
+                          setActiveTab('presentation');
+                      }}
+                      className="p-4 bg-white border border-slate-100 text-slate-400 rounded-2xl hover:bg-amber-100 hover:text-amber-600 transition-all flex items-center justify-center shadow-sm active:scale-90"
+                      title="Launch Presentation"
+                      >
+                      <Monitor size={24} />
+                      </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
