@@ -759,14 +759,22 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollTimeout = useRef<any>(null); // Throttles network requests
 
+  // --- AUTOMATIC VOCABULARY EXTRACTOR ---
+  // Hunts through the lesson and compiles all vocab words for the game block
+  const lessonVocab = useMemo(() => {
+    return lesson?.blocks
+      ?.filter((b: any) => b.type === 'vocab-list')
+      ?.flatMap((b: any) => b.items) || [];
+  }, [lesson]);
+
   // --- PAGINATION LOGIC ---
   const pages = useMemo(() => {
     if (!lesson?.blocks) return [];
     const grouped: any[] = [];
     let buffer: any[] = [];
     lesson.blocks.forEach((b: any) => {
-      // Breaks pages on interactive and discussion blocks
-      if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion'].includes(b.type)) {
+      // THE FIX: Added 'game' to the interactive break list!
+      if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game'].includes(b.type)) {
         if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
         grouped.push({ type: 'interact', blocks: [b] });
         buffer = [];
@@ -847,8 +855,6 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
 
  // --- BLOCK RENDERER ---
   const renderBlock = (block: any, idx: number) => {
-    // THE FIX: Combine the page index and block index. 
-    // This forces React to mount a brand new component when you change pages!
     const blockKey = `page_${activePageIdx}_block_${idx}`;
 
     switch (block.type) {
@@ -912,6 +918,22 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
             </div>
           </div>
         );
+      
+      // --- NEW GAME BLOCK DEPLOYMENT ---
+      case 'game':
+        if (block.gameType === 'connect-three') {
+            return (
+                <div key={blockKey} className="py-6 animate-in fade-in slide-in-from-bottom-4">
+                    <div className="text-center mb-6">
+                        <h3 className="text-2xl font-black text-slate-800">{block.title || "Vocabulary Battle"}</h3>
+                        <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">Pass & Play • Connect 3</p>
+                    </div>
+                    {/* Pass the extracted vocab directly into the game engine */}
+                    <ConnectThreeVocab vocabList={lessonVocab} />
+                </div>
+            );
+        }
+        return null;
 
       case 'quiz':
         return <QuizBlock key={blockKey} block={block} onComplete={handleNext} onStateChange={handleLiveInteraction} />;
