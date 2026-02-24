@@ -2888,18 +2888,19 @@ function LiveActivityFeed() {
 }
 
 // ============================================================================
-//  INSTRUCTOR GRADEBOOK (Fixed: Live Sync & Inline Grading)
+//  INSTRUCTOR GRADEBOOK (Glow-up: Filtered, Color-Coded & Action-Oriented)
 // ============================================================================
 function InstructorGradebook({ classData }: any) {
     const [logs, setLogs] = useState<any[]>([]);
+    const [viewType, setViewType] = useState<'exams' | 'all'>('exams'); // Default to high-stakes only
     
     // UI State for Grading & Toasts
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     const [editingCell, setEditingCell] = useState<{ student: string; assignId: string; logId: string } | null>(null);
     const [scoreInput, setScoreInput] = useState<string>("");
-    
+
     useEffect(() => {
-        if(!classData.assignments || classData.assignments.length === 0 || !classData.students || classData.students.length === 0) return;
+        if(!classData.assignments || !classData.students) return;
         
         const q = query(
             collection(db, 'artifacts', appId, 'activity_logs'), 
@@ -2909,40 +2910,26 @@ function InstructorGradebook({ classData }: any) {
         );
 
         const unsub = onSnapshot(q, (snapshot) => {
-            // We capture the document 'id' here so we can update it later!
             const all = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
             setLogs(all);
         });
         return () => unsub();
     }, [classData]);
 
-    // --- THE GRADE RELEASE ENGINE ---
- const handleReleaseGrade = async (logId: string) => {
-        // 1. Safety Check: Did they type anything?
-        if (!scoreInput || !scoreInput.trim()) {
+    // --- FILTER LOGIC ---
+    const displayedAssignments = classData.assignments.filter((a: any) => 
+        viewType === 'all' || a.contentType === 'test' || a.contentType === 'exam'
+    );
+
+    const handleReleaseGrade = async (logId: string) => {
+        const numericScore = parseInt(scoreInput, 10);
+        if (isNaN(numericScore) || !logId) {
             setEditingCell(null);
             return;
         }
 
-        // 2. Safety Check: Is it a valid number? (Prevents the Firebase NaN crash!)
-        const numericScore = parseInt(scoreInput, 10);
-        if (isNaN(numericScore)) {
-            setToastMsg("Please enter a valid number.");
-            return;
-        }
-
-        // 3. Safety Check: Did React lose the document ID?
-        if (!logId) {
-            console.error("Missing logId for Firebase update.");
-            setToastMsg("Error: Cannot find document ID.");
-            return;
-        }
-
         try {
-            // Target the specific student's activity log safely
             const logRef = doc(db, 'artifacts', appId, 'activity_logs', logId);
-            
-            // Deep merge the strict number into the database
             await setDoc(logRef, {
                 scoreDetail: {
                     finalScorePct: numericScore,
@@ -2953,136 +2940,123 @@ function InstructorGradebook({ classData }: any) {
 
             setToastMsg("Grade Released! 🎯");
             setEditingCell(null);
-            setScoreInput("");
         } catch (error) {
-            console.error("Grade release failed:", error);
-            setToastMsg("Error saving grade to database.");
+            setToastMsg("Error saving grade.");
         }
     };
 
     const getScoreCell = (studentEmail: string, assign: any) => {
         let log = logs.find(l => l.studentEmail === studentEmail && l.itemId === assign.id);
         if (!log && assign.originalId) log = logs.find(l => l.studentEmail === studentEmail && l.itemId === assign.originalId);
-        if (!log) log = logs.find(l => l.studentEmail === studentEmail && l.itemTitle === assign.title);
+        if (!log) log = logs.find(l => l.itemTitle === assign.title);
 
-        if (!log) return <span className="text-slate-300">-</span>;
+        if (!log) return <span className="text-slate-200">-</span>;
         
-        // Calculate Score % so we can pre-fill the input box
-        let pct = 100;
-        if (log.scoreDetail?.finalScorePct !== undefined) pct = log.scoreDetail.finalScorePct;
-        else if (log.scoreDetail?.total > 0) pct = Math.round((log.scoreDetail.score / log.scoreDetail.total) * 100);
-
-        // Check if this specific cell is currently being edited
+        const pct = log.scoreDetail?.finalScorePct ?? (log.scoreDetail?.total > 0 ? Math.round((log.scoreDetail.score / log.scoreDetail.total) * 100) : 0);
         const isEditing = editingCell?.student === studentEmail && editingCell?.assignId === assign.id;
 
         if (isEditing) {
             return (
                 <div className="flex items-center justify-center gap-1 animate-in zoom-in-95">
                     <input
-                        type="number"
-                        autoFocus
-                        value={scoreInput}
+                        type="number" autoFocus value={scoreInput}
                         onChange={(e) => setScoreInput(e.target.value)}
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') handleReleaseGrade(log.id);
                             if (e.key === 'Escape') setEditingCell(null);
                         }}
-                        className="w-14 p-1 text-center font-bold text-xs bg-white border-2 border-indigo-500 rounded-md focus:outline-none shadow-sm"
-                        placeholder="%"
+                        className="w-14 p-1 text-center font-black text-xs bg-white border-2 border-indigo-500 rounded-lg outline-none"
                     />
-                    <button 
-                        onClick={() => handleReleaseGrade(log.id)}
-                        className="p-1 bg-emerald-500 text-white rounded-md hover:bg-emerald-400 transition-colors shadow-sm"
-                    >
-                        <Check size={14} strokeWidth={3} />
-                    </button>
                 </div>
             );
         }
 
-        // If it needs a grade, render as a clickable button to open the editor
         if (log.scoreDetail?.status === 'pending_review') {
             return (
                 <button 
                     onClick={() => { setEditingCell({ student: studentEmail, assignId: assign.id, logId: log.id }); setScoreInput(pct.toString()); }} 
-                    className="text-[10px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded font-bold whitespace-nowrap hover:bg-amber-200 hover:scale-105 transition-all cursor-pointer shadow-sm"
+                    className="text-[10px] bg-amber-100 text-amber-600 px-2 py-1 rounded-md font-black uppercase hover:bg-amber-200 transition-all shadow-sm"
                 >
-                    Needs Grade
+                    Review
                 </button>
             );
         }
         
         const color = pct >= 90 ? 'text-emerald-600 bg-emerald-50' : pct >= 70 ? 'text-indigo-600 bg-indigo-50' : 'text-rose-600 bg-rose-50';
         
-        // Render completed grades as clickable buttons so instructors can override them
         return (
             <button 
                 onClick={() => { setEditingCell({ student: studentEmail, assignId: assign.id, logId: log.id }); setScoreInput(pct.toString()); }}
-                className={`text-xs font-bold px-2 py-1 rounded cursor-pointer hover:ring-2 hover:ring-indigo-300 transition-all ${color}`}
+                className={`text-xs font-black px-2.5 py-1.5 rounded-xl cursor-pointer hover:ring-2 hover:ring-indigo-300 transition-all ${color}`}
             >
                 {pct}%
             </button>
         );
     };
 
-    if (!classData.students || classData.students.length === 0) return <div className="p-8 text-center text-slate-400">No students in roster.</div>;
-
     return (
         <div className="relative animate-in fade-in duration-500">
             {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
 
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden overflow-x-auto">
+            {/* --- CONTROLS --- */}
+            <div className="flex justify-between items-center mb-6">
+                <div className="flex bg-slate-200/50 p-1 rounded-2xl">
+                    <button 
+                        onClick={() => setViewType('exams')}
+                        className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewType === 'exams' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
+                    >
+                        Exams Only
+                    </button>
+                    <button 
+                        onClick={() => setViewType('all')}
+                        className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewType === 'all' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
+                    >
+                        Show Lessons
+                    </button>
+                </div>
+                <div className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Cohort Size: {classData.students.length}</div>
+            </div>
+
+            {/* --- THE TABLE --- */}
+            <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden overflow-x-auto custom-scrollbar">
                 <table className="w-full text-left border-collapse">
                     <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200">
-                            <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-50 z-10 border-r border-slate-200">Student</th>
-                            {classData.assignments.map((a: any) => (
-                                <th key={a.id} className="p-4 text-xs font-bold text-slate-500 whitespace-nowrap min-w-[120px] text-center border-r border-slate-100 last:border-0">{a.title}</th>
+                        <tr className="bg-slate-900 text-white">
+                            <th className="p-5 text-[10px] font-black uppercase tracking-widest sticky left-0 bg-slate-900 z-10 border-r border-white/5">Student</th>
+                            {displayedAssignments.map((a: any) => (
+                                <th key={a.id} className="p-5 text-[10px] font-black uppercase tracking-widest text-center min-w-[140px] border-r border-white/5">
+                                    <div className={`text-[8px] mb-1 ${a.contentType === 'test' ? 'text-rose-400' : 'text-indigo-300'}`}>
+                                        {a.contentType}
+                                    </div>
+                                    {a.title}
+                                </th>
                             ))}
-                            <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest text-right sticky right-0 bg-slate-50 z-10 border-l border-slate-200">Avg</th>
+                            <th className="p-5 text-[10px] font-black uppercase tracking-widest text-right sticky right-0 bg-slate-900 z-10 border-l border-white/5">GPA</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {classData.students.map((student: string) => (
                             <tr key={student} className="hover:bg-slate-50/50 group">
-                                <td className="p-4 font-bold text-slate-700 text-sm sticky left-0 bg-white group-hover:bg-slate-50 transition-colors border-r border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.02)] z-10">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px] font-black shrink-0">
-                                            {student.charAt(0).toUpperCase()}
-                                        </div>
-                                        <div>
-                                            {student.split('@')[0]}
-                                            <div className="text-[9px] text-slate-400 font-normal">{student}</div>
-                                        </div>
-                                    </div>
+                                <td className="p-5 font-bold text-slate-700 text-sm sticky left-0 bg-white group-hover:bg-slate-50 border-r border-slate-100 shadow-[4px_0_10px_rgba(0,0,0,0.02)] z-10 transition-colors">
+                                    {student.split('@')[0]}
+                                    <div className="text-[9px] text-slate-300 font-medium lowercase tracking-tight">{student}</div>
                                 </td>
-                                {classData.assignments.map((a: any) => (
-                                    <td key={a.id} className="p-4 text-center border-r border-slate-50 last:border-0 align-middle">
+                                {displayedAssignments.map((a: any) => (
+                                    <td key={a.id} className="p-4 text-center align-middle border-r border-slate-50">
                                         {getScoreCell(student, a)}
                                     </td>
                                 ))}
-                                <td className="p-4 text-right font-mono text-xs text-slate-400 sticky right-0 bg-white group-hover:bg-slate-50 transition-colors border-l border-slate-200 shadow-[-2px_0_5px_rgba(0,0,0,0.02)] z-10 align-middle">
+                                <td className="p-5 text-right sticky right-0 bg-white group-hover:bg-slate-50 border-l border-slate-100 shadow-[-4px_0_10px_rgba(0,0,0,0.02)] z-10">
                                     {(() => {
-                                        let totalPct = 0;
-                                        let count = 0;
-                                        classData.assignments.forEach((a: any) => {
-                                            let log = logs.find(l => l.studentEmail === student && l.itemId === a.id);
-                                            if (!log && a.originalId) log = logs.find(l => l.studentEmail === student && l.itemId === a.originalId);
-                                            if (!log) log = logs.find(l => l.studentEmail === student && l.itemTitle === a.title);
-
+                                        let total = 0, count = 0;
+                                        displayedAssignments.forEach(a => {
+                                            const log = logs.find(l => l.studentEmail === student && (l.itemId === a.id || l.itemTitle === a.title));
                                             if (log) {
-                                                let p = 100;
-                                                if (log.scoreDetail?.finalScorePct !== undefined) p = log.scoreDetail.finalScorePct;
-                                                else if (log.scoreDetail?.total > 0) p = Math.round((log.scoreDetail.score / log.scoreDetail.total) * 100);
-                                                totalPct += p;
-                                                count++;
+                                                const p = log.scoreDetail?.finalScorePct ?? (log.scoreDetail?.total > 0 ? Math.round((log.scoreDetail.score / log.scoreDetail.total) * 100) : 0);
+                                                total += p; count++;
                                             }
                                         });
-                                        return count === 0 ? '-' : (
-                                            <span className="font-black text-slate-600 bg-slate-100 px-2 py-1 rounded-md">
-                                                {Math.round(totalPct / count)}%
-                                            </span>
-                                        );
+                                        return count === 0 ? <span className="text-slate-200">--</span> : <span className="font-black text-slate-900 text-sm">{Math.round(total / count)}%</span>;
                                     })()}
                                 </td>
                             </tr>
