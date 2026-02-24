@@ -2642,19 +2642,24 @@ function AnalyticsDashboard({ classes }: any) {
 }
 
 // ============================================================================
-//  INSTRUCTOR GRADING SUITE (Inbox)
+//  INSTRUCTOR GRADING SUITE (Inbox - Fixed with Direct Firebase Sync)
 // ============================================================================
-function InstructorInbox({ onGradeSubmission }: any) {
+function InstructorInbox() { // Removed the broken onGradeSubmission prop!
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState('');
+  const [toastMsg, setToastMsg] = useState<string | null>(null); // Added Toast State
   
   // Local state for the grade adjustments
-  const [grades, setGrades] = useState<any>({}); // { questionIndex: pointsAwarded }
+  const [grades, setGrades] = useState<any>({}); 
 
   useEffect(() => { 
-      const q = query(collection(db, 'artifacts', appId, 'activity_logs'), where('scoreDetail.status', '==', 'pending_review'), orderBy('timestamp', 'asc')); 
+      const q = query(
+          collection(db, 'artifacts', appId, 'activity_logs'), 
+          where('scoreDetail.status', '==', 'pending_review'), 
+          orderBy('timestamp', 'asc')
+      ); 
       const unsub = onSnapshot(q, (snapshot) => { 
           setSubmissions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))); 
           setLoading(false); 
@@ -2673,6 +2678,7 @@ function InstructorInbox({ onGradeSubmission }: any) {
               initGrades[i] = q.awardedPoints || 0;
           });
           setGrades(initGrades);
+          setFeedback(''); // Clear feedback on new selection
       }
   }, [selectedItem]);
 
@@ -2684,22 +2690,45 @@ function InstructorInbox({ onGradeSubmission }: any) {
       return Object.values(grades).reduce((acc: number, val: any) => acc + (parseInt(val) || 0), 0);
   };
 
+  // --- NEW: DIRECT FIREBASE UPDATE ENGINE ---
   const handleSubmitGrade = async () => { 
       if(!selectedItem) return; 
       const finalScore = calculateTotal();
-      const totalPossible = selectedItem.scoreDetail.total;
+      const totalPossible = selectedItem.scoreDetail.total || 100;
       const scorePct = Math.round((finalScore / totalPossible) * 100);
       
-      // Update the submission with individual question grades if you wanted to be fancy,
-      // but for now we just update the total score and status.
-      await onGradeSubmission(selectedItem.id, finalScore, feedback, scorePct); 
-      setSelectedId(null); 
-      setFeedback(''); 
-      setGrades({});
+      try {
+          // Target the specific exam in Firebase
+          const logRef = doc(db, 'artifacts', appId, 'activity_logs', selectedItem.id);
+          
+          // Use updateDoc with dot-notation to ONLY update the score fields 
+          // without accidentally erasing the student's actual essay answers!
+          await updateDoc(logRef, {
+              'scoreDetail.score': finalScore,
+              'scoreDetail.finalScorePct': scorePct,
+              'scoreDetail.status': 'graded',
+              'scoreDetail.instructorFeedback': feedback,
+              'lastUpdated': Date.now()
+          });
+
+          // Trigger the satisfying toast!
+          setToastMsg("Exam Graded & Released! 🎯");
+          
+          // Clear the UI so you can grade the next one
+          setSelectedId(null); 
+          setFeedback(''); 
+          setGrades({});
+      } catch (error) {
+          console.error("Failed to submit grade:", error);
+          setToastMsg("Error saving grade to database.");
+      }
   };
 
   return ( 
     <div className="flex h-full bg-slate-50 relative overflow-hidden">
+        {/* TOAST NOTIFICATION */}
+        {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
+
         {/* SIDEBAR LIST */}
         <div className={`${selectedId ? 'hidden md:flex' : 'flex'} w-full md:w-80 flex-col border-r border-slate-200 bg-white z-10`}>
             <div className="p-4 border-b border-slate-100 flex justify-between items-center"><h2 className="font-bold text-slate-800 flex items-center gap-2"><Inbox size={18} className="text-indigo-600"/> Inbox</h2><span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-1 rounded-full">{submissions.length}</span></div>
@@ -2718,7 +2747,7 @@ function InstructorInbox({ onGradeSubmission }: any) {
         <div className={`flex-1 flex flex-col bg-slate-50 ${!selectedId ? 'hidden md:flex' : 'flex'}`}>
             {selectedItem ? (
                 <>
-                    <div className="p-4 bg-white border-b border-slate-200 flex justify-between items-center shadow-sm">
+                    <div className="p-4 bg-white border-b border-slate-200 flex justify-between items-center shadow-sm z-10 relative">
                         <div className="flex items-center gap-3"><button onClick={() => setSelectedId(null)} className="md:hidden p-2 text-slate-400"><ArrowLeft size={20}/></button><div><h2 className="font-bold text-lg text-slate-800">{selectedItem.itemTitle}</h2><p className="text-xs text-slate-500">Submitted by <span className="font-bold text-indigo-600">{selectedItem.studentName}</span></p></div></div>
                         <div className="text-right"><div className="text-xs text-slate-400 font-bold uppercase tracking-wider">Total Score</div><div className="text-2xl font-black text-indigo-600">{calculateTotal()} <span className="text-sm text-slate-300 font-medium">/ {selectedItem.scoreDetail.total}</span></div></div>
                     </div>
@@ -2730,10 +2759,8 @@ function InstructorInbox({ onGradeSubmission }: any) {
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="flex items-center gap-2">
                                             <span className="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-100 px-2 py-1 rounded">{q.type}</span>
-                                            {/* Status Badge */}
                                             {q.type === 'essay' && <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded flex items-center gap-1"><AlertTriangle size={10}/> Essay</span>}
                                         </div>
-                                        {/* Point Input */}
                                         <div className="flex items-center gap-2">
                                             <label className="text-[10px] font-bold text-slate-400 uppercase">Points:</label>
                                             <input type="number" min="0" max={q.maxPoints} value={grades[idx] || 0} onChange={(e) => handlePointChange(idx, parseInt(e.target.value))} className="w-16 p-1 text-center font-bold border border-slate-200 rounded-lg text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"/>
@@ -2742,12 +2769,10 @@ function InstructorInbox({ onGradeSubmission }: any) {
                                     </div>
                                     <h3 className="font-bold text-slate-800 text-lg mb-4">{q.prompt}</h3>
                                     
-                                    {/* Student Answer Display */}
                                     <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-slate-700 font-medium whitespace-pre-wrap font-serif leading-relaxed">
                                         {q.studentVal}
                                     </div>
                                     
-                                    {/* Correct Answer (If applicable) */}
                                     {q.type !== 'essay' && (
                                         <div className="mt-3 flex items-center gap-2 text-xs">
                                             <span className="font-bold text-slate-400 uppercase">Correct Answer:</span>
