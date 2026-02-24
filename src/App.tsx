@@ -2408,13 +2408,15 @@ function ClassForum({ classData, user }: any) {
 // ============================================================================
 //  STUDENT CLASS VIEW (Dashboard with Tabs & Reviewable Feed)
 // ============================================================================
+// ============================================================================
+//  STUDENT CLASS VIEW (Dashboard with Separated Lessons & Exams)
+// ============================================================================
 function StudentClassView({ classData, onBack, onSelectLesson, userData, setActiveTab, setSelectedLessonId }: any) {
-  const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'forum' | 'grades'>('lessons');
+  // --- ADDED 'exams' TO STATE ---
+  const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'exams' | 'forum' | 'grades'>('lessons');
   
-  // STATE TO TRACK COMPLETED ASSIGNMENTS
   const [completedItems, setCompletedItems] = useState<string[]>([]);
 
-  // FETCH COMPLETIONS TO STYLE THE FEED
   useEffect(() => {
       const studentEmail = userData?.email || auth?.currentUser?.email;
       if (!classData?.assignments || !studentEmail) return;
@@ -2435,6 +2437,10 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
 
       return () => unsub();
   }, [classData, userData]);
+
+  // --- SEPARATE THE CONTENT ---
+  const lessonList = classData?.assignments?.filter((a: any) => a.contentType !== 'test' && a.contentType !== 'exam') || [];
+  const examList = classData?.assignments?.filter((a: any) => a.contentType === 'test' || a.contentType === 'exam') || [];
 
   // --- INTERNAL FORUM COMPONENT ---
   const ClassForum = ({ classId }: { classId: string }) => {
@@ -2508,7 +2514,6 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
     );
   };
 
-  // --- MAIN CLASS PORTAL RENDER ---
   return (
     <div className="h-full flex flex-col bg-white overflow-hidden animate-in fade-in duration-500">
       
@@ -2524,56 +2529,60 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
         <h2 className="text-3xl font-black text-slate-900 leading-tight mb-2">{classData.name}</h2>
         <p className="text-slate-400 font-medium text-sm line-clamp-1">{classData.description || "Welcome to Michael's Class."}</p>
 
-        {/* Tab Switcher */}
-        <div className="flex gap-2 mt-8 p-1.5 bg-slate-100 rounded-[1.5rem] w-fit">
+        {/* Tab Switcher - Now with 4 Options */}
+        <div className="flex gap-2 mt-8 p-1.5 bg-slate-100 rounded-[1.5rem] w-fit overflow-x-auto custom-scrollbar">
           <button 
             onClick={() => setActiveSubTab('lessons')}
-            className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all ${
-              activeSubTab === 'lessons' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'
+            className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
+              activeSubTab === 'lessons' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
             }`}
           >
-            Lessons
+            <BookOpen size={14}/> Lessons
+          </button>
+          <button 
+            onClick={() => setActiveSubTab('exams')}
+            className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
+              activeSubTab === 'exams' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            <FileText size={14}/> Exams
           </button>
           <button 
             onClick={() => setActiveSubTab('forum')}
-            className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all ${
-              activeSubTab === 'forum' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'
+            className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
+              activeSubTab === 'forum' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
             }`}
           >
-            Discussion
+            <MessageSquare size={14}/> Discussion
           </button>
           <button 
             onClick={() => setActiveSubTab('grades')}
             className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
-              activeSubTab === 'grades' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'
+              activeSubTab === 'grades' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
             }`}
           >
-            <CheckCircle2 size={12} /> Grades
+            <CheckCircle2 size={14} /> Grades
           </button>
         </div>
       </div>
 
       {/* 2. Content Body */}
       <div className="flex-1 overflow-y-auto px-8 pb-12 custom-scrollbar">
+        
+        {/* TAB: LESSONS */}
         {activeSubTab === 'lessons' && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
-            
-            {(!classData.assignments || classData.assignments.length === 0) && (
+            {lessonList.length === 0 && (
               <div className="py-20 text-center flex flex-col items-center gap-4">
                 <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-200">
                   <Play size={32} />
                 </div>
-                <p className="text-slate-300 italic font-bold">No assignments posted yet.</p>
+                <p className="text-slate-300 italic font-bold">No practice lessons posted yet.</p>
               </div>
             )}
             
-            {classData.assignments?.map((item: any) => {
-              // Check if this specific item is in the completed array
-              const isCompleted = completedItems.includes(item.id) || 
-                                  (item.originalId && completedItems.includes(item.originalId)) || 
-                                  completedItems.includes(item.title);
-
-              // Styling changes dynamically if it's finished!
+            {lessonList.map((item: any) => {
+              const isCompleted = completedItems.includes(item.id) || (item.originalId && completedItems.includes(item.originalId)) || completedItems.includes(item.title);
               const borderStyle = isCompleted ? 'border-emerald-100 bg-emerald-50/20' : 'border-slate-100 bg-white';
               const iconBoxStyle = isCompleted ? 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-600' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600';
               const labelColor = isCompleted ? 'text-emerald-500' : 'text-indigo-400';
@@ -2592,32 +2601,70 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
                     </div>
                   </div>
 
-                  {item.contentType !== 'test' && item.contentType !== 'exam' && (
-                      <button 
-                      onClick={(e) => {
-                          e.stopPropagation();
-                          const targetId = item.originalId || item.lessonId || item.id;
-                          setSelectedLessonId(targetId);
-                          setActiveTab('presentation');
-                      }}
-                      className="p-4 bg-white border border-slate-100 text-slate-400 rounded-2xl hover:bg-amber-100 hover:text-amber-600 transition-all flex items-center justify-center shadow-sm active:scale-90"
-                      title="Launch Presentation"
-                      >
-                      <Monitor size={24} />
-                      </button>
-                  )}
+                  {/* Presentation Mode Button */}
+                  <button 
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        const targetId = item.originalId || item.lessonId || item.id;
+                        setSelectedLessonId(targetId);
+                        setActiveTab('presentation');
+                    }}
+                    className="p-4 bg-white border border-slate-100 text-slate-400 rounded-2xl hover:bg-amber-100 hover:text-amber-600 transition-all flex items-center justify-center shadow-sm active:scale-90"
+                    title="Launch Presentation"
+                  >
+                    <Monitor size={24} />
+                  </button>
                 </div>
               );
             })}
           </div>
         )}
 
+        {/* TAB: EXAMS */}
+        {activeSubTab === 'exams' && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            {examList.length === 0 && (
+              <div className="py-20 text-center flex flex-col items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-200">
+                  <FileText size={32} />
+                </div>
+                <p className="text-slate-300 italic font-bold">No active exams right now.</p>
+              </div>
+            )}
+            
+            {examList.map((item: any) => {
+              const isCompleted = completedItems.includes(item.id) || (item.originalId && completedItems.includes(item.originalId)) || completedItems.includes(item.title);
+              const borderStyle = isCompleted ? 'border-emerald-100 bg-emerald-50/20' : 'border-rose-100 bg-white';
+              const iconBoxStyle = isCompleted ? 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-600' : 'bg-rose-50 text-rose-600 group-hover:bg-rose-600';
+              const labelColor = isCompleted ? 'text-emerald-500' : 'text-rose-400';
+
+              return (
+                <div key={item.id} className={`group p-5 border-2 ${borderStyle} rounded-[2.5rem] flex justify-between items-center hover:shadow-xl hover:shadow-rose-50/20 transition-all duration-300`}>
+                  <div className="flex items-center gap-4 flex-1 cursor-pointer" onClick={() => onSelectLesson(item)}>
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center group-hover:text-white transition-colors ${iconBoxStyle}`}>
+                      {isCompleted ? <CheckCircle2 size={24} /> : <FileText size={24} fill="currentColor" />}
+                    </div>
+                    <div>
+                      <h4 className="font-black text-slate-800 text-lg leading-none mb-1">{item.title}</h4>
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${labelColor}`}>
+                        {isCompleted ? 'Exam Submitted • Review' : 'Active Exam'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* TAB: FORUM */}
         {activeSubTab === 'forum' && (
           <div className="animate-in fade-in h-full">
             <ClassForum classId={classData.id} />
           </div>
         )}
 
+        {/* TAB: GRADES */}
         {activeSubTab === 'grades' && (
           <div className="animate-in fade-in">
              <StudentGradebook classData={classData} user={userData} />
