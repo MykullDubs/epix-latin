@@ -2861,21 +2861,35 @@ function InstructorGradebook({ classData }: any) {
     }, [classData]);
 
     // --- THE GRADE RELEASE ENGINE ---
-    const handleReleaseGrade = async (logId: string) => {
-        if (!scoreInput.trim()) {
+ const handleReleaseGrade = async (logId: string) => {
+        // 1. Safety Check: Did they type anything?
+        if (!scoreInput || !scoreInput.trim()) {
             setEditingCell(null);
             return;
         }
 
+        // 2. Safety Check: Is it a valid number? (Prevents the Firebase NaN crash!)
+        const numericScore = parseInt(scoreInput, 10);
+        if (isNaN(numericScore)) {
+            setToastMsg("Please enter a valid number.");
+            return;
+        }
+
+        // 3. Safety Check: Did React lose the document ID?
+        if (!logId) {
+            console.error("Missing logId for Firebase update.");
+            setToastMsg("Error: Cannot find document ID.");
+            return;
+        }
+
         try {
-            // Target the specific student's activity log
+            // Target the specific student's activity log safely
             const logRef = doc(db, 'artifacts', appId, 'activity_logs', logId);
             
-            // THE FIX: We use setDoc with deep merging instead of updateDoc.
-            // This safely bypasses any missing import errors and correctly updates the nested fields!
+            // Deep merge the strict number into the database
             await setDoc(logRef, {
                 scoreDetail: {
-                    finalScorePct: Number(scoreInput),
+                    finalScorePct: numericScore,
                     status: 'graded'
                 },
                 lastUpdated: Date.now()
@@ -2886,7 +2900,7 @@ function InstructorGradebook({ classData }: any) {
             setScoreInput("");
         } catch (error) {
             console.error("Grade release failed:", error);
-            setToastMsg("Error saving grade.");
+            setToastMsg("Error saving grade to database.");
         }
     };
 
