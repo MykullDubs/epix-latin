@@ -2515,10 +2515,8 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
   };
 
   return (
-    <div className="h-full flex flex-col bg-white overflow-hidden animate-in fade-in duration-500">
-      
-      {/* 1. Header & Navigation */}
-      <div className="p-8 pt-12 shrink-0 bg-white">
+{/* 1. Header & Navigation */}
+      <div className="p-6 md:p-8 pt-10 md:pt-12 shrink-0 bg-white">
         <button 
           onClick={onBack} 
           className="mb-4 flex items-center gap-2 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-black uppercase tracking-widest"
@@ -2527,42 +2525,50 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
         </button>
         
         <h2 className="text-3xl font-black text-slate-900 leading-tight mb-2">{classData.name}</h2>
-        <p className="text-slate-400 font-medium text-sm line-clamp-1">{classData.description || "Welcome to Michael's Class."}</p>
+        <p className="text-slate-400 font-medium text-sm line-clamp-1">{classData.description || "Welcome to the Class."}</p>
 
-        {/* Tab Switcher - Now with 4 Options */}
-        <div className="flex gap-2 mt-8 p-1.5 bg-slate-100 rounded-[1.5rem] w-fit overflow-x-auto custom-scrollbar">
-          <button 
-            onClick={() => setActiveSubTab('lessons')}
-            className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
-              activeSubTab === 'lessons' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            <BookOpen size={14}/> Lessons
-          </button>
-          <button 
-            onClick={() => setActiveSubTab('exams')}
-            className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
-              activeSubTab === 'exams' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            <FileText size={14}/> Exams
-          </button>
-          <button 
-            onClick={() => setActiveSubTab('forum')}
-            className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
-              activeSubTab === 'forum' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            <MessageSquare size={14}/> Discussion
-          </button>
-          <button 
-            onClick={() => setActiveSubTab('grades')}
-            className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
-              activeSubTab === 'grades' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            <CheckCircle2 size={14} /> Grades
-          </button>
+        {/* --- MOBILE-OPTIMIZED SCROLLABLE TAB SWITCHER --- */}
+        <div className="relative mt-8">
+            {/* Optional gradient fade on the right to indicate more scrolling exists on mobile */}
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent md:hidden z-10 pointer-events-none" />
+            
+            <div className="flex gap-2 p-1.5 bg-slate-100 rounded-[1.5rem] w-full md:w-fit overflow-x-auto hide-scrollbar snap-x snap-mandatory">
+              <button 
+                onClick={() => setActiveSubTab('lessons')}
+                className={`shrink-0 snap-start px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
+                  activeSubTab === 'lessons' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                <BookOpen size={14}/> Lessons
+              </button>
+              
+              <button 
+                onClick={() => setActiveSubTab('exams')}
+                className={`shrink-0 snap-start px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
+                  activeSubTab === 'exams' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                <FileText size={14}/> Exams
+              </button>
+              
+              <button 
+                onClick={() => setActiveSubTab('forum')}
+                className={`shrink-0 snap-start px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
+                  activeSubTab === 'forum' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                <MessageSquare size={14}/> Discussion
+              </button>
+              
+              <button 
+                onClick={() => setActiveSubTab('grades')}
+                className={`shrink-0 snap-start px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
+                  activeSubTab === 'grades' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                <CheckCircle2 size={14} /> Grades
+              </button>
+            </div>
         </div>
       </div>
 
