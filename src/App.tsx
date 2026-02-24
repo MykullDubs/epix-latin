@@ -2690,39 +2690,46 @@ function InstructorInbox() { // Removed the broken onGradeSubmission prop!
       return Object.values(grades).reduce((acc: number, val: any) => acc + (parseInt(val) || 0), 0);
   };
 
-  // --- NEW: DIRECT FIREBASE UPDATE ENGINE ---
-  const handleSubmitGrade = async () => { 
-      if(!selectedItem) return; 
-      const finalScore = calculateTotal();
-      const totalPossible = selectedItem.scoreDetail.total || 100;
-      const scorePct = Math.round((finalScore / totalPossible) * 100);
-      
-      try {
-          // Target the specific exam in Firebase
-          const logRef = doc(db, 'artifacts', appId, 'activity_logs', selectedItem.id);
-          
-          // Use updateDoc with dot-notation to ONLY update the score fields 
-          // without accidentally erasing the student's actual essay answers!
-          await updateDoc(logRef, {
-              'scoreDetail.score': finalScore,
-              'scoreDetail.finalScorePct': scorePct,
-              'scoreDetail.status': 'graded',
-              'scoreDetail.instructorFeedback': feedback,
-              'lastUpdated': Date.now()
-          });
+ // --- NEW: DIRECT FIREBASE UPDATE ENGINE ---
+    const handleSubmitGrade = async () => { 
+        if(!selectedItem) return; 
+        const finalScore = calculateTotal();
+        const totalPossible = selectedItem.scoreDetail.total || 100;
+        const scorePct = Math.round((finalScore / totalPossible) * 100);
+        
+        // THE FIX: Rebuild the details array to include the individual points you just assigned!
+        const updatedDetails = selectedItem.scoreDetail.details.map((q: any, idx: number) => ({
+            ...q,
+            // Grab the instructor's grade, or fallback to the auto-graded points if untouched
+            awardedPoints: grades[idx] !== undefined ? parseInt(grades[idx], 10) : (q.awardedPoints || 0)
+        }));
 
-          // Trigger the satisfying toast!
-          setToastMsg("Exam Graded & Released! 🎯");
-          
-          // Clear the UI so you can grade the next one
-          setSelectedId(null); 
-          setFeedback(''); 
-          setGrades({});
-      } catch (error) {
-          console.error("Failed to submit grade:", error);
-          setToastMsg("Error saving grade to database.");
-      }
-  };
+        try {
+            // Target the specific exam in Firebase
+            const logRef = doc(db, 'artifacts', appId, 'activity_logs', selectedItem.id);
+            
+            // Send the total scores AND the updated individual question scores
+            await updateDoc(logRef, {
+                'scoreDetail.score': finalScore,
+                'scoreDetail.finalScorePct': scorePct,
+                'scoreDetail.status': 'graded',
+                'scoreDetail.instructorFeedback': feedback,
+                'scoreDetail.details': updatedDetails, // <--- This saves the individual essay grades!
+                'lastUpdated': Date.now()
+            });
+
+            // Trigger the satisfying toast!
+            setToastMsg("Exam Graded & Released! 🎯");
+            
+            // Clear the UI so you can grade the next one
+            setSelectedId(null); 
+            setFeedback(''); 
+            setGrades({});
+        } catch (error) {
+            console.error("Failed to submit grade:", error);
+            setToastMsg("Error saving grade to database.");
+        }
+    };
 
   return ( 
     <div className="flex h-full bg-slate-50 relative overflow-hidden">
