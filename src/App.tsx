@@ -1964,7 +1964,7 @@ function ProfileView({ user, userData }: any) {
 function GradeDetailModal({ log, onClose }: any) {
     if (!log) return null;
     const { scoreDetail, itemTitle, xp } = log;
-    const isExam = scoreDetail && scoreDetail.details; // Check if it has question breakdown
+    const isExam = scoreDetail && scoreDetail.details; 
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -1999,28 +1999,43 @@ function GradeDetailModal({ log, onClose }: any) {
                     {isExam && (
                         <div className="space-y-4">
                             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Question Breakdown</h3>
-                            {scoreDetail.details.map((q: any, idx: number) => (
-                                <div key={idx} className={`p-4 rounded-2xl border-2 ${q.isCorrect ? 'border-emerald-100 bg-emerald-50/30' : 'border-rose-100 bg-rose-50/30'}`}>
-                                    <div className="flex justify-between items-start mb-2">
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${q.isCorrect ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                                            {q.isCorrect ? 'Correct' : 'Incorrect'}
-                                        </span>
-                                        <span className="text-xs font-bold text-slate-400">{q.awardedPoints} / {q.maxPoints} pts</span>
-                                    </div>
-                                    <p className="font-bold text-slate-800 text-sm mb-2">{q.prompt}</p>
-                                    
-                                    <div className="text-sm text-slate-600 bg-white/50 p-3 rounded-lg border border-slate-200/50 mb-2">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Your Answer</span>
-                                        {q.studentVal}
-                                    </div>
+                            {scoreDetail.details.map((q: any, idx: number) => {
+                                // --- THE FIX: SMART STATUS LOGIC ---
+                                // If it's an essay and points were awarded, it's considered "Graded" (Good).
+                                // Otherwise, fallback to the original isCorrect flag.
+                                const isEssay = q.type === 'essay';
+                                const hasPoints = q.awardedPoints > 0;
+                                const isConsideredCorrect = isEssay ? hasPoints : q.isCorrect;
+                                
+                                const boxColor = isConsideredCorrect ? 'border-emerald-100 bg-emerald-50/30' : 'border-rose-100 bg-rose-50/30';
+                                const badgeColor = isConsideredCorrect ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700';
+                                const badgeLabel = isEssay ? (hasPoints ? 'Graded' : 'Needs Review') : (q.isCorrect ? 'Correct' : 'Incorrect');
 
-                                    {!q.isCorrect && q.correctVal && q.type !== 'essay' && (
-                                        <div className="text-xs text-emerald-700 font-bold flex items-center gap-1">
-                                            <CheckCircle2 size={12}/> Correct Answer: {q.correctVal}
+                                return (
+                                    <div key={idx} className={`p-4 rounded-2xl border-2 ${boxColor}`}>
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${badgeColor}`}>
+                                                {badgeLabel}
+                                            </span>
+                                            <span className="text-xs font-bold text-slate-400">
+                                                {q.awardedPoints || 0} / {q.maxPoints} pts
+                                            </span>
                                         </div>
-                                    )}
-                                </div>
-                            ))}
+                                        <p className="font-bold text-slate-800 text-sm mb-2">{q.prompt}</p>
+                                        
+                                        <div className="text-sm text-slate-600 bg-white/50 p-3 rounded-lg border border-slate-200/50 mb-2 whitespace-pre-wrap font-serif">
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1 font-sans">Your Answer</span>
+                                            {q.studentVal}
+                                        </div>
+
+                                        {!isConsideredCorrect && q.correctVal && !isEssay && (
+                                            <div className="text-xs text-emerald-700 font-bold flex items-center gap-1">
+                                                <CheckCircle2 size={12}/> Correct Answer: {q.correctVal}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
