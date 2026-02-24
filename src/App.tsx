@@ -2406,39 +2406,36 @@ function ClassForum({ classData, user }: any) {
     );
 }
 // ============================================================================
-//  STUDENT CLASS VIEW (Dashboard with Tabs & Reviewable Feed)
-// ============================================================================
-// ============================================================================
-//  STUDENT CLASS VIEW (Dashboard with Separated Lessons & Exams)
+//  STUDENT CLASS VIEW (Fully Integrated & Mobile Optimized)
 // ============================================================================
 function StudentClassView({ classData, onBack, onSelectLesson, userData, setActiveTab, setSelectedLessonId }: any) {
-  // --- ADDED 'exams' TO STATE ---
   const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'exams' | 'forum' | 'grades'>('lessons');
-  
   const [completedItems, setCompletedItems] = useState<string[]>([]);
+  const [activeExam, setActiveExam] = useState<any>(null); // State to launch the Exam Player
 
+  // 1. FETCH COMPLETIONS (To handle the "Review" styling)
   useEffect(() => {
-      const studentEmail = userData?.email || auth?.currentUser?.email;
-      if (!classData?.assignments || !studentEmail) return;
+    const studentEmail = userData?.email || auth?.currentUser?.email;
+    if (!classData?.assignments || !studentEmail) return;
 
-      const q = query(
-          collection(db, 'artifacts', appId, 'activity_logs'),
-          where('studentEmail', '==', studentEmail),
-          where('type', '==', 'completion')
-      );
+    const q = query(
+      collection(db, 'artifacts', appId, 'activity_logs'),
+      where('studentEmail', '==', studentEmail),
+      where('type', '==', 'completion')
+    );
 
-      const unsub = onSnapshot(q, (snapshot) => {
-          const completedIdentifiers = snapshot.docs.flatMap(d => {
-              const data = d.data();
-              return [data.itemId, data.originalId, data.itemTitle].filter(Boolean);
-          });
-          setCompletedItems(completedIdentifiers);
+    const unsub = onSnapshot(q, (snapshot) => {
+      const completedIdentifiers = snapshot.docs.flatMap(d => {
+        const data = d.data();
+        return [data.itemId, data.originalId, data.itemTitle].filter(Boolean);
       });
+      setCompletedItems(completedIdentifiers);
+    });
 
-      return () => unsub();
+    return () => unsub();
   }, [classData, userData]);
 
-  // --- SEPARATE THE CONTENT ---
+  // 2. SPLIT CONTENT INTO CATEGORIES
   const lessonList = classData?.assignments?.filter((a: any) => a.contentType !== 'test' && a.contentType !== 'exam') || [];
   const examList = classData?.assignments?.filter((a: any) => a.contentType === 'test' || a.contentType === 'exam') || [];
 
@@ -2454,20 +2451,15 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
         orderBy('timestamp', 'asc'),
         limit(100)
       );
-
       return onSnapshot(q, (snap) => {
         setMessages(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        setTimeout(() => scrollRef.current?.scrollTo({ 
-          top: scrollRef.current.scrollHeight, 
-          behavior: 'smooth' 
-        }), 100);
+        setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }), 100);
       });
     }, [classId]);
 
     const handleSendMessage = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!newMessage.trim()) return;
-
       await addDoc(collection(db, 'artifacts', appId, 'classes', classId, 'forum'), {
         text: newMessage,
         senderName: userData?.name || 'Scholar',
@@ -2485,199 +2477,128 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
             <div className="h-full flex flex-col items-center justify-center text-slate-300 opacity-50 p-10 text-center">
               <MessageSquare size={40} className="mb-4" />
               <p className="font-black uppercase tracking-tighter text-xs">No questions yet.</p>
-              <p className="text-[10px] font-bold mt-1 italic">Be the first to say hello to the class!</p>
             </div>
           )}
           {messages.map((msg) => (
-            <div key={msg.id} className={`flex flex-col ${msg.senderId === auth.currentUser?.uid ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2`}>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mb-1 px-2">
-                {msg.senderName} {msg.role === 'instructor' && '🎓'}
-              </span>
-              <div className={`p-4 rounded-[1.5rem] text-sm font-medium leading-relaxed max-w-[85%] shadow-sm ${msg.senderId === auth.currentUser?.uid ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'}`}>
+            <div key={msg.id} className={`flex flex-col ${msg.senderId === auth.currentUser?.uid ? 'items-end' : 'items-start'} animate-in fade-in`}>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mb-1 px-2">{msg.senderName}</span>
+              <div className={`p-4 rounded-[1.5rem] text-sm font-medium leading-relaxed max-w-[85%] ${msg.senderId === auth.currentUser?.uid ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'}`}>
                 {msg.text}
               </div>
             </div>
           ))}
         </div>
         <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-100 flex gap-2">
-          <input 
-            value={newMessage} 
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Ask a question..."
-            className="flex-1 bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl px-5 py-3 text-sm font-medium outline-none transition-all"
-          />
-          <button type="submit" className="p-4 bg-indigo-600 text-white rounded-2xl shadow-lg active:scale-90 transition-transform">
-            <Send size={20} />
-          </button>
+          <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Ask a question..." className="flex-1 bg-slate-50 rounded-2xl px-5 py-3 text-sm outline-none" />
+          <button type="submit" className="p-4 bg-indigo-600 text-white rounded-2xl active:scale-90 transition-transform"><Send size={20} /></button>
         </form>
       </div>
     );
   };
 
   return (
-{/* 1. Header & Navigation */}
+    <div className="h-full flex flex-col bg-white overflow-hidden animate-in fade-in duration-500">
+      
+      {/* --- HEADER & MOBILE NAV --- */}
       <div className="p-6 md:p-8 pt-10 md:pt-12 shrink-0 bg-white">
-        <button 
-          onClick={onBack} 
-          className="mb-4 flex items-center gap-2 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-black uppercase tracking-widest"
-        >
+        <button onClick={onBack} className="mb-4 flex items-center gap-2 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-black uppercase tracking-widest">
           <ArrowLeft size={16} /> BACK TO DASHBOARD
         </button>
-        
         <h2 className="text-3xl font-black text-slate-900 leading-tight mb-2">{classData.name}</h2>
-        <p className="text-slate-400 font-medium text-sm line-clamp-1">{classData.description || "Welcome to the Class."}</p>
+        <p className="text-slate-400 font-medium text-sm line-clamp-1">{classData.description || "Welcome to the cohort."}</p>
 
-        {/* --- MOBILE-OPTIMIZED SCROLLABLE TAB SWITCHER --- */}
         <div className="relative mt-8">
-            {/* Optional gradient fade on the right to indicate more scrolling exists on mobile */}
-            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent md:hidden z-10 pointer-events-none" />
-            
-            <div className="flex gap-2 p-1.5 bg-slate-100 rounded-[1.5rem] w-full md:w-fit overflow-x-auto hide-scrollbar snap-x snap-mandatory">
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent md:hidden z-10 pointer-events-none" />
+          <div className="flex gap-2 p-1.5 bg-slate-100 rounded-[1.5rem] w-full md:w-fit overflow-x-auto hide-scrollbar">
+            {[
+              { id: 'lessons', label: 'Lessons', icon: <BookOpen size={14}/>, color: 'text-indigo-600' },
+              { id: 'exams', label: 'Exams', icon: <FileText size={14}/>, color: 'text-rose-600' },
+              { id: 'forum', label: 'Discussion', icon: <MessageSquare size={14}/>, color: 'text-indigo-600' },
+              { id: 'grades', label: 'Grades', icon: <CheckCircle2 size={14}/>, color: 'text-emerald-600' }
+            ].map((tab) => (
               <button 
-                onClick={() => setActiveSubTab('lessons')}
-                className={`shrink-0 snap-start px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
-                  activeSubTab === 'lessons' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                key={tab.id}
+                onClick={() => setActiveSubTab(tab.id as any)}
+                className={`shrink-0 px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
+                  activeSubTab === tab.id ? `bg-white ${tab.color} shadow-sm` : 'text-slate-400'
                 }`}
               >
-                <BookOpen size={14}/> Lessons
+                {tab.icon} {tab.label}
               </button>
-              
-              <button 
-                onClick={() => setActiveSubTab('exams')}
-                className={`shrink-0 snap-start px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
-                  activeSubTab === 'exams' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
-                }`}
-              >
-                <FileText size={14}/> Exams
-              </button>
-              
-              <button 
-                onClick={() => setActiveSubTab('forum')}
-                className={`shrink-0 snap-start px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
-                  activeSubTab === 'forum' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
-                }`}
-              >
-                <MessageSquare size={14}/> Discussion
-              </button>
-              
-              <button 
-                onClick={() => setActiveSubTab('grades')}
-                className={`shrink-0 snap-start px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
-                  activeSubTab === 'grades' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
-                }`}
-              >
-                <CheckCircle2 size={14} /> Grades
-              </button>
-            </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* 2. Content Body */}
-      <div className="flex-1 overflow-y-auto px-8 pb-12 custom-scrollbar">
+      {/* --- CONTENT BODY --- */}
+      <div className="flex-1 overflow-y-auto px-6 md:px-8 pb-12 custom-scrollbar">
         
         {/* TAB: LESSONS */}
         {activeSubTab === 'lessons' && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
-            {lessonList.length === 0 && (
-              <div className="py-20 text-center flex flex-col items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-200">
-                  <Play size={32} />
-                </div>
-                <p className="text-slate-300 italic font-bold">No practice lessons posted yet.</p>
-              </div>
-            )}
-            
-            {lessonList.map((item: any) => {
-              const isCompleted = completedItems.includes(item.id) || (item.originalId && completedItems.includes(item.originalId)) || completedItems.includes(item.title);
-              const borderStyle = isCompleted ? 'border-emerald-100 bg-emerald-50/20' : 'border-slate-100 bg-white';
-              const iconBoxStyle = isCompleted ? 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-600' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600';
-              const labelColor = isCompleted ? 'text-emerald-500' : 'text-indigo-400';
-
-              return (
-                <div key={item.id} className={`group p-5 border-2 ${borderStyle} rounded-[2.5rem] flex justify-between items-center hover:shadow-xl hover:shadow-indigo-50/20 transition-all duration-300`}>
-                  <div className="flex items-center gap-4 flex-1 cursor-pointer" onClick={() => onSelectLesson(item)}>
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center group-hover:text-white transition-colors ${iconBoxStyle}`}>
-                      {isCompleted ? <CheckCircle2 size={24} /> : <Play size={24} fill="currentColor" />}
+            {lessonList.length === 0 ? (
+              <p className="py-20 text-center text-slate-300 italic font-bold">No lessons posted.</p>
+            ) : (
+              lessonList.map((item: any) => {
+                const isCompleted = completedItems.includes(item.id) || (item.originalId && completedItems.includes(item.originalId)) || completedItems.includes(item.title);
+                return (
+                  <div key={item.id} className={`group p-5 border-2 ${isCompleted ? 'border-emerald-100 bg-emerald-50/20' : 'border-slate-100 bg-white'} rounded-[2.5rem] flex justify-between items-center hover:shadow-xl transition-all`}>
+                    <div className="flex items-center gap-4 flex-1 cursor-pointer" onClick={() => onSelectLesson(item)}>
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center group-hover:text-white transition-colors ${isCompleted ? 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-600' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600'}`}>
+                        {isCompleted ? <CheckCircle2 size={24} /> : <Play size={24} fill="currentColor" />}
+                      </div>
+                      <div>
+                        <h4 className="font-black text-slate-800 text-lg leading-none mb-1">{item.title}</h4>
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${isCompleted ? 'text-emerald-500' : 'text-indigo-400'}`}>
+                          {isCompleted ? 'Completed • Review' : 'Lesson'}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-black text-slate-800 text-lg leading-none mb-1">{item.title}</h4>
-                      <span className={`text-[10px] font-black uppercase tracking-widest ${labelColor}`}>
-                        {isCompleted ? 'Completed • Review' : (item.type || 'Lesson')}
-                      </span>
-                    </div>
+                    <button onClick={() => { setSelectedLessonId(item.originalId || item.id); setActiveTab('presentation'); }} className="p-4 text-slate-400 hover:text-amber-600 transition-colors"><Monitor size={24} /></button>
                   </div>
-
-                  {/* Presentation Mode Button */}
-                  <button 
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        const targetId = item.originalId || item.lessonId || item.id;
-                        setSelectedLessonId(targetId);
-                        setActiveTab('presentation');
-                    }}
-                    className="p-4 bg-white border border-slate-100 text-slate-400 rounded-2xl hover:bg-amber-100 hover:text-amber-600 transition-all flex items-center justify-center shadow-sm active:scale-90"
-                    title="Launch Presentation"
-                  >
-                    <Monitor size={24} />
-                  </button>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         )}
 
         {/* TAB: EXAMS */}
         {activeSubTab === 'exams' && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
-            {examList.length === 0 && (
-              <div className="py-20 text-center flex flex-col items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-200">
-                  <FileText size={32} />
-                </div>
-                <p className="text-slate-300 italic font-bold">No active exams right now.</p>
-              </div>
-            )}
-            
-            {examList.map((item: any) => {
-              const isCompleted = completedItems.includes(item.id) || (item.originalId && completedItems.includes(item.originalId)) || completedItems.includes(item.title);
-              const borderStyle = isCompleted ? 'border-emerald-100 bg-emerald-50/20' : 'border-rose-100 bg-white';
-              const iconBoxStyle = isCompleted ? 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-600' : 'bg-rose-50 text-rose-600 group-hover:bg-rose-600';
-              const labelColor = isCompleted ? 'text-emerald-500' : 'text-rose-400';
-
-              return (
-                <div key={item.id} className={`group p-5 border-2 ${borderStyle} rounded-[2.5rem] flex justify-between items-center hover:shadow-xl hover:shadow-rose-50/20 transition-all duration-300`}>
-                  <div className="flex items-center gap-4 flex-1 cursor-pointer" onClick={() => onSelectLesson(item)}>
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center group-hover:text-white transition-colors ${iconBoxStyle}`}>
+            {examList.length === 0 ? (
+              <p className="py-20 text-center text-slate-300 italic font-bold">No active exams.</p>
+            ) : (
+              examList.map((item: any) => {
+                const isCompleted = completedItems.includes(item.id) || (item.originalId && completedItems.includes(item.originalId)) || completedItems.includes(item.title);
+                return (
+                  <div key={item.id} className={`group p-5 border-2 ${isCompleted ? 'border-emerald-100 bg-emerald-50/20' : 'border-rose-100 bg-white'} rounded-[2.5rem] flex items-center gap-4 cursor-pointer hover:shadow-xl transition-all`} onClick={() => !isCompleted && setActiveExam(item)}>
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center group-hover:text-white transition-colors ${isCompleted ? 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-600' : 'bg-rose-50 text-rose-600 group-hover:bg-rose-600'}`}>
                       {isCompleted ? <CheckCircle2 size={24} /> : <FileText size={24} fill="currentColor" />}
                     </div>
                     <div>
                       <h4 className="font-black text-slate-800 text-lg leading-none mb-1">{item.title}</h4>
-                      <span className={`text-[10px] font-black uppercase tracking-widest ${labelColor}`}>
-                        {isCompleted ? 'Exam Submitted • Review' : 'Active Exam'}
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${isCompleted ? 'text-emerald-500' : 'text-rose-400'}`}>
+                        {isCompleted ? 'Exam Submitted • Review in Grades' : 'Active Exam'}
                       </span>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         )}
 
-        {/* TAB: FORUM */}
-        {activeSubTab === 'forum' && (
-          <div className="animate-in fade-in h-full">
-            <ClassForum classId={classData.id} />
-          </div>
-        )}
-
-        {/* TAB: GRADES */}
-        {activeSubTab === 'grades' && (
-          <div className="animate-in fade-in">
-             <StudentGradebook classData={classData} user={userData} />
-          </div>
-        )}
-
+        {activeSubTab === 'forum' && <ClassForum classId={classData.id} />}
+        {activeSubTab === 'grades' && <StudentGradebook classData={classData} user={userData} />}
       </div>
+
+      {/* --- EXAM OVERLAY --- */}
+      {activeExam && (
+        <ExamPlayerView 
+          exam={activeExam} 
+          onFinish={() => setActiveExam(null)} 
+        />
+      )}
     </div>
   );
 }
