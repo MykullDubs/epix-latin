@@ -3988,6 +3988,9 @@ function InjectorButton({ icon, label, onClick }: any) {
     </button>
   );
 }
+// ============================================================================
+//  BUILDER HUB (The Main Studio Workspace)
+// ============================================================================
 function BuilderHub({ 
   onSaveCard, 
   onUpdateCard, 
@@ -4056,12 +4059,18 @@ function BuilderHub({
               <X size={20} />
             </button>
           )}
-          <button 
-            onClick={() => onSaveLesson(lessonData)}
-            className="hidden sm:flex bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all"
-          >
-            Commit Unit
-          </button>
+          {/* Hide the commit button when in exam mode, because the ExamBuilder has its own fancy "Publish Exam" button at the bottom */}
+          {mode !== 'exam' && (
+             <button 
+               onClick={() => {
+                  onSaveLesson(lessonData);
+                  setToastMsg("Unit Committed!");
+               }}
+               className="hidden sm:flex bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+             >
+               Commit Unit
+             </button>
+          )}
         </div>
       </header>
 
@@ -4073,7 +4082,7 @@ function BuilderHub({
           viewMode === 'edit' ? 'w-full md:w-1/2 opacity-100' : 'hidden md:block md:w-1/2 opacity-50 grayscale-[50%]'
         }`}>
           <div className="p-6 md:p-12 max-w-2xl mx-auto pb-40">
-            {/* MODE TOGGLE: Cards vs Lesson */}
+            {/* MODE TOGGLE: Cards vs Lesson vs Exam */}
             <div className="mb-10 flex bg-slate-200/50 p-1.5 rounded-[2rem] w-fit mx-auto md:mx-0">
               {modes.map((m) => (
                 <button 
@@ -4106,6 +4115,17 @@ function BuilderHub({
                   availableDecks={allDecks} 
                 />
               )}
+              {/* --- NEW: EXAM BUILDER HOOKUP --- */}
+              {mode === 'exam' && (
+                <div className="-mx-6 md:-mx-12">
+                   <ExamBuilderView 
+                     onSave={(examObj: any) => {
+                         onSaveLesson(examObj); // Use your existing save function to push to Firebase
+                         setToastMsg("Assessment Successfully Built! 🎯");
+                     }}
+                   />
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -4114,27 +4134,42 @@ function BuilderHub({
         <div className={`h-full bg-slate-100 border-l border-slate-200 items-center justify-center p-6 md:p-12 transition-all duration-500 ${
           viewMode === 'preview' ? 'flex w-full md:w-1/2' : 'hidden md:flex md:w-1/2'
         }`}>
-          <div className="relative w-full h-full max-w-sm max-h-[750px] group">
-            {/* Aura Decoration for Tablet Preview */}
-            <div className="absolute -inset-4 bg-gradient-to-tr from-indigo-500/10 to-emerald-500/10 blur-2xl rounded-[4rem] opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+          <div className="relative w-full h-full max-w-sm max-h-[750px] group flex flex-col items-center justify-center">
             
-            {/* The Actual Preview Component */}
-            <div className="relative h-full w-full animate-in zoom-in-95 duration-500">
-              <LivePreview data={lessonData} />
-            </div>
+            {mode === 'exam' ? (
+                // Exam Preview Placeholder
+                <div className="w-full max-w-xs aspect-[9/16] bg-white border-4 border-dashed border-slate-200 rounded-[3rem] shadow-sm flex flex-col items-center justify-center p-8 text-center animate-in zoom-in-95 duration-500">
+                    <FileText size={64} className="text-slate-200 mb-6" />
+                    <h3 className="text-lg font-black text-slate-800 mb-2">Exam Preview</h3>
+                    <p className="text-sm font-bold text-slate-400">Assessments are rendered dynamically in the student's isolated testing environment.</p>
+                </div>
+            ) : (
+                // Lesson Preview
+                <>
+                    <div className="absolute -inset-4 bg-gradient-to-tr from-indigo-500/10 to-emerald-500/10 blur-2xl rounded-[4rem] opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                    <div className="relative h-full w-full animate-in zoom-in-95 duration-500">
+                      <LivePreview data={lessonData} />
+                    </div>
+                </>
+            )}
 
             {/* Quick-Save Floating Action (For Tablet Preview Mode) */}
-            <button 
-              onClick={() => onSaveLesson(lessonData)}
-              className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-10 py-5 rounded-[2rem] font-black text-[10px] uppercase tracking-[0.3em] shadow-2xl md:hidden flex items-center gap-3 active:scale-90 transition-all"
-            >
-              <Zap size={16} className="text-yellow-400" /> Commit to Library
-            </button>
+            {mode !== 'exam' && (
+                <button 
+                onClick={() => {
+                    onSaveLesson(lessonData);
+                    setToastMsg("Unit Committed!");
+                }}
+                className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-10 py-5 rounded-[2rem] font-black text-[10px] uppercase tracking-[0.3em] shadow-2xl md:hidden flex items-center gap-3 active:scale-90 transition-all"
+                >
+                <Zap size={16} className="text-yellow-400" /> Commit to Library
+                </button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* --- 3. TABLET FOOTER (Quick Block Injector) --- */}
+      {/* --- 3. TABLET FOOTER (Quick Block Injector Indicator) --- */}
       <div className={`md:hidden fixed bottom-10 left-1/2 -translate-x-1/2 transition-all duration-500 ${
         viewMode === 'edit' ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'
       }`}>
