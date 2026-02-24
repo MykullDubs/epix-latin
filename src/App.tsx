@@ -3743,6 +3743,7 @@ function LessonBuilderView({ data, setData, onSave }: any) {
                   </div>
                 )}
 
+                
                 {/* DIALOGUE EDITOR */}
                 {block.type === 'dialogue' && (
                   <div className="space-y-3">
@@ -3848,6 +3849,8 @@ function LessonBuilderView({ data, setData, onSave }: any) {
               </div>
             ))}
           </div>
+
+          
 
           {/* Injector Button Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-10 border-t border-slate-100">
@@ -4586,7 +4589,7 @@ function ExamBuilderView({ onSave, initialData }: any) {
 // ============================================================================
 //  CONNECT THREE: VOCABULARY BATTLE
 // ============================================================================
-export default function ConnectThreeVocab({ vocabList }: any) {
+function ConnectThreeVocab({ vocabList }: any) {
     // Fallback vocabulary if none is provided by the lesson
     const defaultVocab = [
         { term: "Serendipity", definition: "The occurrence of events by chance in a happy or beneficial way." },
