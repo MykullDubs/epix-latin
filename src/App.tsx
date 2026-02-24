@@ -5287,16 +5287,19 @@ function ArcadeBuilderView({ data, setData, availableDecks = [] }: any) {
         ...data
     };
 
+    // 🛡️ BULLETPROOF ARRAYS: Converts objects/nulls into safe arrays so .map() and .includes() never crash
+    const safeDecks = Array.isArray(availableDecks) ? availableDecks : Object.values(availableDecks || {});
+    const safeDeckIds = Array.isArray(gameData.deckIds) ? gameData.deckIds : [];
+
     const updateField = (field: string, value: any) => {
         setData({ ...gameData, [field]: value });
     };
 
     const toggleDeck = (deckId: string) => {
-        const current = gameData.deckIds;
-        if (current.includes(deckId)) {
-            updateField('deckIds', current.filter((id: string) => id !== deckId));
+        if (safeDeckIds.includes(deckId)) {
+            updateField('deckIds', safeDeckIds.filter((id: string) => id !== deckId));
         } else {
-            updateField('deckIds', [...current, deckId]);
+            updateField('deckIds', [...safeDeckIds, deckId]);
         }
     };
 
@@ -5406,18 +5409,18 @@ function ArcadeBuilderView({ data, setData, availableDecks = [] }: any) {
                         <Database size={14} /> Connect Vocabulary Decks
                     </h3>
                     <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2 py-1 rounded-md">
-                        {gameData.deckIds.length} Linked
+                        {safeDeckIds.length} Linked
                     </span>
                 </div>
                 
-                {availableDecks.length === 0 ? (
+                {safeDecks.length === 0 ? (
                     <div className="bg-rose-50 border border-rose-100 p-6 rounded-3xl text-center">
                         <p className="text-sm font-bold text-rose-600">No decks found in the Scriptorium. Create some flashcards first!</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto custom-scrollbar p-1">
-                        {availableDecks.map((deck: any) => {
-                            const isLinked = gameData.deckIds.includes(deck.id);
+                        {safeDecks.map((deck: any) => {
+                            const isLinked = safeDeckIds.includes(deck.id);
                             return (
                                 <button 
                                     key={deck.id}
