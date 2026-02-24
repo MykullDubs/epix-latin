@@ -2035,7 +2035,7 @@ function GradeDetailModal({ log, onClose }: any) {
 }
 
 // ============================================================================
-//  STUDENT GRADEBOOK (With Fuzzy Title Matching)
+//  STUDENT GRADEBOOK (Synchronized with Instructor Grading & Overrides)
 // ============================================================================
 function StudentGradebook({ classData, user }: any) {
     const [logs, setLogs] = useState<any[]>([]);
@@ -2054,8 +2054,8 @@ function StudentGradebook({ classData, user }: any) {
         );
 
         const unsub = onSnapshot(q, (snapshot) => {
-            const allLogs = snapshot.docs.map(d => d.data());
-            // We don't filter here anymore to ensure we catch everything
+            // FIX 1: Capture the document ID to ensure modals work perfectly
+            const allLogs = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
             setLogs(allLogs);
             setLoading(false);
         });
@@ -2064,62 +2064,88 @@ function StudentGradebook({ classData, user }: any) {
 
     const getGradeStatus = (assign: any) => {
         // --- ROBUST MATCHING LOGIC ---
-        // 1. Try Exact Match (Assignment ID) - Best Case
         let log = logs.find(l => l.itemId === assign.id && l.type === 'completion');
-        
-        // 2. Try Original ID Match (Content ID) - Fallback
-        if (!log && assign.originalId) {
-            log = logs.find(l => l.itemId === assign.originalId && l.type === 'completion');
-        }
-
-        // 3. Try Title Match (Fuzzy) - The "Savior" Case
-        // If IDs failed but titles match, assume it's the right one.
-        if (!log) {
-            log = logs.find(l => l.itemTitle === assign.title && l.type === 'completion');
-        }
+        if (!log && assign.originalId) log = logs.find(l => l.itemId === assign.originalId && l.type === 'completion');
+        if (!log) log = logs.find(l => l.itemTitle === assign.title && l.type === 'completion');
         
         // If still nothing, it really is missing
         if (!log) return { status: 'missing', label: 'Not Started', color: 'bg-slate-100 text-slate-400', interactable: false };
         
         // --- SCORE DISPLAY LOGIC ---
-        if (assign.contentType === 'test' || assign.contentType === 'exam') {
-             if (log.scoreDetail?.status === 'pending_review') {
-                 return { status: 'pending', label: 'In Review', color: 'bg-amber-100 text-amber-600', interactable: true, log };
-             }
+        // If it explicitly needs a grade from the instructor
+        if (log.scoreDetail?.status === 'pending_review') {
+            return { status: 'pending', label: 'In Review', color: 'bg-amber-100 text-amber-600', interactable: true, log };
+        }
              
-             const score = log.scoreDetail?.score || 0;
-             const total = log.scoreDetail?.total || 100;
-             const pct = log.scoreDetail?.finalScorePct ?? (total > 0 ? Math.round((score/total)*100) : 0);
-             
-             let color = 'bg-slate-100 text-slate-600';
-             if (pct >= 90) color = 'bg-emerald-100 text-emerald-600';
-             else if (pct >= 70) color = 'bg-indigo-100 text-indigo-600';
-             else color = 'bg-rose-100 text-rose-600';
+        // FIX 2: Check if it's an exam OR if the instructor explicitly graded it via the InstructorGradebook
+        const isExam = assign.contentType === 'test' || assign.contentType === 'exam';
+        const hasInstructorGrade = log.scoreDetail?.finalScorePct !== undefined;
 
-             return { status: 'complete', label: `${score}/${total} pts`, color, interactable: true, log };
+        if (isExam || hasInstructorGrade) {
+            const score = log.scoreDetail?.score || 0;
+            const total = log.scoreDetail?.total || 100;
+            // Use the explicitly instructor-set finalScorePct, or calculate it normally
+            const pct = log.scoreDetail?.finalScorePct ?? (total > 0 ? Math.round((score/total)*100) : 0);
+             
+            let color = 'bg-slate-100 text-slate-600';
+            if (pct >= 90) color = 'bg-emerald-100 text-emerald-600';
+            else if (pct >= 70) color = 'bg-indigo-100 text-indigo-600';
+            else color = 'bg-rose-100 text-rose-600';
+
+            // Show just the percentage if the instructor manually graded it, otherwise show points
+            const displayLabel = hasInstructorGrade ? `${pct}%` : `${score}/${total} pts`;
+
+            return { status: 'complete', label: displayLabel, color, interactable: true, log };
         }
 
+        // Standard completion for a regular lesson/deck that WAS NOT manually graded
         return { status: 'complete', label: 'Complete', color: 'bg-emerald-100 text-emerald-600', interactable: true, log };
     };
 
     return (
         <>
             {selectedLog && <GradeDetailModal log={selectedLog} onClose={() => setSelectedLog(null)} />}
+            
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2">
-                <div className="p-6 border-b border-slate-100 bg-slate-50"><h3 className="font-bold text-slate-800 flex items-center gap-2"><ClipboardList size={18} className="text-indigo-600"/> Report Card</h3></div>
-                {classData.assignments?.length === 0 ? <div className="p-8 text-center text-slate-400 text-sm">No assignments yet.</div> : (
+                <div className="p-6 border-b border-slate-100 bg-slate-50">
+                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                        <ClipboardList size={18} className="text-indigo-600"/> Report Card
+                    </h3>
+                </div>
+                
+                {classData.assignments?.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 text-sm">No assignments yet.</div> 
+                ) : (
                     <div className="divide-y divide-slate-100">
                         {classData.assignments.map((assign: any) => {
                             const { status, label, color, interactable, log } = getGradeStatus(assign);
                             return (
-                                <button key={assign.id} disabled={!interactable} onClick={() => interactable && setSelectedLog(log)} className={`w-full p-4 flex items-center justify-between transition-colors group text-left ${interactable ? 'hover:bg-slate-50 cursor-pointer' : 'cursor-default'}`}>
+                                <button 
+                                    key={assign.id} 
+                                    disabled={!interactable} 
+                                    onClick={() => interactable && setSelectedLog(log)} 
+                                    className={`w-full p-4 flex items-center justify-between transition-colors group text-left ${interactable ? 'hover:bg-slate-50 cursor-pointer' : 'cursor-default'}`}
+                                >
                                     <div className="flex items-center gap-4">
                                         <div className={`p-2 rounded-lg ${assign.contentType === 'test' || assign.contentType === 'exam' ? 'bg-rose-100 text-rose-600' : assign.contentType === 'deck' ? 'bg-orange-100 text-orange-600' : 'bg-indigo-100 text-indigo-600'}`}>
                                             {assign.contentType === 'deck' ? <Layers size={16}/> : (assign.contentType === 'test' || assign.contentType === 'exam') ? <FileText size={16}/> : <BookOpen size={16}/>}
                                         </div>
-                                        <div><h4 className="font-bold text-slate-800 text-sm">{assign.title}</h4><p className="text-xs text-slate-400">{(assign.contentType === 'test' || assign.contentType === 'exam') ? 'Exam' : 'Lesson'}</p></div>
+                                        <div>
+                                            <h4 className="font-bold text-slate-800 text-sm">{assign.title}</h4>
+                                            <p className="text-xs text-slate-400">{(assign.contentType === 'test' || assign.contentType === 'exam') ? 'Exam' : 'Lesson'}</p>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-3"><div className="text-right"><span className={`px-3 py-1 rounded-full text-xs font-bold ${color}`}>{label}</span>{log?.scoreDetail?.instructorFeedback && <div className="flex items-center justify-end gap-1 mt-1 text-[10px] text-indigo-500 font-bold"><MessageCircle size={10}/> Feedback</div>}</div>{interactable && <ChevronRight size={16} className="text-slate-300 group-hover:text-indigo-500 transition-colors"/>}</div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="text-right">
+                                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${color}`}>{label}</span>
+                                            {log?.scoreDetail?.instructorFeedback && (
+                                                <div className="flex items-center justify-end gap-1 mt-1 text-[10px] text-indigo-500 font-bold">
+                                                    <MessageCircle size={10}/> Feedback
+                                                </div>
+                                            )}
+                                        </div>
+                                        {interactable && <ChevronRight size={16} className="text-slate-300 group-hover:text-indigo-500 transition-colors"/>}
+                                    </div>
                                 </button>
                             );
                         })}
@@ -2364,7 +2390,8 @@ function ClassForum({ classData, user }: any) {
     );
 }
 function StudentClassView({ classData, onBack, onSelectLesson, userData, setActiveTab, setSelectedLessonId }: any) {
-  const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'forum'>('lessons');
+  // --- ADDED 'grades' TO STATE ---
+  const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'forum' | 'grades'>('lessons');
 
   // --- INTERNAL FORUM COMPONENT ---
   const ClassForum = ({ classId }: { classId: string }) => {
@@ -2373,7 +2400,6 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-      // Points to the specific sub-collection for Michael's class
       const q = query(
         collection(db, 'artifacts', appId, 'classes', classId, 'forum'),
         orderBy('timestamp', 'asc'),
@@ -2382,7 +2408,6 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
 
       return onSnapshot(q, (snap) => {
         setMessages(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        // Smooth scroll to bottom on new message
         setTimeout(() => scrollRef.current?.scrollTo({ 
           top: scrollRef.current.scrollHeight, 
           behavior: 'smooth' 
@@ -2406,7 +2431,6 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
 
     return (
       <div className="flex flex-col h-[60vh] bg-slate-50 rounded-[2.5rem] overflow-hidden border-2 border-slate-100 shadow-inner">
-        {/* Discussion Feed */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
           {messages.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-slate-300 opacity-50 p-10 text-center">
@@ -2416,25 +2440,16 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
             </div>
           )}
           {messages.map((msg) => (
-            <div 
-              key={msg.id} 
-              className={`flex flex-col ${msg.senderId === auth.currentUser?.uid ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2`}
-            >
+            <div key={msg.id} className={`flex flex-col ${msg.senderId === auth.currentUser?.uid ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2`}>
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mb-1 px-2">
                 {msg.senderName} {msg.role === 'instructor' && '🎓'}
               </span>
-              <div className={`p-4 rounded-[1.5rem] text-sm font-medium leading-relaxed max-w-[85%] shadow-sm ${
-                msg.senderId === auth.currentUser?.uid 
-                  ? 'bg-indigo-600 text-white rounded-tr-none' 
-                  : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'
-              }`}>
+              <div className={`p-4 rounded-[1.5rem] text-sm font-medium leading-relaxed max-w-[85%] shadow-sm ${msg.senderId === auth.currentUser?.uid ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'}`}>
                 {msg.text}
               </div>
             </div>
           ))}
         </div>
-
-        {/* Input Bar */}
         <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-100 flex gap-2">
           <input 
             value={newMessage} 
@@ -2453,6 +2468,7 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
   // --- MAIN CLASS PORTAL RENDER ---
   return (
     <div className="h-full flex flex-col bg-white overflow-hidden animate-in fade-in duration-500">
+      
       {/* 1. Header & Navigation */}
       <div className="p-8 pt-12 shrink-0 bg-white">
         <button 
@@ -2465,7 +2481,7 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
         <h2 className="text-3xl font-black text-slate-900 leading-tight mb-2">{classData.name}</h2>
         <p className="text-slate-400 font-medium text-sm line-clamp-1">{classData.description || "Welcome to Michael's Class."}</p>
 
-        {/* Tab Switcher */}
+        {/* --- ADDED 'Grades' TO TAB SWITCHER --- */}
         <div className="flex gap-2 mt-8 p-1.5 bg-slate-100 rounded-[1.5rem] w-fit">
           <button 
             onClick={() => setActiveSubTab('lessons')}
@@ -2483,12 +2499,20 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
           >
             Discussion
           </button>
+          <button 
+            onClick={() => setActiveSubTab('grades')}
+            className={`px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
+              activeSubTab === 'grades' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'
+            }`}
+          >
+            <CheckCircle2 size={12} /> Grades
+          </button>
         </div>
       </div>
 
       {/* 2. Content Body */}
       <div className="flex-1 overflow-y-auto px-8 pb-12 custom-scrollbar">
-        {activeSubTab === 'lessons' ? (
+        {activeSubTab === 'lessons' && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
             {(!classData.assignments || classData.assignments.length === 0) && (
               <div className="py-20 text-center flex flex-col items-center gap-4">
@@ -2500,15 +2524,8 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
             )}
             
             {classData.assignments?.map((item: any) => (
-              <div 
-                key={item.id} 
-                className="group p-5 bg-white border-2 border-slate-100 rounded-[2.5rem] flex justify-between items-center hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-50/20 transition-all duration-300"
-              >
-                {/* PART A: PLAY (Self-Paced) */}
-                <div 
-                  className="flex items-center gap-4 flex-1 cursor-pointer" 
-                  onClick={() => onSelectLesson(item)}
-                >
+              <div key={item.id} className="group p-5 bg-white border-2 border-slate-100 rounded-[2.5rem] flex justify-between items-center hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-50/20 transition-all duration-300">
+                <div className="flex items-center gap-4 flex-1 cursor-pointer" onClick={() => onSelectLesson(item)}>
                   <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                     <Play size={24} fill="currentColor" />
                   </div>
@@ -2518,28 +2535,39 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
                   </div>
                 </div>
 
-                {/* PART B: PRESENT (Big Screen Mode) */}
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // We target the ORIGINAL ID to ensure blocks are hydrated
-                    const targetId = item.originalId || item.lessonId || item.id;
-                    setSelectedLessonId(targetId);
-                    setActiveTab('presentation');
-                  }}
-                  className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-amber-100 hover:text-amber-600 transition-all flex items-center justify-center shadow-sm active:scale-90"
-                  title="Launch Presentation"
-                >
-                  <Monitor size={24} />
-                </button>
+                {/* Only render presentation button if it's NOT an exam */}
+                {item.contentType !== 'test' && item.contentType !== 'exam' && (
+                    <button 
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        const targetId = item.originalId || item.lessonId || item.id;
+                        setSelectedLessonId(targetId);
+                        setActiveTab('presentation');
+                    }}
+                    className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-amber-100 hover:text-amber-600 transition-all flex items-center justify-center shadow-sm active:scale-90"
+                    title="Launch Presentation"
+                    >
+                    <Monitor size={24} />
+                    </button>
+                )}
               </div>
             ))}
           </div>
-        ) : (
+        )}
+
+        {activeSubTab === 'forum' && (
           <div className="animate-in fade-in h-full">
             <ClassForum classId={classData.id} />
           </div>
         )}
+
+        {/* --- ADDED GRADEBOOK RENDERER --- */}
+        {activeSubTab === 'grades' && (
+          <div className="animate-in fade-in">
+             <StudentGradebook classData={classData} user={userData} />
+          </div>
+        )}
+
       </div>
     </div>
   );
