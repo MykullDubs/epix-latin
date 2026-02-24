@@ -2035,32 +2035,38 @@ function GradeDetailModal({ log, onClose }: any) {
 }
 
 // ============================================================================
-//  STUDENT GRADEBOOK (Synchronized with Instructor Grading & Overrides)
+//  STUDENT GRADEBOOK (Fixed: Crash Prevention & Safe Email Fetching)
 // ============================================================================
 function StudentGradebook({ classData, user }: any) {
     const [logs, setLogs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedLog, setSelectedLog] = useState<any>(null);
 
+    // FIX 1: Safely grab the email from either the passed prop OR directly from Firebase Auth
+    const studentEmail = user?.email || auth?.currentUser?.email;
+
     useEffect(() => {
-        if(!classData.assignments || classData.assignments.length === 0) { setLoading(false); return; }
+        // FIX 2: If we don't have an email yet, STOP HERE to prevent Firebase from crashing!
+        if(!classData.assignments || classData.assignments.length === 0 || !studentEmail) { 
+            setLoading(false); 
+            return; 
+        }
         
-        // 1. Fetch EVERYTHING recent for this student
+        // Now it's perfectly safe to query
         const q = query(
             collection(db, 'artifacts', appId, 'activity_logs'), 
-            where('studentEmail', '==', user.email),
+            where('studentEmail', '==', studentEmail),
             orderBy('timestamp', 'desc'),
             limit(100)
         );
 
         const unsub = onSnapshot(q, (snapshot) => {
-            // FIX 1: Capture the document ID to ensure modals work perfectly
             const allLogs = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
             setLogs(allLogs);
             setLoading(false);
         });
         return () => unsub();
-    }, [classData, user]);
+    }, [classData, studentEmail]); // Depend on the safe string
 
     const getGradeStatus = (assign: any) => {
         // --- ROBUST MATCHING LOGIC ---
@@ -2072,19 +2078,16 @@ function StudentGradebook({ classData, user }: any) {
         if (!log) return { status: 'missing', label: 'Not Started', color: 'bg-slate-100 text-slate-400', interactable: false };
         
         // --- SCORE DISPLAY LOGIC ---
-        // If it explicitly needs a grade from the instructor
         if (log.scoreDetail?.status === 'pending_review') {
             return { status: 'pending', label: 'In Review', color: 'bg-amber-100 text-amber-600', interactable: true, log };
         }
              
-        // FIX 2: Check if it's an exam OR if the instructor explicitly graded it via the InstructorGradebook
         const isExam = assign.contentType === 'test' || assign.contentType === 'exam';
         const hasInstructorGrade = log.scoreDetail?.finalScorePct !== undefined;
 
         if (isExam || hasInstructorGrade) {
             const score = log.scoreDetail?.score || 0;
             const total = log.scoreDetail?.total || 100;
-            // Use the explicitly instructor-set finalScorePct, or calculate it normally
             const pct = log.scoreDetail?.finalScorePct ?? (total > 0 ? Math.round((score/total)*100) : 0);
              
             let color = 'bg-slate-100 text-slate-600';
@@ -2092,13 +2095,11 @@ function StudentGradebook({ classData, user }: any) {
             else if (pct >= 70) color = 'bg-indigo-100 text-indigo-600';
             else color = 'bg-rose-100 text-rose-600';
 
-            // Show just the percentage if the instructor manually graded it, otherwise show points
             const displayLabel = hasInstructorGrade ? `${pct}%` : `${score}/${total} pts`;
 
             return { status: 'complete', label: displayLabel, color, interactable: true, log };
         }
 
-        // Standard completion for a regular lesson/deck that WAS NOT manually graded
         return { status: 'complete', label: 'Complete', color: 'bg-emerald-100 text-emerald-600', interactable: true, log };
     };
 
