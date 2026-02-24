@@ -543,8 +543,8 @@ const ChatDialogueBlock = ({ lines }: any) => (
 );
 // 1. Define the Interface for Props
 interface ClassViewProps {
-lessonId: string | null;
-lessons: any[]; // Replace 'any' with your Lesson type if defined
+    lessonId: string | null;
+    lessons: any[]; // Replace 'any' with your Lesson type if defined
 }
 
 // ============================================================================
@@ -555,6 +555,14 @@ function ClassView({ lesson, classId, userData }: any) {
   const [showForum, setShowForum] = useState(false);
   const [liveState, setLiveState] = useState<any>(null); // Holds live interactions
   const stageRef = useRef<HTMLDivElement>(null);
+
+  // --- AUTOMATIC VOCABULARY EXTRACTOR ---
+  // Scrapes the lesson data to feed the Connect Three game on the big screen
+  const lessonVocab = useMemo(() => {
+    return lesson?.blocks
+      ?.filter((b: any) => b.type === 'vocab-list')
+      ?.flatMap((b: any) => b.items) || [];
+  }, [lesson]);
 
   // 1. PAGE & SCROLL SYNC: Listen for updates from the Remote
   useEffect(() => {
@@ -599,7 +607,8 @@ function ClassView({ lesson, classId, userData }: any) {
     const grouped: any[] = [];
     let buffer: any[] = [];
     lesson.blocks.forEach((b: any) => {
-      if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion'].includes(b.type)) {
+      // THE FIX: Added 'game' to the interactive page-break trigger
+      if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game'].includes(b.type)) {
         if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
         grouped.push({ type: 'interact', blocks: [b] });
         buffer = [];
@@ -627,9 +636,13 @@ function ClassView({ lesson, classId, userData }: any) {
               <div key={i} className="animate-in fade-in duration-700 w-full">
                 
                 {block.type === 'text' && (<div className="text-center">{block.title && <h3 className="text-[3vh] font-black text-indigo-400 uppercase tracking-widest mb-6">{block.title}</h3>}<p className="text-[6vh] font-bold text-slate-800 leading-tight">{block.content}</p></div>)}
+                
                 {block.type === 'essay' && (<div className="w-full max-w-5xl mx-auto space-y-[4vh]"><h1 className="text-[8vh] font-black text-slate-900 leading-none mb-12 text-center">{block.title}</h1>{block.content?.split('\n\n').map((para: string, pIdx: number) => (<p key={pIdx} className="text-[4vh] leading-[1.6] text-slate-700 font-serif text-justify first-letter:text-[6vh] first-letter:font-black first-letter:text-indigo-600 first-letter:mr-3">{para.trim()}</p>))}</div>)}
+                
                 {block.type === 'image' && (<div className="w-full flex flex-col items-center"><img src={block.url} alt="presentation" className="max-h-[60vh] rounded-[3rem] shadow-2xl object-cover border-8 border-slate-50" />{block.caption && <p className="text-[3vh] text-slate-500 font-bold mt-8 text-center max-w-4xl">{block.caption}</p>}</div>)}
+                
                 {block.type === 'dialogue' && (<div className="w-full max-w-5xl mx-auto space-y-12">{block.lines?.map((line: any, j: number) => (<div key={j} className={`flex items-end gap-6 ${line.side === 'right' ? 'flex-row-reverse' : ''}`}><div className={`w-20 h-20 rounded-full flex items-center justify-center text-[3vh] font-black text-white shrink-0 shadow-2xl ${line.side === 'right' ? 'bg-indigo-600' : 'bg-slate-800'}`}>{line.speaker?.[0].toUpperCase()}</div><div className={`max-w-[80%] p-10 rounded-[3rem] shadow-lg text-[4vh] font-medium leading-relaxed ${line.side === 'right' ? 'bg-indigo-500 text-white rounded-br-none' : 'bg-white border-4 border-slate-100 text-slate-800 rounded-bl-none'}`}>{line.text}{line.translation && (<p className={`text-[2.5vh] mt-6 italic opacity-70 font-bold border-t pt-4 ${line.side === 'right' ? 'border-white/20' : 'border-slate-100'}`}>{line.translation}</p>)}</div></div>))}</div>)}
+                
                 {block.type === 'vocab-list' && (<div className="grid grid-cols-2 gap-8">{block.items.map((item: any, j: number) => (<div key={j} className="bg-slate-50 p-12 rounded-[3rem] border-4 border-slate-100 text-center shadow-xl"><p className="text-[5vh] font-black text-indigo-600 mb-2">{item.term}</p><p className="text-[2.5vh] text-slate-500 font-bold">{item.definition}</p></div>))}</div>)}
                 
                 {block.type === 'discussion' && (
@@ -645,6 +658,24 @@ function ClassView({ lesson, classId, userData }: any) {
                           <p className="text-[4vh] font-bold text-slate-800 leading-tight">{q}</p>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* --- NEW SYNCED GAME BLOCK --- */}
+                {block.type === 'game' && block.gameType === 'connect-three' && (
+                  <div className="w-full max-w-6xl mx-auto flex flex-col items-center">
+                    <div className="text-center mb-12">
+                        <div className="inline-flex items-center justify-center p-6 bg-indigo-50 text-indigo-600 rounded-3xl mb-8 shadow-inner">
+                            <Gamepad2 size={64} />
+                        </div>
+                        <h3 className="text-[6vh] font-black text-slate-800 leading-none">{block.title || "Vocabulary Battle"}</h3>
+                        <p className="text-[3vh] font-bold text-slate-400 uppercase tracking-[0.4em] mt-4">Local Multiplayer Mode</p>
+                    </div>
+                    
+                    {/* Scaling it up so it looks massive on the projector screen */}
+                    <div className="scale-[1.2] origin-top mt-8 w-full flex justify-center pointer-events-auto">
+                        <ConnectThreeVocab vocabList={lessonVocab} />
                     </div>
                   </div>
                 )}
