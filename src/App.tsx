@@ -805,7 +805,7 @@ function ClassView({ lesson, classId, userData }: any) {
 // ============================================================================
 //  LESSON VIEW (Modern "Story" Style - Fully Interactive & Remote Synced)
 // ============================================================================
-export default function LessonView({ lesson, onFinish, isInstructor = true }: any) {
+function LessonView({ lesson, onFinish, isInstructor = true }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollTimeout = useRef<any>(null); 
