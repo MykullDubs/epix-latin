@@ -2832,14 +2832,12 @@ function LiveActivityFeed() {
 }
 
 // ============================================================================
-//  INSTRUCTOR GRADEBOOK (Fixed: Robust Matching)
-// ============================================================================
 //  INSTRUCTOR GRADEBOOK (Fixed: Live Sync & Inline Grading)
 // ============================================================================
 function InstructorGradebook({ classData }: any) {
     const [logs, setLogs] = useState<any[]>([]);
     
-    // NEW: UI State for Grading & Toasts
+    // UI State for Grading & Toasts
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     const [editingCell, setEditingCell] = useState<{ student: string; assignId: string; logId: string } | null>(null);
     const [scoreInput, setScoreInput] = useState<string>("");
@@ -2855,7 +2853,7 @@ function InstructorGradebook({ classData }: any) {
         );
 
         const unsub = onSnapshot(q, (snapshot) => {
-            // FIX: We MUST grab the document 'id' here so we can update it later!
+            // We capture the document 'id' here so we can update it later!
             const all = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
             setLogs(all);
         });
@@ -2870,14 +2868,18 @@ function InstructorGradebook({ classData }: any) {
         }
 
         try {
-            // Target the specific student's activity log using the captured ID
+            // Target the specific student's activity log
             const logRef = doc(db, 'artifacts', appId, 'activity_logs', logId);
             
-            await updateDoc(logRef, {
-                'scoreDetail.finalScorePct': Number(scoreInput),
-                'scoreDetail.status': 'graded', // Changes "pending_review" to graded
-                'lastUpdated': Date.now()
-            });
+            // THE FIX: We use setDoc with deep merging instead of updateDoc.
+            // This safely bypasses any missing import errors and correctly updates the nested fields!
+            await setDoc(logRef, {
+                scoreDetail: {
+                    finalScorePct: Number(scoreInput),
+                    status: 'graded'
+                },
+                lastUpdated: Date.now()
+            }, { merge: true });
 
             setToastMsg("Grade Released! 🎯");
             setEditingCell(null);
