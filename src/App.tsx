@@ -2405,9 +2405,45 @@ function ClassForum({ classData, user }: any) {
         </div>
     );
 }
+// ============================================================================
+//  STUDENT CLASS VIEW (Dashboard with Tabs & Filtered Activity Feed)
+// ============================================================================
 function StudentClassView({ classData, onBack, onSelectLesson, userData, setActiveTab, setSelectedLessonId }: any) {
-  // --- ADDED 'grades' TO STATE ---
   const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'forum' | 'grades'>('lessons');
+  
+  // --- NEW: STATE TO TRACK COMPLETED ASSIGNMENTS ---
+  const [completedItems, setCompletedItems] = useState<string[]>([]);
+
+  // --- NEW: FETCH COMPLETIONS TO FILTER THE FEED ---
+  useEffect(() => {
+      const studentEmail = userData?.email || auth?.currentUser?.email;
+      if (!classData?.assignments || !studentEmail) return;
+
+      const q = query(
+          collection(db, 'artifacts', appId, 'activity_logs'),
+          where('studentEmail', '==', studentEmail),
+          where('type', '==', 'completion')
+      );
+
+      const unsub = onSnapshot(q, (snapshot) => {
+          // We collect EVERY possible identifier (id, originalId, title) to ensure fuzzy matching works perfectly
+          const completedIdentifiers = snapshot.docs.flatMap(d => {
+              const data = d.data();
+              return [data.itemId, data.originalId, data.itemTitle].filter(Boolean);
+          });
+          setCompletedItems(completedIdentifiers);
+      });
+
+      return () => unsub();
+  }, [classData, userData]);
+
+  // Filter out any assignments that match a completed identifier
+  const activeAssignments = classData?.assignments?.filter((assign: any) => {
+      const isCompleted = completedItems.includes(assign.id) || 
+                          (assign.originalId && completedItems.includes(assign.originalId)) || 
+                          completedItems.includes(assign.title);
+      return !isCompleted; // Only keep it if it is NOT completed
+  }) || [];
 
   // --- INTERNAL FORUM COMPONENT ---
   const ClassForum = ({ classId }: { classId: string }) => {
@@ -2497,7 +2533,7 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
         <h2 className="text-3xl font-black text-slate-900 leading-tight mb-2">{classData.name}</h2>
         <p className="text-slate-400 font-medium text-sm line-clamp-1">{classData.description || "Welcome to Michael's Class."}</p>
 
-        {/* --- ADDED 'Grades' TO TAB SWITCHER --- */}
+        {/* Tab Switcher */}
         <div className="flex gap-2 mt-8 p-1.5 bg-slate-100 rounded-[1.5rem] w-fit">
           <button 
             onClick={() => setActiveSubTab('lessons')}
@@ -2530,16 +2566,20 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
       <div className="flex-1 overflow-y-auto px-8 pb-12 custom-scrollbar">
         {activeSubTab === 'lessons' && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
-            {(!classData.assignments || classData.assignments.length === 0) && (
+            
+            {/* UPDATED: If there are NO active assignments left to do, show the caught-up message! */}
+            {activeAssignments.length === 0 && (
               <div className="py-20 text-center flex flex-col items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-200">
-                  <Play size={32} />
+                <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500">
+                  <CheckCircle2 size={32} />
                 </div>
-                <p className="text-slate-300 italic font-bold">No assignments posted yet.</p>
+                <p className="text-slate-400 font-bold">You're all caught up! 🎉</p>
+                <p className="text-xs text-slate-300">Check the Grades tab to review your past work.</p>
               </div>
             )}
             
-            {classData.assignments?.map((item: any) => (
+            {/* UPDATED: Map over activeAssignments instead of classData.assignments */}
+            {activeAssignments.map((item: any) => (
               <div key={item.id} className="group p-5 bg-white border-2 border-slate-100 rounded-[2.5rem] flex justify-between items-center hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-50/20 transition-all duration-300">
                 <div className="flex items-center gap-4 flex-1 cursor-pointer" onClick={() => onSelectLesson(item)}>
                   <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
@@ -2551,7 +2591,6 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
                   </div>
                 </div>
 
-                {/* Only render presentation button if it's NOT an exam */}
                 {item.contentType !== 'test' && item.contentType !== 'exam' && (
                     <button 
                     onClick={(e) => {
@@ -2577,7 +2616,6 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
           </div>
         )}
 
-        {/* --- ADDED GRADEBOOK RENDERER --- */}
         {activeSubTab === 'grades' && (
           <div className="animate-in fade-in">
              <StudentGradebook classData={classData} user={userData} />
