@@ -2050,24 +2050,21 @@ function GradeDetailModal({ log, onClose }: any) {
 }
 
 // ============================================================================
-//  STUDENT GRADEBOOK (Fixed: Crash Prevention & Safe Email Fetching)
+//  STUDENT GRADEBOOK (Filtered: Exams Only)
 // ============================================================================
 function StudentGradebook({ classData, user }: any) {
     const [logs, setLogs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedLog, setSelectedLog] = useState<any>(null);
 
-    // FIX 1: Safely grab the email from either the passed prop OR directly from Firebase Auth
     const studentEmail = user?.email || auth?.currentUser?.email;
 
     useEffect(() => {
-        // FIX 2: If we don't have an email yet, STOP HERE to prevent Firebase from crashing!
         if(!classData.assignments || classData.assignments.length === 0 || !studentEmail) { 
             setLoading(false); 
             return; 
         }
         
-        // Now it's perfectly safe to query
         const q = query(
             collection(db, 'artifacts', appId, 'activity_logs'), 
             where('studentEmail', '==', studentEmail),
@@ -2081,41 +2078,37 @@ function StudentGradebook({ classData, user }: any) {
             setLoading(false);
         });
         return () => unsub();
-    }, [classData, studentEmail]); // Depend on the safe string
+    }, [classData, studentEmail]);
+
+    // --- THE FILTER: Only show high-stakes items ---
+    const gradedAssignments = classData.assignments?.filter((a: any) => 
+        a.contentType === 'test' || a.contentType === 'exam'
+    ) || [];
 
     const getGradeStatus = (assign: any) => {
-        // --- ROBUST MATCHING LOGIC ---
         let log = logs.find(l => l.itemId === assign.id && l.type === 'completion');
         if (!log && assign.originalId) log = logs.find(l => l.itemId === assign.originalId && l.type === 'completion');
         if (!log) log = logs.find(l => l.itemTitle === assign.title && l.type === 'completion');
         
-        // If still nothing, it really is missing
-        if (!log) return { status: 'missing', label: 'Not Started', color: 'bg-slate-100 text-slate-400', interactable: false };
+        if (!log) return { status: 'missing', label: 'Not Taken', color: 'bg-slate-100 text-slate-400', interactable: false };
         
-        // --- SCORE DISPLAY LOGIC ---
         if (log.scoreDetail?.status === 'pending_review') {
             return { status: 'pending', label: 'In Review', color: 'bg-amber-100 text-amber-600', interactable: true, log };
         }
              
-        const isExam = assign.contentType === 'test' || assign.contentType === 'exam';
-        const hasInstructorGrade = log.scoreDetail?.finalScorePct !== undefined;
-
-        if (isExam || hasInstructorGrade) {
-            const score = log.scoreDetail?.score || 0;
-            const total = log.scoreDetail?.total || 100;
-            const pct = log.scoreDetail?.finalScorePct ?? (total > 0 ? Math.round((score/total)*100) : 0);
+        const score = log.scoreDetail?.score || 0;
+        const total = log.scoreDetail?.total || 100;
+        const pct = log.scoreDetail?.finalScorePct ?? (total > 0 ? Math.round((score/total)*100) : 0);
              
-            let color = 'bg-slate-100 text-slate-600';
-            if (pct >= 90) color = 'bg-emerald-100 text-emerald-600';
-            else if (pct >= 70) color = 'bg-indigo-100 text-indigo-600';
-            else color = 'bg-rose-100 text-rose-600';
+        let color = 'bg-slate-100 text-slate-600';
+        if (pct >= 90) color = 'bg-emerald-100 text-emerald-600';
+        else if (pct >= 70) color = 'bg-indigo-100 text-indigo-600';
+        else color = 'bg-rose-100 text-rose-600';
 
-            const displayLabel = hasInstructorGrade ? `${pct}%` : `${score}/${total} pts`;
+        const hasInstructorGrade = log.scoreDetail?.finalScorePct !== undefined;
+        const displayLabel = hasInstructorGrade ? `${pct}%` : `${score}/${total} pts`;
 
-            return { status: 'complete', label: displayLabel, color, interactable: true, log };
-        }
-
-        return { status: 'complete', label: 'Complete', color: 'bg-emerald-100 text-emerald-600', interactable: true, log };
+        return { status: 'complete', label: displayLabel, color, interactable: true, log };
     };
 
     return (
@@ -2125,35 +2118,37 @@ function StudentGradebook({ classData, user }: any) {
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2">
                 <div className="p-6 border-b border-slate-100 bg-slate-50">
                     <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                        <ClipboardList size={18} className="text-indigo-600"/> Report Card
+                        <ClipboardList size={18} className="text-indigo-600"/> Official Report Card
                     </h3>
                 </div>
                 
-                {classData.assignments?.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400 text-sm">No assignments yet.</div> 
+                {gradedAssignments.length === 0 ? (
+                    <div className="p-12 text-center text-slate-400 text-sm italic">
+                        No exams have been assigned to this cohort yet.
+                    </div> 
                 ) : (
                     <div className="divide-y divide-slate-100">
-                        {classData.assignments.map((assign: any) => {
-                            const { status, label, color, interactable, log } = getGradeStatus(assign);
+                        {gradedAssignments.map((assign: any) => {
+                            const { label, color, interactable, log } = getGradeStatus(assign);
                             return (
                                 <button 
                                     key={assign.id} 
                                     disabled={!interactable} 
                                     onClick={() => interactable && setSelectedLog(log)} 
-                                    className={`w-full p-4 flex items-center justify-between transition-colors group text-left ${interactable ? 'hover:bg-slate-50 cursor-pointer' : 'cursor-default'}`}
+                                    className={`w-full p-5 flex items-center justify-between transition-colors group text-left ${interactable ? 'hover:bg-slate-50 cursor-pointer' : 'cursor-default'}`}
                                 >
                                     <div className="flex items-center gap-4">
-                                        <div className={`p-2 rounded-lg ${assign.contentType === 'test' || assign.contentType === 'exam' ? 'bg-rose-100 text-rose-600' : assign.contentType === 'deck' ? 'bg-orange-100 text-orange-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                                            {assign.contentType === 'deck' ? <Layers size={16}/> : (assign.contentType === 'test' || assign.contentType === 'exam') ? <FileText size={16}/> : <BookOpen size={16}/>}
+                                        <div className="p-3 rounded-xl bg-rose-50 text-rose-600">
+                                            <FileText size={20}/>
                                         </div>
                                         <div>
                                             <h4 className="font-bold text-slate-800 text-sm">{assign.title}</h4>
-                                            <p className="text-xs text-slate-400">{(assign.contentType === 'test' || assign.contentType === 'exam') ? 'Exam' : 'Lesson'}</p>
+                                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Final Assessment</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3">
                                         <div className="text-right">
-                                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${color}`}>{label}</span>
+                                            <span className={`px-4 py-1.5 rounded-full text-xs font-black shadow-sm ${color}`}>{label}</span>
                                             {log?.scoreDetail?.instructorFeedback && (
                                                 <div className="flex items-center justify-end gap-1 mt-1 text-[10px] text-indigo-500 font-bold">
                                                     <MessageCircle size={10}/> Feedback
