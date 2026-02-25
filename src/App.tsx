@@ -3138,399 +3138,316 @@ function InstructorGradebook({ classData }: any) {
         </div>
     );
 }
+// ============================================================================
+//  CLASS MANAGER VIEW (Master-Detail Mission Control)
+// ============================================================================
 function ClassManagerView({ 
-  user, 
-  classes, 
-  lessons, 
-  allDecks, 
-  onAssign,       
-  onRevoke,       
-  onCreateClass, 
-  onDeleteClass,
-  onRenameClass,
-  onAddStudent 
+    user, 
+    classes = [], 
+    lessons = [], 
+    allDecks = [],
+    onAssign, 
+    onRevoke, 
+    onCreateClass, 
+    onDeleteClass, 
+    onRenameClass, 
+    onAddStudent 
 }: any) {
-  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
-  const [newClassName, setNewClassName] = useState('');
-  const [newStudentEmail, setNewStudentEmail] = useState('');
-  
-  // Modals & Feedback
-  const [assignModalOpen, setAssignModalOpen] = useState(false);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [assignmentToRemove, setAssignmentToRemove] = useState<any>(null);
+    const [selectedClassId, setSelectedClassId] = useState<string | null>(classes[0]?.id || null);
+    const [activeTab, setActiveTab] = useState<'roster' | 'assignments'>('roster');
+    const [newStudentEmail, setNewStudentEmail] = useState('');
 
-  // Assignment Logic State
-  const [targetStudentMode, setTargetStudentMode] = useState<'all' | 'specific'>('all'); 
-  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
-  const [assignType, setAssignType] = useState<'deck' | 'lesson' | 'exam'>('lesson');
-  const [activeTab, setActiveTab] = useState<'overview' | 'gradebook'>('overview');
+    const activeClass = classes.find((c: any) => c.id === selectedClassId);
 
-  // --- NEW: Search & Filter State ---
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedLevel, setSelectedLevel] = useState('All');
-  
-  const selectedClass = classes.find((c: any) => c.id === selectedClassId);
+    // Filter to separate Arcade Games from Standard Lessons
+    const standardLessons = lessons.filter((l: any) => l.type !== 'arcade_game');
+    const arcadeGames = lessons.filter((l: any) => l.type === 'arcade_game');
 
-  const availableExams = lessons.filter((l: any) => l.type === 'test' || l.type === 'exam');
-  const availableLessons = lessons.filter((l: any) => l.type !== 'test' && l.type !== 'exam');
-
-  // --- 1. LOCAL FORM WRAPPERS ---
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newClassName.trim()) return;
-    const result = await onCreateClass(newClassName);
-    if (result && result.success) {
-      setNewClassName('');
-      setToastMsg("Cohort Established");
-    } else {
-      setToastMsg("Failed to create cohort");
-    }
-  };
-
-  const handleAddRoster = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newStudentEmail.trim() || !selectedClass) return;
-    const result = await onAddStudent(selectedClass.id, newStudentEmail);
-    if (result && result.success) {
-      setNewStudentEmail('');
-      setToastMsg("Student Added to Roster");
-    } else {
-      setToastMsg("Failed to add student");
-    }
-  };
-
-  // --- 2. LOCAL UI STATE ---
-  const toggleAssignee = (email: string) => {
-    if (selectedAssignees.includes(email)) {
-      setSelectedAssignees(selectedAssignees.filter(e => e !== email));
-    } else {
-      setSelectedAssignees([...selectedAssignees, email]);
-    }
-  };
-
-  // --- 3. RELAY HANDLERS ---
-  const handleAssignContent = async (item: any, type: string) => {
-    if (!selectedClass) return;
-    
-    const assignment = {
-      ...item,
-      id: `assign_${Date.now()}`,
-      originalId: item.id,
-      contentType: type,
-      targetStudents: targetStudentMode === 'specific' ? selectedAssignees : null,
-      assignedAt: Date.now()
+    const handleAddStudent = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newStudentEmail.trim() || !activeClass) return;
+        onAddStudent(activeClass.id, newStudentEmail);
+        setNewStudentEmail('');
     };
 
-    const result = await onAssign(selectedClass.id, assignment);
-
-    if (result && result.success) {
-      setToastMsg(`Unit "${item.title}" Deployed!`);
-      setAssignModalOpen(false);
-      setSelectedAssignees([]);
-      setTargetStudentMode('all');
-      // Reset filters when closed
-      setSearchQuery('');
-      setSelectedLevel('All');
-    } else {
-      setToastMsg("Deployment Failed");
-    }
-  };
-
-  const confirmRevoke = async () => {
-    if (!selectedClass || !assignmentToRemove) return;
-    
-    const result = await onRevoke(selectedClass.id, assignmentToRemove);
-    
-    if (result && result.success) {
-      setToastMsg("Assignment Revoked");
-      setAssignmentToRemove(null);
-    } else {
-      setToastMsg("Error revoking access");
-    }
-  };
-
-  // --- 4. RENDERER: SINGLE CLASS VIEW ---
-  if (selectedClass) {
     return (
-      <div className="flex flex-col h-full animate-in slide-in-from-right-6 duration-500 relative">
-        {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
-        
-        {/* REVOKE MODAL */}
-        {assignmentToRemove && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-                <div className="bg-white w-full max-w-sm rounded-[3rem] shadow-2xl p-10 text-center animate-in zoom-in-95 duration-200">
-                    <div className="w-20 h-20 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <Trash2 size={40} />
+        <div className="h-full max-w-7xl mx-auto flex flex-col md:flex-row gap-8 pb-32 animate-in fade-in duration-500">
+            
+            {/* ============================================================== */}
+            {/* LEFT PANE: THE COHORT LIST (MASTER) */}
+            {/* ============================================================== */}
+            <div className="w-full md:w-1/3 flex flex-col gap-6 shrink-0">
+                
+                {/* Header & Create Action */}
+                <div className="flex items-center justify-between bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
+                    <div>
+                        <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-none">Cohorts</h2>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{classes.length} Active Deployments</span>
                     </div>
-                    <h3 className="text-3xl font-black text-slate-900 mb-2 tracking-tighter">Revoke Access?</h3>
-                    <p className="text-slate-500 text-sm mb-8 leading-relaxed">
-                        Are you sure you want to pull <strong>"{assignmentToRemove.title}"</strong> from this cohort's feed?
-                    </p>
-                    <div className="flex flex-col gap-3">
-                        <button onClick={confirmRevoke} className="w-full py-4 bg-rose-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-rose-200 active:scale-95 transition-all">Revoke Now</button>
-                        <button onClick={() => setAssignmentToRemove(null)} className="w-full py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-200 transition-all">Keep it</button>
-                    </div>
+                    <button 
+                        onClick={() => onCreateClass('New Cohort')}
+                        className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200 hover:scale-105 active:scale-95 transition-all"
+                    >
+                        <Plus size={24} />
+                    </button>
                 </div>
-            </div>
-        )}
 
-        {/* CLASS HEADER */}
-        <div className="pb-8 border-b border-slate-100 mb-8 bg-white/80 backdrop-blur-md sticky top-0 z-20">
-          <button onClick={() => setSelectedClassId(null)} className="flex items-center text-slate-400 hover:text-indigo-600 mb-6 text-xs font-black uppercase tracking-widest transition-colors"><ArrowLeft size={16} className="mr-2"/> Cohort Directory</button>
-          
-          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6">
-            <div>
-              <div className="flex items-center gap-3 mb-1">
-                <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-indigo-100">Live Cohort</span>
-                <span className="text-xs text-slate-300 font-mono">ID: {selectedClass.code}</span>
-              </div>
-              <h1 className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{selectedClass.name}</h1>
-            </div>
-
-            <div className="flex gap-3">
-                <ActionButton icon={<BookOpen/>} label="Unit" color="bg-indigo-600" onClick={() => { setAssignType('lesson'); setAssignModalOpen(true); }} />
-                <ActionButton icon={<Layers/>} label="Deck" color="bg-orange-500" onClick={() => { setAssignType('deck'); setAssignModalOpen(true); }} />
-                <ActionButton icon={<FileText/>} label="Exam" color="bg-rose-600" onClick={() => { setAssignType('exam'); setAssignModalOpen(true); }} />
-            </div>
-          </div>
-
-          <div className="flex gap-8 mt-10">
-              <TabButton active={activeTab === 'overview'} label="Overview" onClick={() => setActiveTab('overview')} />
-              <TabButton active={activeTab === 'gradebook'} label="Gradebook" onClick={() => setActiveTab('gradebook')} />
-          </div>
-        </div>
-
-        {activeTab === 'overview' ? (
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-12 pb-32">
-                <div className="lg:col-span-3 space-y-6">
-                    <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em] mb-4">Active Deployments</h3>
-                    {(!selectedClass.assignments || selectedClass.assignments.length === 0) ? (
-                      <div className="p-12 border-2 border-dashed border-slate-100 rounded-[3rem] text-center">
-                        <p className="text-slate-300 font-bold italic">No units broadcasted yet.</p>
-                      </div>
+                {/* Cohort List */}
+                <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-2">
+                    {classes.length === 0 ? (
+                        <div className="text-center p-10 border-2 border-dashed border-slate-200 rounded-[2rem] bg-slate-50">
+                            <Users size={32} className="mx-auto text-slate-300 mb-3" />
+                            <p className="text-sm font-bold text-slate-500">No cohorts assigned yet.</p>
+                        </div>
                     ) : (
-                      <div className="space-y-4">
-                        {selectedClass.assignments.map((l: any, idx: number) => ( 
-                          <div key={idx} className="bg-white p-6 rounded-[2.5rem] border-2 border-slate-50 shadow-sm flex justify-between items-center group hover:border-indigo-100 transition-all">
-                              <div className="flex items-center gap-5">
-                                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${l.contentType === 'deck' ? 'bg-orange-50 text-orange-600' : l.contentType === 'test' ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'}`}>
-                                      {l.contentType === 'deck' ? <Layers size={24} /> : l.contentType === 'test' ? <FileText size={24}/> : <BookOpen size={24} />}
-                                  </div>
-                                  <div>
-                                      <h4 className="font-black text-slate-900 text-lg tracking-tight leading-none mb-1">{l.title}</h4>
-                                      <div className="flex items-center gap-3">
-                                          <span className="text-[9px] text-slate-400 uppercase font-black tracking-widest">{l.contentType}</span>
-                                          {l.targetStudents && <span className="flex items-center gap-1 text-[9px] font-black text-indigo-500 uppercase tracking-widest"><Users size={10}/> Targeted</span>}
-                                      </div>
-                                  </div>
-                              </div>
-                              <button onClick={() => setAssignmentToRemove(l)} className="p-4 text-slate-200 hover:text-rose-500 hover:bg-rose-50 rounded-2xl transition-all">
-                                  <Trash2 size={20}/>
-                              </button>
-                          </div> 
-                        ))}
-                      </div>
+                        classes.map((cls: any) => {
+                            const isSelected = selectedClassId === cls.id;
+                            // Mock a pulse score if not provided
+                            const pulse = cls.pulse || Math.floor(Math.random() * 40) + 60; 
+                            
+                            return (
+                                <button 
+                                    key={cls.id}
+                                    onClick={() => setSelectedClassId(cls.id)}
+                                    className={`w-full text-left p-5 rounded-[2rem] border-2 transition-all duration-300 active:scale-[0.98] ${
+                                        isSelected 
+                                            ? 'bg-white border-indigo-500 shadow-xl shadow-indigo-100 ring-4 ring-indigo-50' 
+                                            : 'bg-white border-slate-100 shadow-sm hover:border-indigo-200 hover:bg-indigo-50/30'
+                                    }`}
+                                >
+                                    <div className="flex justify-between items-start mb-4">
+                                        <h3 className={`text-lg font-black leading-tight ${isSelected ? 'text-indigo-900' : 'text-slate-800'}`}>
+                                            {cls.name}
+                                        </h3>
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isSelected ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-50 text-slate-400'}`}>
+                                            <Users size={14} />
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex items-center justify-between text-xs font-bold">
+                                        <span className="text-slate-500">{cls.students?.length || 0} Students</span>
+                                        <span className={`flex items-center gap-1 ${pulse >= 80 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                            <Activity size={12} /> Pulse: {pulse}%
+                                        </span>
+                                    </div>
+                                </button>
+                            );
+                        })
                     )}
                 </div>
+            </div>
 
-                <div className="lg:col-span-2 space-y-6">
-                    <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em] mb-4">Cohort Roster</h3>
-                    <form onSubmit={handleAddRoster} className="flex gap-2">
-                        <input value={newStudentEmail} onChange={e => setNewStudentEmail(e.target.value)} placeholder="student@email.com" className="flex-1 px-6 py-4 rounded-2xl bg-slate-50 border-none text-sm font-bold focus:ring-2 focus:ring-indigo-100 transition-all" />
-                        <button type="submit" className="bg-slate-900 text-white p-4 rounded-2xl active:scale-90 transition-all shadow-lg"><Plus size={24}/></button>
-                    </form>
-                    
-                    <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-                        {(!selectedClass.students || selectedClass.students.length === 0) && (
-                           <div className="p-8 text-center text-slate-400 text-sm italic font-bold">No students have joined yet.</div>
-                        )}
-                        {selectedClass.students?.map((s: string, i: number) => (
-                            <div key={i} className="p-5 border-b border-slate-50 last:border-0 flex items-center justify-between group">
-                                <div className="flex items-center gap-4">
-                                  <div className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black text-xs">{s.charAt(0).toUpperCase()}</div>
-                                  <span className="text-sm font-bold text-slate-700">{s}</span>
-                                </div>
-                                <button className="opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-rose-500"><X size={16}/></button>
+            {/* ============================================================== */}
+            {/* RIGHT PANE: COHORT DETAILS (DETAIL) */}
+            {/* ============================================================== */}
+            <div className="w-full md:w-2/3 flex flex-col bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden relative min-h-[600px]">
+                
+                {!activeClass ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center p-12 bg-slate-50/50">
+                        <div className="w-24 h-24 bg-slate-100 rounded-[2rem] flex items-center justify-center text-slate-300 mb-6 rotate-12">
+                            <BookOpen size={48} />
+                        </div>
+                        <h2 className="text-2xl font-black text-slate-800 mb-2">Select a Cohort</h2>
+                        <p className="text-slate-500 font-bold max-w-xs">Click on a cohort from the list to view its roster, manage assignments, and track student pulse.</p>
+                    </div>
+                ) : (
+                    <div className="flex-1 flex flex-col animate-in slide-in-from-right-8 duration-500 fade-in">
+                        
+                        {/* Detail Header */}
+                        <header className="p-8 border-b border-slate-100 bg-slate-50/50 relative overflow-hidden">
+                            <div className="absolute -right-10 -top-10 text-slate-100 rotate-12 pointer-events-none">
+                                <Users size={160} />
                             </div>
-                        ))}
+                            
+                            <div className="relative z-10 flex justify-between items-start">
+                                <div>
+                                    <span className="inline-block px-3 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-black uppercase tracking-widest mb-3">
+                                        ID: {activeClass.id}
+                                    </span>
+                                    <input 
+                                        className="block text-4xl font-black text-slate-900 tracking-tighter bg-transparent border-none p-0 focus:ring-0 w-full max-w-md"
+                                        value={activeClass.name}
+                                        onChange={(e) => onRenameClass(activeClass.id, e.target.value)}
+                                        title="Click to rename"
+                                    />
+                                    <div className="flex gap-4 mt-4">
+                                        <div className="flex items-center gap-2 text-sm font-bold text-slate-500 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm">
+                                            <Users size={16} className="text-indigo-500"/> {activeClass.students?.length || 0} Enrolled
+                                        </div>
+                                        <div className="flex items-center gap-2 text-sm font-bold text-slate-500 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm">
+                                            <Flame size={16} className="text-rose-500"/> High Engagement
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button 
+                                    onClick={() => onDeleteClass(activeClass.id)}
+                                    className="p-3 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"
+                                    title="Delete Cohort"
+                                >
+                                    <Trash2 size={20} />
+                                </button>
+                            </div>
+
+                            {/* Inner Tabs */}
+                            <div className="flex gap-2 mt-8">
+                                <button 
+                                    onClick={() => setActiveTab('roster')}
+                                    className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'roster' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}
+                                >
+                                    Student Roster
+                                </button>
+                                <button 
+                                    onClick={() => setActiveTab('assignments')}
+                                    className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'assignments' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}
+                                >
+                                    Curriculum & Arcade
+                                </button>
+                            </div>
+                        </header>
+
+                        {/* Detail Content Area */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-white">
+                            
+                            {/* ROSTER TAB */}
+                            {activeTab === 'roster' && (
+                                <div className="space-y-6 animate-in fade-in">
+                                    <form onSubmit={handleAddStudent} className="flex gap-3">
+                                        <div className="relative flex-1">
+                                            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
+                                                <Search size={16} />
+                                            </div>
+                                            <input 
+                                                type="email" 
+                                                placeholder="Add student by email..." 
+                                                value={newStudentEmail}
+                                                onChange={e => setNewStudentEmail(e.target.value)}
+                                                className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 focus:border-indigo-500 focus:ring-0 transition-colors"
+                                            />
+                                        </div>
+                                        <button type="submit" className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-colors shrink-0">
+                                            Enroll
+                                        </button>
+                                    </form>
+
+                                    <div className="border border-slate-100 rounded-[2rem] overflow-hidden">
+                                        <table className="w-full text-left">
+                                            <thead className="bg-slate-50/80 border-b border-slate-100">
+                                                <tr>
+                                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Student</th>
+                                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Progress</th>
+                                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-50">
+                                                {(!activeClass.students || activeClass.students.length === 0) ? (
+                                                    <tr>
+                                                        <td colSpan={3} className="px-6 py-8 text-center text-sm font-bold text-slate-400">
+                                                            No students enrolled yet. Add an email above.
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    activeClass.students.map((student: any, idx: number) => (
+                                                        <tr key={idx} className="hover:bg-slate-50/50 transition-colors group">
+                                                            <td className="px-6 py-4">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-700 font-black flex items-center justify-center text-xs">
+                                                                        {student.email?.[0]?.toUpperCase() || 'S'}
+                                                                    </div>
+                                                                    <span className="font-bold text-slate-700">{student.email}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden w-24">
+                                                                        <div className="h-full bg-emerald-500 w-[45%]" />
+                                                                    </div>
+                                                                    <span className="text-[10px] font-black text-slate-400">45%</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right">
+                                                                <button className="text-slate-300 hover:text-slate-600 transition-colors">
+                                                                    <MoreVertical size={18} />
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ASSIGNMENTS TAB */}
+                            {activeTab === 'assignments' && (
+                                <div className="space-y-8 animate-in fade-in">
+                                    
+                                    {/* Sub-Section: Curriculum */}
+                                    <div>
+                                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4">
+                                            <BookOpen size={14} /> Assigned Curriculum
+                                        </h3>
+                                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                                            {standardLessons.map((lesson: any) => {
+                                                const isAssigned = activeClass.assignments?.includes(lesson.id);
+                                                return (
+                                                    <div key={lesson.id} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${isAssigned ? 'border-indigo-500 bg-indigo-50 shadow-sm' : 'border-slate-100 bg-white hover:border-slate-200'}`}>
+                                                        <div>
+                                                            <h4 className={`font-bold text-sm ${isAssigned ? 'text-indigo-900' : 'text-slate-700'}`}>{lesson.title || 'Untitled Unit'}</h4>
+                                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{lesson.blocks?.length || 0} Blocks</p>
+                                                        </div>
+                                                        <button 
+                                                            onClick={() => isAssigned ? onRevoke(activeClass.id, lesson.id) : onAssign(activeClass.id, lesson.id)}
+                                                            className={`p-2 rounded-xl transition-all ${isAssigned ? 'text-indigo-600 bg-white shadow-sm' : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50'}`}
+                                                        >
+                                                            {isAssigned ? <CheckCircle2 size={24} className="fill-indigo-100" /> : <Circle size={24} />}
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Sub-Section: Arcade Games */}
+                                    <div>
+                                        <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2 mb-4 bg-amber-50 px-3 py-1.5 rounded-lg w-fit">
+                                            <Gamepad2 size={14} /> Assigned Arcade Games
+                                        </h3>
+                                        {arcadeGames.length === 0 ? (
+                                            <p className="text-xs font-bold text-slate-400 italic">No games built in the Studio yet.</p>
+                                        ) : (
+                                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                                                {arcadeGames.map((game: any) => {
+                                                    const isAssigned = activeClass.assignments?.includes(game.id);
+                                                    return (
+                                                        <div key={game.id} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${isAssigned ? 'border-amber-500 bg-amber-50 shadow-sm' : 'border-slate-100 bg-white hover:border-slate-200'}`}>
+                                                            <div>
+                                                                <h4 className={`font-bold text-sm ${isAssigned ? 'text-amber-900' : 'text-slate-700'}`}>{game.title || 'Untitled Game'}</h4>
+                                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Template: {game.gameTemplate}</p>
+                                                            </div>
+                                                            <button 
+                                                                onClick={() => isAssigned ? onRevoke(activeClass.id, game.id) : onAssign(activeClass.id, game.id)}
+                                                                className={`p-2 rounded-xl transition-all ${isAssigned ? 'text-amber-600 bg-white shadow-sm' : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50'}`}
+                                                            >
+                                                                {isAssigned ? <CheckCircle2 size={24} className="fill-amber-100" /> : <Circle size={24} />}
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                </div>
+                            )}
+
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
-        ) : (
-            <div className="pb-20"><InstructorGradebook classData={selectedClass} /></div>
-        )}
-
-        {/* ASSIGNMENT MODAL WITH SEARCH & FILTER */}
-        {assignModalOpen && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-6">
-            <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-300">
-              <div className="p-8 border-b border-slate-100 bg-slate-50/50 pb-6">
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-3xl font-black tracking-tighter uppercase italic">Deploy {assignType}</h3>
-                    <button onClick={() => { setAssignModalOpen(false); setSearchQuery(''); setSelectedLevel('All'); }} className="p-2 bg-white text-slate-300 rounded-xl hover:text-rose-500 transition-colors shadow-sm"><X size={20}/></button>
-                  </div>
-                  
-                  <div className="bg-slate-200/50 p-1.5 rounded-2xl flex gap-1">
-                    <button onClick={() => setTargetStudentMode('all')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${targetStudentMode === 'all' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-500'}`}>Full Cohort</button>
-                    <button onClick={() => setTargetStudentMode('specific')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${targetStudentMode === 'specific' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-500'}`}>Specific Students</button>
-                  </div>
-
-                  {targetStudentMode === 'specific' && (
-                    <div className="max-h-32 overflow-y-auto space-y-1 mt-4 custom-scrollbar pr-2 animate-in slide-in-from-top-2">
-                       {selectedClass.students?.map((email: string) => (
-                         <button key={email} onClick={() => toggleAssignee(email)} className="flex items-center gap-3 w-full p-3 bg-white rounded-xl border border-slate-100 text-left transition-all">
-                            {selectedAssignees.includes(email) ? <CheckCircle2 size={18} className="text-indigo-600"/> : <Circle size={18} className="text-slate-200"/>}
-                            <span className="text-xs font-bold text-slate-600">{email}</span>
-                         </button>
-                       ))}
-                    </div>
-                  )}
-              </div>
-
-              {/* SEARCH & FILTER BAR */}
-              <div className="px-8 pt-4 pb-4 bg-slate-50/50 border-b border-slate-100 flex gap-3 shadow-sm z-10 relative">
-                 <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/>
-                    <input 
-                       type="text" 
-                       placeholder="Search titles or tags..." 
-                       value={searchQuery}
-                       onChange={(e) => setSearchQuery(e.target.value)}
-                       className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                    />
-                 </div>
-                 <select 
-                    value={selectedLevel}
-                    onChange={(e) => setSelectedLevel(e.target.value)}
-                    className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer transition-colors"
-                 >
-                    <option value="All">All Levels</option>
-                    <option value="A1">A1 Beginner</option>
-                    <option value="A2">A2 Elementary</option>
-                    <option value="B1">B1 Intermediate</option>
-                    <option value="B2">B2 Upper Int.</option>
-                    <option value="C1">C1 Advanced</option>
-                 </select>
-              </div>
-
-              {/* FILTERED CONTENT LIST */}
-              <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-3 bg-slate-50/30">
-                  {(() => {
-                     // 1. Pick the right data source based on active tab
-                     let sourceData = assignType === 'lesson' ? availableLessons 
-                                    : assignType === 'exam' ? availableExams 
-                                    : Object.entries(allDecks || {}).map(([id, d]: any) => ({...d, id}));
-
-                     // 2. Apply Filters
-                     const filteredData = sourceData.filter((item: any) => {
-                         const searchLower = searchQuery.toLowerCase();
-                         const matchesSearch = item.title?.toLowerCase().includes(searchLower) || 
-                                               item.tags?.some((t: string) => t.toLowerCase().includes(searchLower)) ||
-                                               item.description?.toLowerCase().includes(searchLower);
-                         const matchesLevel = selectedLevel === 'All' || item.level === selectedLevel;
-                         return matchesSearch && matchesLevel;
-                     });
-
-                     if (filteredData.length === 0) {
-                         return <div className="text-center py-10 text-slate-400 font-bold italic">No matching {assignType}s found.</div>;
-                     }
-
-                     return filteredData.map((item: any) => (
-                         <div key={item.id} className="relative group pb-1">
-                             <ContentRow 
-                               item={item} 
-                               icon={assignType === 'deck' ? <Layers/> : assignType === 'exam' ? <FileText/> : <BookOpen/>} 
-                               color={assignType === 'deck' ? "text-orange-500" : assignType === 'exam' ? "text-rose-600" : "text-indigo-600"} 
-                               onClick={() => handleAssignContent(item, assignType === 'exam' ? 'test' : assignType)} 
-                             />
-                             {/* Visual Tag Indicators (Rendered over the row) */}
-                             <div className="absolute left-[72px] bottom-3 flex gap-1.5 pointer-events-none">
-                                {item.level && <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-slate-200 text-slate-600 uppercase tracking-widest">{item.level}</span>}
-                                {item.tags?.slice(0,2).map((t: string) => <span key={t} className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-indigo-50 text-indigo-500 border border-indigo-100">{t}</span>)}
-                             </div>
-                         </div>
-                     ));
-                  })()}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
     );
-  }
-
-  // --- 5. RENDERER: MAIN DIRECTORY GRID ---
-  return (
-    <div className="space-y-10 animate-in fade-in duration-700">
-      {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
-      
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-        <div>
-          <h2 className="text-6xl font-black text-slate-900 tracking-tighter uppercase leading-none">Cohorts</h2>
-          <p className="text-xs text-slate-400 font-bold mt-2 uppercase tracking-[0.3em]">Managed Learning Environments</p>
-        </div>
-        <form onSubmit={handleCreate} className="flex gap-2 bg-white p-2 rounded-[2rem] shadow-xl shadow-slate-200 border border-slate-100">
-          <input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="New Class Name" className="bg-transparent px-6 py-2 outline-none text-sm font-bold w-48 md:w-64" />
-          <button type="submit" className="bg-indigo-600 text-white px-8 py-3 rounded-full font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all">Establish</button>
-        </form>
-      </header>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {classes.map((cls: any) => (
-          <div key={cls.id} onClick={() => setSelectedClassId(cls.id)} className="bg-white p-8 rounded-[3rem] border-2 border-slate-50 shadow-sm hover:shadow-2xl hover:border-indigo-100 transition-all cursor-pointer relative group">
-            <div className="absolute top-8 right-8 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
-              <button onClick={(e) => {e.stopPropagation(); onRenameClass(cls.id, cls.name);}} className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:bg-indigo-50 hover:text-indigo-600"><Edit3 size={18}/></button>
-              <button onClick={(e) => {e.stopPropagation(); onDeleteClass(cls.id);}} className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:bg-rose-50 hover:text-rose-500"><Trash2 size={18}/></button>
-            </div>
-
-            <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-[1.5rem] flex items-center justify-center mb-6 font-black text-2xl shadow-inner shadow-indigo-100/50">
-              {cls.name.charAt(0)}
-            </div>
-            
-            <h3 className="font-black text-2xl text-slate-900 tracking-tight mb-1">{cls.name}</h3>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">{(cls.students || []).length} Students Enrolled</p>
-            
-            <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
-              <span className="text-[10px] font-black font-mono text-slate-400 tracking-[0.2em]">{cls.code}</span>
-              <button className="text-indigo-600 text-[9px] font-black uppercase tracking-widest flex items-center gap-2 hover:underline" onClick={(e) => {e.stopPropagation(); navigator.clipboard.writeText(cls.code); setToastMsg("Code Copied!");}}><Copy size={12}/> Copy Code</button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// --- SUB-COMPONENTS ---
-function ActionButton({ icon, label, color, onClick }: any) {
-  return (
-    <button onClick={onClick} className={`${color} text-white px-5 py-3 rounded-2xl font-black text-[10px] flex items-center gap-3 shadow-xl active:scale-95 transition-all uppercase tracking-widest`}>
-      {React.cloneElement(icon, { size: 18 })} {label}
-    </button>
-  );
-}
-
-function TabButton({ active, label, onClick }: any) {
-  return (
-    <button onClick={onClick} className={`pb-4 text-xs font-black uppercase tracking-[0.3em] border-b-4 transition-all ${active ? 'border-indigo-600 text-slate-900' : 'border-transparent text-slate-300 hover:text-slate-500'}`}>
-      {label}
-    </button>
-  );
-}
-
-function ContentRow({ item, icon, color, onClick }: any) {
-  return (
-    <button onClick={onClick} className="w-full p-5 pb-8 bg-slate-50 border-2 border-transparent rounded-[2rem] flex items-center justify-between hover:border-indigo-600 hover:bg-white transition-all group text-left">
-      <div className="flex items-center gap-4">
-        <div className={`p-3 bg-white rounded-xl ${color} shadow-sm group-hover:scale-110 transition-transform`}>{icon}</div>
-        <div>
-          <h4 className="font-black text-slate-900 text-sm tracking-tight">{item.title}</h4>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{item.subtitle || 'Unit module'}</p>
-        </div>
-      </div>
-      <PlusCircle size={24} className="text-slate-200 group-hover:text-indigo-600 transition-colors" />
-    </button>
-  );
 }
 // ============================================================================
 //  CREATOR TOOLS (Builders)
