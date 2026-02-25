@@ -1266,14 +1266,14 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
   }, [lesson, isInstructor]);
 
   // --- NAVIGATION HANDLERS ---
-  const handlePrev = () => {
+  const handlePrev = useCallback(() => {
       const newIdx = Math.max(0, activePageIdx - 1);
       setActivePageIdx(newIdx);
       syncToProjector(newIdx);
       containerRef.current?.scrollTo(0,0);
-  };
+  }, [activePageIdx, syncToProjector]);
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
       if (activePageIdx < pages.length - 1) {
           const newIdx = activePageIdx + 1;
           setActivePageIdx(newIdx);
@@ -1282,7 +1282,9 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
       } else {
           onFinish();
       }
-  };
+  }, [activePageIdx, pages.length, syncToProjector, onFinish]);
+
+  // --- KEYBOARD NAVIGATION ENGINE ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -1296,7 +1298,7 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activePageIdx, pages.length]);
+  }, [handleNext, handlePrev]);
 
  // --- MASTER BLOCK RENDERER ---
   const renderBlock = (block: any, idx: number) => {
