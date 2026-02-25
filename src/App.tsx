@@ -6062,10 +6062,14 @@ function AdminDashboardView({ user }: any) {
     const [vaultFilters, setVaultFilters] = useState<string[]>(['lesson', 'exam', 'arcade']);
     const [selectedVaultItems, setSelectedVaultItems] = useState<string[]>([]);
 
-    // NEW: DEPLOYMENT MATRIX STATES
+    // DEPLOYMENT MATRIX STATES
     const [deployingContent, setDeployingContent] = useState<any | null>(null);
     const [deploySelectedCohorts, setDeploySelectedCohorts] = useState<string[]>([]);
     const [isDeploying, setIsDeploying] = useState(false);
+
+    // TAGGING STATES
+    const [bulkTagInput, setBulkTagInput] = useState('');
+    const [inspectorTagInput, setInspectorTagInput] = useState('');
 
     useEffect(() => {
         const qProfiles = query(collectionGroup(db, 'profile'));
@@ -6143,6 +6147,8 @@ function AdminDashboardView({ user }: any) {
         }
     };
 
+    // --- CONTENT GOVERNANCE & TAGGING ---
+
     const forceDeleteContent = async (instructorUid: string, contentId: string) => {
         if (window.confirm("CRITICAL WARNING: This will permanently delete this curriculum item from the platform. Continue?")) {
             try {
@@ -6157,9 +6163,7 @@ function AdminDashboardView({ user }: any) {
         try {
             const deletePromises = selectedVaultItems.map(id => {
                 const item = allContent.find(c => c.id === id);
-                if (item) {
-                    return deleteDoc(doc(db, 'artifacts', appId, 'users', item._instructorUid, 'custom_lessons', id));
-                }
+                if (item) return deleteDoc(doc(db, 'artifacts', appId, 'users', item._instructorUid, 'custom_lessons', id));
             });
             await Promise.all(deletePromises);
             setSelectedVaultItems([]); 
@@ -6167,7 +6171,45 @@ function AdminDashboardView({ user }: any) {
         } catch (e) { alert("Error during bulk deletion."); }
     };
 
-    // NEW: DEPLOYMENT EXECUTION ENGINE
+    // NEW: Add a tag to a single item in the inspector
+    const handleAddSingleTag = async (instructorUid: string, contentId: string) => {
+        if (!inspectorTagInput.trim()) return;
+        try {
+            const contentRef = doc(db, 'artifacts', appId, 'users', instructorUid, 'custom_lessons', contentId);
+            await updateDoc(contentRef, { tags: arrayUnion(inspectorTagInput.trim().toLowerCase()) });
+            setInspectorTagInput('');
+        } catch (e) { alert("Failed to add tag."); }
+    };
+
+    // NEW: Remove a tag from a single item in the inspector
+    const handleRemoveSingleTag = async (instructorUid: string, contentId: string, tagToRemove: string) => {
+        try {
+            const contentRef = doc(db, 'artifacts', appId, 'users', instructorUid, 'custom_lessons', contentId);
+            await updateDoc(contentRef, { tags: arrayRemove(tagToRemove) });
+        } catch (e) { alert("Failed to remove tag."); }
+    };
+
+    // NEW: Bulk Tagging Engine
+    const handleBulkTagAdd = async () => {
+        if (!bulkTagInput.trim()) return;
+        const formattedTag = bulkTagInput.trim().toLowerCase();
+        try {
+            const tagPromises = selectedVaultItems.map(id => {
+                const item = allContent.find(c => c.id === id);
+                if (item) {
+                    return updateDoc(
+                        doc(db, 'artifacts', appId, 'users', item._instructorUid, 'custom_lessons', id), 
+                        { tags: arrayUnion(formattedTag) }
+                    );
+                }
+            });
+            await Promise.all(tagPromises);
+            setBulkTagInput('');
+            alert(`Tag '${formattedTag}' applied to ${selectedVaultItems.length} items.`);
+        } catch (e) { alert("Error applying bulk tags."); }
+    };
+
+    // --- DEPLOYMENT EXECUTION ENGINE ---
     const executeDeployment = async () => {
         if (!deployingContent || deploySelectedCohorts.length === 0) return;
         setIsDeploying(true);
@@ -6175,17 +6217,13 @@ function AdminDashboardView({ user }: any) {
             const pushPromises = deploySelectedCohorts.map(cohortId => {
                 const cohort = allCohorts.find(c => c.id === cohortId);
                 if (!cohort) return Promise.resolve();
-                
-                // Inject the content ID directly into the instructor's class assignment array
                 const classRef = doc(db, 'artifacts', appId, 'users', cohort._instructorUid, 'classes', cohort.id);
                 return updateDoc(classRef, { assignments: arrayUnion(deployingContent.id) });
             });
-            
             await Promise.all(pushPromises);
-            
             setDeployingContent(null);
             setDeploySelectedCohorts([]);
-            setSelectedContentId(null); // Close the inspector to show success
+            setSelectedContentId(null); 
             alert(`Deployment Successful! Pushed to ${deploySelectedCohorts.length} cohorts.`);
         } catch (error) {
             console.error("Deployment Error:", error);
@@ -6194,18 +6232,9 @@ function AdminDashboardView({ user }: any) {
         setIsDeploying(false);
     };
 
-    const toggleVaultFilter = (type: string) => {
-        setVaultFilters(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]);
-    };
-
-    const toggleVaultItemSelection = (id: string, e: React.MouseEvent) => {
-        e.stopPropagation();
-        setSelectedVaultItems(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-    };
-
-    const toggleCohortSelection = (id: string) => {
-        setDeploySelectedCohorts(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
-    };
+    const toggleVaultFilter = (type: string) => setVaultFilters(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]);
+    const toggleVaultItemSelection = (id: string, e: React.MouseEvent) => { e.stopPropagation(); setSelectedVaultItems(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]); };
+    const toggleCohortSelection = (id: string) => setDeploySelectedCohorts(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
 
     // --- DATA PROCESSING ---
     const students = allProfiles.filter(p => p.role === 'student');
@@ -6236,7 +6265,7 @@ function AdminDashboardView({ user }: any) {
     });
 
     const filteredContent = populatedContent.filter(c => {
-        const searchStr = `${c.title || ''} ${c.authorName || ''} ${c.type || ''}`.toLowerCase();
+        const searchStr = `${c.title || ''} ${c.authorName || ''} ${c.type || ''} ${(c.tags || []).join(' ')}`.toLowerCase();
         const matchesSearch = !vaultSearch || searchStr.includes(vaultSearch.toLowerCase());
         const isArcade = c.type === 'arcade_game';
         const isExam = c.type === 'exam' || c.type === 'test';
@@ -6368,7 +6397,7 @@ function AdminDashboardView({ user }: any) {
                 </div>
             )}
 
-            {/* 4. NEW: CONTENT VAULT DEPLOYMENT MATRIX */}
+            {/* 4. CONTENT VAULT DEPLOYMENT MATRIX / INSPECTOR */}
             {activeContent && (
                 <div className="absolute inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
                     {deployingContent ? (
@@ -6387,10 +6416,7 @@ function AdminDashboardView({ user }: any) {
                             <div className="flex-1 overflow-y-auto p-8 bg-slate-50 custom-scrollbar">
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Select Target Cohorts</h3>
-                                    <button 
-                                        onClick={() => setDeploySelectedCohorts(deploySelectedCohorts.length === populatedCohorts.length ? [] : populatedCohorts.map(c => c.id))}
-                                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
-                                    >
+                                    <button onClick={() => setDeploySelectedCohorts(deploySelectedCohorts.length === populatedCohorts.length ? [] : populatedCohorts.map(c => c.id))} className="text-xs font-bold text-indigo-600 hover:text-indigo-800">
                                         {deploySelectedCohorts.length === populatedCohorts.length ? 'Deselect All' : 'Select All'}
                                     </button>
                                 </div>
@@ -6402,16 +6428,10 @@ function AdminDashboardView({ user }: any) {
                                         populatedCohorts.map(cohort => {
                                             const isSelected = deploySelectedCohorts.includes(cohort.id);
                                             return (
-                                                <button 
-                                                    key={cohort.id}
-                                                    onClick={() => toggleCohortSelection(cohort.id)}
-                                                    className={`w-full p-4 rounded-2xl border-2 flex items-center justify-between transition-all text-left group ${isSelected ? 'border-indigo-500 bg-indigo-50 shadow-sm' : 'border-slate-200 bg-white hover:border-indigo-300'}`}
-                                                >
+                                                <button key={cohort.id} onClick={() => toggleCohortSelection(cohort.id)} className={`w-full p-4 rounded-2xl border-2 flex items-center justify-between transition-all text-left group ${isSelected ? 'border-indigo-500 bg-indigo-50 shadow-sm' : 'border-slate-200 bg-white hover:border-indigo-300'}`}>
                                                     <div>
                                                         <h4 className={`font-bold text-sm ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{cohort.name}</h4>
-                                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1 flex items-center gap-2">
-                                                            <User size={10}/> {cohort.instructorName} • {cohort.students?.length || 0} Students
-                                                        </p>
+                                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1 flex items-center gap-2"><User size={10}/> {cohort.instructorName} • {cohort.students?.length || 0} Students</p>
                                                     </div>
                                                     <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300 group-hover:border-indigo-400'}`}>
                                                         {isSelected && <Check size={12} strokeWidth={4}/>}
@@ -6424,20 +6444,14 @@ function AdminDashboardView({ user }: any) {
                             </div>
 
                             <div className="p-6 bg-white border-t border-slate-100 flex items-center justify-between shrink-0">
-                                <div className="text-sm font-bold text-slate-500">
-                                    <span className="text-indigo-600 font-black">{deploySelectedCohorts.length}</span> targets selected
-                                </div>
-                                <button 
-                                    onClick={executeDeployment}
-                                    disabled={deploySelectedCohorts.length === 0 || isDeploying}
-                                    className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-indigo-200 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100 flex items-center gap-2"
-                                >
+                                <div className="text-sm font-bold text-slate-500"><span className="text-indigo-600 font-black">{deploySelectedCohorts.length}</span> targets selected</div>
+                                <button onClick={executeDeployment} disabled={deploySelectedCohorts.length === 0 || isDeploying} className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-indigo-200 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2">
                                     {isDeploying ? <Loader size={16} className="animate-spin"/> : <Send size={16}/>} Initialize Push
                                 </button>
                             </div>
                         </div>
                     ) : (
-                        /* --- STANDARD INSPECTOR UI --- */
+                        /* --- STANDARD INSPECTOR UI WITH TAGGING --- */
                         <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl relative animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col">
                             <div className="p-8 border-b border-slate-100 flex justify-between items-start bg-slate-50/80 relative overflow-hidden">
                                 <div className={`absolute top-0 left-0 w-2 h-full ${activeContent.type === 'arcade_game' ? 'bg-amber-500' : activeContent.type === 'exam' || activeContent.type === 'test' ? 'bg-rose-500' : 'bg-indigo-500'}`} />
@@ -6451,7 +6465,7 @@ function AdminDashboardView({ user }: any) {
                                 <button onClick={() => setSelectedContentId(null)} className="p-2 text-slate-400 hover:text-slate-600 bg-white border border-slate-200 rounded-full transition-all shadow-sm relative z-10"><X size={20}/></button>
                             </div>
 
-                            <div className="p-8 space-y-6 bg-white">
+                            <div className="p-8 space-y-6 bg-white overflow-y-auto">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Architecture</span>
@@ -6463,12 +6477,41 @@ function AdminDashboardView({ user }: any) {
                                     </div>
                                 </div>
                                 
-                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">System Node ID</span>
-                                    <span className="font-mono text-xs font-bold text-slate-500 break-all">{activeContent.id}</span>
+                                {/* NEW: TAG MANAGER */}
+                                <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Tag size={12}/> Content Tags</span>
+                                    
+                                    <div className="flex flex-wrap gap-2">
+                                        {(!activeContent.tags || activeContent.tags.length === 0) && (
+                                            <span className="text-xs font-bold text-slate-400 italic">No tags assigned.</span>
+                                        )}
+                                        {activeContent.tags?.map((tag: string) => (
+                                            <div key={tag} className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-black text-slate-600 shadow-sm">
+                                                {tag}
+                                                <button onClick={() => handleRemoveSingleTag(activeContent._instructorUid, activeContent.id, tag)} className="text-slate-300 hover:text-rose-500"><X size={12}/></button>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Add a new tag..."
+                                            value={inspectorTagInput}
+                                            onChange={(e) => setInspectorTagInput(e.target.value)}
+                                            onKeyDown={(e) => { if(e.key === 'Enter') handleAddSingleTag(activeContent._instructorUid, activeContent.id); }}
+                                            className="flex-1 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                                        />
+                                        <button 
+                                            onClick={() => handleAddSingleTag(activeContent._instructorUid, activeContent.id)}
+                                            disabled={!inspectorTagInput.trim()}
+                                            className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50"
+                                        >
+                                            Add
+                                        </button>
+                                    </div>
                                 </div>
 
-                                {/* NEW: DEPLOY TO NETWORK ACTION */}
                                 <button 
                                     onClick={() => setDeployingContent(activeContent)}
                                     className="w-full py-5 bg-indigo-50 border-2 border-indigo-200 text-indigo-700 font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-indigo-600 hover:text-white transition-colors shadow-sm flex items-center justify-center gap-2 group"
@@ -6510,22 +6553,47 @@ function AdminDashboardView({ user }: any) {
                 
                 {/* --- FLOATING BULK ACTION DOCK --- */}
                 {selectedVaultItems.length > 0 && activeTab === 'vault' && (
-                    <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-8 duration-300">
-                        <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700 p-3 pr-4 rounded-full shadow-[0_20px_40px_rgba(0,0,0,0.3)] flex items-center gap-6">
-                            <div className="flex items-center gap-3 pl-3">
-                                <div className="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-white font-black text-sm shadow-inner">{selectedVaultItems.length}</div>
-                                <span className="text-sm font-bold text-white uppercase tracking-widest">Selected</span>
+                    <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-8 duration-300 w-[90%] max-w-3xl">
+                        <div className="bg-slate-900/95 backdrop-blur-xl border border-slate-700 p-3 pr-4 rounded-[2rem] shadow-[0_30px_60px_rgba(0,0,0,0.4)] flex flex-col md:flex-row items-center justify-between gap-4">
+                            
+                            <div className="flex items-center gap-3 pl-3 w-full md:w-auto shrink-0">
+                                <div className="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-white font-black text-sm shadow-inner shrink-0">{selectedVaultItems.length}</div>
+                                <span className="text-xs font-black text-white uppercase tracking-widest">Selected</span>
                             </div>
-                            <div className="h-8 w-px bg-slate-700" />
-                            <div className="flex items-center gap-2">
-                                <button onClick={() => setSelectedVaultItems([])} className="px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">Clear</button>
-                                <button onClick={handleBulkDelete} className="px-6 py-2.5 rounded-full text-xs font-black uppercase tracking-widest bg-rose-500 text-white hover:bg-rose-600 shadow-lg shadow-rose-500/20 active:scale-95 transition-all flex items-center gap-2"><Trash2 size={14}/> Nuke Items</button>
+
+                            <div className="hidden md:block h-8 w-px bg-slate-700" />
+
+                            {/* BULK TAG INPUT */}
+                            <div className="flex items-center w-full bg-slate-800/50 rounded-xl border border-slate-700 p-1">
+                                <div className="pl-3 pr-2 text-slate-400"><Tag size={14}/></div>
+                                <input 
+                                    type="text" 
+                                    placeholder="Add bulk tag..."
+                                    value={bulkTagInput}
+                                    onChange={e => setBulkTagInput(e.target.value)}
+                                    onKeyDown={(e) => { if(e.key === 'Enter') handleBulkTagAdd(); }}
+                                    className="flex-1 bg-transparent border-none text-xs font-bold text-white placeholder:text-slate-500 outline-none"
+                                />
+                                <button 
+                                    onClick={handleBulkTagAdd}
+                                    disabled={!bulkTagInput.trim()}
+                                    className="px-4 py-2 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50"
+                                >
+                                    Apply
+                                </button>
+                            </div>
+
+                            <div className="hidden md:block h-8 w-px bg-slate-700" />
+
+                            <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
+                                <button onClick={() => setSelectedVaultItems([])} className="flex-1 md:flex-none px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">Clear</button>
+                                <button onClick={handleBulkDelete} className="flex-1 md:flex-none px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest bg-rose-500 text-white hover:bg-rose-600 shadow-lg shadow-rose-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"><Trash2 size={14}/> Nuke</button>
                             </div>
                         </div>
                     </div>
                 )}
 
-                <div className="max-w-6xl mx-auto space-y-12 pb-32">
+                <div className="max-w-6xl mx-auto space-y-12 pb-48">
                     {/* OVERVIEW TAB */}
                     {activeTab === 'overview' && (
                         <div className="space-y-12 animate-in slide-in-from-bottom-4">
@@ -6717,6 +6785,17 @@ function AdminDashboardView({ user }: any) {
                                                             </span>
                                                         </div>
                                                         <h4 className={`font-black text-slate-800 text-lg leading-tight mb-2 group-hover:text-${themeColor}-600 transition-colors`}>{content.title || 'Untitled Module'}</h4>
+                                                        
+                                                        {/* Vault Card Tags Preview */}
+                                                        {content.tags && content.tags.length > 0 && (
+                                                            <div className="flex flex-wrap gap-1 mt-2">
+                                                                {content.tags.slice(0, 3).map((t:string) => (
+                                                                    <span key={t} className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded uppercase">{t}</span>
+                                                                ))}
+                                                                {content.tags.length > 3 && <span className="text-[9px] font-bold text-slate-400">+{content.tags.length - 3}</span>}
+                                                            </div>
+                                                        )}
+
                                                     </div>
                                                     <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-500 w-full">
                                                         <span className="flex items-center gap-1 truncate pr-2"><User size={12}/> {content.authorName}</span>
