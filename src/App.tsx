@@ -3982,9 +3982,6 @@ function InjectorButton({ icon, label, onClick }: any) {
 // ============================================================================
 //  BUILDER HUB (The Main Studio Workspace)
 // ============================================================================
-// ============================================================================
-//  BUILDER HUB (The Main Studio Workspace - Now with Arcade!)
-// ============================================================================
 function BuilderHub({ 
   onSaveCard, 
   onUpdateCard, 
@@ -3997,17 +3994,15 @@ function BuilderHub({
 }: any) {
   const [lessonData, setLessonData] = useState<any>({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
   const [mode, setMode] = useState<'card' | 'lesson' | 'exam' | 'arcade'>(initialMode || 'card'); 
-  const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit'); // TABLET TOGGLE
+  const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   useEffect(() => { if (initialMode) setMode(initialMode); }, [initialMode]);
 
-  // --- TAB CONFIG ---
   const modes = [
     { id: 'card', label: 'Scriptorium', icon: <Layers size={18}/>, color: 'text-indigo-600', bg: 'bg-indigo-50' },
     { id: 'lesson', label: 'Curriculum', icon: <BookOpen size={18}/>, color: 'text-emerald-600', bg: 'bg-emerald-50' },
     { id: 'exam', label: 'Assessment', icon: <FileText size={18}/>, color: 'text-rose-600', bg: 'bg-rose-50' },
-    // THE NEW ARCADE TAB
     { id: 'arcade', label: 'Arcade', icon: <Gamepad2 size={18}/>, color: 'text-amber-600', bg: 'bg-amber-50' }
   ];
 
@@ -4017,7 +4012,7 @@ function BuilderHub({
     <div className="h-full flex flex-col bg-slate-50 overflow-hidden select-none animate-in fade-in duration-500">
       {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
       
-      {/* --- 1. THE ADAPTIVE HEADER --- */}
+      {/* HEADER */}
       <header className="h-24 bg-white border-b border-slate-200 px-6 md:px-10 flex justify-between items-center shrink-0 z-30 shadow-sm">
         <div className="flex items-center gap-4">
           <div className={`p-3 rounded-2xl ${activeModeConfig.bg} ${activeModeConfig.color} hidden sm:flex transition-colors`}>
@@ -4029,7 +4024,6 @@ function BuilderHub({
           </div>
         </div>
 
-        {/* --- TABLET VIEW SWITCHER (Visible only on Tablet/Mobile) --- */}
         <div className="flex bg-slate-100 p-1 rounded-2xl md:hidden border border-slate-200">
           <button 
             onClick={() => setViewMode('edit')}
@@ -4056,11 +4050,9 @@ function BuilderHub({
             </button>
           )}
           
-          {/* Hide the commit button when in exam mode, because the ExamBuilder has its own "Publish Exam" button */}
           {mode !== 'exam' && (
              <button 
                onClick={() => {
-                 // Format the payload based on what we are building
                  const payload = mode === 'arcade' ? { ...lessonData, type: 'arcade_game' } : lessonData;
                  onSaveLesson(payload);
                  setToastMsg(mode === 'arcade' ? "Arcade Game Committed! 🎮" : "Unit Committed! 📚");
@@ -4073,23 +4065,21 @@ function BuilderHub({
         </div>
       </header>
 
-      {/* --- 2. DYNAMIC WORKSPACE --- */}
+      {/* WORKSPACE */}
       <div className="flex-1 flex overflow-hidden relative">
         
-        {/* LEFT PANE: THE EDITOR */}
+        {/* LEFT PANE: EDITOR */}
         <div className={`h-full overflow-y-auto custom-scrollbar transition-all duration-500 ease-in-out ${
           viewMode === 'edit' ? 'w-full md:w-1/2 opacity-100' : 'hidden md:block md:w-1/2 opacity-50 grayscale-[50%]'
         }`}>
           <div className="p-6 md:p-12 max-w-2xl mx-auto pb-40">
             
-            {/* MODE TOGGLE: Cards vs Lesson vs Exam vs Arcade */}
             <div className="mb-10 flex flex-wrap bg-slate-200/50 p-1.5 rounded-[2rem] w-fit mx-auto md:mx-0 gap-1">
               {modes.map((m) => (
                 <button 
                   key={m.id}
                   onClick={() => {
                     setMode(m.id as any);
-                    // Reset lesson data when switching modes so we don't accidentally save a lesson as a game
                     if (m.id === 'arcade') setLessonData({ title: '', description: '', gameTemplate: 'connect-three', targetScore: 3, mode: 'pvp', deckIds: [] });
                     if (m.id === 'lesson') setLessonData({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
                   }} 
@@ -4102,80 +4092,25 @@ function BuilderHub({
               ))}
             </div>
 
-            {/* THE BUILDER VIEWS */}
             <div className="animate-in fade-in slide-in-from-bottom-4">
-              {mode === 'card' && (
-                <CardBuilderView 
-                  onSaveCard={onSaveCard} 
-                  onUpdateCard={onUpdateCard} 
-                  onDeleteCard={onDeleteCard} 
-                  availableDecks={allDecks} 
-                />
-              )}
-              {mode === 'lesson' && (
-                <LessonBuilderView 
-                  data={lessonData} 
-                  setData={setLessonData} 
-                  onSave={onSaveLesson} 
-                  availableDecks={allDecks} 
-                />
-              )}
+              {mode === 'card' && <CardBuilderView onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} availableDecks={allDecks} />}
+              {mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onSave={onSaveLesson} availableDecks={allDecks} />}
               {mode === 'exam' && (
                 <div className="-mx-6 md:-mx-12">
-                   <ExamBuilderView 
-                     onSave={(examObj: any) => {
-                         onSaveLesson(examObj);
-                         setToastMsg("Assessment Successfully Built! 🎯");
-                     }}
-                   />
+                   <ExamBuilderView onSave={(examObj: any) => { onSaveLesson(examObj); setToastMsg("Assessment Successfully Built! 🎯"); }} />
                 </div>
               )}
-              {/* --- NEW: ARCADE BUILDER HOOKUP --- */}
-              {mode === 'arcade' && (
-                <ArcadeBuilderView 
-                  data={lessonData} 
-                  setData={setLessonData} 
-                  availableDecks={allDecks} 
-                />
-              )}
+              {mode === 'arcade' && <ArcadeBuilderView data={lessonData} setData={setLessonData} availableDecks={allDecks} />}
             </div>
           </div>
         </div>
 
-        {/* RIGHT PANE: THE LIVE PREVIEW (Projector/Mobile) */}
+        {/* RIGHT PANE: LIVE PREVIEW */}
         <div className={`h-full bg-slate-100 border-l border-slate-200 flex flex-col items-center justify-center p-6 md:p-12 transition-all duration-500 ${
           viewMode === 'preview' ? 'flex w-full md:w-1/2' : 'hidden md:flex md:w-1/2'
         }`}>
           <div className="relative w-full h-full max-w-sm max-h-[750px] group flex flex-col items-center justify-center">
             
-            {/* EXAM PREVIEW PLACEHOLDER */accesability}
-            {mode === 'exam' && (
-                <div className="w-full max-w-xs aspect-[9/16] bg-white border-4 border-dashed border-slate-200 rounded-[3rem] shadow-sm flex flex-col items-center justify-center p-8 text-center animate-in zoom-in-95 duration-500">
-                    <FileText size={64} className="text-slate-200 mb-6" />
-                    <h3 className="text-lg font-black text-slate-800 mb-2">Exam Preview</h3>
-                    <p className="text-sm font-bold text-slate-400">Assessments are rendered dynamically in the student's isolated testing environment.</p>
-                </div>
-            )} </div>
-              )}
-{/* --- NEW: ARCADE BUILDER HOOKUP --- */}
-              {mode === 'arcade' && (
-                <ArcadeBuilderView 
-                  data={lessonData} 
-                  setData={setLessonData} 
-                  availableDecks={allDecks} 
-                />
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* RIGHT PANE: THE LIVE PREVIEW (Projector/Mobile) */}
-        <div className={`h-full bg-slate-100 border-l border-slate-200 flex flex-col items-center justify-center p-6 md:p-12 transition-all duration-500 ${
-          viewMode === 'preview' ? 'flex w-full md:w-1/2' : 'hidden md:flex md:w-1/2'
-        }`}>
-          <div className="relative w-full h-full max-w-sm max-h-[750px] group flex flex-col items-center justify-center">
-            
-            {/* EXAM PREVIEW PLACEHOLDER */}
             {mode === 'exam' && (
                 <div className="w-full max-w-xs aspect-[9/16] bg-white border-4 border-dashed border-slate-200 rounded-[3rem] shadow-sm flex flex-col items-center justify-center p-8 text-center animate-in zoom-in-95 duration-500">
                     <FileText size={64} className="text-slate-200 mb-6" />
@@ -4184,7 +4119,6 @@ function BuilderHub({
                 </div>
             )}
 
-            {/* ARCADE PREVIEW PLACEHOLDER */}
             {mode === 'arcade' && (
                 <div className="w-full h-full bg-white rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border-[12px] border-slate-900 animate-in zoom-in-95 duration-500 relative">
                     <div className="absolute inset-0 bg-amber-500/10 z-0" />
@@ -4217,7 +4151,6 @@ function BuilderHub({
                 </div>
             )}
 
-            {/* LESSON / SCRIPTORIUM PREVIEW */}
             {(mode === 'lesson' || mode === 'card') && (
                 <>
                     <div className="absolute -inset-4 bg-gradient-to-tr from-indigo-500/10 to-emerald-500/10 blur-2xl rounded-[4rem] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
@@ -4227,7 +4160,6 @@ function BuilderHub({
                 </>
             )}
 
-            {/* Quick-Save Floating Action (For Tablet Preview Mode) */}
             {mode !== 'exam' && (
                 <button 
                 onClick={() => {
@@ -4244,7 +4176,7 @@ function BuilderHub({
         </div>
       </div>
 
-      {/* --- 3. TABLET FOOTER (Quick Block Injector Indicator) --- */}
+      {/* TABLET FOOTER */}
       <div className={`md:hidden fixed bottom-10 left-1/2 -translate-x-1/2 transition-all duration-500 ${
         viewMode === 'edit' ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'
       }`}>
