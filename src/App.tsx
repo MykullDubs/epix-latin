@@ -8,7 +8,7 @@ import {
 import { 
   getFirestore, doc, setDoc, onSnapshot, collection, addDoc, updateDoc, 
   increment, writeBatch, deleteDoc, arrayUnion, arrayRemove, query, where, collectionGroup, 
-  orderBy, limit 
+  orderBy, limit, getDocs, getDoc 
 } from "firebase/firestore";
 import { 
   BookOpen, Layers, User, Home, Check, X, Zap, ChevronRight, Search, Volume2, 
@@ -2246,36 +2246,79 @@ function AuthView() {
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
-    const handleAuth = async (e: any) => { 
+   const handleAuth = async (e: any) => { 
         e.preventDefault(); 
         setError(''); 
         setLoading(true); 
         
         try { 
+            let userCredential;
+            let finalName = name.trim();
+            const userEmail = email.toLowerCase().trim();
+
             if (isLogin) {
-                await signInWithEmailAndPassword(auth, email, password); 
+                // 1. SIGN IN
+                userCredential = await signInWithEmailAndPassword(auth, email, password); 
+                
+                // Fetch their name from their profile so we can use it in the handshake
+                const profileSnap = await getDoc(doc(db, 'artifacts', appId, 'users', userCredential.user.uid, 'profile', 'main'));
+                if (profileSnap.exists()) finalName = profileSnap.data().name;
+
             } else { 
-                const uc = await createUserWithEmailAndPassword(auth, email, password); 
-                const finalName = name.trim() || (role === 'instructor' ? "Professor" : "Scholar");
+                // 2. SIGN UP
+                userCredential = await createUserWithEmailAndPassword(auth, email, password); 
+                finalName = finalName || (role === 'instructor' ? "Professor" : "Scholar");
                 
                 // Create the Base User Profile
-                await setDoc(doc(db, 'artifacts', appId, 'users', uc.user.uid, 'profile', 'main'), { 
+                await setDoc(doc(db, 'artifacts', appId, 'users', userCredential.user.uid, 'profile', 'main'), { 
                     ...DEFAULT_USER_DATA, 
                     name: finalName, 
-                    email: email.toLowerCase().trim(), 
+                    email: userEmail, 
                     role: role,
                     joinedAt: Date.now(),
                     isOnboarded: true
                 }); 
             } 
+
+            // ====================================================================
+            // 3. THE MAGIC ROSTER HANDSHAKE
+            // ====================================================================
+            // Find all classes across ALL instructors where this student's email is listed
+            const classesQuery = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', userEmail));
+            const classesSnap = await getDocs(classesQuery);
+            
+            // Loop through those classes and update the 'Pending' roster objects with real data
+            const updatePromises = classesSnap.docs.map(async (classDoc) => {
+                const classData = classDoc.data();
+                const studentsArray = classData.students || [];
+                
+                let rosterChanged = false;
+                
+                const updatedStudents = studentsArray.map((s: any) => {
+                    // If we find their email, and their name is missing, heal it!
+                    if (s.email === userEmail && !s.name) {
+                        rosterChanged = true;
+                        return { ...s, name: finalName || "Student", uid: userCredential.user.uid };
+                    }
+                    return s;
+                });
+
+                // Only push to Firebase if we actually fixed a pending registration
+                if (rosterChanged) {
+                    return updateDoc(classDoc.ref, { students: updatedStudents });
+                }
+            });
+
+            // Wait for all rosters to update before finishing the login
+            await Promise.all(updatePromises);
+
         } catch (err: any) { 
-            // Clean up ugly Firebase errors
             setError(err.message.replace('Firebase: ', '').replace('Error (auth/', '').replace(').', '').split('-').join(' ')); 
         } finally { 
             setLoading(false); 
         } 
     };
-
+  
     return ( 
         <div className="min-h-screen w-full flex items-center justify-center p-6 relative overflow-hidden font-sans">
             
