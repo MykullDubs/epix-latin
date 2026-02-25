@@ -800,7 +800,7 @@ function ClassView({ lesson, classId, userData }: any) {
           <h2 className="text-[3vh] font-black text-slate-900 opacity-20 uppercase tracking-widest">{lesson.title}</h2>
         </div>
       </div>
-    </div>
+    </div>classview
   );
 }
 // ============================================================================
@@ -3250,12 +3250,9 @@ function ClassManagerView({
     const [selectedClassId, setSelectedClassId] = useState<string | null>(classes[0]?.id || null);
     const [activeTab, setActiveTab] = useState<'roster' | 'assignments'>('roster');
     const [newStudentEmail, setNewStudentEmail] = useState('');
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
 
     const activeClass = classes.find((c: any) => c.id === selectedClassId);
-
-    // Filter to separate Arcade Games from Standard Lessons
-    const standardLessons = lessons.filter((l: any) => l.type !== 'arcade_game');
-    const arcadeGames = lessons.filter((l: any) => l.type === 'arcade_game');
 
     const handleAddStudent = (e: React.FormEvent) => {
         e.preventDefault();
@@ -3265,22 +3262,28 @@ function ClassManagerView({
     };
 
     return (
-        <div className="h-full max-w-7xl mx-auto flex flex-col md:flex-row gap-8 pb-32 animate-in fade-in duration-500">
+        <div className="h-full max-w-7xl mx-auto flex flex-col md:flex-row gap-6 pb-32 animate-in fade-in duration-500 font-sans">
             
             {/* ============================================================== */}
             {/* LEFT PANE: THE COHORT LIST (MASTER) */}
             {/* ============================================================== */}
-            <div className="w-full md:w-1/3 flex flex-col gap-6 shrink-0">
+            <div className="w-full md:w-[340px] flex flex-col gap-6 shrink-0">
                 
                 {/* Header & Create Action */}
-                <div className="flex items-center justify-between bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
-                    <div>
-                        <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-none">Cohorts</h2>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{classes.length} Active Deployments</span>
+                <div className="flex items-center justify-between bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm relative overflow-hidden group">
+                    <div className="absolute -right-4 -top-4 text-indigo-50 opacity-50 rotate-12 pointer-events-none transition-transform group-hover:scale-110 duration-700">
+                        <Users size={100} />
+                    </div>
+                    <div className="relative z-10">
+                        <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-none mb-1">Cohorts</h2>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-1 rounded-md">
+                            {classes.length} Active
+                        </span>
                     </div>
                     <button 
                         onClick={() => onCreateClass('New Cohort')}
-                        className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200 hover:scale-105 active:scale-95 transition-all"
+                        className="relative z-10 w-12 h-12 bg-slate-900 text-white rounded-[1.25rem] flex items-center justify-center shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-95 active:translate-y-0 transition-all"
+                        title="Provision New Cohort"
                     >
                         <Plus size={24} />
                     </button>
@@ -3289,39 +3292,41 @@ function ClassManagerView({
                 {/* Cohort List */}
                 <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-2">
                     {classes.length === 0 ? (
-                        <div className="text-center p-10 border-2 border-dashed border-slate-200 rounded-[2rem] bg-slate-50">
+                        <div className="text-center p-10 border-2 border-dashed border-slate-200 rounded-[2rem] bg-white/50">
                             <Users size={32} className="mx-auto text-slate-300 mb-3" />
-                            <p className="text-sm font-bold text-slate-500">No cohorts assigned yet.</p>
+                            <p className="text-sm font-bold text-slate-500">No cohorts deployed.</p>
                         </div>
                     ) : (
                         classes.map((cls: any) => {
                             const isSelected = selectedClassId === cls.id;
-                            // Mock a pulse score if not provided
                             const pulse = cls.pulse || Math.floor(Math.random() * 40) + 60; 
                             
                             return (
                                 <button 
                                     key={cls.id}
                                     onClick={() => setSelectedClassId(cls.id)}
-                                    className={`w-full text-left p-5 rounded-[2rem] border-2 transition-all duration-300 active:scale-[0.98] ${
+                                    className={`w-full text-left p-5 rounded-[1.5rem] border-2 transition-all duration-300 active:scale-[0.98] group relative overflow-hidden ${
                                         isSelected 
-                                            ? 'bg-white border-indigo-500 shadow-xl shadow-indigo-100 ring-4 ring-indigo-50' 
-                                            : 'bg-white border-slate-100 shadow-sm hover:border-indigo-200 hover:bg-indigo-50/30'
+                                            ? 'bg-indigo-600 border-indigo-600 shadow-xl shadow-indigo-200' 
+                                            : 'bg-white border-slate-100 shadow-sm hover:border-indigo-200 hover:bg-slate-50'
                                     }`}
                                 >
-                                    <div className="flex justify-between items-start mb-4">
-                                        <h3 className={`text-lg font-black leading-tight ${isSelected ? 'text-indigo-900' : 'text-slate-800'}`}>
+                                    {/* Selected Glow Effect */}
+                                    {isSelected && <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/20 pointer-events-none" />}
+
+                                    <div className="flex justify-between items-start mb-4 relative z-10">
+                                        <h3 className={`text-lg font-black leading-tight pr-4 ${isSelected ? 'text-white' : 'text-slate-800 group-hover:text-indigo-900'}`}>
                                             {cls.name}
                                         </h3>
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isSelected ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-50 text-slate-400'}`}>
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${isSelected ? 'bg-indigo-500 text-indigo-50 shadow-inner' : 'bg-slate-100 text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600'}`}>
                                             <Users size={14} />
                                         </div>
                                     </div>
                                     
-                                    <div className="flex items-center justify-between text-xs font-bold">
-                                        <span className="text-slate-500">{cls.students?.length || 0} Students</span>
-                                        <span className={`flex items-center gap-1 ${pulse >= 80 ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                            <Activity size={12} /> Pulse: {pulse}%
+                                    <div className={`flex items-center justify-between text-xs font-bold relative z-10 ${isSelected ? 'text-indigo-100' : 'text-slate-500'}`}>
+                                        <span>{cls.students?.length || 0} Students</span>
+                                        <span className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${isSelected ? 'bg-indigo-500/50 text-white' : pulse >= 80 ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                                            <Activity size={12} /> {pulse}%
                                         </span>
                                     </div>
                                 </button>
@@ -3334,134 +3339,151 @@ function ClassManagerView({
             {/* ============================================================== */}
             {/* RIGHT PANE: COHORT DETAILS (DETAIL) */}
             {/* ============================================================== */}
-            <div className="w-full md:w-2/3 flex flex-col bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden relative min-h-[600px]">
+            <div className="flex-1 flex flex-col bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 overflow-hidden relative min-h-[600px]">
                 
                 {!activeClass ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-center p-12 bg-slate-50/50">
-                        <div className="w-24 h-24 bg-slate-100 rounded-[2rem] flex items-center justify-center text-slate-300 mb-6 rotate-12">
-                            <BookOpen size={48} />
+                        <div className="w-24 h-24 bg-white shadow-sm border border-slate-100 rounded-[2rem] flex items-center justify-center text-slate-300 mb-6 rotate-12 transition-transform hover:rotate-0 duration-500">
+                            <BookOpen size={40} />
                         </div>
                         <h2 className="text-2xl font-black text-slate-800 mb-2">Select a Cohort</h2>
-                        <p className="text-slate-500 font-bold max-w-xs">Click on a cohort from the list to view its roster, manage assignments, and track student pulse.</p>
+                        <p className="text-slate-500 font-bold max-w-sm">Click on a deployment from the roster to manage assignments, view progress, and track student pulse.</p>
                     </div>
                 ) : (
                     <div className="flex-1 flex flex-col animate-in slide-in-from-right-8 duration-500 fade-in">
                         
                         {/* Detail Header */}
-                        <header className="p-8 border-b border-slate-100 bg-slate-50/50 relative overflow-hidden">
-                            <div className="absolute -right-10 -top-10 text-slate-100 rotate-12 pointer-events-none">
-                                <Users size={160} />
-                            </div>
-                            
-                            <div className="relative z-10 flex justify-between items-start">
-                                <div>
-                                    <span className="inline-block px-3 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-black uppercase tracking-widest mb-3">
+                        <header className="px-8 pt-8 pb-0 border-b border-slate-100 bg-slate-50/50 relative">
+                            <div className="flex justify-between items-start mb-8">
+                                <div className="flex-1 pr-8">
+                                    <span className="inline-block px-3 py-1 bg-slate-200/50 text-slate-500 rounded-lg text-[10px] font-black uppercase tracking-[0.2em] mb-3 border border-slate-200">
                                         ID: {activeClass.id}
                                     </span>
-                                    <input 
-                                        className="block text-4xl font-black text-slate-900 tracking-tighter bg-transparent border-none p-0 focus:ring-0 w-full max-w-md"
-                                        value={activeClass.name}
-                                        onChange={(e) => onRenameClass(activeClass.id, e.target.value)}
-                                        title="Click to rename"
-                                    />
-                                    <div className="flex gap-4 mt-4">
-                                        <div className="flex items-center gap-2 text-sm font-bold text-slate-500 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm">
-                                            <Users size={16} className="text-indigo-500"/> {activeClass.students?.length || 0} Enrolled
+                                    
+                                    {/* Editable Title Group */}
+                                    <div className="flex items-center gap-3 group">
+                                        <input 
+                                            className="text-3xl md:text-4xl font-black text-slate-900 tracking-tighter bg-transparent border-b-2 border-transparent focus:border-indigo-500 p-0 focus:ring-0 w-full max-w-lg transition-colors"
+                                            value={activeClass.name}
+                                            onChange={(e) => onRenameClass(activeClass.id, e.target.value)}
+                                            onFocus={() => setIsEditingTitle(true)}
+                                            onBlur={() => setIsEditingTitle(false)}
+                                            placeholder="Cohort Name..."
+                                        />
+                                        <Edit3 size={18} className={`text-slate-300 transition-opacity ${isEditingTitle ? 'opacity-0' : 'opacity-100 group-hover:text-indigo-400'}`} />
+                                    </div>
+
+                                    {/* Quick Stats */}
+                                    <div className="flex flex-wrap gap-3 mt-4">
+                                        <div className="flex items-center gap-2 text-xs font-bold text-slate-600 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm">
+                                            <Users size={14} className="text-indigo-500"/> {activeClass.students?.length || 0} Enrolled
                                         </div>
-                                        <div className="flex items-center gap-2 text-sm font-bold text-slate-500 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm">
-                                            <Flame size={16} className="text-rose-500"/> High Engagement
+                                        <div className="flex items-center gap-2 text-xs font-bold text-slate-600 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm">
+                                            <BookOpen size={14} className="text-emerald-500"/> {activeClass.assignments?.length || 0} Units Assigned
                                         </div>
                                     </div>
                                 </div>
 
                                 <button 
                                     onClick={() => onDeleteClass(activeClass.id)}
-                                    className="p-3 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"
+                                    className="p-3 text-slate-400 hover:text-white hover:bg-rose-500 rounded-2xl transition-all shadow-sm bg-white border border-slate-200 hover:border-rose-500"
                                     title="Delete Cohort"
                                 >
-                                    <Trash2 size={20} />
+                                    <Trash2 size={18} />
                                 </button>
                             </div>
 
-                            {/* Inner Tabs */}
-                            <div className="flex gap-2 mt-8">
+                            {/* Inner Tabs - Merged into header bottom */}
+                            <div className="flex gap-6 relative bottom-[-1px]">
                                 <button 
                                     onClick={() => setActiveTab('roster')}
-                                    className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'roster' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}
+                                    className={`pb-4 text-sm font-black uppercase tracking-widest transition-all border-b-4 ${activeTab === 'roster' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
                                 >
                                     Student Roster
                                 </button>
                                 <button 
                                     onClick={() => setActiveTab('assignments')}
-                                    className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'assignments' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}
+                                    className={`pb-4 text-sm font-black uppercase tracking-widest transition-all border-b-4 ${activeTab === 'assignments' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
                                 >
-                                    Curriculum & Arcade
+                                    Curriculum
                                 </button>
                             </div>
                         </header>
 
                         {/* Detail Content Area */}
-                        <div className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-white">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-white relative">
                             
-                            {/* ROSTER TAB */}
+                            {/* ==================== ROSTER TAB ==================== */}
                             {activeTab === 'roster' && (
-                                <div className="space-y-6 animate-in fade-in">
-                                    <form onSubmit={handleAddStudent} className="flex gap-3">
-                                        <div className="relative flex-1">
-                                            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
-                                                <Search size={16} />
+                                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
+                                    
+                                    {/* Juiced Enrollment Form */}
+                                    <form onSubmit={handleAddStudent} className="relative group max-w-xl">
+                                        <div className="absolute inset-0 bg-indigo-500/5 rounded-2xl blur-lg group-focus-within:bg-indigo-500/20 transition-all duration-500" />
+                                        <div className="relative flex items-center bg-white border-2 border-slate-200 focus-within:border-indigo-500 rounded-2xl p-1.5 shadow-sm transition-colors">
+                                            <div className="pl-4 pr-2 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+                                                <Mail size={18} />
                                             </div>
                                             <input 
                                                 type="email" 
-                                                placeholder="Add student by email..." 
+                                                placeholder="Enter student email address..." 
                                                 value={newStudentEmail}
                                                 onChange={e => setNewStudentEmail(e.target.value)}
-                                                className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-700 focus:border-indigo-500 focus:ring-0 transition-colors"
+                                                className="flex-1 bg-transparent border-none py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-0"
                                             />
+                                            <button 
+                                                type="submit" 
+                                                disabled={!newStudentEmail.trim()}
+                                                className="bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-600 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100 flex items-center gap-2"
+                                            >
+                                                Enroll <Plus size={14} />
+                                            </button>
                                         </div>
-                                        <button type="submit" className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-colors shrink-0">
-                                            Enroll
-                                        </button>
                                     </form>
 
-                                    <div className="border border-slate-100 rounded-[2rem] overflow-hidden">
-                                        <table className="w-full text-left">
+                                    {/* Student Table */}
+                                    <div className="border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm">
+                                        <table className="w-full text-left border-collapse">
                                             <thead className="bg-slate-50/80 border-b border-slate-100">
                                                 <tr>
-                                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Student</th>
-                                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Progress</th>
-                                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
+                                                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Student</th>
+                                                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest w-1/3">Completion</th>
+                                                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-50">
                                                 {(!activeClass.students || activeClass.students.length === 0) ? (
                                                     <tr>
-                                                        <td colSpan={3} className="px-6 py-8 text-center text-sm font-bold text-slate-400">
-                                                            No students enrolled yet. Add an email above.
+                                                        <td colSpan={3} className="px-6 py-12 text-center">
+                                                            <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-300">
+                                                                <Users size={20} />
+                                                            </div>
+                                                            <p className="text-sm font-bold text-slate-500">The roster is empty.</p>
+                                                            <p className="text-xs font-bold text-slate-400 mt-1">Enroll students using the field above.</p>
                                                         </td>
                                                     </tr>
                                                 ) : (
                                                     activeClass.students.map((student: any, idx: number) => (
                                                         <tr key={idx} className="hover:bg-slate-50/50 transition-colors group">
                                                             <td className="px-6 py-4">
-                                                                <div className="flex items-center gap-3">
-                                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-700 font-black flex items-center justify-center text-xs">
+                                                                <div className="flex items-center gap-4">
+                                                                    <div className="w-10 h-10 rounded-[1rem] bg-indigo-50 text-indigo-600 font-black flex items-center justify-center text-sm shadow-inner border border-indigo-100/50">
                                                                         {student.email?.[0]?.toUpperCase() || 'S'}
                                                                     </div>
                                                                     <span className="font-bold text-slate-700">{student.email}</span>
                                                                 </div>
                                                             </td>
                                                             <td className="px-6 py-4">
-                                                                <div className="flex items-center gap-2">
-                                                                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden w-24">
-                                                                        <div className="h-full bg-emerald-500 w-[45%]" />
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                                                        <div className="h-full bg-emerald-500 w-[45%] rounded-full" />
                                                                     </div>
-                                                                    <span className="text-[10px] font-black text-slate-400">45%</span>
+                                                                    <span className="text-[10px] font-black text-slate-400 w-8">45%</span>
                                                                 </div>
                                                             </td>
                                                             <td className="px-6 py-4 text-right">
-                                                                <button className="text-slate-300 hover:text-slate-600 transition-colors">
-                                                                    <MoreVertical size={18} />
+                                                                <button className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors">
+                                                                    <X size={16} strokeWidth={3} />
                                                                 </button>
                                                             </td>
                                                         </tr>
@@ -3473,66 +3495,70 @@ function ClassManagerView({
                                 </div>
                             )}
 
-                            {/* ASSIGNMENTS TAB */}
+                            {/* ==================== ASSIGNMENTS TAB ==================== */}
                             {activeTab === 'assignments' && (
-                                <div className="space-y-8 animate-in fade-in">
+                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
                                     
-                                    {/* Sub-Section: Curriculum */}
-                                    <div>
-                                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4">
-                                            <BookOpen size={14} /> Assigned Curriculum
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                                            <BookOpen size={16} className="text-indigo-500" /> Lesson Library
                                         </h3>
-                                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                                            {standardLessons.map((lesson: any) => {
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Click to toggle assignment</span>
+                                    </div>
+
+                                    {lessons.length === 0 ? (
+                                        <div className="text-center p-12 border-2 border-dashed border-slate-200 rounded-[2rem] bg-slate-50/50">
+                                            <BookOpen size={32} className="mx-auto text-slate-300 mb-3" />
+                                            <p className="text-sm font-bold text-slate-600 mb-1">Your library is empty.</p>
+                                            <p className="text-xs font-bold text-slate-400">Build lessons in the Studio first.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                            {lessons.map((lesson: any) => {
                                                 const isAssigned = activeClass.assignments?.includes(lesson.id);
+                                                
                                                 return (
-                                                    <div key={lesson.id} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${isAssigned ? 'border-indigo-500 bg-indigo-50 shadow-sm' : 'border-slate-100 bg-white hover:border-slate-200'}`}>
-                                                        <div>
-                                                            <h4 className={`font-bold text-sm ${isAssigned ? 'text-indigo-900' : 'text-slate-700'}`}>{lesson.title || 'Untitled Unit'}</h4>
-                                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{lesson.blocks?.length || 0} Blocks</p>
+                                                    <button 
+                                                        key={lesson.id} 
+                                                        onClick={() => isAssigned ? onRevoke(activeClass.id, lesson.id) : onAssign(activeClass.id, lesson.id)}
+                                                        className={`relative flex items-center p-5 rounded-[1.5rem] border-2 transition-all duration-300 text-left w-full group active:scale-[0.98] ${
+                                                            isAssigned 
+                                                                ? 'bg-indigo-50/50 border-indigo-500 shadow-md shadow-indigo-100' 
+                                                                : 'bg-white border-slate-100 hover:border-slate-300 shadow-sm hover:shadow-md'
+                                                        }`}
+                                                    >
+                                                        {/* Icon Box */}
+                                                        <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center shrink-0 mr-4 transition-colors ${
+                                                            isAssigned ? 'bg-indigo-500 text-white shadow-inner' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100'
+                                                        }`}>
+                                                            {lesson.type === 'arcade_game' ? <Gamepad2 size={20} /> : <BookOpen size={20} />}
                                                         </div>
-                                                        <button 
-                                                            onClick={() => isAssigned ? onRevoke(activeClass.id, lesson.id) : onAssign(activeClass.id, lesson.id)}
-                                                            className={`p-2 rounded-xl transition-all ${isAssigned ? 'text-indigo-600 bg-white shadow-sm' : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50'}`}
-                                                        >
-                                                            {isAssigned ? <CheckCircle2 size={24} className="fill-indigo-100" /> : <Circle size={24} />}
-                                                        </button>
-                                                    </div>
+
+                                                        {/* Text Content */}
+                                                        <div className="flex-1 pr-4">
+                                                            <h4 className={`font-black text-base leading-tight mb-1 transition-colors ${isAssigned ? 'text-indigo-900' : 'text-slate-700'}`}>
+                                                                {lesson.title || 'Untitled Unit'}
+                                                            </h4>
+                                                            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                                <span>{lesson.type === 'arcade_game' ? 'Arcade Game' : 'Standard Unit'}</span>
+                                                                <span className="w-1 h-1 rounded-full bg-slate-300" />
+                                                                <span>{lesson.blocks?.length || 0} Blocks</span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Toggle Indicator */}
+                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 shrink-0 transition-all ${
+                                                            isAssigned 
+                                                                ? 'bg-indigo-500 border-indigo-500 text-white scale-110' 
+                                                                : 'bg-white border-slate-200 text-transparent group-hover:border-indigo-300 group-hover:bg-indigo-50'
+                                                        }`}>
+                                                            <Check size={16} strokeWidth={4} />
+                                                        </div>
+                                                    </button>
                                                 );
                                             })}
                                         </div>
-                                    </div>
-
-                                    {/* Sub-Section: Arcade Games */}
-                                    <div>
-                                        <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2 mb-4 bg-amber-50 px-3 py-1.5 rounded-lg w-fit">
-                                            <Gamepad2 size={14} /> Assigned Arcade Games
-                                        </h3>
-                                        {arcadeGames.length === 0 ? (
-                                            <p className="text-xs font-bold text-slate-400 italic">No games built in the Studio yet.</p>
-                                        ) : (
-                                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                                                {arcadeGames.map((game: any) => {
-                                                    const isAssigned = activeClass.assignments?.includes(game.id);
-                                                    return (
-                                                        <div key={game.id} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${isAssigned ? 'border-amber-500 bg-amber-50 shadow-sm' : 'border-slate-100 bg-white hover:border-slate-200'}`}>
-                                                            <div>
-                                                                <h4 className={`font-bold text-sm ${isAssigned ? 'text-amber-900' : 'text-slate-700'}`}>{game.title || 'Untitled Game'}</h4>
-                                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Template: {game.gameTemplate}</p>
-                                                            </div>
-                                                            <button 
-                                                                onClick={() => isAssigned ? onRevoke(activeClass.id, game.id) : onAssign(activeClass.id, game.id)}
-                                                                className={`p-2 rounded-xl transition-all ${isAssigned ? 'text-amber-600 bg-white shadow-sm' : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50'}`}
-                                                            >
-                                                                {isAssigned ? <CheckCircle2 size={24} className="fill-amber-100" /> : <Circle size={24} />}
-                                                            </button>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-
+                                    )}
                                 </div>
                             )}
 
