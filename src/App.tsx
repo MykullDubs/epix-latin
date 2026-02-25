@@ -812,33 +812,44 @@ const QuizBlockRenderer = ({ block }: any) => {
     const [selectedOpt, setSelectedOpt] = useState<string | null>(null);
     const [isSubmitted, setIsSubmitted] = useState(false);
 
-    // 1. LOCATE THE DATA
-    const data = block?.content || block?.data || block || {};
-    const question = data.question || data.title || data.text || "Missing Question Data";
+    // DEBUG: If it still fails, check your browser console for this!
+    React.useEffect(() => {
+        console.log("QUIZ BLOCK DATA:", block);
+    }, [block]);
 
-    // 2. SANITIZE OPTIONS
-    let rawOptions = data.options || data.choices || [];
+    // 1. EXTRACT QUESTION & OPTIONS (Checking all possible nestings)
+    const question = block.question ?? block?.content?.question ?? block?.data?.question ?? "Missing Question";
+    
+    let rawOptions = block.options ?? block?.content?.options ?? block?.data?.options ?? [];
     if (!Array.isArray(rawOptions)) {
         rawOptions = typeof rawOptions === 'string' ? [rawOptions] : ["Option A", "Option B"];
     }
+    
+    // Sanitize options to flat strings
     const options = rawOptions.map((opt: any) => {
         if (typeof opt === 'string' || typeof opt === 'number') return String(opt);
-        if (opt && typeof opt === 'object') return opt.text || opt.label || opt.value || "Invalid Option Format";
-        return "Unknown Option";
+        if (opt && typeof opt === 'object') return opt.text || opt.label || opt.value || "Invalid";
+        return "Unknown";
     });
 
-    // 3. FIND THE REAL CORRECT ANSWER (Translates Index to String)
-    let actualCorrectAnswer = options[0]; // Fallback
+    // 2. THE AGGRESSIVE CORRECT ANSWER HUNT
+    let actualCorrectAnswer = options[0]; // Ultimate fallback
+
+    // Look for an INDEX (e.g., 0, 1, 2) anywhere in the object
+    const possibleIndex = block.correctIndex ?? block?.content?.correctIndex ?? block?.data?.correctIndex ?? block.correct ?? block?.content?.correct;
     
-    if (data.correctAnswer !== undefined && data.correctAnswer !== null) {
-        // If the Builder saved the exact text string
-        actualCorrectAnswer = String(data.correctAnswer);
-    } else if (data.correctIndex !== undefined && data.correctIndex !== null) {
-        // If the Builder saved the index number (e.g., 0, 1, 2)
-        actualCorrectAnswer = options[data.correctIndex] || options[0];
-    } else if (data.correct !== undefined && data.correct !== null) {
-        // Just in case it was saved under the generic 'correct' key
-        actualCorrectAnswer = options[data.correct] || options[0];
+    // Look for a STRING (e.g., "Option B") anywhere in the object
+    const possibleString = block.correctAnswer ?? block?.content?.correctAnswer ?? block.answer ?? block?.content?.answer;
+
+    if (possibleIndex !== undefined && possibleIndex !== null) {
+        // If it found a number (even if it was saved as a string like "1"), parse it!
+        const parsedIndex = parseInt(possibleIndex, 10);
+        if (!isNaN(parsedIndex) && options[parsedIndex]) {
+            actualCorrectAnswer = options[parsedIndex];
+        }
+    } else if (possibleString !== undefined && possibleString !== null) {
+        // If it found a string, use it directly
+        actualCorrectAnswer = String(possibleString);
     }
 
     return (
@@ -882,7 +893,7 @@ const QuizBlockRenderer = ({ block }: any) => {
             {!isSubmitted && selectedOpt !== null && (
                 <button 
                     onClick={() => setIsSubmitted(true)}
-                    className="mt-6 w-full py-4 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 active:scale-95 transition-all shadow-xl shadow-slate-200"
+                    className="mt-6 w-full py-4 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 active:scale-95 transition-all shadow-xl"
                 >
                     Check Answer
                 </button>
