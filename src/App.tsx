@@ -46,82 +46,6 @@ const appId = typeof __app_id !== 'undefined' ? __app_id : 'epic-latin-prod';
 // --- DEFAULTS ---
 const DEFAULT_USER_DATA = { name: "Discipulus", targetLanguage: "Latin", level: "Novice", streak: 1, xp: 0, role: 'student', classes: [], completedAssignments: [] };
 
-    // Sanitize options to flat strings
-    const options = rawOptions.map((opt: any) => {
-        if (typeof opt === 'string' || typeof opt === 'number') return String(opt);
-        if (opt && typeof opt === 'object') return opt.text || opt.label || opt.value || "Invalid";
-        return "Unknown";
-    });
-
-    // 2. THE AGGRESSIVE CORRECT ANSWER HUNT
-    let actualCorrectAnswer = options[0]; // Ultimate fallback
-
-    // Look for an INDEX (e.g., 0, 1, 2) anywhere in the object
-    const possibleIndex = block.correctIndex ?? block?.content?.correctIndex ?? block?.data?.correctIndex ?? block.correct ?? block?.content?.correct;
-    
-    // Look for a STRING (e.g., "Option B") anywhere in the object
-    const possibleString = block.correctAnswer ?? block?.content?.correctAnswer ?? block.answer ?? block?.content?.answer;
-
-    if (possibleIndex !== undefined && possibleIndex !== null) {
-        // If it found a number (even if it was saved as a string like "1"), parse it!
-        const parsedIndex = parseInt(possibleIndex, 10);
-        if (!isNaN(parsedIndex) && options[parsedIndex]) {
-            actualCorrectAnswer = options[parsedIndex];
-        }
-    } else if (possibleString !== undefined && possibleString !== null) {
-        // If it found a string, use it directly
-        actualCorrectAnswer = String(possibleString);
-    }
-
-    return (
-        <div className="bg-white p-6 md:p-8 rounded-[2rem] border-2 border-slate-100 shadow-sm my-6 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-2 h-full bg-indigo-500" />
-            <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center shadow-inner">
-                    <HelpCircle size={20} strokeWidth={2.5} />
-                </div>
-                <h3 className="text-xs font-black text-indigo-400 uppercase tracking-widest">Knowledge Check</h3>
-            </div>
-            
-            <h4 className="text-xl font-black text-slate-800 mb-6 leading-snug">{question}</h4>
-            
-            <div className="space-y-3">
-                {options.map((opt: string, idx: number) => {
-                    const isSelected = selectedOpt === opt;
-                    const isCorrect = isSubmitted && opt === actualCorrectAnswer;
-                    const isWrong = isSubmitted && isSelected && opt !== actualCorrectAnswer;
-
-                    let btnStyle = "bg-slate-50 border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50";
-                    if (isSelected && !isSubmitted) btnStyle = "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200";
-                    if (isCorrect) btnStyle = "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200";
-                    if (isWrong) btnStyle = "bg-rose-500 border-rose-500 text-white shadow-md shadow-rose-200";
-
-                    return (
-                        <button 
-                            key={idx}
-                            disabled={isSubmitted}
-                            onClick={() => setSelectedOpt(opt)}
-                            className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 font-bold text-left transition-all active:scale-[0.98] disabled:active:scale-100 ${btnStyle}`}
-                        >
-                            <span>{opt}</span>
-                            {isCorrect && <CheckCircle2 size={20} className="text-white" />}
-                            {isWrong && <X size={20} className="text-white" />}
-                        </button>
-                    );
-                })}
-            </div>
-
-            {!isSubmitted && selectedOpt !== null && (
-                <button 
-                    onClick={() => setIsSubmitted(true)}
-                    className="mt-6 w-full py-4 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 active:scale-95 transition-all shadow-xl"
-                >
-                    Check Answer
-                </button>
-            )}
-        </div>
-    );
-};
 // --- CONFIG: DAILY QUESTS ---
 const DAILY_QUESTS = [
   { id: 'q_cards', label: "Review 10 Cards", target: 10, xp: 50, icon: 'layers', type: 'self_study' },
@@ -884,25 +808,33 @@ function ClassView({ lesson, classId, userData }: any) {
 // ============================================================================
 // --- INTERNAL INTERACTIVE RENDERERS ---
 const QuizBlockRenderer = ({ block }: any) => {
-    // Uses selectedId so it correctly grades against your Builder's data!
+    // State now tracks the selected option ID, not the string/index
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [isSubmitted, setIsSubmitted] = useState(false);
 
+    // 1. LOCATE THE DATA
     const data = block?.content || block?.data || block || {};
     const question = data.question || "Missing Question Data";
     
+    // 2. EXTRACT OPTIONS (Preserving the {id, text} structure)
     let options = data.options || [];
     if (!Array.isArray(options)) options = [];
 
+    // Normalize options so they definitely have an id and text
     const normalizedOptions = options.map((opt: any, idx: number) => {
-        if (typeof opt === 'string') return { id: `opt_${idx}`, text: opt };
+        if (typeof opt === 'string') {
+            return { id: `opt_${idx}`, text: opt };
+        }
         return {
             id: opt.id || `opt_${idx}`,
             text: opt.text || opt.label || opt.value || "Unknown Option"
         };
     });
 
+    // 3. EXTRACT THE CORRECT ID
     let correctId = data.correctId;
+    
+    // Fallbacks just in case older lessons used a different format
     if (correctId === undefined) {
          if (data.correctIndex !== undefined) correctId = normalizedOptions[data.correctIndex]?.id;
          else if (data.correctAnswer) {
@@ -910,10 +842,13 @@ const QuizBlockRenderer = ({ block }: any) => {
              correctId = found?.id;
          }
     }
+
+    // Ultimate fallback if data is somehow totally missing
     if (correctId === undefined && normalizedOptions.length > 0) {
         correctId = normalizedOptions[0].id;
     }
 
+    // Is the currently selected ID the correct one?
     const isCorrect = selectedId === correctId;
 
     return (
@@ -958,6 +893,7 @@ const QuizBlockRenderer = ({ block }: any) => {
                 )}
             </div>
 
+            {/* Submission & Feedback Controls */}
             {!isSubmitted && selectedId !== null ? (
                 <button 
                     onClick={() => setIsSubmitted(true)}
@@ -983,19 +919,21 @@ const QuizBlockRenderer = ({ block }: any) => {
         </div>
     );
 };
-
 const FillBlankBlockRenderer = ({ block }: any) => {
+    // 1. LOCATE THE DATA (Safely)
     const data = block?.content || block?.data || block || {};
     const rawText = data.text || "Missing text [here].";
     
-    const { textParts, correctAnswers } = React.useMemo(() => {
+    // 2. EXTRACT BLANKS & CORRECT ANSWERS
+    const { textParts, correctAnswers } = useMemo(() => {
         const parts = rawText.split(/\[.*?\]/g);
         const matches = Array.from(rawText.matchAll(/\[(.*?)\]/g));
         const answers = matches.map((m: any) => m[1]); 
         return { textParts: parts, correctAnswers: answers };
     }, [rawText]);
 
-    const distractors = React.useMemo(() => {
+    // 3. EXTRACT DECOYS/OPTIONS (With crash protection!)
+    const distractors = useMemo(() => {
         let rawOptions = data.options || data.distractors || [];
         if (!Array.isArray(rawOptions)) {
             rawOptions = typeof rawOptions === 'string' ? [rawOptions] : [];
@@ -1004,18 +942,22 @@ const FillBlankBlockRenderer = ({ block }: any) => {
             if (typeof opt === 'string' || typeof opt === 'number') return String(opt);
             if (opt && typeof opt === 'object') return opt.text || opt.label || opt.value || "";
             return "";
-        }).filter(Boolean);
+        }).filter(Boolean); // Removes empty strings
     }, [data]);
 
     const [wordBank, setWordBank] = useState<string[]>([]);
     const [filledBlanks, setFilledBlanks] = useState<(string | null)[]>(Array(correctAnswers.length).fill(null));
     const [isChecked, setIsChecked] = useState(false);
 
-    React.useEffect(() => {
+    // 4. SHUFFLE EVERYTHING TOGETHER
+    useEffect(() => {
+        // Combine correct answers and distractors
+        // (Using a Set ensures we don't get duplicates if the Builder accidentally saved the correct answer inside the options array too)
         const allWords = Array.from(new Set([...correctAnswers, ...distractors]));
         setWordBank(allWords.sort(() => Math.random() - 0.5));
     }, [correctAnswers, distractors]);
 
+    // Interactions
     const handleBankClick = (word: string) => {
         if (isChecked) return;
         const firstEmptyIdx = filledBlanks.indexOf(null);
@@ -1052,6 +994,7 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                 </div>
             </div>
 
+            {/* The Sentence */}
             <div className="text-xl font-medium text-slate-700 leading-loose flex flex-wrap items-center gap-y-4 mb-10">
                 {textParts.map((part: string, i: number) => {
                     const isLast = i === textParts.length - 1;
@@ -1078,6 +1021,7 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                 })}
             </div>
 
+            {/* The Word Bank */}
             <div className="bg-slate-50 rounded-[1.5rem] p-6 border-2 border-slate-100">
                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center justify-between">
                     <span>Word Bank</span>
@@ -1100,6 +1044,7 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                 </div>
             </div>
 
+            {/* Submit Action */}
             {isComplete && !isChecked && (
                 <button 
                     onClick={() => setIsChecked(true)}
@@ -1115,10 +1060,10 @@ const FillBlankBlockRenderer = ({ block }: any) => {
 const ScenarioBlockRenderer = ({ block }: any) => {
     const [selectedOpt, setSelectedOpt] = useState<string | null>(null);
     
-    const data = block?.content || block?.data || block || {};
-    const title = data.title || "Real-World Scenario";
-    const context = data.context || "Scenario context goes here...";
-    const options = data.options || [];
+    // Robust Data Extraction
+    const title = block.title || block?.content?.title || block?.data?.title || "Real-World Scenario";
+    const context = block.context || block?.content?.context || block?.data?.context || "Scenario context goes here...";
+    const options = block.options || block?.content?.options || block?.data?.options || [];
     
     return (
         <div className="bg-slate-900 p-6 md:p-8 rounded-[2.5rem] shadow-xl my-6 text-white relative overflow-hidden group">
@@ -1133,7 +1078,9 @@ const ScenarioBlockRenderer = ({ block }: any) => {
                 </div>
 
                 <h4 className="text-2xl font-black mb-3 leading-tight">{title}</h4>
-                <p className="text-slate-300 font-medium leading-relaxed mb-8 italic">"{context}"</p>
+                <p className="text-slate-300 font-medium leading-relaxed mb-8 italic">
+                    "{context}"
+                </p>
 
                 <div className="space-y-3">
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">How do you respond?</p>
@@ -1145,7 +1092,9 @@ const ScenarioBlockRenderer = ({ block }: any) => {
                                 key={i} 
                                 onClick={() => setSelectedOpt(opt)}
                                 className={`w-full p-4 border rounded-2xl text-left font-bold text-sm transition-all active:scale-[0.98] ${
-                                    selectedOpt === opt ? 'bg-rose-500 border-rose-400 text-white shadow-lg shadow-rose-500/20' : 'bg-white/10 hover:bg-white/20 border-white/10'
+                                    selectedOpt === opt 
+                                        ? 'bg-rose-500 border-rose-400 text-white shadow-lg shadow-rose-500/20' 
+                                        : 'bg-white/10 hover:bg-white/20 border-white/10'
                                 }`}
                             >
                                 {opt}
@@ -1167,15 +1116,20 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollTimeout = useRef<any>(null); 
 
-  const lessonVocab = React.useMemo(() => {
-    return lesson?.blocks?.filter((b: any) => b.type === 'vocab-list')?.flatMap((b: any) => b.items) || [];
+  // --- AUTOMATIC VOCABULARY EXTRACTOR ---
+  const lessonVocab = useMemo(() => {
+    return lesson?.blocks
+      ?.filter((b: any) => b.type === 'vocab-list')
+      ?.flatMap((b: any) => b.items) || [];
   }, [lesson]);
 
-  const pages = React.useMemo(() => {
+  // --- CRITICAL FIX: PAGINATION LOGIC ---
+  const pages = useMemo(() => {
     if (!lesson?.blocks) return [];
     const grouped: any[] = [];
     let buffer: any[] = [];
     lesson.blocks.forEach((b: any) => {
+      // Isolating interactive blocks into their own pages
       if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game'].includes(b.type)) {
         if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
         grouped.push({ type: 'interact', blocks: [b] });
@@ -1186,7 +1140,8 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
     return grouped;
   }, [lesson]);
 
-  const syncToProjector = React.useCallback((newIdx: number) => {
+  // --- THE SYNC ENGINE ---
+  const syncToProjector = useCallback((newIdx: number) => {
     if (!isInstructor) return;
     const syncId = lesson.originalId || lesson.id;
     setDoc(doc(db, 'live_sessions', syncId), {
@@ -1196,7 +1151,7 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
     }, { merge: true }).catch(console.error);
   }, [lesson, isInstructor]);
 
-  const handleLiveInteraction = React.useCallback((state: any) => {
+  const handleLiveInteraction = useCallback((state: any) => {
     if (!isInstructor) return;
     const syncId = lesson.originalId || lesson.id;
     setDoc(doc(db, 'live_sessions', syncId), {
@@ -1209,19 +1164,23 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
     if (isInstructor) syncToProjector(0);
   }, [isInstructor, syncToProjector]);
 
+  // --- THROTTLED SCROLL SYNC ---
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !isInstructor) return;
     
     const handleScroll = () => {
       if (scrollTimeout.current) return; 
+      
       scrollTimeout.current = setTimeout(() => {
         const scrollPercent = container.scrollTop / (container.scrollHeight - container.clientHeight);
         const syncId = lesson.originalId || lesson.id;
+        
         setDoc(doc(db, 'live_sessions', syncId), {
           scrollPercent: scrollPercent || 0,
           lastUpdate: Date.now()
         }, { merge: true }).catch(e => {});
+        
         scrollTimeout.current = null;
       }, 50); 
     };
@@ -1230,14 +1189,15 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
     return () => container.removeEventListener('scroll', handleScroll);
   }, [lesson, isInstructor]);
 
-  const handlePrev = React.useCallback(() => {
+  // --- NAVIGATION HANDLERS ---
+  const handlePrev = () => {
       const newIdx = Math.max(0, activePageIdx - 1);
       setActivePageIdx(newIdx);
       syncToProjector(newIdx);
       containerRef.current?.scrollTo(0,0);
-  }, [activePageIdx, syncToProjector]);
+  };
 
-  const handleNext = React.useCallback(() => {
+  const handleNext = () => {
       if (activePageIdx < pages.length - 1) {
           const newIdx = activePageIdx + 1;
           setActivePageIdx(newIdx);
@@ -1246,20 +1206,9 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
       } else {
           onFinish();
       }
-  }, [activePageIdx, pages.length, syncToProjector, onFinish]);
+  };
 
-  // KEYBOARD NAVIGATION
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-        if (e.key === 'ArrowRight') handleNext();
-        else if (e.key === 'ArrowLeft') handlePrev();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleNext, handlePrev]);
-
+ // --- MASTER BLOCK RENDERER ---
   const renderBlock = (block: any, idx: number) => {
     const blockKey = `page_${activePageIdx}_block_${idx}`;
 
@@ -1325,6 +1274,7 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
           </div>
         );
       
+      // --- NEWLY INJECTED INTERACTIVE BLOCKS ---
       case 'quiz':
         return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><QuizBlockRenderer block={block} /></div>;
       case 'fill-blank':
@@ -1332,6 +1282,7 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
       case 'scenario':
         return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><ScenarioBlockRenderer block={block} /></div>;
 
+      // --- GAME BLOCK ---
       case 'game':
         if (block.gameType === 'connect-three') {
             return (
@@ -1340,6 +1291,10 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
                         <h3 className="text-2xl font-black text-slate-800">{block.title || "Vocabulary Battle"}</h3>
                         <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">Game Active on Projector</p>
                     </div>
+                    {/* Assuming ConnectThreeVocab is imported and available! */}
+                    {/* <div className="scale-90 origin-top">
+                        <ConnectThreeVocab vocabList={lessonVocab} />
+                    </div> */}
                     <div className="w-full h-64 bg-amber-50 rounded-[2rem] border-2 border-amber-200 flex items-center justify-center text-amber-500 font-black">
                         [Game Rendered Here]
                     </div>
