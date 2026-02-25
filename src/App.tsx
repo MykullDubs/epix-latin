@@ -6037,7 +6037,7 @@ function ExamPlayerView({ exam, onFinish }: any) {
 //  ADMIN DASHBOARD (Real-Time God Mode)
 // ============================================================================
 function AdminDashboardView({ user }: any) {
-    const [activeTab, setActiveTab] = useState<'overview' | 'cohorts' | 'instructors'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'cohorts' | 'instructors' | 'directory'>('overview');
     
     // Real-Time Global State
     const [allProfiles, setAllProfiles] = useState<any[]>([]);
@@ -6045,19 +6045,22 @@ function AdminDashboardView({ user }: any) {
     const [globalLogs, setGlobalLogs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
+    // New Admin Features State
+    const [directorySearch, setDirectorySearch] = useState('');
+    const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+    const [broadcastMsg, setBroadcastMsg] = useState('');
+    const [isBroadcasting, setIsBroadcasting] = useState(false);
+
     useEffect(() => {
-        // 1. Fetch ALL user profiles across the platform
         const qProfiles = query(collectionGroup(db, 'profile'));
         const unsubProfiles = onSnapshot(qProfiles, (snap) => {
             const profiles = snap.docs.map(d => ({ 
-                // Safely extract the UID from the document path (artifacts/appId/users/UID/profile/main)
                 uid: d.ref.path.split('/')[3], 
                 ...d.data() 
             }));
             setAllProfiles(profiles);
         });
 
-        // 2. Fetch ALL cohorts across ALL instructors
         const qClasses = query(collectionGroup(db, 'classes'));
         const unsubClasses = onSnapshot(qClasses, (snap) => {
             const classes = snap.docs.map(d => ({ 
@@ -6068,7 +6071,6 @@ function AdminDashboardView({ user }: any) {
             setAllCohorts(classes);
         });
 
-        // 3. Fetch recent system activity to find pending grades
         const qLogs = query(collection(db, 'artifacts', appId, 'activity_logs'), where('scoreDetail.status', '==', 'pending_review'));
         const unsubLogs = onSnapshot(qLogs, (snap) => {
             setGlobalLogs(snap.docs.map(d => d.data()));
@@ -6078,11 +6080,45 @@ function AdminDashboardView({ user }: any) {
         return () => { unsubProfiles(); unsubClasses(); unsubLogs(); };
     }, []);
 
+    // --- ADMIN ACTIONS ---
+    const toggleUserRole = async (uid: string, currentRole: string) => {
+        const newRole = currentRole === 'student' ? 'instructor' : 'student';
+        if (window.confirm(`Change this user's permissions to ${newRole.toUpperCase()}?`)) {
+            try {
+                await updateDoc(doc(db, 'artifacts', appId, 'users', uid, 'profile', 'main'), {
+                    role: newRole
+                });
+            } catch (error) {
+                alert("Failed to update user role.");
+            }
+        }
+    };
+
+    const handleGlobalBroadcast = async () => {
+        if (!broadcastMsg.trim()) return;
+        setIsBroadcasting(true);
+        try {
+            await addDoc(collection(db, 'artifacts', appId, 'global_announcements'), {
+                message: broadcastMsg.trim(),
+                authorName: user.displayName || 'System Admin',
+                timestamp: Date.now(),
+                active: true,
+                type: 'system_alert'
+            });
+            setBroadcastMsg('');
+            setShowBroadcastModal(false);
+            alert("Global alert broadcasted successfully!"); // You can swap this for a JuicyToast later!
+        } catch (error) {
+            console.error(error);
+            alert("Failed to send broadcast.");
+        }
+        setIsBroadcasting(false);
+    };
+
     // --- DATA PROCESSING ---
     const students = allProfiles.filter(p => p.role === 'student');
     const instructors = allProfiles.filter(p => p.role === 'instructor' || p.role === 'admin');
 
-    // Cross-reference cohorts with their instructor's name
     const populatedCohorts = allCohorts.map(cohort => {
         const inst = instructors.find(i => i.uid === cohort._instructorUid);
         return {
@@ -6092,18 +6128,19 @@ function AdminDashboardView({ user }: any) {
         };
     });
 
-    // Map instructor workloads
     const populatedInstructors = instructors.map(inst => {
         const theirCohorts = allCohorts.filter(c => c._instructorUid === inst.uid);
-        // Find how many pending grades belong to this specific instructor's students
         const theirStudentEmails = theirCohorts.flatMap(c => c.studentEmails || []);
         const theirPendingGrades = globalLogs.filter(log => theirStudentEmails.includes(log.studentEmail)).length;
 
-        return {
-            ...inst,
-            activeCohorts: theirCohorts.length,
-            ungradedItems: theirPendingGrades
-        };
+        return { ...inst, activeCohorts: theirCohorts.length, ungradedItems: theirPendingGrades };
+    });
+
+    // Directory Search Engine
+    const filteredProfiles = allProfiles.filter(p => {
+        if (!directorySearch) return true;
+        const searchStr = `${p.name || ''} ${p.email || ''} ${p.role || ''}`.toLowerCase();
+        return searchStr.includes(directorySearch.toLowerCase());
     });
 
     const metrics = {
@@ -6123,8 +6160,51 @@ function AdminDashboardView({ user }: any) {
     }
 
     return (
-        <div className="h-full flex flex-col bg-slate-50 overflow-hidden animate-in fade-in duration-500 font-sans select-none">
+        <div className="h-full flex flex-col bg-slate-50 overflow-hidden animate-in fade-in duration-500 font-sans select-none relative">
             
+            {/* --- GLOBAL BROADCAST MODAL --- */}
+            {showBroadcastModal && (
+                <div className="absolute inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl p-8 relative animate-in zoom-in-95 duration-200">
+                        <button onClick={() => setShowBroadcastModal(false)} className="absolute top-6 right-6 text-slate-400 hover:text-rose-500 transition-colors"><X size={24}/></button>
+                        
+                        <div className="flex items-center gap-4 mb-6">
+                            <div className="w-14 h-14 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center shadow-inner">
+                                <Megaphone size={28} />
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-black text-slate-900">Global Broadcast</h2>
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Platform-Wide Alert</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3">
+                                <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                                <p className="text-xs font-bold text-amber-800 leading-relaxed">
+                                    Warning: This message will be pushed to the database and will appear for every active Student and Instructor.
+                                </p>
+                            </div>
+
+                            <textarea 
+                                className="w-full p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-medium text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors resize-none h-32"
+                                placeholder="Type your system announcement here..."
+                                value={broadcastMsg}
+                                onChange={(e) => setBroadcastMsg(e.target.value)}
+                            />
+
+                            <button 
+                                onClick={handleGlobalBroadcast}
+                                disabled={!broadcastMsg.trim() || isBroadcasting}
+                                className="w-full py-5 bg-slate-900 hover:bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
+                            >
+                                {isBroadcasting ? <Loader size={18} className="animate-spin" /> : <Send size={18} />} Push to Network
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* --- HEADER --- */}
             <header className="h-24 bg-slate-900 px-6 md:px-10 flex justify-between items-center shrink-0 z-30 shadow-xl">
                 <div className="flex items-center gap-4">
@@ -6137,11 +6217,12 @@ function AdminDashboardView({ user }: any) {
                     </div>
                 </div>
 
-                <div className="flex bg-slate-800 p-1.5 rounded-[1.5rem]">
+                <div className="flex bg-slate-800 p-1.5 rounded-[1.5rem] overflow-x-auto hide-scrollbar">
                     {[
                         { id: 'overview', label: 'Overview' },
                         { id: 'cohorts', label: 'Cohorts' },
-                        { id: 'instructors', label: 'Instructors' }
+                        { id: 'instructors', label: 'Staff' },
+                        { id: 'directory', label: 'Directory' }
                     ].map(tab => (
                         <button 
                             key={tab.id}
@@ -6161,7 +6242,6 @@ function AdminDashboardView({ user }: any) {
                     {/* OVERVIEW TAB */}
                     {activeTab === 'overview' && (
                         <div className="space-y-12 animate-in slide-in-from-bottom-4">
-                            {/* Bento Box Metrics */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                 <MetricCard icon={<Users size={24} className="text-indigo-500"/>} label="Total Enrollment" value={metrics.totalStudents} trend="Active Profiles" color="indigo" />
                                 <MetricCard icon={<BookOpen size={24} className="text-emerald-500"/>} label="Active Cohorts" value={metrics.activeCohorts} trend="Deployed Classes" color="emerald" />
@@ -6169,13 +6249,12 @@ function AdminDashboardView({ user }: any) {
                                 <MetricCard icon={<AlertCircle size={24} className="text-amber-500"/>} label="Global Pending" value={metrics.pendingGrades} trend="Exams awaiting grades" color="amber" />
                             </div>
 
-                            {/* Quick Action Dock */}
                             <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
                                 <div>
                                     <h3 className="text-2xl font-black text-slate-900 mb-1">System Global Broadcast</h3>
                                     <p className="text-sm font-bold text-slate-500">Push an alert to every single user on the platform.</p>
                                 </div>
-                                <button onClick={() => alert('Global Broadcast UI coming soon!')} className="w-full md:w-auto px-8 py-5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-emerald-200 active:scale-95 transition-all flex items-center justify-center gap-3 text-xs">
+                                <button onClick={() => setShowBroadcastModal(true)} className="w-full md:w-auto px-8 py-5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-emerald-200 active:scale-95 transition-all flex items-center justify-center gap-3 text-xs">
                                     <Megaphone size={18} /> Send Alert
                                 </button>
                             </div>
@@ -6272,6 +6351,92 @@ function AdminDashboardView({ user }: any) {
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    )}
+
+                    {/* DIRECTORY TAB */}
+                    {activeTab === 'directory' && (
+                        <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in">
+                            <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-slate-50/50">
+                                <div>
+                                    <h3 className="text-2xl font-black text-slate-900">User Directory</h3>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Platform-Wide Access Control</p>
+                                </div>
+                                
+                                {/* Omni-Search Input */}
+                                <div className="relative w-full md:w-72">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Search name or email..."
+                                        value={directorySearch}
+                                        onChange={(e) => setDirectorySearch(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 shadow-sm transition-all"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse min-w-[600px]">
+                                    <thead>
+                                        <tr className="bg-white border-b border-slate-100">
+                                            <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">User Profile</th>
+                                            <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
+                                            <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Joined</th>
+                                            <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Access Level</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {filteredProfiles.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={4} className="p-12 text-center text-slate-400 font-bold italic">No users found matching "{directorySearch}".</td>
+                                            </tr>
+                                        ) : (
+                                            filteredProfiles.map(profile => (
+                                                <tr key={profile.uid} className="hover:bg-slate-50 transition-colors group">
+                                                    <td className="p-6">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 font-black flex items-center justify-center border border-slate-200 shadow-inner shrink-0">
+                                                                {profile.name?.charAt(0).toUpperCase() || '?'}
+                                                            </div>
+                                                            <div>
+                                                                <span className="font-black text-slate-800 text-sm block">{profile.name || "Pending Setup"}</span>
+                                                                <span className="text-[10px] font-bold text-slate-400">{profile.email}</span>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-6 text-center">
+                                                        {profile.isOnboarded ? (
+                                                            <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md uppercase tracking-widest">Active</span>
+                                                        ) : (
+                                                            <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-md uppercase tracking-widest">Pending</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-6 text-center text-xs font-bold text-slate-500">
+                                                        {profile.joinedAt ? new Date(profile.joinedAt).toLocaleDateString() : 'Unknown'}
+                                                    </td>
+                                                    <td className="p-6 text-right">
+                                                        <button 
+                                                            onClick={() => toggleUserRole(profile.uid, profile.role)}
+                                                            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 ${
+                                                                profile.role === 'instructor' 
+                                                                    ? 'bg-indigo-600 text-white hover:bg-rose-500 hover:shadow-rose-200' 
+                                                                    : profile.role === 'admin'
+                                                                    ? 'bg-slate-900 text-amber-400 cursor-not-allowed'
+                                                                    : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-500 hover:text-indigo-600'
+                                                            }`}
+                                                            disabled={profile.role === 'admin'}
+                                                            title={profile.role === 'instructor' ? 'Demote to Student' : 'Promote to Instructor'}
+                                                        >
+                                                            {profile.role}
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     )}
 
