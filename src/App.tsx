@@ -2237,15 +2237,173 @@ function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, ac
 //  5. AUTH, PROFILE, CLASS, BUILDER, INSTRUCTOR
 // ============================================================================
 function AuthView() {
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [role, setRole] = useState('student');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const handleAuth = async (e: any) => { e.preventDefault(); setError(''); setLoading(true); try { if (isLogin) await signInWithEmailAndPassword(auth, email, password); else { const uc = await createUserWithEmailAndPassword(auth, email, password); await setDoc(doc(db, 'artifacts', appId, 'users', uc.user.uid, 'profile', 'main'), { ...DEFAULT_USER_DATA, name: name || "User", email: email, role: role }); } } catch (err: any) { setError(err.message.replace('Firebase: ', '')); } finally { setLoading(false); } };
-  return ( <div className="h-full flex flex-col p-6 bg-slate-50"><div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full"><div className="text-center mb-8"><div className="w-20 h-20 bg-indigo-600 rounded-3xl mx-auto flex items-center justify-center text-white mb-4 shadow-xl"><GraduationCap size={40} /></div><h1 className="text-3xl font-bold text-slate-900">LinguistFlow v3.0</h1></div><form onSubmit={handleAuth} className="space-y-4">{!isLogin && <><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase">Name</label><input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl" required={!isLogin} /></div><div className="flex gap-3"><button type="button" onClick={() => setRole('student')} className={`flex-1 p-3 rounded-xl border font-bold text-sm ${role === 'student' ? 'bg-indigo-600 text-white' : 'bg-white'}`}>Student</button><button type="button" onClick={() => setRole('instructor')} className={`flex-1 p-3 rounded-xl border font-bold text-sm ${role === 'instructor' ? 'bg-indigo-600 text-white' : 'bg-white'}`}>Instructor</button></div></>}<div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase">Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl" required /></div><div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase">Password</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-3 bg-white border border-slate-200 rounded-xl" required /></div>{error && <div className="p-3 bg-rose-50 text-rose-600 text-sm rounded-lg">{error}</div>}<button type="submit" disabled={loading} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-bold shadow-lg">{loading ? <Loader className="animate-spin" /> : (isLogin ? "Sign In" : "Create Account")}</button></form><div className="mt-6 text-center"><button onClick={() => setIsLogin(!isLogin)} className="text-indigo-600 font-bold text-sm hover:underline">{isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}</button></div></div></div> );
+    const [isLogin, setIsLogin] = useState(true);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [name, setName] = useState('');
+    const [role, setRole] = useState<'student' | 'instructor'>('student');
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+
+    const handleAuth = async (e: any) => { 
+        e.preventDefault(); 
+        setError(''); 
+        setLoading(true); 
+        
+        try { 
+            if (isLogin) {
+                await signInWithEmailAndPassword(auth, email, password); 
+            } else { 
+                const uc = await createUserWithEmailAndPassword(auth, email, password); 
+                const finalName = name.trim() || (role === 'instructor' ? "Professor" : "Scholar");
+                
+                // Create the Base User Profile
+                await setDoc(doc(db, 'artifacts', appId, 'users', uc.user.uid, 'profile', 'main'), { 
+                    ...DEFAULT_USER_DATA, 
+                    name: finalName, 
+                    email: email.toLowerCase().trim(), 
+                    role: role,
+                    joinedAt: Date.now(),
+                    isOnboarded: true
+                }); 
+            } 
+        } catch (err: any) { 
+            // Clean up ugly Firebase errors
+            setError(err.message.replace('Firebase: ', '').replace('Error (auth/', '').replace(').', '').split('-').join(' ')); 
+        } finally { 
+            setLoading(false); 
+        } 
+    };
+
+    return ( 
+        <div className="min-h-screen w-full flex items-center justify-center p-6 relative overflow-hidden font-sans">
+            
+            {/* --- IMMERSIVE BACKGROUND --- */}
+            <div className="absolute inset-0 bg-slate-950 z-0">
+                <div className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] rounded-full bg-indigo-600/30 blur-[120px] mix-blend-screen animate-pulse" style={{ animationDuration: '8s' }}></div>
+                <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] rounded-full bg-rose-600/20 blur-[100px] mix-blend-screen animate-pulse" style={{ animationDuration: '10s' }}></div>
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03] mix-blend-overlay"></div>
+            </div>
+
+            {/* --- GLASSMORPHISM CARD --- */}
+            <div className="w-full max-w-md bg-white/10 backdrop-blur-2xl border border-white/20 p-8 md:p-10 rounded-[3rem] shadow-2xl relative z-10 animate-in zoom-in-95 duration-700">
+                
+                <div className="text-center mb-10">
+                    <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] mx-auto flex items-center justify-center text-white mb-6 shadow-lg shadow-indigo-500/30 rotate-12 hover:rotate-0 transition-transform duration-500">
+                        <GraduationCap size={40} strokeWidth={2.5} />
+                    </div>
+                    <h1 className="text-3xl font-black text-white tracking-tight mb-2">LinguistFlow</h1>
+                    <p className="text-indigo-200 font-medium text-sm">Enter the Academy.</p>
+                </div>
+
+                <form onSubmit={handleAuth} className="space-y-5">
+                    
+                    {/* SIGN UP ONLY: Name & Role */}
+                    {!isLogin && (
+                        <div className="space-y-5 animate-in slide-in-from-top-4 fade-in duration-300">
+                            {/* Segmented Role Toggle */}
+                            <div className="flex bg-slate-900/50 p-1.5 rounded-2xl border border-white/10">
+                                <button 
+                                    type="button" 
+                                    onClick={() => setRole('student')} 
+                                    className={`flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${role === 'student' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    Student
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={() => setRole('instructor')} 
+                                    className={`flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${role === 'instructor' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    Instructor
+                                </button>
+                            </div>
+
+                            <div className="relative group">
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-300 group-focus-within:text-white transition-colors">
+                                    <User size={20} />
+                                </div>
+                                <input 
+                                    type="text" 
+                                    value={name} 
+                                    onChange={(e) => setName(e.target.value)} 
+                                    placeholder="Full Name"
+                                    className="w-full pl-12 pr-4 py-4 bg-slate-900/50 border-2 border-white/10 focus:border-indigo-500 rounded-2xl text-white placeholder:text-slate-400 outline-none transition-all font-bold" 
+                                    required={!isLogin} 
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Email Input */}
+                    <div className="relative group">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-300 group-focus-within:text-white transition-colors">
+                            <Mail size={20} />
+                        </div>
+                        <input 
+                            type="email" 
+                            value={email} 
+                            onChange={(e) => setEmail(e.target.value)} 
+                            placeholder="Email Address"
+                            className="w-full pl-12 pr-4 py-4 bg-slate-900/50 border-2 border-white/10 focus:border-indigo-500 rounded-2xl text-white placeholder:text-slate-400 outline-none transition-all font-bold" 
+                            required 
+                        />
+                    </div>
+
+                    {/* Password Input with Reveal Toggle */}
+                    <div className="relative group">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-300 group-focus-within:text-white transition-colors">
+                            <Shield size={20} />
+                        </div>
+                        <input 
+                            type={showPassword ? "text" : "password"} 
+                            value={password} 
+                            onChange={(e) => setPassword(e.target.value)} 
+                            placeholder="Password"
+                            className="w-full pl-12 pr-12 py-4 bg-slate-900/50 border-2 border-white/10 focus:border-indigo-500 rounded-2xl text-white placeholder:text-slate-400 outline-none transition-all font-bold" 
+                            required 
+                        />
+                        <button 
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors p-1"
+                        >
+                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                    </div>
+
+                    {/* Error Toast */}
+                    {error && (
+                        <div className="p-4 bg-rose-500/20 border border-rose-500/50 text-rose-200 text-sm font-bold rounded-xl flex items-start gap-3 animate-in shake">
+                            <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                            <span className="capitalize">{error}</span>
+                        </div>
+                    )}
+
+                    {/* Submit Button */}
+                    <button 
+                        type="submit" 
+                        disabled={loading || !email || !password || (!isLogin && !name)} 
+                        className="w-full bg-white text-indigo-900 hover:bg-indigo-50 active:scale-95 py-4 rounded-2xl font-black uppercase tracking-widest shadow-[0_0_20px_rgba(255,255,255,0.2)] transition-all flex justify-center items-center gap-2 disabled:opacity-50 disabled:active:scale-100 mt-4"
+                    >
+                        {loading ? <Loader className="animate-spin text-indigo-600" size={20} /> : (isLogin ? "Sign In" : "Create Account")}
+                        {!loading && <ArrowRight size={18} />}
+                    </button>
+                </form>
+
+                {/* Mode Switcher */}
+                <div className="mt-8 text-center">
+                    <button 
+                        onClick={() => { setIsLogin(!isLogin); setError(''); }} 
+                        className="text-indigo-300 font-bold text-sm hover:text-white transition-colors"
+                    >
+                        {isLogin ? "Need access? Apply here." : "Already enrolled? Sign in."}
+                    </button>
+                </div>
+            </div>
+        </div> 
+    );
 }
 
 // --- PROFILE HELPER: CALCULATE STATS ---
@@ -2290,7 +2448,6 @@ const calculateUserStats = (logs: any[]) => {
         graphData 
     };
 };
-
 // ============================================================================
 //  ULTIMATE PROFILE VIEW (Revamped & Juicified)
 // ============================================================================
@@ -6329,18 +6486,21 @@ function App() {
     } catch (e) { return { success: false }; }
   };
 
-  const handleAddStudent = async (classId: string, email: string) => {
+const handleAddStudent = async (classId: string, email: string) => {
     if (!user) return { success: false };
     try {
+      const cleanEmail = email.toLowerCase().trim();
       const classRef = doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId);
+      
       await updateDoc(classRef, {
-        students: arrayUnion(email.toLowerCase().trim()),
-        studentEmails: arrayUnion(email.toLowerCase().trim())
+        // We push an OBJECT now so the Roster UI has a place to look for a name
+        students: arrayUnion({ email: cleanEmail, name: null, uid: null }),
+        studentEmails: arrayUnion(cleanEmail)
       });
       return { success: true };
     } catch (e) { return { success: false }; }
   };
-
+  
   const handleAssign = async (classId: string, assignment: any) => {
     if (!user) return { success: false };
     try {
