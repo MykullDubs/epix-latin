@@ -4157,13 +4157,13 @@ function BuilderHub({
                 </div>
             )} </div>
               )}
-              {/* --- NEW: ARCADE BUILDER HOOKUP --- */}
+{/* --- NEW: ARCADE BUILDER HOOKUP --- */}
               {mode === 'arcade' && (
                 <ArcadeBuilderView 
                   data={lessonData} 
                   setData={setLessonData} 
                   availableDecks={allDecks} 
-                />accesability
+                />
               )}
             </div>
           </div>
@@ -4175,6 +4175,14 @@ function BuilderHub({
         }`}>
           <div className="relative w-full h-full max-w-sm max-h-[750px] group flex flex-col items-center justify-center">
             
+            {/* EXAM PREVIEW PLACEHOLDER */}
+            {mode === 'exam' && (
+                <div className="w-full max-w-xs aspect-[9/16] bg-white border-4 border-dashed border-slate-200 rounded-[3rem] shadow-sm flex flex-col items-center justify-center p-8 text-center animate-in zoom-in-95 duration-500">
+                    <FileText size={64} className="text-slate-200 mb-6" />
+                    <h3 className="text-lg font-black text-slate-800 mb-2">Exam Preview</h3>
+                    <p className="text-sm font-bold text-slate-400">Assessments are rendered dynamically in the student's isolated testing environment.</p>
+                </div>
+            )}
 
             {/* ARCADE PREVIEW PLACEHOLDER */}
             {mode === 'arcade' && (
