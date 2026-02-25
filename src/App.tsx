@@ -21,7 +21,7 @@ import {
   ArrowUp, ArrowDown, Eye, EyeOff, MessageCircle, AlignLeft, ClipboardList, Table, Calendar,
   Trophy, Flame, Settings, BarChart3, CornerDownRight, MoreHorizontal, Dumbbell, Map, Sparkles, Star, TrendingUp, Target,
   Filter, SlidersHorizontal, Hash, Gauge, ChevronLeft, Monitor, Smartphone, PenTool, Menu, Code, BarChart, Tag, RefreshCcw, Gamepad2,
-  Bot, Database, Shield, ChefHat, AlertCircle, MoreVertical, Mail, <--- ADDED MISSING ICONS
+  Bot, Database, Shield, ChefHat, AlertCircle, MoreVertical, Mail
 } from 'lucide-react';
 
 
