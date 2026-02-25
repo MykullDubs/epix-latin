@@ -21,7 +21,7 @@ import {
   ArrowUp, ArrowDown, Eye, EyeOff, MessageCircle, AlignLeft, ClipboardList, Table, Calendar,
   Trophy, Flame, Settings, BarChart3, CornerDownRight, MoreHorizontal, Dumbbell, Map, Sparkles, Star, TrendingUp, Target,
   Filter, SlidersHorizontal, Hash, Gauge, ChevronLeft, Monitor, Smartphone, PenTool, Menu, Code, BarChart, Tag, RefreshCcw, Gamepad2,
-  Bot, Database, Shield// <--- ADDED MISSING ICONS
+  Bot, Database, Shield, ChefHat, AlertCircle, MoreVertical// <--- ADDED MISSING ICONS
 } from 'lucide-react';
 
 
@@ -4155,7 +4155,26 @@ function BuilderHub({
                     <h3 className="text-lg font-black text-slate-800 mb-2">Exam Preview</h3>
                     <p className="text-sm font-bold text-slate-400">Assessments are rendered dynamically in the student's isolated testing environment.</p>
                 </div>
-            )}
+            )} </div>
+              )}
+              {/* --- NEW: ARCADE BUILDER HOOKUP --- */}
+              {mode === 'arcade' && (
+                <ArcadeBuilderView 
+                  data={lessonData} 
+                  setData={setLessonData} 
+                  availableDecks={allDecks} 
+                />accesability
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT PANE: THE LIVE PREVIEW (Projector/Mobile) */}
+        <div className={`h-full bg-slate-100 border-l border-slate-200 flex flex-col items-center justify-center p-6 md:p-12 transition-all duration-500 ${
+          viewMode === 'preview' ? 'flex w-full md:w-1/2' : 'hidden md:flex md:w-1/2'
+        }`}>
+          <div className="relative w-full h-full max-w-sm max-h-[750px] group flex flex-col items-center justify-center">
+            
 
             {/* ARCADE PREVIEW PLACEHOLDER */}
             {mode === 'arcade' && (
