@@ -4136,7 +4136,7 @@ function BuilderHub({
                   data={lessonData} 
                   setData={setLessonData} 
                   availableDecks={allDecks} 
-                />accesability
+                />
               )}
             </div>
           </div>
