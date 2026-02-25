@@ -6183,6 +6183,7 @@ function App() {
           ) : activeStudentClass ? (
             <StudentClassView 
                classData={activeStudentClass} 
+               lessons={lessons}
                onBack={() => setActiveStudentClass(null)} 
                onSelectLesson={setActiveLesson} // Safely passes the click up to trigger Layer 1
                setActiveTab={setActiveTab}
