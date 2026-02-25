@@ -809,13 +809,44 @@ function ClassView({ lesson, classId, userData }: any) {
 // --- INTERNAL INTERACTIVE RENDERERS ---
 
 const QuizBlockRenderer = ({ block }: any) => {
-    const [selectedOpt, setSelectedOpt] = useState<string | null>(null);
+    const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
     const [isSubmitted, setIsSubmitted] = useState(false);
 
-    // BULLETPROOF DATA EXTRACTION: Checks block directly, then block.content, then block.data
-    const question = block.question || block?.content?.question || block?.data?.question || "Missing Question Data";
-    const options = block.options || block?.content?.options || block?.data?.options || [];
-    const correctAnswer = block.correctAnswer || block?.content?.correctAnswer || block?.data?.correctAnswer || options[0];
+    // 1. LOCATE THE DATA (Checks all possible nesting levels)
+    const data = block?.content || block?.data || block || {};
+    
+    // 2. EXTRACT THE QUESTION
+    const question = data.question || data.title || data.text || "Missing Question Data";
+
+    // 3. EXTRACT AND SANITIZE OPTIONS (This prevents the Grey Screen Crash!)
+    let rawOptions = data.options || data.choices || [];
+    if (!Array.isArray(rawOptions)) {
+        // Fallback if data got corrupted into a string or undefined
+        rawOptions = typeof rawOptions === 'string' ? [rawOptions] : ["Option 1", "Option 2"];
+    }
+
+    // Force every option to be a clean string, even if the DB saved it as an object
+    const options = rawOptions.map((opt: any) => {
+        if (typeof opt === 'string' || typeof opt === 'number') return String(opt);
+        if (opt && typeof opt === 'object') return opt.text || opt.label || opt.value || "Invalid Option Format";
+        return "Unknown Option";
+    });
+
+    // 4. FIND THE CORRECT ANSWER
+    let correctIdx = 0;
+    if (typeof data.correctIndex === 'number') {
+        correctIdx = data.correctIndex;
+    } else if (typeof data.correctAnswer === 'string') {
+        const foundIdx = options.findIndex((o: string) => o === data.correctAnswer);
+        correctIdx = foundIdx !== -1 ? foundIdx : 0;
+    } else if (typeof data.correct === 'number') {
+        correctIdx = data.correct;
+    }
+
+    // Safety fallback just in case the correct index is somehow out of bounds
+    if (correctIdx < 0 || correctIdx >= options.length) {
+        correctIdx = 0; 
+    }
 
     return (
         <div className="bg-white p-6 md:p-8 rounded-[2rem] border-2 border-slate-100 shadow-sm my-6 relative overflow-hidden">
@@ -831,12 +862,12 @@ const QuizBlockRenderer = ({ block }: any) => {
             
             <div className="space-y-3">
                 {options.length === 0 ? (
-                    <p className="text-slate-400 font-bold italic">No options found for this quiz.</p>
+                    <p className="text-slate-400 font-bold italic p-4 text-center border-2 border-dashed rounded-2xl">No options provided in this lesson.</p>
                 ) : (
                     options.map((opt: string, idx: number) => {
-                        const isSelected = selectedOpt === opt;
-                        const isCorrect = isSubmitted && opt === correctAnswer;
-                        const isWrong = isSubmitted && isSelected && opt !== correctAnswer;
+                        const isSelected = selectedIdx === idx;
+                        const isCorrect = isSubmitted && idx === correctIdx;
+                        const isWrong = isSubmitted && isSelected && idx !== correctIdx;
 
                         let btnStyle = "bg-slate-50 border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50";
                         if (isSelected && !isSubmitted) btnStyle = "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200";
@@ -847,7 +878,7 @@ const QuizBlockRenderer = ({ block }: any) => {
                             <button 
                                 key={idx}
                                 disabled={isSubmitted}
-                                onClick={() => setSelectedOpt(opt)}
+                                onClick={() => setSelectedIdx(idx)}
                                 className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 font-bold text-left transition-all active:scale-[0.98] disabled:active:scale-100 ${btnStyle}`}
                             >
                                 <span>{opt}</span>
@@ -859,10 +890,10 @@ const QuizBlockRenderer = ({ block }: any) => {
                 )}
             </div>
 
-            {!isSubmitted && selectedOpt !== null && (
+            {!isSubmitted && selectedIdx !== null && (
                 <button 
                     onClick={() => setIsSubmitted(true)}
-                    className="mt-6 w-full py-4 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 active:scale-95 transition-all"
+                    className="mt-6 w-full py-4 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 active:scale-95 transition-all shadow-xl"
                 >
                     Check Answer
                 </button>
@@ -870,7 +901,6 @@ const QuizBlockRenderer = ({ block }: any) => {
         </div>
     );
 };
-
 const FillBlankBlockRenderer = ({ block }: any) => {
     // Robust Data Extraction
     const rawText = block.text || block?.content?.text || block?.data?.text || "Missing text [here].";
