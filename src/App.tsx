@@ -6280,6 +6280,40 @@ function AdminDashboardView({ user }: any) {
         </div>
     );
 }
+// Helper Component for the Admin Overview Bento Box
+function MetricCard({ icon, label, value, trend, color }: any) {
+    const bgColors: any = { 
+        indigo: 'bg-indigo-50', 
+        emerald: 'bg-emerald-50', 
+        rose: 'bg-rose-50', 
+        amber: 'bg-amber-50' 
+    };
+    
+    const textColors: any = { 
+        indigo: 'text-indigo-600', 
+        emerald: 'text-emerald-600', 
+        rose: 'text-rose-600', 
+        amber: 'text-amber-600' 
+    };
+
+    return (
+        <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col justify-between h-48 group hover:border-slate-300 transition-colors">
+            <div className="flex justify-between items-start">
+                <div className={`p-4 rounded-2xl ${bgColors[color]}`}>
+                    {icon}
+                </div>
+                <TrendingUp size={16} className="text-slate-300 group-hover:text-emerald-400 transition-colors" />
+            </div>
+            <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
+                <div className="flex items-end gap-3">
+                    <span className={`text-4xl font-black leading-none ${textColors[color]}`}>{value}</span>
+                    <span className="text-xs font-bold text-slate-400 mb-1">{trend}</span>
+                </div>
+            </div>
+        </div>
+    );
+}
 // ============================================================================
 //  ARCADE BUILDER (Phase 1: Game Template Configurator)
 // ============================================================================
