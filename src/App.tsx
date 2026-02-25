@@ -6050,6 +6050,9 @@ function AdminDashboardView({ user }: any) {
     const [showBroadcastModal, setShowBroadcastModal] = useState(false);
     const [broadcastMsg, setBroadcastMsg] = useState('');
     const [isBroadcasting, setIsBroadcasting] = useState(false);
+    
+    // DEEP DIVE INSTRUCTOR STATE
+    const [selectedInstructorUid, setSelectedInstructorUid] = useState<string | null>(null);
 
     useEffect(() => {
         const qProfiles = query(collectionGroup(db, 'profile'));
@@ -6088,6 +6091,9 @@ function AdminDashboardView({ user }: any) {
                 await updateDoc(doc(db, 'artifacts', appId, 'users', uid, 'profile', 'main'), {
                     role: newRole
                 });
+                if (selectedInstructorUid === uid && newRole === 'student') {
+                    setSelectedInstructorUid(null); // Close modal if demoted
+                }
             } catch (error) {
                 alert("Failed to update user role.");
             }
@@ -6107,7 +6113,7 @@ function AdminDashboardView({ user }: any) {
             });
             setBroadcastMsg('');
             setShowBroadcastModal(false);
-            alert("Global alert broadcasted successfully!"); // You can swap this for a JuicyToast later!
+            alert("Global alert broadcasted successfully!"); 
         } catch (error) {
             console.error(error);
             alert("Failed to send broadcast.");
@@ -6132,8 +6138,15 @@ function AdminDashboardView({ user }: any) {
         const theirCohorts = allCohorts.filter(c => c._instructorUid === inst.uid);
         const theirStudentEmails = theirCohorts.flatMap(c => c.studentEmails || []);
         const theirPendingGrades = globalLogs.filter(log => theirStudentEmails.includes(log.studentEmail)).length;
+        const totalStudentsManaged = theirCohorts.reduce((acc, curr) => acc + (curr.students?.length || 0), 0);
 
-        return { ...inst, activeCohorts: theirCohorts.length, ungradedItems: theirPendingGrades };
+        return { 
+            ...inst, 
+            activeCohorts: theirCohorts.length, 
+            ungradedItems: theirPendingGrades,
+            totalStudentsManaged,
+            theirCohorts
+        };
     });
 
     // Directory Search Engine
@@ -6159,10 +6172,17 @@ function AdminDashboardView({ user }: any) {
         );
     }
 
+    // Find the actively selected instructor for the deep-dive modal
+    const activeInstructor = populatedInstructors.find(i => i.uid === selectedInstructorUid);
+
     return (
         <div className="h-full flex flex-col bg-slate-50 overflow-hidden animate-in fade-in duration-500 font-sans select-none relative">
             
-            {/* --- GLOBAL BROADCAST MODAL --- */}
+            {/* ============================================================== */}
+            {/* OVERLAY MODALS */}
+            {/* ============================================================== */}
+            
+            {/* 1. GLOBAL BROADCAST MODAL */}
             {showBroadcastModal && (
                 <div className="absolute inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl p-8 relative animate-in zoom-in-95 duration-200">
@@ -6205,7 +6225,121 @@ function AdminDashboardView({ user }: any) {
                 </div>
             )}
 
-            {/* --- HEADER --- */}
+            {/* 2. INSTRUCTOR DEEP-DIVE DOSSIER */}
+            {activeInstructor && (
+                <div className="absolute inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
+                    <div className="bg-white w-full max-w-4xl rounded-[3rem] shadow-2xl relative animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]">
+                        
+                        {/* Dossier Header */}
+                        <div className="bg-slate-950 p-8 flex justify-between items-start shrink-0 relative overflow-hidden">
+                            <div className="absolute -right-20 -top-20 w-64 h-64 bg-indigo-500/20 rounded-full blur-[80px] pointer-events-none" />
+                            
+                            <div className="flex items-center gap-6 relative z-10">
+                                <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] flex items-center justify-center text-white font-black text-4xl shadow-xl border-4 border-slate-800">
+                                    {activeInstructor.name?.charAt(0).toUpperCase() || 'I'}
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <h2 className="text-3xl font-black text-white">{activeInstructor.name}</h2>
+                                        <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${activeInstructor.role === 'admin' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/50' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50'}`}>
+                                            {activeInstructor.role}
+                                        </span>
+                                    </div>
+                                    <p className="text-slate-400 font-bold flex items-center gap-2">
+                                        <Mail size={14}/> {activeInstructor.email}
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <button onClick={() => setSelectedInstructorUid(null)} className="p-2 bg-white/10 text-white/50 hover:text-white hover:bg-rose-500 rounded-full transition-all relative z-10">
+                                <X size={24}/>
+                            </button>
+                        </div>
+
+                        {/* Dossier Body */}
+                        <div className="flex-1 overflow-y-auto p-8 bg-slate-50 flex flex-col md:flex-row gap-8 custom-scrollbar">
+                            
+                            {/* Left Col: Stats & Actions */}
+                            <div className="w-full md:w-1/3 space-y-6 shrink-0">
+                                <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
+                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-100 pb-2">Impact Metrics</h3>
+                                    
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center gap-2 text-slate-600 font-bold text-sm"><School size={16} className="text-indigo-500"/> Cohorts</div>
+                                        <span className="font-black text-slate-900 text-lg">{activeInstructor.activeCohorts}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center gap-2 text-slate-600 font-bold text-sm"><Users size={16} className="text-emerald-500"/> Students</div>
+                                        <span className="font-black text-slate-900 text-lg">{activeInstructor.totalStudentsManaged}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center gap-2 text-slate-600 font-bold text-sm"><FileText size={16} className="text-amber-500"/> To Grade</div>
+                                        <span className={`font-black text-lg ${activeInstructor.ungradedItems > 20 ? 'text-rose-600' : 'text-slate-900'}`}>{activeInstructor.ungradedItems}</span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <a 
+                                        href={`mailto:${activeInstructor.email}`}
+                                        className="w-full py-4 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-2xl font-black text-sm transition-all shadow-sm flex items-center justify-center gap-2 group"
+                                    >
+                                        <Mail size={18} className="group-hover:scale-110 transition-transform"/> Message Instructor
+                                    </a>
+                                    
+                                    {activeInstructor.role !== 'admin' && (
+                                        <button 
+                                            onClick={() => toggleUserRole(activeInstructor.uid, activeInstructor.role)}
+                                            className="w-full py-4 bg-white border-2 border-slate-200 hover:border-rose-500 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-2xl font-black text-sm transition-all shadow-sm flex items-center justify-center gap-2"
+                                        >
+                                            <Shield size={18}/> Revoke Status
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Right Col: Managed Cohorts */}
+                            <div className="w-full md:w-2/3">
+                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                    <School size={18} className="text-indigo-500"/> Managed Cohorts
+                                </h3>
+                                
+                                {activeInstructor.theirCohorts.length === 0 ? (
+                                    <div className="p-8 text-center bg-white rounded-[2rem] border-2 border-dashed border-slate-200">
+                                        <p className="text-slate-400 font-bold">This instructor has not created any cohorts yet.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {activeInstructor.theirCohorts.map((c: any) => (
+                                            <div key={c.id} className="bg-white p-5 rounded-[1.5rem] border border-slate-200 shadow-sm flex justify-between items-center group hover:border-indigo-200 transition-colors">
+                                                <div>
+                                                    <h4 className="font-black text-slate-800 text-lg group-hover:text-indigo-600 transition-colors">{c.name}</h4>
+                                                    <div className="flex gap-3 mt-1">
+                                                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded uppercase tracking-widest">ID: {c.code || c.id.substring(0, 6)}</span>
+                                                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded uppercase tracking-widest flex items-center gap-1">
+                                                            <Users size={10}/> {c.students?.length || 0}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col items-end">
+                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Pulse</span>
+                                                    <span className={`px-3 py-1 rounded-lg text-sm font-black shadow-inner ${(c.pulse || 80) >= 80 ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                                                        {c.pulse || 80}%
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ============================================================== */}
+            {/* MAIN ADMIN DASHBOARD UI */}
+            {/* ============================================================== */}
+
             <header className="h-24 bg-slate-900 px-6 md:px-10 flex justify-between items-center shrink-0 z-30 shadow-xl">
                 <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.4)]">
@@ -6235,7 +6369,6 @@ function AdminDashboardView({ user }: any) {
                 </div>
             </header>
 
-            {/* --- WORKSPACE --- */}
             <div className="flex-1 overflow-y-auto p-6 md:p-12 custom-scrollbar">
                 <div className="max-w-6xl mx-auto space-y-12 pb-32">
 
@@ -6322,34 +6455,38 @@ function AdminDashboardView({ user }: any) {
                         </div>
                     )}
 
-                    {/* INSTRUCTORS TAB */}
+                    {/* INSTRUCTORS TAB (Now Clickable Cards) */}
                     {activeTab === 'instructors' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4">
                             {populatedInstructors.map(inst => (
-                                <div key={inst.uid} className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl transition-shadow relative overflow-hidden">
-                                    <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 to-teal-500" />
+                                <button 
+                                    key={inst.uid} 
+                                    onClick={() => setSelectedInstructorUid(inst.uid)}
+                                    className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl hover:border-indigo-300 hover:-translate-y-1 transition-all relative overflow-hidden text-left group"
+                                >
+                                    <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 to-teal-500 group-hover:h-3 transition-all" />
                                     <div className="flex items-start justify-between mb-6 mt-2">
-                                        <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg">
+                                        <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg group-hover:scale-110 transition-transform">
                                             {inst.name?.charAt(0).toUpperCase() || 'I'}
                                         </div>
-                                        <span className="text-[10px] font-black text-slate-500 bg-slate-100 px-2 py-1 rounded-md uppercase tracking-widest flex items-center gap-1">
+                                        <span className="text-[10px] font-black text-slate-500 bg-slate-100 px-2 py-1 rounded-md uppercase tracking-widest flex items-center gap-1 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
                                             <Shield size={10} /> {inst.role}
                                         </span>
                                     </div>
-                                    <h3 className="text-xl font-black text-slate-800">{inst.name}</h3>
-                                    <p className="text-xs font-bold text-slate-400 mb-6">{inst.email}</p>
+                                    <h3 className="text-xl font-black text-slate-800 group-hover:text-indigo-600 transition-colors">{inst.name}</h3>
+                                    <p className="text-xs font-bold text-slate-400 mb-6 truncate">{inst.email}</p>
                                     
                                     <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-6">
-                                        <div className="bg-slate-50 p-3 rounded-xl text-center">
+                                        <div className="bg-slate-50 p-3 rounded-xl text-center group-hover:bg-white group-hover:shadow-sm transition-colors">
                                             <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Cohorts</span>
                                             <span className="text-xl font-black text-slate-700">{inst.activeCohorts}</span>
                                         </div>
-                                        <div className={`p-3 rounded-xl text-center ${inst.ungradedItems > 0 ? 'bg-amber-50 text-amber-600' : 'bg-slate-50 text-slate-700'}`}>
+                                        <div className={`p-3 rounded-xl text-center transition-colors ${inst.ungradedItems > 0 ? 'bg-amber-50 text-amber-600 group-hover:shadow-sm' : 'bg-slate-50 text-slate-700 group-hover:bg-white group-hover:shadow-sm'}`}>
                                             <span className="block text-[9px] font-black uppercase tracking-widest mb-1 opacity-60">Backlog</span>
                                             <span className="text-xl font-black">{inst.ungradedItems}</span>
                                         </div>
                                     </div>
-                                </div>
+                                </button>
                             ))}
                         </div>
                     )}
@@ -6363,7 +6500,6 @@ function AdminDashboardView({ user }: any) {
                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Platform-Wide Access Control</p>
                                 </div>
                                 
-                                {/* Omni-Search Input */}
                                 <div className="relative w-full md:w-72">
                                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                                     <input 
