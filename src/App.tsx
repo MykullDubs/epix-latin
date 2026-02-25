@@ -809,12 +809,13 @@ function ClassView({ lesson, classId, userData }: any) {
 // --- INTERNAL INTERACTIVE RENDERERS ---
 
 const QuizBlockRenderer = ({ block }: any) => {
-    const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+    const [selectedOpt, setSelectedOpt] = useState<string | null>(null);
     const [isSubmitted, setIsSubmitted] = useState(false);
 
-    const data = block.content || {};
-    const options = data.options || ['Option A', 'Option B', 'Option C'];
-    const correctIdx = data.correctIndex || 0;
+    // BULLETPROOF DATA EXTRACTION: Checks block directly, then block.content, then block.data
+    const question = block.question || block?.content?.question || block?.data?.question || "Missing Question Data";
+    const options = block.options || block?.content?.options || block?.data?.options || [];
+    const correctAnswer = block.correctAnswer || block?.content?.correctAnswer || block?.data?.correctAnswer || options[0];
 
     return (
         <div className="bg-white p-6 md:p-8 rounded-[2rem] border-2 border-slate-100 shadow-sm my-6 relative overflow-hidden">
@@ -826,35 +827,39 @@ const QuizBlockRenderer = ({ block }: any) => {
                 <h3 className="text-xs font-black text-indigo-400 uppercase tracking-widest">Knowledge Check</h3>
             </div>
             
-            <h4 className="text-xl font-black text-slate-800 mb-6 leading-snug">{data.question || "What is the correct answer?"}</h4>
+            <h4 className="text-xl font-black text-slate-800 mb-6 leading-snug">{question}</h4>
             
             <div className="space-y-3">
-                {options.map((opt: string, idx: number) => {
-                    const isSelected = selectedIdx === idx;
-                    const isCorrect = isSubmitted && idx === correctIdx;
-                    const isWrong = isSubmitted && isSelected && idx !== correctIdx;
+                {options.length === 0 ? (
+                    <p className="text-slate-400 font-bold italic">No options found for this quiz.</p>
+                ) : (
+                    options.map((opt: string, idx: number) => {
+                        const isSelected = selectedOpt === opt;
+                        const isCorrect = isSubmitted && opt === correctAnswer;
+                        const isWrong = isSubmitted && isSelected && opt !== correctAnswer;
 
-                    let btnStyle = "bg-slate-50 border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50";
-                    if (isSelected && !isSubmitted) btnStyle = "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200";
-                    if (isCorrect) btnStyle = "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200";
-                    if (isWrong) btnStyle = "bg-rose-500 border-rose-500 text-white shadow-md shadow-rose-200";
+                        let btnStyle = "bg-slate-50 border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50";
+                        if (isSelected && !isSubmitted) btnStyle = "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200";
+                        if (isCorrect) btnStyle = "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200";
+                        if (isWrong) btnStyle = "bg-rose-500 border-rose-500 text-white shadow-md shadow-rose-200";
 
-                    return (
-                        <button 
-                            key={idx}
-                            disabled={isSubmitted}
-                            onClick={() => setSelectedIdx(idx)}
-                            className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 font-bold text-left transition-all active:scale-[0.98] disabled:active:scale-100 ${btnStyle}`}
-                        >
-                            <span>{opt}</span>
-                            {isCorrect && <CheckCircle2 size={20} className="text-white" />}
-                            {isWrong && <X size={20} className="text-white" />}
-                        </button>
-                    );
-                })}
+                        return (
+                            <button 
+                                key={idx}
+                                disabled={isSubmitted}
+                                onClick={() => setSelectedOpt(opt)}
+                                className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 font-bold text-left transition-all active:scale-[0.98] disabled:active:scale-100 ${btnStyle}`}
+                            >
+                                <span>{opt}</span>
+                                {isCorrect && <CheckCircle2 size={20} className="text-white" />}
+                                {isWrong && <X size={20} className="text-white" />}
+                            </button>
+                        );
+                    })
+                )}
             </div>
 
-            {!isSubmitted && selectedIdx !== null && (
+            {!isSubmitted && selectedOpt !== null && (
                 <button 
                     onClick={() => setIsSubmitted(true)}
                     className="mt-6 w-full py-4 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 active:scale-95 transition-all"
@@ -867,43 +872,136 @@ const QuizBlockRenderer = ({ block }: any) => {
 };
 
 const FillBlankBlockRenderer = ({ block }: any) => {
-    const data = block.content || {};
-    // If the builder saves the text with brackets like "The [blank] jumps over the [blank]"
-    const textParts = (data.text || "This is a [blank] sentence.").split(/\[.*?\]/g);
+    // Robust Data Extraction
+    const rawText = block.text || block?.content?.text || block?.data?.text || "Missing text [here].";
     
+    // Parse the sentence and extract the blanks
+    const { textParts, correctAnswers } = React.useMemo(() => {
+        const parts = rawText.split(/\[.*?\]/g);
+        const matches = Array.from(rawText.matchAll(/\[(.*?)\]/g));
+        const answers = matches.map(m => m[1]);
+        return { textParts: parts, correctAnswers: answers };
+    }, [rawText]);
+
+    const [wordBank, setWordBank] = useState<string[]>([]);
+    const [filledBlanks, setFilledBlanks] = useState<(string | null)[]>(Array(correctAnswers.length).fill(null));
+    const [isChecked, setIsChecked] = useState(false);
+
+    // Initialize the word bank shuffled
+    React.useEffect(() => {
+        setWordBank([...correctAnswers].sort(() => Math.random() - 0.5));
+    }, [correctAnswers]);
+
+    // Handle clicking a word in the bank to fill the first available blank
+    const handleBankClick = (word: string) => {
+        if (isChecked) return;
+        const firstEmptyIdx = filledBlanks.indexOf(null);
+        if (firstEmptyIdx !== -1) {
+            const newFilled = [...filledBlanks];
+            newFilled[firstEmptyIdx] = word;
+            setFilledBlanks(newFilled);
+            
+            // Remove word from bank
+            const wordIdx = wordBank.indexOf(word);
+            const newBank = [...wordBank];
+            newBank.splice(wordIdx, 1);
+            setWordBank(newBank);
+        }
+    };
+
+    // Handle clicking a filled blank to return it to the bank
+    const handleBlankClick = (word: string | null, idx: number) => {
+        if (isChecked || !word) return;
+        const newFilled = [...filledBlanks];
+        newFilled[idx] = null;
+        setFilledBlanks(newFilled);
+        setWordBank([...wordBank, word]);
+    };
+
+    const isComplete = filledBlanks.every(slot => slot !== null);
+
     return (
         <div className="bg-white p-6 md:p-8 rounded-[2rem] border-2 border-slate-100 shadow-sm my-6">
-            <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shadow-inner">
-                    <Edit3 size={20} strokeWidth={2.5} />
+            <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shadow-inner">
+                        <Edit3 size={20} strokeWidth={2.5} />
+                    </div>
+                    <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest">Fill in the Blanks</h3>
                 </div>
-                <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest">Fill in the Blanks</h3>
             </div>
 
-            <p className="text-lg font-medium text-slate-700 leading-loose flex flex-wrap items-center gap-y-3">
-                {textParts.map((part: string, i: number) => (
-                    <React.Fragment key={i}>
-                        <span>{part}</span>
-                        {i < textParts.length - 1 && (
-                            <input 
-                                type="text"
-                                className="mx-2 w-32 bg-slate-100 border-b-2 border-slate-300 focus:bg-amber-50 focus:border-amber-500 px-3 py-1.5 text-center font-bold text-amber-700 outline-none transition-all rounded-t-lg"
-                            />
-                        )}
-                    </React.Fragment>
-                ))}
-            </p>
+            {/* The Sentence */}
+            <div className="text-xl font-medium text-slate-700 leading-loose flex flex-wrap items-center gap-y-4 mb-10">
+                {textParts.map((part: string, i: number) => {
+                    const isLast = i === textParts.length - 1;
+                    const filledWord = filledBlanks[i];
+                    
+                    let blankStyle = "min-w-[80px] h-10 border-b-4 border-slate-200 mx-2 flex items-center justify-center px-4 cursor-pointer transition-all";
+                    if (filledWord) blankStyle = "min-w-[80px] h-10 bg-indigo-100 text-indigo-700 font-bold rounded-xl mx-2 flex items-center justify-center px-4 cursor-pointer shadow-sm hover:bg-rose-100 hover:text-rose-600 transition-all active:scale-95";
+                    
+                    // Validation Styling
+                    if (isChecked && filledWord) {
+                        const isCorrect = filledWord === correctAnswers[i];
+                        blankStyle = `min-w-[80px] h-10 font-bold rounded-xl mx-2 flex items-center justify-center px-4 shadow-sm text-white ${isCorrect ? 'bg-emerald-500' : 'bg-rose-500'}`;
+                    }
+
+                    return (
+                        <React.Fragment key={i}>
+                            <span className="leading-none">{part}</span>
+                            {!isLast && (
+                                <div onClick={() => handleBlankClick(filledWord, i)} className={blankStyle}>
+                                    {filledWord || ""}
+                                </div>
+                            )}
+                        </React.Fragment>
+                    );
+                })}
+            </div>
+
+            {/* The Word Bank */}
+            <div className="bg-slate-50 rounded-[1.5rem] p-6 border-2 border-slate-100">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Word Bank</h4>
+                <div className="flex flex-wrap gap-3 min-h-[48px]">
+                    {wordBank.map((word, idx) => (
+                        <button 
+                            key={`bank-${idx}`}
+                            onClick={() => handleBankClick(word)}
+                            disabled={isChecked}
+                            className="px-5 py-2.5 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl shadow-sm hover:border-indigo-300 hover:text-indigo-600 hover:-translate-y-1 active:scale-95 transition-all disabled:opacity-50 disabled:hover:translate-y-0"
+                        >
+                            {word}
+                        </button>
+                    ))}
+                    {wordBank.length === 0 && !isChecked && (
+                        <span className="text-slate-400 font-bold text-sm italic py-2">All words placed.</span>
+                    )}
+                </div>
+            </div>
+
+            {/* Submit Action */}
+            {isComplete && !isChecked && (
+                <button 
+                    onClick={() => setIsChecked(true)}
+                    className="mt-6 w-full py-4 bg-emerald-500 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 active:scale-95 transition-all shadow-xl shadow-emerald-200 animate-in slide-in-from-bottom-2 fade-in"
+                >
+                    Check Answers
+                </button>
+            )}
         </div>
     );
 };
 
 const ScenarioBlockRenderer = ({ block }: any) => {
-    const [selectedOpt, setSelectedOpt] = useState<number | null>(null);
-    const data = block.content || {};
+    const [selectedOpt, setSelectedOpt] = useState<string | null>(null);
+    
+    // Robust Data Extraction
+    const title = block.title || block?.content?.title || block?.data?.title || "Real-World Scenario";
+    const context = block.context || block?.content?.context || block?.data?.context || "Scenario context goes here...";
+    const options = block.options || block?.content?.options || block?.data?.options || [];
     
     return (
         <div className="bg-slate-900 p-6 md:p-8 rounded-[2.5rem] shadow-xl my-6 text-white relative overflow-hidden group">
-            {/* Ambient Background Glow */}
             <div className="absolute -right-20 -top-20 w-64 h-64 bg-rose-500/20 rounded-full blur-[80px] pointer-events-none group-hover:bg-rose-500/30 transition-colors duration-700" />
             
             <div className="relative z-10">
@@ -911,27 +1009,33 @@ const ScenarioBlockRenderer = ({ block }: any) => {
                     <div className="w-10 h-10 bg-rose-500/20 text-rose-400 rounded-xl flex items-center justify-center border border-rose-500/30">
                         <MessageSquare size={20} />
                     </div>
-                    <h3 className="text-xs font-black text-rose-400 uppercase tracking-widest">Real-World Scenario</h3>
+                    <h3 className="text-xs font-black text-rose-400 uppercase tracking-widest">Interactive Branch</h3>
                 </div>
 
-                <h4 className="text-2xl font-black mb-3 leading-tight">{data.title || "The Kitchen Meltdown"}</h4>
+                <h4 className="text-2xl font-black mb-3 leading-tight">{title}</h4>
                 <p className="text-slate-300 font-medium leading-relaxed mb-8 italic">
-                    "{data.context || "You are working the line during the dinner rush. The sous chef yells an order, but you didn't hear the modifier."}"
+                    "{context}"
                 </p>
 
                 <div className="space-y-3">
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">How do you respond?</p>
-                    {(data.options || ["Yes, chef!", "Could you repeat the modifier, chef?", "I'll guess it."]).map((opt: string, i: number) => (
-                        <button 
-                            key={i} 
-                            onClick={() => setSelectedOpt(i)}
-                            className={`w-full p-4 border rounded-2xl text-left font-bold text-sm transition-all active:scale-[0.98] ${
-                                selectedOpt === i ? 'bg-rose-500 border-rose-400 text-white shadow-lg shadow-rose-500/20' : 'bg-white/10 hover:bg-white/20 border-white/10'
-                            }`}
-                        >
-                            {opt}
-                        </button>
-                    ))}
+                    {options.length === 0 ? (
+                        <p className="text-rose-400 font-bold italic text-sm">No scenario options provided.</p>
+                    ) : (
+                        options.map((opt: string, i: number) => (
+                            <button 
+                                key={i} 
+                                onClick={() => setSelectedOpt(opt)}
+                                className={`w-full p-4 border rounded-2xl text-left font-bold text-sm transition-all active:scale-[0.98] ${
+                                    selectedOpt === opt 
+                                        ? 'bg-rose-500 border-rose-400 text-white shadow-lg shadow-rose-500/20' 
+                                        : 'bg-white/10 hover:bg-white/20 border-white/10'
+                                }`}
+                            >
+                                {opt}
+                            </button>
+                        ))
+                    )}
                 </div>
             </div>
         </div>
