@@ -879,7 +879,7 @@ const FillBlankBlockRenderer = ({ block }: any) => {
     const { textParts, correctAnswers } = React.useMemo(() => {
         const parts = rawText.split(/\[.*?\]/g);
         const matches = Array.from(rawText.matchAll(/\[(.*?)\]/g));
-        const answers = matches.map(m => m[1]);
+        const answers = matches.map((m: any) => m[1]);
         return { textParts: parts, correctAnswers: answers };
     }, [rawText]);
 
