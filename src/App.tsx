@@ -6062,6 +6062,11 @@ function AdminDashboardView({ user }: any) {
     const [vaultFilters, setVaultFilters] = useState<string[]>(['lesson', 'exam', 'arcade']);
     const [selectedVaultItems, setSelectedVaultItems] = useState<string[]>([]);
 
+    // NEW: DEPLOYMENT MATRIX STATES
+    const [deployingContent, setDeployingContent] = useState<any | null>(null);
+    const [deploySelectedCohorts, setDeploySelectedCohorts] = useState<string[]>([]);
+    const [isDeploying, setIsDeploying] = useState(false);
+
     useEffect(() => {
         const qProfiles = query(collectionGroup(db, 'profile'));
         const unsubProfiles = onSnapshot(qProfiles, (snap) => {
@@ -6149,7 +6154,6 @@ function AdminDashboardView({ user }: any) {
 
     const handleBulkDelete = async () => {
         if (!window.confirm(`CRITICAL WARNING: You are about to permanently delete ${selectedVaultItems.length} items from the platform. This cannot be undone. Continue?`)) return;
-        
         try {
             const deletePromises = selectedVaultItems.map(id => {
                 const item = allContent.find(c => c.id === id);
@@ -6160,22 +6164,47 @@ function AdminDashboardView({ user }: any) {
             await Promise.all(deletePromises);
             setSelectedVaultItems([]); 
             alert(`Successfully purged ${selectedVaultItems.length} items.`);
-        } catch (e) {
-            alert("Error during bulk deletion.");
+        } catch (e) { alert("Error during bulk deletion."); }
+    };
+
+    // NEW: DEPLOYMENT EXECUTION ENGINE
+    const executeDeployment = async () => {
+        if (!deployingContent || deploySelectedCohorts.length === 0) return;
+        setIsDeploying(true);
+        try {
+            const pushPromises = deploySelectedCohorts.map(cohortId => {
+                const cohort = allCohorts.find(c => c.id === cohortId);
+                if (!cohort) return Promise.resolve();
+                
+                // Inject the content ID directly into the instructor's class assignment array
+                const classRef = doc(db, 'artifacts', appId, 'users', cohort._instructorUid, 'classes', cohort.id);
+                return updateDoc(classRef, { assignments: arrayUnion(deployingContent.id) });
+            });
+            
+            await Promise.all(pushPromises);
+            
+            setDeployingContent(null);
+            setDeploySelectedCohorts([]);
+            setSelectedContentId(null); // Close the inspector to show success
+            alert(`Deployment Successful! Pushed to ${deploySelectedCohorts.length} cohorts.`);
+        } catch (error) {
+            console.error("Deployment Error:", error);
+            alert("Failed to deploy content. Check console for details.");
         }
+        setIsDeploying(false);
     };
 
     const toggleVaultFilter = (type: string) => {
-        setVaultFilters(prev => 
-            prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
-        );
+        setVaultFilters(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]);
     };
 
     const toggleVaultItemSelection = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        setSelectedVaultItems(prev => 
-            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-        );
+        setSelectedVaultItems(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    };
+
+    const toggleCohortSelection = (id: string) => {
+        setDeploySelectedCohorts(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
     };
 
     // --- DATA PROCESSING ---
@@ -6339,44 +6368,125 @@ function AdminDashboardView({ user }: any) {
                 </div>
             )}
 
-            {/* 4. CONTENT VAULT INSPECTOR */}
+            {/* 4. NEW: CONTENT VAULT DEPLOYMENT MATRIX */}
             {activeContent && (
-                <div className="absolute inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
-                    <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl relative animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col">
-                        <div className="p-8 border-b border-slate-100 flex justify-between items-start bg-slate-50/80 relative overflow-hidden">
-                            <div className={`absolute top-0 left-0 w-2 h-full ${activeContent.type === 'arcade_game' ? 'bg-amber-500' : activeContent.type === 'exam' || activeContent.type === 'test' ? 'bg-rose-500' : 'bg-indigo-500'}`} />
-                            <div>
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Content Inspector</span>
-                                <h2 className="text-2xl font-black text-slate-900 leading-tight mb-2">{activeContent.title || 'Untitled Content'}</h2>
-                                <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                                    <User size={14} className="text-indigo-500"/> Created by {activeContent.authorName}
+                <div className="absolute inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
+                    {deployingContent ? (
+                        /* --- DEPLOYMENT TARGETING UI --- */
+                        <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl relative animate-in zoom-in-95 duration-300 overflow-hidden flex flex-col max-h-[85vh]">
+                            <div className="p-8 border-b border-slate-100 bg-indigo-600 text-white relative overflow-hidden shrink-0">
+                                <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
+                                <button onClick={() => setDeployingContent(null)} className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors"><X size={24}/></button>
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm"><Zap size={20}/></div>
+                                    <h2 className="text-2xl font-black">Global Deployment Matrix</h2>
+                                </div>
+                                <p className="text-indigo-200 text-sm font-medium">Targeting cohorts for: <span className="text-white font-bold">{deployingContent.title}</span></p>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-8 bg-slate-50 custom-scrollbar">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Select Target Cohorts</h3>
+                                    <button 
+                                        onClick={() => setDeploySelectedCohorts(deploySelectedCohorts.length === populatedCohorts.length ? [] : populatedCohorts.map(c => c.id))}
+                                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
+                                    >
+                                        {deploySelectedCohorts.length === populatedCohorts.length ? 'Deselect All' : 'Select All'}
+                                    </button>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                    {populatedCohorts.length === 0 ? (
+                                        <p className="text-center text-slate-400 italic py-10">No active cohorts to deploy to.</p>
+                                    ) : (
+                                        populatedCohorts.map(cohort => {
+                                            const isSelected = deploySelectedCohorts.includes(cohort.id);
+                                            return (
+                                                <button 
+                                                    key={cohort.id}
+                                                    onClick={() => toggleCohortSelection(cohort.id)}
+                                                    className={`w-full p-4 rounded-2xl border-2 flex items-center justify-between transition-all text-left group ${isSelected ? 'border-indigo-500 bg-indigo-50 shadow-sm' : 'border-slate-200 bg-white hover:border-indigo-300'}`}
+                                                >
+                                                    <div>
+                                                        <h4 className={`font-bold text-sm ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{cohort.name}</h4>
+                                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1 flex items-center gap-2">
+                                                            <User size={10}/> {cohort.instructorName} • {cohort.students?.length || 0} Students
+                                                        </p>
+                                                    </div>
+                                                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300 group-hover:border-indigo-400'}`}>
+                                                        {isSelected && <Check size={12} strokeWidth={4}/>}
+                                                    </div>
+                                                </button>
+                                            )
+                                        })
+                                    )}
                                 </div>
                             </div>
-                            <button onClick={() => setSelectedContentId(null)} className="p-2 text-slate-400 hover:text-slate-600 bg-white border border-slate-200 rounded-full transition-all shadow-sm relative z-10"><X size={20}/></button>
+
+                            <div className="p-6 bg-white border-t border-slate-100 flex items-center justify-between shrink-0">
+                                <div className="text-sm font-bold text-slate-500">
+                                    <span className="text-indigo-600 font-black">{deploySelectedCohorts.length}</span> targets selected
+                                </div>
+                                <button 
+                                    onClick={executeDeployment}
+                                    disabled={deploySelectedCohorts.length === 0 || isDeploying}
+                                    className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-indigo-200 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100 flex items-center gap-2"
+                                >
+                                    {isDeploying ? <Loader size={16} className="animate-spin"/> : <Send size={16}/>} Initialize Push
+                                </button>
+                            </div>
                         </div>
-                        <div className="p-8 space-y-6 bg-white">
-                            <div className="grid grid-cols-2 gap-4">
+                    ) : (
+                        /* --- STANDARD INSPECTOR UI --- */
+                        <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl relative animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col">
+                            <div className="p-8 border-b border-slate-100 flex justify-between items-start bg-slate-50/80 relative overflow-hidden">
+                                <div className={`absolute top-0 left-0 w-2 h-full ${activeContent.type === 'arcade_game' ? 'bg-amber-500' : activeContent.type === 'exam' || activeContent.type === 'test' ? 'bg-rose-500' : 'bg-indigo-500'}`} />
+                                <div>
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Content Inspector</span>
+                                    <h2 className="text-2xl font-black text-slate-900 leading-tight mb-2">{activeContent.title || 'Untitled Content'}</h2>
+                                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                                        <User size={14} className="text-indigo-500"/> Created by {activeContent.authorName}
+                                    </div>
+                                </div>
+                                <button onClick={() => setSelectedContentId(null)} className="p-2 text-slate-400 hover:text-slate-600 bg-white border border-slate-200 rounded-full transition-all shadow-sm relative z-10"><X size={20}/></button>
+                            </div>
+
+                            <div className="p-8 space-y-6 bg-white">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Architecture</span>
+                                        <span className="font-bold text-slate-800 capitalize">{activeContent.type === 'arcade_game' ? 'Arcade Game' : activeContent.type || 'Standard Lesson'}</span>
+                                    </div>
+                                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Complexity</span>
+                                        <span className="font-bold text-slate-800">{activeContent.blocks?.length || activeContent.questions?.length || 0} Modules</span>
+                                    </div>
+                                </div>
+                                
                                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Architecture</span>
-                                    <span className="font-bold text-slate-800 capitalize">{activeContent.type === 'arcade_game' ? 'Arcade Game' : activeContent.type || 'Standard Lesson'}</span>
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">System Node ID</span>
+                                    <span className="font-mono text-xs font-bold text-slate-500 break-all">{activeContent.id}</span>
                                 </div>
-                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Complexity</span>
-                                    <span className="font-bold text-slate-800">{activeContent.blocks?.length || activeContent.questions?.length || 0} Modules</span>
-                                </div>
+
+                                {/* NEW: DEPLOY TO NETWORK ACTION */}
+                                <button 
+                                    onClick={() => setDeployingContent(activeContent)}
+                                    className="w-full py-5 bg-indigo-50 border-2 border-indigo-200 text-indigo-700 font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-indigo-600 hover:text-white transition-colors shadow-sm flex items-center justify-center gap-2 group"
+                                >
+                                    <Zap size={16} className="group-hover:scale-125 transition-transform" /> Deploy to Network
+                                </button>
                             </div>
-                            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">System Node ID</span>
-                                <span className="font-mono text-xs font-bold text-slate-500 break-all">{activeContent.id}</span>
+
+                            <div className="p-6 bg-rose-50/50 border-t border-rose-100 flex flex-col items-center text-center">
+                                <button 
+                                    onClick={() => forceDeleteContent(activeContent._instructorUid, activeContent.id)}
+                                    className="text-rose-500 font-bold text-xs uppercase tracking-widest hover:underline flex items-center gap-1"
+                                >
+                                    <Trash2 size={12}/> Delete from Platform
+                                </button>
                             </div>
                         </div>
-                        <div className="p-6 bg-rose-50/50 border-t border-rose-100 flex flex-col items-center text-center">
-                            <p className="text-xs font-bold text-rose-600 mb-4">Does this content violate platform guidelines?</p>
-                            <button onClick={() => forceDeleteContent(activeContent._instructorUid, activeContent.id)} className="w-full py-4 bg-rose-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-rose-700 transition-colors shadow-lg shadow-rose-200">
-                                Nuke from Platform
-                            </button>
-                        </div>
-                    </div>
+                    )}
                 </div>
             )}
 
@@ -6524,7 +6634,6 @@ function AdminDashboardView({ user }: any) {
                     {activeTab === 'vault' && (
                         <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in">
                             <div className="p-8 border-b border-slate-100 flex flex-col gap-6 bg-slate-50/50">
-                                
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                                     <div>
                                         <h3 className="text-2xl font-black text-slate-900">The Curriculum Vault</h3>
@@ -6541,7 +6650,6 @@ function AdminDashboardView({ user }: any) {
                                         />
                                     </div>
                                 </div>
-
                                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-t border-slate-200/60 pt-4">
                                     <div className="flex gap-2">
                                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-2 flex items-center">Filter By:</span>
