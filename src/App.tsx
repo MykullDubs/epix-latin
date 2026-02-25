@@ -5288,6 +5288,222 @@ function ExamPlayerView({ exam, onFinish }: any) {
         </div>
     );
 }
+AdminDashboardView({ user }: any) {
+    const [activeTab, setActiveTab] = useState<'overview' | 'cohorts' | 'instructors'>('overview');
+
+    // --- MOCK DATA FOR UI DESIGN ---
+    const metrics = {
+        totalStudents: 342,
+        activeCohorts: 8,
+        avgPulseScore: 84, // The system-wide engagement metric
+        pendingGrades: 156 // Global bottleneck indicator
+    };
+
+    const mockCohorts = [
+        { id: 'c1', name: 'KitchenComm Prep - Alpha', instructor: 'Sarah Jenkins', students: 24, progress: 65, pulse: 88, status: 'active', icon: <ChefHat size={16}/> },
+        { id: 'c2', name: 'KitchenComm Prep - Beta', instructor: 'Mike Chen', students: 28, progress: 30, pulse: 92, status: 'active', icon: <ChefHat size={16}/> },
+        { id: 'c3', name: 'IELTS Intensive - Spring', instructor: 'You (Admin)', students: 15, progress: 10, pulse: 45, status: 'warning', icon: <GraduationCap size={16}/> },
+        { id: 'c4', name: 'Culinary ESL Basics', instructor: 'Unassigned', students: 0, progress: 0, pulse: 0, status: 'draft', icon: <BookOpen size={16}/> }
+    ];
+
+    const mockInstructors = [
+        { id: 'i1', name: 'Sarah Jenkins', email: 'sarah@lllms.edu', activeCohorts: 2, ungradedItems: 12, lastActive: '2 mins ago' },
+        { id: 'i2', name: 'Mike Chen', email: 'mike@lllms.edu', activeCohorts: 3, ungradedItems: 84, lastActive: '5 hours ago' },
+        { id: 'i3', name: 'Elena Rodriguez', email: 'elena@lllms.edu', activeCohorts: 1, ungradedItems: 0, lastActive: '1 day ago' }
+    ];
+
+    return (
+        <div className="h-full flex flex-col bg-slate-50 overflow-hidden animate-in fade-in duration-500 font-sans select-none">
+            
+            {/* --- HEADER --- */}
+            <header className="h-24 bg-slate-900 px-6 md:px-10 flex justify-between items-center shrink-0 z-30 shadow-xl">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.4)]">
+                        <Shield size={24} />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-black text-white tracking-tighter uppercase leading-none">Command Center</h2>
+                        <p className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.3em] mt-1">L.L.L.M.S. Admin Access</p>
+                    </div>
+                </div>
+
+                <div className="flex bg-slate-800 p-1.5 rounded-[1.5rem]">
+                    {[
+                        { id: 'overview', label: 'Overview' },
+                        { id: 'cohorts', label: 'Cohorts' },
+                        { id: 'instructors', label: 'Instructors' }
+                    ].map(tab => (
+                        <button 
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id as any)}
+                            className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+            </header>
+
+            {/* --- WORKSPACE --- */}
+            <div className="flex-1 overflow-y-auto p-6 md:p-12 custom-scrollbar">
+                <div className="max-w-6xl mx-auto space-y-12 pb-32">
+
+                    {/* OVERVIEW TAB */}
+                    {activeTab === 'overview' && (
+                        <div className="space-y-12 animate-in slide-in-from-bottom-4">
+                            {/* Bento Box Metrics */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                <MetricCard icon={<Users size={24} className="text-indigo-500"/>} label="Total Enrollment" value={metrics.totalStudents} trend="+12 this week" color="indigo" />
+                                <MetricCard icon={<BookOpen size={24} className="text-emerald-500"/>} label="Active Cohorts" value={metrics.activeCohorts} trend="2 launching soon" color="emerald" />
+                                <MetricCard icon={<Activity size={24} className="text-rose-500"/>} label="Avg Pulse Score" value={`${metrics.avgPulseScore}%`} trend="High Engagement" color="rose" />
+                                <MetricCard icon={<AlertCircle size={24} className="text-amber-500"/>} label="Global Pending Grades" value={metrics.pendingGrades} trend="Needs attention" color="amber" />
+                            </div>
+
+                            {/* Quick Action Dock */}
+                            <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+                                <div>
+                                    <h3 className="text-2xl font-black text-slate-900 mb-1">Provision New Cohort</h3>
+                                    <p className="text-sm font-bold text-slate-500">Create a container, assign a curriculum, and invite an instructor.</p>
+                                </div>
+                                <button className="w-full md:w-auto px-8 py-5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-emerald-200 active:scale-95 transition-all flex items-center justify-center gap-3 text-xs">
+                                    <Plus size={18} /> Build Cohort
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* COHORTS TAB */}
+                    {activeTab === 'cohorts' && (
+                        <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in">
+                            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                                <div>
+                                    <h3 className="text-2xl font-black text-slate-900">Cohort Management</h3>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Active Deployments</p>
+                                </div>
+                                <button className="p-4 bg-slate-900 text-white rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-lg">
+                                    <Plus size={20} />
+                                </button>
+                            </div>
+                            
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-white border-b border-slate-100">
+                                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Deployment Name</th>
+                                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Instructor</th>
+                                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Roster</th>
+                                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Cohort Pulse</th>
+                                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {mockCohorts.map(cohort => (
+                                        <tr key={cohort.id} className="hover:bg-slate-50 transition-colors group">
+                                            <td className="p-6">
+                                                <div className="flex items-center gap-4">
+                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${cohort.status === 'draft' ? 'bg-slate-100 text-slate-400' : 'bg-indigo-50 text-indigo-600'}`}>
+                                                        {cohort.icon}
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-black text-slate-800 text-sm block">{cohort.name}</span>
+                                                        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md mt-1 inline-block ${cohort.status === 'active' ? 'bg-emerald-100 text-emerald-600' : cohort.status === 'warning' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
+                                                            {cohort.status}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="p-6 font-bold text-slate-600 text-sm">
+                                                {cohort.instructor}
+                                            </td>
+                                            <td className="p-6 text-center">
+                                                <span className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-black">
+                                                    {cohort.students} <Users size={12} className="inline ml-1 opacity-50"/>
+                                                </span>
+                                            </td>
+                                            <td className="p-6 w-48">
+                                                {cohort.students > 0 ? (
+                                                    <div>
+                                                        <div className="flex justify-between text-[10px] font-black text-slate-500 mb-1">
+                                                            <span>Health</span>
+                                                            <span className={cohort.pulse > 80 ? 'text-emerald-500' : 'text-amber-500'}>{cohort.pulse}%</span>
+                                                        </div>
+                                                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                                            <div className={`h-full transition-all duration-1000 ${cohort.pulse > 80 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${cohort.pulse}%` }} />
+                                                        </div>
+                                                    </div>
+                                                ) : <span className="text-xs text-slate-300 font-bold italic">No data</span>}
+                                            </td>
+                                            <td className="p-6 text-right">
+                                                <button className="p-2 text-slate-300 hover:text-indigo-600 transition-colors">
+                                                    <MoreVertical size={20} />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {/* INSTRUCTORS TAB */}
+                    {activeTab === 'instructors' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4">
+                            {mockInstructors.map(inst => (
+                                <div key={inst.id} className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl transition-shadow">
+                                    <div className="flex items-start justify-between mb-6">
+                                        <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg">
+                                            {inst.name.split(' ').map(n => n[0]).join('')}
+                                        </div>
+                                        <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md uppercase tracking-widest flex items-center gap-1">
+                                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Online
+                                        </span>
+                                    </div>
+                                    <h3 className="text-xl font-black text-slate-800">{inst.name}</h3>
+                                    <p className="text-xs font-bold text-slate-400 mb-6">{inst.email}</p>
+                                    
+                                    <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-6">
+                                        <div className="bg-slate-50 p-3 rounded-xl text-center">
+                                            <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Cohorts</span>
+                                            <span className="text-xl font-black text-slate-700">{inst.activeCohorts}</span>
+                                        </div>
+                                        <div className={`p-3 rounded-xl text-center ${inst.ungradedItems > 50 ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-700'}`}>
+                                            <span className="block text-[9px] font-black uppercase tracking-widest mb-1 opacity-60">To Grade</span>
+                                            <span className="text-xl font-black">{inst.ungradedItems}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// Helper Component for the Bento Box Metrics
+function MetricCard({ icon, label, value, trend, color }: any) {
+    const bgColors: any = { indigo: 'bg-indigo-50', emerald: 'bg-emerald-50', rose: 'bg-rose-50', amber: 'bg-amber-50' };
+    const textColors: any = { indigo: 'text-indigo-600', emerald: 'text-emerald-600', rose: 'text-rose-600', amber: 'text-amber-600' };
+
+    return (
+        <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col justify-between h-48 group hover:border-slate-300 transition-colors">
+            <div className="flex justify-between items-start">
+                <div className={`p-4 rounded-2xl ${bgColors[color]}`}>
+                    {icon}
+                </div>
+                <TrendingUp size={16} className="text-slate-300 group-hover:text-emerald-400 transition-colors" />
+            </div>
+            <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
+                <div className="flex items-end gap-3">
+                    <span className={`text-4xl font-black leading-none ${textColors[color]}`}>{value}</span>
+                    <span className="text-xs font-bold text-slate-400 mb-1">{trend}</span>
+                </div>
+            </div>
+        </div>
+    );
+}
 // ============================================================================
 //  ARCADE BUILDER (Phase 1: Game Template Configurator)
 // ============================================================================
