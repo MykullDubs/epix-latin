@@ -884,33 +884,25 @@ function ClassView({ lesson, classId, userData }: any) {
 // ============================================================================
 // --- INTERNAL INTERACTIVE RENDERERS ---
 const QuizBlockRenderer = ({ block }: any) => {
-    // State now tracks the selected option ID, not the string/index
+    // Uses selectedId so it correctly grades against your Builder's data!
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [isSubmitted, setIsSubmitted] = useState(false);
 
-    // 1. LOCATE THE DATA
     const data = block?.content || block?.data || block || {};
     const question = data.question || "Missing Question Data";
     
-    // 2. EXTRACT OPTIONS (Preserving the {id, text} structure)
     let options = data.options || [];
     if (!Array.isArray(options)) options = [];
 
-    // Normalize options so they definitely have an id and text
     const normalizedOptions = options.map((opt: any, idx: number) => {
-        if (typeof opt === 'string') {
-            return { id: `opt_${idx}`, text: opt };
-        }
+        if (typeof opt === 'string') return { id: `opt_${idx}`, text: opt };
         return {
             id: opt.id || `opt_${idx}`,
             text: opt.text || opt.label || opt.value || "Unknown Option"
         };
     });
 
-    // 3. EXTRACT THE CORRECT ID
     let correctId = data.correctId;
-    
-    // Fallbacks just in case older lessons used a different format
     if (correctId === undefined) {
          if (data.correctIndex !== undefined) correctId = normalizedOptions[data.correctIndex]?.id;
          else if (data.correctAnswer) {
@@ -918,13 +910,10 @@ const QuizBlockRenderer = ({ block }: any) => {
              correctId = found?.id;
          }
     }
-
-    // Ultimate fallback if data is somehow totally missing
     if (correctId === undefined && normalizedOptions.length > 0) {
         correctId = normalizedOptions[0].id;
     }
 
-    // Is the currently selected ID the correct one?
     const isCorrect = selectedId === correctId;
 
     return (
@@ -969,7 +958,6 @@ const QuizBlockRenderer = ({ block }: any) => {
                 )}
             </div>
 
-            {/* Submission & Feedback Controls */}
             {!isSubmitted && selectedId !== null ? (
                 <button 
                     onClick={() => setIsSubmitted(true)}
@@ -995,21 +983,19 @@ const QuizBlockRenderer = ({ block }: any) => {
         </div>
     );
 };
+
 const FillBlankBlockRenderer = ({ block }: any) => {
-    // 1. LOCATE THE DATA (Safely)
     const data = block?.content || block?.data || block || {};
     const rawText = data.text || "Missing text [here].";
     
-    // 2. EXTRACT BLANKS & CORRECT ANSWERS
-    const { textParts, correctAnswers } = useMemo(() => {
+    const { textParts, correctAnswers } = React.useMemo(() => {
         const parts = rawText.split(/\[.*?\]/g);
         const matches = Array.from(rawText.matchAll(/\[(.*?)\]/g));
         const answers = matches.map((m: any) => m[1]); 
         return { textParts: parts, correctAnswers: answers };
     }, [rawText]);
 
-    // 3. EXTRACT DECOYS/OPTIONS (With crash protection!)
-    const distractors = useMemo(() => {
+    const distractors = React.useMemo(() => {
         let rawOptions = data.options || data.distractors || [];
         if (!Array.isArray(rawOptions)) {
             rawOptions = typeof rawOptions === 'string' ? [rawOptions] : [];
@@ -1018,22 +1004,18 @@ const FillBlankBlockRenderer = ({ block }: any) => {
             if (typeof opt === 'string' || typeof opt === 'number') return String(opt);
             if (opt && typeof opt === 'object') return opt.text || opt.label || opt.value || "";
             return "";
-        }).filter(Boolean); // Removes empty strings
+        }).filter(Boolean);
     }, [data]);
 
     const [wordBank, setWordBank] = useState<string[]>([]);
     const [filledBlanks, setFilledBlanks] = useState<(string | null)[]>(Array(correctAnswers.length).fill(null));
     const [isChecked, setIsChecked] = useState(false);
 
-    // 4. SHUFFLE EVERYTHING TOGETHER
-    useEffect(() => {
-        // Combine correct answers and distractors
-        // (Using a Set ensures we don't get duplicates if the Builder accidentally saved the correct answer inside the options array too)
+    React.useEffect(() => {
         const allWords = Array.from(new Set([...correctAnswers, ...distractors]));
         setWordBank(allWords.sort(() => Math.random() - 0.5));
     }, [correctAnswers, distractors]);
 
-    // Interactions
     const handleBankClick = (word: string) => {
         if (isChecked) return;
         const firstEmptyIdx = filledBlanks.indexOf(null);
@@ -1070,7 +1052,6 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                 </div>
             </div>
 
-            {/* The Sentence */}
             <div className="text-xl font-medium text-slate-700 leading-loose flex flex-wrap items-center gap-y-4 mb-10">
                 {textParts.map((part: string, i: number) => {
                     const isLast = i === textParts.length - 1;
@@ -1097,7 +1078,6 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                 })}
             </div>
 
-            {/* The Word Bank */}
             <div className="bg-slate-50 rounded-[1.5rem] p-6 border-2 border-slate-100">
                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center justify-between">
                     <span>Word Bank</span>
@@ -1120,7 +1100,6 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                 </div>
             </div>
 
-            {/* Submit Action */}
             {isComplete && !isChecked && (
                 <button 
                     onClick={() => setIsChecked(true)}
@@ -1136,10 +1115,10 @@ const FillBlankBlockRenderer = ({ block }: any) => {
 const ScenarioBlockRenderer = ({ block }: any) => {
     const [selectedOpt, setSelectedOpt] = useState<string | null>(null);
     
-    // Robust Data Extraction
-    const title = block.title || block?.content?.title || block?.data?.title || "Real-World Scenario";
-    const context = block.context || block?.content?.context || block?.data?.context || "Scenario context goes here...";
-    const options = block.options || block?.content?.options || block?.data?.options || [];
+    const data = block?.content || block?.data || block || {};
+    const title = data.title || "Real-World Scenario";
+    const context = data.context || "Scenario context goes here...";
+    const options = data.options || [];
     
     return (
         <div className="bg-slate-900 p-6 md:p-8 rounded-[2.5rem] shadow-xl my-6 text-white relative overflow-hidden group">
@@ -1154,9 +1133,7 @@ const ScenarioBlockRenderer = ({ block }: any) => {
                 </div>
 
                 <h4 className="text-2xl font-black mb-3 leading-tight">{title}</h4>
-                <p className="text-slate-300 font-medium leading-relaxed mb-8 italic">
-                    "{context}"
-                </p>
+                <p className="text-slate-300 font-medium leading-relaxed mb-8 italic">"{context}"</p>
 
                 <div className="space-y-3">
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">How do you respond?</p>
@@ -1168,9 +1145,7 @@ const ScenarioBlockRenderer = ({ block }: any) => {
                                 key={i} 
                                 onClick={() => setSelectedOpt(opt)}
                                 className={`w-full p-4 border rounded-2xl text-left font-bold text-sm transition-all active:scale-[0.98] ${
-                                    selectedOpt === opt 
-                                        ? 'bg-rose-500 border-rose-400 text-white shadow-lg shadow-rose-500/20' 
-                                        : 'bg-white/10 hover:bg-white/20 border-white/10'
+                                    selectedOpt === opt ? 'bg-rose-500 border-rose-400 text-white shadow-lg shadow-rose-500/20' : 'bg-white/10 hover:bg-white/20 border-white/10'
                                 }`}
                             >
                                 {opt}
@@ -1192,20 +1167,15 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollTimeout = useRef<any>(null); 
 
-  // --- AUTOMATIC VOCABULARY EXTRACTOR ---
-  const lessonVocab = useMemo(() => {
-    return lesson?.blocks
-      ?.filter((b: any) => b.type === 'vocab-list')
-      ?.flatMap((b: any) => b.items) || [];
+  const lessonVocab = React.useMemo(() => {
+    return lesson?.blocks?.filter((b: any) => b.type === 'vocab-list')?.flatMap((b: any) => b.items) || [];
   }, [lesson]);
 
-  // --- CRITICAL FIX: PAGINATION LOGIC ---
-  const pages = useMemo(() => {
+  const pages = React.useMemo(() => {
     if (!lesson?.blocks) return [];
     const grouped: any[] = [];
     let buffer: any[] = [];
     lesson.blocks.forEach((b: any) => {
-      // Isolating interactive blocks into their own pages
       if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game'].includes(b.type)) {
         if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
         grouped.push({ type: 'interact', blocks: [b] });
@@ -1216,8 +1186,7 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
     return grouped;
   }, [lesson]);
 
-  // --- THE SYNC ENGINE ---
-  const syncToProjector = useCallback((newIdx: number) => {
+  const syncToProjector = React.useCallback((newIdx: number) => {
     if (!isInstructor) return;
     const syncId = lesson.originalId || lesson.id;
     setDoc(doc(db, 'live_sessions', syncId), {
@@ -1227,7 +1196,7 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
     }, { merge: true }).catch(console.error);
   }, [lesson, isInstructor]);
 
-  const handleLiveInteraction = useCallback((state: any) => {
+  const handleLiveInteraction = React.useCallback((state: any) => {
     if (!isInstructor) return;
     const syncId = lesson.originalId || lesson.id;
     setDoc(doc(db, 'live_sessions', syncId), {
@@ -1240,23 +1209,19 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
     if (isInstructor) syncToProjector(0);
   }, [isInstructor, syncToProjector]);
 
-  // --- THROTTLED SCROLL SYNC ---
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !isInstructor) return;
     
     const handleScroll = () => {
       if (scrollTimeout.current) return; 
-      
       scrollTimeout.current = setTimeout(() => {
         const scrollPercent = container.scrollTop / (container.scrollHeight - container.clientHeight);
         const syncId = lesson.originalId || lesson.id;
-        
         setDoc(doc(db, 'live_sessions', syncId), {
           scrollPercent: scrollPercent || 0,
           lastUpdate: Date.now()
         }, { merge: true }).catch(e => {});
-        
         scrollTimeout.current = null;
       }, 50); 
     };
@@ -1265,15 +1230,14 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
     return () => container.removeEventListener('scroll', handleScroll);
   }, [lesson, isInstructor]);
 
-  // --- NAVIGATION HANDLERS ---
-  const handlePrev = useCallback(() => {
+  const handlePrev = React.useCallback(() => {
       const newIdx = Math.max(0, activePageIdx - 1);
       setActivePageIdx(newIdx);
       syncToProjector(newIdx);
       containerRef.current?.scrollTo(0,0);
   }, [activePageIdx, syncToProjector]);
 
-  const handleNext = useCallback(() => {
+  const handleNext = React.useCallback(() => {
       if (activePageIdx < pages.length - 1) {
           const newIdx = activePageIdx + 1;
           setActivePageIdx(newIdx);
@@ -1284,23 +1248,18 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
       }
   }, [activePageIdx, pages.length, syncToProjector, onFinish]);
 
-  // --- KEYBOARD NAVIGATION ENGINE ---
+  // KEYBOARD NAVIGATION
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-        if (e.key === 'ArrowRight') {
-            handleNext();
-        } else if (e.key === 'ArrowLeft') {
-            handlePrev();
-        }
+        if (e.key === 'ArrowRight') handleNext();
+        else if (e.key === 'ArrowLeft') handlePrev();
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleNext, handlePrev]);
 
- // --- MASTER BLOCK RENDERER ---
   const renderBlock = (block: any, idx: number) => {
     const blockKey = `page_${activePageIdx}_block_${idx}`;
 
@@ -1366,7 +1325,6 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
           </div>
         );
       
-      // --- NEWLY INJECTED INTERACTIVE BLOCKS ---
       case 'quiz':
         return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><QuizBlockRenderer block={block} /></div>;
       case 'fill-blank':
@@ -1374,7 +1332,6 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
       case 'scenario':
         return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><ScenarioBlockRenderer block={block} /></div>;
 
-      // --- GAME BLOCK ---
       case 'game':
         if (block.gameType === 'connect-three') {
             return (
@@ -1383,10 +1340,6 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
                         <h3 className="text-2xl font-black text-slate-800">{block.title || "Vocabulary Battle"}</h3>
                         <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">Game Active on Projector</p>
                     </div>
-                    {/* Assuming ConnectThreeVocab is imported and available! */}
-                    {/* <div className="scale-90 origin-top">
-                        <ConnectThreeVocab vocabList={lessonVocab} />
-                    </div> */}
                     <div className="w-full h-64 bg-amber-50 rounded-[2rem] border-2 border-amber-200 flex items-center justify-center text-amber-500 font-black">
                         [Game Rendered Here]
                     </div>
