@@ -3233,9 +3233,9 @@ function InstructorGradebook({ classData }: any) {
     );
 }
 // ============================================================================
-//  CLASS MANAGER VIEW (Master-Detail Mission Control)
+//  CLASS MANAGER VIEW (Searchable & Strict Creation)
 // ============================================================================
-function ClassManagerView({ 
+ function ClassManagerView({ 
     user, 
     classes = [], 
     lessons = [], 
@@ -3249,10 +3249,31 @@ function ClassManagerView({
 }: any) {
     const [selectedClassId, setSelectedClassId] = useState<string | null>(classes[0]?.id || null);
     const [activeTab, setActiveTab] = useState<'roster' | 'assignments'>('roster');
+    
+    // Form States
     const [newStudentEmail, setNewStudentEmail] = useState('');
     const [isEditingTitle, setIsEditingTitle] = useState(false);
+    
+    // NEW: Creation & Search States
+    const [isCreatingCohort, setIsCreatingCohort] = useState(false);
+    const [newCohortName, setNewCohortName] = useState('');
+    const [lessonSearch, setLessonSearch] = useState('');
 
     const activeClass = classes.find((c: any) => c.id === selectedClassId);
+
+    // Filter Lessons based on Search
+    const filteredLessons = lessons.filter((l: any) => {
+        if (!lessonSearch.trim()) return true;
+        const searchStr = `${l.title || 'Untitled Unit'} ${l.type === 'arcade_game' ? 'arcade game' : 'standard unit'}`.toLowerCase();
+        return searchStr.includes(lessonSearch.toLowerCase());
+    });
+
+    const handleCreateSubmit = () => {
+        if (!newCohortName.trim()) return;
+        onCreateClass(newCohortName.trim());
+        setNewCohortName('');
+        setIsCreatingCohort(false);
+    };
 
     const handleAddStudent = (e: React.FormEvent) => {
         e.preventDefault();
@@ -3281,20 +3302,47 @@ function ClassManagerView({
                         </span>
                     </div>
                     <button 
-                        onClick={() => onCreateClass('New Cohort')}
-                        className="relative z-10 w-12 h-12 bg-slate-900 text-white rounded-[1.25rem] flex items-center justify-center shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-95 active:translate-y-0 transition-all"
+                        onClick={() => {
+                            setIsCreatingCohort(!isCreatingCohort);
+                            setNewCohortName('');
+                        }}
+                        className={`relative z-10 w-12 h-12 rounded-[1.25rem] flex items-center justify-center shadow-lg transition-all active:scale-95 ${isCreatingCohort ? 'bg-rose-500 text-white hover:bg-rose-600 shadow-rose-200' : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-200'}`}
                         title="Provision New Cohort"
                     >
-                        <Plus size={24} />
+                        {isCreatingCohort ? <X size={24} /> : <Plus size={24} />}
                     </button>
                 </div>
 
-                {/* Cohort List */}
-                <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-2">
-                    {classes.length === 0 ? (
+                {/* Cohort List & Inline Creator */}
+                <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-2 pb-12">
+                    
+                    {/* NEW: INLINE COHORT FORGE */}
+                    {isCreatingCohort && (
+                        <div className="p-5 bg-indigo-600 rounded-[1.5rem] shadow-xl shadow-indigo-200 animate-in slide-in-from-top-4 fade-in duration-300">
+                            <label className="text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-2 block">Forge New Cohort</label>
+                            <input 
+                                autoFocus
+                                value={newCohortName}
+                                onChange={e => setNewCohortName(e.target.value)}
+                                placeholder="e.g. KitchenComm Beta..."
+                                className="w-full bg-white/10 border-2 border-indigo-400/50 rounded-xl px-4 py-3 mb-3 text-sm font-black text-white placeholder:text-indigo-300 focus:outline-none focus:border-white focus:bg-white/20 transition-all"
+                                onKeyDown={(e) => e.key === 'Enter' && handleCreateSubmit()}
+                            />
+                            <button 
+                                disabled={!newCohortName.trim()}
+                                onClick={handleCreateSubmit}
+                                className="w-full py-3 bg-white text-indigo-600 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-indigo-50 disabled:opacity-50 disabled:hover:bg-white active:scale-95 transition-all shadow-sm flex items-center justify-center gap-2"
+                            >
+                                <Flame size={16} /> Deploy
+                            </button>
+                        </div>
+                    )}
+
+                    {classes.length === 0 && !isCreatingCohort ? (
                         <div className="text-center p-10 border-2 border-dashed border-slate-200 rounded-[2rem] bg-white/50">
                             <Users size={32} className="mx-auto text-slate-300 mb-3" />
                             <p className="text-sm font-bold text-slate-500">No cohorts deployed.</p>
+                            <button onClick={() => setIsCreatingCohort(true)} className="mt-4 text-xs font-black text-indigo-600 uppercase tracking-widest hover:text-indigo-700">Create One Now</button>
                         </div>
                     ) : (
                         classes.map((cls: any) => {
@@ -3311,7 +3359,6 @@ function ClassManagerView({
                                             : 'bg-white border-slate-100 shadow-sm hover:border-indigo-200 hover:bg-slate-50'
                                     }`}
                                 >
-                                    {/* Selected Glow Effect */}
                                     {isSelected && <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/20 pointer-events-none" />}
 
                                     <div className="flex justify-between items-start mb-4 relative z-10">
@@ -3360,7 +3407,6 @@ function ClassManagerView({
                                         ID: {activeClass.id}
                                     </span>
                                     
-                                    {/* Editable Title Group */}
                                     <div className="flex items-center gap-3 group">
                                         <input 
                                             className="text-3xl md:text-4xl font-black text-slate-900 tracking-tighter bg-transparent border-b-2 border-transparent focus:border-indigo-500 p-0 focus:ring-0 w-full max-w-lg transition-colors"
@@ -3373,7 +3419,6 @@ function ClassManagerView({
                                         <Edit3 size={18} className={`text-slate-300 transition-opacity ${isEditingTitle ? 'opacity-0' : 'opacity-100 group-hover:text-indigo-400'}`} />
                                     </div>
 
-                                    {/* Quick Stats */}
                                     <div className="flex flex-wrap gap-3 mt-4">
                                         <div className="flex items-center gap-2 text-xs font-bold text-slate-600 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm">
                                             <Users size={14} className="text-indigo-500"/> {activeClass.students?.length || 0} Enrolled
@@ -3385,7 +3430,10 @@ function ClassManagerView({
                                 </div>
 
                                 <button 
-                                    onClick={() => onDeleteClass(activeClass.id)}
+                                    onClick={() => {
+                                        onDeleteClass(activeClass.id);
+                                        setSelectedClassId(null);
+                                    }}
                                     className="p-3 text-slate-400 hover:text-white hover:bg-rose-500 rounded-2xl transition-all shadow-sm bg-white border border-slate-200 hover:border-rose-500"
                                     title="Delete Cohort"
                                 >
@@ -3393,7 +3441,6 @@ function ClassManagerView({
                                 </button>
                             </div>
 
-                            {/* Inner Tabs - Merged into header bottom */}
                             <div className="flex gap-6 relative bottom-[-1px]">
                                 <button 
                                     onClick={() => setActiveTab('roster')}
@@ -3416,14 +3463,10 @@ function ClassManagerView({
                             {/* ==================== ROSTER TAB ==================== */}
                             {activeTab === 'roster' && (
                                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
-                                    
-                                    {/* Juiced Enrollment Form */}
                                     <form onSubmit={handleAddStudent} className="relative group max-w-xl">
                                         <div className="absolute inset-0 bg-indigo-500/5 rounded-2xl blur-lg group-focus-within:bg-indigo-500/20 transition-all duration-500" />
                                         <div className="relative flex items-center bg-white border-2 border-slate-200 focus-within:border-indigo-500 rounded-2xl p-1.5 shadow-sm transition-colors">
-                                            <div className="pl-4 pr-2 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
-                                                <Mail size={18} />
-                                            </div>
+                                            <div className="pl-4 pr-2 text-slate-400 group-focus-within:text-indigo-500 transition-colors"><Mail size={18} /></div>
                                             <input 
                                                 type="email" 
                                                 placeholder="Enter student email address..." 
@@ -3441,7 +3484,6 @@ function ClassManagerView({
                                         </div>
                                     </form>
 
-                                    {/* Student Table */}
                                     <div className="border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm">
                                         <table className="w-full text-left border-collapse">
                                             <thead className="bg-slate-50/80 border-b border-slate-100">
@@ -3455,9 +3497,7 @@ function ClassManagerView({
                                                 {(!activeClass.students || activeClass.students.length === 0) ? (
                                                     <tr>
                                                         <td colSpan={3} className="px-6 py-12 text-center">
-                                                            <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-300">
-                                                                <Users size={20} />
-                                                            </div>
+                                                            <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-300"><Users size={20} /></div>
                                                             <p className="text-sm font-bold text-slate-500">The roster is empty.</p>
                                                             <p className="text-xs font-bold text-slate-400 mt-1">Enroll students using the field above.</p>
                                                         </td>
@@ -3475,16 +3515,12 @@ function ClassManagerView({
                                                             </td>
                                                             <td className="px-6 py-4">
                                                                 <div className="flex items-center gap-3">
-                                                                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                                                                        <div className="h-full bg-emerald-500 w-[45%] rounded-full" />
-                                                                    </div>
+                                                                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 w-[45%] rounded-full" /></div>
                                                                     <span className="text-[10px] font-black text-slate-400 w-8">45%</span>
                                                                 </div>
                                                             </td>
                                                             <td className="px-6 py-4 text-right">
-                                                                <button className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors">
-                                                                    <X size={16} strokeWidth={3} />
-                                                                </button>
+                                                                <button className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"><X size={16} strokeWidth={3} /></button>
                                                             </td>
                                                         </tr>
                                                     ))
@@ -3495,15 +3531,26 @@ function ClassManagerView({
                                 </div>
                             )}
 
-                            {/* ==================== ASSIGNMENTS TAB ==================== */}
+                            {/* ==================== ASSIGNMENTS TAB (SEARCHABLE) ==================== */}
                             {activeTab === 'assignments' && (
                                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
                                     
-                                    <div className="flex items-center justify-between mb-2">
+                                    {/* The New Search Engine */}
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
                                         <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                                            <BookOpen size={16} className="text-indigo-500" /> Lesson Library
+                                            <BookOpen size={16} className="text-indigo-500" /> Library
                                         </h3>
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Click to toggle assignment</span>
+                                        
+                                        <div className="relative w-full md:w-72">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                            <input 
+                                                type="text"
+                                                placeholder="Search assignments..."
+                                                value={lessonSearch}
+                                                onChange={(e) => setLessonSearch(e.target.value)}
+                                                className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 focus:bg-white rounded-xl text-sm font-bold text-slate-700 outline-none transition-all placeholder:text-slate-400"
+                                            />
+                                        </div>
                                     </div>
 
                                     {lessons.length === 0 ? (
@@ -3512,47 +3559,51 @@ function ClassManagerView({
                                             <p className="text-sm font-bold text-slate-600 mb-1">Your library is empty.</p>
                                             <p className="text-xs font-bold text-slate-400">Build lessons in the Studio first.</p>
                                         </div>
+                                    ) : filteredLessons.length === 0 ? (
+                                        <div className="text-center p-12 bg-slate-50/50 rounded-[2rem] border border-slate-100">
+                                            <p className="text-sm font-bold text-slate-500">No lessons match "{lessonSearch}"</p>
+                                        </div>
                                     ) : (
-                                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                                            {lessons.map((lesson: any) => {
+                                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                                            {filteredLessons.map((lesson: any) => {
                                                 const isAssigned = activeClass.assignments?.includes(lesson.id);
                                                 
                                                 return (
                                                     <button 
                                                         key={lesson.id} 
                                                         onClick={() => isAssigned ? onRevoke(activeClass.id, lesson.id) : onAssign(activeClass.id, lesson.id)}
-                                                        className={`relative flex items-center p-5 rounded-[1.5rem] border-2 transition-all duration-300 text-left w-full group active:scale-[0.98] ${
+                                                        className={`relative flex items-center p-4 rounded-[1.5rem] border-2 transition-all duration-300 text-left w-full group active:scale-[0.98] ${
                                                             isAssigned 
                                                                 ? 'bg-indigo-50/50 border-indigo-500 shadow-md shadow-indigo-100' 
                                                                 : 'bg-white border-slate-100 hover:border-slate-300 shadow-sm hover:shadow-md'
                                                         }`}
                                                     >
                                                         {/* Icon Box */}
-                                                        <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center shrink-0 mr-4 transition-colors ${
+                                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mr-4 transition-colors ${
                                                             isAssigned ? 'bg-indigo-500 text-white shadow-inner' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100'
                                                         }`}>
-                                                            {lesson.type === 'arcade_game' ? <Gamepad2 size={20} /> : <BookOpen size={20} />}
+                                                            {lesson.type === 'arcade_game' ? <Gamepad2 size={18} /> : <BookOpen size={18} />}
                                                         </div>
 
                                                         {/* Text Content */}
                                                         <div className="flex-1 pr-4">
-                                                            <h4 className={`font-black text-base leading-tight mb-1 transition-colors ${isAssigned ? 'text-indigo-900' : 'text-slate-700'}`}>
+                                                            <h4 className={`font-black text-sm leading-tight mb-1 transition-colors ${isAssigned ? 'text-indigo-900' : 'text-slate-700'}`}>
                                                                 {lesson.title || 'Untitled Unit'}
                                                             </h4>
                                                             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                                                <span>{lesson.type === 'arcade_game' ? 'Arcade Game' : 'Standard Unit'}</span>
+                                                                <span>{lesson.type === 'arcade_game' ? 'Arcade' : 'Standard'}</span>
                                                                 <span className="w-1 h-1 rounded-full bg-slate-300" />
                                                                 <span>{lesson.blocks?.length || 0} Blocks</span>
                                                             </div>
                                                         </div>
 
                                                         {/* Toggle Indicator */}
-                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 shrink-0 transition-all ${
+                                                        <div className={`w-7 h-7 rounded-full flex items-center justify-center border-2 shrink-0 transition-all ${
                                                             isAssigned 
                                                                 ? 'bg-indigo-500 border-indigo-500 text-white scale-110' 
                                                                 : 'bg-white border-slate-200 text-transparent group-hover:border-indigo-300 group-hover:bg-indigo-50'
                                                         }`}>
-                                                            <Check size={16} strokeWidth={4} />
+                                                            <Check size={14} strokeWidth={4} />
                                                         </div>
                                                     </button>
                                                 );
