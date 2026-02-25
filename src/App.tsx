@@ -6045,14 +6045,15 @@ function AdminDashboardView({ user }: any) {
     const [globalLogs, setGlobalLogs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // New Admin Features State
+    // Admin Features State
     const [directorySearch, setDirectorySearch] = useState('');
     const [showBroadcastModal, setShowBroadcastModal] = useState(false);
     const [broadcastMsg, setBroadcastMsg] = useState('');
     const [isBroadcasting, setIsBroadcasting] = useState(false);
     
-    // DEEP DIVE INSTRUCTOR STATE
+    // DEEP DIVE STATES
     const [selectedInstructorUid, setSelectedInstructorUid] = useState<string | null>(null);
+    const [selectedCohortId, setSelectedCohortId] = useState<string | null>(null);
 
     useEffect(() => {
         const qProfiles = query(collectionGroup(db, 'profile'));
@@ -6088,15 +6089,9 @@ function AdminDashboardView({ user }: any) {
         const newRole = currentRole === 'student' ? 'instructor' : 'student';
         if (window.confirm(`Change this user's permissions to ${newRole.toUpperCase()}?`)) {
             try {
-                await updateDoc(doc(db, 'artifacts', appId, 'users', uid, 'profile', 'main'), {
-                    role: newRole
-                });
-                if (selectedInstructorUid === uid && newRole === 'student') {
-                    setSelectedInstructorUid(null); // Close modal if demoted
-                }
-            } catch (error) {
-                alert("Failed to update user role.");
-            }
+                await updateDoc(doc(db, 'artifacts', appId, 'users', uid, 'profile', 'main'), { role: newRole });
+                if (selectedInstructorUid === uid && newRole === 'student') setSelectedInstructorUid(null); 
+            } catch (error) { alert("Failed to update user role."); }
         }
     };
 
@@ -6114,11 +6109,30 @@ function AdminDashboardView({ user }: any) {
             setBroadcastMsg('');
             setShowBroadcastModal(false);
             alert("Global alert broadcasted successfully!"); 
-        } catch (error) {
-            console.error(error);
-            alert("Failed to send broadcast.");
-        }
+        } catch (error) { alert("Failed to send broadcast."); }
         setIsBroadcasting(false);
+    };
+
+    // --- COHORT GOVERNANCE ACTIONS (GOD MODE) ---
+    const forceDeleteCohort = async (instructorUid: string, classId: string) => {
+        if (window.confirm("CRITICAL WARNING: This will permanently delete this cohort, all its assignments, and disconnect all students. Continue?")) {
+            try {
+                await deleteDoc(doc(db, 'artifacts', appId, 'users', instructorUid, 'classes', classId));
+                setSelectedCohortId(null);
+            } catch (e) { alert("Failed to delete cohort."); }
+        }
+    };
+
+    const forceRemoveStudent = async (instructorUid: string, classId: string, studentEmail: string, studentObj: any) => {
+        if (window.confirm(`Remove ${studentEmail} from this cohort?`)) {
+            try {
+                const classRef = doc(db, 'artifacts', appId, 'users', instructorUid, 'classes', classId);
+                await updateDoc(classRef, {
+                    studentEmails: arrayRemove(studentEmail),
+                    students: arrayRemove(studentObj)
+                });
+            } catch (e) { alert("Failed to remove student."); }
+        }
     };
 
     // --- DATA PROCESSING ---
@@ -6130,6 +6144,7 @@ function AdminDashboardView({ user }: any) {
         return {
             ...cohort,
             instructorName: inst?.name || 'Unknown Instructor',
+            instructorEmail: inst?.email || 'Unknown Email',
             studentCount: cohort.students?.length || 0
         };
     });
@@ -6139,29 +6154,16 @@ function AdminDashboardView({ user }: any) {
         const theirStudentEmails = theirCohorts.flatMap(c => c.studentEmails || []);
         const theirPendingGrades = globalLogs.filter(log => theirStudentEmails.includes(log.studentEmail)).length;
         const totalStudentsManaged = theirCohorts.reduce((acc, curr) => acc + (curr.students?.length || 0), 0);
-
-        return { 
-            ...inst, 
-            activeCohorts: theirCohorts.length, 
-            ungradedItems: theirPendingGrades,
-            totalStudentsManaged,
-            theirCohorts
-        };
+        return { ...inst, activeCohorts: theirCohorts.length, ungradedItems: theirPendingGrades, totalStudentsManaged, theirCohorts };
     });
 
-    // Directory Search Engine
     const filteredProfiles = allProfiles.filter(p => {
         if (!directorySearch) return true;
         const searchStr = `${p.name || ''} ${p.email || ''} ${p.role || ''}`.toLowerCase();
         return searchStr.includes(directorySearch.toLowerCase());
     });
 
-    const metrics = {
-        totalStudents: students.length,
-        activeCohorts: allCohorts.length,
-        totalInstructors: instructors.length,
-        pendingGrades: globalLogs.length
-    };
+    const metrics = { totalStudents: students.length, activeCohorts: allCohorts.length, totalInstructors: instructors.length, pendingGrades: globalLogs.length };
 
     if (loading) {
         return (
@@ -6172,8 +6174,8 @@ function AdminDashboardView({ user }: any) {
         );
     }
 
-    // Find the actively selected instructor for the deep-dive modal
     const activeInstructor = populatedInstructors.find(i => i.uid === selectedInstructorUid);
+    const activeCohort = populatedCohorts.find(c => c.id === selectedCohortId);
 
     return (
         <div className="h-full flex flex-col bg-slate-50 overflow-hidden animate-in fade-in duration-500 font-sans select-none relative">
@@ -6187,37 +6189,14 @@ function AdminDashboardView({ user }: any) {
                 <div className="absolute inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl p-8 relative animate-in zoom-in-95 duration-200">
                         <button onClick={() => setShowBroadcastModal(false)} className="absolute top-6 right-6 text-slate-400 hover:text-rose-500 transition-colors"><X size={24}/></button>
-                        
                         <div className="flex items-center gap-4 mb-6">
-                            <div className="w-14 h-14 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center shadow-inner">
-                                <Megaphone size={28} />
-                            </div>
-                            <div>
-                                <h2 className="text-2xl font-black text-slate-900">Global Broadcast</h2>
-                                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Platform-Wide Alert</p>
-                            </div>
+                            <div className="w-14 h-14 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center shadow-inner"><Megaphone size={28} /></div>
+                            <div><h2 className="text-2xl font-black text-slate-900">Global Broadcast</h2><p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Platform-Wide Alert</p></div>
                         </div>
-
                         <div className="space-y-4">
-                            <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3">
-                                <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
-                                <p className="text-xs font-bold text-amber-800 leading-relaxed">
-                                    Warning: This message will be pushed to the database and will appear for every active Student and Instructor.
-                                </p>
-                            </div>
-
-                            <textarea 
-                                className="w-full p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-medium text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors resize-none h-32"
-                                placeholder="Type your system announcement here..."
-                                value={broadcastMsg}
-                                onChange={(e) => setBroadcastMsg(e.target.value)}
-                            />
-
-                            <button 
-                                onClick={handleGlobalBroadcast}
-                                disabled={!broadcastMsg.trim() || isBroadcasting}
-                                className="w-full py-5 bg-slate-900 hover:bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
-                            >
+                            <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3"><AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" /><p className="text-xs font-bold text-amber-800 leading-relaxed">Warning: This message will be pushed to the database and will appear for every active Student and Instructor.</p></div>
+                            <textarea className="w-full p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-medium text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors resize-none h-32" placeholder="Type your system announcement here..." value={broadcastMsg} onChange={(e) => setBroadcastMsg(e.target.value)} />
+                            <button onClick={handleGlobalBroadcast} disabled={!broadcastMsg.trim() || isBroadcasting} className="w-full py-5 bg-slate-900 hover:bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2">
                                 {isBroadcasting ? <Loader size={18} className="animate-spin" /> : <Send size={18} />} Push to Network
                             </button>
                         </div>
@@ -6225,112 +6204,117 @@ function AdminDashboardView({ user }: any) {
                 </div>
             )}
 
-            {/* 2. INSTRUCTOR DEEP-DIVE DOSSIER */}
+            {/* 2. INSTRUCTOR DOSSIER */}
             {activeInstructor && (
                 <div className="absolute inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
                     <div className="bg-white w-full max-w-4xl rounded-[3rem] shadow-2xl relative animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]">
-                        
-                        {/* Dossier Header */}
                         <div className="bg-slate-950 p-8 flex justify-between items-start shrink-0 relative overflow-hidden">
                             <div className="absolute -right-20 -top-20 w-64 h-64 bg-indigo-500/20 rounded-full blur-[80px] pointer-events-none" />
-                            
                             <div className="flex items-center gap-6 relative z-10">
-                                <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] flex items-center justify-center text-white font-black text-4xl shadow-xl border-4 border-slate-800">
-                                    {activeInstructor.name?.charAt(0).toUpperCase() || 'I'}
-                                </div>
+                                <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] flex items-center justify-center text-white font-black text-4xl shadow-xl border-4 border-slate-800">{activeInstructor.name?.charAt(0).toUpperCase() || 'I'}</div>
                                 <div>
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <h2 className="text-3xl font-black text-white">{activeInstructor.name}</h2>
-                                        <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${activeInstructor.role === 'admin' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/50' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50'}`}>
-                                            {activeInstructor.role}
-                                        </span>
-                                    </div>
-                                    <p className="text-slate-400 font-bold flex items-center gap-2">
-                                        <Mail size={14}/> {activeInstructor.email}
-                                    </p>
+                                    <div className="flex items-center gap-3 mb-2"><h2 className="text-3xl font-black text-white">{activeInstructor.name}</h2><span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${activeInstructor.role === 'admin' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/50' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50'}`}>{activeInstructor.role}</span></div>
+                                    <p className="text-slate-400 font-bold flex items-center gap-2"><Mail size={14}/> {activeInstructor.email}</p>
                                 </div>
                             </div>
-                            
-                            <button onClick={() => setSelectedInstructorUid(null)} className="p-2 bg-white/10 text-white/50 hover:text-white hover:bg-rose-500 rounded-full transition-all relative z-10">
-                                <X size={24}/>
-                            </button>
+                            <button onClick={() => setSelectedInstructorUid(null)} className="p-2 bg-white/10 text-white/50 hover:text-white hover:bg-rose-500 rounded-full transition-all relative z-10"><X size={24}/></button>
                         </div>
-
-                        {/* Dossier Body */}
                         <div className="flex-1 overflow-y-auto p-8 bg-slate-50 flex flex-col md:flex-row gap-8 custom-scrollbar">
-                            
-                            {/* Left Col: Stats & Actions */}
                             <div className="w-full md:w-1/3 space-y-6 shrink-0">
                                 <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
                                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-100 pb-2">Impact Metrics</h3>
-                                    
-                                    <div className="flex justify-between items-center">
-                                        <div className="flex items-center gap-2 text-slate-600 font-bold text-sm"><School size={16} className="text-indigo-500"/> Cohorts</div>
-                                        <span className="font-black text-slate-900 text-lg">{activeInstructor.activeCohorts}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <div className="flex items-center gap-2 text-slate-600 font-bold text-sm"><Users size={16} className="text-emerald-500"/> Students</div>
-                                        <span className="font-black text-slate-900 text-lg">{activeInstructor.totalStudentsManaged}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <div className="flex items-center gap-2 text-slate-600 font-bold text-sm"><FileText size={16} className="text-amber-500"/> To Grade</div>
-                                        <span className={`font-black text-lg ${activeInstructor.ungradedItems > 20 ? 'text-rose-600' : 'text-slate-900'}`}>{activeInstructor.ungradedItems}</span>
-                                    </div>
+                                    <div className="flex justify-between items-center"><div className="flex items-center gap-2 text-slate-600 font-bold text-sm"><School size={16} className="text-indigo-500"/> Cohorts</div><span className="font-black text-slate-900 text-lg">{activeInstructor.activeCohorts}</span></div>
+                                    <div className="flex justify-between items-center"><div className="flex items-center gap-2 text-slate-600 font-bold text-sm"><Users size={16} className="text-emerald-500"/> Students</div><span className="font-black text-slate-900 text-lg">{activeInstructor.totalStudentsManaged}</span></div>
+                                    <div className="flex justify-between items-center"><div className="flex items-center gap-2 text-slate-600 font-bold text-sm"><FileText size={16} className="text-amber-500"/> To Grade</div><span className={`font-black text-lg ${activeInstructor.ungradedItems > 20 ? 'text-rose-600' : 'text-slate-900'}`}>{activeInstructor.ungradedItems}</span></div>
                                 </div>
-
                                 <div className="space-y-3">
-                                    <a 
-                                        href={`mailto:${activeInstructor.email}`}
-                                        className="w-full py-4 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-2xl font-black text-sm transition-all shadow-sm flex items-center justify-center gap-2 group"
-                                    >
-                                        <Mail size={18} className="group-hover:scale-110 transition-transform"/> Message Instructor
-                                    </a>
-                                    
-                                    {activeInstructor.role !== 'admin' && (
-                                        <button 
-                                            onClick={() => toggleUserRole(activeInstructor.uid, activeInstructor.role)}
-                                            className="w-full py-4 bg-white border-2 border-slate-200 hover:border-rose-500 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-2xl font-black text-sm transition-all shadow-sm flex items-center justify-center gap-2"
-                                        >
-                                            <Shield size={18}/> Revoke Status
-                                        </button>
-                                    )}
+                                    <a href={`mailto:${activeInstructor.email}`} className="w-full py-4 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-2xl font-black text-sm transition-all shadow-sm flex items-center justify-center gap-2 group"><Mail size={18} className="group-hover:scale-110 transition-transform"/> Message Instructor</a>
+                                    {activeInstructor.role !== 'admin' && ( <button onClick={() => toggleUserRole(activeInstructor.uid, activeInstructor.role)} className="w-full py-4 bg-white border-2 border-slate-200 hover:border-rose-500 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-2xl font-black text-sm transition-all shadow-sm flex items-center justify-center gap-2"><Shield size={18}/> Revoke Status</button> )}
                                 </div>
                             </div>
-
-                            {/* Right Col: Managed Cohorts */}
                             <div className="w-full md:w-2/3">
-                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                    <School size={18} className="text-indigo-500"/> Managed Cohorts
-                                </h3>
-                                
-                                {activeInstructor.theirCohorts.length === 0 ? (
-                                    <div className="p-8 text-center bg-white rounded-[2rem] border-2 border-dashed border-slate-200">
-                                        <p className="text-slate-400 font-bold">This instructor has not created any cohorts yet.</p>
-                                    </div>
-                                ) : (
+                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2"><School size={18} className="text-indigo-500"/> Managed Cohorts</h3>
+                                {activeInstructor.theirCohorts.length === 0 ? ( <div className="p-8 text-center bg-white rounded-[2rem] border-2 border-dashed border-slate-200"><p className="text-slate-400 font-bold">This instructor has not created any cohorts yet.</p></div> ) : (
                                     <div className="space-y-3">
                                         {activeInstructor.theirCohorts.map((c: any) => (
-                                            <div key={c.id} className="bg-white p-5 rounded-[1.5rem] border border-slate-200 shadow-sm flex justify-between items-center group hover:border-indigo-200 transition-colors">
+                                            <div key={c.id} className="bg-white p-5 rounded-[1.5rem] border border-slate-200 shadow-sm flex justify-between items-center">
                                                 <div>
-                                                    <h4 className="font-black text-slate-800 text-lg group-hover:text-indigo-600 transition-colors">{c.name}</h4>
-                                                    <div className="flex gap-3 mt-1">
-                                                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded uppercase tracking-widest">ID: {c.code || c.id.substring(0, 6)}</span>
-                                                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded uppercase tracking-widest flex items-center gap-1">
-                                                            <Users size={10}/> {c.students?.length || 0}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex flex-col items-end">
-                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Pulse</span>
-                                                    <span className={`px-3 py-1 rounded-lg text-sm font-black shadow-inner ${(c.pulse || 80) >= 80 ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                                                        {c.pulse || 80}%
-                                                    </span>
+                                                    <h4 className="font-black text-slate-800 text-lg">{c.name}</h4>
+                                                    <div className="flex gap-3 mt-1"><span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded uppercase tracking-widest">ID: {c.code || c.id.substring(0, 6)}</span><span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded uppercase tracking-widest flex items-center gap-1"><Users size={10}/> {c.students?.length || 0}</span></div>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                 )}
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 3. NEW: COHORT GOVERNANCE INSPECTOR */}
+            {activeCohort && (
+                <div className="absolute inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
+                    <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl relative animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[85vh]">
+                        
+                        <div className="p-8 border-b border-slate-100 flex justify-between items-start bg-slate-50/80">
+                            <div>
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center"><BookOpen size={20}/></div>
+                                    <h2 className="text-2xl font-black text-slate-900">{activeCohort.name}</h2>
+                                </div>
+                                <div className="flex gap-2">
+                                    <span className="text-[10px] font-black text-slate-500 bg-white border border-slate-200 px-2 py-1 rounded-md uppercase tracking-widest">Code: {activeCohort.code}</span>
+                                    <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-1 rounded-md uppercase tracking-widest">Prof: {activeCohort.instructorName}</span>
+                                </div>
+                            </div>
+                            <button onClick={() => setSelectedCohortId(null)} className="p-2 text-slate-400 hover:text-slate-600 bg-white border border-slate-200 rounded-full transition-all shadow-sm"><X size={20}/></button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
+                            <div>
+                                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Users size={14}/> Student Roster Auditing</h3>
+                                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                                    {(!activeCohort.students || activeCohort.students.length === 0) ? (
+                                        <div className="p-8 text-center text-slate-400 font-bold text-sm bg-slate-50/50">Roster is empty.</div>
+                                    ) : (
+                                        <div className="divide-y divide-slate-100">
+                                            {activeCohort.students.map((studentObj: any, idx: number) => {
+                                                const email = studentObj.email || studentObj; // Fallback for old string-based arrays
+                                                const name = studentObj.name || 'Pending Registration';
+                                                
+                                                return (
+                                                    <div key={idx} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center font-black text-xs">{name.charAt(0).toUpperCase()}</div>
+                                                            <div>
+                                                                <p className="font-bold text-slate-800 text-sm leading-none mb-1">{name}</p>
+                                                                <p className="text-[10px] text-slate-400 font-bold">{email}</p>
+                                                            </div>
+                                                        </div>
+                                                        <button 
+                                                            onClick={() => forceRemoveStudent(activeCohort._instructorUid, activeCohort.id, email, studentObj)}
+                                                            className="text-xs font-black text-slate-400 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition-colors border border-transparent hover:border-rose-200"
+                                                        >
+                                                            Force Remove
+                                                        </button>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+                            <button 
+                                onClick={() => forceDeleteCohort(activeCohort._instructorUid, activeCohort.id)}
+                                className="flex items-center gap-2 px-4 py-3 bg-white border-2 border-rose-100 text-rose-600 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-rose-50 hover:border-rose-200 transition-colors shadow-sm"
+                            >
+                                <Trash2 size={16}/> Delete Cohort
+                            </button>
+                            <span className="text-[10px] font-bold text-slate-400 italic">This action cannot be undone.</span>
                         </div>
                     </div>
                 </div>
@@ -6394,13 +6378,16 @@ function AdminDashboardView({ user }: any) {
                         </div>
                     )}
 
-                    {/* COHORTS TAB */}
+                    {/* COHORTS TAB (NOW CLICKABLE ROWS!) */}
                     {activeTab === 'cohorts' && (
                         <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in">
                             <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                                 <div>
                                     <h3 className="text-2xl font-black text-slate-900">Platform Deployments</h3>
                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">All Active Cohorts</p>
+                                </div>
+                                <div className="text-xs font-bold text-slate-500 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm">
+                                    Click a row to audit
                                 </div>
                             </div>
                             
@@ -6420,14 +6407,14 @@ function AdminDashboardView({ user }: any) {
                                         </tr>
                                     ) : (
                                         populatedCohorts.map(cohort => (
-                                            <tr key={cohort.id} className="hover:bg-slate-50 transition-colors group">
+                                            <tr key={cohort.id} onClick={() => setSelectedCohortId(cohort.id)} className="hover:bg-slate-50 transition-colors group cursor-pointer">
                                                 <td className="p-6">
                                                     <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-indigo-50 text-indigo-600">
+                                                        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors shadow-sm">
                                                             <BookOpen size={16} />
                                                         </div>
                                                         <div>
-                                                            <span className="font-black text-slate-800 text-sm block">{cohort.name}</span>
+                                                            <span className="font-black text-slate-800 text-sm block group-hover:text-indigo-600 transition-colors">{cohort.name}</span>
                                                             <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 mt-1 inline-block">
                                                                 {(cohort.assignments?.length || 0)} Units Assigned
                                                             </span>
@@ -6438,14 +6425,15 @@ function AdminDashboardView({ user }: any) {
                                                     {cohort.instructorName}
                                                 </td>
                                                 <td className="p-6 text-center">
-                                                    <span className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-black">
+                                                    <span className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-black group-hover:bg-white group-hover:border group-hover:border-slate-200 transition-colors">
                                                         {cohort.studentCount} <Users size={12} className="inline ml-1 opacity-50"/>
                                                     </span>
                                                 </td>
-                                                <td className="p-6">
+                                                <td className="p-6 flex items-center justify-between">
                                                     <span className="text-xs font-mono font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100">
                                                         {cohort.id}
                                                     </span>
+                                                    <ChevronRight size={18} className="text-slate-300 group-hover:text-indigo-500 transition-colors opacity-0 group-hover:opacity-100" />
                                                 </td>
                                             </tr>
                                         ))
@@ -6455,7 +6443,7 @@ function AdminDashboardView({ user }: any) {
                         </div>
                     )}
 
-                    {/* INSTRUCTORS TAB (Now Clickable Cards) */}
+                    {/* INSTRUCTORS TAB */}
                     {activeTab === 'instructors' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4">
                             {populatedInstructors.map(inst => (
