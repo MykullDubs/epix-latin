@@ -806,6 +806,142 @@ function ClassView({ lesson, classId, userData }: any) {
 // ============================================================================
 //  LESSON VIEW (Modern "Story" Style - Fully Interactive & Remote Synced)
 // ============================================================================
+// --- INTERNAL INTERACTIVE RENDERERS ---
+
+const QuizBlockRenderer = ({ block }: any) => {
+    const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+    const [isSubmitted, setIsSubmitted] = useState(false);
+
+    const data = block.content || {};
+    const options = data.options || ['Option A', 'Option B', 'Option C'];
+    const correctIdx = data.correctIndex || 0;
+
+    return (
+        <div className="bg-white p-6 md:p-8 rounded-[2rem] border-2 border-slate-100 shadow-sm my-6 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-2 h-full bg-indigo-500" />
+            <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center shadow-inner">
+                    <HelpCircle size={20} strokeWidth={2.5} />
+                </div>
+                <h3 className="text-xs font-black text-indigo-400 uppercase tracking-widest">Knowledge Check</h3>
+            </div>
+            
+            <h4 className="text-xl font-black text-slate-800 mb-6 leading-snug">{data.question || "What is the correct answer?"}</h4>
+            
+            <div className="space-y-3">
+                {options.map((opt: string, idx: number) => {
+                    const isSelected = selectedIdx === idx;
+                    const isCorrect = isSubmitted && idx === correctIdx;
+                    const isWrong = isSubmitted && isSelected && idx !== correctIdx;
+
+                    let btnStyle = "bg-slate-50 border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50";
+                    if (isSelected && !isSubmitted) btnStyle = "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200";
+                    if (isCorrect) btnStyle = "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200";
+                    if (isWrong) btnStyle = "bg-rose-500 border-rose-500 text-white shadow-md shadow-rose-200";
+
+                    return (
+                        <button 
+                            key={idx}
+                            disabled={isSubmitted}
+                            onClick={() => setSelectedIdx(idx)}
+                            className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 font-bold text-left transition-all active:scale-[0.98] disabled:active:scale-100 ${btnStyle}`}
+                        >
+                            <span>{opt}</span>
+                            {isCorrect && <CheckCircle2 size={20} className="text-white" />}
+                            {isWrong && <X size={20} className="text-white" />}
+                        </button>
+                    );
+                })}
+            </div>
+
+            {!isSubmitted && selectedIdx !== null && (
+                <button 
+                    onClick={() => setIsSubmitted(true)}
+                    className="mt-6 w-full py-4 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 active:scale-95 transition-all"
+                >
+                    Check Answer
+                </button>
+            )}
+        </div>
+    );
+};
+
+const FillBlankBlockRenderer = ({ block }: any) => {
+    const data = block.content || {};
+    // If the builder saves the text with brackets like "The [blank] jumps over the [blank]"
+    const textParts = (data.text || "This is a [blank] sentence.").split(/\[.*?\]/g);
+    
+    return (
+        <div className="bg-white p-6 md:p-8 rounded-[2rem] border-2 border-slate-100 shadow-sm my-6">
+            <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shadow-inner">
+                    <Edit3 size={20} strokeWidth={2.5} />
+                </div>
+                <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest">Fill in the Blanks</h3>
+            </div>
+
+            <p className="text-lg font-medium text-slate-700 leading-loose flex flex-wrap items-center gap-y-3">
+                {textParts.map((part: string, i: number) => (
+                    <React.Fragment key={i}>
+                        <span>{part}</span>
+                        {i < textParts.length - 1 && (
+                            <input 
+                                type="text"
+                                className="mx-2 w-32 bg-slate-100 border-b-2 border-slate-300 focus:bg-amber-50 focus:border-amber-500 px-3 py-1.5 text-center font-bold text-amber-700 outline-none transition-all rounded-t-lg"
+                            />
+                        )}
+                    </React.Fragment>
+                ))}
+            </p>
+        </div>
+    );
+};
+
+const ScenarioBlockRenderer = ({ block }: any) => {
+    const [selectedOpt, setSelectedOpt] = useState<number | null>(null);
+    const data = block.content || {};
+    
+    return (
+        <div className="bg-slate-900 p-6 md:p-8 rounded-[2.5rem] shadow-xl my-6 text-white relative overflow-hidden group">
+            {/* Ambient Background Glow */}
+            <div className="absolute -right-20 -top-20 w-64 h-64 bg-rose-500/20 rounded-full blur-[80px] pointer-events-none group-hover:bg-rose-500/30 transition-colors duration-700" />
+            
+            <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 bg-rose-500/20 text-rose-400 rounded-xl flex items-center justify-center border border-rose-500/30">
+                        <MessageSquare size={20} />
+                    </div>
+                    <h3 className="text-xs font-black text-rose-400 uppercase tracking-widest">Real-World Scenario</h3>
+                </div>
+
+                <h4 className="text-2xl font-black mb-3 leading-tight">{data.title || "The Kitchen Meltdown"}</h4>
+                <p className="text-slate-300 font-medium leading-relaxed mb-8 italic">
+                    "{data.context || "You are working the line during the dinner rush. The sous chef yells an order, but you didn't hear the modifier."}"
+                </p>
+
+                <div className="space-y-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">How do you respond?</p>
+                    {(data.options || ["Yes, chef!", "Could you repeat the modifier, chef?", "I'll guess it."]).map((opt: string, i: number) => (
+                        <button 
+                            key={i} 
+                            onClick={() => setSelectedOpt(i)}
+                            className={`w-full p-4 border rounded-2xl text-left font-bold text-sm transition-all active:scale-[0.98] ${
+                                selectedOpt === i ? 'bg-rose-500 border-rose-400 text-white shadow-lg shadow-rose-500/20' : 'bg-white/10 hover:bg-white/20 border-white/10'
+                            }`}
+                        >
+                            {opt}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ============================================================================
+//  MAIN LESSON VIEW PLAYER
+// ============================================================================
+
 function LessonView({ lesson, onFinish, isInstructor = true }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -819,13 +955,12 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
   }, [lesson]);
 
   // --- CRITICAL FIX: PAGINATION LOGIC ---
-  // This must EXACTLY match the ClassView so the page numbers sync perfectly!
   const pages = useMemo(() => {
     if (!lesson?.blocks) return [];
     const grouped: any[] = [];
     let buffer: any[] = [];
     lesson.blocks.forEach((b: any) => {
-      // ADDED 'game' HERE so the phone knows to give it a dedicated page
+      // Isolating interactive blocks into their own pages
       if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game'].includes(b.type)) {
         if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
         grouped.push({ type: 'interact', blocks: [b] });
@@ -904,7 +1039,7 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
       }
   };
 
- // --- BLOCK RENDERER ---
+ // --- MASTER BLOCK RENDERER ---
   const renderBlock = (block: any, idx: number) => {
     const blockKey = `page_${activePageIdx}_block_${idx}`;
 
@@ -970,7 +1105,15 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
           </div>
         );
       
-      // --- CRITICAL FIX: NEW GAME BLOCK CONTROLLER RENDERING ---
+      // --- NEWLY INJECTED INTERACTIVE BLOCKS ---
+      case 'quiz':
+        return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><QuizBlockRenderer block={block} /></div>;
+      case 'fill-blank':
+        return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><FillBlankBlockRenderer block={block} /></div>;
+      case 'scenario':
+        return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><ScenarioBlockRenderer block={block} /></div>;
+
+      // --- GAME BLOCK ---
       case 'game':
         if (block.gameType === 'connect-three') {
             return (
@@ -979,55 +1122,81 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
                         <h3 className="text-2xl font-black text-slate-800">{block.title || "Vocabulary Battle"}</h3>
                         <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">Game Active on Projector</p>
                     </div>
-                    {/* Render the game on the phone too, so the instructor can pass the tablet to students! */}
-                    <div className="scale-90 origin-top">
+                    {/* Assuming ConnectThreeVocab is imported and available! */}
+                    {/* <div className="scale-90 origin-top">
                         <ConnectThreeVocab vocabList={lessonVocab} />
+                    </div> */}
+                    <div className="w-full h-64 bg-amber-50 rounded-[2rem] border-2 border-amber-200 flex items-center justify-center text-amber-500 font-black">
+                        [Game Rendered Here]
                     </div>
                 </div>
             );
         }
         return <div key={blockKey} className="text-rose-500">Unknown Game Type</div>;
 
-      // Note: Make sure QuizBlock, ScenarioBlock, FillBlankBlock are imported if you are using them!
-      // case 'quiz': return <QuizBlock ... />
-      // case 'scenario': return <ScenarioBlock ... />
-      // case 'fill-blank': return <FillBlankBlock ... />
-      
       default:
-        return <div key={blockKey} className="p-8 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-100 text-center text-xs text-slate-400 font-bold uppercase tracking-widest">Unsupported Module: {block.type}</div>;
+        return <div key={blockKey} className="p-8 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 text-center text-xs text-slate-400 font-bold uppercase tracking-widest my-4">Unsupported Module: {block.type}</div>;
     }
   };
 
   if (!pages[activePageIdx]) return null;
 
   return (
-    <div className="flex flex-col h-full bg-slate-50/30 overflow-hidden font-sans">
-      <div className="px-8 pt-14 pb-6 bg-white border-b border-slate-100 shrink-0">
+    <div className="flex flex-col h-full bg-slate-50/30 overflow-hidden font-sans relative">
+      <div className="px-6 md:px-8 pt-10 md:pt-14 pb-6 bg-white border-b border-slate-100 shrink-0 shadow-sm relative z-10">
         <div className="flex justify-between items-end">
-          <div><h1 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.4em] mb-1">{lesson.title}</h1><p className="text-lg font-black text-slate-900 tracking-tighter">Current Session</p></div>
-          <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 rounded-full border border-emerald-100"><span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /><span className="text-[9px] font-black text-emerald-600 uppercase">Synced</span></div>
+          <div>
+              <h1 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.4em] mb-1">{lesson.title}</h1>
+              <p className="text-2xl font-black text-slate-900 tracking-tighter leading-none">Current Session</p>
+          </div>
+          {isInstructor && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 rounded-full border border-emerald-100">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                <span className="text-[9px] font-black text-emerald-600 uppercase">Synced</span>
+            </div>
+          )}
         </div>
       </div>
       
-      <div ref={containerRef} className="flex-1 overflow-y-auto px-6 py-8 pb-40 custom-scrollbar scroll-smooth">
+      <div ref={containerRef} className="flex-1 overflow-y-auto px-4 md:px-6 py-8 pb-40 custom-scrollbar scroll-smooth relative z-0">
         <div className="max-w-md mx-auto space-y-12">
           {pages[activePageIdx].blocks.map((block: any, i: number) => renderBlock(block, i))}
         </div>
       </div>
       
-      <div className="p-8 pb-10 bg-white/80 backdrop-blur-xl border-t border-slate-100 flex justify-between items-center fixed bottom-0 left-0 right-0 z-50">
-        <button onClick={handlePrev} className="p-5 bg-slate-100 text-slate-400 rounded-3xl disabled:opacity-20 active:scale-90 transition-all shadow-sm" disabled={activePageIdx === 0}><ArrowLeft size={24} strokeWidth={3} /></button>
-        <div className="text-center"><span className="text-[10px] font-black text-slate-300 uppercase block mb-1">Slide</span><span className="text-xl font-black text-slate-900">{activePageIdx + 1} <span className="text-slate-200">/</span> {pages.length}</span></div>
+      <div className="p-6 md:p-8 pb-safe bg-white/90 backdrop-blur-xl border-t border-slate-100 flex justify-between items-center fixed bottom-0 left-0 right-0 z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+        <button 
+            onClick={handlePrev} 
+            className="p-4 bg-slate-100 text-slate-400 rounded-2xl disabled:opacity-20 active:scale-90 transition-all hover:bg-slate-200" 
+            disabled={activePageIdx === 0}
+        >
+            <ArrowLeft size={24} strokeWidth={3} />
+        </button>
+        
+        <div className="text-center">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Slide</span>
+            <span className="text-xl font-black text-slate-900">{activePageIdx + 1} <span className="text-slate-300">/</span> {pages.length}</span>
+        </div>
+        
         {activePageIdx < pages.length - 1 ? (
-          <button onClick={handleNext} className="p-5 bg-indigo-600 text-white rounded-3xl shadow-xl shadow-indigo-200 active:scale-90 transition-all"><ArrowRight size={24} strokeWidth={3} /></button>
+          <button 
+            onClick={handleNext} 
+            className="p-4 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-200 active:scale-90 transition-all hover:bg-indigo-500 hover:-translate-y-1"
+          >
+            <ArrowRight size={24} strokeWidth={3} />
+          </button>
         ) : (
-          <button onClick={onFinish} className="px-8 py-5 bg-emerald-500 text-white font-black rounded-3xl shadow-xl shadow-emerald-200 active:scale-95 transition-all text-xs tracking-widest">FINISH</button>
+          <button 
+            onClick={onFinish} 
+            className="px-8 py-4 bg-emerald-500 text-white font-black rounded-2xl shadow-xl shadow-emerald-200 active:scale-95 transition-all text-xs tracking-widest hover:bg-emerald-400 hover:-translate-y-1"
+          >
+            FINISH
+          </button>
         )}
       </div>
     </div>
   );
 }
-
 // ============================================================================
 //  STUDENT DISCOVERY VIEW (Baptized in Juice)
 // ============================================================================
