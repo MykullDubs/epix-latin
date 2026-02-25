@@ -4425,40 +4425,76 @@ function InstructorDashboard({
     </div>
   );
 }
-// ============================================================================
-//  4-BUTTON NAVIGATION BAR
-// ============================================================================
 function StudentNavBar({ activeTab, setActiveTab }: any) {
     const tabs = [
         { id: 'home', label: 'Home', icon: LayoutDashboard },
-        { id: 'discovery', label: 'Explore', icon: Compass },   // <--- The New 4th Button
+        { id: 'discovery', label: 'Explore', icon: Compass, badge: true }, // 🔴 Pulses to show new content
         { id: 'flashcards', label: 'Practice', icon: Layers },
         { id: 'profile', label: 'Me', icon: User }
     ];
 
     return (
-        <nav className="fixed bottom-0 w-full max-w-md bg-white/90 backdrop-blur-xl border-t border-slate-200 pb-safe pt-2 px-6 z-40 flex justify-between items-center h-[85px] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
-            {tabs.map((tab) => {
-                const isActive = activeTab === tab.id;
-                return (
-                    <button 
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)} 
-                        className={`flex flex-col items-center gap-1 transition-all duration-300 w-16 ${isActive ? 'text-indigo-600 -translate-y-1' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                        <div className={`p-2 rounded-2xl transition-all ${isActive ? 'bg-indigo-50 shadow-sm ring-1 ring-indigo-100' : ''}`}>
-                            <tab.icon size={24} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'fill-indigo-100' : ''}/>
-                        </div>
-                        <span className={`text-[10px] font-bold ${isActive ? 'opacity-100' : 'opacity-0 scale-0'} transition-all duration-300 absolute -bottom-2`}>
-                            {tab.label}
-                        </span>
-                    </button>
-                );
-            })}
-        </nav>
+        // The container creates a safe area at the bottom of mobile screens
+        <div className="fixed bottom-0 left-0 w-full z-50 pb-6 pointer-events-none">
+            
+            {/* The Floating Frosted Glass Base */}
+            <nav 
+                role="tablist" 
+                aria-label="Student Navigation"
+                className="mx-auto max-w-md w-[calc(100%-3rem)] bg-white/80 backdrop-blur-2xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)] border border-white/50 rounded-[2rem] p-2 flex justify-between items-center pointer-events-auto"
+            >
+                {tabs.map((tab) => {
+                    const isActive = activeTab === tab.id;
+                    const Icon = tab.icon;
+
+                    return (
+                        <button 
+                            key={tab.id}
+                            role="tab"
+                            aria-selected={isActive}
+                            aria-label={tab.label} // Crucial since inactive text is visually hidden
+                            onClick={() => setActiveTab(tab.id)} 
+                            // The magic expanding classes:
+                            className={`relative flex items-center justify-center h-14 rounded-[1.5rem] transition-all duration-500 ease-out outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 active:scale-95 ${
+                                isActive 
+                                    ? 'bg-indigo-600 shadow-lg shadow-indigo-600/20 w-full flex-[1.5]' // Expands to take up more room
+                                    : 'bg-transparent text-slate-400 hover:bg-slate-100 hover:text-slate-600 flex-1'
+                            }`}
+                        >
+                            <div className="flex items-center justify-center gap-2">
+                                {/* Icon Container */}
+                                <div className="relative flex-shrink-0">
+                                    <Icon 
+                                        size={22} 
+                                        strokeWidth={isActive ? 2.5 : 2} 
+                                        className={`transition-colors duration-500 ${isActive ? 'text-white' : ''}`}
+                                    />
+                                    
+                                    {/* The LMS Notification Juice */}
+                                    {tab.badge && !isActive && (
+                                        <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500 border-2 border-white"></span>
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Label (Only visible when active) */}
+                                <span className={`font-black uppercase tracking-widest text-[10px] whitespace-nowrap overflow-hidden transition-all duration-500 ${
+                                    isActive 
+                                        ? 'max-w-[100px] opacity-100 text-white ml-1' 
+                                        : 'max-w-0 opacity-0'
+                                }`}>
+                                    {tab.label}
+                                </span>
+                            </div>
+                        </button>
+                    );
+                })}
+            </nav>
+        </div>
     );
 }
-
 // --- QUIZ LOGIC HELPER ---
 const generateQuiz = (cards: any[]) => {
   if (!cards || cards.length < 4) return []; // Need at least 4 cards for distractors
@@ -5307,7 +5343,7 @@ function ExamPlayerView({ exam, onFinish }: any) {
         </div>
     );
 }
-AdminDashboardView({ user }: any) {
+function AdminDashboardView({ user }: any) {
     const [activeTab, setActiveTab] = useState<'overview' | 'cohorts' | 'instructors'>('overview');
 
     // --- MOCK DATA FOR UI DESIGN ---
