@@ -809,43 +809,36 @@ function ClassView({ lesson, classId, userData }: any) {
 // --- INTERNAL INTERACTIVE RENDERERS ---
 
 const QuizBlockRenderer = ({ block }: any) => {
-    const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+    const [selectedOpt, setSelectedOpt] = useState<string | null>(null);
     const [isSubmitted, setIsSubmitted] = useState(false);
 
-    // 1. LOCATE THE DATA (Checks all possible nesting levels)
+    // 1. LOCATE THE DATA
     const data = block?.content || block?.data || block || {};
-    
-    // 2. EXTRACT THE QUESTION
     const question = data.question || data.title || data.text || "Missing Question Data";
 
-    // 3. EXTRACT AND SANITIZE OPTIONS (This prevents the Grey Screen Crash!)
+    // 2. SANITIZE OPTIONS
     let rawOptions = data.options || data.choices || [];
     if (!Array.isArray(rawOptions)) {
-        // Fallback if data got corrupted into a string or undefined
-        rawOptions = typeof rawOptions === 'string' ? [rawOptions] : ["Option 1", "Option 2"];
+        rawOptions = typeof rawOptions === 'string' ? [rawOptions] : ["Option A", "Option B"];
     }
-
-    // Force every option to be a clean string, even if the DB saved it as an object
     const options = rawOptions.map((opt: any) => {
         if (typeof opt === 'string' || typeof opt === 'number') return String(opt);
         if (opt && typeof opt === 'object') return opt.text || opt.label || opt.value || "Invalid Option Format";
         return "Unknown Option";
     });
 
-    // 4. FIND THE CORRECT ANSWER
-    let correctIdx = 0;
-    if (typeof data.correctIndex === 'number') {
-        correctIdx = data.correctIndex;
-    } else if (typeof data.correctAnswer === 'string') {
-        const foundIdx = options.findIndex((o: string) => o === data.correctAnswer);
-        correctIdx = foundIdx !== -1 ? foundIdx : 0;
-    } else if (typeof data.correct === 'number') {
-        correctIdx = data.correct;
-    }
-
-    // Safety fallback just in case the correct index is somehow out of bounds
-    if (correctIdx < 0 || correctIdx >= options.length) {
-        correctIdx = 0; 
+    // 3. FIND THE REAL CORRECT ANSWER (Translates Index to String)
+    let actualCorrectAnswer = options[0]; // Fallback
+    
+    if (data.correctAnswer !== undefined && data.correctAnswer !== null) {
+        // If the Builder saved the exact text string
+        actualCorrectAnswer = String(data.correctAnswer);
+    } else if (data.correctIndex !== undefined && data.correctIndex !== null) {
+        // If the Builder saved the index number (e.g., 0, 1, 2)
+        actualCorrectAnswer = options[data.correctIndex] || options[0];
+    } else if (data.correct !== undefined && data.correct !== null) {
+        // Just in case it was saved under the generic 'correct' key
+        actualCorrectAnswer = options[data.correct] || options[0];
     }
 
     return (
@@ -861,39 +854,35 @@ const QuizBlockRenderer = ({ block }: any) => {
             <h4 className="text-xl font-black text-slate-800 mb-6 leading-snug">{question}</h4>
             
             <div className="space-y-3">
-                {options.length === 0 ? (
-                    <p className="text-slate-400 font-bold italic p-4 text-center border-2 border-dashed rounded-2xl">No options provided in this lesson.</p>
-                ) : (
-                    options.map((opt: string, idx: number) => {
-                        const isSelected = selectedIdx === idx;
-                        const isCorrect = isSubmitted && idx === correctIdx;
-                        const isWrong = isSubmitted && isSelected && idx !== correctIdx;
+                {options.map((opt: string, idx: number) => {
+                    const isSelected = selectedOpt === opt;
+                    const isCorrect = isSubmitted && opt === actualCorrectAnswer;
+                    const isWrong = isSubmitted && isSelected && opt !== actualCorrectAnswer;
 
-                        let btnStyle = "bg-slate-50 border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50";
-                        if (isSelected && !isSubmitted) btnStyle = "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200";
-                        if (isCorrect) btnStyle = "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200";
-                        if (isWrong) btnStyle = "bg-rose-500 border-rose-500 text-white shadow-md shadow-rose-200";
+                    let btnStyle = "bg-slate-50 border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50";
+                    if (isSelected && !isSubmitted) btnStyle = "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200";
+                    if (isCorrect) btnStyle = "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200";
+                    if (isWrong) btnStyle = "bg-rose-500 border-rose-500 text-white shadow-md shadow-rose-200";
 
-                        return (
-                            <button 
-                                key={idx}
-                                disabled={isSubmitted}
-                                onClick={() => setSelectedIdx(idx)}
-                                className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 font-bold text-left transition-all active:scale-[0.98] disabled:active:scale-100 ${btnStyle}`}
-                            >
-                                <span>{opt}</span>
-                                {isCorrect && <CheckCircle2 size={20} className="text-white" />}
-                                {isWrong && <X size={20} className="text-white" />}
-                            </button>
-                        );
-                    })
-                )}
+                    return (
+                        <button 
+                            key={idx}
+                            disabled={isSubmitted}
+                            onClick={() => setSelectedOpt(opt)}
+                            className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 font-bold text-left transition-all active:scale-[0.98] disabled:active:scale-100 ${btnStyle}`}
+                        >
+                            <span>{opt}</span>
+                            {isCorrect && <CheckCircle2 size={20} className="text-white" />}
+                            {isWrong && <X size={20} className="text-white" />}
+                        </button>
+                    );
+                })}
             </div>
 
-            {!isSubmitted && selectedIdx !== null && (
+            {!isSubmitted && selectedOpt !== null && (
                 <button 
                     onClick={() => setIsSubmitted(true)}
-                    className="mt-6 w-full py-4 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 active:scale-95 transition-all shadow-xl"
+                    className="mt-6 w-full py-4 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 active:scale-95 transition-all shadow-xl shadow-slate-200"
                 >
                     Check Answer
                 </button>
