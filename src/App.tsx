@@ -21,7 +21,7 @@ import {
   ArrowUp, ArrowDown, Eye, EyeOff, MessageCircle, AlignLeft, ClipboardList, Table, Calendar,
   Trophy, Flame, Settings, BarChart3, CornerDownRight, MoreHorizontal, Dumbbell, Map, Sparkles, Star, TrendingUp, Target,
   Filter, SlidersHorizontal, Hash, Gauge, ChevronLeft, Monitor, Smartphone, PenTool, Menu, Code, BarChart, Tag, RefreshCcw, Gamepad2,
-  Bot, Database// <--- ADDED MISSING ICONS
+  Bot, Database, Shield// <--- ADDED MISSING ICONS
 } from 'lucide-react';
 
 
@@ -4136,7 +4136,7 @@ function BuilderHub({
                   data={lessonData} 
                   setData={setLessonData} 
                   availableDecks={allDecks} 
-                />
+                />accesability
               )}
             </div>
           </div>
@@ -4148,7 +4148,7 @@ function BuilderHub({
         }`}>
           <div className="relative w-full h-full max-w-sm max-h-[750px] group flex flex-col items-center justify-center">
             
-            {/* EXAM PREVIEW PLACEHOLDER */}
+            {/* EXAM PREVIEW PLACEHOLDER */accesability}
             {mode === 'exam' && (
                 <div className="w-full max-w-xs aspect-[9/16] bg-white border-4 border-dashed border-slate-200 rounded-[3rem] shadow-sm flex flex-col items-center justify-center p-8 text-center animate-in zoom-in-95 duration-500">
                     <FileText size={64} className="text-slate-200 mb-6" />
@@ -4236,12 +4236,12 @@ function InstructorDashboard({
   lessons, 
   onSaveLesson, 
   onSaveCard, 
-  onAssign,       // Aligned with handleAssign in App.tsx
-  onRevoke,       // Aligned with handleRevoke in App.tsx
-  onCreateClass,  // Aligned with handleCreateClass in App.tsx
-  onDeleteClass,  // Aligned with handleDeleteClass in App.tsx
-  onRenameClass,  // Aligned with handleRenameClass in App.tsx
-  onAddStudent,   // Aligned with handleAddStudent in App.tsx
+  onAssign,       
+  onRevoke,       
+  onCreateClass,  
+  onDeleteClass,  
+  onRenameClass,  
+  onAddStudent,   
   onSwitchView, 
   onLogout 
 }: any) {
@@ -4333,6 +4333,20 @@ function InstructorDashboard({
 
         {/* Footer: User & Mode Switchers */}
         <div className="p-3 border-t border-slate-900 space-y-2 shrink-0 bg-slate-950/50">
+          
+          {/* 🛡️ THE GOD MODE GATEKEEPER */}
+          {userData?.role === 'admin' && (
+            <button 
+              onClick={() => setActiveTab('admin')}
+              className={`flex items-center h-14 w-full rounded-2xl transition-all active:scale-95 ${activeTab === 'admin' ? 'bg-emerald-900/40 text-emerald-400' : 'text-slate-500 hover:bg-slate-800 hover:text-emerald-400'}`}
+            >
+              <div className="w-14 flex items-center justify-center shrink-0 ml-1">
+                <Shield size={20} />
+              </div>
+              {isRailExpanded && <span className="text-[10px] font-black uppercase tracking-widest">Admin Console</span>}
+            </button>
+          )}
+
           <button 
             onClick={onSwitchView}
             className="flex items-center h-14 w-full rounded-2xl text-slate-500 hover:bg-slate-800 hover:text-indigo-400 transition-all active:scale-95"
@@ -4358,7 +4372,13 @@ function InstructorDashboard({
       {/* --- MAIN STAGE: DYNAMIC CONTENT --- */}
       <main className="flex-1 overflow-hidden relative bg-slate-50">
         <div className="h-full w-full">
-           {activeTab === 'studio' ? (
+           
+           {/* --- NEW: ADMIN CONSOLE ROUTE --- */}
+           {activeTab === 'admin' ? (
+             <div className="h-full animate-in zoom-in-95 duration-500">
+               <AdminDashboardView user={userData} />
+             </div>
+           ) : activeTab === 'studio' ? (
              <div className="h-full animate-in zoom-in-95 duration-500">
                <BuilderHub 
                   onSaveLesson={onSaveLesson} 
@@ -4370,17 +4390,16 @@ function InstructorDashboard({
            ) : activeTab === 'classes' ? (
              <div className="h-full p-6 md:p-12 overflow-y-auto custom-scrollbar animate-in slide-in-from-right-6 duration-500">
                <ClassManagerView 
-                  user={user}
-                  classes={userData?.classes || []}
-                  lessons={lessons}
-                  allDecks={allDecks}
-                  // PROP RELAY ALIGNMENT
-                  onAssign={onAssign}
-                  onRevoke={onRevoke}
-                  onCreateClass={onCreateClass}
-                  onDeleteClass={onDeleteClass}
-                  onRenameClass={onRenameClass}
-                  onAddStudent={onAddStudent}
+                 user={user}
+                 classes={userData?.classes || []}
+                 lessons={lessons}
+                 allDecks={allDecks}
+                 onAssign={onAssign}
+                 onRevoke={onRevoke}
+                 onCreateClass={onCreateClass}
+                 onDeleteClass={onDeleteClass}
+                 onRenameClass={onRenameClass}
+                 onAddStudent={onAddStudent}
                />
              </div>
            ) : (
