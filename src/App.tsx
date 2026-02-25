@@ -2570,12 +2570,12 @@ function ClassForum({ classData, user }: any) {
     );
 }
 // ============================================================================
-//  STUDENT CLASS VIEW (Fully Integrated & Mobile Optimized)
+//  STUDENT CLASS VIEW
 // ============================================================================
-function StudentClassView({ classData, onBack, onSelectLesson, userData, setActiveTab, setSelectedLessonId }: any) {
+function StudentClassView({ classData, allLessons = [], onBack, onSelectLesson, userData, setActiveTab, setSelectedLessonId }: any) {
   const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'exams' | 'forum' | 'grades'>('lessons');
   const [completedItems, setCompletedItems] = useState<string[]>([]);
-  const [activeExam, setActiveExam] = useState<any>(null); // State to launch the Exam Player
+  const [activeExam, setActiveExam] = useState<any>(null); 
 
   // 1. FETCH COMPLETIONS (To handle the "Review" styling)
   useEffect(() => {
@@ -2599,9 +2599,19 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
     return () => unsub();
   }, [classData, userData]);
 
-  // 2. SPLIT CONTENT INTO CATEGORIES
-  const lessonList = classData?.assignments?.filter((a: any) => a.contentType !== 'test' && a.contentType !== 'exam') || [];
-  const examList = classData?.assignments?.filter((a: any) => a.contentType === 'test' || a.contentType === 'exam') || [];
+  // ==========================================================================
+  // 2. THE FIX: POPULATE ASSIGNMENTS FROM IDs
+  // ==========================================================================
+  // classData.assignments is just an array of IDs like ["lesson_1", "exam_2"]
+  // We need to find those objects in the allLessons array.
+  
+  const populatedAssignments = (classData?.assignments || [])
+    .map((assignedId: string) => allLessons.find((l: any) => l.id === assignedId))
+    .filter(Boolean); // Removes undefined if a lesson was deleted from the master library
+
+  // Now we split the populated objects into categories
+  const lessonList = populatedAssignments.filter((a: any) => a.type !== 'test' && a.type !== 'exam');
+  const examList = populatedAssignments.filter((a: any) => a.type === 'test' || a.type === 'exam');
 
   // --- INTERNAL FORUM COMPONENT ---
   const ClassForum = ({ classId }: { classId: string }) => {
@@ -2661,19 +2671,19 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
   };
 
   return (
-    <div className="h-full flex flex-col bg-white overflow-hidden animate-in fade-in duration-500">
+    <div className="h-full flex flex-col bg-white overflow-hidden animate-in fade-in duration-500 font-sans">
       
       {/* --- HEADER & MOBILE NAV --- */}
       <div className="p-6 md:p-8 pt-10 md:pt-12 shrink-0 bg-white">
-        <button onClick={onBack} className="mb-4 flex items-center gap-2 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-black uppercase tracking-widest">
+        <button onClick={onBack} className="mb-4 flex items-center gap-2 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-black uppercase tracking-widest active:scale-95">
           <ArrowLeft size={16} /> BACK TO DASHBOARD
         </button>
         <h2 className="text-3xl font-black text-slate-900 leading-tight mb-2">{classData.name}</h2>
-        <p className="text-slate-400 font-medium text-sm line-clamp-1">{classData.description || "Welcome to the cohort."}</p>
+        <p className="text-slate-400 font-bold text-sm line-clamp-1">{classData.description || "Welcome to your active curriculum."}</p>
 
         <div className="relative mt-8">
           <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent md:hidden z-10 pointer-events-none" />
-          <div className="flex gap-2 p-1.5 bg-slate-100 rounded-[1.5rem] w-full md:w-fit overflow-x-auto hide-scrollbar">
+          <div className="flex gap-2 p-1.5 bg-slate-50 border border-slate-100 rounded-[1.5rem] w-full md:w-fit overflow-x-auto hide-scrollbar">
             {[
               { id: 'lessons', label: 'Lessons', icon: <BookOpen size={14}/>, color: 'text-indigo-600' },
               { id: 'exams', label: 'Exams', icon: <FileText size={14}/>, color: 'text-rose-600' },
@@ -2683,8 +2693,8 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
               <button 
                 key={tab.id}
                 onClick={() => setActiveSubTab(tab.id as any)}
-                className={`shrink-0 px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
-                  activeSubTab === tab.id ? `bg-white ${tab.color} shadow-sm` : 'text-slate-400'
+                className={`shrink-0 px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all flex items-center gap-1.5 ${
+                  activeSubTab === tab.id ? `bg-white ${tab.color} shadow-sm border border-slate-200/50` : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
                 }`}
               >
                 {tab.icon} {tab.label}
@@ -2697,28 +2707,46 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
       {/* --- CONTENT BODY --- */}
       <div className="flex-1 overflow-y-auto px-6 md:px-8 pb-12 custom-scrollbar">
         
-        {/* TAB: LESSONS */}
+        {/* TAB: LESSONS & ARCADE GAMES */}
         {activeSubTab === 'lessons' && (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
             {lessonList.length === 0 ? (
-              <p className="py-20 text-center text-slate-300 italic font-bold">No lessons posted.</p>
+              <div className="py-20 flex flex-col items-center justify-center text-slate-300">
+                  <BookOpen size={48} className="mb-4 opacity-50" />
+                  <p className="text-center italic font-bold">No curriculum assigned yet.</p>
+              </div>
             ) : (
               lessonList.map((item: any) => {
                 const isCompleted = completedItems.includes(item.id) || (item.originalId && completedItems.includes(item.originalId)) || completedItems.includes(item.title);
+                const isArcade = item.type === 'arcade_game';
+
                 return (
-                  <div key={item.id} className={`group p-5 border-2 ${isCompleted ? 'border-emerald-100 bg-emerald-50/20' : 'border-slate-100 bg-white'} rounded-[2.5rem] flex justify-between items-center hover:shadow-xl transition-all`}>
-                    <div className="flex items-center gap-4 flex-1 cursor-pointer" onClick={() => onSelectLesson(item)}>
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center group-hover:text-white transition-colors ${isCompleted ? 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-600' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600'}`}>
-                        {isCompleted ? <CheckCircle2 size={24} /> : <Play size={24} fill="currentColor" />}
+                  <div key={item.id} className={`group p-5 border-2 ${isCompleted ? 'border-emerald-100 bg-emerald-50/30' : isArcade ? 'border-amber-100 bg-amber-50/20' : 'border-slate-100 bg-white'} rounded-[2.5rem] flex justify-between items-center hover:shadow-xl hover:-translate-y-1 transition-all`}>
+                    <button className="flex items-center gap-4 flex-1 text-left" onClick={() => onSelectLesson(item)}>
+                      
+                      {/* Dynamic Icon */}
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-colors ${
+                          isCompleted ? 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white' : 
+                          isArcade ? 'bg-amber-100 text-amber-500 group-hover:bg-amber-500 group-hover:text-white' :
+                          'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'
+                      }`}>
+                        {isCompleted ? <CheckCircle2 size={24} /> : isArcade ? <Gamepad2 size={28} /> : <Play size={24} className="ml-1" fill="currentColor" />}
                       </div>
+
                       <div>
-                        <h4 className="font-black text-slate-800 text-lg leading-none mb-1">{item.title}</h4>
-                        <span className={`text-[10px] font-black uppercase tracking-widest ${isCompleted ? 'text-emerald-500' : 'text-indigo-400'}`}>
-                          {isCompleted ? 'Completed • Review' : 'Lesson'}
+                        <h4 className="font-black text-slate-800 text-lg leading-tight mb-1 group-hover:text-indigo-600 transition-colors">{item.title}</h4>
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${isCompleted ? 'text-emerald-500' : isArcade ? 'text-amber-500' : 'text-indigo-400'}`}>
+                          {isCompleted ? 'Completed • Review' : isArcade ? 'Arcade Game' : 'Standard Unit'}
                         </span>
                       </div>
-                    </div>
-                    <button onClick={() => { setSelectedLessonId(item.originalId || item.id); setActiveTab('presentation'); }} className="p-4 text-slate-400 hover:text-amber-600 transition-colors"><Monitor size={24} /></button>
+                    </button>
+                    
+                    {/* Projector / Presentation Mode Button (Hidden for Arcade) */}
+                    {!isArcade && (
+                        <button onClick={() => { setSelectedLessonId(item.originalId || item.id); setActiveTab('presentation'); }} className="p-4 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-colors shrink-0" title="Presentation Mode">
+                            <Monitor size={24} />
+                        </button>
+                    )}
                   </div>
                 );
               })
@@ -2736,11 +2764,11 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
                 const isCompleted = completedItems.includes(item.id) || (item.originalId && completedItems.includes(item.originalId)) || completedItems.includes(item.title);
                 return (
                   <div key={item.id} className={`group p-5 border-2 ${isCompleted ? 'border-emerald-100 bg-emerald-50/20' : 'border-rose-100 bg-white'} rounded-[2.5rem] flex items-center gap-4 cursor-pointer hover:shadow-xl transition-all`} onClick={() => !isCompleted && setActiveExam(item)}>
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center group-hover:text-white transition-colors ${isCompleted ? 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-600' : 'bg-rose-50 text-rose-600 group-hover:bg-rose-600'}`}>
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-colors ${isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white'}`}>
                       {isCompleted ? <CheckCircle2 size={24} /> : <FileText size={24} fill="currentColor" />}
                     </div>
                     <div>
-                      <h4 className="font-black text-slate-800 text-lg leading-none mb-1">{item.title}</h4>
+                      <h4 className="font-black text-slate-800 text-lg leading-tight mb-1 group-hover:text-rose-600 transition-colors">{item.title}</h4>
                       <span className={`text-[10px] font-black uppercase tracking-widest ${isCompleted ? 'text-emerald-500' : 'text-rose-400'}`}>
                         {isCompleted ? 'Exam Submitted • Review in Grades' : 'Active Exam'}
                       </span>
@@ -2753,16 +2781,18 @@ function StudentClassView({ classData, onBack, onSelectLesson, userData, setActi
         )}
 
         {activeSubTab === 'forum' && <ClassForum classId={classData.id} />}
-        {activeSubTab === 'grades' && <StudentGradebook classData={classData} user={userData} />}
+        {/* If you have StudentGradebook, ensure it's imported! */}
+        {/* {activeSubTab === 'grades' && <StudentGradebook classData={classData} user={userData} />} */}
       </div>
 
       {/* --- EXAM OVERLAY --- */}
-      {activeExam && (
+      {/* If you have ExamPlayerView, ensure it's imported! */}
+      {/* {activeExam && (
         <ExamPlayerView 
           exam={activeExam} 
           onFinish={() => setActiveExam(null)} 
         />
-      )}
+      )} */}
     </div>
   );
 }
@@ -3233,7 +3263,7 @@ function InstructorGradebook({ classData }: any) {
     );
 }
 // ============================================================================
-//  CLASS MANAGER VIEW (Searchable, Strict, & Named Students)
+//  CLASS MANAGER VIEW (Search Dropdown & Active Playlist)
 // ============================================================================
 function ClassManagerView({ 
     user, 
@@ -3261,10 +3291,17 @@ function ClassManagerView({
 
     const activeClass = classes.find((c: any) => c.id === selectedClassId);
 
-    // Filter Lessons based on Search
-    const filteredLessons = lessons.filter((l: any) => {
+    // --- ASSIGNMENT DATA LOGIC ---
+    // 1. Get lessons already assigned to this cohort
+    const assignedLessons = lessons.filter((l: any) => activeClass?.assignments?.includes(l.id));
+    
+    // 2. Get lessons NOT yet assigned
+    const unassignedLessons = lessons.filter((l: any) => !activeClass?.assignments?.includes(l.id));
+    
+    // 3. Filter unassigned lessons by the search bar
+    const filteredUnassigned = unassignedLessons.filter((l: any) => {
         if (!lessonSearch.trim()) return true;
-        const searchStr = `${l.title || 'Untitled Unit'} ${l.type === 'arcade_game' ? 'arcade game' : 'standard unit'}`.toLowerCase();
+        const searchStr = `${l.title || 'Untitled'} ${l.type === 'arcade_game' ? 'arcade' : 'unit'}`.toLowerCase();
         return searchStr.includes(lessonSearch.toLowerCase());
     });
 
@@ -3472,7 +3509,7 @@ function ClassManagerView({
                                                 placeholder="Enter student email address..." 
                                                 value={newStudentEmail}
                                                 onChange={e => setNewStudentEmail(e.target.value)}
-                                                className="flex-1 bg-transparent border-none py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-0"
+                                                className="flex-1 bg-transparent border-none py-3 text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:ring-0 outline-none"
                                             />
                                             <button 
                                                 type="submit" 
@@ -3504,7 +3541,6 @@ function ClassManagerView({
                                                     </tr>
                                                 ) : (
                                                     activeClass.students.map((student: any, idx: number) => {
-                                                        // Fallbacks for display
                                                         const displayName = student.name || 'Pending Registration';
                                                         const isPending = !student.name;
                                                         const initial = (student.name?.[0] || student.email?.[0] || 'S').toUpperCase();
@@ -3545,85 +3581,105 @@ function ClassManagerView({
                                 </div>
                             )}
 
-                            {/* ==================== ASSIGNMENTS TAB (SEARCHABLE) ==================== */}
+                            {/* ==================== ASSIGNMENTS TAB (SEARCH & LIST) ==================== */}
                             {activeTab === 'assignments' && (
-                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                                <div className="space-y-10 animate-in fade-in slide-in-from-bottom-2 flex flex-col h-full">
                                     
-                                    {/* The New Search Engine */}
-                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                                            <BookOpen size={16} className="text-indigo-500" /> Library
-                                        </h3>
-                                        
-                                        <div className="relative w-full md:w-72">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                    {/* 1. THE SEARCH & ADD BAR */}
+                                    <div className="bg-slate-50 p-5 rounded-[2rem] border border-slate-100 relative z-20">
+                                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Add to Curriculum</h3>
+                                        <div className="relative group">
+                                            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={18} />
                                             <input 
                                                 type="text"
-                                                placeholder="Search assignments..."
+                                                placeholder="Search library to add..."
                                                 value={lessonSearch}
                                                 onChange={(e) => setLessonSearch(e.target.value)}
-                                                className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 focus:bg-white rounded-xl text-sm font-bold text-slate-700 outline-none transition-all placeholder:text-slate-400"
+                                                className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-200 focus:border-indigo-500 rounded-2xl text-sm font-bold text-slate-800 outline-none transition-all shadow-sm"
                                             />
+                                            
+                                            {/* Live Search Dropdown */}
+                                            {lessonSearch.trim().length > 0 && (
+                                                <div className="absolute top-[110%] left-0 right-0 bg-white border border-slate-200 shadow-2xl rounded-2xl overflow-hidden max-h-72 overflow-y-auto custom-scrollbar animate-in slide-in-from-top-2 fade-in">
+                                                    {filteredUnassigned.length === 0 ? (
+                                                        <div className="p-6 text-center text-sm font-bold text-slate-400">
+                                                            No unassigned lessons match "{lessonSearch}"
+                                                        </div>
+                                                    ) : (
+                                                        filteredUnassigned.map((lesson: any) => (
+                                                            <button
+                                                                key={lesson.id}
+                                                                onClick={() => {
+                                                                    onAssign(activeClass.id, lesson.id);
+                                                                    setLessonSearch(''); // Clear search on assign
+                                                                }}
+                                                                className="w-full flex items-center justify-between p-4 hover:bg-indigo-50 border-b border-slate-50 transition-colors text-left group"
+                                                            >
+                                                                <div className="flex items-center gap-4">
+                                                                    <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 group-hover:bg-indigo-100 group-hover:text-indigo-600 flex items-center justify-center shrink-0 transition-colors">
+                                                                        {lesson.type === 'arcade_game' ? <Gamepad2 size={18} /> : <BookOpen size={18} />}
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="font-bold text-sm text-slate-800 group-hover:text-indigo-900 transition-colors">{lesson.title || 'Untitled'}</p>
+                                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{lesson.type === 'arcade_game' ? 'Arcade' : 'Standard'} • {lesson.blocks?.length || 0} Blocks</p>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="w-8 h-8 rounded-full bg-white border-2 border-slate-200 flex items-center justify-center text-transparent group-hover:border-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                                                                    <Plus size={16} strokeWidth={3} />
+                                                                </div>
+                                                            </button>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 
-                                    {lessons.length === 0 ? (
-                                        <div className="text-center p-12 border-2 border-dashed border-slate-200 rounded-[2rem] bg-slate-50/50">
-                                            <BookOpen size={32} className="mx-auto text-slate-300 mb-3" />
-                                            <p className="text-sm font-bold text-slate-600 mb-1">Your library is empty.</p>
-                                            <p className="text-xs font-bold text-slate-400">Build lessons in the Studio first.</p>
+                                    {/* 2. THE ACTIVE PLAYLIST */}
+                                    <div className="flex-1">
+                                        <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+                                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                                <CheckCircle2 size={14} className="text-emerald-500" /> Active Playlist
+                                            </h3>
+                                            <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-2 py-1 rounded-md uppercase tracking-widest">
+                                                {assignedLessons.length} Items
+                                            </span>
                                         </div>
-                                    ) : filteredLessons.length === 0 ? (
-                                        <div className="text-center p-12 bg-slate-50/50 rounded-[2rem] border border-slate-100">
-                                            <p className="text-sm font-bold text-slate-500">No lessons match "{lessonSearch}"</p>
-                                        </div>
-                                    ) : (
-                                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                                            {filteredLessons.map((lesson: any) => {
-                                                const isAssigned = activeClass.assignments?.includes(lesson.id);
-                                                
-                                                return (
-                                                    <button 
-                                                        key={lesson.id} 
-                                                        onClick={() => isAssigned ? onRevoke(activeClass.id, lesson.id) : onAssign(activeClass.id, lesson.id)}
-                                                        className={`relative flex items-center p-4 rounded-[1.5rem] border-2 transition-all duration-300 text-left w-full group active:scale-[0.98] ${
-                                                            isAssigned 
-                                                                ? 'bg-indigo-50/50 border-indigo-500 shadow-md shadow-indigo-100' 
-                                                                : 'bg-white border-slate-100 hover:border-slate-300 shadow-sm hover:shadow-md'
-                                                        }`}
-                                                    >
-                                                        {/* Icon Box */}
-                                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mr-4 transition-colors ${
-                                                            isAssigned ? 'bg-indigo-500 text-white shadow-inner' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100'
-                                                        }`}>
-                                                            {lesson.type === 'arcade_game' ? <Gamepad2 size={18} /> : <BookOpen size={18} />}
+                                        
+                                        {assignedLessons.length === 0 ? (
+                                            <div className="text-center p-12 border-2 border-dashed border-slate-200 rounded-[2rem]">
+                                                <BookOpen size={32} className="mx-auto text-slate-200 mb-3" />
+                                                <p className="text-sm font-bold text-slate-500">No content assigned yet.</p>
+                                                <p className="text-xs font-bold text-slate-400 mt-1">Use the search bar above to add lessons.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                {assignedLessons.map((lesson: any, idx: number) => (
+                                                    <div key={lesson.id} className="flex items-center p-4 rounded-2xl border-2 border-slate-100 bg-white shadow-sm hover:border-slate-200 transition-colors group animate-in fade-in">
+                                                        <div className="w-8 h-8 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center text-[10px] font-black mr-4 shrink-0">
+                                                            {idx + 1}
                                                         </div>
-
-                                                        {/* Text Content */}
+                                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 mr-4 ${lesson.type === 'arcade_game' ? 'bg-amber-50 text-amber-500' : 'bg-indigo-50 text-indigo-500'}`}>
+                                                            {lesson.type === 'arcade_game' ? <Gamepad2 size={20} /> : <BookOpen size={20} />}
+                                                        </div>
                                                         <div className="flex-1 pr-4">
-                                                            <h4 className={`font-black text-sm leading-tight mb-1 transition-colors ${isAssigned ? 'text-indigo-900' : 'text-slate-700'}`}>
-                                                                {lesson.title || 'Untitled Unit'}
-                                                            </h4>
-                                                            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                                                <span>{lesson.type === 'arcade_game' ? 'Arcade' : 'Standard'}</span>
-                                                                <span className="w-1 h-1 rounded-full bg-slate-300" />
-                                                                <span>{lesson.blocks?.length || 0} Blocks</span>
-                                                            </div>
+                                                            <h4 className="font-black text-slate-800 text-sm mb-0.5">{lesson.title || 'Untitled'}</h4>
+                                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                                {lesson.type === 'arcade_game' ? 'Arcade Game' : 'Standard Unit'}
+                                                            </span>
                                                         </div>
-
-                                                        {/* Toggle Indicator */}
-                                                        <div className={`w-7 h-7 rounded-full flex items-center justify-center border-2 shrink-0 transition-all ${
-                                                            isAssigned 
-                                                                ? 'bg-indigo-500 border-indigo-500 text-white scale-110' 
-                                                                : 'bg-white border-slate-200 text-transparent group-hover:border-indigo-300 group-hover:bg-indigo-50'
-                                                        }`}>
-                                                            <Check size={14} strokeWidth={4} />
-                                                        </div>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
+                                                        <button 
+                                                            onClick={() => onRevoke(activeClass.id, lesson.id)}
+                                                            className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-rose-500 hover:text-white hover:shadow-md transition-all shrink-0"
+                                                            title="Revoke Assignment"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
 
