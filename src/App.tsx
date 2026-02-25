@@ -6034,31 +6034,93 @@ function ExamPlayerView({ exam, onFinish }: any) {
     );
 }
 // ============================================================================
-//  ADMIN DASHBOARD (God Mode: Cohorts, Instructors, Metrics)
+//  ADMIN DASHBOARD (Real-Time God Mode)
 // ============================================================================
 function AdminDashboardView({ user }: any) {
     const [activeTab, setActiveTab] = useState<'overview' | 'cohorts' | 'instructors'>('overview');
+    
+    // Real-Time Global State
+    const [allProfiles, setAllProfiles] = useState<any[]>([]);
+    const [allCohorts, setAllCohorts] = useState<any[]>([]);
+    const [globalLogs, setGlobalLogs] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    // --- MOCK DATA FOR UI DESIGN ---
+    useEffect(() => {
+        // 1. Fetch ALL user profiles across the platform
+        const qProfiles = query(collectionGroup(db, 'profile'));
+        const unsubProfiles = onSnapshot(qProfiles, (snap) => {
+            const profiles = snap.docs.map(d => ({ 
+                // Safely extract the UID from the document path (artifacts/appId/users/UID/profile/main)
+                uid: d.ref.path.split('/')[3], 
+                ...d.data() 
+            }));
+            setAllProfiles(profiles);
+        });
+
+        // 2. Fetch ALL cohorts across ALL instructors
+        const qClasses = query(collectionGroup(db, 'classes'));
+        const unsubClasses = onSnapshot(qClasses, (snap) => {
+            const classes = snap.docs.map(d => ({ 
+                id: d.id, 
+                _instructorUid: d.ref.path.split('/')[3], 
+                ...d.data() 
+            }));
+            setAllCohorts(classes);
+        });
+
+        // 3. Fetch recent system activity to find pending grades
+        const qLogs = query(collection(db, 'artifacts', appId, 'activity_logs'), where('scoreDetail.status', '==', 'pending_review'));
+        const unsubLogs = onSnapshot(qLogs, (snap) => {
+            setGlobalLogs(snap.docs.map(d => d.data()));
+            setLoading(false);
+        });
+
+        return () => { unsubProfiles(); unsubClasses(); unsubLogs(); };
+    }, []);
+
+    // --- DATA PROCESSING ---
+    const students = allProfiles.filter(p => p.role === 'student');
+    const instructors = allProfiles.filter(p => p.role === 'instructor' || p.role === 'admin');
+
+    // Cross-reference cohorts with their instructor's name
+    const populatedCohorts = allCohorts.map(cohort => {
+        const inst = instructors.find(i => i.uid === cohort._instructorUid);
+        return {
+            ...cohort,
+            instructorName: inst?.name || 'Unknown Instructor',
+            studentCount: cohort.students?.length || 0
+        };
+    });
+
+    // Map instructor workloads
+    const populatedInstructors = instructors.map(inst => {
+        const theirCohorts = allCohorts.filter(c => c._instructorUid === inst.uid);
+        // Find how many pending grades belong to this specific instructor's students
+        const theirStudentEmails = theirCohorts.flatMap(c => c.studentEmails || []);
+        const theirPendingGrades = globalLogs.filter(log => theirStudentEmails.includes(log.studentEmail)).length;
+
+        return {
+            ...inst,
+            activeCohorts: theirCohorts.length,
+            ungradedItems: theirPendingGrades
+        };
+    });
+
     const metrics = {
-        totalStudents: 342,
-        activeCohorts: 8,
-        avgPulseScore: 84, // The system-wide engagement metric
-        pendingGrades: 156 // Global bottleneck indicator
+        totalStudents: students.length,
+        activeCohorts: allCohorts.length,
+        totalInstructors: instructors.length,
+        pendingGrades: globalLogs.length
     };
 
-    const mockCohorts = [
-        { id: 'c1', name: 'KitchenComm Prep - Alpha', instructor: 'Sarah Jenkins', students: 24, progress: 65, pulse: 88, status: 'active', icon: <ChefHat size={16}/> },
-        { id: 'c2', name: 'KitchenComm Prep - Beta', instructor: 'Mike Chen', students: 28, progress: 30, pulse: 92, status: 'active', icon: <ChefHat size={16}/> },
-        { id: 'c3', name: 'IELTS Intensive - Spring', instructor: 'You (Admin)', students: 15, progress: 10, pulse: 45, status: 'warning', icon: <GraduationCap size={16}/> },
-        { id: 'c4', name: 'Culinary ESL Basics', instructor: 'Unassigned', students: 0, progress: 0, pulse: 0, status: 'draft', icon: <BookOpen size={16}/> }
-    ];
-
-    const mockInstructors = [
-        { id: 'i1', name: 'Sarah Jenkins', email: 'sarah@lllms.edu', activeCohorts: 2, ungradedItems: 12, lastActive: '2 mins ago' },
-        { id: 'i2', name: 'Mike Chen', email: 'mike@lllms.edu', activeCohorts: 3, ungradedItems: 84, lastActive: '5 hours ago' },
-        { id: 'i3', name: 'Elena Rodriguez', email: 'elena@lllms.edu', activeCohorts: 1, ungradedItems: 0, lastActive: '1 day ago' }
-    ];
+    if (loading) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center bg-slate-50 text-emerald-500">
+                <Loader className="animate-spin mb-4" size={40} />
+                <p className="font-black uppercase tracking-widest text-xs text-slate-400">Decrypting Global State...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="h-full flex flex-col bg-slate-50 overflow-hidden animate-in fade-in duration-500 font-sans select-none">
@@ -6101,20 +6163,20 @@ function AdminDashboardView({ user }: any) {
                         <div className="space-y-12 animate-in slide-in-from-bottom-4">
                             {/* Bento Box Metrics */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                <MetricCard icon={<Users size={24} className="text-indigo-500"/>} label="Total Enrollment" value={metrics.totalStudents} trend="+12 this week" color="indigo" />
-                                <MetricCard icon={<BookOpen size={24} className="text-emerald-500"/>} label="Active Cohorts" value={metrics.activeCohorts} trend="2 launching soon" color="emerald" />
-                                <MetricCard icon={<Activity size={24} className="text-rose-500"/>} label="Avg Pulse Score" value={`${metrics.avgPulseScore}%`} trend="High Engagement" color="rose" />
-                                <MetricCard icon={<AlertCircle size={24} className="text-amber-500"/>} label="Global Pending Grades" value={metrics.pendingGrades} trend="Needs attention" color="amber" />
+                                <MetricCard icon={<Users size={24} className="text-indigo-500"/>} label="Total Enrollment" value={metrics.totalStudents} trend="Active Profiles" color="indigo" />
+                                <MetricCard icon={<BookOpen size={24} className="text-emerald-500"/>} label="Active Cohorts" value={metrics.activeCohorts} trend="Deployed Classes" color="emerald" />
+                                <MetricCard icon={<Shield size={24} className="text-rose-500"/>} label="Staff Count" value={metrics.totalInstructors} trend="Teachers & Admins" color="rose" />
+                                <MetricCard icon={<AlertCircle size={24} className="text-amber-500"/>} label="Global Pending" value={metrics.pendingGrades} trend="Exams awaiting grades" color="amber" />
                             </div>
 
                             {/* Quick Action Dock */}
                             <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
                                 <div>
-                                    <h3 className="text-2xl font-black text-slate-900 mb-1">Provision New Cohort</h3>
-                                    <p className="text-sm font-bold text-slate-500">Create a container, assign a curriculum, and invite an instructor.</p>
+                                    <h3 className="text-2xl font-black text-slate-900 mb-1">System Global Broadcast</h3>
+                                    <p className="text-sm font-bold text-slate-500">Push an alert to every single user on the platform.</p>
                                 </div>
-                                <button className="w-full md:w-auto px-8 py-5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-emerald-200 active:scale-95 transition-all flex items-center justify-center gap-3 text-xs">
-                                    <Plus size={18} /> Build Cohort
+                                <button onClick={() => alert('Global Broadcast UI coming soon!')} className="w-full md:w-auto px-8 py-5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-emerald-200 active:scale-95 transition-all flex items-center justify-center gap-3 text-xs">
+                                    <Megaphone size={18} /> Send Alert
                                 </button>
                             </div>
                         </div>
@@ -6125,12 +6187,9 @@ function AdminDashboardView({ user }: any) {
                         <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in">
                             <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                                 <div>
-                                    <h3 className="text-2xl font-black text-slate-900">Cohort Management</h3>
-                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Active Deployments</p>
+                                    <h3 className="text-2xl font-black text-slate-900">Platform Deployments</h3>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">All Active Cohorts</p>
                                 </div>
-                                <button className="p-4 bg-slate-900 text-white rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-lg">
-                                    <Plus size={20} />
-                                </button>
                             </div>
                             
                             <table className="w-full text-left border-collapse">
@@ -6139,54 +6198,46 @@ function AdminDashboardView({ user }: any) {
                                         <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Deployment Name</th>
                                         <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Instructor</th>
                                         <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Roster</th>
-                                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Cohort Pulse</th>
-                                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
+                                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">System ID</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
-                                    {mockCohorts.map(cohort => (
-                                        <tr key={cohort.id} className="hover:bg-slate-50 transition-colors group">
-                                            <td className="p-6">
-                                                <div className="flex items-center gap-4">
-                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${cohort.status === 'draft' ? 'bg-slate-100 text-slate-400' : 'bg-indigo-50 text-indigo-600'}`}>
-                                                        {cohort.icon}
-                                                    </div>
-                                                    <div>
-                                                        <span className="font-black text-slate-800 text-sm block">{cohort.name}</span>
-                                                        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md mt-1 inline-block ${cohort.status === 'active' ? 'bg-emerald-100 text-emerald-600' : cohort.status === 'warning' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
-                                                            {cohort.status}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="p-6 font-bold text-slate-600 text-sm">
-                                                {cohort.instructor}
-                                            </td>
-                                            <td className="p-6 text-center">
-                                                <span className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-black">
-                                                    {cohort.students} <Users size={12} className="inline ml-1 opacity-50"/>
-                                                </span>
-                                            </td>
-                                            <td className="p-6 w-48">
-                                                {cohort.students > 0 ? (
-                                                    <div>
-                                                        <div className="flex justify-between text-[10px] font-black text-slate-500 mb-1">
-                                                            <span>Health</span>
-                                                            <span className={cohort.pulse > 80 ? 'text-emerald-500' : 'text-amber-500'}>{cohort.pulse}%</span>
-                                                        </div>
-                                                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                                                            <div className={`h-full transition-all duration-1000 ${cohort.pulse > 80 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${cohort.pulse}%` }} />
-                                                        </div>
-                                                    </div>
-                                                ) : <span className="text-xs text-slate-300 font-bold italic">No data</span>}
-                                            </td>
-                                            <td className="p-6 text-right">
-                                                <button className="p-2 text-slate-300 hover:text-indigo-600 transition-colors">
-                                                    <MoreVertical size={20} />
-                                                </button>
-                                            </td>
+                                    {populatedCohorts.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={4} className="p-12 text-center text-slate-400 font-bold italic">No cohorts found in database.</td>
                                         </tr>
-                                    ))}
+                                    ) : (
+                                        populatedCohorts.map(cohort => (
+                                            <tr key={cohort.id} className="hover:bg-slate-50 transition-colors group">
+                                                <td className="p-6">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-indigo-50 text-indigo-600">
+                                                            <BookOpen size={16} />
+                                                        </div>
+                                                        <div>
+                                                            <span className="font-black text-slate-800 text-sm block">{cohort.name}</span>
+                                                            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 mt-1 inline-block">
+                                                                {(cohort.assignments?.length || 0)} Units Assigned
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="p-6 font-bold text-slate-600 text-sm">
+                                                    {cohort.instructorName}
+                                                </td>
+                                                <td className="p-6 text-center">
+                                                    <span className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-black">
+                                                        {cohort.studentCount} <Users size={12} className="inline ml-1 opacity-50"/>
+                                                    </span>
+                                                </td>
+                                                <td className="p-6">
+                                                    <span className="text-xs font-mono font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100">
+                                                        {cohort.id}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -6195,14 +6246,15 @@ function AdminDashboardView({ user }: any) {
                     {/* INSTRUCTORS TAB */}
                     {activeTab === 'instructors' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4">
-                            {mockInstructors.map(inst => (
-                                <div key={inst.id} className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl transition-shadow">
-                                    <div className="flex items-start justify-between mb-6">
+                            {populatedInstructors.map(inst => (
+                                <div key={inst.uid} className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-xl transition-shadow relative overflow-hidden">
+                                    <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 to-teal-500" />
+                                    <div className="flex items-start justify-between mb-6 mt-2">
                                         <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg">
-                                            {inst.name.split(' ').map(n => n[0]).join('')}
+                                            {inst.name?.charAt(0).toUpperCase() || 'I'}
                                         </div>
-                                        <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md uppercase tracking-widest flex items-center gap-1">
-                                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Online
+                                        <span className="text-[10px] font-black text-slate-500 bg-slate-100 px-2 py-1 rounded-md uppercase tracking-widest flex items-center gap-1">
+                                            <Shield size={10} /> {inst.role}
                                         </span>
                                     </div>
                                     <h3 className="text-xl font-black text-slate-800">{inst.name}</h3>
@@ -6213,8 +6265,8 @@ function AdminDashboardView({ user }: any) {
                                             <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Cohorts</span>
                                             <span className="text-xl font-black text-slate-700">{inst.activeCohorts}</span>
                                         </div>
-                                        <div className={`p-3 rounded-xl text-center ${inst.ungradedItems > 50 ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-700'}`}>
-                                            <span className="block text-[9px] font-black uppercase tracking-widest mb-1 opacity-60">To Grade</span>
+                                        <div className={`p-3 rounded-xl text-center ${inst.ungradedItems > 0 ? 'bg-amber-50 text-amber-600' : 'bg-slate-50 text-slate-700'}`}>
+                                            <span className="block text-[9px] font-black uppercase tracking-widest mb-1 opacity-60">Backlog</span>
                                             <span className="text-xl font-black">{inst.ungradedItems}</span>
                                         </div>
                                     </div>
@@ -6223,30 +6275,6 @@ function AdminDashboardView({ user }: any) {
                         </div>
                     )}
 
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// Helper Component for the Bento Box Metrics
-function MetricCard({ icon, label, value, trend, color }: any) {
-    const bgColors: any = { indigo: 'bg-indigo-50', emerald: 'bg-emerald-50', rose: 'bg-rose-50', amber: 'bg-amber-50' };
-    const textColors: any = { indigo: 'text-indigo-600', emerald: 'text-emerald-600', rose: 'text-rose-600', amber: 'text-amber-600' };
-
-    return (
-        <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col justify-between h-48 group hover:border-slate-300 transition-colors">
-            <div className="flex justify-between items-start">
-                <div className={`p-4 rounded-2xl ${bgColors[color]}`}>
-                    {icon}
-                </div>
-                <TrendingUp size={16} className="text-slate-300 group-hover:text-emerald-400 transition-colors" />
-            </div>
-            <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-                <div className="flex items-end gap-3">
-                    <span className={`text-4xl font-black leading-none ${textColors[color]}`}>{value}</span>
-                    <span className="text-xs font-bold text-slate-400 mb-1">{trend}</span>
                 </div>
             </div>
         </div>
