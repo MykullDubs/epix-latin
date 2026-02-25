@@ -902,27 +902,44 @@ const QuizBlockRenderer = ({ block }: any) => {
     );
 };
 const FillBlankBlockRenderer = ({ block }: any) => {
-    // Robust Data Extraction
-    const rawText = block.text || block?.content?.text || block?.data?.text || "Missing text [here].";
+    // 1. LOCATE THE DATA (Safely)
+    const data = block?.content || block?.data || block || {};
+    const rawText = data.text || "Missing text [here].";
     
-    // Parse the sentence and extract the blanks
-    const { textParts, correctAnswers } = React.useMemo(() => {
+    // 2. EXTRACT BLANKS & CORRECT ANSWERS
+    const { textParts, correctAnswers } = useMemo(() => {
         const parts = rawText.split(/\[.*?\]/g);
         const matches = Array.from(rawText.matchAll(/\[(.*?)\]/g));
-        const answers = matches.map((m: any) => m[1]);
+        const answers = matches.map((m: any) => m[1]); 
         return { textParts: parts, correctAnswers: answers };
     }, [rawText]);
+
+    // 3. EXTRACT DECOYS/OPTIONS (With crash protection!)
+    const distractors = useMemo(() => {
+        let rawOptions = data.options || data.distractors || [];
+        if (!Array.isArray(rawOptions)) {
+            rawOptions = typeof rawOptions === 'string' ? [rawOptions] : [];
+        }
+        return rawOptions.map((opt: any) => {
+            if (typeof opt === 'string' || typeof opt === 'number') return String(opt);
+            if (opt && typeof opt === 'object') return opt.text || opt.label || opt.value || "";
+            return "";
+        }).filter(Boolean); // Removes empty strings
+    }, [data]);
 
     const [wordBank, setWordBank] = useState<string[]>([]);
     const [filledBlanks, setFilledBlanks] = useState<(string | null)[]>(Array(correctAnswers.length).fill(null));
     const [isChecked, setIsChecked] = useState(false);
 
-    // Initialize the word bank shuffled
-    React.useEffect(() => {
-        setWordBank([...correctAnswers].sort(() => Math.random() - 0.5));
-    }, [correctAnswers]);
+    // 4. SHUFFLE EVERYTHING TOGETHER
+    useEffect(() => {
+        // Combine correct answers and distractors
+        // (Using a Set ensures we don't get duplicates if the Builder accidentally saved the correct answer inside the options array too)
+        const allWords = Array.from(new Set([...correctAnswers, ...distractors]));
+        setWordBank(allWords.sort(() => Math.random() - 0.5));
+    }, [correctAnswers, distractors]);
 
-    // Handle clicking a word in the bank to fill the first available blank
+    // Interactions
     const handleBankClick = (word: string) => {
         if (isChecked) return;
         const firstEmptyIdx = filledBlanks.indexOf(null);
@@ -931,7 +948,6 @@ const FillBlankBlockRenderer = ({ block }: any) => {
             newFilled[firstEmptyIdx] = word;
             setFilledBlanks(newFilled);
             
-            // Remove word from bank
             const wordIdx = wordBank.indexOf(word);
             const newBank = [...wordBank];
             newBank.splice(wordIdx, 1);
@@ -939,7 +955,6 @@ const FillBlankBlockRenderer = ({ block }: any) => {
         }
     };
 
-    // Handle clicking a filled blank to return it to the bank
     const handleBlankClick = (word: string | null, idx: number) => {
         if (isChecked || !word) return;
         const newFilled = [...filledBlanks];
@@ -970,7 +985,6 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                     let blankStyle = "min-w-[80px] h-10 border-b-4 border-slate-200 mx-2 flex items-center justify-center px-4 cursor-pointer transition-all";
                     if (filledWord) blankStyle = "min-w-[80px] h-10 bg-indigo-100 text-indigo-700 font-bold rounded-xl mx-2 flex items-center justify-center px-4 cursor-pointer shadow-sm hover:bg-rose-100 hover:text-rose-600 transition-all active:scale-95";
                     
-                    // Validation Styling
                     if (isChecked && filledWord) {
                         const isCorrect = filledWord === correctAnswers[i];
                         blankStyle = `min-w-[80px] h-10 font-bold rounded-xl mx-2 flex items-center justify-center px-4 shadow-sm text-white ${isCorrect ? 'bg-emerald-500' : 'bg-rose-500'}`;
@@ -991,7 +1005,10 @@ const FillBlankBlockRenderer = ({ block }: any) => {
 
             {/* The Word Bank */}
             <div className="bg-slate-50 rounded-[1.5rem] p-6 border-2 border-slate-100">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Word Bank</h4>
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center justify-between">
+                    <span>Word Bank</span>
+                    {isComplete && !isChecked && <span className="text-indigo-500">Ready to check!</span>}
+                </h4>
                 <div className="flex flex-wrap gap-3 min-h-[48px]">
                     {wordBank.map((word, idx) => (
                         <button 
