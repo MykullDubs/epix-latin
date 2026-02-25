@@ -5343,6 +5343,9 @@ function ExamPlayerView({ exam, onFinish }: any) {
         </div>
     );
 }
+// ============================================================================
+//  ADMIN DASHBOARD (God Mode: Cohorts, Instructors, Metrics)
+// ============================================================================
 function AdminDashboardView({ user }: any) {
     const [activeTab, setActiveTab] = useState<'overview' | 'cohorts' | 'instructors'>('overview');
 
