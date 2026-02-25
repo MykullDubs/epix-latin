@@ -4425,6 +4425,9 @@ function InstructorDashboard({
     </div>
   );
 }
+// ============================================================================
+//  STUDENT NAVIGATION BAR (Floating Pill Edition)
+// ============================================================================
 function StudentNavBar({ activeTab, setActiveTab }: any) {
     const tabs = [
         { id: 'home', label: 'Home', icon: LayoutDashboard },
