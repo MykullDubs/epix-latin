@@ -3233,9 +3233,9 @@ function InstructorGradebook({ classData }: any) {
     );
 }
 // ============================================================================
-//  CLASS MANAGER VIEW (Searchable & Strict Creation)
+//  CLASS MANAGER VIEW (Searchable, Strict, & Named Students)
 // ============================================================================
- function ClassManagerView({ 
+function ClassManagerView({ 
     user, 
     classes = [], 
     lessons = [], 
@@ -3254,7 +3254,7 @@ function InstructorGradebook({ classData }: any) {
     const [newStudentEmail, setNewStudentEmail] = useState('');
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     
-    // NEW: Creation & Search States
+    // Creation & Search States
     const [isCreatingCohort, setIsCreatingCohort] = useState(false);
     const [newCohortName, setNewCohortName] = useState('');
     const [lessonSearch, setLessonSearch] = useState('');
@@ -3316,7 +3316,7 @@ function InstructorGradebook({ classData }: any) {
                 {/* Cohort List & Inline Creator */}
                 <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-2 pb-12">
                     
-                    {/* NEW: INLINE COHORT FORGE */}
+                    {/* INLINE COHORT FORGE */}
                     {isCreatingCohort && (
                         <div className="p-5 bg-indigo-600 rounded-[1.5rem] shadow-xl shadow-indigo-200 animate-in slide-in-from-top-4 fade-in duration-300">
                             <label className="text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-2 block">Forge New Cohort</label>
@@ -3503,27 +3503,41 @@ function InstructorGradebook({ classData }: any) {
                                                         </td>
                                                     </tr>
                                                 ) : (
-                                                    activeClass.students.map((student: any, idx: number) => (
-                                                        <tr key={idx} className="hover:bg-slate-50/50 transition-colors group">
-                                                            <td className="px-6 py-4">
-                                                                <div className="flex items-center gap-4">
-                                                                    <div className="w-10 h-10 rounded-[1rem] bg-indigo-50 text-indigo-600 font-black flex items-center justify-center text-sm shadow-inner border border-indigo-100/50">
-                                                                        {student.email?.[0]?.toUpperCase() || 'S'}
+                                                    activeClass.students.map((student: any, idx: number) => {
+                                                        // Fallbacks for display
+                                                        const displayName = student.name || 'Pending Registration';
+                                                        const isPending = !student.name;
+                                                        const initial = (student.name?.[0] || student.email?.[0] || 'S').toUpperCase();
+
+                                                        return (
+                                                            <tr key={idx} className="hover:bg-slate-50/50 transition-colors group">
+                                                                <td className="px-6 py-4">
+                                                                    <div className="flex items-center gap-4">
+                                                                        <div className={`w-10 h-10 rounded-[1rem] font-black flex items-center justify-center text-sm shadow-inner border transition-colors ${isPending ? 'bg-slate-50 text-slate-400 border-slate-200' : 'bg-indigo-50 text-indigo-600 border-indigo-100/50'}`}>
+                                                                            {initial}
+                                                                        </div>
+                                                                        <div>
+                                                                            <span className={`block font-bold mb-0.5 ${isPending ? 'text-slate-400 italic' : 'text-slate-800'}`}>
+                                                                                {displayName}
+                                                                            </span>
+                                                                            <span className="text-xs font-bold text-slate-400 block">{student.email}</span>
+                                                                        </div>
                                                                     </div>
-                                                                    <span className="font-bold text-slate-700">{student.email}</span>
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-6 py-4">
-                                                                <div className="flex items-center gap-3">
-                                                                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 w-[45%] rounded-full" /></div>
-                                                                    <span className="text-[10px] font-black text-slate-400 w-8">45%</span>
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-6 py-4 text-right">
-                                                                <button className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"><X size={16} strokeWidth={3} /></button>
-                                                            </td>
-                                                        </tr>
-                                                    ))
+                                                                </td>
+                                                                <td className="px-6 py-4">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                                                            <div className={`h-full w-[45%] rounded-full ${isPending ? 'bg-slate-300' : 'bg-emerald-500'}`} />
+                                                                        </div>
+                                                                        <span className="text-[10px] font-black text-slate-400 w-8">45%</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-6 py-4 text-right">
+                                                                    <button className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"><X size={16} strokeWidth={3} /></button>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })
                                                 )}
                                             </tbody>
                                         </table>
