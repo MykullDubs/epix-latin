@@ -4207,55 +4207,73 @@ function InstructorDashboard({
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isRailExpanded, setIsRailExpanded] = useState(false);
 
-  // --- 1. THE NAV ITEM (FINGER-FRIENDLY & RESPONSIVE) ---
-  const NavItem = ({ id, icon, label }: { id: string; icon: React.ReactNode; label: string }) => {
+  // --- 1. THE NAV ITEM (NEON PILL EDITION) ---
+  const NavItem = ({ id, icon, label, badge }: { id: string; icon: React.ReactNode; label: string; badge?: boolean }) => {
     const isActive = activeTab === id;
     
     return (
       <button 
         onClick={() => setActiveTab(id)}
-        className={`relative flex items-center h-14 w-full rounded-2xl transition-all duration-300 group ${
-          isActive 
-            ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-900/20 scale-[1.02]' 
-            : 'text-slate-500 hover:bg-slate-800 hover:text-slate-200'
+        role="tab"
+        aria-selected={isActive}
+        className={`relative flex items-center h-14 w-full rounded-[1.5rem] transition-all duration-300 ease-out group outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 active:scale-[0.96] ${
+          isActive ? '' : 'hover:bg-slate-900/60'
         }`}
       >
-        {/* The "Rail" Zone - Optimized for tablet thumb placement */}
-        <div className="w-20 shrink-0 flex items-center justify-center">
-          {React.cloneElement(icon as React.ReactElement, { 
-            size: 22, 
-            strokeWidth: isActive ? 2.5 : 2 
-          })}
+        {/* The Animated Active Pill Background */}
+        {isActive && (
+            <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-[1.5rem] shadow-lg shadow-indigo-900/50 animate-in fade-in zoom-in-95 duration-300 border border-indigo-400/20" />
+        )}
+
+        <div className="relative z-10 flex items-center w-full">
+            {/* Icon Zone */}
+            <div className="w-20 shrink-0 flex items-center justify-center relative">
+                {React.cloneElement(icon as React.ReactElement, { 
+                    size: 22, 
+                    strokeWidth: isActive ? 2.5 : 2,
+                    className: `transition-colors duration-300 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-indigo-400'}`
+                })}
+                
+                {/* The LMS Attention Badge */}
+                {badge && !isActive && (
+                    <span className="absolute top-3 right-5 flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500 border border-slate-950"></span>
+                    </span>
+                )}
+            </div>
+
+            {/* Expanding Label Zone */}
+            <span className={`font-black text-[11px] uppercase tracking-[0.2em] whitespace-nowrap transition-all duration-300 ease-out ${
+                isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'
+            } ${
+                isRailExpanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4 pointer-events-none'
+            }`}>
+                {label}
+            </span>
         </div>
 
-        {/* The Expanding Label Zone */}
-        <span className={`font-black text-[11px] uppercase tracking-[0.2em] whitespace-nowrap transition-all duration-500 ease-in-out ${
-          isRailExpanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4 pointer-events-none'
-        }`}>
-          {label}
-        </span>
-
-        {/* Active Indicator Pip (Tablet Rail Mode) */}
+        {/* Glowing Active Pip (For Collapsed Rail Mode) */}
         {isActive && !isRailExpanded && (
-          <div className="absolute left-0 w-1.5 h-6 bg-white rounded-r-full animate-in slide-in-from-left-full" />
+          <div className="absolute left-1.5 w-1 h-8 bg-white rounded-full z-20 shadow-[0_0_12px_rgba(255,255,255,0.8)] animate-in slide-in-from-left-full duration-300" />
         )}
       </button>
     );
   };
 
   return (
-    <div className="flex h-screen bg-slate-100 overflow-hidden font-sans select-none">
+    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans select-none">
       
       {/* --- SIDE RAIL / SIDEBAR --- */}
       <aside 
-        className={`bg-slate-950 flex flex-col transition-all duration-500 ease-in-out z-50 shadow-2xl ${
+        className={`bg-slate-950 flex flex-col transition-all duration-500 ease-in-out z-50 shadow-[20px_0_40px_rgba(0,0,0,0.1)] ${
           isRailExpanded ? 'w-72' : 'w-20'
         }`}
       >
         {/* Branding & Interaction Header */}
         <div className="h-24 flex items-center border-b border-slate-900 overflow-hidden shrink-0">
           <div className="w-20 flex items-center justify-center shrink-0">
-            <div className={`w-11 h-11 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/20 transition-transform duration-700 ${isRailExpanded ? 'rotate-0' : 'rotate-12 scale-90'}`}>
+            <div className={`w-11 h-11 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 transition-all duration-700 ${isRailExpanded ? 'rotate-0' : 'rotate-12 scale-90 hover:scale-100 hover:rotate-0 cursor-pointer'}`} onClick={() => !isRailExpanded && setIsRailExpanded(true)}>
               <GraduationCap size={24} strokeWidth={2.5} />
             </div>
           </div>
@@ -4264,7 +4282,7 @@ function InstructorDashboard({
             <span className="text-white font-black text-lg tracking-tighter uppercase italic">Magister</span>
             <button 
               onClick={() => setIsRailExpanded(false)}
-              className="p-2 text-slate-500 hover:text-white transition-colors active:scale-90"
+              className="p-2 text-slate-500 hover:text-white bg-slate-900/50 hover:bg-slate-800 rounded-xl transition-all active:scale-90"
             >
               <ChevronLeft size={20} />
             </button>
@@ -4282,48 +4300,51 @@ function InstructorDashboard({
         </div>
 
         {/* Main Navigation Stack */}
-        <nav className="flex-1 px-3 py-10 space-y-4 overflow-y-auto custom-scrollbar">
+        <nav className="flex-1 px-3 py-8 space-y-2 overflow-y-auto custom-scrollbar">
           <NavItem id="dashboard" icon={<Activity />} label="Live Feed" />
           <NavItem id="studio" icon={<PenTool />} label="Studio Hub" />
           <NavItem id="classes" icon={<School />} label="Cohort Manager" />
-          <NavItem id="inbox" icon={<Inbox />} label="Grading" />
+          {/* 🔴 Notice the badge property here to trigger the grading alert */}
+          <NavItem id="inbox" icon={<Inbox />} label="Grading Inbox" badge={true} />
           <NavItem id="analytics" icon={<BarChart2 />} label="Analytics" />
         </nav>
 
         {/* Footer: User & Mode Switchers */}
-        <div className="p-3 border-t border-slate-900 space-y-2 shrink-0 bg-slate-950/50">
+        <div className="p-4 border-t border-slate-900 space-y-2 shrink-0 bg-slate-950/50">
           
           {/* 🛡️ THE GOD MODE GATEKEEPER */}
           {userData?.role === 'admin' && (
             <button 
               onClick={() => setActiveTab('admin')}
-              className={`flex items-center h-14 w-full rounded-2xl transition-all active:scale-95 ${activeTab === 'admin' ? 'bg-emerald-900/40 text-emerald-400' : 'text-slate-500 hover:bg-slate-800 hover:text-emerald-400'}`}
+              className={`relative flex items-center h-14 w-full rounded-[1.5rem] transition-all duration-300 active:scale-[0.96] group overflow-hidden ${activeTab === 'admin' ? 'bg-emerald-500/20 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.5)]' : 'hover:bg-slate-900'}`}
             >
               <div className="w-14 flex items-center justify-center shrink-0 ml-1">
-                <Shield size={20} />
+                <Shield size={20} className={activeTab === 'admin' ? 'text-emerald-400' : 'text-slate-500 group-hover:text-emerald-400 transition-colors'} />
               </div>
-              {isRailExpanded && <span className="text-[10px] font-black uppercase tracking-widest">Admin Console</span>}
+              <span className={`font-black text-[11px] uppercase tracking-[0.2em] whitespace-nowrap transition-all duration-300 ${activeTab === 'admin' ? 'text-emerald-400' : 'text-slate-500 group-hover:text-slate-300'} ${isRailExpanded ? 'opacity-100' : 'opacity-0 -translate-x-4'}`}>
+                  Command Center
+              </span>
             </button>
           )}
 
           <button 
             onClick={onSwitchView}
-            className="flex items-center h-14 w-full rounded-2xl text-slate-500 hover:bg-slate-800 hover:text-indigo-400 transition-all active:scale-95"
+            className="flex items-center h-14 w-full rounded-[1.5rem] text-slate-500 hover:bg-slate-900 hover:text-indigo-400 transition-all active:scale-[0.96] group"
           >
             <div className="w-14 flex items-center justify-center shrink-0 ml-1">
-              <User size={20} />
+              <User size={20} className="group-hover:scale-110 transition-transform" />
             </div>
-            {isRailExpanded && <span className="text-[10px] font-black uppercase tracking-widest">Student View</span>}
+            {isRailExpanded && <span className="font-black text-[11px] uppercase tracking-[0.2em] whitespace-nowrap opacity-100 transition-opacity">Student View</span>}
           </button>
 
           <button 
             onClick={onLogout}
-            className="flex items-center h-14 w-full rounded-2xl text-slate-500 hover:bg-rose-900/20 hover:text-rose-500 transition-all active:scale-95"
+            className="flex items-center h-14 w-full rounded-[1.5rem] text-slate-500 hover:bg-rose-950/40 hover:text-rose-400 transition-all active:scale-[0.96] group"
           >
             <div className="w-14 flex items-center justify-center shrink-0 ml-1">
-              <LogOut size={20} />
+              <LogOut size={20} className="group-hover:-translate-x-1 transition-transform" />
             </div>
-            {isRailExpanded && <span className="text-[10px] font-black uppercase tracking-widest">Logout</span>}
+            {isRailExpanded && <span className="font-black text-[11px] uppercase tracking-[0.2em] whitespace-nowrap opacity-100 transition-opacity">Logout</span>}
           </button>
         </div>
       </aside>
