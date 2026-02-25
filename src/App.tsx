@@ -6071,9 +6071,12 @@ function AdminDashboardView({ user }: any) {
     const [bulkTagInput, setBulkTagInput] = useState('');
     const [inspectorTagInput, setInspectorTagInput] = useState('');
 
-    // --- NEW: TOAST NOTIFICATION STATE ---
+    // --- TOAST & CONFIRMATION MODAL STATES ---
     const [toast, setToast] = useState<{msg: string, type: 'success' | 'error' | 'info'} | null>(null);
     const triggerToast = (msg: string, type: 'success' | 'error' | 'info' = 'success') => setToast({ msg, type });
+    
+    // THE NEW CUSTOM CONFIRMATION ENGINE
+    const [confirmModal, setConfirmModal] = useState<{ title: string, message: string, onConfirm: () => void } | null>(null);
 
     useEffect(() => {
         const qProfiles = query(collectionGroup(db, 'profile'));
@@ -6104,18 +6107,23 @@ function AdminDashboardView({ user }: any) {
         return () => { unsubProfiles(); unsubClasses(); unsubLogs(); unsubContent(); };
     }, []);
 
-    // --- ADMIN ACTIONS ---
-    const toggleUserRole = async (uid: string, currentRole: string) => {
+    // --- ADMIN ACTIONS (Now utilizing custom ConfirmModal) ---
+    const toggleUserRole = (uid: string, currentRole: string) => {
         const newRole = currentRole === 'student' ? 'instructor' : 'student';
-        if (window.confirm(`Change this user's permissions to ${newRole.toUpperCase()}?`)) {
-            try {
-                await updateDoc(doc(db, 'artifacts', appId, 'users', uid, 'profile', 'main'), { role: newRole });
-                if (selectedInstructorUid === uid && newRole === 'student') setSelectedInstructorUid(null); 
-                triggerToast(`User role updated to ${newRole}`, 'success');
-            } catch (error) { 
-                triggerToast("Failed to update user role.", 'error'); 
+        setConfirmModal({
+            title: "Change User Role",
+            message: `Are you sure you want to change this user's permissions to ${newRole.toUpperCase()}?`,
+            onConfirm: async () => {
+                try {
+                    await updateDoc(doc(db, 'artifacts', appId, 'users', uid, 'profile', 'main'), { role: newRole });
+                    if (selectedInstructorUid === uid && newRole === 'student') setSelectedInstructorUid(null); 
+                    triggerToast(`User role updated to ${newRole}`, 'success');
+                } catch (error) { 
+                    triggerToast("Failed to update user role.", 'error'); 
+                }
+                setConfirmModal(null);
             }
-        }
+        });
     };
 
     const handleGlobalBroadcast = async () => {
@@ -6138,58 +6146,79 @@ function AdminDashboardView({ user }: any) {
         setIsBroadcasting(false);
     };
 
-    const forceDeleteCohort = async (instructorUid: string, classId: string) => {
-        if (window.confirm("CRITICAL WARNING: This will permanently delete this cohort. Continue?")) {
-            try {
-                await deleteDoc(doc(db, 'artifacts', appId, 'users', instructorUid, 'classes', classId));
-                setSelectedCohortId(null);
-                triggerToast("Cohort successfully deleted.", 'success');
-            } catch (e) { 
-                triggerToast("Failed to delete cohort.", 'error'); 
+    const forceDeleteCohort = (instructorUid: string, classId: string) => {
+        setConfirmModal({
+            title: "Nuke Cohort",
+            message: "CRITICAL WARNING: This will permanently delete this cohort and disconnect all students. This cannot be undone.",
+            onConfirm: async () => {
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'users', instructorUid, 'classes', classId));
+                    setSelectedCohortId(null);
+                    triggerToast("Cohort successfully deleted.", 'success');
+                } catch (e) { 
+                    triggerToast("Failed to delete cohort.", 'error'); 
+                }
+                setConfirmModal(null);
             }
-        }
+        });
     };
 
-    const forceRemoveStudent = async (instructorUid: string, classId: string, studentEmail: string, studentObj: any) => {
-        if (window.confirm(`Remove ${studentEmail} from this cohort?`)) {
-            try {
-                const classRef = doc(db, 'artifacts', appId, 'users', instructorUid, 'classes', classId);
-                await updateDoc(classRef, { studentEmails: arrayRemove(studentEmail), students: arrayRemove(studentObj) });
-                triggerToast("Student removed from roster.", 'success');
-            } catch (e) { 
-                triggerToast("Failed to remove student.", 'error'); 
+    const forceRemoveStudent = (instructorUid: string, classId: string, studentEmail: string, studentObj: any) => {
+        setConfirmModal({
+            title: "Remove Student",
+            message: `Are you sure you want to forcibly remove ${studentEmail} from this active roster?`,
+            onConfirm: async () => {
+                try {
+                    const classRef = doc(db, 'artifacts', appId, 'users', instructorUid, 'classes', classId);
+                    await updateDoc(classRef, { studentEmails: arrayRemove(studentEmail), students: arrayRemove(studentObj) });
+                    triggerToast("Student removed from roster.", 'success');
+                } catch (e) { 
+                    triggerToast("Failed to remove student.", 'error'); 
+                }
+                setConfirmModal(null);
             }
-        }
+        });
     };
 
     // --- CONTENT GOVERNANCE & TAGGING ---
 
-    const forceDeleteContent = async (instructorUid: string, contentId: string) => {
-        if (window.confirm("CRITICAL WARNING: This will permanently delete this curriculum item from the platform. Continue?")) {
-            try {
-                await deleteDoc(doc(db, 'artifacts', appId, 'users', instructorUid, 'custom_lessons', contentId));
-                setSelectedContentId(null);
-                triggerToast("Curriculum item nuked from platform.", 'success');
-            } catch (e) { 
-                triggerToast("Failed to delete content.", 'error'); 
+    const forceDeleteContent = (instructorUid: string, contentId: string) => {
+        setConfirmModal({
+            title: "Nuke Curriculum",
+            message: "CRITICAL WARNING: This will permanently delete this item from the platform. Active cohorts using it will lose access.",
+            onConfirm: async () => {
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'users', instructorUid, 'custom_lessons', contentId));
+                    setSelectedContentId(null);
+                    triggerToast("Curriculum item nuked from platform.", 'success');
+                } catch (e) { 
+                    triggerToast("Failed to delete content.", 'error'); 
+                }
+                setConfirmModal(null);
             }
-        }
+        });
     };
 
-    const handleBulkDelete = async () => {
-        if (!window.confirm(`CRITICAL WARNING: You are about to permanently delete ${selectedVaultItems.length} items from the platform. This cannot be undone. Continue?`)) return;
-        try {
-            const deletePromises = selectedVaultItems.map(id => {
-                const item = allContent.find(c => c.id === id);
-                if (item) return deleteDoc(doc(db, 'artifacts', appId, 'users', item._instructorUid, 'custom_lessons', id));
-            });
-            await Promise.all(deletePromises);
-            const count = selectedVaultItems.length;
-            setSelectedVaultItems([]); 
-            triggerToast(`Successfully purged ${count} items.`, 'success');
-        } catch (e) { 
-            triggerToast("Error during bulk deletion.", 'error'); 
-        }
+    const handleBulkDelete = () => {
+        setConfirmModal({
+            title: "Bulk Nuke",
+            message: `CRITICAL WARNING: You are about to permanently wipe ${selectedVaultItems.length} items from the platform. This action is irreversible.`,
+            onConfirm: async () => {
+                try {
+                    const deletePromises = selectedVaultItems.map(id => {
+                        const item = allContent.find(c => c.id === id);
+                        if (item) return deleteDoc(doc(db, 'artifacts', appId, 'users', item._instructorUid, 'custom_lessons', id));
+                    });
+                    await Promise.all(deletePromises);
+                    const count = selectedVaultItems.length;
+                    setSelectedVaultItems([]); 
+                    triggerToast(`Successfully purged ${count} items.`, 'success');
+                } catch (e) { 
+                    triggerToast("Error during bulk deletion.", 'error'); 
+                }
+                setConfirmModal(null);
+            }
+        });
     };
 
     const handleAddSingleTag = async (instructorUid: string, contentId: string) => {
@@ -6313,7 +6342,7 @@ function AdminDashboardView({ user }: any) {
             
             {/* THE NEW TOAST RENDERER */}
             {toast && (
-                <div className="absolute top-0 left-0 w-full z-[1000] flex justify-center pointer-events-none">
+                <div className="absolute top-0 left-0 w-full z-[2000] flex justify-center pointer-events-none">
                     <JuicyToast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />
                 </div>
             )}
@@ -6321,6 +6350,33 @@ function AdminDashboardView({ user }: any) {
             {/* ============================================================== */}
             {/* OVERLAY MODALS */}
             {/* ============================================================== */}
+
+            {/* NEW: UNIVERSAL CONFIRMATION MODAL */}
+            {confirmModal && (
+                <div className="absolute inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8 text-center animate-in zoom-in-95 duration-200">
+                        <div className="w-20 h-20 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                            <AlertTriangle size={32} />
+                        </div>
+                        <h3 className="text-2xl font-black text-slate-900 mb-2">{confirmModal.title}</h3>
+                        <p className="text-slate-500 text-sm mb-8 leading-relaxed font-medium">{confirmModal.message}</p>
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={() => setConfirmModal(null)} 
+                                className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-200 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={confirmModal.onConfirm} 
+                                className="flex-[1.5] py-4 bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-rose-700 shadow-lg shadow-rose-200 transition-all active:scale-95"
+                            >
+                                Confirm
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             
             {/* 1. GLOBAL BROADCAST MODAL */}
             {showBroadcastModal && (
@@ -6424,7 +6480,6 @@ function AdminDashboardView({ user }: any) {
                         </div>
                         <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
                             <button onClick={() => forceDeleteCohort(activeCohort._instructorUid, activeCohort.id)} className="flex items-center gap-2 px-4 py-3 bg-white border-2 border-rose-100 text-rose-600 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-rose-50 hover:border-rose-200 transition-colors shadow-sm"><Trash2 size={16}/> Delete Cohort</button>
-                            <span className="text-[10px] font-bold text-slate-400 italic">This action cannot be undone.</span>
                         </div>
                     </div>
                 </div>
