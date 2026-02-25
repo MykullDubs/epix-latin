@@ -46,6 +46,82 @@ const appId = typeof __app_id !== 'undefined' ? __app_id : 'epic-latin-prod';
 // --- DEFAULTS ---
 const DEFAULT_USER_DATA = { name: "Discipulus", targetLanguage: "Latin", level: "Novice", streak: 1, xp: 0, role: 'student', classes: [], completedAssignments: [] };
 
+    // Sanitize options to flat strings
+    const options = rawOptions.map((opt: any) => {
+        if (typeof opt === 'string' || typeof opt === 'number') return String(opt);
+        if (opt && typeof opt === 'object') return opt.text || opt.label || opt.value || "Invalid";
+        return "Unknown";
+    });
+
+    // 2. THE AGGRESSIVE CORRECT ANSWER HUNT
+    let actualCorrectAnswer = options[0]; // Ultimate fallback
+
+    // Look for an INDEX (e.g., 0, 1, 2) anywhere in the object
+    const possibleIndex = block.correctIndex ?? block?.content?.correctIndex ?? block?.data?.correctIndex ?? block.correct ?? block?.content?.correct;
+    
+    // Look for a STRING (e.g., "Option B") anywhere in the object
+    const possibleString = block.correctAnswer ?? block?.content?.correctAnswer ?? block.answer ?? block?.content?.answer;
+
+    if (possibleIndex !== undefined && possibleIndex !== null) {
+        // If it found a number (even if it was saved as a string like "1"), parse it!
+        const parsedIndex = parseInt(possibleIndex, 10);
+        if (!isNaN(parsedIndex) && options[parsedIndex]) {
+            actualCorrectAnswer = options[parsedIndex];
+        }
+    } else if (possibleString !== undefined && possibleString !== null) {
+        // If it found a string, use it directly
+        actualCorrectAnswer = String(possibleString);
+    }
+
+    return (
+        <div className="bg-white p-6 md:p-8 rounded-[2rem] border-2 border-slate-100 shadow-sm my-6 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-2 h-full bg-indigo-500" />
+            <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center shadow-inner">
+                    <HelpCircle size={20} strokeWidth={2.5} />
+                </div>
+                <h3 className="text-xs font-black text-indigo-400 uppercase tracking-widest">Knowledge Check</h3>
+            </div>
+            
+            <h4 className="text-xl font-black text-slate-800 mb-6 leading-snug">{question}</h4>
+            
+            <div className="space-y-3">
+                {options.map((opt: string, idx: number) => {
+                    const isSelected = selectedOpt === opt;
+                    const isCorrect = isSubmitted && opt === actualCorrectAnswer;
+                    const isWrong = isSubmitted && isSelected && opt !== actualCorrectAnswer;
+
+                    let btnStyle = "bg-slate-50 border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50";
+                    if (isSelected && !isSubmitted) btnStyle = "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200";
+                    if (isCorrect) btnStyle = "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200";
+                    if (isWrong) btnStyle = "bg-rose-500 border-rose-500 text-white shadow-md shadow-rose-200";
+
+                    return (
+                        <button 
+                            key={idx}
+                            disabled={isSubmitted}
+                            onClick={() => setSelectedOpt(opt)}
+                            className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 font-bold text-left transition-all active:scale-[0.98] disabled:active:scale-100 ${btnStyle}`}
+                        >
+                            <span>{opt}</span>
+                            {isCorrect && <CheckCircle2 size={20} className="text-white" />}
+                            {isWrong && <X size={20} className="text-white" />}
+                        </button>
+                    );
+                })}
+            </div>
+
+            {!isSubmitted && selectedOpt !== null && (
+                <button 
+                    onClick={() => setIsSubmitted(true)}
+                    className="mt-6 w-full py-4 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 active:scale-95 transition-all shadow-xl"
+                >
+                    Check Answer
+                </button>
+            )}
+        </div>
+    );
+};
 // --- CONFIG: DAILY QUESTS ---
 const DAILY_QUESTS = [
   { id: 'q_cards', label: "Review 10 Cards", target: 10, xp: 50, icon: 'layers', type: 'self_study' },
@@ -1207,6 +1283,20 @@ function LessonView({ lesson, onFinish, isInstructor = true }: any) {
           onFinish();
       }
   };
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+        if (e.key === 'ArrowRight') {
+            handleNext();
+        } else if (e.key === 'ArrowLeft') {
+            handlePrev();
+        }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activePageIdx, pages.length]);
 
  // --- MASTER BLOCK RENDERER ---
   const renderBlock = (block: any, idx: number) => {
