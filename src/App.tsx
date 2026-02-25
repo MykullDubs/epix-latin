@@ -807,50 +807,49 @@ function ClassView({ lesson, classId, userData }: any) {
 //  LESSON VIEW (Modern "Story" Style - Fully Interactive & Remote Synced)
 // ============================================================================
 // --- INTERNAL INTERACTIVE RENDERERS ---
-
 const QuizBlockRenderer = ({ block }: any) => {
-    const [selectedOpt, setSelectedOpt] = useState<string | null>(null);
+    // State now tracks the selected option ID, not the string/index
+    const [selectedId, setSelectedId] = useState<string | null>(null);
     const [isSubmitted, setIsSubmitted] = useState(false);
 
-    // DEBUG: If it still fails, check your browser console for this!
-    React.useEffect(() => {
-        console.log("QUIZ BLOCK DATA:", block);
-    }, [block]);
+    // 1. LOCATE THE DATA
+    const data = block?.content || block?.data || block || {};
+    const question = data.question || "Missing Question Data";
+    
+    // 2. EXTRACT OPTIONS (Preserving the {id, text} structure)
+    let options = data.options || [];
+    if (!Array.isArray(options)) options = [];
 
-    // 1. EXTRACT QUESTION & OPTIONS (Checking all possible nestings)
-    const question = block.question ?? block?.content?.question ?? block?.data?.question ?? "Missing Question";
-    
-    let rawOptions = block.options ?? block?.content?.options ?? block?.data?.options ?? [];
-    if (!Array.isArray(rawOptions)) {
-        rawOptions = typeof rawOptions === 'string' ? [rawOptions] : ["Option A", "Option B"];
-    }
-    
-    // Sanitize options to flat strings
-    const options = rawOptions.map((opt: any) => {
-        if (typeof opt === 'string' || typeof opt === 'number') return String(opt);
-        if (opt && typeof opt === 'object') return opt.text || opt.label || opt.value || "Invalid";
-        return "Unknown";
+    // Normalize options so they definitely have an id and text
+    const normalizedOptions = options.map((opt: any, idx: number) => {
+        if (typeof opt === 'string') {
+            return { id: `opt_${idx}`, text: opt };
+        }
+        return {
+            id: opt.id || `opt_${idx}`,
+            text: opt.text || opt.label || opt.value || "Unknown Option"
+        };
     });
 
-    // 2. THE AGGRESSIVE CORRECT ANSWER HUNT
-    let actualCorrectAnswer = options[0]; // Ultimate fallback
-
-    // Look for an INDEX (e.g., 0, 1, 2) anywhere in the object
-    const possibleIndex = block.correctIndex ?? block?.content?.correctIndex ?? block?.data?.correctIndex ?? block.correct ?? block?.content?.correct;
+    // 3. EXTRACT THE CORRECT ID
+    let correctId = data.correctId;
     
-    // Look for a STRING (e.g., "Option B") anywhere in the object
-    const possibleString = block.correctAnswer ?? block?.content?.correctAnswer ?? block.answer ?? block?.content?.answer;
-
-    if (possibleIndex !== undefined && possibleIndex !== null) {
-        // If it found a number (even if it was saved as a string like "1"), parse it!
-        const parsedIndex = parseInt(possibleIndex, 10);
-        if (!isNaN(parsedIndex) && options[parsedIndex]) {
-            actualCorrectAnswer = options[parsedIndex];
-        }
-    } else if (possibleString !== undefined && possibleString !== null) {
-        // If it found a string, use it directly
-        actualCorrectAnswer = String(possibleString);
+    // Fallbacks just in case older lessons used a different format
+    if (correctId === undefined) {
+         if (data.correctIndex !== undefined) correctId = normalizedOptions[data.correctIndex]?.id;
+         else if (data.correctAnswer) {
+             const found = normalizedOptions.find((o:any) => o.text === data.correctAnswer);
+             correctId = found?.id;
+         }
     }
+
+    // Ultimate fallback if data is somehow totally missing
+    if (correctId === undefined && normalizedOptions.length > 0) {
+        correctId = normalizedOptions[0].id;
+    }
+
+    // Is the currently selected ID the correct one?
+    const isCorrect = selectedId === correctId;
 
     return (
         <div className="bg-white p-6 md:p-8 rounded-[2rem] border-2 border-slate-100 shadow-sm my-6 relative overflow-hidden">
@@ -865,38 +864,57 @@ const QuizBlockRenderer = ({ block }: any) => {
             <h4 className="text-xl font-black text-slate-800 mb-6 leading-snug">{question}</h4>
             
             <div className="space-y-3">
-                {options.map((opt: string, idx: number) => {
-                    const isSelected = selectedOpt === opt;
-                    const isCorrect = isSubmitted && opt === actualCorrectAnswer;
-                    const isWrong = isSubmitted && isSelected && opt !== actualCorrectAnswer;
+                {normalizedOptions.length === 0 ? (
+                    <p className="text-slate-400 font-bold italic p-4 text-center border-2 border-dashed rounded-2xl">No options provided.</p>
+                ) : (
+                    normalizedOptions.map((opt: any) => {
+                        const isSelected = selectedId === opt.id;
+                        const isOptCorrect = isSubmitted && opt.id === correctId;
+                        const isOptWrong = isSubmitted && isSelected && opt.id !== correctId;
 
-                    let btnStyle = "bg-slate-50 border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50";
-                    if (isSelected && !isSubmitted) btnStyle = "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200";
-                    if (isCorrect) btnStyle = "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200";
-                    if (isWrong) btnStyle = "bg-rose-500 border-rose-500 text-white shadow-md shadow-rose-200";
+                        let btnStyle = "bg-slate-50 border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50";
+                        if (isSelected && !isSubmitted) btnStyle = "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200";
+                        if (isOptCorrect) btnStyle = "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-200";
+                        if (isOptWrong) btnStyle = "bg-rose-500 border-rose-500 text-white shadow-md shadow-rose-200";
 
-                    return (
-                        <button 
-                            key={idx}
-                            disabled={isSubmitted}
-                            onClick={() => setSelectedOpt(opt)}
-                            className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 font-bold text-left transition-all active:scale-[0.98] disabled:active:scale-100 ${btnStyle}`}
-                        >
-                            <span>{opt}</span>
-                            {isCorrect && <CheckCircle2 size={20} className="text-white" />}
-                            {isWrong && <X size={20} className="text-white" />}
-                        </button>
-                    );
-                })}
+                        return (
+                            <button 
+                                key={opt.id}
+                                disabled={isSubmitted}
+                                onClick={() => setSelectedId(opt.id)}
+                                className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 font-bold text-left transition-all active:scale-[0.98] disabled:active:scale-100 ${btnStyle}`}
+                            >
+                                <span>{opt.text}</span>
+                                {isOptCorrect && <CheckCircle2 size={20} className="text-white" />}
+                                {isOptWrong && <X size={20} className="text-white" />}
+                            </button>
+                        );
+                    })
+                )}
             </div>
 
-            {!isSubmitted && selectedOpt !== null && (
+            {/* Submission & Feedback Controls */}
+            {!isSubmitted && selectedId !== null ? (
                 <button 
                     onClick={() => setIsSubmitted(true)}
                     className="mt-6 w-full py-4 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 active:scale-95 transition-all shadow-xl"
                 >
                     Check Answer
                 </button>
+            ) : isSubmitted && (
+                <div className={`mt-6 p-4 rounded-xl flex justify-between items-center animate-in zoom-in ${isCorrect ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
+                    <span className="font-bold flex items-center gap-2">
+                        {isCorrect ? <><CheckCircle2 size={20}/> Correct!</> : <><X size={20}/> Incorrect</>}
+                    </span>
+                    {!isCorrect && (
+                        <button 
+                            onClick={() => { setIsSubmitted(false); setSelectedId(null); }} 
+                            className="px-4 py-2 bg-white rounded-lg text-xs font-black uppercase tracking-widest shadow-sm hover:shadow active:scale-95 transition-all text-rose-600 border border-rose-200"
+                        >
+                            Try Again
+                        </button>
+                    )}
+                </div>
             )}
         </div>
     );
