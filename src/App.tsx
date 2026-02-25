@@ -4425,6 +4425,8 @@ function InstructorDashboard({
     </div>
   );
 }
+
+export default InstructorDashboard;
 function StudentNavBar({ activeTab, setActiveTab }: any) {
     const tabs = [
         { id: 'home', label: 'Home', icon: LayoutDashboard },
