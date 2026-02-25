@@ -4323,8 +4323,8 @@ function InstructorDashboard({
         {/* Footer: User & Mode Switchers */}
         <div className="p-4 border-t border-slate-900 space-y-2 shrink-0 bg-slate-950/50">
           
-          {/* 🛡️ THE GOD MODE GATEKEEPER */}
-          {userData?.role === 'admin' && (
+         {/* 🛡️ THE GOD MODE GATEKEEPER (Bypassed for UI testing!) */}
+{true && (
             <button 
               onClick={() => setActiveTab('admin')}
               className={`relative flex items-center h-14 w-full rounded-[1.5rem] transition-all duration-300 active:scale-[0.96] group overflow-hidden ${activeTab === 'admin' ? 'bg-emerald-500/20 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.5)]' : 'hover:bg-slate-900'}`}
