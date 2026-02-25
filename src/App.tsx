@@ -800,7 +800,7 @@ function ClassView({ lesson, classId, userData }: any) {
           <h2 className="text-[3vh] font-black text-slate-900 opacity-20 uppercase tracking-widest">{lesson.title}</h2>
         </div>
       </div>
-    </div>classview
+    </div>
   );
 }
 // ============================================================================
