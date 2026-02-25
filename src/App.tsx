@@ -6071,6 +6071,10 @@ function AdminDashboardView({ user }: any) {
     const [bulkTagInput, setBulkTagInput] = useState('');
     const [inspectorTagInput, setInspectorTagInput] = useState('');
 
+    // --- NEW: TOAST NOTIFICATION STATE ---
+    const [toast, setToast] = useState<{msg: string, type: 'success' | 'error' | 'info'} | null>(null);
+    const triggerToast = (msg: string, type: 'success' | 'error' | 'info' = 'success') => setToast({ msg, type });
+
     useEffect(() => {
         const qProfiles = query(collectionGroup(db, 'profile'));
         const unsubProfiles = onSnapshot(qProfiles, (snap) => {
@@ -6107,7 +6111,10 @@ function AdminDashboardView({ user }: any) {
             try {
                 await updateDoc(doc(db, 'artifacts', appId, 'users', uid, 'profile', 'main'), { role: newRole });
                 if (selectedInstructorUid === uid && newRole === 'student') setSelectedInstructorUid(null); 
-            } catch (error) { alert("Failed to update user role."); }
+                triggerToast(`User role updated to ${newRole}`, 'success');
+            } catch (error) { 
+                triggerToast("Failed to update user role.", 'error'); 
+            }
         }
     };
 
@@ -6124,8 +6131,10 @@ function AdminDashboardView({ user }: any) {
             });
             setBroadcastMsg('');
             setShowBroadcastModal(false);
-            alert("Global alert broadcasted successfully!"); 
-        } catch (error) { alert("Failed to send broadcast."); }
+            triggerToast("Global alert broadcasted to all users!", 'success');
+        } catch (error) { 
+            triggerToast("Failed to send broadcast.", 'error'); 
+        }
         setIsBroadcasting(false);
     };
 
@@ -6134,7 +6143,10 @@ function AdminDashboardView({ user }: any) {
             try {
                 await deleteDoc(doc(db, 'artifacts', appId, 'users', instructorUid, 'classes', classId));
                 setSelectedCohortId(null);
-            } catch (e) { alert("Failed to delete cohort."); }
+                triggerToast("Cohort successfully deleted.", 'success');
+            } catch (e) { 
+                triggerToast("Failed to delete cohort.", 'error'); 
+            }
         }
     };
 
@@ -6143,7 +6155,10 @@ function AdminDashboardView({ user }: any) {
             try {
                 const classRef = doc(db, 'artifacts', appId, 'users', instructorUid, 'classes', classId);
                 await updateDoc(classRef, { studentEmails: arrayRemove(studentEmail), students: arrayRemove(studentObj) });
-            } catch (e) { alert("Failed to remove student."); }
+                triggerToast("Student removed from roster.", 'success');
+            } catch (e) { 
+                triggerToast("Failed to remove student.", 'error'); 
+            }
         }
     };
 
@@ -6154,7 +6169,10 @@ function AdminDashboardView({ user }: any) {
             try {
                 await deleteDoc(doc(db, 'artifacts', appId, 'users', instructorUid, 'custom_lessons', contentId));
                 setSelectedContentId(null);
-            } catch (e) { alert("Failed to delete content."); }
+                triggerToast("Curriculum item nuked from platform.", 'success');
+            } catch (e) { 
+                triggerToast("Failed to delete content.", 'error'); 
+            }
         }
     };
 
@@ -6166,30 +6184,36 @@ function AdminDashboardView({ user }: any) {
                 if (item) return deleteDoc(doc(db, 'artifacts', appId, 'users', item._instructorUid, 'custom_lessons', id));
             });
             await Promise.all(deletePromises);
+            const count = selectedVaultItems.length;
             setSelectedVaultItems([]); 
-            alert(`Successfully purged ${selectedVaultItems.length} items.`);
-        } catch (e) { alert("Error during bulk deletion."); }
+            triggerToast(`Successfully purged ${count} items.`, 'success');
+        } catch (e) { 
+            triggerToast("Error during bulk deletion.", 'error'); 
+        }
     };
 
-    // NEW: Add a tag to a single item in the inspector
     const handleAddSingleTag = async (instructorUid: string, contentId: string) => {
         if (!inspectorTagInput.trim()) return;
         try {
             const contentRef = doc(db, 'artifacts', appId, 'users', instructorUid, 'custom_lessons', contentId);
             await updateDoc(contentRef, { tags: arrayUnion(inspectorTagInput.trim().toLowerCase()) });
+            triggerToast(`Tag added.`, 'info');
             setInspectorTagInput('');
-        } catch (e) { alert("Failed to add tag."); }
+        } catch (e) { 
+            triggerToast("Failed to add tag.", 'error'); 
+        }
     };
 
-    // NEW: Remove a tag from a single item in the inspector
     const handleRemoveSingleTag = async (instructorUid: string, contentId: string, tagToRemove: string) => {
         try {
             const contentRef = doc(db, 'artifacts', appId, 'users', instructorUid, 'custom_lessons', contentId);
             await updateDoc(contentRef, { tags: arrayRemove(tagToRemove) });
-        } catch (e) { alert("Failed to remove tag."); }
+            triggerToast(`Tag removed.`, 'info');
+        } catch (e) { 
+            triggerToast("Failed to remove tag.", 'error'); 
+        }
     };
 
-    // NEW: Bulk Tagging Engine
     const handleBulkTagAdd = async () => {
         if (!bulkTagInput.trim()) return;
         const formattedTag = bulkTagInput.trim().toLowerCase();
@@ -6205,8 +6229,10 @@ function AdminDashboardView({ user }: any) {
             });
             await Promise.all(tagPromises);
             setBulkTagInput('');
-            alert(`Tag '${formattedTag}' applied to ${selectedVaultItems.length} items.`);
-        } catch (e) { alert("Error applying bulk tags."); }
+            triggerToast(`Tag '${formattedTag}' applied to ${selectedVaultItems.length} items.`, 'success');
+        } catch (e) { 
+            triggerToast("Error applying bulk tags.", 'error'); 
+        }
     };
 
     // --- DEPLOYMENT EXECUTION ENGINE ---
@@ -6224,10 +6250,10 @@ function AdminDashboardView({ user }: any) {
             setDeployingContent(null);
             setDeploySelectedCohorts([]);
             setSelectedContentId(null); 
-            alert(`Deployment Successful! Pushed to ${deploySelectedCohorts.length} cohorts.`);
+            triggerToast(`Deployment Successful! Pushed to ${deploySelectedCohorts.length} cohorts.`, 'success');
         } catch (error) {
             console.error("Deployment Error:", error);
-            alert("Failed to deploy content. Check console for details.");
+            triggerToast("Failed to deploy content. Check console for details.", 'error');
         }
         setIsDeploying(false);
     };
@@ -6285,6 +6311,13 @@ function AdminDashboardView({ user }: any) {
     return (
         <div className="h-full flex flex-col bg-slate-50 overflow-hidden animate-in fade-in duration-500 font-sans select-none relative">
             
+            {/* THE NEW TOAST RENDERER */}
+            {toast && (
+                <div className="absolute top-0 left-0 w-full z-[1000] flex justify-center pointer-events-none">
+                    <JuicyToast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />
+                </div>
+            )}
+
             {/* ============================================================== */}
             {/* OVERLAY MODALS */}
             {/* ============================================================== */}
@@ -6452,8 +6485,8 @@ function AdminDashboardView({ user }: any) {
                         </div>
                     ) : (
                         /* --- STANDARD INSPECTOR UI WITH TAGGING --- */
-                        <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl relative animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col">
-                            <div className="p-8 border-b border-slate-100 flex justify-between items-start bg-slate-50/80 relative overflow-hidden">
+                        <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl relative animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]">
+                            <div className="p-8 border-b border-slate-100 flex justify-between items-start bg-slate-50/80 relative overflow-hidden shrink-0">
                                 <div className={`absolute top-0 left-0 w-2 h-full ${activeContent.type === 'arcade_game' ? 'bg-amber-500' : activeContent.type === 'exam' || activeContent.type === 'test' ? 'bg-rose-500' : 'bg-indigo-500'}`} />
                                 <div>
                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Content Inspector</span>
@@ -6465,7 +6498,7 @@ function AdminDashboardView({ user }: any) {
                                 <button onClick={() => setSelectedContentId(null)} className="p-2 text-slate-400 hover:text-slate-600 bg-white border border-slate-200 rounded-full transition-all shadow-sm relative z-10"><X size={20}/></button>
                             </div>
 
-                            <div className="p-8 space-y-6 bg-white overflow-y-auto">
+                            <div className="p-8 space-y-6 bg-white overflow-y-auto custom-scrollbar">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Architecture</span>
@@ -6477,7 +6510,7 @@ function AdminDashboardView({ user }: any) {
                                     </div>
                                 </div>
                                 
-                                {/* NEW: TAG MANAGER */}
+                                {/* TAG MANAGER */}
                                 <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Tag size={12}/> Content Tags</span>
                                     
@@ -6505,7 +6538,7 @@ function AdminDashboardView({ user }: any) {
                                         <button 
                                             onClick={() => handleAddSingleTag(activeContent._instructorUid, activeContent.id)}
                                             disabled={!inspectorTagInput.trim()}
-                                            className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50"
+                                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 transition-colors"
                                         >
                                             Add
                                         </button>
@@ -6520,7 +6553,7 @@ function AdminDashboardView({ user }: any) {
                                 </button>
                             </div>
 
-                            <div className="p-6 bg-rose-50/50 border-t border-rose-100 flex flex-col items-center text-center">
+                            <div className="p-6 bg-rose-50/50 border-t border-rose-100 flex flex-col items-center text-center shrink-0">
                                 <button 
                                     onClick={() => forceDeleteContent(activeContent._instructorUid, activeContent.id)}
                                     className="text-rose-500 font-bold text-xs uppercase tracking-widest hover:underline flex items-center gap-1"
@@ -6572,12 +6605,12 @@ function AdminDashboardView({ user }: any) {
                                     value={bulkTagInput}
                                     onChange={e => setBulkTagInput(e.target.value)}
                                     onKeyDown={(e) => { if(e.key === 'Enter') handleBulkTagAdd(); }}
-                                    className="flex-1 bg-transparent border-none text-xs font-bold text-white placeholder:text-slate-500 outline-none"
+                                    className="flex-1 bg-transparent border-none text-xs font-bold text-white placeholder:text-slate-500 outline-none min-w-[100px]"
                                 />
                                 <button 
                                     onClick={handleBulkTagAdd}
                                     disabled={!bulkTagInput.trim()}
-                                    className="px-4 py-2 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50"
+                                    className="px-4 py-2 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50 shrink-0"
                                 >
                                     Apply
                                 </button>
@@ -6711,7 +6744,7 @@ function AdminDashboardView({ user }: any) {
                                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                                         <input 
                                             type="text" 
-                                            placeholder="Search title, author, or type..."
+                                            placeholder="Search title, author, or tags..."
                                             value={vaultSearch}
                                             onChange={(e) => setVaultSearch(e.target.value)}
                                             className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 shadow-sm transition-all"
@@ -6786,11 +6819,10 @@ function AdminDashboardView({ user }: any) {
                                                         </div>
                                                         <h4 className={`font-black text-slate-800 text-lg leading-tight mb-2 group-hover:text-${themeColor}-600 transition-colors`}>{content.title || 'Untitled Module'}</h4>
                                                         
-                                                        {/* Vault Card Tags Preview */}
                                                         {content.tags && content.tags.length > 0 && (
                                                             <div className="flex flex-wrap gap-1 mt-2">
                                                                 {content.tags.slice(0, 3).map((t:string) => (
-                                                                    <span key={t} className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded uppercase">{t}</span>
+                                                                    <span key={t} className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded uppercase border border-slate-200">{t}</span>
                                                                 ))}
                                                                 {content.tags.length > 3 && <span className="text-[9px] font-bold text-slate-400">+{content.tags.length - 3}</span>}
                                                             </div>
