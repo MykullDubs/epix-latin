@@ -7084,27 +7084,28 @@ function App() {
   const [authChecked, setAuthChecked] = useState(false);
   
   // High-Level View Controllers
-const [currentView, setCurrentView] = useState(() => {
-    if (user?.role === 'admin' || user?.role === 'org_admin') return 'admin';
-    if (user?.role === 'instructor') return 'instructor';
-    return 'student';
-});  
+  const [currentView, setCurrentView] = useState<'student' | 'instructor' | 'admin'>('student');
+  const [activeTab, setActiveTab] = useState<string>('home'); // FIXED: Added missing activeTab state
+  
+  // We use this ref to ensure we only force-route the user on their VERY FIRST login load. 
+  // Otherwise, if they switch to Student mode to test, gaining XP would force them back to Admin mode!
+  const hasRoutedInitial = useRef(false);
+
   // --- 2. DATA REPOSITORIES ---
   const [systemLessons] = useState([]); 
   const [customLessons, setCustomLessons] = useState<any[]>([]);
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
-  const [instructorClasses, setInstructorClasses] = useState<any[]>([]); // ADD THIS LINE
+  const [instructorClasses, setInstructorClasses] = useState<any[]>([]); 
   const [allDecks, setAllDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
   
   // --- 3. UI NAVIGATION STATE (DECOUPLED) ---
-  const [activeLesson, setActiveLesson] = useState<any>(null); // Triggers Lesson/Exam Player
-  const [activeStudentClass, setActiveStudentClass] = useState<any>(null); // Triggers Class Dashboard
-  const [presentationLessonId, setPresentationLessonId] = useState<string | null>(null); // Triggers Projector
-  const [activeDeckKey, setActiveDeckKey] = useState<string | null>(null); // Triggers Flashcards
+  const [activeLesson, setActiveLesson] = useState<any>(null); 
+  const [activeStudentClass, setActiveStudentClass] = useState<any>(null); 
+  const [presentationLessonId, setPresentationLessonId] = useState<string | null>(null); 
+  const [activeDeckKey, setActiveDeckKey] = useState<string | null>(null); 
 
- // --- 4. DATA CONSOLIDATION ---
+  // --- 4. DATA CONSOLIDATION ---
   const lessons = useMemo(() => {
-    // Combine both lists to find assignments
     const allActiveClasses = [...instructorClasses, ...enrolledClasses]; 
     const assignments = allActiveClasses.flatMap(c => c.assignments || []);
     return [...systemLessons, ...customLessons, ...assignments];
@@ -7116,6 +7117,7 @@ const [currentView, setCurrentView] = useState(() => {
       setUser(u);
       if (!u) {
         setUserData(null);
+        hasRoutedInitial.current = false; // Reset routing lock on logout
         setAuthChecked(true);
       }
     });
@@ -7125,7 +7127,18 @@ const [currentView, setCurrentView] = useState(() => {
         if (snap.exists()) {
           const data = snap.data();
           setUserData(data);
-          if (data.role === 'instructor') setViewMode('instructor');
+          
+          // FIXED: Intelligent Initial Routing
+          if (!hasRoutedInitial.current) {
+              if (data.role === 'admin' || data.role === 'org_admin') {
+                  setCurrentView('admin');
+              } else if (data.role === 'instructor') {
+                  setCurrentView('instructor');
+              } else {
+                  setCurrentView('student');
+              }
+              hasRoutedInitial.current = true;
+          }
         }
         setAuthChecked(true);
       });
@@ -7143,7 +7156,7 @@ const [currentView, setCurrentView] = useState(() => {
       const unsubClasses = onSnapshot(qClasses, (snap) => {
         setEnrolledClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
-      // ADD THIS NEW BLOCK: Instructor Cohort Sync
+
       const unsubInstructorClasses = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), (snap) => {
         setInstructorClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
@@ -7181,14 +7194,13 @@ const [currentView, setCurrentView] = useState(() => {
     } catch (e) { return { success: false }; }
   };
 
-const handleAddStudent = async (classId: string, email: string) => {
+  const handleAddStudent = async (classId: string, email: string) => {
     if (!user) return { success: false };
     try {
       const cleanEmail = email.toLowerCase().trim();
       const classRef = doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId);
       
       await updateDoc(classRef, {
-        // We push an OBJECT now so the Roster UI has a place to look for a name
         students: arrayUnion({ email: cleanEmail, name: null, uid: null }),
         studentEmails: arrayUnion(cleanEmail)
       });
@@ -7255,7 +7267,6 @@ const handleAddStudent = async (classId: string, email: string) => {
     } catch (e) { console.error("Log error", e); }
   };
 
-  // Helper to exit any active lesson gracefully
   const closeLessons = () => {
     setActiveLesson(null);
   };
@@ -7293,15 +7304,33 @@ const handleAddStudent = async (classId: string, email: string) => {
     );
   }
 
-  // ROUTE 2: MAGISTER COMMAND CENTER
-  if (viewMode === 'instructor' && userData?.role === 'instructor') {
+  // FIXED: ROUTE 2 - ADMIN COMMAND CENTER
+  if (currentView === 'admin' && (userData?.role === 'admin' || userData?.role === 'org_admin')) {
+      return (
+          <div className="h-screen w-full relative">
+              {/* Note: Merging `user` and `userData` so AdminDashboardView has access to `role` and `orgId` */}
+              <AdminDashboardView user={{...user, ...userData}} />
+              
+              {/* Backdoor button so Admins can preview what Students see */}
+              <button 
+                  onClick={() => setCurrentView('student')}
+                  className="fixed bottom-6 right-6 z-[9000] bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest shadow-2xl transition-transform active:scale-95"
+              >
+                  👁️ Preview App
+              </button>
+          </div>
+      );
+  }
+
+  // FIXED: ROUTE 3 - MAGISTER COMMAND CENTER (Instructors)
+  // Admins are allowed to access this route too if they switch to it manually
+  if (currentView === 'instructor' && (userData?.role === 'instructor' || userData?.role === 'admin' || userData?.role === 'org_admin')) {
     return (
       <InstructorDashboard 
         user={user} 
         userData={{ ...userData, classes: instructorClasses }} 
         allDecks={allDecks} 
         lessons={lessons} 
-        
         onSaveLesson={handleSaveLesson} 
         onSaveCard={handleSaveCard}
         onAssign={handleAssign}
@@ -7310,27 +7339,24 @@ const handleAddStudent = async (classId: string, email: string) => {
         onDeleteClass={handleDeleteClass}
         onRenameClass={handleRenameClass}
         onAddStudent={handleAddStudent}
-        
-        // This triggers Route 1 above
         onStartPresentation={(lessonId: string) => setPresentationLessonId(lessonId)}
-        
-        onSwitchView={() => setViewMode('student')}
+        onSwitchView={() => setCurrentView('student')}
         onLogout={() => signOut(auth)} 
       />
     );
   }
 
-  // ROUTE 3: STUDENT VIEWPORT
+  // ROUTE 4: STUDENT VIEWPORT
   return (
     <div className="bg-slate-50 min-h-screen w-full flex flex-col items-center relative font-sans overflow-hidden">
       
-      {/* Instructor Backdoor Toggle */}
-      {userData?.role === 'instructor' && (
+      {/* FIXED: Universal Backdoor Toggle for Instructors AND Admins */}
+      {(userData?.role === 'instructor' || userData?.role === 'admin' || userData?.role === 'org_admin') && (
         <button 
-          onClick={() => setViewMode('instructor')} 
+          onClick={() => setCurrentView(userData?.role === 'instructor' ? 'instructor' : 'admin')} 
           className="fixed top-6 right-6 z-[1000] bg-slate-900 text-white px-8 py-3 rounded-full font-black text-xs uppercase tracking-widest shadow-2xl transition-all hover:scale-105 active:scale-95"
         >
-          🎓 Magister Command
+          {userData?.role === 'instructor' ? '🎓 Magister Command' : '🛡️ Command Center'}
         </button>
       )}
 
@@ -7340,7 +7366,7 @@ const handleAddStudent = async (classId: string, email: string) => {
           
           {/* --- THE SOLID STUDENT ROUTING STACK --- */}
           
-          {/* Layer 1: Is a Lesson Active? (Handles Exams, Decks, and Standard Lessons) */}
+          {/* Layer 1: Is a Lesson Active? */}
           {activeLesson ? (
             (activeLesson.type === 'test' || activeLesson.type === 'exam' || activeLesson.contentType === 'test') ? (
               <ExamPlayerView 
@@ -7355,7 +7381,7 @@ const handleAddStudent = async (classId: string, email: string) => {
                  <FlashcardView 
                     allDecks={{ [activeLesson.id || 'temp']: activeLesson }}
                     selectedDeckKey={activeLesson.id || 'temp'}
-                    onSelectDeck={closeLessons} // Closes the lesson when back is clicked inside FlashcardView
+                    onSelectDeck={closeLessons} 
                     onLogActivity={handleLogActivity}
                     userData={userData}
                     user={user}
@@ -7378,7 +7404,7 @@ const handleAddStudent = async (classId: string, email: string) => {
                classData={activeStudentClass} 
                lessons={lessons}
                onBack={() => setActiveStudentClass(null)} 
-               onSelectLesson={setActiveLesson} // Safely passes the click up to trigger Layer 1
+               onSelectLesson={setActiveLesson}
                setActiveTab={setActiveTab}
                setSelectedLessonId={setPresentationLessonId}
                userData={userData}
@@ -7401,7 +7427,7 @@ const handleAddStudent = async (classId: string, email: string) => {
                selectedDeckKey={activeDeckKey}
                onSelectDeck={(key: string | null) => {
                  setActiveDeckKey(key);
-                 if (!key) setActiveTab('home'); // Go home if deck library is closed
+                 if (!key) setActiveTab('home');
                }}
                onLogActivity={handleLogActivity}
                onSaveCard={handleSaveCard}
@@ -7414,7 +7440,6 @@ const handleAddStudent = async (classId: string, email: string) => {
                userData={userData} 
             />
           ) : (
-            // Default to HomeView
             <HomeView 
               setActiveTab={setActiveTab} 
               classes={enrolledClasses} 
@@ -7434,4 +7459,3 @@ const handleAddStudent = async (classId: string, email: string) => {
     </div>
   );
 }
-export default App;
