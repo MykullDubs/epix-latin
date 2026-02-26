@@ -6034,12 +6034,19 @@ function ExamPlayerView({ exam, onFinish }: any) {
     );
 }
 // ============================================================================
-//  ADMIN DASHBOARD (Real-Time God Mode & B2B Franchise Engine)
+//  ADMIN DASHBOARD: THE FRANCHISE EDITION (SaaS Multi-Tenant)
 // ============================================================================
 function AdminDashboardView({ user }: any) {
-    const [activeTab, setActiveTab] = useState<'overview' | 'cohorts' | 'instructors' | 'directory' | 'vault' | 'franchise'>('overview');
+    // 1. IDENTITY & PERMISSIONS
+    const isSuperAdmin = user.role === 'admin';
+    const isOrgAdmin = user.role === 'org_admin';
+    const userOrgId = user.orgId || null;
+
+    // 2. NAVIGATION STATE
+    // Super Admins start on Overview, Org Admins start on their local Cohorts
+    const [activeTab, setActiveTab] = useState<any>(isSuperAdmin ? 'overview' : 'cohorts');
     
-    // Real-Time Global State
+    // 3. REAL-TIME DATA STATE
     const [allProfiles, setAllProfiles] = useState<any[]>([]);
     const [allCohorts, setAllCohorts] = useState<any[]>([]);
     const [globalLogs, setGlobalLogs] = useState<any[]>([]);
@@ -6047,88 +6054,87 @@ function AdminDashboardView({ user }: any) {
     const [organizations, setOrganizations] = useState<any[]>([]); 
     const [loading, setLoading] = useState(true);
 
-    // Admin Features State
+    // 4. UI & INTERACTION STATE
     const [directorySearch, setDirectorySearch] = useState('');
-    const [showBroadcastModal, setShowBroadcastModal] = useState(false);
-    const [broadcastMsg, setBroadcastMsg] = useState('');
-    const [isBroadcasting, setIsBroadcasting] = useState(false);
-    
-    // B2B FRANCHISE STATES
-    const [showOrgModal, setShowOrgModal] = useState(false);
-    const [newOrg, setNewOrg] = useState({ name: '', logoUrl: '', themeColor: '#4f46e5' });
-    const [isProvisioning, setIsProvisioning] = useState(false);
-
-    // DEEP DIVE STATES
-    const [selectedInstructorUid, setSelectedInstructorUid] = useState<string | null>(null);
-    const [selectedCohortId, setSelectedCohortId] = useState<string | null>(null);
-    const [selectedContentId, setSelectedContentId] = useState<string | null>(null); 
-    
-    // VAULT ADVANCED STATES
     const [vaultSearch, setVaultSearch] = useState('');
     const [vaultFilters, setVaultFilters] = useState<string[]>(['lesson', 'exam', 'arcade']);
     const [selectedVaultItems, setSelectedVaultItems] = useState<string[]>([]);
-
-    // DEPLOYMENT MATRIX STATES
+    const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+    const [broadcastMsg, setBroadcastMsg] = useState('');
+    const [isBroadcasting, setIsBroadcasting] = useState(false);
+    const [showOrgModal, setShowOrgModal] = useState(false);
+    const [newOrg, setNewOrg] = useState({ name: '', logoUrl: '', themeColor: '#4f46e5' });
+    const [isProvisioning, setIsProvisioning] = useState(false);
+    
+    // DEEP DIVE SELECTIONS
+    const [selectedInstructorUid, setSelectedInstructorUid] = useState<string | null>(null);
+    const [selectedCohortId, setSelectedCohortId] = useState<string | null>(null);
+    const [selectedContentId, setSelectedContentId] = useState<string | null>(null); 
     const [deployingContent, setDeployingContent] = useState<any | null>(null);
     const [deploySelectedCohorts, setDeploySelectedCohorts] = useState<string[]>([]);
     const [isDeploying, setIsDeploying] = useState(false);
 
-    // TAGGING STATES
+    // INPUTS
     const [bulkTagInput, setBulkTagInput] = useState('');
     const [inspectorTagInput, setInspectorTagInput] = useState('');
 
-    // --- TOAST & CONFIRMATION MODAL STATES ---
+    // FEEDBACK
     const [toast, setToast] = useState<{msg: string, type: 'success' | 'error' | 'info'} | null>(null);
     const triggerToast = (msg: string, type: 'success' | 'error' | 'info' = 'success') => setToast({ msg, type });
     const [confirmModal, setConfirmModal] = useState<{ title: string, message: string, onConfirm: () => void } | null>(null);
 
+    // 5. THE SCOPED DATA ENGINE
     useEffect(() => {
-        const qProfiles = query(collectionGroup(db, 'profile'));
-        const unsubProfiles = onSnapshot(qProfiles, (snap) => {
-            setAllProfiles(snap.docs.map(d => ({ uid: d.ref.path.split('/')[3], ...d.data() })));
-        });
+        // A. PROFILES: Filtered by Org if not Super Admin
+        const qProfiles = isSuperAdmin 
+            ? query(collectionGroup(db, 'profile')) 
+            : query(collectionGroup(db, 'profile'), where('orgId', '==', userOrgId));
+        const unsubProfiles = onSnapshot(qProfiles, (snap) => setAllProfiles(snap.docs.map(d => ({ uid: d.ref.path.split('/')[3], ...d.data() }))));
 
-        const qClasses = query(collectionGroup(db, 'classes'));
-        const unsubClasses = onSnapshot(qClasses, (snap) => {
-            setAllCohorts(snap.docs.map(d => ({ id: d.id, _instructorUid: d.ref.path.split('/')[3], ...d.data() })));
-        });
+        // B. COHORTS: Filtered by Org if not Super Admin
+        const qClasses = isSuperAdmin 
+            ? query(collectionGroup(db, 'classes'))
+            : query(collectionGroup(db, 'classes'), where('orgId', '==', userOrgId));
+        const unsubClasses = onSnapshot(qClasses, (snap) => setAllCohorts(snap.docs.map(d => ({ id: d.id, _instructorUid: d.ref.path.split('/')[3], ...d.data() }))));
 
-        const qLogs = query(collection(db, 'artifacts', appId, 'activity_logs'), where('scoreDetail.status', '==', 'pending_review'));
-        const unsubLogs = onSnapshot(qLogs, (snap) => {
-            setGlobalLogs(snap.docs.map(d => d.data()));
-        });
+        // C. ACTIVITY: Filtered by Org if not Super Admin
+        const qLogs = isSuperAdmin
+            ? query(collection(db, 'artifacts', appId, 'activity_logs'), where('scoreDetail.status', '==', 'pending_review'))
+            : query(collection(db, 'artifacts', appId, 'activity_logs'), where('orgId', '==', userOrgId), where('scoreDetail.status', '==', 'pending_review'));
+        const unsubLogs = onSnapshot(qLogs, (snap) => setGlobalLogs(snap.docs.map(d => d.data())));
 
-        const qContent = query(collectionGroup(db, 'custom_lessons'));
-        const unsubContent = onSnapshot(qContent, (snap) => {
-            setAllContent(snap.docs.map(d => ({ id: d.id, _instructorUid: d.ref.path.split('/')[3], ...d.data() })));
-        });
+        // D. VAULT: Filtered by (Global + Own Org)
+        const qContent = isSuperAdmin
+            ? query(collectionGroup(db, 'custom_lessons'))
+            : query(collectionGroup(db, 'custom_lessons'), where('orgId', 'in', ['global', userOrgId]));
+        const unsubContent = onSnapshot(qContent, (snap) => setAllContent(snap.docs.map(d => ({ id: d.id, _instructorUid: d.ref.path.split('/')[3], ...d.data() }))));
 
-        const qOrgs = query(collection(db, 'artifacts', appId, 'organizations'));
-        const unsubOrgs = onSnapshot(qOrgs, (snap) => {
-            setOrganizations(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-            setLoading(false);
-        });
+        // E. ORGANIZATIONS: (Super Admin Only)
+        let unsubOrgs = () => {};
+        if (isSuperAdmin) {
+            const qOrgs = query(collection(db, 'artifacts', appId, 'organizations'));
+            unsubOrgs = onSnapshot(qOrgs, (snap) => {
+                setOrganizations(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+                setLoading(false);
+            });
+        } else { setLoading(false); }
 
         return () => { unsubProfiles(); unsubClasses(); unsubLogs(); unsubContent(); unsubOrgs(); };
-    }, []);
+    }, [userOrgId, isSuperAdmin]);
 
-    // --- B2B FRANCHISE ACTIONS ---
+    // 6. ACTION HANDLERS
     const handleProvisionOrg = async () => {
         if (!newOrg.name.trim()) return;
         setIsProvisioning(true);
         try {
             await addDoc(collection(db, 'artifacts', appId, 'organizations'), {
-                name: newOrg.name.trim(),
-                logoUrl: newOrg.logoUrl.trim(),
-                themeColor: newOrg.themeColor,
+                ...newOrg,
                 createdAt: Date.now()
             });
             setShowOrgModal(false);
             setNewOrg({ name: '', logoUrl: '', themeColor: '#4f46e5' });
             triggerToast("B2B Organization Provisioned!", 'success');
-        } catch (e) {
-            triggerToast("Failed to provision organization.", 'error');
-        }
+        } catch (e) { triggerToast("Provisioning failed.", 'error'); }
         setIsProvisioning(false);
     };
 
@@ -6137,10 +6143,8 @@ function AdminDashboardView({ user }: any) {
             await updateDoc(doc(db, 'artifacts', appId, 'users', uid, 'profile', 'main'), {
                 orgId: orgId === 'global' ? null : orgId
             });
-            triggerToast("User migrated to new organization.", 'success');
-        } catch (e) {
-            triggerToast("Failed to migrate user.", 'error');
-        }
+            triggerToast("Migration complete.", 'success');
+        } catch (e) { triggerToast("Migration failed.", 'error'); }
     };
 
     const deleteOrganization = (orgId: string) => {
@@ -6157,18 +6161,20 @@ function AdminDashboardView({ user }: any) {
         });
     };
 
-    // --- STANDARD ADMIN ACTIONS ---
     const toggleUserRole = (uid: string, currentRole: string) => {
-        const newRole = currentRole === 'student' ? 'instructor' : 'student';
+        const roles = isSuperAdmin ? ['student', 'instructor', 'org_admin', 'admin'] : ['student', 'instructor', 'org_admin'];
+        const currentIndex = roles.indexOf(currentRole);
+        const nextRole = roles[(currentIndex + 1) % roles.length];
+
         setConfirmModal({
-            title: "Change User Role",
-            message: `Are you sure you want to change this user's permissions to ${newRole.toUpperCase()}?`,
+            title: "Update Permissions",
+            message: `Promote/Demote user to ${nextRole.toUpperCase()}?`,
             onConfirm: async () => {
                 try {
-                    await updateDoc(doc(db, 'artifacts', appId, 'users', uid, 'profile', 'main'), { role: newRole });
-                    if (selectedInstructorUid === uid && newRole === 'student') setSelectedInstructorUid(null); 
-                    triggerToast(`User role updated to ${newRole}`, 'success');
-                } catch (error) { triggerToast("Failed to update user role.", 'error'); }
+                    await updateDoc(doc(db, 'artifacts', appId, 'users', uid, 'profile', 'main'), { role: nextRole });
+                    if (selectedInstructorUid === uid && newRole === 'student') setSelectedInstructorUid(null);
+                    triggerToast(`Role updated to ${nextRole}`);
+                } catch (e) { triggerToast("Update failed", "error"); }
                 setConfirmModal(null);
             }
         });
@@ -6183,29 +6189,26 @@ function AdminDashboardView({ user }: any) {
                 authorName: user.displayName || 'System Admin',
                 timestamp: Date.now(),
                 active: true,
-                type: 'system_alert'
+                type: 'system_alert',
+                orgId: isSuperAdmin ? 'global' : userOrgId
             });
             setBroadcastMsg('');
             setShowBroadcastModal(false);
-            triggerToast("Global alert broadcasted to all users!", 'success');
-        } catch (error) { 
-            triggerToast("Failed to send broadcast.", 'error'); 
-        }
+            triggerToast("Alert broadcasted successfully!", 'success');
+        } catch (error) { triggerToast("Failed to send broadcast.", 'error'); }
         setIsBroadcasting(false);
     };
 
     const forceDeleteCohort = (instructorUid: string, classId: string) => {
         setConfirmModal({
             title: "Nuke Cohort",
-            message: "CRITICAL WARNING: This will permanently delete this cohort and disconnect all students. This cannot be undone.",
+            message: "Permanently delete this classroom? This cannot be undone.",
             onConfirm: async () => {
                 try {
                     await deleteDoc(doc(db, 'artifacts', appId, 'users', instructorUid, 'classes', classId));
                     setSelectedCohortId(null);
-                    triggerToast("Cohort successfully deleted.", 'success');
-                } catch (e) { 
-                    triggerToast("Failed to delete cohort.", 'error'); 
-                }
+                    triggerToast("Cohort deleted.", 'success');
+                } catch (e) { triggerToast("Delete failed.", 'error'); }
                 setConfirmModal(null);
             }
         });
@@ -6220,9 +6223,7 @@ function AdminDashboardView({ user }: any) {
                     const classRef = doc(db, 'artifacts', appId, 'users', instructorUid, 'classes', classId);
                     await updateDoc(classRef, { studentEmails: arrayRemove(studentEmail), students: arrayRemove(studentObj) });
                     triggerToast("Student removed from roster.", 'success');
-                } catch (e) { 
-                    triggerToast("Failed to remove student.", 'error'); 
-                }
+                } catch (e) { triggerToast("Failed to remove student.", 'error'); }
                 setConfirmModal(null);
             }
         });
@@ -6237,9 +6238,7 @@ function AdminDashboardView({ user }: any) {
                     await deleteDoc(doc(db, 'artifacts', appId, 'users', instructorUid, 'custom_lessons', contentId));
                     setSelectedContentId(null);
                     triggerToast("Curriculum item nuked from platform.", 'success');
-                } catch (e) { 
-                    triggerToast("Failed to delete content.", 'error'); 
-                }
+                } catch (e) { triggerToast("Failed to delete content.", 'error'); }
                 setConfirmModal(null);
             }
         });
@@ -6259,9 +6258,7 @@ function AdminDashboardView({ user }: any) {
                     const count = selectedVaultItems.length;
                     setSelectedVaultItems([]); 
                     triggerToast(`Successfully purged ${count} items.`, 'success');
-                } catch (e) { 
-                    triggerToast("Error during bulk deletion.", 'error'); 
-                }
+                } catch (e) { triggerToast("Error during bulk deletion.", 'error'); }
                 setConfirmModal(null);
             }
         });
@@ -6274,9 +6271,7 @@ function AdminDashboardView({ user }: any) {
             await updateDoc(contentRef, { tags: arrayUnion(inspectorTagInput.trim().toLowerCase()) });
             triggerToast(`Tag added.`, 'info');
             setInspectorTagInput('');
-        } catch (e) { 
-            triggerToast("Failed to add tag.", 'error'); 
-        }
+        } catch (e) { triggerToast("Failed to add tag.", 'error'); }
     };
 
     const handleRemoveSingleTag = async (instructorUid: string, contentId: string, tagToRemove: string) => {
@@ -6284,30 +6279,21 @@ function AdminDashboardView({ user }: any) {
             const contentRef = doc(db, 'artifacts', appId, 'users', instructorUid, 'custom_lessons', contentId);
             await updateDoc(contentRef, { tags: arrayRemove(tagToRemove) });
             triggerToast(`Tag removed.`, 'info');
-        } catch (e) { 
-            triggerToast("Failed to remove tag.", 'error'); 
-        }
+        } catch (e) { triggerToast("Failed to remove tag.", 'error'); }
     };
 
     const handleBulkTagAdd = async () => {
         if (!bulkTagInput.trim()) return;
-        const formattedTag = bulkTagInput.trim().toLowerCase();
+        const tag = bulkTagInput.trim().toLowerCase();
         try {
             const tagPromises = selectedVaultItems.map(id => {
                 const item = allContent.find(c => c.id === id);
-                if (item) {
-                    return updateDoc(
-                        doc(db, 'artifacts', appId, 'users', item._instructorUid, 'custom_lessons', id), 
-                        { tags: arrayUnion(formattedTag) }
-                    );
-                }
+                if (item) return updateDoc(doc(db, 'artifacts', appId, 'users', item._instructorUid, 'custom_lessons', id), { tags: arrayUnion(tag) });
             });
             await Promise.all(tagPromises);
             setBulkTagInput('');
-            triggerToast(`Tag '${formattedTag}' applied to ${selectedVaultItems.length} items.`, 'success');
-        } catch (e) { 
-            triggerToast("Error applying bulk tags.", 'error'); 
-        }
+            triggerToast(`Tag '${tag}' applied.`, 'success');
+        } catch (e) { triggerToast("Tagging failed.", 'error'); }
     };
 
     const executeDeployment = async () => {
@@ -6317,18 +6303,14 @@ function AdminDashboardView({ user }: any) {
             const pushPromises = deploySelectedCohorts.map(cohortId => {
                 const cohort = allCohorts.find(c => c.id === cohortId);
                 if (!cohort) return Promise.resolve();
-                const classRef = doc(db, 'artifacts', appId, 'users', cohort._instructorUid, 'classes', cohort.id);
-                return updateDoc(classRef, { assignments: arrayUnion(deployingContent.id) });
+                return updateDoc(doc(db, 'artifacts', appId, 'users', cohort._instructorUid, 'classes', cohort.id), { assignments: arrayUnion(deployingContent.id) });
             });
             await Promise.all(pushPromises);
             setDeployingContent(null);
             setDeploySelectedCohorts([]);
             setSelectedContentId(null); 
-            triggerToast(`Deployment Successful! Pushed to ${deploySelectedCohorts.length} cohorts.`, 'success');
-        } catch (error) {
-            console.error("Deployment Error:", error);
-            triggerToast("Failed to deploy content. Check console for details.", 'error');
-        }
+            triggerToast(`Pushed to ${deploySelectedCohorts.length} cohorts.`, 'success');
+        } catch (error) { triggerToast("Deployment failed.", 'error'); }
         setIsDeploying(false);
     };
 
@@ -6336,16 +6318,16 @@ function AdminDashboardView({ user }: any) {
     const toggleVaultItemSelection = (id: string, e: React.MouseEvent) => { e.stopPropagation(); setSelectedVaultItems(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]); };
     const toggleCohortSelection = (id: string) => setDeploySelectedCohorts(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
 
-    // --- DATA PROCESSING ---
-    const students = allProfiles.filter(p => p.role === 'student');
-    const instructors = allProfiles.filter(p => p.role === 'instructor' || p.role === 'admin');
-
+    // 7. DERIVED UI DATA
+    const studentsCount = allProfiles.filter(p => p.role === 'student').length;
+    const instructorsCount = allProfiles.filter(p => p.role === 'instructor' || p.role === 'org_admin' || p.role === 'admin').length;
+    
     const populatedCohorts = allCohorts.map(cohort => {
-        const inst = instructors.find(i => i.uid === cohort._instructorUid);
-        return { ...cohort, instructorName: inst?.name || 'Unknown Instructor', instructorEmail: inst?.email || 'Unknown', studentCount: cohort.students?.length || 0 };
+        const inst = allProfiles.find(i => i.uid === cohort._instructorUid);
+        return { ...cohort, instructorName: inst?.name || 'Unknown', studentCount: cohort.students?.length || 0 };
     });
 
-    const populatedInstructors = instructors.map(inst => {
+    const populatedInstructors = allProfiles.filter(p => p.role === 'instructor' || p.role === 'org_admin' || p.role === 'admin').map(inst => {
         const theirCohorts = allCohorts.filter(c => c._instructorUid === inst.uid);
         const theirStudentEmails = theirCohorts.flatMap(c => c.studentEmails || []);
         const theirPendingGrades = globalLogs.filter(log => theirStudentEmails.includes(log.studentEmail)).length;
@@ -6354,69 +6336,54 @@ function AdminDashboardView({ user }: any) {
     });
 
     const populatedContent = allContent.map(item => {
-        const author = instructors.find(i => i.uid === item._instructorUid);
+        const author = allProfiles.find(i => i.uid === item._instructorUid);
         return { ...item, authorName: author?.name || 'Unknown Author' };
     });
 
-    const filteredProfiles = allProfiles.filter(p => {
-        if (!directorySearch) return true;
-        const searchStr = `${p.name || ''} ${p.email || ''} ${p.role || ''}`.toLowerCase();
-        return searchStr.includes(directorySearch.toLowerCase());
-    });
+    const filteredProfiles = allProfiles.filter(p => `${p.name} ${p.email}`.toLowerCase().includes(directorySearch.toLowerCase()));
 
     const filteredContent = populatedContent.filter(c => {
-        const searchStr = `${c.title || ''} ${c.authorName || ''} ${c.type || ''} ${(c.tags || []).join(' ')}`.toLowerCase();
-        const matchesSearch = !vaultSearch || searchStr.includes(vaultSearch.toLowerCase());
-        const isArcade = c.type === 'arcade_game';
-        const isExam = c.type === 'exam' || c.type === 'test';
-        const mappedType = isArcade ? 'arcade' : isExam ? 'exam' : 'lesson';
-        const matchesFilter = vaultFilters.includes(mappedType);
-        return matchesSearch && matchesFilter;
+        const matchesSearch = !vaultSearch || `${c.title} ${(c.tags || []).join(' ')} ${c.authorName}`.toLowerCase().includes(vaultSearch.toLowerCase());
+        const mappedType = c.type === 'arcade_game' ? 'arcade' : (c.type === 'exam' || c.type === 'test' ? 'exam' : 'lesson');
+        return matchesSearch && vaultFilters.includes(mappedType);
     });
 
-    const metrics = { totalStudents: students.length, activeCohorts: allCohorts.length, totalInstructors: instructors.length, pendingGrades: globalLogs.length, activeTenants: organizations.length };
-
-    if (loading) return ( <div className="h-full flex flex-col items-center justify-center bg-slate-50 text-emerald-500"><Loader className="animate-spin mb-4" size={40} /><p className="font-black uppercase tracking-widest text-xs text-slate-400">Decrypting Global State...</p></div> );
+    if (loading) return <div className="h-full flex flex-col items-center justify-center text-emerald-500 bg-slate-50"><Loader className="animate-spin mb-4" size={40} /><p className="font-black uppercase tracking-widest text-[10px]">Synchronizing Multi-Tenant State...</p></div>;
 
     const activeInstructor = populatedInstructors.find(i => i.uid === selectedInstructorUid);
     const activeCohort = populatedCohorts.find(c => c.id === selectedCohortId);
     const activeContent = populatedContent.find(c => c.id === selectedContentId);
 
     return (
-        <div className="h-full flex flex-col bg-slate-50 overflow-hidden animate-in fade-in duration-500 font-sans select-none relative">
+        <div className="h-full flex flex-col bg-slate-50 overflow-hidden font-sans relative">
             
-            {/* THE NEW TOAST RENDERER */}
-            {toast && (
-                <div className="absolute top-0 left-0 w-full z-[3000] flex justify-center pointer-events-none">
-                    <JuicyToast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />
-                </div>
-            )}
+            {/* OVERLAY: TOASTS */}
+            {toast && <div className="absolute top-0 left-0 w-full z-[4000] flex justify-center pointer-events-none"><JuicyToast message={toast.msg} type={toast.type} onClose={() => setToast(null)} /></div>}
 
-            {/* UNIVERSAL CONFIRMATION MODAL */}
+            {/* OVERLAY: CONFIRMATION MODAL */}
             {confirmModal && (
-                <div className="absolute inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
+                <div className="absolute inset-0 z-[3000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
                     <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8 text-center animate-in zoom-in-95 duration-200">
                         <div className="w-20 h-20 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><AlertTriangle size={32} /></div>
                         <h3 className="text-2xl font-black text-slate-900 mb-2">{confirmModal.title}</h3>
                         <p className="text-slate-500 text-sm mb-8 leading-relaxed font-medium">{confirmModal.message}</p>
                         <div className="flex gap-3">
-                            <button onClick={() => setConfirmModal(null)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-200 transition-colors">Cancel</button>
-                            <button onClick={confirmModal.onConfirm} className="flex-[1.5] py-4 bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-rose-700 shadow-lg shadow-rose-200 transition-all active:scale-95">Confirm</button>
+                            <button onClick={() => setConfirmModal(null)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-xs uppercase hover:bg-slate-200 transition-colors">Cancel</button>
+                            <button onClick={confirmModal.onConfirm} className="flex-[1.5] py-4 bg-rose-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-rose-200 active:scale-95 transition-all">Confirm</button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* CREATE ORG MODAL */}
+            {/* OVERLAY: PROVISION ORG MODAL */}
             {showOrgModal && (
                 <div className="absolute inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl p-8 relative animate-in zoom-in-95">
                         <button onClick={() => setShowOrgModal(false)} className="absolute top-6 right-6 text-slate-400 hover:text-rose-500 transition-colors"><X size={24}/></button>
                         <div className="flex items-center gap-4 mb-8">
                             <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shadow-inner"><Briefcase size={28} /></div>
-                            <div><h2 className="text-2xl font-black text-slate-900 leading-tight">New Franchise</h2><p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">B2B Tenant Setup</p></div>
+                            <div><h2 className="text-2xl font-black text-slate-900 leading-tight">New Franchise</h2><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Provision B2B Tenant</p></div>
                         </div>
-                        
                         <div className="space-y-4">
                             <div>
                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Organization Name</label>
@@ -6428,31 +6395,30 @@ function AdminDashboardView({ user }: any) {
                             </div>
                             <div>
                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Brand Theme Color</label>
-                                <div className="flex items-center gap-3">
-                                    <input type="color" value={newOrg.themeColor} onChange={e => setNewOrg({...newOrg, themeColor: e.target.value})} className="w-12 h-12 rounded-xl cursor-pointer border-none bg-transparent" />
-                                    <span className="font-mono text-sm font-bold text-slate-500">{newOrg.themeColor}</span>
+                                <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border-2 border-slate-200">
+                                    <input type="color" value={newOrg.themeColor} onChange={e => setNewOrg({...newOrg, themeColor: e.target.value})} className="w-10 h-10 border-none cursor-pointer bg-transparent" />
+                                    <span className="font-mono text-sm font-black text-slate-600 uppercase">{newOrg.themeColor}</span>
                                 </div>
                             </div>
-
-                            <button onClick={handleProvisionOrg} disabled={!newOrg.name.trim() || isProvisioning} className="w-full mt-4 py-5 bg-slate-900 hover:bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2">
-                                {isProvisioning ? <Loader size={18} className="animate-spin" /> : <Shield size={18} />} Provision Tenant
+                            <button onClick={handleProvisionOrg} disabled={!newOrg.name.trim() || isProvisioning} className="w-full mt-4 py-5 bg-slate-900 hover:bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2">
+                                {isProvisioning ? <Loader size={18} className="animate-spin" /> : <Shield size={18} />} Initialize Tenant
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* GLOBAL BROADCAST MODAL */}
+            {/* OVERLAY: GLOBAL BROADCAST MODAL */}
             {showBroadcastModal && (
                 <div className="absolute inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl p-8 relative animate-in zoom-in-95 duration-200">
                         <button onClick={() => setShowBroadcastModal(false)} className="absolute top-6 right-6 text-slate-400 hover:text-rose-500 transition-colors"><X size={24}/></button>
                         <div className="flex items-center gap-4 mb-6">
                             <div className="w-14 h-14 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center shadow-inner"><Megaphone size={28} /></div>
-                            <div><h2 className="text-2xl font-black text-slate-900">Global Broadcast</h2><p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Platform-Wide Alert</p></div>
+                            <div><h2 className="text-2xl font-black text-slate-900">System Broadcast</h2><p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">{isSuperAdmin ? 'Global Alert' : 'Tenant Alert'}</p></div>
                         </div>
                         <div className="space-y-4">
-                            <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3"><AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" /><p className="text-xs font-bold text-amber-800 leading-relaxed">Warning: This message will be pushed to the database and will appear for every active Student and Instructor.</p></div>
+                            <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3"><AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" /><p className="text-xs font-bold text-amber-800 leading-relaxed">Warning: This message will be pushed to {isSuperAdmin ? 'all users across all organizations' : 'all users in your organization'}.</p></div>
                             <textarea className="w-full p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-medium text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white transition-colors resize-none h-32" placeholder="Type your system announcement here..." value={broadcastMsg} onChange={(e) => setBroadcastMsg(e.target.value)} />
                             <button onClick={handleGlobalBroadcast} disabled={!broadcastMsg.trim() || isBroadcasting} className="w-full py-5 bg-slate-900 hover:bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2">
                                 {isBroadcasting ? <Loader size={18} className="animate-spin" /> : <Send size={18} />} Push to Network
@@ -6462,7 +6428,7 @@ function AdminDashboardView({ user }: any) {
                 </div>
             )}
 
-            {/* INSTRUCTOR DOSSIER */}
+            {/* OVERLAY: INSTRUCTOR DOSSIER MODAL */}
             {activeInstructor && (
                 <div className="absolute inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
                     <div className="bg-white w-full max-w-4xl rounded-[3rem] shadow-2xl relative animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]">
@@ -6487,7 +6453,7 @@ function AdminDashboardView({ user }: any) {
                                 </div>
                                 <div className="space-y-3">
                                     <a href={`mailto:${activeInstructor.email}`} className="w-full py-4 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-2xl font-black text-sm transition-all shadow-sm flex items-center justify-center gap-2 group"><Mail size={18} className="group-hover:scale-110 transition-transform"/> Message Instructor</a>
-                                    {activeInstructor.role !== 'admin' && ( <button onClick={() => toggleUserRole(activeInstructor.uid, activeInstructor.role)} className="w-full py-4 bg-white border-2 border-slate-200 hover:border-rose-500 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-2xl font-black text-sm transition-all shadow-sm flex items-center justify-center gap-2"><Shield size={18}/> Revoke Status</button> )}
+                                    {activeInstructor.role !== 'admin' && ( <button onClick={() => toggleUserRole(activeInstructor.uid, activeInstructor.role)} className="w-full py-4 bg-white border-2 border-slate-200 hover:border-rose-500 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-2xl font-black text-sm transition-all shadow-sm flex items-center justify-center gap-2"><Shield size={18}/> Manage Permissions</button> )}
                                 </div>
                             </div>
                             <div className="w-full md:w-2/3">
@@ -6510,7 +6476,7 @@ function AdminDashboardView({ user }: any) {
                 </div>
             )}
 
-            {/* 3. COHORT GOVERNANCE INSPECTOR */}
+            {/* OVERLAY: COHORT GOVERNANCE INSPECTOR */}
             {activeCohort && (
                 <div className="absolute inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
                     <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl relative animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[85vh]">
@@ -6549,10 +6515,11 @@ function AdminDashboardView({ user }: any) {
                 </div>
             )}
 
-            {/* 4. CONTENT VAULT DEPLOYMENT MATRIX / INSPECTOR */}
+            {/* OVERLAY: CONTENT VAULT DEPLOYMENT MATRIX & INSPECTOR */}
             {activeContent && (
                 <div className="absolute inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
                     {deployingContent ? (
+                        /* MATRIX VIEW */
                         <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl relative animate-in zoom-in-95 duration-300 overflow-hidden flex flex-col max-h-[85vh]">
                             <div className="p-8 border-b border-slate-100 bg-indigo-600 text-white relative overflow-hidden shrink-0">
                                 <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
@@ -6599,15 +6566,14 @@ function AdminDashboardView({ user }: any) {
                             </div>
                         </div>
                     ) : (
+                        /* VAULT INSPECTOR VIEW */
                         <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl relative animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]">
                             <div className="p-8 border-b border-slate-100 flex justify-between items-start bg-slate-50/80 relative overflow-hidden shrink-0">
                                 <div className={`absolute top-0 left-0 w-2 h-full ${activeContent.type === 'arcade_game' ? 'bg-amber-500' : activeContent.type === 'exam' || activeContent.type === 'test' ? 'bg-rose-500' : 'bg-indigo-500'}`} />
                                 <div>
                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Content Inspector</span>
                                     <h2 className="text-2xl font-black text-slate-900 leading-tight mb-2">{activeContent.title || 'Untitled Content'}</h2>
-                                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                                        <User size={14} className="text-indigo-500"/> Created by {activeContent.authorName}
-                                    </div>
+                                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500"><User size={14} className="text-indigo-500"/> Created by {activeContent.authorName}</div>
                                 </div>
                                 <button onClick={() => setSelectedContentId(null)} className="p-2 text-slate-400 hover:text-slate-600 bg-white border border-slate-200 rounded-full transition-all shadow-sm relative z-10"><X size={20}/></button>
                             </div>
@@ -6623,12 +6589,11 @@ function AdminDashboardView({ user }: any) {
                                     </div>
                                 </div>
                                 
+                                {/* TAG MANAGER */}
                                 <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Tag size={12}/> Content Tags</span>
                                     <div className="flex flex-wrap gap-2">
-                                        {(!activeContent.tags || activeContent.tags.length === 0) && (
-                                            <span className="text-xs font-bold text-slate-400 italic">No tags assigned.</span>
-                                        )}
+                                        {(!activeContent.tags || activeContent.tags.length === 0) && <span className="text-xs font-bold text-slate-400 italic">No tags assigned.</span>}
                                         {activeContent.tags?.map((tag: string) => (
                                             <div key={tag} className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-black text-slate-600 shadow-sm">
                                                 {tag}
@@ -6637,16 +6602,10 @@ function AdminDashboardView({ user }: any) {
                                         ))}
                                     </div>
                                     <div className="flex gap-2">
-                                        <input 
-                                            type="text" placeholder="Add a new tag..." value={inspectorTagInput}
-                                            onChange={(e) => setInspectorTagInput(e.target.value)}
-                                            onKeyDown={(e) => { if(e.key === 'Enter') handleAddSingleTag(activeContent._instructorUid, activeContent.id); }}
-                                            className="flex-1 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-                                        />
+                                        <input type="text" placeholder="Add a new tag..." value={inspectorTagInput} onChange={(e) => setInspectorTagInput(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter') handleAddSingleTag(activeContent._instructorUid, activeContent.id); }} className="flex-1 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" />
                                         <button onClick={() => handleAddSingleTag(activeContent._instructorUid, activeContent.id)} disabled={!inspectorTagInput.trim()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 transition-colors">Add</button>
                                     </div>
                                 </div>
-
                                 <button onClick={() => setDeployingContent(activeContent)} className="w-full py-5 bg-indigo-50 border-2 border-indigo-200 text-indigo-700 font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-indigo-600 hover:text-white transition-colors shadow-sm flex items-center justify-center gap-2 group">
                                     <Zap size={16} className="group-hover:scale-125 transition-transform" /> Deploy to Network
                                 </button>
@@ -6660,16 +6619,24 @@ function AdminDashboardView({ user }: any) {
             )}
 
             {/* ============================================================== */}
-            {/* MAIN ADMIN DASHBOARD UI */}
+            {/* MAIN ADMIN DASHBOARD UI (BACKGROUND LAYER) */}
             {/* ============================================================== */}
+
             <header className="h-24 bg-slate-900 px-6 md:px-10 flex justify-between items-center shrink-0 z-30 shadow-xl">
                 <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.4)]"><Shield size={24} /></div>
-                    <div><h2 className="text-xl font-black text-white tracking-tighter uppercase leading-none">Command Center</h2><p className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.3em] mt-1">L.L.L.M.S. Admin Access</p></div>
+                    <div><h2 className="text-xl font-black text-white tracking-tighter uppercase leading-none">{isSuperAdmin ? 'Command Center' : 'Org Portal'}</h2><p className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.3em] mt-1">{isSuperAdmin ? 'Global Access' : 'Tenant Management'}</p></div>
                 </div>
                 <div className="flex bg-slate-800 p-1.5 rounded-[1.5rem] overflow-x-auto hide-scrollbar">
-                    {[ { id: 'overview', label: 'Overview' }, { id: 'franchise', label: 'B2B Orgs' }, { id: 'cohorts', label: 'Cohorts' }, { id: 'instructors', label: 'Staff' }, { id: 'directory', label: 'Directory' }, { id: 'vault', label: 'The Vault' } ].map(tab => (
-                        <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>{tab.label}</button>
+                    {[ 
+                        isSuperAdmin && { id: 'overview', label: 'Global' }, 
+                        isSuperAdmin && { id: 'franchise', label: 'B2B Orgs' }, 
+                        { id: 'cohorts', label: 'Cohorts' }, 
+                        { id: 'instructors', label: 'Staff' }, 
+                        { id: 'directory', label: 'Directory' }, 
+                        { id: 'vault', label: 'The Vault' } 
+                    ].filter(Boolean).map((tab:any) => (
+                        <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>{tab.label}</button>
                     ))}
                 </div>
             </header>
@@ -6677,14 +6644,14 @@ function AdminDashboardView({ user }: any) {
             <div className="flex-1 overflow-y-auto p-6 md:p-12 custom-scrollbar relative">
                 <div className="max-w-6xl mx-auto space-y-12 pb-48">
 
-                    {/* OVERVIEW TAB */}
-                    {activeTab === 'overview' && (
+                    {/* OVERVIEW TAB (Super Admin Only) */}
+                    {activeTab === 'overview' && isSuperAdmin && (
                         <div className="space-y-12 animate-in slide-in-from-bottom-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                <MetricCard icon={<Users size={24} className="text-indigo-500"/>} label="Total Enrollment" value={metrics.totalStudents} trend="Active Profiles" color="indigo" />
-                                <MetricCard icon={<Briefcase size={24} className="text-purple-500"/>} label="Active Franchises" value={metrics.activeTenants} trend="B2B Organizations" color="indigo" />
-                                <MetricCard icon={<BookOpen size={24} className="text-emerald-500"/>} label="Global Cohorts" value={metrics.activeCohorts} trend="Deployed Classes" color="emerald" />
-                                <MetricCard icon={<AlertCircle size={24} className="text-rose-500"/>} label="Global Pending" value={metrics.pendingGrades} trend="Exams awaiting grades" color="rose" />
+                                <MetricCard icon={<Users size={24} className="text-indigo-500"/>} label="Global Enrollment" value={studentsCount} trend="Active Profiles" color="indigo" />
+                                <MetricCard icon={<Briefcase size={24} className="text-purple-500"/>} label="Active Franchises" value={organizations.length} trend="B2B Organizations" color="indigo" />
+                                <MetricCard icon={<BookOpen size={24} className="text-emerald-500"/>} label="Global Cohorts" value={populatedCohorts.length} trend="Deployed Classes" color="emerald" />
+                                <MetricCard icon={<AlertCircle size={24} className="text-rose-500"/>} label="Global Pending" value={globalLogs.length} trend="Exams awaiting grades" color="rose" />
                             </div>
                             <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
                                 <div><h3 className="text-2xl font-black text-slate-900 mb-1">System Global Broadcast</h3><p className="text-sm font-bold text-slate-500">Push an alert to every single user on the platform.</p></div>
@@ -6693,8 +6660,8 @@ function AdminDashboardView({ user }: any) {
                         </div>
                     )}
 
-                    {/* FRANCHISE ENGINE TAB */}
-                    {activeTab === 'franchise' && (
+                    {/* FRANCHISE ENGINE TAB (Super Admin Only) */}
+                    {activeTab === 'franchise' && isSuperAdmin && (
                         <div className="space-y-8 animate-in slide-in-from-bottom-4">
                             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm">
                                 <div><h3 className="text-2xl font-black text-slate-900">Franchise Engine</h3><p className="text-sm font-bold text-slate-500 max-w-lg mt-2 leading-relaxed">Provision isolated B2B environments. Users assigned to an organization enter a walled garden with branded styling.</p></div>
@@ -6704,13 +6671,13 @@ function AdminDashboardView({ user }: any) {
                                 {organizations.map(org => {
                                     const orgUsersCount = allProfiles.filter(p => p.orgId === org.id).length;
                                     return (
-                                        <div key={org.id} className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm relative overflow-hidden group">
+                                        <div key={org.id} className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm relative overflow-hidden group hover:border-indigo-200 transition-colors">
                                             <div className="absolute top-0 left-0 w-full h-2 transition-all" style={{ backgroundColor: org.themeColor || '#4f46e5' }} />
                                             <div className="flex justify-between items-start mb-6">
                                                 {org.logoUrl ? <img src={org.logoUrl} alt={org.name} className="w-16 h-16 object-contain rounded-xl border border-slate-100 p-1" /> : <div className="w-16 h-16 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 font-black text-xl border border-slate-200">{org.name.charAt(0).toUpperCase()}</div>}
                                                 <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100">ID: {org.id.substring(0,6)}</span>
                                             </div>
-                                            <h3 className="text-xl font-black text-slate-900 mb-1">{org.name}</h3>
+                                            <h3 className="text-xl font-black text-slate-900 mb-1 truncate">{org.name}</h3>
                                             <p className="text-xs font-bold text-slate-400 mb-6 flex items-center gap-1"><Users size={12}/> {orgUsersCount} Users Assigned</p>
                                             <button onClick={() => deleteOrganization(org.id)} className="w-full py-3 bg-white border-2 border-slate-100 text-rose-500 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-rose-50 hover:border-rose-200 transition-colors">Dissolve Tenant</button>
                                         </div>
@@ -6723,11 +6690,11 @@ function AdminDashboardView({ user }: any) {
                         </div>
                     )}
 
-                    {/* COHORTS TAB */}
+                    {/* COHORTS TAB (Scoped) */}
                     {activeTab === 'cohorts' && (
                         <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in">
                             <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                                <div><h3 className="text-2xl font-black text-slate-900">Platform Deployments</h3><p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">All Active Cohorts</p></div>
+                                <div><h3 className="text-2xl font-black text-slate-900">Platform Deployments</h3><p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{isOrgAdmin ? 'Local Tenant View' : 'Global Network View'}</p></div>
                                 <div className="text-xs font-bold text-slate-500 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm">Click a row to audit</div>
                             </div>
                             <table className="w-full text-left border-collapse">
@@ -6741,14 +6708,14 @@ function AdminDashboardView({ user }: any) {
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
                                     {populatedCohorts.length === 0 ? (
-                                        <tr><td colSpan={4} className="p-12 text-center text-slate-400 font-bold italic">No cohorts found in database.</td></tr>
+                                        <tr><td colSpan={4} className="p-12 text-center text-slate-400 font-bold italic">No cohorts found in this environment.</td></tr>
                                     ) : (
                                         populatedCohorts.map(cohort => (
                                             <tr key={cohort.id} onClick={() => setSelectedCohortId(cohort.id)} className="hover:bg-slate-50 transition-colors group cursor-pointer">
                                                 <td className="p-6"><div className="flex items-center gap-4"><div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors shadow-sm"><BookOpen size={16} /></div><div><span className="font-black text-slate-800 text-sm block group-hover:text-indigo-600 transition-colors">{cohort.name}</span><span className="text-[9px] font-black uppercase tracking-widest text-slate-400 mt-1 inline-block">{(cohort.assignments?.length || 0)} Units Assigned</span></div></div></td>
                                                 <td className="p-6 font-bold text-slate-600 text-sm">{cohort.instructorName}</td>
                                                 <td className="p-6 text-center"><span className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-black group-hover:bg-white group-hover:border group-hover:border-slate-200 transition-colors">{cohort.studentCount} <Users size={12} className="inline ml-1 opacity-50"/></span></td>
-                                                <td className="p-6 flex items-center justify-between"><span className="text-xs font-mono font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100">{cohort.id}</span><ChevronRight size={18} className="text-slate-300 group-hover:text-indigo-500 transition-colors opacity-0 group-hover:opacity-100" /></td>
+                                                <td className="p-6 flex items-center justify-between"><span className="text-xs font-mono font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100">{cohort.id.substring(0,8)}</span><ChevronRight size={18} className="text-slate-300 group-hover:text-indigo-500 transition-colors opacity-0 group-hover:opacity-100" /></td>
                                             </tr>
                                         ))
                                     )}
@@ -6757,7 +6724,7 @@ function AdminDashboardView({ user }: any) {
                         </div>
                     )}
 
-                    {/* INSTRUCTORS TAB */}
+                    {/* INSTRUCTORS TAB (Scoped) */}
                     {activeTab === 'instructors' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4">
                             {populatedInstructors.map(inst => (
@@ -6772,14 +6739,15 @@ function AdminDashboardView({ user }: any) {
                                     </div>
                                 </button>
                             ))}
+                            {populatedInstructors.length === 0 && <div className="col-span-full text-center py-10 text-slate-400 font-bold">No instructors found in this environment.</div>}
                         </div>
                     )}
 
-                    {/* DIRECTORY TAB */}
+                    {/* DIRECTORY TAB (Scoped & Routed) */}
                     {activeTab === 'directory' && (
                         <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in">
                             <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-slate-50/50">
-                                <div><h3 className="text-2xl font-black text-slate-900">User Directory</h3><p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Platform-Wide Access Control</p></div>
+                                <div><h3 className="text-2xl font-black text-slate-900">User Directory</h3><p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Access Control</p></div>
                                 <div className="relative w-full md:w-72"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input type="text" placeholder="Search name or email..." value={directorySearch} onChange={(e) => setDirectorySearch(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 shadow-sm transition-all" /></div>
                             </div>
                             <div className="overflow-x-auto">
@@ -6788,19 +6756,19 @@ function AdminDashboardView({ user }: any) {
                                         <tr className="bg-white border-b border-slate-100">
                                             <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">User Profile</th>
                                             <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Access Level</th>
-                                            {organizations.length > 0 && <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">B2B Routing (Tenant)</th>}
+                                            {isSuperAdmin && organizations.length > 0 && <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">B2B Routing (Tenant)</th>}
                                             <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Status</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
                                         {filteredProfiles.length === 0 ? (
-                                            <tr><td colSpan={4} className="p-12 text-center text-slate-400 font-bold italic">No users found matching "{directorySearch}".</td></tr>
+                                            <tr><td colSpan={4} className="p-12 text-center text-slate-400 font-bold italic">No users found.</td></tr>
                                         ) : (
                                             filteredProfiles.map(profile => (
                                                 <tr key={profile.uid} className="hover:bg-slate-50 transition-colors group">
                                                     <td className="p-6"><div className="flex items-center gap-4"><div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 font-black flex items-center justify-center border border-slate-200 shadow-inner shrink-0">{profile.name?.charAt(0).toUpperCase() || '?'}</div><div><span className="font-black text-slate-800 text-sm block">{profile.name || "Pending Setup"}</span><span className="text-[10px] font-bold text-slate-400">{profile.email}</span></div></div></td>
-                                                    <td className="p-6"><button onClick={() => toggleUserRole(profile.uid, profile.role)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 ${profile.role === 'instructor' ? 'bg-indigo-600 text-white hover:bg-rose-500 hover:shadow-rose-200' : profile.role === 'admin' ? 'bg-slate-900 text-amber-400 cursor-not-allowed' : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-500 hover:text-indigo-600'}`} disabled={profile.role === 'admin'}>{profile.role}</button></td>
-                                                    {organizations.length > 0 && (
+                                                    <td className="p-6"><button onClick={() => toggleUserRole(profile.uid, profile.role)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 ${profile.role === 'admin' ? 'bg-slate-900 text-amber-400 cursor-not-allowed' : profile.role === 'org_admin' ? 'bg-purple-600 text-white' : profile.role === 'instructor' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-500 hover:text-indigo-600'}`} disabled={profile.role === 'admin'}>{profile.role}</button></td>
+                                                    {isSuperAdmin && organizations.length > 0 && (
                                                         <td className="p-6">
                                                             <select value={profile.orgId || 'global'} onChange={(e) => assignUserToOrg(profile.uid, e.target.value)} className="w-full max-w-[200px] p-2.5 bg-white border-2 border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 cursor-pointer shadow-sm">
                                                                 <option value="global">🌍 Global Pool</option>
@@ -6818,12 +6786,12 @@ function AdminDashboardView({ user }: any) {
                         </div>
                     )}
 
-                    {/* VAULT TAB WITH BULK DOCK */}
+                    {/* VAULT TAB (Scoped & Filterable) */}
                     {activeTab === 'vault' && (
                         <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in">
                             <div className="p-8 border-b border-slate-100 flex flex-col gap-6 bg-slate-50/50">
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                                    <div><h3 className="text-2xl font-black text-slate-900">The Curriculum Vault</h3><p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Platform-Wide Content Repository</p></div>
+                                    <div><h3 className="text-2xl font-black text-slate-900">The Curriculum Vault</h3><p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{isOrgAdmin ? 'Tenant Library' : 'Global Repository'}</p></div>
                                     <div className="relative w-full md:w-80"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input type="text" placeholder="Search title, author, or tags..." value={vaultSearch} onChange={(e) => setVaultSearch(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 shadow-sm transition-all" /></div>
                                 </div>
                                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-t border-slate-200/60 pt-4">
@@ -6836,7 +6804,6 @@ function AdminDashboardView({ user }: any) {
                                     <button onClick={() => setSelectedVaultItems(selectedVaultItems.length === filteredContent.length ? [] : filteredContent.map(c => c.id))} className="text-[10px] font-black text-indigo-500 uppercase tracking-widest hover:text-indigo-700 transition-colors">{selectedVaultItems.length === filteredContent.length ? 'Deselect All' : 'Select All Visible'}</button>
                                 </div>
                             </div>
-                            
                             <div className="p-8">
                                 {filteredContent.length === 0 ? (
                                     <div className="py-20 flex flex-col items-center justify-center text-slate-300 border-2 border-dashed border-slate-200 rounded-[2rem]"><Database size={48} className="mb-4 opacity-50" /><p className="text-center font-bold text-sm text-slate-400">No curriculum found matching your query.</p></div>
@@ -6847,16 +6814,13 @@ function AdminDashboardView({ user }: any) {
                                             const isExam = content.type === 'exam' || content.type === 'test';
                                             const themeColor = isArcade ? 'amber' : isExam ? 'rose' : 'indigo';
                                             const isSelected = selectedVaultItems.includes(content.id);
-                                            
                                             return (
                                                 <div key={content.id} onClick={() => setSelectedContentId(content.id)} className={`relative p-6 rounded-[2rem] border-2 transition-all text-left flex flex-col justify-between group cursor-pointer ${isSelected ? 'border-indigo-500 bg-indigo-50/30 shadow-lg ring-4 ring-indigo-500/10' : `border-slate-100 bg-white hover:border-${themeColor}-300 hover:shadow-xl`}`}>
                                                     <button onClick={(e) => toggleVaultItemSelection(content.id, e)} className={`absolute top-5 right-5 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all z-10 ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white scale-110 shadow-md' : 'bg-white border-slate-200 text-transparent hover:border-indigo-400 opacity-0 group-hover:opacity-100'}`}><Check size={14} strokeWidth={4} /></button>
                                                     <div>
                                                         <div className="flex justify-between items-start mb-4 pr-8">
-                                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-inner transition-colors bg-${themeColor}-50 text-${themeColor}-600 group-hover:bg-${themeColor}-600 group-hover:text-white`}>
-                                                                {isArcade ? <Gamepad2 size={24} /> : isExam ? <FileText size={24} /> : <BookOpen size={24} />}
-                                                            </div>
-                                                            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded bg-slate-50 text-slate-400 border border-slate-100`}>{isArcade ? 'Arcade' : isExam ? 'Exam' : 'Lesson'}</span>
+                                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-inner transition-colors bg-${themeColor}-50 text-${themeColor}-600 group-hover:bg-${themeColor}-600 group-hover:text-white`}><BookOpen size={24} /></div>
+                                                            <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded border ${content.orgId === 'global' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>{content.orgId === 'global' ? 'Global Baseline' : 'Internal Content'}</span>
                                                         </div>
                                                         <h4 className={`font-black text-slate-800 text-lg leading-tight mb-2 group-hover:text-${themeColor}-600 transition-colors`}>{content.title || 'Untitled Module'}</h4>
                                                         {content.tags && content.tags.length > 0 && (
@@ -6866,9 +6830,7 @@ function AdminDashboardView({ user }: any) {
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-500 w-full">
-                                                        <span className="flex items-center gap-1 truncate pr-2"><User size={12}/> {content.authorName}</span>
-                                                    </div>
+                                                    <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-500 w-full"><span className="flex items-center gap-1 truncate pr-2"><User size={12}/> {content.authorName}</span></div>
                                                 </div>
                                             );
                                         })}
@@ -6876,9 +6838,9 @@ function AdminDashboardView({ user }: any) {
                                 )}
                             </div>
                             
-                            {/* FLOATING BULK DOCK - Re-rendered here so it stays above the vault content specifically */}
+                            {/* FLOATING BULK DOCK FOR VAULT */}
                             {selectedVaultItems.length > 0 && (
-                                <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-8 duration-300 w-[90%] max-w-3xl">
+                                <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[50] animate-in slide-in-from-bottom-8 duration-300 w-[90%] max-w-3xl">
                                     <div className="bg-slate-900/95 backdrop-blur-xl border border-slate-700 p-3 pr-4 rounded-[2rem] shadow-[0_30px_60px_rgba(0,0,0,0.4)] flex flex-col md:flex-row items-center justify-between gap-4">
                                         <div className="flex items-center gap-3 pl-3 w-full md:w-auto shrink-0">
                                             <div className="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-white font-black text-sm shadow-inner shrink-0">{selectedVaultItems.length}</div>
@@ -6898,10 +6860,8 @@ function AdminDashboardView({ user }: any) {
                                     </div>
                                 </div>
                             )}
-
                         </div>
                     )}
-
                 </div>
             </div>
         </div>
