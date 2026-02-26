@@ -6161,7 +6161,7 @@ function AdminDashboardView({ user }: any) {
         });
     };
 
-    const toggleUserRole = (uid: string, currentRole: string) => {
+ const toggleUserRole = (uid: string, currentRole: string) => {
         const roles = isSuperAdmin ? ['student', 'instructor', 'org_admin', 'admin'] : ['student', 'instructor', 'org_admin'];
         const currentIndex = roles.indexOf(currentRole);
         const nextRole = roles[(currentIndex + 1) % roles.length];
@@ -6172,7 +6172,8 @@ function AdminDashboardView({ user }: any) {
             onConfirm: async () => {
                 try {
                     await updateDoc(doc(db, 'artifacts', appId, 'users', uid, 'profile', 'main'), { role: nextRole });
-                    if (selectedInstructorUid === uid && newRole === 'student') setSelectedInstructorUid(null);
+                    // Fix: Changed 'newRole' to 'nextRole'
+                    if (selectedInstructorUid === uid && nextRole === 'student') setSelectedInstructorUid(null); 
                     triggerToast(`Role updated to ${nextRole}`);
                 } catch (e) { triggerToast("Update failed", "error"); }
                 setConfirmModal(null);
