@@ -7214,32 +7214,56 @@ function MarketingSite({ onLoginClick }: { onLoginClick: () => void }) {
                 </div>
             </main>
 
-            {/* PROPUESTAS DE VALOR */}
+                        {/* NUEVA SECCIÓN: LA FILOSOFÍA MAGISTER (PROPUESTAS DE VALOR) */}
             <section className="py-32 bg-slate-950 border-t border-white/5 relative">
                 <div className="max-w-7xl mx-auto px-6">
                     <div className="text-center mb-20">
-                        <h2 className="text-3xl md:text-5xl font-black text-white mb-6">Diseñado para Directores Académicos.</h2>
-                        <p className="text-slate-400 text-lg font-medium max-w-2xl mx-auto">Compites contra cadenas gigantes y aplicaciones de bajo costo. Magister OS te brinda la infraestructura empresarial para lucir premium y retener a tus estudiantes por más tiempo.</p>
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold text-xs uppercase tracking-widest mb-6">
+                            Nuestra Filosofía
+                        </div>
+                        <h2 className="text-3xl md:text-5xl font-black text-white mb-6">Construido por educadores, para la academia moderna.</h2>
+                        <p className="text-slate-400 text-lg font-medium max-w-2xl mx-auto">
+                            Creemos que la tecnología no debe reemplazar la enseñanza, sino potenciarla. Magister OS alinea los objetivos del estudiante, el profesor y el director en un solo ecosistema.
+                        </p>
                     </div>
+                    
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <div className="p-8 rounded-[2rem] bg-slate-900 border border-slate-800 hover:border-indigo-500/50 transition-colors">
-                            <div className="w-14 h-14 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-400 mb-6"><Smartphone size={28}/></div>
-                            <h3 className="text-xl font-black text-white mb-3">Gimnasio de Vocabulario Móvil</h3>
-                            <p className="text-slate-400 font-medium leading-relaxed">Los PDFs y los grupos de WhatsApp son cosa del pasado. Mantén a tus alumnos comprometidos con tarjetas interactivas, repetición espaciada y puntos de XP directamente en sus teléfonos.</p>
+                        {/* PILAR 1: EL ESTUDIANTE */}
+                        <div className="p-8 rounded-[2rem] bg-slate-900 border border-slate-800 hover:border-orange-500/50 transition-colors group">
+                            <div className="w-14 h-14 bg-orange-500/10 rounded-2xl flex items-center justify-center text-orange-400 mb-6 group-hover:scale-110 transition-transform">
+                                <Zap size={28}/>
+                            </div>
+                            <h3 className="text-xl font-black text-white mb-3">La Experiencia del Alumno</h3>
+                            <p className="text-slate-400 font-medium leading-relaxed">
+                                Fluidez impulsada por la motivación, no por la memorización. Transformamos el estudio pasivo en una experiencia interactiva y dinámica que los alumnos realmente disfrutan, logrando una retención del idioma más rápida y resultados comprobables.
+                            </p>
                         </div>
-                        <div className="p-8 rounded-[2rem] bg-slate-900 border border-slate-800 hover:border-emerald-500/50 transition-colors">
-                            <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-400 mb-6"><BarChart3 size={28}/></div>
-                            <h3 className="text-xl font-black text-white mb-3">Calificaciones Automatizadas</h3>
-                            <p className="text-slate-400 font-medium leading-relaxed">Ahorra a tus profesores 10 horas a la semana. Envía exámenes a todo un grupo con un solo clic y observa cómo el Centro de Mando califica y destaca a los alumnos que necesitan ayuda.</p>
+
+                        {/* PILAR 2: EL PROFESOR */}
+                        <div className="p-8 rounded-[2rem] bg-slate-900 border border-slate-800 hover:border-indigo-500/50 transition-colors group">
+                            <div className="w-14 h-14 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-400 mb-6 group-hover:scale-110 transition-transform">
+                                <BookOpen size={28}/>
+                            </div>
+                            <h3 className="text-xl font-black text-white mb-3">Empoderamiento Docente</h3>
+                            <p className="text-slate-400 font-medium leading-relaxed">
+                                La tecnología debe liberar tiempo, no consumirlo. Aceleramos la planeación de clases y eliminamos horas de trabajo manual para que tus instructores enfoquen su energía en lo más importante: su presencia, entrega y conexión en el aula.
+                            </p>
                         </div>
-                        <div className="p-8 rounded-[2rem] bg-slate-900 border border-slate-800 hover:border-purple-500/50 transition-colors">
-                            <div className="w-14 h-14 bg-purple-500/10 rounded-2xl flex items-center justify-center text-purple-400 mb-6"><BookOpen size={28}/></div>
-                            <h3 className="text-xl font-black text-white mb-3">La Bóveda Global de Inglés</h3>
-                            <p className="text-slate-400 font-medium leading-relaxed">No empieces desde cero. Accede a nuestro repositorio maestro de módulos de gramática, fonética y lectura, listos para implementar en tus clases hoy mismo.</p>
+
+                        {/* PILAR 3: EL ADMINISTRADOR */}
+                        <div className="p-8 rounded-[2rem] bg-slate-900 border border-slate-800 hover:border-emerald-500/50 transition-colors group">
+                            <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-400 mb-6 group-hover:scale-110 transition-transform">
+                                <BarChart3 size={28}/>
+                            </div>
+                            <h3 className="text-xl font-black text-white mb-3">Rentabilidad y Retención</h3>
+                            <p className="text-slate-400 font-medium leading-relaxed">
+                                Deja de adivinar el estado de tu negocio. Brindamos a la dirección métricas claras y accionables sobre el progreso de los alumnos y el desempeño docente, facilitando la retención de estudiantes y garantizando la satisfacción de tu equipo.
+                            </p>
                         </div>
                     </div>
                 </div>
             </section>
+
             <Footer />
         </div>
     );
