@@ -6034,16 +6034,17 @@ function ExamPlayerView({ exam, onFinish }: any) {
     );
 }
 // ============================================================================
-//  ADMIN DASHBOARD (Real-Time God Mode)
+//  ADMIN DASHBOARD (Real-Time God Mode & B2B Franchise Engine)
 // ============================================================================
 function AdminDashboardView({ user }: any) {
-    const [activeTab, setActiveTab] = useState<'overview' | 'cohorts' | 'instructors' | 'directory' | 'vault'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'cohorts' | 'instructors' | 'directory' | 'vault' | 'franchise'>('overview');
     
     // Real-Time Global State
     const [allProfiles, setAllProfiles] = useState<any[]>([]);
     const [allCohorts, setAllCohorts] = useState<any[]>([]);
     const [globalLogs, setGlobalLogs] = useState<any[]>([]);
     const [allContent, setAllContent] = useState<any[]>([]);
+    const [organizations, setOrganizations] = useState<any[]>([]); 
     const [loading, setLoading] = useState(true);
 
     // Admin Features State
@@ -6052,6 +6053,11 @@ function AdminDashboardView({ user }: any) {
     const [broadcastMsg, setBroadcastMsg] = useState('');
     const [isBroadcasting, setIsBroadcasting] = useState(false);
     
+    // B2B FRANCHISE STATES
+    const [showOrgModal, setShowOrgModal] = useState(false);
+    const [newOrg, setNewOrg] = useState({ name: '', logoUrl: '', themeColor: '#4f46e5' });
+    const [isProvisioning, setIsProvisioning] = useState(false);
+
     // DEEP DIVE STATES
     const [selectedInstructorUid, setSelectedInstructorUid] = useState<string | null>(null);
     const [selectedCohortId, setSelectedCohortId] = useState<string | null>(null);
@@ -6074,8 +6080,6 @@ function AdminDashboardView({ user }: any) {
     // --- TOAST & CONFIRMATION MODAL STATES ---
     const [toast, setToast] = useState<{msg: string, type: 'success' | 'error' | 'info'} | null>(null);
     const triggerToast = (msg: string, type: 'success' | 'error' | 'info' = 'success') => setToast({ msg, type });
-    
-    // THE NEW CUSTOM CONFIRMATION ENGINE
     const [confirmModal, setConfirmModal] = useState<{ title: string, message: string, onConfirm: () => void } | null>(null);
 
     useEffect(() => {
@@ -6096,18 +6100,64 @@ function AdminDashboardView({ user }: any) {
 
         const qContent = query(collectionGroup(db, 'custom_lessons'));
         const unsubContent = onSnapshot(qContent, (snap) => {
-            setAllContent(snap.docs.map(d => ({ 
-                id: d.id, 
-                _instructorUid: d.ref.path.split('/')[3], 
-                ...d.data() 
-            })));
+            setAllContent(snap.docs.map(d => ({ id: d.id, _instructorUid: d.ref.path.split('/')[3], ...d.data() })));
+        });
+
+        const qOrgs = query(collection(db, 'artifacts', appId, 'organizations'));
+        const unsubOrgs = onSnapshot(qOrgs, (snap) => {
+            setOrganizations(snap.docs.map(d => ({ id: d.id, ...d.data() })));
             setLoading(false);
         });
 
-        return () => { unsubProfiles(); unsubClasses(); unsubLogs(); unsubContent(); };
+        return () => { unsubProfiles(); unsubClasses(); unsubLogs(); unsubContent(); unsubOrgs(); };
     }, []);
 
-    // --- ADMIN ACTIONS (Now utilizing custom ConfirmModal) ---
+    // --- B2B FRANCHISE ACTIONS ---
+    const handleProvisionOrg = async () => {
+        if (!newOrg.name.trim()) return;
+        setIsProvisioning(true);
+        try {
+            await addDoc(collection(db, 'artifacts', appId, 'organizations'), {
+                name: newOrg.name.trim(),
+                logoUrl: newOrg.logoUrl.trim(),
+                themeColor: newOrg.themeColor,
+                createdAt: Date.now()
+            });
+            setShowOrgModal(false);
+            setNewOrg({ name: '', logoUrl: '', themeColor: '#4f46e5' });
+            triggerToast("B2B Organization Provisioned!", 'success');
+        } catch (e) {
+            triggerToast("Failed to provision organization.", 'error');
+        }
+        setIsProvisioning(false);
+    };
+
+    const assignUserToOrg = async (uid: string, orgId: string) => {
+        try {
+            await updateDoc(doc(db, 'artifacts', appId, 'users', uid, 'profile', 'main'), {
+                orgId: orgId === 'global' ? null : orgId
+            });
+            triggerToast("User migrated to new organization.", 'success');
+        } catch (e) {
+            triggerToast("Failed to migrate user.", 'error');
+        }
+    };
+
+    const deleteOrganization = (orgId: string) => {
+        setConfirmModal({
+            title: "Dissolve Organization",
+            message: "CRITICAL WARNING: This will dissolve the tenant. Users assigned to this org will fall back to the Global Pool.",
+            onConfirm: async () => {
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'organizations', orgId));
+                    triggerToast("Organization dissolved.", 'success');
+                } catch (e) { triggerToast("Failed to delete org.", 'error'); }
+                setConfirmModal(null);
+            }
+        });
+    };
+
+    // --- STANDARD ADMIN ACTIONS ---
     const toggleUserRole = (uid: string, currentRole: string) => {
         const newRole = currentRole === 'student' ? 'instructor' : 'student';
         setConfirmModal({
@@ -6118,9 +6168,7 @@ function AdminDashboardView({ user }: any) {
                     await updateDoc(doc(db, 'artifacts', appId, 'users', uid, 'profile', 'main'), { role: newRole });
                     if (selectedInstructorUid === uid && newRole === 'student') setSelectedInstructorUid(null); 
                     triggerToast(`User role updated to ${newRole}`, 'success');
-                } catch (error) { 
-                    triggerToast("Failed to update user role.", 'error'); 
-                }
+                } catch (error) { triggerToast("Failed to update user role.", 'error'); }
                 setConfirmModal(null);
             }
         });
@@ -6179,8 +6227,6 @@ function AdminDashboardView({ user }: any) {
             }
         });
     };
-
-    // --- CONTENT GOVERNANCE & TAGGING ---
 
     const forceDeleteContent = (instructorUid: string, contentId: string) => {
         setConfirmModal({
@@ -6264,7 +6310,6 @@ function AdminDashboardView({ user }: any) {
         }
     };
 
-    // --- DEPLOYMENT EXECUTION ENGINE ---
     const executeDeployment = async () => {
         if (!deployingContent || deploySelectedCohorts.length === 0) return;
         setIsDeploying(true);
@@ -6329,7 +6374,7 @@ function AdminDashboardView({ user }: any) {
         return matchesSearch && matchesFilter;
     });
 
-    const metrics = { totalStudents: students.length, activeCohorts: allCohorts.length, totalInstructors: instructors.length, pendingGrades: globalLogs.length };
+    const metrics = { totalStudents: students.length, activeCohorts: allCohorts.length, totalInstructors: instructors.length, pendingGrades: globalLogs.length, activeTenants: organizations.length };
 
     if (loading) return ( <div className="h-full flex flex-col items-center justify-center bg-slate-50 text-emerald-500"><Loader className="animate-spin mb-4" size={40} /><p className="font-black uppercase tracking-widest text-xs text-slate-400">Decrypting Global State...</p></div> );
 
@@ -6342,43 +6387,62 @@ function AdminDashboardView({ user }: any) {
             
             {/* THE NEW TOAST RENDERER */}
             {toast && (
-                <div className="absolute top-0 left-0 w-full z-[2000] flex justify-center pointer-events-none">
+                <div className="absolute top-0 left-0 w-full z-[3000] flex justify-center pointer-events-none">
                     <JuicyToast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />
                 </div>
             )}
 
-            {/* ============================================================== */}
-            {/* OVERLAY MODALS */}
-            {/* ============================================================== */}
-
-            {/* NEW: UNIVERSAL CONFIRMATION MODAL */}
+            {/* UNIVERSAL CONFIRMATION MODAL */}
             {confirmModal && (
-                <div className="absolute inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
+                <div className="absolute inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
                     <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8 text-center animate-in zoom-in-95 duration-200">
-                        <div className="w-20 h-20 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-                            <AlertTriangle size={32} />
-                        </div>
+                        <div className="w-20 h-20 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><AlertTriangle size={32} /></div>
                         <h3 className="text-2xl font-black text-slate-900 mb-2">{confirmModal.title}</h3>
                         <p className="text-slate-500 text-sm mb-8 leading-relaxed font-medium">{confirmModal.message}</p>
                         <div className="flex gap-3">
-                            <button 
-                                onClick={() => setConfirmModal(null)} 
-                                className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-200 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button 
-                                onClick={confirmModal.onConfirm} 
-                                className="flex-[1.5] py-4 bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-rose-700 shadow-lg shadow-rose-200 transition-all active:scale-95"
-                            >
-                                Confirm
+                            <button onClick={() => setConfirmModal(null)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-200 transition-colors">Cancel</button>
+                            <button onClick={confirmModal.onConfirm} className="flex-[1.5] py-4 bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-rose-700 shadow-lg shadow-rose-200 transition-all active:scale-95">Confirm</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* CREATE ORG MODAL */}
+            {showOrgModal && (
+                <div className="absolute inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl p-8 relative animate-in zoom-in-95">
+                        <button onClick={() => setShowOrgModal(false)} className="absolute top-6 right-6 text-slate-400 hover:text-rose-500 transition-colors"><X size={24}/></button>
+                        <div className="flex items-center gap-4 mb-8">
+                            <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shadow-inner"><Briefcase size={28} /></div>
+                            <div><h2 className="text-2xl font-black text-slate-900 leading-tight">New Franchise</h2><p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">B2B Tenant Setup</p></div>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Organization Name</label>
+                                <input type="text" value={newOrg.name} onChange={e => setNewOrg({...newOrg, name: e.target.value})} placeholder="e.g. Texas Culinary Institute" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-indigo-500" />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Logo URL (Optional)</label>
+                                <input type="text" value={newOrg.logoUrl} onChange={e => setNewOrg({...newOrg, logoUrl: e.target.value})} placeholder="https://..." className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-indigo-500" />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Brand Theme Color</label>
+                                <div className="flex items-center gap-3">
+                                    <input type="color" value={newOrg.themeColor} onChange={e => setNewOrg({...newOrg, themeColor: e.target.value})} className="w-12 h-12 rounded-xl cursor-pointer border-none bg-transparent" />
+                                    <span className="font-mono text-sm font-bold text-slate-500">{newOrg.themeColor}</span>
+                                </div>
+                            </div>
+
+                            <button onClick={handleProvisionOrg} disabled={!newOrg.name.trim() || isProvisioning} className="w-full mt-4 py-5 bg-slate-900 hover:bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2">
+                                {isProvisioning ? <Loader size={18} className="animate-spin" /> : <Shield size={18} />} Provision Tenant
                             </button>
                         </div>
                     </div>
                 </div>
             )}
-            
-            {/* 1. GLOBAL BROADCAST MODAL */}
+
+            {/* GLOBAL BROADCAST MODAL */}
             {showBroadcastModal && (
                 <div className="absolute inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl p-8 relative animate-in zoom-in-95 duration-200">
@@ -6398,7 +6462,7 @@ function AdminDashboardView({ user }: any) {
                 </div>
             )}
 
-            {/* 2. INSTRUCTOR DOSSIER */}
+            {/* INSTRUCTOR DOSSIER */}
             {activeInstructor && (
                 <div className="absolute inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
                     <div className="bg-white w-full max-w-4xl rounded-[3rem] shadow-2xl relative animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]">
@@ -6489,7 +6553,6 @@ function AdminDashboardView({ user }: any) {
             {activeContent && (
                 <div className="absolute inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in">
                     {deployingContent ? (
-                        /* --- DEPLOYMENT TARGETING UI --- */
                         <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl relative animate-in zoom-in-95 duration-300 overflow-hidden flex flex-col max-h-[85vh]">
                             <div className="p-8 border-b border-slate-100 bg-indigo-600 text-white relative overflow-hidden shrink-0">
                                 <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
@@ -6500,7 +6563,6 @@ function AdminDashboardView({ user }: any) {
                                 </div>
                                 <p className="text-indigo-200 text-sm font-medium">Targeting cohorts for: <span className="text-white font-bold">{deployingContent.title}</span></p>
                             </div>
-
                             <div className="flex-1 overflow-y-auto p-8 bg-slate-50 custom-scrollbar">
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Select Target Cohorts</h3>
@@ -6508,7 +6570,6 @@ function AdminDashboardView({ user }: any) {
                                         {deploySelectedCohorts.length === populatedCohorts.length ? 'Deselect All' : 'Select All'}
                                     </button>
                                 </div>
-                                
                                 <div className="space-y-2">
                                     {populatedCohorts.length === 0 ? (
                                         <p className="text-center text-slate-400 italic py-10">No active cohorts to deploy to.</p>
@@ -6530,7 +6591,6 @@ function AdminDashboardView({ user }: any) {
                                     )}
                                 </div>
                             </div>
-
                             <div className="p-6 bg-white border-t border-slate-100 flex items-center justify-between shrink-0">
                                 <div className="text-sm font-bold text-slate-500"><span className="text-indigo-600 font-black">{deploySelectedCohorts.length}</span> targets selected</div>
                                 <button onClick={executeDeployment} disabled={deploySelectedCohorts.length === 0 || isDeploying} className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-indigo-200 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2">
@@ -6539,7 +6599,6 @@ function AdminDashboardView({ user }: any) {
                             </div>
                         </div>
                     ) : (
-                        /* --- STANDARD INSPECTOR UI WITH TAGGING --- */
                         <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl relative animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]">
                             <div className="p-8 border-b border-slate-100 flex justify-between items-start bg-slate-50/80 relative overflow-hidden shrink-0">
                                 <div className={`absolute top-0 left-0 w-2 h-full ${activeContent.type === 'arcade_game' ? 'bg-amber-500' : activeContent.type === 'exam' || activeContent.type === 'test' ? 'bg-rose-500' : 'bg-indigo-500'}`} />
@@ -6552,7 +6611,6 @@ function AdminDashboardView({ user }: any) {
                                 </div>
                                 <button onClick={() => setSelectedContentId(null)} className="p-2 text-slate-400 hover:text-slate-600 bg-white border border-slate-200 rounded-full transition-all shadow-sm relative z-10"><X size={20}/></button>
                             </div>
-
                             <div className="p-8 space-y-6 bg-white overflow-y-auto custom-scrollbar">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
@@ -6565,10 +6623,8 @@ function AdminDashboardView({ user }: any) {
                                     </div>
                                 </div>
                                 
-                                {/* TAG MANAGER */}
                                 <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Tag size={12}/> Content Tags</span>
-                                    
                                     <div className="flex flex-wrap gap-2">
                                         {(!activeContent.tags || activeContent.tags.length === 0) && (
                                             <span className="text-xs font-bold text-slate-400 italic">No tags assigned.</span>
@@ -6580,41 +6636,23 @@ function AdminDashboardView({ user }: any) {
                                             </div>
                                         ))}
                                     </div>
-
                                     <div className="flex gap-2">
                                         <input 
-                                            type="text" 
-                                            placeholder="Add a new tag..."
-                                            value={inspectorTagInput}
+                                            type="text" placeholder="Add a new tag..." value={inspectorTagInput}
                                             onChange={(e) => setInspectorTagInput(e.target.value)}
                                             onKeyDown={(e) => { if(e.key === 'Enter') handleAddSingleTag(activeContent._instructorUid, activeContent.id); }}
                                             className="flex-1 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                                         />
-                                        <button 
-                                            onClick={() => handleAddSingleTag(activeContent._instructorUid, activeContent.id)}
-                                            disabled={!inspectorTagInput.trim()}
-                                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 transition-colors"
-                                        >
-                                            Add
-                                        </button>
+                                        <button onClick={() => handleAddSingleTag(activeContent._instructorUid, activeContent.id)} disabled={!inspectorTagInput.trim()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 transition-colors">Add</button>
                                     </div>
                                 </div>
 
-                                <button 
-                                    onClick={() => setDeployingContent(activeContent)}
-                                    className="w-full py-5 bg-indigo-50 border-2 border-indigo-200 text-indigo-700 font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-indigo-600 hover:text-white transition-colors shadow-sm flex items-center justify-center gap-2 group"
-                                >
+                                <button onClick={() => setDeployingContent(activeContent)} className="w-full py-5 bg-indigo-50 border-2 border-indigo-200 text-indigo-700 font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-indigo-600 hover:text-white transition-colors shadow-sm flex items-center justify-center gap-2 group">
                                     <Zap size={16} className="group-hover:scale-125 transition-transform" /> Deploy to Network
                                 </button>
                             </div>
-
                             <div className="p-6 bg-rose-50/50 border-t border-rose-100 flex flex-col items-center text-center shrink-0">
-                                <button 
-                                    onClick={() => forceDeleteContent(activeContent._instructorUid, activeContent.id)}
-                                    className="text-rose-500 font-bold text-xs uppercase tracking-widest hover:underline flex items-center gap-1"
-                                >
-                                    <Trash2 size={12}/> Delete from Platform
-                                </button>
+                                <button onClick={() => forceDeleteContent(activeContent._instructorUid, activeContent.id)} className="text-rose-500 font-bold text-xs uppercase tracking-widest hover:underline flex items-center gap-1"><Trash2 size={12}/> Delete from Platform</button>
                             </div>
                         </div>
                     )}
@@ -6624,76 +6662,63 @@ function AdminDashboardView({ user }: any) {
             {/* ============================================================== */}
             {/* MAIN ADMIN DASHBOARD UI */}
             {/* ============================================================== */}
-
             <header className="h-24 bg-slate-900 px-6 md:px-10 flex justify-between items-center shrink-0 z-30 shadow-xl">
                 <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.4)]"><Shield size={24} /></div>
                     <div><h2 className="text-xl font-black text-white tracking-tighter uppercase leading-none">Command Center</h2><p className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.3em] mt-1">L.L.L.M.S. Admin Access</p></div>
                 </div>
                 <div className="flex bg-slate-800 p-1.5 rounded-[1.5rem] overflow-x-auto hide-scrollbar">
-                    {[ { id: 'overview', label: 'Overview' }, { id: 'cohorts', label: 'Cohorts' }, { id: 'instructors', label: 'Staff' }, { id: 'directory', label: 'Directory' }, { id: 'vault', label: 'The Vault' } ].map(tab => (
-                        <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>{tab.label}</button>
+                    {[ { id: 'overview', label: 'Overview' }, { id: 'franchise', label: 'B2B Orgs' }, { id: 'cohorts', label: 'Cohorts' }, { id: 'instructors', label: 'Staff' }, { id: 'directory', label: 'Directory' }, { id: 'vault', label: 'The Vault' } ].map(tab => (
+                        <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>{tab.label}</button>
                     ))}
                 </div>
             </header>
 
             <div className="flex-1 overflow-y-auto p-6 md:p-12 custom-scrollbar relative">
-                
-                {/* --- FLOATING BULK ACTION DOCK --- */}
-                {selectedVaultItems.length > 0 && activeTab === 'vault' && (
-                    <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-8 duration-300 w-[90%] max-w-3xl">
-                        <div className="bg-slate-900/95 backdrop-blur-xl border border-slate-700 p-3 pr-4 rounded-[2rem] shadow-[0_30px_60px_rgba(0,0,0,0.4)] flex flex-col md:flex-row items-center justify-between gap-4">
-                            
-                            <div className="flex items-center gap-3 pl-3 w-full md:w-auto shrink-0">
-                                <div className="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-white font-black text-sm shadow-inner shrink-0">{selectedVaultItems.length}</div>
-                                <span className="text-xs font-black text-white uppercase tracking-widest">Selected</span>
-                            </div>
-
-                            <div className="hidden md:block h-8 w-px bg-slate-700" />
-
-                            {/* BULK TAG INPUT */}
-                            <div className="flex items-center w-full bg-slate-800/50 rounded-xl border border-slate-700 p-1">
-                                <div className="pl-3 pr-2 text-slate-400"><Tag size={14}/></div>
-                                <input 
-                                    type="text" 
-                                    placeholder="Add bulk tag..."
-                                    value={bulkTagInput}
-                                    onChange={e => setBulkTagInput(e.target.value)}
-                                    onKeyDown={(e) => { if(e.key === 'Enter') handleBulkTagAdd(); }}
-                                    className="flex-1 bg-transparent border-none text-xs font-bold text-white placeholder:text-slate-500 outline-none min-w-[100px]"
-                                />
-                                <button 
-                                    onClick={handleBulkTagAdd}
-                                    disabled={!bulkTagInput.trim()}
-                                    className="px-4 py-2 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50 shrink-0"
-                                >
-                                    Apply
-                                </button>
-                            </div>
-
-                            <div className="hidden md:block h-8 w-px bg-slate-700" />
-
-                            <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
-                                <button onClick={() => setSelectedVaultItems([])} className="flex-1 md:flex-none px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">Clear</button>
-                                <button onClick={handleBulkDelete} className="flex-1 md:flex-none px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest bg-rose-500 text-white hover:bg-rose-600 shadow-lg shadow-rose-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"><Trash2 size={14}/> Nuke</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
                 <div className="max-w-6xl mx-auto space-y-12 pb-48">
+
                     {/* OVERVIEW TAB */}
                     {activeTab === 'overview' && (
                         <div className="space-y-12 animate-in slide-in-from-bottom-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                 <MetricCard icon={<Users size={24} className="text-indigo-500"/>} label="Total Enrollment" value={metrics.totalStudents} trend="Active Profiles" color="indigo" />
-                                <MetricCard icon={<BookOpen size={24} className="text-emerald-500"/>} label="Active Cohorts" value={metrics.activeCohorts} trend="Deployed Classes" color="emerald" />
-                                <MetricCard icon={<Shield size={24} className="text-rose-500"/>} label="Staff Count" value={metrics.totalInstructors} trend="Teachers & Admins" color="rose" />
-                                <MetricCard icon={<AlertCircle size={24} className="text-amber-500"/>} label="Global Pending" value={metrics.pendingGrades} trend="Exams awaiting grades" color="amber" />
+                                <MetricCard icon={<Briefcase size={24} className="text-purple-500"/>} label="Active Franchises" value={metrics.activeTenants} trend="B2B Organizations" color="indigo" />
+                                <MetricCard icon={<BookOpen size={24} className="text-emerald-500"/>} label="Global Cohorts" value={metrics.activeCohorts} trend="Deployed Classes" color="emerald" />
+                                <MetricCard icon={<AlertCircle size={24} className="text-rose-500"/>} label="Global Pending" value={metrics.pendingGrades} trend="Exams awaiting grades" color="rose" />
                             </div>
                             <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
                                 <div><h3 className="text-2xl font-black text-slate-900 mb-1">System Global Broadcast</h3><p className="text-sm font-bold text-slate-500">Push an alert to every single user on the platform.</p></div>
                                 <button onClick={() => setShowBroadcastModal(true)} className="w-full md:w-auto px-8 py-5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-emerald-200 active:scale-95 transition-all flex items-center justify-center gap-3 text-xs"><Megaphone size={18} /> Send Alert</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* FRANCHISE ENGINE TAB */}
+                    {activeTab === 'franchise' && (
+                        <div className="space-y-8 animate-in slide-in-from-bottom-4">
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm">
+                                <div><h3 className="text-2xl font-black text-slate-900">Franchise Engine</h3><p className="text-sm font-bold text-slate-500 max-w-lg mt-2 leading-relaxed">Provision isolated B2B environments. Users assigned to an organization enter a walled garden with branded styling.</p></div>
+                                <button onClick={() => setShowOrgModal(true)} className="w-full md:w-auto px-8 py-5 bg-slate-900 hover:bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3 text-xs"><Plus size={18} /> Provision Org</button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {organizations.map(org => {
+                                    const orgUsersCount = allProfiles.filter(p => p.orgId === org.id).length;
+                                    return (
+                                        <div key={org.id} className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm relative overflow-hidden group">
+                                            <div className="absolute top-0 left-0 w-full h-2 transition-all" style={{ backgroundColor: org.themeColor || '#4f46e5' }} />
+                                            <div className="flex justify-between items-start mb-6">
+                                                {org.logoUrl ? <img src={org.logoUrl} alt={org.name} className="w-16 h-16 object-contain rounded-xl border border-slate-100 p-1" /> : <div className="w-16 h-16 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 font-black text-xl border border-slate-200">{org.name.charAt(0).toUpperCase()}</div>}
+                                                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100">ID: {org.id.substring(0,6)}</span>
+                                            </div>
+                                            <h3 className="text-xl font-black text-slate-900 mb-1">{org.name}</h3>
+                                            <p className="text-xs font-bold text-slate-400 mb-6 flex items-center gap-1"><Users size={12}/> {orgUsersCount} Users Assigned</p>
+                                            <button onClick={() => deleteOrganization(org.id)} className="w-full py-3 bg-white border-2 border-slate-100 text-rose-500 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-rose-50 hover:border-rose-200 transition-colors">Dissolve Tenant</button>
+                                        </div>
+                                    );
+                                })}
+                                {organizations.length === 0 && (
+                                    <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-200 rounded-[3rem]"><Briefcase size={48} className="mx-auto text-slate-300 mb-4" /><h3 className="text-lg font-black text-slate-800">No Active Franchises</h3><p className="text-sm font-bold text-slate-400 mt-1">The platform is currently operating in Global Pool mode.</p></div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -6758,13 +6783,13 @@ function AdminDashboardView({ user }: any) {
                                 <div className="relative w-full md:w-72"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input type="text" placeholder="Search name or email..." value={directorySearch} onChange={(e) => setDirectorySearch(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 shadow-sm transition-all" /></div>
                             </div>
                             <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse min-w-[600px]">
+                                <table className="w-full text-left border-collapse min-w-[800px]">
                                     <thead>
                                         <tr className="bg-white border-b border-slate-100">
                                             <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">User Profile</th>
-                                            <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
-                                            <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Joined</th>
-                                            <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Access Level</th>
+                                            <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Access Level</th>
+                                            {organizations.length > 0 && <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">B2B Routing (Tenant)</th>}
+                                            <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Status</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
@@ -6774,9 +6799,16 @@ function AdminDashboardView({ user }: any) {
                                             filteredProfiles.map(profile => (
                                                 <tr key={profile.uid} className="hover:bg-slate-50 transition-colors group">
                                                     <td className="p-6"><div className="flex items-center gap-4"><div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 font-black flex items-center justify-center border border-slate-200 shadow-inner shrink-0">{profile.name?.charAt(0).toUpperCase() || '?'}</div><div><span className="font-black text-slate-800 text-sm block">{profile.name || "Pending Setup"}</span><span className="text-[10px] font-bold text-slate-400">{profile.email}</span></div></div></td>
-                                                    <td className="p-6 text-center">{profile.isOnboarded ? <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md uppercase tracking-widest">Active</span> : <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-md uppercase tracking-widest">Pending</span>}</td>
-                                                    <td className="p-6 text-center text-xs font-bold text-slate-500">{profile.joinedAt ? new Date(profile.joinedAt).toLocaleDateString() : 'Unknown'}</td>
-                                                    <td className="p-6 text-right"><button onClick={() => toggleUserRole(profile.uid, profile.role)} className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 ${profile.role === 'instructor' ? 'bg-indigo-600 text-white hover:bg-rose-500 hover:shadow-rose-200' : profile.role === 'admin' ? 'bg-slate-900 text-amber-400 cursor-not-allowed' : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-500 hover:text-indigo-600'}`} disabled={profile.role === 'admin'} title={profile.role === 'instructor' ? 'Demote to Student' : 'Promote to Instructor'}>{profile.role}</button></td>
+                                                    <td className="p-6"><button onClick={() => toggleUserRole(profile.uid, profile.role)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 ${profile.role === 'instructor' ? 'bg-indigo-600 text-white hover:bg-rose-500 hover:shadow-rose-200' : profile.role === 'admin' ? 'bg-slate-900 text-amber-400 cursor-not-allowed' : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-500 hover:text-indigo-600'}`} disabled={profile.role === 'admin'}>{profile.role}</button></td>
+                                                    {organizations.length > 0 && (
+                                                        <td className="p-6">
+                                                            <select value={profile.orgId || 'global'} onChange={(e) => assignUserToOrg(profile.uid, e.target.value)} className="w-full max-w-[200px] p-2.5 bg-white border-2 border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 cursor-pointer shadow-sm">
+                                                                <option value="global">🌍 Global Pool</option>
+                                                                {organizations.map(o => <option key={o.id} value={o.id}>🏢 {o.name}</option>)}
+                                                            </select>
+                                                        </td>
+                                                    )}
+                                                    <td className="p-6 text-right">{profile.isOnboarded ? <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md uppercase tracking-widest">Active</span> : <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-md uppercase tracking-widest">Pending</span>}</td>
                                                 </tr>
                                             ))
                                         )}
@@ -6786,59 +6818,28 @@ function AdminDashboardView({ user }: any) {
                         </div>
                     )}
 
-                    {/* VAULT TAB */}
+                    {/* VAULT TAB WITH BULK DOCK */}
                     {activeTab === 'vault' && (
                         <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in">
                             <div className="p-8 border-b border-slate-100 flex flex-col gap-6 bg-slate-50/50">
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                                    <div>
-                                        <h3 className="text-2xl font-black text-slate-900">The Curriculum Vault</h3>
-                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Platform-Wide Content Repository</p>
-                                    </div>
-                                    <div className="relative w-full md:w-80">
-                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                        <input 
-                                            type="text" 
-                                            placeholder="Search title, author, or tags..."
-                                            value={vaultSearch}
-                                            onChange={(e) => setVaultSearch(e.target.value)}
-                                            className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 shadow-sm transition-all"
-                                        />
-                                    </div>
+                                    <div><h3 className="text-2xl font-black text-slate-900">The Curriculum Vault</h3><p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Platform-Wide Content Repository</p></div>
+                                    <div className="relative w-full md:w-80"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input type="text" placeholder="Search title, author, or tags..." value={vaultSearch} onChange={(e) => setVaultSearch(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 shadow-sm transition-all" /></div>
                                 </div>
                                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-t border-slate-200/60 pt-4">
                                     <div className="flex gap-2">
                                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-2 flex items-center">Filter By:</span>
-                                        {[
-                                            { id: 'lesson', label: 'Lessons', icon: <BookOpen size={12}/> },
-                                            { id: 'exam', label: 'Exams', icon: <FileText size={12}/> },
-                                            { id: 'arcade', label: 'Arcade', icon: <Gamepad2 size={12}/> }
-                                        ].map(f => (
-                                            <button 
-                                                key={f.id}
-                                                onClick={() => toggleVaultFilter(f.id)}
-                                                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 border ${
-                                                    vaultFilters.includes(f.id) 
-                                                        ? 'bg-slate-900 text-white border-slate-900 shadow-md' 
-                                                        : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
-                                                }`}
-                                            >
-                                                {f.icon} {f.label}
-                                            </button>
+                                        {[ { id: 'lesson', label: 'Lessons', icon: <BookOpen size={12}/> }, { id: 'exam', label: 'Exams', icon: <FileText size={12}/> }, { id: 'arcade', label: 'Arcade', icon: <Gamepad2 size={12}/> } ].map(f => (
+                                            <button key={f.id} onClick={() => toggleVaultFilter(f.id)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 border ${vaultFilters.includes(f.id) ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'}`}>{f.icon} {f.label}</button>
                                         ))}
                                     </div>
-                                    <button onClick={() => setSelectedVaultItems(selectedVaultItems.length === filteredContent.length ? [] : filteredContent.map(c => c.id))} className="text-[10px] font-black text-indigo-500 uppercase tracking-widest hover:text-indigo-700 transition-colors">
-                                        {selectedVaultItems.length === filteredContent.length ? 'Deselect All' : 'Select All Visible'}
-                                    </button>
+                                    <button onClick={() => setSelectedVaultItems(selectedVaultItems.length === filteredContent.length ? [] : filteredContent.map(c => c.id))} className="text-[10px] font-black text-indigo-500 uppercase tracking-widest hover:text-indigo-700 transition-colors">{selectedVaultItems.length === filteredContent.length ? 'Deselect All' : 'Select All Visible'}</button>
                                 </div>
                             </div>
                             
                             <div className="p-8">
                                 {filteredContent.length === 0 ? (
-                                    <div className="py-20 flex flex-col items-center justify-center text-slate-300 border-2 border-dashed border-slate-200 rounded-[2rem]">
-                                        <Database size={48} className="mb-4 opacity-50" />
-                                        <p className="text-center font-bold text-sm text-slate-400">No curriculum found matching your query.</p>
-                                    </div>
+                                    <div className="py-20 flex flex-col items-center justify-center text-slate-300 border-2 border-dashed border-slate-200 rounded-[2rem]"><Database size={48} className="mb-4 opacity-50" /><p className="text-center font-bold text-sm text-slate-400">No curriculum found matching your query.</p></div>
                                 ) : (
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                         {filteredContent.map(content => {
@@ -6848,41 +6849,22 @@ function AdminDashboardView({ user }: any) {
                                             const isSelected = selectedVaultItems.includes(content.id);
                                             
                                             return (
-                                                <div 
-                                                    key={content.id}
-                                                    onClick={() => setSelectedContentId(content.id)}
-                                                    className={`relative p-6 rounded-[2rem] border-2 transition-all text-left flex flex-col justify-between group cursor-pointer ${
-                                                        isSelected ? 'border-indigo-500 bg-indigo-50/30 shadow-lg ring-4 ring-indigo-500/10' : `border-slate-100 bg-white hover:border-${themeColor}-300 hover:shadow-xl`
-                                                    }`}
-                                                >
-                                                    <button 
-                                                        onClick={(e) => toggleVaultItemSelection(content.id, e)}
-                                                        className={`absolute top-5 right-5 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all z-10 ${
-                                                            isSelected ? 'bg-indigo-600 border-indigo-600 text-white scale-110 shadow-md' : 'bg-white border-slate-200 text-transparent hover:border-indigo-400 opacity-0 group-hover:opacity-100'
-                                                        }`}
-                                                    >
-                                                        <Check size={14} strokeWidth={4} />
-                                                    </button>
+                                                <div key={content.id} onClick={() => setSelectedContentId(content.id)} className={`relative p-6 rounded-[2rem] border-2 transition-all text-left flex flex-col justify-between group cursor-pointer ${isSelected ? 'border-indigo-500 bg-indigo-50/30 shadow-lg ring-4 ring-indigo-500/10' : `border-slate-100 bg-white hover:border-${themeColor}-300 hover:shadow-xl`}`}>
+                                                    <button onClick={(e) => toggleVaultItemSelection(content.id, e)} className={`absolute top-5 right-5 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all z-10 ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white scale-110 shadow-md' : 'bg-white border-slate-200 text-transparent hover:border-indigo-400 opacity-0 group-hover:opacity-100'}`}><Check size={14} strokeWidth={4} /></button>
                                                     <div>
                                                         <div className="flex justify-between items-start mb-4 pr-8">
                                                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-inner transition-colors bg-${themeColor}-50 text-${themeColor}-600 group-hover:bg-${themeColor}-600 group-hover:text-white`}>
                                                                 {isArcade ? <Gamepad2 size={24} /> : isExam ? <FileText size={24} /> : <BookOpen size={24} />}
                                                             </div>
-                                                            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded bg-slate-50 text-slate-400 border border-slate-100`}>
-                                                                {isArcade ? 'Arcade' : isExam ? 'Exam' : 'Lesson'}
-                                                            </span>
+                                                            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded bg-slate-50 text-slate-400 border border-slate-100`}>{isArcade ? 'Arcade' : isExam ? 'Exam' : 'Lesson'}</span>
                                                         </div>
                                                         <h4 className={`font-black text-slate-800 text-lg leading-tight mb-2 group-hover:text-${themeColor}-600 transition-colors`}>{content.title || 'Untitled Module'}</h4>
-                                                        
                                                         {content.tags && content.tags.length > 0 && (
                                                             <div className="flex flex-wrap gap-1 mt-2">
-                                                                {content.tags.slice(0, 3).map((t:string) => (
-                                                                    <span key={t} className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded uppercase border border-slate-200">{t}</span>
-                                                                ))}
+                                                                {content.tags.slice(0, 3).map((t:string) => <span key={t} className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded uppercase border border-slate-200">{t}</span>)}
                                                                 {content.tags.length > 3 && <span className="text-[9px] font-bold text-slate-400">+{content.tags.length - 3}</span>}
                                                             </div>
                                                         )}
-
                                                     </div>
                                                     <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-500 w-full">
                                                         <span className="flex items-center gap-1 truncate pr-2"><User size={12}/> {content.authorName}</span>
@@ -6893,8 +6875,33 @@ function AdminDashboardView({ user }: any) {
                                     </div>
                                 )}
                             </div>
+                            
+                            {/* FLOATING BULK DOCK - Re-rendered here so it stays above the vault content specifically */}
+                            {selectedVaultItems.length > 0 && (
+                                <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-8 duration-300 w-[90%] max-w-3xl">
+                                    <div className="bg-slate-900/95 backdrop-blur-xl border border-slate-700 p-3 pr-4 rounded-[2rem] shadow-[0_30px_60px_rgba(0,0,0,0.4)] flex flex-col md:flex-row items-center justify-between gap-4">
+                                        <div className="flex items-center gap-3 pl-3 w-full md:w-auto shrink-0">
+                                            <div className="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-white font-black text-sm shadow-inner shrink-0">{selectedVaultItems.length}</div>
+                                            <span className="text-xs font-black text-white uppercase tracking-widest">Selected</span>
+                                        </div>
+                                        <div className="hidden md:block h-8 w-px bg-slate-700" />
+                                        <div className="flex items-center w-full bg-slate-800/50 rounded-xl border border-slate-700 p-1">
+                                            <div className="pl-3 pr-2 text-slate-400"><Tag size={14}/></div>
+                                            <input type="text" placeholder="Add bulk tag..." value={bulkTagInput} onChange={e => setBulkTagInput(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter') handleBulkTagAdd(); }} className="flex-1 bg-transparent border-none text-xs font-bold text-white placeholder:text-slate-500 outline-none min-w-[100px]" />
+                                            <button onClick={handleBulkTagAdd} disabled={!bulkTagInput.trim()} className="px-4 py-2 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50 shrink-0">Apply</button>
+                                        </div>
+                                        <div className="hidden md:block h-8 w-px bg-slate-700" />
+                                        <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
+                                            <button onClick={() => setSelectedVaultItems([])} className="flex-1 md:flex-none px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">Clear</button>
+                                            <button onClick={handleBulkDelete} className="flex-1 md:flex-none px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest bg-rose-500 text-white hover:bg-rose-600 shadow-lg shadow-rose-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"><Trash2 size={14}/> Nuke</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                         </div>
                     )}
+
                 </div>
             </div>
         </div>
