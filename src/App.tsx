@@ -7117,6 +7117,259 @@ function ArcadeBuilderView({ data, setData, availableDecks = [] }: any) {
         </div>
     );
 }
+function MarketingSite({ onLoginClick }: { onLoginClick: () => void }) {
+    const [activePage, setActivePage] = useState<'home' | 'platform' | 'pricing'>('home');
+
+    const Nav = () => (
+        <nav className="fixed top-0 w-full z-50 bg-slate-900/80 backdrop-blur-xl border-b border-white/10">
+            <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+                <div 
+                    className="flex items-center gap-3 cursor-pointer group" 
+                    onClick={() => setActivePage('home')}
+                >
+                    <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-[0_0_20px_rgba(79,70,229,0.4)] group-hover:scale-105 transition-transform">
+                        <Shield size={20} />
+                    </div>
+                    <span className="text-xl font-black text-white tracking-tighter">MAGISTER<span className="text-indigo-500">OS</span></span>
+                </div>
+                <div className="hidden md:flex items-center gap-8">
+                    <button onClick={() => setActivePage('platform')} className={`text-sm font-bold transition-colors ${activePage === 'platform' ? 'text-white' : 'text-slate-400 hover:text-white'}`}>Platform</button>
+                    <button onClick={() => setActivePage('pricing')} className={`text-sm font-bold transition-colors ${activePage === 'pricing' ? 'text-white' : 'text-slate-400 hover:text-white'}`}>Pricing</button>
+                </div>
+                <div className="flex items-center gap-4">
+                    <button onClick={onLoginClick} className="text-sm font-bold text-slate-300 hover:text-white transition-colors hidden md:block">Client Login</button>
+                    <button className="bg-white text-slate-900 px-6 py-2.5 rounded-full text-sm font-black hover:bg-indigo-50 transition-colors shadow-lg shadow-white/10">Book a Demo</button>
+                </div>
+            </div>
+        </nav>
+    );
+
+    const Footer = () => (
+        <footer className="bg-slate-950 py-16 border-t border-white/5">
+            <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-12">
+                <div className="col-span-1 md:col-span-2">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Shield size={24} className="text-indigo-500" />
+                        <span className="text-2xl font-black text-white tracking-tighter">MAGISTER<span className="text-indigo-500">OS</span></span>
+                    </div>
+                    <p className="text-slate-400 font-medium max-w-sm">The white-label learning operating system for elite English academies across Latin America.</p>
+                </div>
+                <div>
+                    <h4 className="text-white font-black mb-4 uppercase tracking-widest text-xs">Product</h4>
+                    <div className="flex flex-col gap-3">
+                        <button onClick={() => setActivePage('platform')} className="text-slate-400 hover:text-indigo-400 text-left text-sm font-medium">The Walled Garden</button>
+                        <button onClick={() => setActivePage('platform')} className="text-slate-400 hover:text-indigo-400 text-left text-sm font-medium">Global ESL Vault</button>
+                        <button onClick={() => setActivePage('platform')} className="text-slate-400 hover:text-indigo-400 text-left text-sm font-medium">Mobile Vocab Gym</button>
+                    </div>
+                </div>
+                <div>
+                    <h4 className="text-white font-black mb-4 uppercase tracking-widest text-xs">Company</h4>
+                    <div className="flex flex-col gap-3">
+                        <button onClick={() => setActivePage('pricing')} className="text-slate-400 hover:text-indigo-400 text-left text-sm font-medium">Pricing Tiers</button>
+                        <a href="#" className="text-slate-400 hover:text-indigo-400 text-left text-sm font-medium">Contact Sales</a>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    );
+
+    // ==========================================
+    // PAGE 1: HOME
+    // ==========================================
+    if (activePage === 'home') return (
+        <div className="min-h-screen bg-slate-900 font-sans selection:bg-indigo-500/30">
+            <Nav />
+            {/* HERO */}
+            <main className="pt-32 pb-20 px-6 relative overflow-hidden">
+                <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
+                <div className="max-w-5xl mx-auto text-center relative z-10 pt-10">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-bold text-xs uppercase tracking-widest mb-8">
+                        <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" /> The Standard for LatAm Academies
+                    </div>
+                    <h1 className="text-5xl md:text-7xl font-black text-white tracking-tight leading-[1.1] mb-8">
+                        Stop renting generic tools.<br/>
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-400">Own your digital campus.</span>
+                    </h1>
+                    <p className="text-xl text-slate-400 font-medium max-w-2xl mx-auto mb-12 leading-relaxed">
+                        Instantly deploy a premium, mobile-first learning platform wrapped entirely in your academy's brand. Reduce student churn, automate grading, and access a world-class ESL curriculum out of the box.
+                    </p>
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                        <button className="w-full sm:w-auto px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-[0_0_30px_rgba(79,70,229,0.3)] hover:shadow-[0_0_40px_rgba(79,70,229,0.5)]">
+                            Book Your Pilot
+                        </button>
+                        <button onClick={() => setActivePage('platform')} className="w-full sm:w-auto px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-2">
+                            <PlayCircle size={18} /> Tour the Platform
+                        </button>
+                    </div>
+                </div>
+
+                {/* DASHBOARD PREVIEW MOCKUP */}
+                <div className="max-w-6xl mx-auto mt-20 relative z-10">
+                    <div className="aspect-[16/9] bg-slate-950 rounded-[2rem] border border-slate-800 shadow-2xl overflow-hidden flex items-center justify-center">
+                        <div className="text-slate-600 font-black flex flex-col items-center gap-4">
+                            <Shield size={64} className="opacity-50" />
+                            [ HIGH FIDELITY PRODUCT SCREENSHOT HERE ]
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            {/* VALUE PROPS */}
+            <section className="py-32 bg-slate-950 border-t border-white/5 relative">
+                <div className="max-w-7xl mx-auto px-6">
+                    <div className="text-center mb-20">
+                        <h2 className="text-3xl md:text-5xl font-black text-white mb-6">Built for Academic Directors.</h2>
+                        <p className="text-slate-400 text-lg font-medium max-w-2xl mx-auto">You are fighting giant chains and low-cost apps. Magister OS gives you the enterprise infrastructure to look premium and retain students longer.</p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div className="p-8 rounded-[2rem] bg-slate-900 border border-slate-800 hover:border-indigo-500/50 transition-colors">
+                            <div className="w-14 h-14 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-400 mb-6"><Smartphone size={28}/></div>
+                            <h3 className="text-xl font-black text-white mb-3">Mobile-First "Vocab Gym"</h3>
+                            <p className="text-slate-400 font-medium leading-relaxed">PDFs and WhatsApp groups are dead. Engage Gen-Z students with interactive flashcards, spaced repetition, and gamified XP right on their phones.</p>
+                        </div>
+                        <div className="p-8 rounded-[2rem] bg-slate-900 border border-slate-800 hover:border-emerald-500/50 transition-colors">
+                            <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-400 mb-6"><BarChart3 size={28}/></div>
+                            <h3 className="text-xl font-black text-white mb-3">Automated Grading & Analytics</h3>
+                            <p className="text-slate-400 font-medium leading-relaxed">Save your teachers 10 hours a week. Push exams to a cohort with one click, and watch the Command Center automatically grade and highlight struggling students.</p>
+                        </div>
+                        <div className="p-8 rounded-[2rem] bg-slate-900 border border-slate-800 hover:border-purple-500/50 transition-colors">
+                            <div className="w-14 h-14 bg-purple-500/10 rounded-2xl flex items-center justify-center text-purple-400 mb-6"><BookOpen size={28}/></div>
+                            <h3 className="text-xl font-black text-white mb-3">The Global ESL Vault</h3>
+                            <p className="text-slate-400 font-medium leading-relaxed">Don't start from scratch. Tap into our master repository of pre-built grammar, phonetics, and reading modules, ready to deploy to your classes on day one.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <Footer />
+        </div>
+    );
+
+    // ==========================================
+    // PAGE 2: PLATFORM / FEATURES
+    // ==========================================
+    if (activePage === 'platform') return (
+        <div className="min-h-screen bg-slate-900 font-sans">
+            <Nav />
+            <main className="pt-40 pb-32 px-6">
+                <div className="max-w-7xl mx-auto">
+                    <div className="text-center mb-24">
+                        <h1 className="text-5xl font-black text-white tracking-tight mb-6">The SaaS Engine Inside.</h1>
+                        <p className="text-xl text-slate-400 font-medium max-w-2xl mx-auto">Explore the Walled Garden architecture that keeps your data isolated, your brand front-and-center, and your teachers in absolute control.</p>
+                    </div>
+
+                    {/* FEATURE 1: WHITE LABEL */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center mb-32">
+                        <div className="order-2 lg:order-1 aspect-square bg-slate-800 rounded-[3rem] border border-slate-700 flex items-center justify-center p-12 relative overflow-hidden">
+                             <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-transparent" />
+                             <div className="w-full h-full bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl flex flex-col p-6 z-10">
+                                 {/* Mockup of white-labeling */}
+                                 <div className="flex gap-4 mb-8">
+                                     <div className="w-12 h-12 rounded-xl bg-rose-500 flex items-center justify-center text-white font-black">TC</div>
+                                     <div><div className="h-4 w-32 bg-slate-700 rounded mb-2"/><div className="h-3 w-20 bg-slate-800 rounded"/></div>
+                                 </div>
+                                 <div className="flex-1 rounded-xl bg-slate-800/50 border border-slate-700 border-dashed" />
+                             </div>
+                        </div>
+                        <div className="order-1 lg:order-2">
+                            <div className="text-indigo-400 font-black text-xs uppercase tracking-widest mb-4">SaaS Multi-Tenancy</div>
+                            <h2 className="text-4xl font-black text-white mb-6">Your Walled Garden.</h2>
+                            <p className="text-slate-400 text-lg leading-relaxed mb-8">
+                                When you sign up, Magister OS spins up an isolated database strictly for your academy. Your students will never see our brand. They log in to an interface dynamically injected with your school's hex colors, logo, and custom navigation layout.
+                            </p>
+                            <ul className="space-y-4">
+                                {['100% Data Isolation between academies', 'Dynamic CSS color injection', 'Custom terminology (e.g., change "Classes" to "Groups")'].map((item, i) => (
+                                    <li key={i} className="flex items-center gap-3 text-slate-300 font-medium"><CheckCircle2 size={20} className="text-emerald-500" /> {item}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+
+                    {/* FEATURE 2: MAGISTER COMMAND */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                        <div>
+                            <div className="text-purple-400 font-black text-xs uppercase tracking-widest mb-4">Instructional Design</div>
+                            <h2 className="text-4xl font-black text-white mb-6">The Command Center.</h2>
+                            <p className="text-slate-400 text-lg leading-relaxed mb-8">
+                                Give your academic director god-mode visibility. Track every student's XP, monitor cohort progress bars in real-time, and manage permissions for all your teaching staff from a single pane of glass.
+                            </p>
+                            <ul className="space-y-4">
+                                {['Global Roster & Directory Auditing', 'One-click Curriculum Deployment', 'System-wide Broadcast Alerts'].map((item, i) => (
+                                    <li key={i} className="flex items-center gap-3 text-slate-300 font-medium"><CheckCircle2 size={20} className="text-emerald-500" /> {item}</li>
+                                ))}
+                            </ul>
+                        </div>
+                        <div className="aspect-square bg-slate-800 rounded-[3rem] border border-slate-700 flex items-center justify-center p-12 relative overflow-hidden">
+                             <div className="absolute inset-0 bg-gradient-to-tl from-purple-500/20 to-transparent" />
+                             <div className="w-full h-full bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl p-6 z-10 grid grid-cols-2 gap-4">
+                                 <div className="bg-slate-800 rounded-xl p-4 flex flex-col justify-end"><div className="text-3xl font-black text-white">420</div><div className="text-[10px] text-slate-400 uppercase font-black">Students</div></div>
+                                 <div className="bg-purple-600/20 border border-purple-500/30 rounded-xl p-4 flex flex-col justify-end"><div className="text-3xl font-black text-purple-400">12</div><div className="text-[10px] text-purple-400/70 uppercase font-black">Pending Grades</div></div>
+                                 <div className="col-span-2 bg-slate-800 rounded-xl p-4" />
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+            <Footer />
+        </div>
+    );
+
+    // ==========================================
+    // PAGE 3: PRICING (LATAM FOCUS)
+    // ==========================================
+    if (activePage === 'pricing') return (
+        <div className="min-h-screen bg-slate-900 font-sans">
+            <Nav />
+            <main className="pt-40 pb-32 px-6">
+                <div className="max-w-3xl mx-auto text-center mb-20">
+                    <h1 className="text-5xl font-black text-white tracking-tight mb-6">Enterprise power.<br/>Independent prices.</h1>
+                    <p className="text-xl text-slate-400 font-medium">Flat-rate monthly pricing designed for the economics of Latin American academies. No punitive "per-seat" licenses. Predictable ROI.</p>
+                </div>
+
+                <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* TIER 1 */}
+                    <div className="bg-slate-800/50 rounded-[3rem] border border-slate-700 p-10 flex flex-col">
+                        <h3 className="text-2xl font-black text-white mb-2">Growth Academy</h3>
+                        <p className="text-slate-400 font-medium mb-8 h-12">Perfect for independent tutors and boutique language centers.</p>
+                        <div className="mb-8">
+                            <span className="text-5xl font-black text-white">$149</span>
+                            <span className="text-slate-500 font-bold"> / month (USD)</span>
+                        </div>
+                        <ul className="space-y-4 mb-10 flex-1">
+                            {['Up to 100 Active Students', 'Global Curriculum Vault Access', 'Instructor Command Center', 'Standard Email Support'].map((feat, i) => (
+                                <li key={i} className="flex items-center gap-3 text-slate-300 font-medium"><CheckCircle2 size={20} className="text-slate-600" /> {feat}</li>
+                            ))}
+                        </ul>
+                        <button className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-colors">Start Free Trial</button>
+                    </div>
+
+                    {/* TIER 2 (PREMIUM) */}
+                    <div className="bg-indigo-600 rounded-[3rem] border border-indigo-500 p-10 flex flex-col relative overflow-hidden shadow-[0_0_50px_rgba(79,70,229,0.3)]">
+                        <div className="absolute top-6 right-6 bg-white/20 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full backdrop-blur-sm">Most Popular</div>
+                        <h3 className="text-2xl font-black text-white mb-2">Premium Campus</h3>
+                        <p className="text-indigo-200 font-medium mb-8 h-12">For established schools ready to scale and own their brand experience.</p>
+                        <div className="mb-8">
+                            <span className="text-5xl font-black text-white">$299</span>
+                            <span className="text-indigo-300 font-bold"> / month (USD)</span>
+                        </div>
+                        <ul className="space-y-4 mb-10 flex-1">
+                            {['Up to 250 Active Students', 'Full White-Labeling (Logo & Colors)', 'Custom Layout Configurations', 'Priority WhatsApp Support', 'Dedicated Org Admin Roles'].map((feat, i) => (
+                                <li key={i} className="flex items-center gap-3 text-white font-medium"><CheckCircle2 size={20} className="text-indigo-300" /> {feat}</li>
+                            ))}
+                        </ul>
+                        <button className="w-full py-4 bg-white hover:bg-slate-50 text-indigo-900 rounded-2xl font-black text-sm uppercase tracking-widest transition-colors shadow-xl">Contact Sales</button>
+                    </div>
+                </div>
+
+                <div className="max-w-2xl mx-auto mt-20 text-center p-8 bg-slate-800/30 rounded-3xl border border-slate-700/50">
+                    <div className="inline-block p-3 bg-emerald-500/10 rounded-full mb-4"><Zap size={24} className="text-emerald-400" /></div>
+                    <h4 className="text-xl font-black text-white mb-2">The ROI Guarantee</h4>
+                    <p className="text-slate-400 font-medium">If Magister OS prevents just two students from dropping out this month due to better engagement, the platform completely pays for itself.</p>
+                </div>
+            </main>
+            <Footer />
+        </div>
+    );
+}
 function App() {
   // --- 1. CORE SYSTEM STATE ---
   const [user, setUser] = useState<any>(null);
