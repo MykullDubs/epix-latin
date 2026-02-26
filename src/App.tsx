@@ -7084,9 +7084,11 @@ function App() {
   const [authChecked, setAuthChecked] = useState(false);
   
   // High-Level View Controllers
-  const [viewMode, setViewMode] = useState<'student' | 'instructor'>('student');
-  const [activeTab, setActiveTab] = useState('home'); // Controls Bottom Nav
-  
+const [currentView, setCurrentView] = useState(() => {
+    if (user?.role === 'admin' || user?.role === 'org_admin') return 'admin';
+    if (user?.role === 'instructor') return 'instructor';
+    return 'student';
+});  
   // --- 2. DATA REPOSITORIES ---
   const [systemLessons] = useState([]); 
   const [customLessons, setCustomLessons] = useState<any[]>([]);
