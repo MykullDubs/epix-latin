@@ -6043,7 +6043,6 @@ function AdminDashboardView({ user }: any) {
     const userOrgId = user.orgId || null;
 
     // 2. NAVIGATION STATE
-    // Super Admins start on Overview, Org Admins start on their local Cohorts
     const [activeTab, setActiveTab] = useState<any>(isSuperAdmin ? 'overview' : 'cohorts');
     
     // 3. REAL-TIME DATA STATE
@@ -6062,9 +6061,14 @@ function AdminDashboardView({ user }: any) {
     const [showBroadcastModal, setShowBroadcastModal] = useState(false);
     const [broadcastMsg, setBroadcastMsg] = useState('');
     const [isBroadcasting, setIsBroadcasting] = useState(false);
+    
+    // B2B FRANCHISE STATES
     const [showOrgModal, setShowOrgModal] = useState(false);
     const [newOrg, setNewOrg] = useState({ name: '', logoUrl: '', themeColor: '#4f46e5' });
     const [isProvisioning, setIsProvisioning] = useState(false);
+    
+    // NEW: EDITING STATE
+    const [editingOrg, setEditingOrg] = useState<any | null>(null);
     
     // DEEP DIVE SELECTIONS
     const [selectedInstructorUid, setSelectedInstructorUid] = useState<string | null>(null);
@@ -6085,31 +6089,18 @@ function AdminDashboardView({ user }: any) {
 
     // 5. THE SCOPED DATA ENGINE
     useEffect(() => {
-        // A. PROFILES: Filtered by Org if not Super Admin
-        const qProfiles = isSuperAdmin 
-            ? query(collectionGroup(db, 'profile')) 
-            : query(collectionGroup(db, 'profile'), where('orgId', '==', userOrgId));
+        const qProfiles = isSuperAdmin ? query(collectionGroup(db, 'profile')) : query(collectionGroup(db, 'profile'), where('orgId', '==', userOrgId));
         const unsubProfiles = onSnapshot(qProfiles, (snap) => setAllProfiles(snap.docs.map(d => ({ uid: d.ref.path.split('/')[3], ...d.data() }))));
 
-        // B. COHORTS: Filtered by Org if not Super Admin
-        const qClasses = isSuperAdmin 
-            ? query(collectionGroup(db, 'classes'))
-            : query(collectionGroup(db, 'classes'), where('orgId', '==', userOrgId));
+        const qClasses = isSuperAdmin ? query(collectionGroup(db, 'classes')) : query(collectionGroup(db, 'classes'), where('orgId', '==', userOrgId));
         const unsubClasses = onSnapshot(qClasses, (snap) => setAllCohorts(snap.docs.map(d => ({ id: d.id, _instructorUid: d.ref.path.split('/')[3], ...d.data() }))));
 
-        // C. ACTIVITY: Filtered by Org if not Super Admin
-        const qLogs = isSuperAdmin
-            ? query(collection(db, 'artifacts', appId, 'activity_logs'), where('scoreDetail.status', '==', 'pending_review'))
-            : query(collection(db, 'artifacts', appId, 'activity_logs'), where('orgId', '==', userOrgId), where('scoreDetail.status', '==', 'pending_review'));
+        const qLogs = isSuperAdmin ? query(collection(db, 'artifacts', appId, 'activity_logs'), where('scoreDetail.status', '==', 'pending_review')) : query(collection(db, 'artifacts', appId, 'activity_logs'), where('orgId', '==', userOrgId), where('scoreDetail.status', '==', 'pending_review'));
         const unsubLogs = onSnapshot(qLogs, (snap) => setGlobalLogs(snap.docs.map(d => d.data())));
 
-        // D. VAULT: Filtered by (Global + Own Org)
-        const qContent = isSuperAdmin
-            ? query(collectionGroup(db, 'custom_lessons'))
-            : query(collectionGroup(db, 'custom_lessons'), where('orgId', 'in', ['global', userOrgId]));
+        const qContent = isSuperAdmin ? query(collectionGroup(db, 'custom_lessons')) : query(collectionGroup(db, 'custom_lessons'), where('orgId', 'in', ['global', userOrgId]));
         const unsubContent = onSnapshot(qContent, (snap) => setAllContent(snap.docs.map(d => ({ id: d.id, _instructorUid: d.ref.path.split('/')[3], ...d.data() }))));
 
-        // E. ORGANIZATIONS: (Super Admin Only)
         let unsubOrgs = () => {};
         if (isSuperAdmin) {
             const qOrgs = query(collection(db, 'artifacts', appId, 'organizations'));
@@ -6127,10 +6118,7 @@ function AdminDashboardView({ user }: any) {
         if (!newOrg.name.trim()) return;
         setIsProvisioning(true);
         try {
-            await addDoc(collection(db, 'artifacts', appId, 'organizations'), {
-                ...newOrg,
-                createdAt: Date.now()
-            });
+            await addDoc(collection(db, 'artifacts', appId, 'organizations'), { ...newOrg, createdAt: Date.now() });
             setShowOrgModal(false);
             setNewOrg({ name: '', logoUrl: '', themeColor: '#4f46e5' });
             triggerToast("B2B Organization Provisioned!", 'success');
@@ -6138,16 +6126,37 @@ function AdminDashboardView({ user }: any) {
         setIsProvisioning(false);
     };
 
+    // NEW: Handle Saving an Edited Organization
+    const handleSaveOrgEdit = async () => {
+        if (!editingOrg || !editingOrg.name.trim()) return;
+        try {
+            await updateDoc(doc(db, 'artifacts', appId, 'organizations', editingOrg.id), {
+                name: editingOrg.name,
+                logoUrl: editingOrg.logoUrl,
+                themeColor: editingOrg.themeColor
+            });
+            setEditingOrg(null);
+            triggerToast("Organization updated successfully.", "success");
+        } catch (e) {
+            triggerToast("Failed to update organization.", "error");
+        }
+    };
+
     const assignUserToOrg = async (uid: string, orgId: string) => {
         try {
             await updateDoc(doc(db, 'artifacts', appId, 'users', uid, 'profile', 'main'), {
                 orgId: orgId === 'global' ? null : orgId
             });
-            triggerToast("Migration complete.", 'success');
+            if (orgId !== 'global') {
+                triggerToast("Entered Preview Mode. Data is now scoped.", 'info');
+            } else {
+                triggerToast("Returned to Global View.", 'success');
+            }
         } catch (e) { triggerToast("Migration failed.", 'error'); }
     };
 
-    const deleteOrganization = (orgId: string) => {
+    const deleteOrganization = (orgId: string, e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevents the card click (edit) from triggering
         setConfirmModal({
             title: "Dissolve Organization",
             message: "CRITICAL WARNING: This will dissolve the tenant. Users assigned to this org will fall back to the Global Pool.",
@@ -6161,19 +6170,17 @@ function AdminDashboardView({ user }: any) {
         });
     };
 
- const toggleUserRole = (uid: string, currentRole: string) => {
+    // ... (Keep existing toggleUserRole, handleGlobalBroadcast, forceDeleteCohort, etc.) ...
+    const toggleUserRole = (uid: string, currentRole: string) => {
         const roles = isSuperAdmin ? ['student', 'instructor', 'org_admin', 'admin'] : ['student', 'instructor', 'org_admin'];
         const currentIndex = roles.indexOf(currentRole);
         const nextRole = roles[(currentIndex + 1) % roles.length];
-
         setConfirmModal({
-            title: "Update Permissions",
-            message: `Promote/Demote user to ${nextRole.toUpperCase()}?`,
+            title: "Update Permissions", message: `Promote/Demote user to ${nextRole.toUpperCase()}?`,
             onConfirm: async () => {
                 try {
                     await updateDoc(doc(db, 'artifacts', appId, 'users', uid, 'profile', 'main'), { role: nextRole });
-                    // Fix: Changed 'newRole' to 'nextRole'
-                    if (selectedInstructorUid === uid && nextRole === 'student') setSelectedInstructorUid(null); 
+                    if (selectedInstructorUid === uid && nextRole === 'student') setSelectedInstructorUid(null);
                     triggerToast(`Role updated to ${nextRole}`);
                 } catch (e) { triggerToast("Update failed", "error"); }
                 setConfirmModal(null);
@@ -6186,29 +6193,20 @@ function AdminDashboardView({ user }: any) {
         setIsBroadcasting(true);
         try {
             await addDoc(collection(db, 'artifacts', appId, 'global_announcements'), {
-                message: broadcastMsg.trim(),
-                authorName: user.displayName || 'System Admin',
-                timestamp: Date.now(),
-                active: true,
-                type: 'system_alert',
-                orgId: isSuperAdmin ? 'global' : userOrgId
+                message: broadcastMsg.trim(), authorName: user.displayName || 'System Admin', timestamp: Date.now(), active: true, type: 'system_alert', orgId: isSuperAdmin ? 'global' : userOrgId
             });
-            setBroadcastMsg('');
-            setShowBroadcastModal(false);
-            triggerToast("Alert broadcasted successfully!", 'success');
+            setBroadcastMsg(''); setShowBroadcastModal(false); triggerToast("Alert broadcasted successfully!", 'success');
         } catch (error) { triggerToast("Failed to send broadcast.", 'error'); }
         setIsBroadcasting(false);
     };
 
     const forceDeleteCohort = (instructorUid: string, classId: string) => {
         setConfirmModal({
-            title: "Nuke Cohort",
-            message: "Permanently delete this classroom? This cannot be undone.",
+            title: "Nuke Cohort", message: "Permanently delete this classroom? This cannot be undone.",
             onConfirm: async () => {
                 try {
                     await deleteDoc(doc(db, 'artifacts', appId, 'users', instructorUid, 'classes', classId));
-                    setSelectedCohortId(null);
-                    triggerToast("Cohort deleted.", 'success');
+                    setSelectedCohortId(null); triggerToast("Cohort deleted.", 'success');
                 } catch (e) { triggerToast("Delete failed.", 'error'); }
                 setConfirmModal(null);
             }
@@ -6217,12 +6215,10 @@ function AdminDashboardView({ user }: any) {
 
     const forceRemoveStudent = (instructorUid: string, classId: string, studentEmail: string, studentObj: any) => {
         setConfirmModal({
-            title: "Remove Student",
-            message: `Are you sure you want to forcibly remove ${studentEmail} from this active roster?`,
+            title: "Remove Student", message: `Are you sure you want to forcibly remove ${studentEmail} from this active roster?`,
             onConfirm: async () => {
                 try {
-                    const classRef = doc(db, 'artifacts', appId, 'users', instructorUid, 'classes', classId);
-                    await updateDoc(classRef, { studentEmails: arrayRemove(studentEmail), students: arrayRemove(studentObj) });
+                    await updateDoc(doc(db, 'artifacts', appId, 'users', instructorUid, 'classes', classId), { studentEmails: arrayRemove(studentEmail), students: arrayRemove(studentObj) });
                     triggerToast("Student removed from roster.", 'success');
                 } catch (e) { triggerToast("Failed to remove student.", 'error'); }
                 setConfirmModal(null);
@@ -6232,13 +6228,11 @@ function AdminDashboardView({ user }: any) {
 
     const forceDeleteContent = (instructorUid: string, contentId: string) => {
         setConfirmModal({
-            title: "Nuke Curriculum",
-            message: "CRITICAL WARNING: This will permanently delete this item from the platform. Active cohorts using it will lose access.",
+            title: "Nuke Curriculum", message: "CRITICAL WARNING: This will permanently delete this item from the platform.",
             onConfirm: async () => {
                 try {
                     await deleteDoc(doc(db, 'artifacts', appId, 'users', instructorUid, 'custom_lessons', contentId));
-                    setSelectedContentId(null);
-                    triggerToast("Curriculum item nuked from platform.", 'success');
+                    setSelectedContentId(null); triggerToast("Curriculum nuked.", 'success');
                 } catch (e) { triggerToast("Failed to delete content.", 'error'); }
                 setConfirmModal(null);
             }
@@ -6247,8 +6241,7 @@ function AdminDashboardView({ user }: any) {
 
     const handleBulkDelete = () => {
         setConfirmModal({
-            title: "Bulk Nuke",
-            message: `CRITICAL WARNING: You are about to permanently wipe ${selectedVaultItems.length} items from the platform. This action is irreversible.`,
+            title: "Bulk Nuke", message: `Permanently wipe ${selectedVaultItems.length} items from the platform?`,
             onConfirm: async () => {
                 try {
                     const deletePromises = selectedVaultItems.map(id => {
@@ -6256,10 +6249,8 @@ function AdminDashboardView({ user }: any) {
                         if (item) return deleteDoc(doc(db, 'artifacts', appId, 'users', item._instructorUid, 'custom_lessons', id));
                     });
                     await Promise.all(deletePromises);
-                    const count = selectedVaultItems.length;
-                    setSelectedVaultItems([]); 
-                    triggerToast(`Successfully purged ${count} items.`, 'success');
-                } catch (e) { triggerToast("Error during bulk deletion.", 'error'); }
+                    const count = selectedVaultItems.length; setSelectedVaultItems([]); triggerToast(`Purged ${count} items.`, 'success');
+                } catch (e) { triggerToast("Error during deletion.", 'error'); }
                 setConfirmModal(null);
             }
         });
@@ -6267,20 +6258,13 @@ function AdminDashboardView({ user }: any) {
 
     const handleAddSingleTag = async (instructorUid: string, contentId: string) => {
         if (!inspectorTagInput.trim()) return;
-        try {
-            const contentRef = doc(db, 'artifacts', appId, 'users', instructorUid, 'custom_lessons', contentId);
-            await updateDoc(contentRef, { tags: arrayUnion(inspectorTagInput.trim().toLowerCase()) });
-            triggerToast(`Tag added.`, 'info');
-            setInspectorTagInput('');
-        } catch (e) { triggerToast("Failed to add tag.", 'error'); }
+        try { await updateDoc(doc(db, 'artifacts', appId, 'users', instructorUid, 'custom_lessons', contentId), { tags: arrayUnion(inspectorTagInput.trim().toLowerCase()) }); triggerToast(`Tag added.`, 'info'); setInspectorTagInput(''); } 
+        catch (e) { triggerToast("Failed to add tag.", 'error'); }
     };
 
     const handleRemoveSingleTag = async (instructorUid: string, contentId: string, tagToRemove: string) => {
-        try {
-            const contentRef = doc(db, 'artifacts', appId, 'users', instructorUid, 'custom_lessons', contentId);
-            await updateDoc(contentRef, { tags: arrayRemove(tagToRemove) });
-            triggerToast(`Tag removed.`, 'info');
-        } catch (e) { triggerToast("Failed to remove tag.", 'error'); }
+        try { await updateDoc(doc(db, 'artifacts', appId, 'users', instructorUid, 'custom_lessons', contentId), { tags: arrayRemove(tagToRemove) }); triggerToast(`Tag removed.`, 'info'); } 
+        catch (e) { triggerToast("Failed to remove tag.", 'error'); }
     };
 
     const handleBulkTagAdd = async () => {
@@ -6291,9 +6275,7 @@ function AdminDashboardView({ user }: any) {
                 const item = allContent.find(c => c.id === id);
                 if (item) return updateDoc(doc(db, 'artifacts', appId, 'users', item._instructorUid, 'custom_lessons', id), { tags: arrayUnion(tag) });
             });
-            await Promise.all(tagPromises);
-            setBulkTagInput('');
-            triggerToast(`Tag '${tag}' applied.`, 'success');
+            await Promise.all(tagPromises); setBulkTagInput(''); triggerToast(`Tag '${tag}' applied.`, 'success');
         } catch (e) { triggerToast("Tagging failed.", 'error'); }
     };
 
@@ -6307,10 +6289,7 @@ function AdminDashboardView({ user }: any) {
                 return updateDoc(doc(db, 'artifacts', appId, 'users', cohort._instructorUid, 'classes', cohort.id), { assignments: arrayUnion(deployingContent.id) });
             });
             await Promise.all(pushPromises);
-            setDeployingContent(null);
-            setDeploySelectedCohorts([]);
-            setSelectedContentId(null); 
-            triggerToast(`Pushed to ${deploySelectedCohorts.length} cohorts.`, 'success');
+            setDeployingContent(null); setDeploySelectedCohorts([]); setSelectedContentId(null); triggerToast(`Pushed to ${deploySelectedCohorts.length} cohorts.`, 'success');
         } catch (error) { triggerToast("Deployment failed.", 'error'); }
         setIsDeploying(false);
     };
@@ -6355,11 +6334,27 @@ function AdminDashboardView({ user }: any) {
     const activeCohort = populatedCohorts.find(c => c.id === selectedCohortId);
     const activeContent = populatedContent.find(c => c.id === selectedContentId);
 
+    // Identify if the Super Admin is currently ghosting an org
+    const previewingOrgData = organizations.find(o => o.id === userOrgId);
+
     return (
         <div className="h-full flex flex-col bg-slate-50 overflow-hidden font-sans relative">
             
             {/* OVERLAY: TOASTS */}
             {toast && <div className="absolute top-0 left-0 w-full z-[4000] flex justify-center pointer-events-none"><JuicyToast message={toast.msg} type={toast.type} onClose={() => setToast(null)} /></div>}
+
+            {/* NEW: THE GHOST MODE BANNER */}
+            {isSuperAdmin && userOrgId && userOrgId !== 'global' && previewingOrgData && (
+                <div 
+                    onClick={() => assignUserToOrg(user.uid, 'global')}
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-white py-2 px-4 flex items-center justify-center gap-2 cursor-pointer transition-colors z-[100]"
+                >
+                    <AlertTriangle size={14} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">
+                        Previewing Tenant: {previewingOrgData.name}. Click here to exit and return to Global Pool.
+                    </span>
+                </div>
+            )}
 
             {/* OVERLAY: CONFIRMATION MODAL */}
             {confirmModal && (
@@ -6386,29 +6381,41 @@ function AdminDashboardView({ user }: any) {
                             <div><h2 className="text-2xl font-black text-slate-900 leading-tight">New Franchise</h2><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Provision B2B Tenant</p></div>
                         </div>
                         <div className="space-y-4">
-                            <div>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Organization Name</label>
-                                <input type="text" value={newOrg.name} onChange={e => setNewOrg({...newOrg, name: e.target.value})} placeholder="e.g. Texas Culinary Institute" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-indigo-500" />
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Logo URL (Optional)</label>
-                                <input type="text" value={newOrg.logoUrl} onChange={e => setNewOrg({...newOrg, logoUrl: e.target.value})} placeholder="https://..." className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-indigo-500" />
-                            </div>
+                            <div><label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Organization Name</label><input type="text" value={newOrg.name} onChange={e => setNewOrg({...newOrg, name: e.target.value})} placeholder="e.g. Texas Culinary Institute" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-indigo-500" /></div>
+                            <div><label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Logo URL (Optional)</label><input type="text" value={newOrg.logoUrl} onChange={e => setNewOrg({...newOrg, logoUrl: e.target.value})} placeholder="https://..." className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-indigo-500" /></div>
                             <div>
                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Brand Theme Color</label>
-                                <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border-2 border-slate-200">
-                                    <input type="color" value={newOrg.themeColor} onChange={e => setNewOrg({...newOrg, themeColor: e.target.value})} className="w-10 h-10 border-none cursor-pointer bg-transparent" />
-                                    <span className="font-mono text-sm font-black text-slate-600 uppercase">{newOrg.themeColor}</span>
-                                </div>
+                                <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border-2 border-slate-200"><input type="color" value={newOrg.themeColor} onChange={e => setNewOrg({...newOrg, themeColor: e.target.value})} className="w-10 h-10 border-none cursor-pointer bg-transparent" /><span className="font-mono text-sm font-black text-slate-600 uppercase">{newOrg.themeColor}</span></div>
                             </div>
-                            <button onClick={handleProvisionOrg} disabled={!newOrg.name.trim() || isProvisioning} className="w-full mt-4 py-5 bg-slate-900 hover:bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2">
-                                {isProvisioning ? <Loader size={18} className="animate-spin" /> : <Shield size={18} />} Initialize Tenant
-                            </button>
+                            <button onClick={handleProvisionOrg} disabled={!newOrg.name.trim() || isProvisioning} className="w-full mt-4 py-5 bg-slate-900 hover:bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2">{isProvisioning ? <Loader size={18} className="animate-spin" /> : <Shield size={18} />} Initialize Tenant</button>
                         </div>
                     </div>
                 </div>
             )}
 
+            {/* NEW OVERLAY: EDIT ORG MODAL */}
+            {editingOrg && (
+                <div className="absolute inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl p-8 relative animate-in zoom-in-95">
+                        <button onClick={() => setEditingOrg(null)} className="absolute top-6 right-6 text-slate-400 hover:text-rose-500 transition-colors"><X size={24}/></button>
+                        <div className="flex items-center gap-4 mb-8">
+                            <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shadow-inner"><Briefcase size={28} /></div>
+                            <div><h2 className="text-2xl font-black text-slate-900 leading-tight">Edit Franchise</h2><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Tenant Settings</p></div>
+                        </div>
+                        <div className="space-y-4">
+                            <div><label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Organization Name</label><input type="text" value={editingOrg.name} onChange={e => setEditingOrg({...editingOrg, name: e.target.value})} className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-indigo-500" /></div>
+                            <div><label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Logo URL (Optional)</label><input type="text" value={editingOrg.logoUrl || ''} onChange={e => setEditingOrg({...editingOrg, logoUrl: e.target.value})} className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:border-indigo-500" /></div>
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Brand Theme Color</label>
+                                <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border-2 border-slate-200"><input type="color" value={editingOrg.themeColor || '#4f46e5'} onChange={e => setEditingOrg({...editingOrg, themeColor: e.target.value})} className="w-10 h-10 border-none cursor-pointer bg-transparent" /><span className="font-mono text-sm font-black text-slate-600 uppercase">{editingOrg.themeColor || '#4f46e5'}</span></div>
+                            </div>
+                            <button onClick={handleSaveOrgEdit} disabled={!editingOrg.name.trim()} className="w-full mt-4 py-5 bg-slate-900 hover:bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2">Save Changes</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* KEEP EXISTING OVERLAYS (Broadcast, Dossier, Inspector, Matrices) */}
             {/* OVERLAY: GLOBAL BROADCAST MODAL */}
             {showBroadcastModal && (
                 <div className="absolute inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in">
@@ -6672,15 +6679,23 @@ function AdminDashboardView({ user }: any) {
                                 {organizations.map(org => {
                                     const orgUsersCount = allProfiles.filter(p => p.orgId === org.id).length;
                                     return (
-                                        <div key={org.id} className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm relative overflow-hidden group hover:border-indigo-200 transition-colors">
+                                        <div 
+                                            key={org.id} 
+                                            onClick={() => setEditingOrg(org)}
+                                            className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm relative overflow-hidden group hover:border-indigo-200 transition-all cursor-pointer"
+                                        >
                                             <div className="absolute top-0 left-0 w-full h-2 transition-all" style={{ backgroundColor: org.themeColor || '#4f46e5' }} />
                                             <div className="flex justify-between items-start mb-6">
                                                 {org.logoUrl ? <img src={org.logoUrl} alt={org.name} className="w-16 h-16 object-contain rounded-xl border border-slate-100 p-1" /> : <div className="w-16 h-16 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 font-black text-xl border border-slate-200">{org.name.charAt(0).toUpperCase()}</div>}
                                                 <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100">ID: {org.id.substring(0,6)}</span>
                                             </div>
-                                            <h3 className="text-xl font-black text-slate-900 mb-1 truncate">{org.name}</h3>
+                                            <h3 className="text-xl font-black text-slate-900 mb-1 truncate group-hover:text-indigo-600 transition-colors">{org.name}</h3>
                                             <p className="text-xs font-bold text-slate-400 mb-6 flex items-center gap-1"><Users size={12}/> {orgUsersCount} Users Assigned</p>
-                                            <button onClick={() => deleteOrganization(org.id)} className="w-full py-3 bg-white border-2 border-slate-100 text-rose-500 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-rose-50 hover:border-rose-200 transition-colors">Dissolve Tenant</button>
+                                            
+                                            <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-slate-100">
+                                                <button onClick={(e) => deleteOrganization(org.id, e)} className="w-full py-2 bg-slate-50 text-rose-500 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-rose-50 transition-colors">Dissolve</button>
+                                                <button onClick={(e) => { e.stopPropagation(); assignUserToOrg(user.uid, org.id); }} className="w-full py-2 bg-indigo-50 text-indigo-600 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-indigo-600 hover:text-white transition-colors">Preview Mode</button>
+                                            </div>
                                         </div>
                                     );
                                 })}
@@ -6695,7 +6710,7 @@ function AdminDashboardView({ user }: any) {
                     {activeTab === 'cohorts' && (
                         <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in">
                             <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                                <div><h3 className="text-2xl font-black text-slate-900">Platform Deployments</h3><p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{isOrgAdmin ? 'Local Tenant View' : 'Global Network View'}</p></div>
+                                <div><h3 className="text-2xl font-black text-slate-900">Platform Deployments</h3><p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{isOrgAdmin || userOrgId !== 'global' ? 'Local Tenant View' : 'Global Network View'}</p></div>
                                 <div className="text-xs font-bold text-slate-500 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm">Click a row to audit</div>
                             </div>
                             <table className="w-full text-left border-collapse">
@@ -6792,7 +6807,7 @@ function AdminDashboardView({ user }: any) {
                         <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in">
                             <div className="p-8 border-b border-slate-100 flex flex-col gap-6 bg-slate-50/50">
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                                    <div><h3 className="text-2xl font-black text-slate-900">The Curriculum Vault</h3><p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{isOrgAdmin ? 'Tenant Library' : 'Global Repository'}</p></div>
+                                    <div><h3 className="text-2xl font-black text-slate-900">The Curriculum Vault</h3><p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{isOrgAdmin || userOrgId !== 'global' ? 'Tenant Library' : 'Global Repository'}</p></div>
                                     <div className="relative w-full md:w-80"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input type="text" placeholder="Search title, author, or tags..." value={vaultSearch} onChange={(e) => setVaultSearch(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 shadow-sm transition-all" /></div>
                                 </div>
                                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-t border-slate-200/60 pt-4">
@@ -6821,7 +6836,7 @@ function AdminDashboardView({ user }: any) {
                                                     <div>
                                                         <div className="flex justify-between items-start mb-4 pr-8">
                                                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-inner transition-colors bg-${themeColor}-50 text-${themeColor}-600 group-hover:bg-${themeColor}-600 group-hover:text-white`}><BookOpen size={24} /></div>
-                                                            <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded border ${content.orgId === 'global' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>{content.orgId === 'global' ? 'Global Baseline' : 'Internal Content'}</span>
+                                                            <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded border ${content.orgId === 'global' || !content.orgId ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>{content.orgId === 'global' || !content.orgId ? 'Global Baseline' : 'Internal Content'}</span>
                                                         </div>
                                                         <h4 className={`font-black text-slate-800 text-lg leading-tight mb-2 group-hover:text-${themeColor}-600 transition-colors`}>{content.title || 'Untitled Module'}</h4>
                                                         {content.tags && content.tags.length > 0 && (
