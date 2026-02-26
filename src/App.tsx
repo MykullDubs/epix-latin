@@ -7133,12 +7133,12 @@ function MarketingSite({ onLoginClick }: { onLoginClick: () => void }) {
                     <span className="text-xl font-black text-white tracking-tighter">MAGISTER<span className="text-indigo-500">OS</span></span>
                 </div>
                 <div className="hidden md:flex items-center gap-8">
-                    <button onClick={() => setActivePage('platform')} className={`text-sm font-bold transition-colors ${activePage === 'platform' ? 'text-white' : 'text-slate-400 hover:text-white'}`}>Platform</button>
-                    <button onClick={() => setActivePage('pricing')} className={`text-sm font-bold transition-colors ${activePage === 'pricing' ? 'text-white' : 'text-slate-400 hover:text-white'}`}>Pricing</button>
+                    <button onClick={() => setActivePage('platform')} className={`text-sm font-bold transition-colors ${activePage === 'platform' ? 'text-white' : 'text-slate-400 hover:text-white'}`}>Plataforma</button>
+                    <button onClick={() => setActivePage('pricing')} className={`text-sm font-bold transition-colors ${activePage === 'pricing' ? 'text-white' : 'text-slate-400 hover:text-white'}`}>Precios</button>
                 </div>
                 <div className="flex items-center gap-4">
-                    <button onClick={onLoginClick} className="text-sm font-bold text-slate-300 hover:text-white transition-colors hidden md:block">Client Login</button>
-                    <button className="bg-white text-slate-900 px-6 py-2.5 rounded-full text-sm font-black hover:bg-indigo-50 transition-colors shadow-lg shadow-white/10">Book a Demo</button>
+                    <button onClick={onLoginClick} className="text-sm font-bold text-slate-300 hover:text-white transition-colors hidden md:block">Acceso a Clientes</button>
+                    <button className="bg-white text-slate-900 px-6 py-2.5 rounded-full text-sm font-black hover:bg-indigo-50 transition-colors shadow-lg shadow-white/10">Agenda una Demo</button>
                 </div>
             </div>
         </nav>
@@ -7152,21 +7152,21 @@ function MarketingSite({ onLoginClick }: { onLoginClick: () => void }) {
                         <Shield size={24} className="text-indigo-500" />
                         <span className="text-2xl font-black text-white tracking-tighter">MAGISTER<span className="text-indigo-500">OS</span></span>
                     </div>
-                    <p className="text-slate-400 font-medium max-w-sm">The white-label learning operating system for elite English academies across Latin America.</p>
+                    <p className="text-slate-400 font-medium max-w-sm">El sistema operativo de aprendizaje de marca blanca diseñado para academias de inglés de élite en Latinoamérica.</p>
                 </div>
                 <div>
-                    <h4 className="text-white font-black mb-4 uppercase tracking-widest text-xs">Product</h4>
+                    <h4 className="text-white font-black mb-4 uppercase tracking-widest text-xs">Producto</h4>
                     <div className="flex flex-col gap-3">
-                        <button onClick={() => setActivePage('platform')} className="text-slate-400 hover:text-indigo-400 text-left text-sm font-medium">The Walled Garden</button>
-                        <button onClick={() => setActivePage('platform')} className="text-slate-400 hover:text-indigo-400 text-left text-sm font-medium">Global ESL Vault</button>
-                        <button onClick={() => setActivePage('platform')} className="text-slate-400 hover:text-indigo-400 text-left text-sm font-medium">Mobile Vocab Gym</button>
+                        <button onClick={() => setActivePage('platform')} className="text-slate-400 hover:text-indigo-400 text-left text-sm font-medium">El Entorno Privado</button>
+                        <button onClick={() => setActivePage('platform')} className="text-slate-400 hover:text-indigo-400 text-left text-sm font-medium">Bóveda Global de Inglés</button>
+                        <button onClick={() => setActivePage('platform')} className="text-slate-400 hover:text-indigo-400 text-left text-sm font-medium">Gimnasio de Vocabulario</button>
                     </div>
                 </div>
                 <div>
-                    <h4 className="text-white font-black mb-4 uppercase tracking-widest text-xs">Company</h4>
+                    <h4 className="text-white font-black mb-4 uppercase tracking-widest text-xs">Empresa</h4>
                     <div className="flex flex-col gap-3">
-                        <button onClick={() => setActivePage('pricing')} className="text-slate-400 hover:text-indigo-400 text-left text-sm font-medium">Pricing Tiers</button>
-                        <a href="#" className="text-slate-400 hover:text-indigo-400 text-left text-sm font-medium">Contact Sales</a>
+                        <button onClick={() => setActivePage('pricing')} className="text-slate-400 hover:text-indigo-400 text-left text-sm font-medium">Planes y Precios</button>
+                        <a href="#" className="text-slate-400 hover:text-indigo-400 text-left text-sm font-medium">Contactar a Ventas</a>
                     </div>
                 </div>
             </div>
@@ -7174,7 +7174,7 @@ function MarketingSite({ onLoginClick }: { onLoginClick: () => void }) {
     );
 
     // ==========================================
-    // PAGE 1: HOME
+    // PÁGINA 1: INICIO
     // ==========================================
     if (activePage === 'home') return (
         <div className="min-h-screen bg-slate-900 font-sans selection:bg-indigo-500/30">
@@ -7184,21 +7184,21 @@ function MarketingSite({ onLoginClick }: { onLoginClick: () => void }) {
                 <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
                 <div className="max-w-5xl mx-auto text-center relative z-10 pt-10">
                     <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-bold text-xs uppercase tracking-widest mb-8">
-                        <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" /> The Standard for LatAm Academies
+                        <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" /> El Estándar para Academias en LatAm
                     </div>
                     <h1 className="text-5xl md:text-7xl font-black text-white tracking-tight leading-[1.1] mb-8">
-                        Stop renting generic tools.<br/>
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-400">Own your digital campus.</span>
+                        Deja de alquilar herramientas genéricas.<br/>
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-400">Sé dueño de tu campus digital.</span>
                     </h1>
                     <p className="text-xl text-slate-400 font-medium max-w-2xl mx-auto mb-12 leading-relaxed">
-                        Instantly deploy a premium, mobile-first learning platform wrapped entirely in your academy's brand. Reduce student churn, automate grading, and access a world-class ESL curriculum out of the box.
+                        Implementa al instante una plataforma de aprendizaje premium, diseñada para móviles y con la marca de tu academia. Reduce la deserción de alumnos, automatiza las calificaciones y accede a un currículo de inglés de clase mundial.
                     </p>
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                         <button className="w-full sm:w-auto px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-[0_0_30px_rgba(79,70,229,0.3)] hover:shadow-[0_0_40px_rgba(79,70,229,0.5)]">
-                            Book Your Pilot
+                            Inicia tu Prueba Piloto
                         </button>
                         <button onClick={() => setActivePage('platform')} className="w-full sm:w-auto px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-2">
-                            <PlayCircle size={18} /> Tour the Platform
+                            <PlayCircle size={18} /> Explora la Plataforma
                         </button>
                     </div>
                 </div>
@@ -7208,34 +7208,34 @@ function MarketingSite({ onLoginClick }: { onLoginClick: () => void }) {
                     <div className="aspect-[16/9] bg-slate-950 rounded-[2rem] border border-slate-800 shadow-2xl overflow-hidden flex items-center justify-center">
                         <div className="text-slate-600 font-black flex flex-col items-center gap-4">
                             <Shield size={64} className="opacity-50" />
-                            [ HIGH FIDELITY PRODUCT SCREENSHOT HERE ]
+                            [ CAPTURA DE PANTALLA DE ALTA FIDELIDAD AQUÍ ]
                         </div>
                     </div>
                 </div>
             </main>
 
-            {/* VALUE PROPS */}
+            {/* PROPUESTAS DE VALOR */}
             <section className="py-32 bg-slate-950 border-t border-white/5 relative">
                 <div className="max-w-7xl mx-auto px-6">
                     <div className="text-center mb-20">
-                        <h2 className="text-3xl md:text-5xl font-black text-white mb-6">Built for Academic Directors.</h2>
-                        <p className="text-slate-400 text-lg font-medium max-w-2xl mx-auto">You are fighting giant chains and low-cost apps. Magister OS gives you the enterprise infrastructure to look premium and retain students longer.</p>
+                        <h2 className="text-3xl md:text-5xl font-black text-white mb-6">Diseñado para Directores Académicos.</h2>
+                        <p className="text-slate-400 text-lg font-medium max-w-2xl mx-auto">Compites contra cadenas gigantes y aplicaciones de bajo costo. Magister OS te brinda la infraestructura empresarial para lucir premium y retener a tus estudiantes por más tiempo.</p>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         <div className="p-8 rounded-[2rem] bg-slate-900 border border-slate-800 hover:border-indigo-500/50 transition-colors">
                             <div className="w-14 h-14 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-400 mb-6"><Smartphone size={28}/></div>
-                            <h3 className="text-xl font-black text-white mb-3">Mobile-First "Vocab Gym"</h3>
-                            <p className="text-slate-400 font-medium leading-relaxed">PDFs and WhatsApp groups are dead. Engage Gen-Z students with interactive flashcards, spaced repetition, and gamified XP right on their phones.</p>
+                            <h3 className="text-xl font-black text-white mb-3">Gimnasio de Vocabulario Móvil</h3>
+                            <p className="text-slate-400 font-medium leading-relaxed">Los PDFs y los grupos de WhatsApp son cosa del pasado. Mantén a tus alumnos comprometidos con tarjetas interactivas, repetición espaciada y puntos de XP directamente en sus teléfonos.</p>
                         </div>
                         <div className="p-8 rounded-[2rem] bg-slate-900 border border-slate-800 hover:border-emerald-500/50 transition-colors">
                             <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-400 mb-6"><BarChart3 size={28}/></div>
-                            <h3 className="text-xl font-black text-white mb-3">Automated Grading & Analytics</h3>
-                            <p className="text-slate-400 font-medium leading-relaxed">Save your teachers 10 hours a week. Push exams to a cohort with one click, and watch the Command Center automatically grade and highlight struggling students.</p>
+                            <h3 className="text-xl font-black text-white mb-3">Calificaciones Automatizadas</h3>
+                            <p className="text-slate-400 font-medium leading-relaxed">Ahorra a tus profesores 10 horas a la semana. Envía exámenes a todo un grupo con un solo clic y observa cómo el Centro de Mando califica y destaca a los alumnos que necesitan ayuda.</p>
                         </div>
                         <div className="p-8 rounded-[2rem] bg-slate-900 border border-slate-800 hover:border-purple-500/50 transition-colors">
                             <div className="w-14 h-14 bg-purple-500/10 rounded-2xl flex items-center justify-center text-purple-400 mb-6"><BookOpen size={28}/></div>
-                            <h3 className="text-xl font-black text-white mb-3">The Global ESL Vault</h3>
-                            <p className="text-slate-400 font-medium leading-relaxed">Don't start from scratch. Tap into our master repository of pre-built grammar, phonetics, and reading modules, ready to deploy to your classes on day one.</p>
+                            <h3 className="text-xl font-black text-white mb-3">La Bóveda Global de Inglés</h3>
+                            <p className="text-slate-400 font-medium leading-relaxed">No empieces desde cero. Accede a nuestro repositorio maestro de módulos de gramática, fonética y lectura, listos para implementar en tus clases hoy mismo.</p>
                         </div>
                     </div>
                 </div>
@@ -7245,7 +7245,7 @@ function MarketingSite({ onLoginClick }: { onLoginClick: () => void }) {
     );
 
     // ==========================================
-    // PAGE 2: PLATFORM / FEATURES
+    // PÁGINA 2: PLATAFORMA / FUNCIONES
     // ==========================================
     if (activePage === 'platform') return (
         <div className="min-h-screen bg-slate-900 font-sans">
@@ -7253,47 +7253,47 @@ function MarketingSite({ onLoginClick }: { onLoginClick: () => void }) {
             <main className="pt-40 pb-32 px-6">
                 <div className="max-w-7xl mx-auto">
                     <div className="text-center mb-24">
-                        <h1 className="text-5xl font-black text-white tracking-tight mb-6">The SaaS Engine Inside.</h1>
-                        <p className="text-xl text-slate-400 font-medium max-w-2xl mx-auto">Explore the Walled Garden architecture that keeps your data isolated, your brand front-and-center, and your teachers in absolute control.</p>
+                        <h1 className="text-5xl font-black text-white tracking-tight mb-6">El Motor SaaS en tu Interior.</h1>
+                        <p className="text-xl text-slate-400 font-medium max-w-2xl mx-auto">Explora la arquitectura privada que mantiene tus datos aislados, tu marca en primer plano y a tus profesores con el control absoluto.</p>
                     </div>
 
-                    {/* FEATURE 1: WHITE LABEL */}
+                    {/* FUNCIÓN 1: MARCA BLANCA */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center mb-32">
                         <div className="order-2 lg:order-1 aspect-square bg-slate-800 rounded-[3rem] border border-slate-700 flex items-center justify-center p-12 relative overflow-hidden">
                              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-transparent" />
                              <div className="w-full h-full bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl flex flex-col p-6 z-10">
-                                 {/* Mockup of white-labeling */}
+                                 {/* Mockup de marca blanca */}
                                  <div className="flex gap-4 mb-8">
-                                     <div className="w-12 h-12 rounded-xl bg-rose-500 flex items-center justify-center text-white font-black">TC</div>
+                                     <div className="w-12 h-12 rounded-xl bg-rose-500 flex items-center justify-center text-white font-black">AI</div>
                                      <div><div className="h-4 w-32 bg-slate-700 rounded mb-2"/><div className="h-3 w-20 bg-slate-800 rounded"/></div>
                                  </div>
                                  <div className="flex-1 rounded-xl bg-slate-800/50 border border-slate-700 border-dashed" />
                              </div>
                         </div>
                         <div className="order-1 lg:order-2">
-                            <div className="text-indigo-400 font-black text-xs uppercase tracking-widest mb-4">SaaS Multi-Tenancy</div>
-                            <h2 className="text-4xl font-black text-white mb-6">Your Walled Garden.</h2>
+                            <div className="text-indigo-400 font-black text-xs uppercase tracking-widest mb-4">Arquitectura Multi-Cliente</div>
+                            <h2 className="text-4xl font-black text-white mb-6">Tu Entorno Privado.</h2>
                             <p className="text-slate-400 text-lg leading-relaxed mb-8">
-                                When you sign up, Magister OS spins up an isolated database strictly for your academy. Your students will never see our brand. They log in to an interface dynamically injected with your school's hex colors, logo, and custom navigation layout.
+                                Al registrarte, Magister OS crea una base de datos aislada exclusivamente para tu academia. Tus alumnos nunca verán nuestra marca. Inician sesión en una interfaz inyectada dinámicamente con los colores, el logotipo y el diseño personalizado de tu escuela.
                             </p>
                             <ul className="space-y-4">
-                                {['100% Data Isolation between academies', 'Dynamic CSS color injection', 'Custom terminology (e.g., change "Classes" to "Groups")'].map((item, i) => (
+                                {['Aislamiento de datos al 100% entre academias', 'Inyección dinámica de colores CSS y diseño', 'Terminología personalizada (ej. cambia "Clases" por "Grupos")'].map((item, i) => (
                                     <li key={i} className="flex items-center gap-3 text-slate-300 font-medium"><CheckCircle2 size={20} className="text-emerald-500" /> {item}</li>
                                 ))}
                             </ul>
                         </div>
                     </div>
 
-                    {/* FEATURE 2: MAGISTER COMMAND */}
+                    {/* FUNCIÓN 2: CENTRO DE MANDO */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                         <div>
-                            <div className="text-purple-400 font-black text-xs uppercase tracking-widest mb-4">Instructional Design</div>
-                            <h2 className="text-4xl font-black text-white mb-6">The Command Center.</h2>
+                            <div className="text-purple-400 font-black text-xs uppercase tracking-widest mb-4">Control Académico</div>
+                            <h2 className="text-4xl font-black text-white mb-6">El Centro de Mando.</h2>
                             <p className="text-slate-400 text-lg leading-relaxed mb-8">
-                                Give your academic director god-mode visibility. Track every student's XP, monitor cohort progress bars in real-time, and manage permissions for all your teaching staff from a single pane of glass.
+                                Dale a tu director académico visibilidad total. Monitorea el progreso de cada alumno, observa el rendimiento de los grupos en tiempo real y gestiona los permisos de todo tu personal docente desde un solo panel.
                             </p>
                             <ul className="space-y-4">
-                                {['Global Roster & Directory Auditing', 'One-click Curriculum Deployment', 'System-wide Broadcast Alerts'].map((item, i) => (
+                                {['Auditoría global de listas y directorio', 'Implementación de currículo a grupos con un clic', 'Alertas y comunicados a todo el sistema'].map((item, i) => (
                                     <li key={i} className="flex items-center gap-3 text-slate-300 font-medium"><CheckCircle2 size={20} className="text-emerald-500" /> {item}</li>
                                 ))}
                             </ul>
@@ -7301,8 +7301,8 @@ function MarketingSite({ onLoginClick }: { onLoginClick: () => void }) {
                         <div className="aspect-square bg-slate-800 rounded-[3rem] border border-slate-700 flex items-center justify-center p-12 relative overflow-hidden">
                              <div className="absolute inset-0 bg-gradient-to-tl from-purple-500/20 to-transparent" />
                              <div className="w-full h-full bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl p-6 z-10 grid grid-cols-2 gap-4">
-                                 <div className="bg-slate-800 rounded-xl p-4 flex flex-col justify-end"><div className="text-3xl font-black text-white">420</div><div className="text-[10px] text-slate-400 uppercase font-black">Students</div></div>
-                                 <div className="bg-purple-600/20 border border-purple-500/30 rounded-xl p-4 flex flex-col justify-end"><div className="text-3xl font-black text-purple-400">12</div><div className="text-[10px] text-purple-400/70 uppercase font-black">Pending Grades</div></div>
+                                 <div className="bg-slate-800 rounded-xl p-4 flex flex-col justify-end"><div className="text-3xl font-black text-white">420</div><div className="text-[10px] text-slate-400 uppercase font-black">Alumnos Activos</div></div>
+                                 <div className="bg-purple-600/20 border border-purple-500/30 rounded-xl p-4 flex flex-col justify-end"><div className="text-3xl font-black text-purple-400">12</div><div className="text-[10px] text-purple-400/70 uppercase font-black">Por Calificar</div></div>
                                  <div className="col-span-2 bg-slate-800 rounded-xl p-4" />
                              </div>
                         </div>
@@ -7314,56 +7314,56 @@ function MarketingSite({ onLoginClick }: { onLoginClick: () => void }) {
     );
 
     // ==========================================
-    // PAGE 3: PRICING (LATAM FOCUS)
+    // PÁGINA 3: PRECIOS (ENFOQUE LATAM)
     // ==========================================
     if (activePage === 'pricing') return (
         <div className="min-h-screen bg-slate-900 font-sans">
             <Nav />
             <main className="pt-40 pb-32 px-6">
                 <div className="max-w-3xl mx-auto text-center mb-20">
-                    <h1 className="text-5xl font-black text-white tracking-tight mb-6">Enterprise power.<br/>Independent prices.</h1>
-                    <p className="text-xl text-slate-400 font-medium">Flat-rate monthly pricing designed for the economics of Latin American academies. No punitive "per-seat" licenses. Predictable ROI.</p>
+                    <h1 className="text-5xl font-black text-white tracking-tight mb-6">Poder empresarial.<br/>Precios independientes.</h1>
+                    <p className="text-xl text-slate-400 font-medium">Precios mensuales fijos diseñados para la economía de las academias en América Latina. Sin licencias abusivas "por usuario". Retorno de inversión predecible.</p>
                 </div>
 
                 <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
                     {/* TIER 1 */}
                     <div className="bg-slate-800/50 rounded-[3rem] border border-slate-700 p-10 flex flex-col">
-                        <h3 className="text-2xl font-black text-white mb-2">Growth Academy</h3>
-                        <p className="text-slate-400 font-medium mb-8 h-12">Perfect for independent tutors and boutique language centers.</p>
+                        <h3 className="text-2xl font-black text-white mb-2">Academia en Crecimiento</h3>
+                        <p className="text-slate-400 font-medium mb-8 h-12">Perfecto para tutores independientes y centros de idiomas boutique.</p>
                         <div className="mb-8">
                             <span className="text-5xl font-black text-white">$149</span>
-                            <span className="text-slate-500 font-bold"> / month (USD)</span>
+                            <span className="text-slate-500 font-bold"> / mes (USD)</span>
                         </div>
                         <ul className="space-y-4 mb-10 flex-1">
-                            {['Up to 100 Active Students', 'Global Curriculum Vault Access', 'Instructor Command Center', 'Standard Email Support'].map((feat, i) => (
+                            {['Hasta 100 Alumnos Activos', 'Acceso a la Bóveda Global de Currículo', 'Centro de Mando para Instructores', 'Soporte estándar por correo'].map((feat, i) => (
                                 <li key={i} className="flex items-center gap-3 text-slate-300 font-medium"><CheckCircle2 size={20} className="text-slate-600" /> {feat}</li>
                             ))}
                         </ul>
-                        <button className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-colors">Start Free Trial</button>
+                        <button className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-colors">Comienza tu Prueba Gratis</button>
                     </div>
 
                     {/* TIER 2 (PREMIUM) */}
                     <div className="bg-indigo-600 rounded-[3rem] border border-indigo-500 p-10 flex flex-col relative overflow-hidden shadow-[0_0_50px_rgba(79,70,229,0.3)]">
-                        <div className="absolute top-6 right-6 bg-white/20 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full backdrop-blur-sm">Most Popular</div>
-                        <h3 className="text-2xl font-black text-white mb-2">Premium Campus</h3>
-                        <p className="text-indigo-200 font-medium mb-8 h-12">For established schools ready to scale and own their brand experience.</p>
+                        <div className="absolute top-6 right-6 bg-white/20 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full backdrop-blur-sm">Más Popular</div>
+                        <h3 className="text-2xl font-black text-white mb-2">Campus Premium</h3>
+                        <p className="text-indigo-200 font-medium mb-8 h-12">Para escuelas establecidas listas para escalar y ser dueñas de su marca.</p>
                         <div className="mb-8">
                             <span className="text-5xl font-black text-white">$299</span>
-                            <span className="text-indigo-300 font-bold"> / month (USD)</span>
+                            <span className="text-indigo-300 font-bold"> / mes (USD)</span>
                         </div>
                         <ul className="space-y-4 mb-10 flex-1">
-                            {['Up to 250 Active Students', 'Full White-Labeling (Logo & Colors)', 'Custom Layout Configurations', 'Priority WhatsApp Support', 'Dedicated Org Admin Roles'].map((feat, i) => (
+                            {['Hasta 250 Alumnos Activos', 'Marca Blanca Completa (Tu Logo y Colores)', 'Diseños de Navegación Personalizados', 'Soporte prioritario por WhatsApp', 'Roles dedicados para Directores de Sede'].map((feat, i) => (
                                 <li key={i} className="flex items-center gap-3 text-white font-medium"><CheckCircle2 size={20} className="text-indigo-300" /> {feat}</li>
                             ))}
                         </ul>
-                        <button className="w-full py-4 bg-white hover:bg-slate-50 text-indigo-900 rounded-2xl font-black text-sm uppercase tracking-widest transition-colors shadow-xl">Contact Sales</button>
+                        <button className="w-full py-4 bg-white hover:bg-slate-50 text-indigo-900 rounded-2xl font-black text-sm uppercase tracking-widest transition-colors shadow-xl">Contactar a Ventas</button>
                     </div>
                 </div>
 
                 <div className="max-w-2xl mx-auto mt-20 text-center p-8 bg-slate-800/30 rounded-3xl border border-slate-700/50">
                     <div className="inline-block p-3 bg-emerald-500/10 rounded-full mb-4"><Zap size={24} className="text-emerald-400" /></div>
-                    <h4 className="text-xl font-black text-white mb-2">The ROI Guarantee</h4>
-                    <p className="text-slate-400 font-medium">If Magister OS prevents just two students from dropping out this month due to better engagement, the platform completely pays for itself.</p>
+                    <h4 className="text-xl font-black text-white mb-2">Nuestra Garantía de ROI</h4>
+                    <p className="text-slate-400 font-medium">Si Magister OS evita que tan solo dos alumnos se den de baja este mes gracias a una mejor retención, la plataforma se paga sola.</p>
                 </div>
             </main>
             <Footer />
