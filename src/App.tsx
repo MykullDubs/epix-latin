@@ -1726,7 +1726,7 @@ const DiscoveryCard = ({ item, onClick, compact = false }: any) => {
         </button>
     );
 };
-function HomeView({ setActiveTab, onSelectClass, userData, classes, user }: any) {
+function HomeView({ setActiveTab, classes, onSelectClass, userData, user, activeOrg }: any) {
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
   // Calculate Stats
@@ -1741,19 +1741,29 @@ function HomeView({ setActiveTab, onSelectClass, userData, classes, user }: any)
   const greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
   const firstName = userData?.name?.split(' ')[0] || "Scholar";
 
+  // --- DYNAMIC BRANDING ---
+  const themeColor = activeOrg?.themeColor || '#4f46e5'; // Defaults to Indigo-600
+  const themeName = activeOrg?.name || 'LLLMS';
+
   return (
     <div className="h-full flex flex-col bg-slate-50">
         
-        {/* 1. APP BAR */}
+        {/* 1. DYNAMIC APP BAR */}
         <div className="bg-white/90 backdrop-blur-md border-b border-slate-100 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
-            <div className="flex items-center gap-2">
-                <div className="bg-indigo-600 text-white p-1.5 rounded-lg shadow-sm">
-                    <GraduationCap size={18} strokeWidth={3}/>
-                </div>
-                <span className="font-black text-indigo-900 tracking-tighter text-lg">LLLMS</span>
+            <div className="flex items-center gap-3">
+                {activeOrg?.logoUrl ? (
+                    <img src={activeOrg.logoUrl} alt="Organization Logo" className="w-8 h-8 object-contain rounded-md" />
+                ) : (
+                    <div className="text-white p-1.5 rounded-lg shadow-sm" style={{ backgroundColor: themeColor }}>
+                        <GraduationCap size={18} strokeWidth={3}/>
+                    </div>
+                )}
+                <span className="font-black tracking-tighter text-lg truncate max-w-[150px]" style={{ color: themeColor }}>
+                    {themeName}
+                </span>
             </div>
-            <div className="px-3 py-1.5 bg-slate-100 rounded-full border border-slate-200 flex items-center gap-1.5">
-                <Globe size={14} className="text-indigo-500"/>
+            <div className="px-3 py-1.5 bg-slate-100 rounded-full border border-slate-200 flex items-center gap-1.5 shrink-0">
+                <Globe size={14} className="text-slate-400"/>
                 <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">{targetLang}</span>
             </div>
         </div>
@@ -1767,29 +1777,32 @@ function HomeView({ setActiveTab, onSelectClass, userData, classes, user }: any)
                     <h1 className="text-4xl font-black text-slate-800 tracking-tight">{firstName}.</h1>
                 </div>
 
-                {/* STATS BENTO */}
+                {/* STATS BENTO (Colorized by Brand) */}
                 <div className="grid grid-cols-3 gap-3">
-                    <div className="p-3 bg-indigo-50 rounded-2xl border border-indigo-100 flex flex-col items-center justify-center">
+                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center">
                         <Flame size={20} className="text-orange-500 mb-1 fill-orange-500"/>
-                        <span className="text-lg font-black text-indigo-900">{streak}</span>
-                        <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wider">Day Streak</span>
+                        <span className="text-lg font-black" style={{ color: themeColor }}>{streak}</span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Day Streak</span>
                     </div>
-                    <div className="p-3 bg-indigo-50 rounded-2xl border border-indigo-100 flex flex-col items-center justify-center">
+                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center">
                         <Zap size={20} className="text-yellow-500 mb-1 fill-yellow-500"/>
-                        <span className="text-lg font-black text-indigo-900">{xp}</span>
-                        <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wider">Total XP</span>
+                        <span className="text-lg font-black" style={{ color: themeColor }}>{xp}</span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Total XP</span>
                     </div>
-                    <div className="p-3 bg-indigo-50 rounded-2xl border border-indigo-100 flex flex-col items-center justify-center">
+                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center">
                         <Trophy size={20} className="text-emerald-500 mb-1 fill-emerald-500"/>
-                        <span className="text-lg font-black text-indigo-900">{level}</span>
-                        <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wider">Level</span>
+                        <span className="text-lg font-black" style={{ color: themeColor }}>{level}</span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Level</span>
                     </div>
                 </div>
 
-                {/* PROGRESS BAR */}
+                {/* PROGRESS BAR (Colorized by Brand) */}
                 <div className="mt-6 flex items-center gap-3">
                     <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-1000" style={{ width: `${progress}%` }}></div>
+                        <div 
+                            className="h-full transition-all duration-1000" 
+                            style={{ width: `${progress}%`, backgroundColor: themeColor }}
+                        />
                     </div>
                     <span className="text-[9px] font-bold text-slate-400 whitespace-nowrap">{Math.round(1000 - (xp % 1000))} XP to Level Up</span>
                 </div>
@@ -1807,6 +1820,7 @@ function HomeView({ setActiveTab, onSelectClass, userData, classes, user }: any)
                     <div className="flex gap-5 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">
                         {classes.map((cls: any, index: number) => { 
                             const pendingCount = (cls.assignments || []).length;
+                            // Keeping the varied gradients so classes look distinct from one another
                             const gradients = ["from-indigo-600 to-violet-600", "from-emerald-500 to-teal-600", "from-orange-500 to-rose-600"];
                             const themeGradient = gradients[index % gradients.length];
 
@@ -1822,7 +1836,7 @@ function HomeView({ setActiveTab, onSelectClass, userData, classes, user }: any)
                                         )}
                                     </div>
                                     <div className="p-5 flex-1 relative">
-                                        <h4 className="font-black text-slate-800 text-xl truncate leading-tight group-hover:text-indigo-600 transition-colors">{cls.name}</h4>
+                                        <h4 className="font-black text-slate-800 text-xl truncate leading-tight transition-colors" style={{ color: themeColor }}>{cls.name}</h4>
                                         <div className="flex items-center gap-2 mt-2">
                                           <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100">{cls.code}</span>
                                         </div>
@@ -5115,75 +5129,51 @@ function InstructorDashboard({
 // ============================================================================
 //  STUDENT NAVIGATION BAR (Floating Pill Edition)
 // ============================================================================
-function StudentNavBar({ activeTab, setActiveTab }: any) {
-    const tabs = [
-        { id: 'home', label: 'Home', icon: LayoutDashboard },
-        { id: 'discovery', label: 'Explore', icon: Compass, badge: true }, // 🔴 Pulses to show new content
-        { id: 'flashcards', label: 'Practice', icon: Layers },
-        { id: 'profile', label: 'Me', icon: User }
-    ];
+function StudentNavBar({ activeTab, setActiveTab, activeOrg }: any) {
+  const tabs = [
+    { id: 'home', icon: <Home size={24} />, label: 'Home' },
+    { id: 'discovery', icon: <Compass size={24} />, label: 'Explore' },
+    { id: 'flashcards', icon: <Layers size={24} />, label: 'Decks' },
+    { id: 'profile', icon: <User size={24} />, label: 'Profile' }
+  ];
 
-    return (
-        // The container creates a safe area at the bottom of mobile screens
-        <div className="fixed bottom-0 left-0 w-full z-50 pb-6 pointer-events-none">
-            
-            {/* The Floating Frosted Glass Base */}
-            <nav 
-                role="tablist" 
-                aria-label="Student Navigation"
-                className="mx-auto max-w-md w-[calc(100%-3rem)] bg-white/80 backdrop-blur-2xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)] border border-white/50 rounded-[2rem] p-2 flex justify-between items-center pointer-events-auto"
+  // 2. Define the fallback theme color (your app's default color, e.g., Indigo-600)
+  const themeColor = activeOrg?.themeColor || '#4f46e5'; 
+
+  return (
+    <div className="absolute bottom-0 left-0 w-full bg-white border-t border-slate-200 px-6 py-4 pb-8 z-40 rounded-t-[2rem] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+      <div className="flex justify-between items-center max-w-sm mx-auto">
+        {tabs.map(tab => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className="flex flex-col items-center gap-1 transition-all duration-300 relative"
+              // 3. Inject the dynamic color here!
+              style={{ color: isActive ? themeColor : '#94a3b8' }} 
             >
-                {tabs.map((tab) => {
-                    const isActive = activeTab === tab.id;
-                    const Icon = tab.icon;
+              <div className={`transition-transform duration-300 ${isActive ? '-translate-y-2 scale-110' : 'hover:scale-110'}`}>
+                {tab.icon}
+              </div>
+              
+              <span className={`text-[10px] font-black uppercase tracking-widest transition-all duration-300 absolute -bottom-4 ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
+                {tab.label}
+              </span>
 
-                    return (
-                        <button 
-                            key={tab.id}
-                            role="tab"
-                            aria-selected={isActive}
-                            aria-label={tab.label} // Crucial since inactive text is visually hidden
-                            onClick={() => setActiveTab(tab.id)} 
-                            // The magic expanding classes:
-                            className={`relative flex items-center justify-center h-14 rounded-[1.5rem] transition-all duration-500 ease-out outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 active:scale-95 ${
-                                isActive 
-                                    ? 'bg-indigo-600 shadow-lg shadow-indigo-600/20 w-full flex-[1.5]' // Expands to take up more room
-                                    : 'bg-transparent text-slate-400 hover:bg-slate-100 hover:text-slate-600 flex-1'
-                            }`}
-                        >
-                            <div className="flex items-center justify-center gap-2">
-                                {/* Icon Container */}
-                                <div className="relative flex-shrink-0">
-                                    <Icon 
-                                        size={22} 
-                                        strokeWidth={isActive ? 2.5 : 2} 
-                                        className={`transition-colors duration-500 ${isActive ? 'text-white' : ''}`}
-                                    />
-                                    
-                                    {/* The LMS Notification Juice */}
-                                    {tab.badge && !isActive && (
-                                        <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500 border-2 border-white"></span>
-                                        </span>
-                                    )}
-                                </div>
-
-                                {/* Label (Only visible when active) */}
-                                <span className={`font-black uppercase tracking-widest text-[10px] whitespace-nowrap overflow-hidden transition-all duration-500 ${
-                                    isActive 
-                                        ? 'max-w-[100px] opacity-100 text-white ml-1' 
-                                        : 'max-w-0 opacity-0'
-                                }`}>
-                                    {tab.label}
-                                </span>
-                            </div>
-                        </button>
-                    );
-                })}
-            </nav>
-        </div>
-    );
+              {/* Little glowing dot under the active tab */}
+              {isActive && (
+                <div 
+                  className="absolute -bottom-6 w-1.5 h-1.5 rounded-full shadow-lg" 
+                  style={{ backgroundColor: themeColor, boxShadow: `0 0 10px ${themeColor}` }} 
+                />
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 // --- QUIZ LOGIC HELPER ---
 const generateQuiz = (cards: any[]) => {
@@ -7511,15 +7501,16 @@ function App() {
               classes={enrolledClasses} 
               onSelectClass={setActiveStudentClass} 
               userData={userData} 
-              user={user} 
+              user={user}
+              activeOrg={activeOrg}
             />
           )}
 
         </div>
         
-        {/* Nav Bar hides automatically when immersed in a lesson or class detail */}
+      {/* Nav Bar hides automatically when immersed in a lesson or class detail */}
         {(!activeLesson && !activeStudentClass) && (
-          <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
+          <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} activeOrg={activeOrg} /> // <--- ADD THIS PROP
         )}
       </div>
     </div>
