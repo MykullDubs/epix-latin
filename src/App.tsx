@@ -6036,8 +6036,8 @@ function ExamPlayerView({ exam, onFinish }: any) {
 // ============================================================================
 //  ADMIN DASHBOARD: THE FRANCHISE EDITION (SaaS Multi-Tenant)
 // ============================================================================
-function AdminDashboardView({ user }: any) {
-    // 1. IDENTITY & PERMISSIONS
+function AdminDashboardView({ user, activeOrg }: any) {
+  // 1. IDENTITY & PERMISSIONS
     const isSuperAdmin = user.role === 'admin';
     const isOrgAdmin = user.role === 'org_admin';
     const userOrgId = user.orgId || null;
@@ -6626,15 +6626,42 @@ function AdminDashboardView({ user }: any) {
                 </div>
             )}
 
-            {/* ============================================================== */}
-            {/* MAIN ADMIN DASHBOARD UI (BACKGROUND LAYER) */}
+           {/* ============================================================== */}
+            {/* MAIN ADMIN DASHBOARD UI (DYNAMICALLY BRANDED HEADER) */}
             {/* ============================================================== */}
 
-            <header className="h-24 bg-slate-900 px-6 md:px-10 flex justify-between items-center shrink-0 z-30 shadow-xl">
+            <header 
+                className="h-24 bg-slate-900 px-6 md:px-10 flex justify-between items-center shrink-0 z-30 shadow-xl"
+                style={activeOrg ? { borderBottom: `4px solid ${activeOrg.themeColor}` } : {}}
+            >
                 <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.4)]"><Shield size={24} /></div>
-                    <div><h2 className="text-xl font-black text-white tracking-tighter uppercase leading-none">{isSuperAdmin ? 'Command Center' : 'Org Portal'}</h2><p className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.3em] mt-1">{isSuperAdmin ? 'Global Access' : 'Tenant Management'}</p></div>
+                    {/* DYNAMIC LOGO INJECTION */}
+                    {activeOrg?.logoUrl ? (
+                        <img src={activeOrg.logoUrl} alt="Tenant Logo" className="w-12 h-12 bg-white rounded-2xl object-contain p-1 border-2 border-slate-700" />
+                    ) : (
+                        <div 
+                            className="w-12 h-12 text-white rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(0,0,0,0.4)]" 
+                            style={{ backgroundColor: activeOrg?.themeColor || '#10b981' }}
+                        >
+                            {activeOrg ? <Briefcase size={24} /> : <Shield size={24} />}
+                        </div>
+                    )}
+                    
+                    {/* DYNAMIC TITLE INJECTION */}
+                    <div>
+                        <h2 className="text-xl font-black text-white tracking-tighter uppercase leading-none">
+                            {activeOrg ? activeOrg.name : (isSuperAdmin ? 'Command Center' : 'Org Portal')}
+                        </h2>
+                        <p 
+                            className="text-[9px] font-black uppercase tracking-[0.3em] mt-1" 
+                            style={{ color: activeOrg?.themeColor || '#34d399' }}
+                        >
+                            {activeOrg ? 'Tenant Environment' : (isSuperAdmin ? 'Global Access' : 'Tenant Management')}
+                        </p>
+                    </div>
                 </div>
+                
+                {/* NAVIGATION TABS */}
                 <div className="flex bg-slate-800 p-1.5 rounded-[1.5rem] overflow-x-auto hide-scrollbar">
                     {[ 
                         isSuperAdmin && { id: 'overview', label: 'Global' }, 
@@ -6644,7 +6671,15 @@ function AdminDashboardView({ user }: any) {
                         { id: 'directory', label: 'Directory' }, 
                         { id: 'vault', label: 'The Vault' } 
                     ].filter(Boolean).map((tab:any) => (
-                        <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>{tab.label}</button>
+                        <button 
+                            key={tab.id} 
+                            onClick={() => setActiveTab(tab.id)} 
+                            className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id ? 'text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                            // Injecting active state color dynamically!
+                            style={activeTab === tab.id ? { backgroundColor: activeOrg?.themeColor || '#10b981' } : {}}
+                        >
+                            {tab.label}
+                        </button>
                     ))}
                 </div>
             </header>
@@ -7097,6 +7132,7 @@ function App() {
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [activeOrg, setActiveOrg] = useState<any>(null); // NEW: Holds the branding data
   
   // High-Level View Controllers
   const [currentView, setCurrentView] = useState<'student' | 'instructor' | 'admin'>('student');
@@ -7180,6 +7216,20 @@ function App() {
     }
     return () => unsubAuth();
   }, [user?.uid, user?.email]);
+
+  // --- NEW: DYNAMIC BRANDING LISTENER ---
+  useEffect(() => {
+    if (userData?.orgId && userData.orgId !== 'global') {
+      const unsubOrg = onSnapshot(doc(db, 'artifacts', appId, 'organizations', userData.orgId), (snap) => {
+        if (snap.exists()) {
+          setActiveOrg({ id: snap.id, ...snap.data() });
+        }
+      });
+      return () => unsubOrg();
+    } else {
+      setActiveOrg(null); // Clear branding if returned to global
+    }
+  }, [userData?.orgId]);
 
   // --- 6. MAGISTER DATABASE HANDLERS ---
   const handleCreateClass = async (className: string) => {
@@ -7319,17 +7369,18 @@ function App() {
     );
   }
 
-  // FIXED: ROUTE 2 - ADMIN COMMAND CENTER
+ // ROUTE 2 - ADMIN COMMAND CENTER
   if (currentView === 'admin' && (userData?.role === 'admin' || userData?.role === 'org_admin')) {
       return (
           <div className="h-screen w-full relative">
-              {/* Note: Merging `user` and `userData` so AdminDashboardView has access to `role` and `orgId` */}
-              <AdminDashboardView user={{...user, ...userData}} />
+              {/* Pass the activeOrg down to the dashboard! */}
+              <AdminDashboardView user={{...user, ...userData}} activeOrg={activeOrg} />
               
-              {/* Backdoor button so Admins can preview what Students see */}
               <button 
                   onClick={() => setCurrentView('student')}
-                  className="fixed bottom-6 right-6 z-[9000] bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest shadow-2xl transition-transform active:scale-95"
+                  // Use inline styles to dynamically change the button color to match the Franchise!
+                  style={{ backgroundColor: activeOrg?.themeColor || '#4f46e5' }}
+                  className="fixed bottom-6 right-6 z-[9000] text-white px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest shadow-2xl transition-transform active:scale-95"
               >
                   👁️ Preview App
               </button>
