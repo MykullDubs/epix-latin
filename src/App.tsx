@@ -7380,6 +7380,7 @@ function App() {
   // High-Level View Controllers
   const [currentView, setCurrentView] = useState<'student' | 'instructor' | 'admin'>('student');
   const [activeTab, setActiveTab] = useState<string>('home'); // FIXED: Added missing activeTab state
+  const [showAuth, setShowAuth] = useState(false); // <--- ADD THIS LINE
   
   // We use this ref to ensure we only force-route the user on their VERY FIRST login load. 
   // Otherwise, if they switch to Student mode to test, gaining XP would force them back to Admin mode!
@@ -7590,8 +7591,24 @@ function App() {
     );
   }
 
-  if (!user) return <AuthView />;
-
+if (!user) {
+    if (showAuth) {
+      return (
+        <div className="relative min-h-screen bg-slate-50">
+           {/* A back button so they can return to the marketing site if they change their mind */}
+           <button 
+             onClick={() => setShowAuth(false)}
+             className="absolute top-6 left-6 z-50 text-slate-400 hover:text-slate-900 font-bold text-sm flex items-center gap-2"
+           >
+             ← Back to Site
+           </button>
+           <AuthView />
+        </div>
+      );
+    }
+    // If they haven't clicked login yet, show them the beautiful marketing site!
+    return <MarketingSite onLoginClick={() => setShowAuth(true)} />;
+  }
   // ROUTE 1: GLOBAL PRESENTATION OVERRIDE (Instructor Projector)
   if (presentationLessonId || activeTab === 'presentation') {
     const lessonToPresent = lessons.find(l => l.id === presentationLessonId) || activeLesson || lessons[0];
