@@ -7117,31 +7117,77 @@ function ArcadeBuilderView({ data, setData, availableDecks = [] }: any) {
         </div>
     );
 }
-function MarketingSite({ onLoginClick }: { onLoginClick: () => void }) {
-    const [activePage, setActivePage] = useState<'home' | 'platform' | 'pricing'>('home');
+function MarketingSite({ onLoginClick, onBookDemoClick }: MarketingSiteProps) {
+    const [isScrolled, setIsScrolled] = useState(false);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-    const Nav = () => (
-        <nav className="fixed top-0 w-full z-50 bg-slate-900/80 backdrop-blur-xl border-b border-white/10">
-            <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-                <div 
-                    className="flex items-center gap-3 cursor-pointer group" 
-                    onClick={() => setActivePage('home')}
-                >
-                    <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-[0_0_20px_rgba(79,70,229,0.4)] group-hover:scale-105 transition-transform">
-                        <Shield size={20} />
+    // Creates the glassmorphism effect when scrolling down
+    useEffect(() => {
+        const handleScroll = () => setIsScrolled(window.scrollY > 20);
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    return (
+        <div className="min-h-screen bg-slate-950 text-slate-50 selection:bg-indigo-500/30 font-sans">
+            
+            {/* NAVIGATION BAR */}
+            <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${isScrolled ? 'bg-slate-950/80 backdrop-blur-md border-b border-white/10 py-4' : 'bg-transparent py-6'}`}>
+                <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
+                    
+                    {/* LOGO */}
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-black text-white shadow-lg shadow-indigo-500/20">
+                            M
+                        </div>
+                        <span className="text-xl font-black tracking-widest uppercase text-white">Magister<span className="text-indigo-500">OS</span></span>
                     </div>
-                    <span className="text-xl font-black text-white tracking-tighter">MAGISTER<span className="text-indigo-500">OS</span></span>
+
+                    {/* DESKTOP LINKS */}
+                    <div className="hidden md:flex items-center gap-8 text-sm font-bold text-slate-300 uppercase tracking-widest">
+                        <a href="#filosofia" className="hover:text-white transition-colors">Filosofía</a>
+                        <a href="#plataforma" className="hover:text-white transition-colors">Plataforma</a>
+                        <a href="#precios" className="hover:text-white transition-colors">Inversión</a>
+                    </div>
+
+                    {/* DESKTOP ACTIONS (LOGIN & DEMO) */}
+                    <div className="hidden md:flex items-center gap-4">
+                        {/* THE LOGIN BUTTON */}
+                        <button 
+                            onClick={onLoginClick}
+                            className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-slate-300 hover:text-white transition-colors uppercase tracking-widest group"
+                        >
+                            <LogIn size={16} className="group-hover:text-indigo-400 transition-colors" />
+                            Iniciar Sesión
+                        </button>
+                        
+                        <button 
+                            onClick={onBookDemoClick}
+                            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-black rounded-full transition-all uppercase tracking-widest shadow-lg shadow-indigo-500/20 active:scale-95"
+                        >
+                            Piloto de 14 Días
+                        </button>
+                    </div>
+
+                    {/* MOBILE MENU TOGGLE */}
+                    <button className="md:hidden text-white" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+                        {mobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
+                    </button>
                 </div>
-                <div className="hidden md:flex items-center gap-8">
-                    <button onClick={() => setActivePage('platform')} className={`text-sm font-bold transition-colors ${activePage === 'platform' ? 'text-white' : 'text-slate-400 hover:text-white'}`}>Plataforma</button>
-                    <button onClick={() => setActivePage('pricing')} className={`text-sm font-bold transition-colors ${activePage === 'pricing' ? 'text-white' : 'text-slate-400 hover:text-white'}`}>Precios</button>
-                </div>
-                <div className="flex items-center gap-4">
-                    <button onClick={onLoginClick} className="text-sm font-bold text-slate-300 hover:text-white transition-colors hidden md:block">Acceso a Clientes</button>
-                    <button className="bg-white text-slate-900 px-6 py-2.5 rounded-full text-sm font-black hover:bg-indigo-50 transition-colors shadow-lg shadow-white/10">Agenda una Demo</button>
-                </div>
-            </div>
-        </nav>
+
+                {/* MOBILE MENU DROPDOWN */}
+                {mobileMenuOpen && (
+                    <div className="md:hidden absolute top-full left-0 w-full bg-slate-900 border-b border-white/10 py-6 px-6 flex flex-col gap-6 shadow-2xl">
+                        <button onClick={onLoginClick} className="flex items-center justify-center gap-2 w-full py-4 bg-slate-800 rounded-xl font-bold text-white uppercase tracking-widest border border-white/5">
+                            <LogIn size={18} />
+                            Iniciar Sesión
+                        </button>
+                        <button onClick={onBookDemoClick} className="w-full py-4 bg-indigo-600 rounded-xl font-black text-white uppercase tracking-widest shadow-lg shadow-indigo-500/20">
+                            Solicitar Piloto
+                        </button>
+                    </div>
+                )}
+            </nav>
     );
 
     const Footer = () => (
@@ -7605,8 +7651,9 @@ function App() {
   };
 
 
-  // --- 8. GLOBAL ROUTING ENGINE ---
+// --- 8. GLOBAL ROUTING ENGINE ---
   
+  // 1. Loading State: Wait for Firebase to check authentication
   if (!authChecked) {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50">
@@ -7615,16 +7662,17 @@ function App() {
     );
   }
 
-if (!user) {
+  // 2. Unauthenticated State: Show Marketing Site or Login Portal
+  if (!user) {
     if (showAuth) {
       return (
         <div className="relative min-h-screen bg-slate-50">
            {/* A back button so they can return to the marketing site if they change their mind */}
            <button 
              onClick={() => setShowAuth(false)}
-             className="absolute top-6 left-6 z-50 text-slate-400 hover:text-slate-900 font-bold text-sm flex items-center gap-2"
+             className="absolute top-6 left-6 z-50 text-slate-400 hover:text-slate-900 font-bold text-sm flex items-center gap-2 transition-colors"
            >
-             ← Back to Site
+             ← Regresar
            </button>
            <AuthView />
         </div>
