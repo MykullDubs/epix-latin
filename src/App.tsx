@@ -7117,9 +7117,15 @@ function ArcadeBuilderView({ data, setData, availableDecks = [] }: any) {
         </div>
     );
 }
+interface MarketingSiteProps {
+    onLoginClick: () => void;
+    onBookDemoClick?: () => void;
+}
+
 function MarketingSite({ onLoginClick, onBookDemoClick }: MarketingSiteProps) {
     const [isScrolled, setIsScrolled] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [activePage, setActivePage] = useState('home'); // FIXED: Added missing state
 
     // Creates the glassmorphism effect when scrolling down
     useEffect(() => {
@@ -7128,66 +7134,62 @@ function MarketingSite({ onLoginClick, onBookDemoClick }: MarketingSiteProps) {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    return (
-        <div className="min-h-screen bg-slate-950 text-slate-50 selection:bg-indigo-500/30 font-sans">
-            
-            {/* NAVIGATION BAR */}
-            <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${isScrolled ? 'bg-slate-950/80 backdrop-blur-md border-b border-white/10 py-4' : 'bg-transparent py-6'}`}>
-                <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
+    // FIXED: Extracted Nav into a sub-component so it doesn't break the return tree
+    const Nav = () => (
+        <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${isScrolled ? 'bg-slate-950/80 backdrop-blur-md border-b border-white/10 py-4' : 'bg-transparent py-6'}`}>
+            <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
+                {/* LOGO */}
+                <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActivePage('home')}>
+                    <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-black text-white shadow-lg shadow-indigo-500/20">
+                        M
+                    </div>
+                    <span className="text-xl font-black tracking-widest uppercase text-white">Magister<span className="text-indigo-500">OS</span></span>
+                </div>
+
+                {/* DESKTOP LINKS */}
+                <div className="hidden md:flex items-center gap-8 text-sm font-bold text-slate-300 uppercase tracking-widest">
+                    <button onClick={() => setActivePage('home')} className="hover:text-white transition-colors">Filosofía</button>
+                    <button onClick={() => setActivePage('platform')} className="hover:text-white transition-colors">Plataforma</button>
+                    <button onClick={() => setActivePage('pricing')} className="hover:text-white transition-colors">Inversión</button>
+                </div>
+
+                {/* DESKTOP ACTIONS (LOGIN & DEMO) */}
+                <div className="hidden md:flex items-center gap-4">
+                    <button 
+                        onClick={onLoginClick}
+                        className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-slate-300 hover:text-white transition-colors uppercase tracking-widest group"
+                    >
+                        <LogIn size={16} className="group-hover:text-indigo-400 transition-colors" />
+                        Iniciar Sesión
+                    </button>
                     
-                    {/* LOGO */}
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-black text-white shadow-lg shadow-indigo-500/20">
-                            M
-                        </div>
-                        <span className="text-xl font-black tracking-widest uppercase text-white">Magister<span className="text-indigo-500">OS</span></span>
-                    </div>
-
-                    {/* DESKTOP LINKS */}
-                    <div className="hidden md:flex items-center gap-8 text-sm font-bold text-slate-300 uppercase tracking-widest">
-                        <a href="#filosofia" className="hover:text-white transition-colors">Filosofía</a>
-                        <a href="#plataforma" className="hover:text-white transition-colors">Plataforma</a>
-                        <a href="#precios" className="hover:text-white transition-colors">Inversión</a>
-                    </div>
-
-                    {/* DESKTOP ACTIONS (LOGIN & DEMO) */}
-                    <div className="hidden md:flex items-center gap-4">
-                        {/* THE LOGIN BUTTON */}
-                        <button 
-                            onClick={onLoginClick}
-                            className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-slate-300 hover:text-white transition-colors uppercase tracking-widest group"
-                        >
-                            <LogIn size={16} className="group-hover:text-indigo-400 transition-colors" />
-                            Iniciar Sesión
-                        </button>
-                        
-                        <button 
-                            onClick={onBookDemoClick}
-                            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-black rounded-full transition-all uppercase tracking-widest shadow-lg shadow-indigo-500/20 active:scale-95"
-                        >
-                            Piloto de 14 Días
-                        </button>
-                    </div>
-
-                    {/* MOBILE MENU TOGGLE */}
-                    <button className="md:hidden text-white" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-                        {mobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
+                    <button 
+                        onClick={onBookDemoClick}
+                        className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-black rounded-full transition-all uppercase tracking-widest shadow-lg shadow-indigo-500/20 active:scale-95"
+                    >
+                        Piloto de 14 Días
                     </button>
                 </div>
 
-                {/* MOBILE MENU DROPDOWN */}
-                {mobileMenuOpen && (
-                    <div className="md:hidden absolute top-full left-0 w-full bg-slate-900 border-b border-white/10 py-6 px-6 flex flex-col gap-6 shadow-2xl">
-                        <button onClick={onLoginClick} className="flex items-center justify-center gap-2 w-full py-4 bg-slate-800 rounded-xl font-bold text-white uppercase tracking-widest border border-white/5">
-                            <LogIn size={18} />
-                            Iniciar Sesión
-                        </button>
-                        <button onClick={onBookDemoClick} className="w-full py-4 bg-indigo-600 rounded-xl font-black text-white uppercase tracking-widest shadow-lg shadow-indigo-500/20">
-                            Solicitar Piloto
-                        </button>
-                    </div>
-                )}
-            </nav>
+                {/* MOBILE MENU TOGGLE */}
+                <button className="md:hidden text-white" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+                    {mobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
+                </button>
+            </div>
+
+            {/* MOBILE MENU DROPDOWN */}
+            {mobileMenuOpen && (
+                <div className="md:hidden absolute top-full left-0 w-full bg-slate-900 border-b border-white/10 py-6 px-6 flex flex-col gap-6 shadow-2xl">
+                    <button onClick={onLoginClick} className="flex items-center justify-center gap-2 w-full py-4 bg-slate-800 rounded-xl font-bold text-white uppercase tracking-widest border border-white/5">
+                        <LogIn size={18} />
+                        Iniciar Sesión
+                    </button>
+                    <button onClick={onBookDemoClick} className="w-full py-4 bg-indigo-600 rounded-xl font-black text-white uppercase tracking-widest shadow-lg shadow-indigo-500/20">
+                        Solicitar Piloto
+                    </button>
+                </div>
+            )}
+        </nav>
     );
 
     const Footer = () => (
@@ -7260,7 +7262,7 @@ function MarketingSite({ onLoginClick, onBookDemoClick }: MarketingSiteProps) {
                 </div>
             </main>
 
-                        {/* NUEVA SECCIÓN: LA FILOSOFÍA MAGISTER (PROPUESTAS DE VALOR) */}
+            {/* NUEVA SECCIÓN: LA FILOSOFÍA MAGISTER */}
             <section className="py-32 bg-slate-950 border-t border-white/5 relative">
                 <div className="max-w-7xl mx-auto px-6">
                     <div className="text-center mb-20">
@@ -7309,7 +7311,6 @@ function MarketingSite({ onLoginClick, onBookDemoClick }: MarketingSiteProps) {
                     </div>
                 </div>
             </section>
-
             <Footer />
         </div>
     );
@@ -7332,7 +7333,6 @@ function MarketingSite({ onLoginClick, onBookDemoClick }: MarketingSiteProps) {
                         <div className="order-2 lg:order-1 aspect-square bg-slate-800 rounded-[3rem] border border-slate-700 flex items-center justify-center p-12 relative overflow-hidden">
                              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-transparent" />
                              <div className="w-full h-full bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl flex flex-col p-6 z-10">
-                                 {/* Mockup de marca blanca */}
                                  <div className="flex gap-4 mb-8">
                                      <div className="w-12 h-12 rounded-xl bg-rose-500 flex items-center justify-center text-white font-black">AI</div>
                                      <div><div className="h-4 w-32 bg-slate-700 rounded mb-2"/><div className="h-3 w-20 bg-slate-800 rounded"/></div>
@@ -7439,21 +7439,22 @@ function MarketingSite({ onLoginClick, onBookDemoClick }: MarketingSiteProps) {
             <Footer />
         </div>
     );
+
+    return null; // Fallback
 }
+
 function App() {
   // --- 1. CORE SYSTEM STATE ---
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [activeOrg, setActiveOrg] = useState<any>(null); // NEW: Holds the branding data
+  const [activeOrg, setActiveOrg] = useState<any>(null);
   
   // High-Level View Controllers
   const [currentView, setCurrentView] = useState<'student' | 'instructor' | 'admin'>('student');
-  const [activeTab, setActiveTab] = useState<string>('home'); // FIXED: Added missing activeTab state
-  const [showAuth, setShowAuth] = useState(false); // <--- ADD THIS LINE
+  const [activeTab, setActiveTab] = useState<string>('home');
+  const [showAuth, setShowAuth] = useState(false);
   
-  // We use this ref to ensure we only force-route the user on their VERY FIRST login load. 
-  // Otherwise, if they switch to Student mode to test, gaining XP would force them back to Admin mode!
   const hasRoutedInitial = useRef(false);
 
   // --- 2. DATA REPOSITORIES ---
@@ -7482,7 +7483,7 @@ function App() {
       setUser(u);
       if (!u) {
         setUserData(null);
-        hasRoutedInitial.current = false; // Reset routing lock on logout
+        hasRoutedInitial.current = false;
         setAuthChecked(true);
       }
     });
@@ -7493,7 +7494,6 @@ function App() {
           const data = snap.data();
           setUserData(data);
           
-          // FIXED: Intelligent Initial Routing
           if (!hasRoutedInitial.current) {
               if (data.role === 'admin' || data.role === 'org_admin') {
                   setCurrentView('admin');
@@ -7531,7 +7531,7 @@ function App() {
     return () => unsubAuth();
   }, [user?.uid, user?.email]);
 
-  // --- NEW: DYNAMIC BRANDING LISTENER ---
+  // --- DYNAMIC BRANDING LISTENER ---
   useEffect(() => {
     if (userData?.orgId && userData.orgId !== 'global') {
       const unsubOrg = onSnapshot(doc(db, 'artifacts', appId, 'organizations', userData.orgId), (snap) => {
@@ -7541,7 +7541,7 @@ function App() {
       });
       return () => unsubOrg();
     } else {
-      setActiveOrg(null); // Clear branding if returned to global
+      setActiveOrg(null);
     }
   }, [userData?.orgId]);
 
@@ -7650,8 +7650,7 @@ function App() {
     setActiveLesson(null);
   };
 
-
-// --- 8. GLOBAL ROUTING ENGINE ---
+  // --- 8. GLOBAL ROUTING ENGINE ---
   
   // 1. Loading State: Wait for Firebase to check authentication
   if (!authChecked) {
@@ -7667,7 +7666,6 @@ function App() {
     if (showAuth) {
       return (
         <div className="relative min-h-screen bg-slate-50">
-           {/* A back button so they can return to the marketing site if they change their mind */}
            <button 
              onClick={() => setShowAuth(false)}
              className="absolute top-6 left-6 z-50 text-slate-400 hover:text-slate-900 font-bold text-sm flex items-center gap-2 transition-colors"
@@ -7678,25 +7676,48 @@ function App() {
         </div>
       );
     }
-    // If they haven't clicked login yet, show them the beautiful marketing site!
     return <MarketingSite onLoginClick={() => setShowAuth(true)} />;
   }
+
   // ROUTE 1: GLOBAL PRESENTATION OVERRIDE (Instructor Projector)
   if (presentationLessonId || activeTab === 'presentation') {
     const lessonToPresent = lessons.find(l => l.id === presentationLessonId) || activeLesson || lessons[0];
     return (
-      <div className="fixed inset-0 z-[5000] bg-white w-screen h-screen">
-        <button 
-          onClick={() => { setPresentationLessonId(null); setActiveTab('dashboard'); }} 
-          className="absolute top-6 left-6 z-[5010] bg-slate-900/80 backdrop-blur text-white px-6 py-3 rounded-full font-black text-[10px] uppercase tracking-widest shadow-2xl hover:bg-rose-600 transition-colors"
+      <div className="fixed inset-0 z-[5000] bg-slate-900 w-screen h-screen flex flex-col">
+        {/* DYNAMIC B2B PROJECTOR HEADER */}
+        <div 
+            className="h-16 px-6 flex justify-between items-center shrink-0 border-b border-white/10"
+            style={{ backgroundColor: activeOrg?.themeColor || '#4f46e5' }}
         >
-          End Session
-        </button>
-        {lessonToPresent ? (
-          <ClassView lesson={lessonToPresent} userData={userData} />
-        ) : (
-          <div className="flex h-full items-center justify-center text-slate-400 font-bold uppercase tracking-widest">Unit Not Found</div>
-        )}
+            <div className="flex items-center gap-4">
+                {activeOrg?.logoUrl ? (
+                    <img src={activeOrg.logoUrl} alt="School Logo" className="h-10 object-contain bg-white rounded-lg p-1" />
+                ) : (
+                    <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center text-white font-black text-xl">
+                        {activeOrg ? activeOrg.name.charAt(0) : '🎓'}
+                    </div>
+                )}
+                <span className="font-black text-white text-lg tracking-widest uppercase opacity-90">
+                    {activeOrg ? activeOrg.name : 'Magister Global'} | CLASE EN VIVO
+                </span>
+            </div>
+            
+            <button 
+              onClick={() => { setPresentationLessonId(null); setActiveTab('dashboard'); }} 
+              className="bg-black/20 hover:bg-rose-600 text-white px-6 py-2 rounded-full font-black text-xs uppercase tracking-widest transition-colors shadow-inner border border-white/10"
+            >
+              Terminar Clase
+            </button>
+        </div>
+
+        {/* THE ACTUAL LESSON CONTENT */}
+        <div className="flex-1 overflow-hidden relative bg-white">
+            {lessonToPresent ? (
+              <ClassView lesson={lessonToPresent} userData={userData} activeOrg={activeOrg} />
+            ) : (
+              <div className="flex h-full items-center justify-center text-slate-400 font-bold uppercase tracking-widest">Unidad No Encontrada</div>
+            )}
+        </div>
       </div>
     );
   }
@@ -7705,12 +7726,10 @@ function App() {
   if (currentView === 'admin' && (userData?.role === 'admin' || userData?.role === 'org_admin')) {
       return (
           <div className="h-screen w-full relative">
-              {/* Pass the activeOrg down to the dashboard! */}
               <AdminDashboardView user={{...user, ...userData}} activeOrg={activeOrg} />
               
               <button 
                   onClick={() => setCurrentView('student')}
-                  // Use inline styles to dynamically change the button color to match the Franchise!
                   style={{ backgroundColor: activeOrg?.themeColor || '#4f46e5' }}
                   className="fixed bottom-6 right-6 z-[9000] text-white px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest shadow-2xl transition-transform active:scale-95"
               >
@@ -7720,8 +7739,7 @@ function App() {
       );
   }
 
-  // FIXED: ROUTE 3 - MAGISTER COMMAND CENTER (Instructors)
-  // Admins are allowed to access this route too if they switch to it manually
+  // ROUTE 3 - MAGISTER COMMAND CENTER (Instructors)
   if (currentView === 'instructor' && (userData?.role === 'instructor' || userData?.role === 'admin' || userData?.role === 'org_admin')) {
     return (
       <InstructorDashboard 
@@ -7748,7 +7766,7 @@ function App() {
   return (
     <div className="bg-slate-50 min-h-screen w-full flex flex-col items-center relative font-sans overflow-hidden">
       
-      {/* FIXED: Universal Backdoor Toggle for Instructors AND Admins */}
+      {/* Universal Backdoor Toggle for Instructors AND Admins */}
       {(userData?.role === 'instructor' || userData?.role === 'admin' || userData?.role === 'org_admin') && (
         <button 
           onClick={() => setCurrentView(userData?.role === 'instructor' ? 'instructor' : 'admin')} 
@@ -7761,8 +7779,6 @@ function App() {
       {/* Mobile-Optimized Student Frame */}
       <div className="w-full transition-all duration-700 bg-white relative overflow-hidden flex flex-col max-w-md h-[100dvh] shadow-2xl">
         <div className="flex-1 h-full overflow-hidden relative bg-slate-50">
-          
-          {/* --- THE SOLID STUDENT ROUTING STACK --- */}
           
           {/* Layer 1: Is a Lesson Active? */}
           {activeLesson ? (
@@ -7852,7 +7868,7 @@ function App() {
         
       {/* Nav Bar hides automatically when immersed in a lesson or class detail */}
         {(!activeLesson && !activeStudentClass) && (
-          <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} activeOrg={activeOrg} /> // <--- ADD THIS PROP
+          <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} activeOrg={activeOrg} />
         )}
       </div>
     </div>
