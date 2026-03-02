@@ -44,7 +44,12 @@ export const GLOBAL_CURRICULUMS: Curriculum[] = [
     coverImage: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=800&auto=format&fit=crop',
     themeColor: '#3b82f6', // Blue
     // These IDs will perfectly match the "id" fields you generate with the JSON Factory
-    lessonIds: ['lesson_a1_01', 'lesson_a1_02', 'lesson_a1_03', 'lesson_a1_04', 'lesson_a1_05'] 
+    lessonIds: [
+      'lesson_a1_01', 'lesson_a1_02', 'lesson_a1_03', 'lesson_a1_04', 'lesson_a1_05',
+      'lesson_a1_06', 'lesson_a1_07', 'lesson_a1_08', 'lesson_a1_09', 'lesson_a1_10',
+      'lesson_a1_11', 'lesson_a1_12', 'lesson_a1_13', 'lesson_a1_14', 'lesson_a1_15',
+      'lesson_a1_16', 'lesson_a1_17', 'lesson_a1_18', 'lesson_a1_19', 'lesson_a1_20'
+    ]
   },
   {
     id: 'curr_a2_elementary',
