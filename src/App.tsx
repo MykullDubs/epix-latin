@@ -24,19 +24,6 @@ import {
   Bot, Database, Shield, ChefHat, AlertCircle, MoreVertical, Mail, Briefcase, LogIn, Lock
 } from 'lucide-react';
 import { Curriculum, GLOBAL_CURRICULUMS } from './constants/curriculums';
-export interface Curriculum {
-  id: string;
-  title: string;
-  level: 'A1' | 'A2' | 'B1' | 'B2' | 'C1';
-  description: string;
-  coverImage: string;
-  themeColor: string;
-  lessonIds: string[]; // The ordered roadmap of lesson IDs
-}
-
-// THE MAGISTER GLOBAL VAULT (Pre-loaded Curriculums)
-
-
 
 // --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
