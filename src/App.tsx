@@ -21,7 +21,7 @@ import {
   ArrowUp, ArrowDown, Eye, EyeOff, MessageCircle, AlignLeft, ClipboardList, Table, Calendar,
   Trophy, Flame, Settings, BarChart3, CornerDownRight, MoreHorizontal, Dumbbell, Map, Sparkles, Star, TrendingUp, Target,
   Filter, SlidersHorizontal, Hash, Gauge, ChevronLeft, Monitor, Smartphone, PenTool, Menu, Code, BarChart, Tag, RefreshCcw, Gamepad2,
-  Bot, Database, Shield, ChefHat, AlertCircle, MoreVertical, Mail, Briefcase, LogIn
+  Bot, Database, Shield, ChefHat, AlertCircle, MoreVertical, Mail, Briefcase, LogIn, Lock
 } from 'lucide-react';
 // --- NEW: CURRICULUM ARCHITECTURE ---
 export interface Curriculum {
@@ -3164,11 +3164,12 @@ function ClassForum({ classData, user }: any) {
     );
 }
 // ============================================================================
-//  STUDENT CLASS VIEW (Fixed & De-Janked)
+//  STUDENT CLASS VIEW (Roadmap Edition)
 // ============================================================================
 function StudentClassView({ 
     classData, 
-    lessons = [], // <--- IMPORTANT: Ensure this is passed from parent!
+    lessons = [], 
+    curriculums = [], // <--- NEW: Passed from App.tsx
     onBack, 
     onSelectLesson, 
     userData, 
@@ -3179,10 +3180,11 @@ function StudentClassView({
   const [completedItems, setCompletedItems] = useState<string[]>([]);
   const [activeExam, setActiveExam] = useState<any>(null); 
 
-  // 1. FETCH COMPLETIONS (To handle the "Review" styling)
+  // 1. FETCH COMPLETIONS (To handle the "Review" styling & Curriculum Progress)
   useEffect(() => {
     const studentEmail = userData?.email || auth?.currentUser?.email;
-    if (!classData?.assignments || !studentEmail) return;
+    if (!classData?.assignments && !classData?.assignedCurriculums) return;
+    if (!studentEmail) return;
 
     const q = query(
       collection(db, 'artifacts', appId, 'activity_logs'),
@@ -3204,8 +3206,6 @@ function StudentClassView({
   // ==========================================================================
   // 2. BULLETPROOF ASSIGNMENT POPULATOR
   // ==========================================================================
-  // This handles both cases: if Firebase gave us an array of string IDs, 
-  // OR if it gave us an array of full objects.
   const populatedAssignments = (classData?.assignments || [])
     .map((assignment: any) => {
         if (typeof assignment === 'string') {
@@ -3213,11 +3213,16 @@ function StudentClassView({
         }
         return assignment;
     })
-    .filter(Boolean); // Strips out any nulls/undefined
+    .filter(Boolean);
 
   // Split into Lessons and Exams
   const lessonList = populatedAssignments.filter((a: any) => a.contentType !== 'test' && a.contentType !== 'exam');
   const examList = populatedAssignments.filter((a: any) => a.contentType === 'test' || a.contentType === 'exam');
+
+  // Parse Assigned Curriculums
+  const assignedCurriculums = (classData?.assignedCurriculums || [])
+    .map((id: string) => curriculums.find((c: any) => c.id === id))
+    .filter(Boolean);
 
   // --- INTERNAL FORUM COMPONENT ---
   const ClassForum = ({ classId }: { classId: string }) => {
@@ -3291,7 +3296,7 @@ function StudentClassView({
           <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent md:hidden z-10 pointer-events-none" />
           <div className="flex gap-2 p-1.5 bg-slate-50 border border-slate-100 rounded-[1.5rem] w-full md:w-fit overflow-x-auto hide-scrollbar">
             {[
-              { id: 'lessons', label: 'Lessons', icon: <BookOpen size={14}/>, color: 'text-indigo-600' },
+              { id: 'lessons', label: 'Roadmap', icon: <BookOpen size={14}/>, color: 'text-indigo-600' },
               { id: 'exams', label: 'Exams', icon: <FileText size={14}/>, color: 'text-rose-600' },
               { id: 'forum', label: 'Discussion', icon: <MessageSquare size={14}/>, color: 'text-indigo-600' },
               { id: 'grades', label: 'Grades', icon: <CheckCircle2 size={14}/>, color: 'text-emerald-600' }
@@ -3313,44 +3318,143 @@ function StudentClassView({
       {/* --- CONTENT BODY --- */}
       <div className="flex-1 overflow-y-auto px-6 md:px-8 pb-12 custom-scrollbar relative">
         
-        {/* TAB: LESSONS */}
+        {/* TAB: LESSONS & CURRICULUM ROADMAP */}
         {activeSubTab === 'lessons' && (
-          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
-            {lessonList.length === 0 ? (
+          <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4">
+            
+            {assignedCurriculums.length === 0 && lessonList.length === 0 && (
               <div className="py-20 flex flex-col items-center justify-center text-slate-300">
                   <BookOpen size={48} className="mb-4 opacity-50" />
-                  <p className="text-center font-bold text-sm text-slate-400">No curriculum assigned yet.</p>
+                  <p className="text-center font-bold text-sm text-slate-400">No learning pathways assigned yet.</p>
               </div>
-            ) : (
-              lessonList.map((item: any) => {
-                const isCompleted = completedItems.includes(item.id) || (item.originalId && completedItems.includes(item.originalId)) || completedItems.includes(item.title);
+            )}
+
+            {/* --- 1. RENDER MASTER CURRICULUMS (THE ROADMAP) --- */}
+            {assignedCurriculums.map((curr: any) => {
+                // Map out the actual lesson objects from the curriculum's lessonIds
+                const currLessons = curr.lessonIds.map((id: string) => lessons.find((l: any) => l.id === id)).filter(Boolean);
+                
+                // Calculate progress
+                const completedCount = currLessons.filter((l: any) => completedItems.includes(l.id) || (l.originalId && completedItems.includes(l.originalId)) || completedItems.includes(l.title)).length;
+                const progressPercent = currLessons.length === 0 ? 0 : Math.round((completedCount / currLessons.length) * 100);
 
                 return (
-                  <div key={item.id} className={`group p-5 border-2 ${isCompleted ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-100 bg-white'} rounded-[2.5rem] flex justify-between items-center hover:shadow-xl hover:-translate-y-1 transition-all`}>
-                    <button className="flex items-center gap-4 flex-1 text-left" onClick={() => onSelectLesson(item)}>
-                      
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-colors ${
-                          isCompleted ? 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white' : 
-                          'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'
-                      }`}>
-                        {isCompleted ? <CheckCircle2 size={24} /> : <Play size={24} className="ml-1" fill="currentColor" />}
-                      </div>
+                    <div key={curr.id} className="bg-white rounded-[3rem] border-2 border-slate-100 overflow-hidden shadow-sm">
+                        {/* Curriculum Header */}
+                        <div className="bg-slate-900 p-8 relative overflow-hidden">
+                            <div className="absolute inset-0 opacity-20" style={{ backgroundColor: curr.themeColor }} />
+                            <div className="relative z-10 flex items-center justify-between mb-6">
+                                <div>
+                                    <span className="px-3 py-1 bg-white/20 text-white rounded-lg text-[10px] font-black uppercase tracking-widest backdrop-blur-md mb-3 inline-block">
+                                        {curr.level} Pathway
+                                    </span>
+                                    <h3 className="text-2xl font-black text-white">{curr.title}</h3>
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-3xl font-black text-white">{progressPercent}%</span>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Completed</p>
+                                </div>
+                            </div>
+                            
+                            {/* Master Progress Bar */}
+                            <div className="h-3 w-full bg-slate-800 rounded-full overflow-hidden shadow-inner relative z-10">
+                                <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${progressPercent}%` }} />
+                            </div>
+                        </div>
 
-                      <div>
-                        <h4 className="font-black text-slate-800 text-lg leading-tight mb-1 group-hover:text-indigo-600 transition-colors">{item.title}</h4>
-                        <span className={`text-[10px] font-black uppercase tracking-widest ${isCompleted ? 'text-emerald-500' : 'text-indigo-400'}`}>
-                          {isCompleted ? 'Completed • Review' : 'Curriculum Unit'}
-                        </span>
-                      </div>
-                    </button>
-                    
-                    {/* Projector / Presentation Mode Button */}
-                    <button onClick={() => { setSelectedLessonId(item.originalId || item.id); setActiveTab('presentation'); }} className="p-4 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-colors shrink-0" title="Presentation Mode">
-                        <Monitor size={24} />
-                    </button>
-                  </div>
+                        {/* Curriculum Timeline */}
+                        <div className="p-8">
+                            <div className="relative border-l-4 border-slate-100 ml-6 space-y-10 py-4">
+                                {currLessons.map((item: any, index: number) => {
+                                    const isCompleted = completedItems.includes(item.id) || (item.originalId && completedItems.includes(item.originalId)) || completedItems.includes(item.title);
+                                    const isNext = index === completedCount; // The actively unlocked lesson
+                                    const isLocked = index > completedCount; // Future lessons
+
+                                    return (
+                                        <div key={item.id} className={`relative pl-10 transition-all duration-500 ${isLocked ? 'opacity-50 grayscale' : 'opacity-100'}`}>
+                                            
+                                            {/* Timeline Node Connector */}
+                                            <div className={`absolute -left-[22px] top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center border-4 border-white shadow-sm z-10 transition-colors ${
+                                                isCompleted ? 'bg-emerald-500 text-white' : 
+                                                isNext ? 'bg-indigo-600 text-white ring-4 ring-indigo-200' : 
+                                                'bg-slate-200 text-slate-400'
+                                            }`}>
+                                                {isCompleted ? <CheckCircle2 size={16} strokeWidth={3} /> : 
+                                                 isLocked ? <Lock size={16} /> : 
+                                                 <Play size={16} className="ml-0.5" />}
+                                            </div>
+
+                                            {/* Lesson Card */}
+                                            <button 
+                                                disabled={isLocked}
+                                                onClick={() => onSelectLesson(item)}
+                                                className={`w-full text-left p-6 rounded-[2rem] border-2 transition-all group flex items-center justify-between ${
+                                                    isNext ? 'border-indigo-200 bg-indigo-50 hover:bg-indigo-100 shadow-md scale-[1.02]' : 
+                                                    isCompleted ? 'border-slate-100 bg-white hover:border-emerald-200 hover:bg-emerald-50' : 
+                                                    'border-slate-100 bg-slate-50'
+                                                }`}
+                                            >
+                                                <div>
+                                                    <span className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 block ${
+                                                        isNext ? 'text-indigo-600' : isCompleted ? 'text-emerald-500' : 'text-slate-400'
+                                                    }`}>
+                                                        Unit {index + 1} {isNext && '• Up Next'}
+                                                    </span>
+                                                    <h4 className="font-black text-slate-800 text-lg group-hover:text-indigo-600 transition-colors">{item.title}</h4>
+                                                </div>
+                                                
+                                                {!isLocked && (
+                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-transform ${
+                                                        isNext ? 'bg-indigo-600 text-white group-hover:scale-110' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'
+                                                    }`}>
+                                                        <ChevronRight size={20} />
+                                                    </div>
+                                                )}
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
                 );
-              })
+            })}
+
+            {/* --- 2. RENDER STANDALONE ASSIGNMENTS --- */}
+            {lessonList.length > 0 && (
+              <div className="mt-12">
+                  {assignedCurriculums.length > 0 && (
+                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-6 pl-4 border-l-4 border-slate-200">
+                          Additional Assignments
+                      </h3>
+                  )}
+                  <div className="space-y-4">
+                    {lessonList.map((item: any) => {
+                        const isCompleted = completedItems.includes(item.id) || (item.originalId && completedItems.includes(item.originalId)) || completedItems.includes(item.title);
+                        return (
+                            <div key={item.id} className={`group p-5 border-2 ${isCompleted ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-100 bg-white'} rounded-[2.5rem] flex justify-between items-center hover:shadow-xl hover:-translate-y-1 transition-all`}>
+                                <button className="flex items-center gap-4 flex-1 text-left" onClick={() => onSelectLesson(item)}>
+                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-colors ${
+                                        isCompleted ? 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white' : 
+                                        'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'
+                                    }`}>
+                                        {isCompleted ? <CheckCircle2 size={24} /> : <Play size={24} className="ml-1" fill="currentColor" />}
+                                    </div>
+                                    <div>
+                                        <h4 className="font-black text-slate-800 text-lg leading-tight mb-1 group-hover:text-indigo-600 transition-colors">{item.title}</h4>
+                                        <span className={`text-[10px] font-black uppercase tracking-widest ${isCompleted ? 'text-emerald-500' : 'text-indigo-400'}`}>
+                                            {isCompleted ? 'Completed • Review' : 'Stand-Alone Unit'}
+                                        </span>
+                                    </div>
+                                </button>
+                                <button onClick={() => { setSelectedLessonId(item.originalId || item.id); setActiveTab('presentation'); }} className="p-4 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-colors shrink-0" title="Presentation Mode">
+                                    <Monitor size={24} />
+                                </button>
+                            </div>
+                        );
+                    })}
+                  </div>
+              </div>
             )}
           </div>
         )}
@@ -4956,8 +5060,8 @@ function InstructorDashboard({
   userData, 
   allDecks, 
   lessons, 
-  curriculums, // <--- NEW PROP
-  onAssignCurriculum, // <--- NEW PROP
+  curriculums, 
+  onAssignCurriculum, 
   onSaveLesson, 
   onSaveCard, 
   onAssign,        
@@ -4971,7 +5075,7 @@ function InstructorDashboard({
 }: any) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isRailExpanded, setIsRailExpanded] = useState(false);
-  const [selectedClassId, setSelectedClassId] = useState<string>(''); // For the Vault assignment
+  const [selectedClassId, setSelectedClassId] = useState<string>(''); 
 
   // --- 1. THE NAV ITEM (NEON PILL EDITION) ---
   const NavItem = ({ id, icon, label, badge }: { id: string; icon: React.ReactNode; label: string; badge?: boolean }) => {
