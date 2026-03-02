@@ -4,10 +4,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { MessageSquare, MessageCircle, Gamepad2, CheckCircle2, X, Puzzle } from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
-
-// TODO: If ClassForum isn't extracted yet, you can either pass it as a prop 
-// or extract it into its own file and uncomment this import!
-// import ClassForum from './ClassForum';
+import ClassForum from './ClassForum';
 
 // ============================================================================
 //  CLASS VIEW (The Projector / Big Screen Mode with Live Sync & Fast Scroll)
