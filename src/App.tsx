@@ -3164,12 +3164,12 @@ function ClassForum({ classData, user }: any) {
     );
 }
 // ============================================================================
-//  STUDENT CLASS VIEW (Roadmap Edition)
+//  STUDENT CLASS VIEW (Floating Pillbox Edition)
 // ============================================================================
 function StudentClassView({ 
     classData, 
     lessons = [], 
-    curriculums = [], // <--- NEW: Passed from App.tsx
+    curriculums = [], 
     onBack, 
     onSelectLesson, 
     userData, 
@@ -3180,7 +3180,7 @@ function StudentClassView({
   const [completedItems, setCompletedItems] = useState<string[]>([]);
   const [activeExam, setActiveExam] = useState<any>(null); 
 
-  // 1. FETCH COMPLETIONS (To handle the "Review" styling & Curriculum Progress)
+  // 1. FETCH COMPLETIONS
   useEffect(() => {
     const studentEmail = userData?.email || auth?.currentUser?.email;
     if (!classData?.assignments && !classData?.assignedCurriculums) return;
@@ -3203,9 +3203,7 @@ function StudentClassView({
     return () => unsub();
   }, [classData, userData]);
 
-  // ==========================================================================
-  // 2. BULLETPROOF ASSIGNMENT POPULATOR
-  // ==========================================================================
+  // 2. ASSIGNMENT POPULATOR
   const populatedAssignments = (classData?.assignments || [])
     .map((assignment: any) => {
         if (typeof assignment === 'string') {
@@ -3215,11 +3213,9 @@ function StudentClassView({
     })
     .filter(Boolean);
 
-  // Split into Lessons and Exams
   const lessonList = populatedAssignments.filter((a: any) => a.contentType !== 'test' && a.contentType !== 'exam');
   const examList = populatedAssignments.filter((a: any) => a.contentType === 'test' || a.contentType === 'exam');
 
-  // Parse Assigned Curriculums
   const assignedCurriculums = (classData?.assignedCurriculums || [])
     .map((id: string) => curriculums.find((c: any) => c.id === id))
     .filter(Boolean);
@@ -3256,7 +3252,7 @@ function StudentClassView({
     };
 
     return (
-      <div className="flex flex-col h-[60vh] bg-slate-50 rounded-[2.5rem] overflow-hidden border-2 border-slate-100 shadow-inner">
+      <div className="flex flex-col h-full bg-slate-50 rounded-[2.5rem] overflow-hidden border-2 border-slate-100 shadow-inner">
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
           {messages.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-slate-300 opacity-50 p-10 text-center">
@@ -3282,41 +3278,19 @@ function StudentClassView({
   };
 
   return (
-    <div className="h-full flex flex-col bg-white overflow-hidden animate-in fade-in duration-500 font-sans">
+    <div className="h-full flex flex-col bg-white overflow-hidden animate-in fade-in duration-500 font-sans relative">
       
-      {/* --- HEADER & MOBILE NAV --- */}
+      {/* --- HEADER (Cleaned up, Tabs Removed) --- */}
       <div className="p-6 md:p-8 pt-10 md:pt-12 shrink-0 bg-white">
         <button onClick={onBack} className="mb-4 flex items-center gap-2 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-black uppercase tracking-widest active:scale-95 w-fit">
           <ArrowLeft size={16} /> BACK TO DASHBOARD
         </button>
         <h2 className="text-3xl font-black text-slate-900 leading-tight mb-2">{classData.name}</h2>
         <p className="text-slate-400 font-bold text-sm line-clamp-1">{classData.description || "Welcome to your active curriculum."}</p>
-
-        <div className="relative mt-8">
-          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent md:hidden z-10 pointer-events-none" />
-          <div className="flex gap-2 p-1.5 bg-slate-50 border border-slate-100 rounded-[1.5rem] w-full md:w-fit overflow-x-auto hide-scrollbar">
-            {[
-              { id: 'lessons', label: 'Roadmap', icon: <BookOpen size={14}/>, color: 'text-indigo-600' },
-              { id: 'exams', label: 'Exams', icon: <FileText size={14}/>, color: 'text-rose-600' },
-              { id: 'forum', label: 'Discussion', icon: <MessageSquare size={14}/>, color: 'text-indigo-600' },
-              { id: 'grades', label: 'Grades', icon: <CheckCircle2 size={14}/>, color: 'text-emerald-600' }
-            ].map((tab) => (
-              <button 
-                key={tab.id}
-                onClick={() => setActiveSubTab(tab.id as any)}
-                className={`shrink-0 px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all flex items-center gap-1.5 ${
-                  activeSubTab === tab.id ? `bg-white ${tab.color} shadow-sm border border-slate-200/50` : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
-                }`}
-              >
-                {tab.icon} {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
 
-      {/* --- CONTENT BODY --- */}
-      <div className="flex-1 overflow-y-auto px-6 md:px-8 pb-12 custom-scrollbar relative">
+      {/* --- CONTENT BODY (Added pb-28 to prevent content hiding under pillbox) --- */}
+      <div className="flex-1 overflow-y-auto px-6 md:px-8 pb-28 custom-scrollbar relative">
         
         {/* TAB: LESSONS & CURRICULUM ROADMAP */}
         {activeSubTab === 'lessons' && (
@@ -3329,18 +3303,13 @@ function StudentClassView({
               </div>
             )}
 
-            {/* --- 1. RENDER MASTER CURRICULUMS (THE ROADMAP) --- */}
             {assignedCurriculums.map((curr: any) => {
-                // Map out the actual lesson objects from the curriculum's lessonIds
                 const currLessons = curr.lessonIds.map((id: string) => lessons.find((l: any) => l.id === id)).filter(Boolean);
-                
-                // Calculate progress
                 const completedCount = currLessons.filter((l: any) => completedItems.includes(l.id) || (l.originalId && completedItems.includes(l.originalId)) || completedItems.includes(l.title)).length;
                 const progressPercent = currLessons.length === 0 ? 0 : Math.round((completedCount / currLessons.length) * 100);
 
                 return (
                     <div key={curr.id} className="bg-white rounded-[3rem] border-2 border-slate-100 overflow-hidden shadow-sm">
-                        {/* Curriculum Header */}
                         <div className="bg-slate-900 p-8 relative overflow-hidden">
                             <div className="absolute inset-0 opacity-20" style={{ backgroundColor: curr.themeColor }} />
                             <div className="relative z-10 flex items-center justify-between mb-6">
@@ -3355,25 +3324,20 @@ function StudentClassView({
                                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Completed</p>
                                 </div>
                             </div>
-                            
-                            {/* Master Progress Bar */}
                             <div className="h-3 w-full bg-slate-800 rounded-full overflow-hidden shadow-inner relative z-10">
                                 <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${progressPercent}%` }} />
                             </div>
                         </div>
 
-                        {/* Curriculum Timeline */}
                         <div className="p-8">
                             <div className="relative border-l-4 border-slate-100 ml-6 space-y-10 py-4">
                                 {currLessons.map((item: any, index: number) => {
                                     const isCompleted = completedItems.includes(item.id) || (item.originalId && completedItems.includes(item.originalId)) || completedItems.includes(item.title);
-                                    const isNext = index === completedCount; // The actively unlocked lesson
-                                    const isLocked = index > completedCount; // Future lessons
+                                    const isNext = index === completedCount;
+                                    const isLocked = index > completedCount;
 
                                     return (
                                         <div key={item.id} className={`relative pl-10 transition-all duration-500 ${isLocked ? 'opacity-50 grayscale' : 'opacity-100'}`}>
-                                            
-                                            {/* Timeline Node Connector */}
                                             <div className={`absolute -left-[22px] top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center border-4 border-white shadow-sm z-10 transition-colors ${
                                                 isCompleted ? 'bg-emerald-500 text-white' : 
                                                 isNext ? 'bg-indigo-600 text-white ring-4 ring-indigo-200' : 
@@ -3384,7 +3348,6 @@ function StudentClassView({
                                                  <Play size={16} className="ml-0.5" />}
                                             </div>
 
-                                            {/* Lesson Card */}
                                             <button 
                                                 disabled={isLocked}
                                                 onClick={() => onSelectLesson(item)}
@@ -3420,7 +3383,6 @@ function StudentClassView({
                 );
             })}
 
-            {/* --- 2. RENDER STANDALONE ASSIGNMENTS --- */}
             {lessonList.length > 0 && (
               <div className="mt-12">
                   {assignedCurriculums.length > 0 && (
@@ -3489,13 +3451,45 @@ function StudentClassView({
         )}
 
         {/* RESTORED TABS */}
-        {activeSubTab === 'forum' && <ClassForum classId={classData.id} />}
+        {activeSubTab === 'forum' && <div className="h-[60vh]"><ClassForum classId={classData.id} /></div>}
         {activeSubTab === 'grades' && <StudentGradebook classData={classData} user={userData} />}
+      </div>
+
+      {/* --- NEW: FLOATING BOTTOM PILLBOX NAV --- */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-[400px] z-40">
+          <div className="bg-slate-900/95 backdrop-blur-md p-1.5 rounded-full shadow-2xl border border-white/10 flex items-center justify-between gap-1">
+            {[
+              { id: 'lessons', label: 'Roadmap', icon: <BookOpen size={18}/> },
+              { id: 'exams', label: 'Exams', icon: <FileText size={18}/> },
+              { id: 'forum', label: 'Forum', icon: <MessageSquare size={18}/> },
+              { id: 'grades', label: 'Grades', icon: <CheckCircle2 size={18}/> }
+            ].map((tab) => {
+              const isActive = activeSubTab === tab.id;
+              return (
+                <button 
+                  key={tab.id}
+                  onClick={() => setActiveSubTab(tab.id as any)}
+                  className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-[2rem] transition-all duration-300 ${
+                    isActive 
+                      ? 'bg-indigo-600 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)]' 
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <div className={`${isActive ? 'scale-110 mb-1' : 'mb-1'} transition-transform duration-300`}>
+                      {tab.icon}
+                  </div>
+                  <span className={`text-[9px] font-black uppercase tracking-widest ${isActive ? 'opacity-100' : 'opacity-70'}`}>
+                      {tab.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
       </div>
 
       {/* RESTORED EXAM OVERLAY */}
       {activeExam && (
-        <div className="absolute inset-0 z-50">
+        <div className="absolute inset-0 z-50 bg-white">
             <ExamPlayerView 
                 exam={activeExam} 
                 onFinish={() => setActiveExam(null)} 
