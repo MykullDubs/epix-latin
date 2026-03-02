@@ -1,15 +1,23 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
+
+// --- 1. LOCAL CONFIG & DATA ---
+import { auth, db, appId } from './config/firebase';
+import { Curriculum, GLOBAL_CURRICULUMS } from './constants/curriculums';
+
+// --- 2. FIREBASE AUTHENTICATION ---
 import { 
-  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, signInWithEmailAndPassword, 
   signOut, onAuthStateChanged 
 } from "firebase/auth";
+
+// --- 3. FIREBASE DATABASE (FIRESTORE) ---
 import { 
-  getFirestore, doc, setDoc, onSnapshot, collection, addDoc, updateDoc, 
-  increment, writeBatch, deleteDoc, arrayUnion, arrayRemove, query, where, collectionGroup, 
-  orderBy, limit, getDocs, getDoc 
+  doc, setDoc, onSnapshot, collection, addDoc, updateDoc, 
+  increment, writeBatch, deleteDoc, arrayUnion, arrayRemove, 
+  query, where, collectionGroup, orderBy, limit, getDocs, getDoc 
 } from "firebase/firestore";
+
+// --- 4. UI ICONS (LUCIDE) ---
 import { 
   BookOpen, Layers, User, Home, Check, X, Zap, ChevronRight, Search, Volume2, 
   Puzzle, MessageSquare, GraduationCap, PlusCircle, Save, Feather, ChevronDown, 
@@ -23,25 +31,7 @@ import {
   Filter, SlidersHorizontal, Hash, Gauge, ChevronLeft, Monitor, Smartphone, PenTool, Menu, Code, BarChart, Tag, RefreshCcw, Gamepad2,
   Bot, Database, Shield, ChefHat, AlertCircle, MoreVertical, Mail, Briefcase, LogIn, Lock
 } from 'lucide-react';
-import { Curriculum, GLOBAL_CURRICULUMS } from './constants/curriculums';
 
-// --- FIREBASE CONFIGURATION ---
-const firebaseConfig = {
-  apiKey: "AIzaSyAjK79x_N5pSWzWluFUg25mqEc_HeraRPk",
-  authDomain: "epic-latin.firebaseapp.com",
-  projectId: "epic-latin",
-  storageBucket: "epic-latin.firebasestorage.app",
-  messagingSenderId: "321050459278",
-  appId: "1:321050459278:web:df00b3cf5b8befb0d55ddf",
-  measurementId: "G-KEWLZ67Z61"
-};
-
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-const auth = getAuth(app);
-const db = getFirestore(app);
-// @ts-ignore
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'epic-latin-prod';
 
 // --- DEFAULTS ---
 const DEFAULT_USER_DATA = { name: "Discipulus", targetLanguage: "Latin", level: "Novice", streak: 1, xp: 0, role: 'student', classes: [], completedAssignments: [] };
