@@ -5,7 +5,7 @@ import { JuicyToast } from '../Toast';
 import CardBuilderView from './CardBuilderView';
 import LessonBuilderView from './LessonBuilderView';
 import LivePreview from '../LivePreview';
-
+import ExamBuilderView from './ExamBuilderView';
 // Assuming these exist or will be created next
 // import ExamBuilderView from './ExamBuilderView';
 // import ArcadeBuilderView from './ArcadeBuilderView';
