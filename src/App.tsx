@@ -8,6 +8,10 @@ import {
   INITIAL_SYSTEM_DECKS, INITIAL_SYSTEM_LESSONS, TYPE_COLORS
 } from './constants/defaults';
 import { useLearningTimer } from './hooks/useLearningTimer';
+import { 
+  DEFAULT_USER_DATA, DAILY_QUESTS, 
+  INITIAL_SYSTEM_DECKS, INITIAL_SYSTEM_LESSONS, TYPE_COLORS, THEMES
+} from './constants/defaults';
 
 // --- 2. FIREBASE AUTHENTICATION ---
 import { 
