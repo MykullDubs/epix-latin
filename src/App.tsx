@@ -23,8 +23,7 @@ import {
   Filter, SlidersHorizontal, Hash, Gauge, ChevronLeft, Monitor, Smartphone, PenTool, Menu, Code, BarChart, Tag, RefreshCcw, Gamepad2,
   Bot, Database, Shield, ChefHat, AlertCircle, MoreVertical, Mail, Briefcase, LogIn, Lock
 } from 'lucide-react';
-import { GLOBAL_CURRICULUMS } from 'src/constants/curriculums';
-// --- NEW: CURRICULUM ARCHITECTURE ---
+import { Curriculum, GLOBAL_CURRICULUMS } from './constants/curriculums';// --- NEW: CURRICULUM ARCHITECTURE ---
 export interface Curriculum {
   id: string;
   title: string;
