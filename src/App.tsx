@@ -7,6 +7,7 @@ import {
   DEFAULT_USER_DATA, DAILY_QUESTS, 
   INITIAL_SYSTEM_DECKS, INITIAL_SYSTEM_LESSONS, TYPE_COLORS
 } from './constants/defaults';
+import { useLearningTimer } from './hooks/useLearningTimer';
 
 // --- 2. FIREBASE AUTHENTICATION ---
 import { 
@@ -36,19 +37,6 @@ import {
   Bot, Database, Shield, ChefHat, AlertCircle, MoreVertical, Mail, Briefcase, LogIn, Lock
 } from 'lucide-react';
 
-// --- ANALYTICS HOOK ---
-const useLearningTimer = (user: any, activityId: string, activityType: string, title: string) => {
-    useEffect(() => {
-        if (!user || !activityId) return;
-        const startTime = Date.now();
-        return () => {
-            const durationSec = Math.round((Date.now() - startTime) / 1000);
-            if (durationSec > 5) {
-                try { addDoc(collection(db, 'artifacts', appId, 'activity_logs'), { studentName: user.displayName || user.email.split('@')[0], studentEmail: user.email, itemTitle: title || 'Unknown', itemId: activityId, type: 'time_log', activityType, duration: durationSec, timestamp: Date.now() }); } catch (e) { console.error("Log error", e); }
-            }
-        };
-    }, [user, activityId]);
-};
 const LivePreview = ({ data }: any) => {
   const currentTheme = THEMES[data?.theme || 'indigo'] || THEMES['indigo'];
 
