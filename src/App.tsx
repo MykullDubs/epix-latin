@@ -34,7 +34,6 @@ import InstructorGradebook from './components/instructor/InstructorGradebook';
 import ClassManagerView from './components/instructor/ClassManagerView';
 import BuilderHub from './components/instructor/BuilderHub';
 import InstructorDashboard from './components/instructor/InstructorDashboard';
-import ExamBuilderView from './ExamBuilderView';
 // --- 2. FIREBASE AUTHENTICATION ---
 import { 
   createUserWithEmailAndPassword, signInWithEmailAndPassword, 
