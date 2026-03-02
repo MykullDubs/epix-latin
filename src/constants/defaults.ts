@@ -1,12 +1,29 @@
 // src/constants/defaults.ts
 
-export const DEFAULT_USER_DATA = { name: "Discipulus", targetLanguage: "Latin", level: "Novice", streak: 1, xp: 0, role: 'student', classes: [], completedAssignments: [] };
+export const DEFAULT_USER_DATA = { 
+  name: "Student", 
+  targetLanguage: "English", 
+  level: "Novice", 
+  streak: 1, 
+  xp: 0, 
+  role: 'student', 
+  classes: [], 
+  completedAssignments: [] 
+};
 
 export const DAILY_QUESTS = [
   { id: 'q_cards', label: "Review 10 Cards", target: 10, xp: 50, icon: 'layers', type: 'self_study' },
   { id: 'q_quiz',  label: "Complete a Quiz", target: 1,  xp: 100, icon: 'help-circle', type: 'quiz_complete' },
   { id: 'q_explore', label: "Find a New Deck", target: 1,  xp: 20,  icon: 'search', type: 'explore_deck' },
 ];
+
+export const TYPE_COLORS: any = { 
+  verb: { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700' }, 
+  noun: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' }, 
+  adverb: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' }, 
+  phrase: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' }, 
+  adjective: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700' } 
+};
 
 export const INITIAL_SYSTEM_DECKS = {
   prep_time: {
