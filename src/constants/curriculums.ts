@@ -1,6 +1,3 @@
-// src/constants/curriculums.ts
-
-// 1. The Blueprint (This fixes both errors!)
 export interface Curriculum {
   id: string;
   title: string;
@@ -11,7 +8,6 @@ export interface Curriculum {
   lessonIds: string[];
 }
 
-// 2. The Data
 export const GLOBAL_CURRICULUMS: Curriculum[] = [
   {
     id: 'curr_a1_foundations',
@@ -27,15 +23,13 @@ export const GLOBAL_CURRICULUMS: Curriculum[] = [
       'lesson_a1_16', 'lesson_a1_17', 'lesson_a1_18', 'lesson_a1_19', 'lesson_a1_20'
     ]
   },
-  // Add A2 and B1 back here if you had them!
-];
   {
     id: 'curr_a2_elementary',
     title: 'A2 Elementary',
     level: 'A2',
     description: 'Build confidence with past tenses, daily routines, and essential workplace communication.',
     coverImage: 'https://images.unsplash.com/photo-1516321497487-e288fb19713f?q=80&w=800&auto=format&fit=crop',
-    themeColor: '#10b981', // Emerald
+    themeColor: '#10b981',
     lessonIds: ['lesson_a2_01', 'lesson_a2_02', 'lesson_a2_03']
   },
   {
@@ -44,7 +38,7 @@ export const GLOBAL_CURRICULUMS: Curriculum[] = [
     level: 'B1',
     description: 'Unlock complex grammar, professional emails, and conversational fluency for travel.',
     coverImage: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=800&auto=format&fit=crop',
-    themeColor: '#8b5cf6', // Violet
+    themeColor: '#8b5cf6',
     lessonIds: ['lesson_b1_01', 'lesson_b1_02']
   }
 ];
