@@ -4866,7 +4866,21 @@ function BuilderHub({
     { id: 'exam', label: 'Assessment', icon: <FileText size={18}/>, color: 'text-rose-600', bg: 'bg-rose-50' },
     { id: 'arcade', label: 'Arcade', icon: <Gamepad2 size={18}/>, color: 'text-amber-600', bg: 'bg-amber-50' }
   ];
+const handleCommit = () => {
+    // 1. Save the data
+    const payload = mode === 'arcade' ? { ...lessonData, type: 'arcade_game' } : lessonData;
+    onSaveLesson(payload);
+    
+    // 2. Show the success toast
+    setToastMsg(mode === 'arcade' ? "Arcade Game Committed! 🎮" : "Unit Committed! 📚");
 
+    // 3. THE FIX: Instantly wipe the state clean for the next entry
+    if (mode === 'lesson') {
+        setLessonData({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
+    } else if (mode === 'arcade') {
+        setLessonData({ title: '', description: '', gameTemplate: 'connect-three', targetScore: 3, mode: 'pvp', deckIds: [] });
+    }
+  };
   const activeModeConfig = modes.find(m => m.id === mode) || modes[0];
 
   return ( 
@@ -4912,12 +4926,8 @@ function BuilderHub({
           )}
           
           {mode !== 'exam' && (
-             <button 
-               onClick={() => {
-                 const payload = mode === 'arcade' ? { ...lessonData, type: 'arcade_game' } : lessonData;
-                 onSaveLesson(payload);
-                 setToastMsg(mode === 'arcade' ? "Arcade Game Committed! 🎮" : "Unit Committed! 📚");
-               }}
+<button 
+               onClick={handleCommit}
                className={`hidden sm:flex text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all ${mode === 'arcade' ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-200' : 'bg-slate-900 hover:bg-slate-800'}`}
              >
                Commit {mode === 'arcade' ? 'Game' : 'Unit'}
