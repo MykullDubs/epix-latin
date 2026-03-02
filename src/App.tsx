@@ -5220,29 +5220,23 @@ function InstructorDashboard({
         </div>
       </aside>
 
-      {/* --- MAIN STAGE: DYNAMIC CONTENT --- */}
+{/* --- MAIN STAGE: DYNAMIC CONTENT --- */}
       <main className="flex-1 overflow-hidden relative bg-slate-50">
         <div className="h-full w-full">
             
-           {/* ADMIN CONSOLE ROUTE */}
+           {/* DYNAMIC TAB ROUTING */}
            {activeTab === 'admin' ? (
              <div className="h-full animate-in zoom-in-95 duration-500">
                {/* <AdminDashboardView user={userData} /> */}
              </div>
-           
-           {/* STUDIO HUB */}
            ) : activeTab === 'studio' ? (
              <div className="h-full animate-in zoom-in-95 duration-500">
                {/* <BuilderHub onSaveLesson={onSaveLesson} onSaveCard={onSaveCard} lessons={lessons} allDecks={allDecks} /> */}
              </div>
-           
-           {/* CLASS MANAGER */}
            ) : activeTab === 'classes' ? (
              <div className="h-full p-6 md:p-12 overflow-y-auto custom-scrollbar animate-in slide-in-from-right-6 duration-500">
                {/* <ClassManagerView user={user} classes={userData?.classes || []} lessons={lessons} allDecks={allDecks} onAssign={onAssign} onRevoke={onRevoke} onCreateClass={onCreateClass} onDeleteClass={onDeleteClass} onRenameClass={onRenameClass} onAddStudent={onAddStudent} /> */}
              </div>
-           
-           {/* --- NEW: CURRICULUM VAULT TAB --- */}
            ) : activeTab === 'vault' ? (
              <div className="h-full overflow-y-auto p-6 md:p-12 custom-scrollbar animate-in slide-in-from-bottom-6 duration-500">
                 <div className="max-w-6xl mx-auto space-y-8">
@@ -5330,8 +5324,6 @@ function InstructorDashboard({
                     </div>
                 </div>
              </div>
-
-           // FALLBACK ROUTES
            ) : (
              <div className="h-full overflow-y-auto p-12 custom-scrollbar animate-in fade-in duration-700">
                 <header className="mb-12">
