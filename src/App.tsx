@@ -4956,10 +4956,12 @@ function InstructorDashboard({
   userData, 
   allDecks, 
   lessons, 
+  curriculums, // <--- NEW PROP
+  onAssignCurriculum, // <--- NEW PROP
   onSaveLesson, 
   onSaveCard, 
-  onAssign,       
-  onRevoke,       
+  onAssign,        
+  onRevoke,        
   onCreateClass,  
   onDeleteClass,  
   onRenameClass,  
@@ -4969,6 +4971,7 @@ function InstructorDashboard({
 }: any) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isRailExpanded, setIsRailExpanded] = useState(false);
+  const [selectedClassId, setSelectedClassId] = useState<string>(''); // For the Vault assignment
 
   // --- 1. THE NAV ITEM (NEON PILL EDITION) ---
   const NavItem = ({ id, icon, label, badge }: { id: string; icon: React.ReactNode; label: string; badge?: boolean }) => {
@@ -5067,7 +5070,8 @@ function InstructorDashboard({
           <NavItem id="dashboard" icon={<Activity />} label="Live Feed" />
           <NavItem id="studio" icon={<PenTool />} label="Studio Hub" />
           <NavItem id="classes" icon={<School />} label="Cohort Manager" />
-          {/* 🔴 Notice the badge property here to trigger the grading alert */}
+          {/* NEW VAULT TAB */}
+          <NavItem id="vault" icon={<Layers />} label="Global Vault" />
           <NavItem id="inbox" icon={<Inbox />} label="Grading Inbox" badge={true} />
           <NavItem id="analytics" icon={<BarChart2 />} label="Analytics" />
         </nav>
@@ -5075,8 +5079,8 @@ function InstructorDashboard({
         {/* Footer: User & Mode Switchers */}
         <div className="p-4 border-t border-slate-900 space-y-2 shrink-0 bg-slate-950/50">
           
-         {/* 🛡️ THE GOD MODE GATEKEEPER (Bypassed for UI testing!) */}
-{true && (
+         {/* THE GOD MODE GATEKEEPER */}
+         {(userData?.role === 'admin' || userData?.role === 'org_admin') && (
             <button 
               onClick={() => setActiveTab('admin')}
               className={`relative flex items-center h-14 w-full rounded-[1.5rem] transition-all duration-300 active:scale-[0.96] group overflow-hidden ${activeTab === 'admin' ? 'bg-emerald-500/20 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.5)]' : 'hover:bg-slate-900'}`}
@@ -5115,36 +5119,115 @@ function InstructorDashboard({
       {/* --- MAIN STAGE: DYNAMIC CONTENT --- */}
       <main className="flex-1 overflow-hidden relative bg-slate-50">
         <div className="h-full w-full">
-           
-           {/* --- NEW: ADMIN CONSOLE ROUTE --- */}
+            
+           {/* ADMIN CONSOLE ROUTE */}
            {activeTab === 'admin' ? (
              <div className="h-full animate-in zoom-in-95 duration-500">
-               <AdminDashboardView user={userData} />
+               {/* <AdminDashboardView user={userData} /> */}
              </div>
+           
+           {/* STUDIO HUB */}
            ) : activeTab === 'studio' ? (
              <div className="h-full animate-in zoom-in-95 duration-500">
-               <BuilderHub 
-                  onSaveLesson={onSaveLesson} 
-                  onSaveCard={onSaveCard}
-                  lessons={lessons} 
-                  allDecks={allDecks} 
-               />
+               {/* <BuilderHub onSaveLesson={onSaveLesson} onSaveCard={onSaveCard} lessons={lessons} allDecks={allDecks} /> */}
              </div>
+           
+           {/* CLASS MANAGER */}
            ) : activeTab === 'classes' ? (
              <div className="h-full p-6 md:p-12 overflow-y-auto custom-scrollbar animate-in slide-in-from-right-6 duration-500">
-               <ClassManagerView 
-                 user={user}
-                 classes={userData?.classes || []}
-                 lessons={lessons}
-                 allDecks={allDecks}
-                 onAssign={onAssign}
-                 onRevoke={onRevoke}
-                 onCreateClass={onCreateClass}
-                 onDeleteClass={onDeleteClass}
-                 onRenameClass={onRenameClass}
-                 onAddStudent={onAddStudent}
-               />
+               {/* <ClassManagerView user={user} classes={userData?.classes || []} lessons={lessons} allDecks={allDecks} onAssign={onAssign} onRevoke={onRevoke} onCreateClass={onCreateClass} onDeleteClass={onDeleteClass} onRenameClass={onRenameClass} onAddStudent={onAddStudent} /> */}
              </div>
+           
+           {/* --- NEW: CURRICULUM VAULT TAB --- */}
+           ) : activeTab === 'vault' ? (
+             <div className="h-full overflow-y-auto p-6 md:p-12 custom-scrollbar animate-in slide-in-from-bottom-6 duration-500">
+                <div className="max-w-6xl mx-auto space-y-8">
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 border-b border-slate-200 pb-8">
+                        <div>
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse" />
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Magister Engine</span>
+                            </div>
+                            <h2 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter uppercase leading-none mb-4">Global Vault</h2>
+                            <p className="text-slate-500 font-medium max-w-xl text-lg">Deploy comprehensive, CEFR-aligned learning pathways directly to your cohorts with a single click.</p>
+                        </div>
+
+                        {/* Class Selector Dropdown */}
+                        <div className="bg-white p-4 rounded-2xl border-2 border-slate-100 shadow-sm min-w-[250px]">
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Target Cohort</label>
+                            <select 
+                                value={selectedClassId}
+                                onChange={(e) => setSelectedClassId(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-xl px-4 py-3 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
+                            >
+                                <option value="" disabled>Select a class to assign...</option>
+                                {userData?.classes?.map((c: any) => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {curriculums?.map((curr: any) => {
+                            const activeClass = userData?.classes?.find((c: any) => c.id === selectedClassId);
+                            const isAssigned = activeClass?.assignedCurriculums?.includes(curr.id);
+
+                            return (
+                                <div key={curr.id} className="bg-white border-2 border-slate-100 rounded-[2rem] overflow-hidden hover:border-indigo-200 transition-all shadow-sm hover:shadow-2xl group flex flex-col">
+                                    <div className="h-48 relative overflow-hidden bg-slate-900">
+                                        <img 
+                                            src={curr.coverImage} 
+                                            alt={curr.title} 
+                                            className="w-full h-full object-cover opacity-60 group-hover:scale-105 group-hover:opacity-80 transition-all duration-700" 
+                                        />
+                                        <div className="absolute top-4 left-4">
+                                            <span 
+                                                className="px-4 py-1.5 bg-white font-black text-xs rounded-xl uppercase tracking-widest shadow-lg"
+                                                style={{ color: curr.themeColor }}
+                                            >
+                                                {curr.level} Level
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-8 flex-1 flex flex-col">
+                                        <h3 className="text-2xl font-black text-slate-800 mb-3">{curr.title}</h3>
+                                        <p className="text-slate-500 font-medium leading-relaxed mb-8 flex-1">
+                                            {curr.description}
+                                        </p>
+                                        
+                                        <div className="flex items-center gap-2 mb-8 text-slate-400 text-sm font-bold bg-slate-50 px-4 py-3 rounded-xl border border-slate-100">
+                                            <BookOpen size={18} className="text-indigo-400" />
+                                            {curr.lessonIds?.length || 0} Interactive Lessons
+                                        </div>
+
+                                        {/* Assign Button Logic */}
+                                        {!selectedClassId ? (
+                                            <button disabled className="w-full py-4 bg-slate-100 text-slate-400 rounded-xl font-black text-xs uppercase tracking-widest cursor-not-allowed">
+                                                Select a class first
+                                            </button>
+                                        ) : isAssigned ? (
+                                            <button disabled className="w-full py-4 bg-emerald-50 text-emerald-600 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 border border-emerald-200">
+                                                <CheckCircle2 size={18} /> Active in {activeClass?.name}
+                                            </button>
+                                        ) : (
+                                            <button 
+                                                onClick={() => onAssignCurriculum(selectedClassId, curr.id)}
+                                                className="w-full py-4 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-colors shadow-xl active:scale-95"
+                                            >
+                                                Assign to {activeClass?.name}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+             </div>
+
+           // FALLBACK ROUTES
            ) : (
              <div className="h-full overflow-y-auto p-12 custom-scrollbar animate-in fade-in duration-700">
                 <header className="mb-12">
@@ -5156,10 +5239,10 @@ function InstructorDashboard({
                   <div className="h-1.5 w-16 bg-indigo-600 rounded-full mt-4" />
                 </header>
                 
-                {/* Dynamic Views */}
-                {activeTab === 'dashboard' && <LiveActivityFeed />}
-                {activeTab === 'analytics' && <AnalyticsDashboard classes={userData?.classes} />}
-                {activeTab === 'inbox' && <InstructorInbox />}
+                {/* Dynamic Views (Uncomment your actual components here) */}
+                {/* {activeTab === 'dashboard' && <LiveActivityFeed />} */}
+                {/* {activeTab === 'analytics' && <AnalyticsDashboard classes={userData?.classes} />} */}
+                {/* {activeTab === 'inbox' && <InstructorInbox />} */}
              </div>
            )}
         </div>
@@ -7676,6 +7759,15 @@ function App() {
       return { success: true };
     } catch (e) { return { success: false }; }
   };
+  const handleAssignCurriculum = async (classId: string, curriculumId: string) => {
+    if (!user) return { success: false };
+    try {
+      await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), {
+        assignedCurriculums: arrayUnion(curriculumId)
+      });
+      return { success: true };
+    } catch (e) { return { success: false }; }
+  };
 
   const handleSaveLesson = async (lessonData: any) => {
     if (!user) return;
@@ -7817,6 +7909,8 @@ function App() {
         userData={{ ...userData, classes: instructorClasses }} 
         allDecks={allDecks} 
         lessons={lessons} 
+        curriculums={systemCurriculums} 
+        onAssignCurriculum={handleAssignCurriculum} 
         onSaveLesson={handleSaveLesson} 
         onSaveCard={handleSaveCard}
         onAssign={handleAssign}
