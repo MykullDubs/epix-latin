@@ -5060,8 +5060,8 @@ function InstructorDashboard({
   userData, 
   allDecks, 
   lessons, 
-  curriculums, 
-  onAssignCurriculum, 
+  curriculums,
+  onAssignCurriculum,
   onSaveLesson, 
   onSaveCard, 
   onAssign,        
@@ -5077,7 +5077,6 @@ function InstructorDashboard({
   const [isRailExpanded, setIsRailExpanded] = useState(false);
   const [selectedClassId, setSelectedClassId] = useState<string>(''); 
 
-  // --- 1. THE NAV ITEM (NEON PILL EDITION) ---
   const NavItem = ({ id, icon, label, badge }: { id: string; icon: React.ReactNode; label: string; badge?: boolean }) => {
     const isActive = activeTab === id;
     
@@ -5090,13 +5089,11 @@ function InstructorDashboard({
           isActive ? '' : 'hover:bg-slate-900/60'
         }`}
       >
-        {/* The Animated Active Pill Background */}
         {isActive && (
             <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-[1.5rem] shadow-lg shadow-indigo-900/50 animate-in fade-in zoom-in-95 duration-300 border border-indigo-400/20" />
         )}
 
         <div className="relative z-10 flex items-center w-full">
-            {/* Icon Zone */}
             <div className="w-20 shrink-0 flex items-center justify-center relative">
                 {React.cloneElement(icon as React.ReactElement, { 
                     size: 22, 
@@ -5104,7 +5101,6 @@ function InstructorDashboard({
                     className: `transition-colors duration-300 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-indigo-400'}`
                 })}
                 
-                {/* The LMS Attention Badge */}
                 {badge && !isActive && (
                     <span className="absolute top-3 right-5 flex h-2.5 w-2.5">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
@@ -5113,7 +5109,6 @@ function InstructorDashboard({
                 )}
             </div>
 
-            {/* Expanding Label Zone */}
             <span className={`font-black text-[11px] uppercase tracking-[0.2em] whitespace-nowrap transition-all duration-300 ease-out ${
                 isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'
             } ${
@@ -5123,7 +5118,6 @@ function InstructorDashboard({
             </span>
         </div>
 
-        {/* Glowing Active Pip (For Collapsed Rail Mode) */}
         {isActive && !isRailExpanded && (
           <div className="absolute left-1.5 w-1 h-8 bg-white rounded-full z-20 shadow-[0_0_12px_rgba(255,255,255,0.8)] animate-in slide-in-from-left-full duration-300" />
         )}
@@ -5134,13 +5128,11 @@ function InstructorDashboard({
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans select-none">
       
-      {/* --- SIDE RAIL / SIDEBAR --- */}
       <aside 
         className={`bg-slate-950 flex flex-col transition-all duration-500 ease-in-out z-50 shadow-[20px_0_40px_rgba(0,0,0,0.1)] ${
           isRailExpanded ? 'w-72' : 'w-20'
         }`}
       >
-        {/* Branding & Interaction Header */}
         <div className="h-24 flex items-center border-b border-slate-900 overflow-hidden shrink-0">
           <div className="w-20 flex items-center justify-center shrink-0">
             <div className={`w-11 h-11 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 transition-all duration-700 ${isRailExpanded ? 'rotate-0' : 'rotate-12 scale-90 hover:scale-100 hover:rotate-0 cursor-pointer'}`} onClick={() => !isRailExpanded && setIsRailExpanded(true)}>
@@ -5158,7 +5150,6 @@ function InstructorDashboard({
             </button>
           </div>
 
-          {/* Floating Toggle (Mobile/Tablet Only) */}
           {!isRailExpanded && (
             <button 
               onClick={() => setIsRailExpanded(true)}
@@ -5169,21 +5160,16 @@ function InstructorDashboard({
           )}
         </div>
 
-        {/* Main Navigation Stack */}
         <nav className="flex-1 px-3 py-8 space-y-2 overflow-y-auto custom-scrollbar">
           <NavItem id="dashboard" icon={<Activity />} label="Live Feed" />
           <NavItem id="studio" icon={<PenTool />} label="Studio Hub" />
           <NavItem id="classes" icon={<School />} label="Cohort Manager" />
-          {/* NEW VAULT TAB */}
           <NavItem id="vault" icon={<Layers />} label="Global Vault" />
           <NavItem id="inbox" icon={<Inbox />} label="Grading Inbox" badge={true} />
           <NavItem id="analytics" icon={<BarChart2 />} label="Analytics" />
         </nav>
 
-        {/* Footer: User & Mode Switchers */}
         <div className="p-4 border-t border-slate-900 space-y-2 shrink-0 bg-slate-950/50">
-          
-         {/* THE GOD MODE GATEKEEPER */}
          {(userData?.role === 'admin' || userData?.role === 'org_admin') && (
             <button 
               onClick={() => setActiveTab('admin')}
@@ -5220,22 +5206,21 @@ function InstructorDashboard({
         </div>
       </aside>
 
-{/* --- MAIN STAGE: DYNAMIC CONTENT --- */}
+      {/* --- MAIN STAGE: DYNAMIC CONTENT --- */}
       <main className="flex-1 overflow-hidden relative bg-slate-50">
         <div className="h-full w-full">
             
-           {/* DYNAMIC TAB ROUTING */}
            {activeTab === 'admin' ? (
              <div className="h-full animate-in zoom-in-95 duration-500">
-               {/* <AdminDashboardView user={userData} /> */}
+               <AdminDashboardView user={userData} />
              </div>
            ) : activeTab === 'studio' ? (
              <div className="h-full animate-in zoom-in-95 duration-500">
-               {/* <BuilderHub onSaveLesson={onSaveLesson} onSaveCard={onSaveCard} lessons={lessons} allDecks={allDecks} /> */}
+               <BuilderHub onSaveLesson={onSaveLesson} onSaveCard={onSaveCard} lessons={lessons} allDecks={allDecks} />
              </div>
            ) : activeTab === 'classes' ? (
              <div className="h-full p-6 md:p-12 overflow-y-auto custom-scrollbar animate-in slide-in-from-right-6 duration-500">
-               {/* <ClassManagerView user={user} classes={userData?.classes || []} lessons={lessons} allDecks={allDecks} onAssign={onAssign} onRevoke={onRevoke} onCreateClass={onCreateClass} onDeleteClass={onDeleteClass} onRenameClass={onRenameClass} onAddStudent={onAddStudent} /> */}
+               <ClassManagerView user={user} classes={userData?.classes || []} lessons={lessons} allDecks={allDecks} onAssign={onAssign} onRevoke={onRevoke} onCreateClass={onCreateClass} onDeleteClass={onDeleteClass} onRenameClass={onRenameClass} onAddStudent={onAddStudent} />
              </div>
            ) : activeTab === 'vault' ? (
              <div className="h-full overflow-y-auto p-6 md:p-12 custom-scrollbar animate-in slide-in-from-bottom-6 duration-500">
@@ -5250,7 +5235,6 @@ function InstructorDashboard({
                             <p className="text-slate-500 font-medium max-w-xl text-lg">Deploy comprehensive, CEFR-aligned learning pathways directly to your cohorts with a single click.</p>
                         </div>
 
-                        {/* Class Selector Dropdown */}
                         <div className="bg-white p-4 rounded-2xl border-2 border-slate-100 shadow-sm min-w-[250px]">
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Target Cohort</label>
                             <select 
@@ -5300,7 +5284,6 @@ function InstructorDashboard({
                                             {curr.lessonIds?.length || 0} Interactive Lessons
                                         </div>
 
-                                        {/* Assign Button Logic */}
                                         {!selectedClassId ? (
                                             <button disabled className="w-full py-4 bg-slate-100 text-slate-400 rounded-xl font-black text-xs uppercase tracking-widest cursor-not-allowed">
                                                 Select a class first
@@ -5335,10 +5318,9 @@ function InstructorDashboard({
                   <div className="h-1.5 w-16 bg-indigo-600 rounded-full mt-4" />
                 </header>
                 
-                {/* Dynamic Views (Uncomment your actual components here) */}
-                {/* {activeTab === 'dashboard' && <LiveActivityFeed />} */}
-                {/* {activeTab === 'analytics' && <AnalyticsDashboard classes={userData?.classes} />} */}
-                {/* {activeTab === 'inbox' && <InstructorInbox />} */}
+                {activeTab === 'dashboard' && <LiveActivityFeed />}
+                {activeTab === 'analytics' && <AnalyticsDashboard classes={userData?.classes} />}
+                {activeTab === 'inbox' && <InstructorInbox />}
              </div>
            )}
         </div>
@@ -7665,20 +7647,17 @@ function MarketingSite({ onLoginClick, onBookDemoClick }: MarketingSiteProps) {
 }
 
 function App() {
-  // --- 1. CORE SYSTEM STATE ---
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [activeOrg, setActiveOrg] = useState<any>(null);
   
-  // High-Level View Controllers
   const [currentView, setCurrentView] = useState<'student' | 'instructor' | 'admin'>('student');
   const [activeTab, setActiveTab] = useState<string>('home');
   const [showAuth, setShowAuth] = useState(false);
   
   const hasRoutedInitial = useRef(false);
 
-  // --- 2. DATA REPOSITORIES ---
   const [systemLessons] = useState([]); 
   const [customLessons, setCustomLessons] = useState<any[]>([]);
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
@@ -7686,20 +7665,17 @@ function App() {
   const [allDecks, setAllDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
   const [systemCurriculums] = useState<Curriculum[]>(GLOBAL_CURRICULUMS);
   
-  // --- 3. UI NAVIGATION STATE (DECOUPLED) ---
   const [activeLesson, setActiveLesson] = useState<any>(null); 
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null); 
   const [presentationLessonId, setPresentationLessonId] = useState<string | null>(null); 
   const [activeDeckKey, setActiveDeckKey] = useState<string | null>(null); 
 
-  // --- 4. DATA CONSOLIDATION ---
   const lessons = useMemo(() => {
     const allActiveClasses = [...instructorClasses, ...enrolledClasses]; 
     const assignments = allActiveClasses.flatMap(c => c.assignments || []);
     return [...systemLessons, ...customLessons, ...assignments];
   }, [systemLessons, customLessons, enrolledClasses, instructorClasses]);
 
-  // --- 5. FIREBASE REAL-TIME SYNC ---
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -7753,15 +7729,12 @@ function App() {
     return () => unsubAuth();
   }, [user?.uid, user?.email]);
 
-  // --- NEW: CURRICULUM PROGRESS ENGINE ---
-  // Calculates how far a student is through an assigned curriculum based on their activity logs
   const calculateCurriculumProgress = (curriculumId: string, studentLogs: any[]) => {
       const curriculum = systemCurriculums.find(c => c.id === curriculumId);
       if (!curriculum) return { completed: 0, total: 0, percentage: 0 };
 
       const totalLessons = curriculum.lessonIds.length;
       
-      // Filter the student's logs to only find "completion" events for lessons inside this curriculum
       const completedLessonIds = new Set(
           studentLogs
               .filter(log => log.type === 'completion' && curriculum.lessonIds.includes(log.itemId))
@@ -7775,12 +7748,10 @@ function App() {
           completed: completedCount,
           total: totalLessons,
           percentage: percentage,
-          // We can also return exactly which lessons are unlocked based on the sequence!
           nextLessonId: curriculum.lessonIds[completedCount] || null 
       };
   };
 
-  // --- DYNAMIC BRANDING LISTENER ---
   useEffect(() => {
     if (userData?.orgId && userData.orgId !== 'global') {
       const unsubOrg = onSnapshot(doc(db, 'artifacts', appId, 'organizations', userData.orgId), (snap) => {
@@ -7794,7 +7765,6 @@ function App() {
     }
   }, [userData?.orgId]);
 
-  // --- 6. MAGISTER DATABASE HANDLERS ---
   const handleCreateClass = async (className: string) => {
     if (!user) return { success: false };
     try {
@@ -7855,6 +7825,7 @@ function App() {
       return { success: true };
     } catch (e) { return { success: false }; }
   };
+
   const handleAssignCurriculum = async (classId: string, curriculumId: string) => {
     if (!user) return { success: false };
     try {
@@ -7881,7 +7852,6 @@ function App() {
     });
   };
 
-  // --- 7. UNIFIED XP & ACTIVITY LOGGER ---
   const handleLogActivity = async (itemId: string, xp: number, title: string, details: any = {}) => {
     if (!user) return;
     try {
@@ -7908,9 +7878,6 @@ function App() {
     setActiveLesson(null);
   };
 
-  // --- 8. GLOBAL ROUTING ENGINE ---
-  
-  // 1. Loading State: Wait for Firebase to check authentication
   if (!authChecked) {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50">
@@ -7919,7 +7886,6 @@ function App() {
     );
   }
 
-  // 2. Unauthenticated State: Show Marketing Site or Login Portal
   if (!user) {
     if (showAuth) {
       return (
@@ -7937,12 +7903,10 @@ function App() {
     return <MarketingSite onLoginClick={() => setShowAuth(true)} />;
   }
 
-  // ROUTE 1: GLOBAL PRESENTATION OVERRIDE (Instructor Projector)
   if (presentationLessonId || activeTab === 'presentation') {
     const lessonToPresent = lessons.find(l => l.id === presentationLessonId) || activeLesson || lessons[0];
     return (
       <div className="fixed inset-0 z-[5000] bg-slate-900 w-screen h-screen flex flex-col">
-        {/* DYNAMIC B2B PROJECTOR HEADER */}
         <div 
             className="h-16 px-6 flex justify-between items-center shrink-0 border-b border-white/10"
             style={{ backgroundColor: activeOrg?.themeColor || '#4f46e5' }}
@@ -7968,7 +7932,6 @@ function App() {
             </button>
         </div>
 
-        {/* THE ACTUAL LESSON CONTENT */}
         <div className="flex-1 overflow-hidden relative bg-white">
             {lessonToPresent ? (
               <ClassView lesson={lessonToPresent} userData={userData} activeOrg={activeOrg} />
@@ -7980,7 +7943,6 @@ function App() {
     );
   }
 
- // ROUTE 2 - ADMIN COMMAND CENTER
   if (currentView === 'admin' && (userData?.role === 'admin' || userData?.role === 'org_admin')) {
       return (
           <div className="h-screen w-full relative">
@@ -7997,7 +7959,6 @@ function App() {
       );
   }
 
-  // ROUTE 3 - MAGISTER COMMAND CENTER (Instructors)
   if (currentView === 'instructor' && (userData?.role === 'instructor' || userData?.role === 'admin' || userData?.role === 'org_admin')) {
     return (
       <InstructorDashboard 
@@ -8022,11 +7983,9 @@ function App() {
     );
   }
 
-  // ROUTE 4: STUDENT VIEWPORT
   return (
     <div className="bg-slate-50 min-h-screen w-full flex flex-col items-center relative font-sans overflow-hidden">
       
-      {/* Universal Backdoor Toggle for Instructors AND Admins */}
       {(userData?.role === 'instructor' || userData?.role === 'admin' || userData?.role === 'org_admin') && (
         <button 
           onClick={() => setCurrentView(userData?.role === 'instructor' ? 'instructor' : 'admin')} 
@@ -8036,11 +7995,9 @@ function App() {
         </button>
       )}
 
-      {/* Mobile-Optimized Student Frame */}
       <div className="w-full transition-all duration-700 bg-white relative overflow-hidden flex flex-col max-w-md h-[100dvh] shadow-2xl">
         <div className="flex-1 h-full overflow-hidden relative bg-slate-50">
           
-          {/* Layer 1: Is a Lesson Active? */}
           {activeLesson ? (
             (activeLesson.type === 'test' || activeLesson.type === 'exam' || activeLesson.contentType === 'test') ? (
               <ExamPlayerView 
@@ -8072,11 +8029,11 @@ function App() {
               />
             )
 
-          // Layer 2: Is a specific Cohort Dashboard open?
           ) : activeStudentClass ? (
             <StudentClassView 
                classData={activeStudentClass} 
                lessons={lessons}
+               curriculums={systemCurriculums}
                onBack={() => setActiveStudentClass(null)} 
                onSelectLesson={setActiveLesson}
                setActiveTab={setActiveTab}
@@ -8084,7 +8041,6 @@ function App() {
                userData={userData}
             />
 
-          // Layer 3: Bottom Navigation Tab Views
           ) : activeTab === 'discovery' ? (
             <DiscoveryView 
                allDecks={allDecks} 
@@ -8126,7 +8082,6 @@ function App() {
 
         </div>
         
-      {/* Nav Bar hides automatically when immersed in a lesson or class detail */}
         {(!activeLesson && !activeStudentClass) && (
           <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} activeOrg={activeOrg} />
         )}
