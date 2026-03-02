@@ -5,7 +5,7 @@ import { auth, db, appId } from './config/firebase';
 import { Curriculum, GLOBAL_CURRICULUMS } from './constants/curriculums';
 import { 
   DEFAULT_USER_DATA, DAILY_QUESTS, 
-  INITIAL_SYSTEM_DECKS, INITIAL_SYSTEM_LESSONS 
+  INITIAL_SYSTEM_DECKS, INITIAL_SYSTEM_LESSONS, TYPE_COLORS
 } from './constants/defaults';
 
 // --- 2. FIREBASE AUTHENTICATION ---
@@ -35,19 +35,6 @@ import {
   Filter, SlidersHorizontal, Hash, Gauge, ChevronLeft, Monitor, Smartphone, PenTool, Menu, Code, BarChart, Tag, RefreshCcw, Gamepad2,
   Bot, Database, Shield, ChefHat, AlertCircle, MoreVertical, Mail, Briefcase, LogIn, Lock
 } from 'lucide-react';
-
-
-// --- DEFAULTS ---
-const DEFAULT_USER_DATA = { name: "Discipulus", targetLanguage: "Latin", level: "Novice", streak: 1, xp: 0, role: 'student', classes: [], completedAssignments: [] };
-
-// --- CONFIG: DAILY QUESTS ---
-const DAILY_QUESTS = [
-  { id: 'q_cards', label: "Review 10 Cards", target: 10, xp: 50, icon: 'layers', type: 'self_study' },
-  { id: 'q_quiz',  label: "Complete a Quiz", target: 1,  xp: 100, icon: 'help-circle', type: 'quiz_complete' },
-  { id: 'q_explore', label: "Find a New Deck", target: 1,  xp: 20,  icon: 'search', type: 'explore_deck' },
-];
-
-const TYPE_COLORS: any = { verb: { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700' }, noun: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' }, adverb: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' }, phrase: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' }, adjective: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700' } };
 
 // --- ANALYTICS HOOK ---
 const useLearningTimer = (user: any, activityId: string, activityType: string, title: string) => {
