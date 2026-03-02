@@ -183,3 +183,48 @@ export const INITIAL_SYSTEM_LESSONS = [
     ]
   }
 ];
+// ============================================================================
+//  THEME DEFINITIONS (THE AURA ENGINE)
+// ============================================================================
+export const THEMES: any = {
+  indigo: {
+    id: 'indigo',
+    name: 'Cyberpunk',
+    primary: 'bg-indigo-600',
+    secondary: 'bg-indigo-50',
+    accent: 'text-indigo-600',
+    border: 'border-indigo-100',
+    shadow: 'shadow-indigo-100',
+    font: 'font-sans'
+  },
+  emerald: {
+    id: 'emerald',
+    name: 'Bio-Digital',
+    primary: 'bg-emerald-600',
+    secondary: 'bg-emerald-50',
+    accent: 'text-emerald-600',
+    border: 'border-emerald-100',
+    shadow: 'shadow-emerald-100',
+    font: 'font-sans'
+  },
+  rose: {
+    id: 'rose',
+    name: 'High-Alert',
+    primary: 'bg-rose-600',
+    secondary: 'bg-rose-50',
+    accent: 'text-rose-600',
+    border: 'border-rose-100',
+    shadow: 'shadow-rose-100',
+    font: 'font-sans'
+  },
+  slate: {
+    id: 'slate',
+    name: 'Oxford',
+    primary: 'bg-slate-900',
+    secondary: 'bg-slate-50',
+    accent: 'text-slate-900',
+    border: 'border-slate-200',
+    shadow: 'shadow-slate-200',
+    font: 'font-serif'
+  }
+};
