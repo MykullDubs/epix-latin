@@ -47,7 +47,7 @@ export default function ProfileView({ user, userData }: any) {
 
   // --- GAMIFICATION MATH ---
   const xp = userData?.xp || 0;
-  const streak = userData?.streak || 1;
+  const streak = userData?.streak || 0;
   const { level, currentLevelXp, xpToNext, progressPct } = calculateLevel(xp);
   const league = getLeagueTier(level);
 
@@ -142,23 +142,34 @@ export default function ProfileView({ user, userData }: any) {
                 </div>
             </div>
 
-            {/* 3. ACTIVITY GRAPH */}
+            {/* 3. ACTIVITY GRAPH (Time-based Bars) */}
             <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex justify-between items-center mb-2">
                     <h3 className="font-bold text-slate-800 flex items-center gap-2"><BarChart3 size={18} className="text-indigo-600"/> Activity</h3>
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stats.totalHours} Hrs Total</span>
                 </div>
-                <div className="flex items-end justify-between h-24 gap-2">
+                
+                <div className="flex items-end justify-between h-36 gap-2 mt-4">
                     {stats.graphData.map((d: any, i: number) => (
-                        <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-                            <div 
-                                className="w-full bg-indigo-50 rounded-lg relative group-hover:bg-indigo-500 transition-colors duration-300 overflow-hidden"
-                                style={{ height: `${Math.max(15, d.height)}%` }} // Ensure minimum height so text aligns
-                            >
-                                <div className="absolute bottom-0 left-0 w-full h-full bg-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group cursor-pointer">
+                            
+                            {/* Hover Tooltip (Minutes) */}
+                            <span className="text-[10px] font-black text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity mb-2">
+                                {d.minutes}m
+                            </span>
+                            
+                            {/* The Bar Track */}
+                            <div className="w-full bg-slate-50 rounded-lg relative flex items-end h-24 mb-3 border border-slate-100 overflow-hidden">
+                                {/* The Filled Bar */}
+                                <div 
+                                    className={`w-full rounded-b-lg rounded-t-sm transition-all duration-1000 ${d.minutes > 0 ? 'bg-indigo-500 group-hover:bg-indigo-400 shadow-[0_-4px_15px_rgba(99,102,241,0.4)]' : 'bg-transparent'}`}
+                                    style={{ height: `${d.height}%` }} 
+                                />
                             </div>
-                            <span className={`text-[9px] font-bold uppercase tracking-widest ${d.xp > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>
-                                {d.date.split('/')[1]}
+                            
+                            {/* Day Label (Mon, Tue, etc.) */}
+                            <span className={`text-[9px] font-bold uppercase tracking-widest ${d.minutes > 0 ? 'text-slate-700' : 'text-slate-300'}`}>
+                                {d.day}
                             </span>
                         </div>
                     ))}
