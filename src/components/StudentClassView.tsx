@@ -11,8 +11,7 @@ import {
 } from 'lucide-react';
 
 import StudentGradebook from './StudentGradebook';
-import LeaderboardView from './LeaderboardView'; // Integrated our new component
-
+import { useLeaderboard } from '../hooks/useLeaderboard'; 
 // ============================================================================
 //  INTERNAL FORUM COMPONENT
 // ============================================================================
