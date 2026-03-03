@@ -170,26 +170,39 @@ export function useMagisterData() {
         const yesterdayStr = yesterday.toDateString();
 
         let newStreak = userData?.streak || 0;
+        let newDailyXp = userData?.dailyXp || 0;
+        let newDailyLessons = userData?.dailyLessons || 0;
         const lastActivityDate = userData?.lastActivityDate;
 
-        // Check streak conditions
-        if (lastActivityDate === yesterdayStr) {
-            // They played yesterday! Streak continues.
+        const isLesson = details.mode === 'lesson' || !itemId.includes('explore');
+
+        if (lastActivityDate === todayStr) {
+            // Same day: Accumulate stats
+            newDailyXp += xp;
+            if (isLesson) newDailyLessons += 1;
+        } else if (lastActivityDate === yesterdayStr) {
+            // New day, streak continues: Reset daily stats, increment streak
             newStreak += 1;
-        } else if (lastActivityDate !== todayStr) {
-            // They missed yesterday (and it's not currently today). Streak breaks.
+            newDailyXp = xp;
+            newDailyLessons = isLesson ? 1 : 0;
+        } else {
+            // Streak broken (missed yesterday): Reset everything
             newStreak = 1;
+            newDailyXp = xp;
+            newDailyLessons = isLesson ? 1 : 0;
         }
 
         // 3. Update the User's Main Profile
         await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
           xp: increment(xp),
           streak: newStreak,
-          lastActivityDate: todayStr // Lock in today as their most recent activity
+          dailyXp: newDailyXp,
+          dailyLessons: newDailyLessons,
+          lastActivityDate: todayStr
         });
       }
     }
-  };
+  }; // <-- ADDED THE MISSING BRACE HERE
 
   // Combine local and assigned content for the views
   const allLessons = useMemo(() => {
