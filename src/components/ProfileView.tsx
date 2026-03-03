@@ -1,7 +1,10 @@
 // src/components/ProfileView.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { signOut } from 'firebase/auth';
-import { collection, query, where, orderBy, limit, onSnapshot, doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { 
+  collection, query, where, orderBy, limit, onSnapshot, 
+  doc, updateDoc, writeBatch 
+} from 'firebase/firestore';
 import { auth, db, appId } from '../config/firebase';
 import { INITIAL_SYSTEM_DECKS, INITIAL_SYSTEM_LESSONS } from '../constants/defaults';
 import { 
@@ -18,6 +21,7 @@ import {
 } from 'lucide-react';
 
 // --- SUB-COMPONENT: REUSABLE AVATAR ---
+// This now handles the potential delay in image loading
 const UserAvatar = ({ user, size = "md", border = false }: any) => {
     const sizeClasses: any = {
         sm: "w-8 h-8 text-[10px]",
@@ -26,6 +30,7 @@ const UserAvatar = ({ user, size = "md", border = false }: any) => {
         xl: "w-32 h-32 text-2xl"
     };
 
+    // Use dot-access safely
     const avatarUrl = user?.profile?.main?.avatarUrl;
     const name = user?.name || "Scholar";
     const initials = getInitials(name);
@@ -33,10 +38,15 @@ const UserAvatar = ({ user, size = "md", border = false }: any) => {
     return (
         <div className={`relative shrink-0 ${sizeClasses[size]}`}>
             <div className={`w-full h-full rounded-[35%] overflow-hidden flex items-center justify-center font-black transition-all ${
-                avatarUrl ? 'bg-white' : 'bg-gradient-to-br from-indigo-500 to-cyan-400 text-white'
+                avatarUrl ? 'bg-slate-100' : 'bg-gradient-to-br from-indigo-500 to-cyan-400 text-white'
             } ${border ? 'ring-4 ring-white shadow-xl' : ''}`}>
                 {avatarUrl ? (
-                    <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+                    <img 
+                        key={avatarUrl} // Forces re-render when URL changes
+                        src={avatarUrl} 
+                        alt={name} 
+                        className="w-full h-full object-cover animate-in fade-in duration-500" 
+                    />
                 ) : (
                     <span>{initials}</span>
                 )}
@@ -46,16 +56,37 @@ const UserAvatar = ({ user, size = "md", border = false }: any) => {
     );
 };
 
-export default function ProfileView({ user, userData }: any) {
+export default function ProfileView({ user, userData: propUserData }: any) {
   const [logs, setLogs] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({ totalHours: 0, cardsMastered: 0, perfectScores: 0, graphData: [] });
   const [deploying, setDeploying] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  
+  // NEW: Local state for live profile updates
+  const [liveProfile, setLiveProfile] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 1. LISTEN TO PROFILE CHANGES (The missing link for the picture)
+  useEffect(() => {
+    if (!user?.uid) return;
+    const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
+    const unsub = onSnapshot(userRef, (doc) => {
+        if (doc.exists()) {
+            setLiveProfile(doc.data());
+        }
+    });
+    return () => unsub();
+  }, [user]);
+
+  // 2. FETCH ACTIVITY LOGS
   useEffect(() => {
       if(!user) return;
-      const q = query(collection(db, 'artifacts', appId, 'activity_logs'), where('studentEmail', '==', user.email), orderBy('timestamp', 'desc'), limit(100));
+      const q = query(
+          collection(db, 'artifacts', appId, 'activity_logs'), 
+          where('studentEmail', '==', user.email), 
+          orderBy('timestamp', 'desc'), 
+          limit(100)
+      );
       const unsub = onSnapshot(q, (snapshot) => {
           const data = snapshot.docs.map(d => d.data());
           setLogs(data);
@@ -64,39 +95,35 @@ export default function ProfileView({ user, userData }: any) {
       return () => unsub();
   }, [user]);
 
+  // Merge the prop data with the live profile data for absolute reliability
+  const activeData = liveProfile || propUserData;
+
   const handleLogout = () => signOut(auth);
   
   const toggleRole = async () => { 
-      if (!userData) return; 
-      const newRole = userData.role === 'instructor' ? 'student' : 'instructor'; 
+      if (!activeData) return; 
+      const newRole = activeData.role === 'instructor' ? 'student' : 'instructor'; 
       await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid), { role: newRole }); 
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file || !user?.uid) return;
-
-      // Validate File Type
-      if (!file.type.startsWith('image/')) {
-          alert("Please upload an image file.");
-          return;
-      }
+      if (!file.type.startsWith('image/')) { alert("Upload an image."); return; }
 
       setIsUploading(true);
       try { 
-          console.log("Starting upload for UID:", user.uid);
-          const downloadUrl = await uploadProfilePicture(user.uid, file); 
-          console.log("Upload Success! URL:", downloadUrl);
+          await uploadProfilePicture(user.uid, file); 
+          // The onSnapshot above will handle the UI update automatically!
       } catch (err: any) { 
-          console.error("Profile Upload Error Details:", err);
-          alert(`Upload failed: ${err.code || err.message}`); 
+          alert(`Upload failed: ${err.message}`); 
       } finally { 
           setIsUploading(false); 
       }
   };
 
   const deploySystemContent = async () => { 
-      if (!window.confirm("Overwrite system content? This will reset all core lessons.")) return;
+      if (!window.confirm("Overwrite system content?")) return;
       setDeploying(true); 
       const batch = writeBatch(db); 
       Object.entries(INITIAL_SYSTEM_DECKS).forEach(([key, deck]) => batch.set(doc(db, 'artifacts', appId, 'public', 'data', 'system_decks', key), deck)); 
@@ -106,9 +133,9 @@ export default function ProfileView({ user, userData }: any) {
   };
 
   // --- AGILE MATH ---
-  const xp = userData?.xp || 0;
-  const streak = userData?.streak || 0;
-  const totalLikes = userData?.totalLikesReceived || 0;
+  const xp = activeData?.xp || 0;
+  const streak = activeData?.streak || 0;
+  const totalLikes = activeData?.totalLikesReceived || 0;
   const { level, currentLevelXp, xpToNext, progressPct } = calculateLevel(xp, totalLikes);
   const league = getLeagueTier(level);
 
@@ -117,13 +144,12 @@ export default function ProfileView({ user, userData }: any) {
         
         {/* 1. MAGISTER HERO CARD */}
         <div className="px-6 mb-8">
-            <div className="bg-slate-900 rounded-[3.5rem] p-8 relative overflow-hidden shadow-2xl border border-white/5">
+            <div className="bg-slate-900 rounded-[3rem] p-8 relative overflow-hidden shadow-2xl border border-white/5">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[80px] -mr-32 -mt-32" />
                 <div className="absolute bottom-0 left-0 w-48 h-48 bg-cyan-400/10 rounded-full blur-[60px] -ml-24 -mb-24" />
 
                 <div className="relative z-10 flex flex-col items-center">
                     <div className="relative mb-6">
-                        {/* Interactive Progress Ring */}
                         <div className="absolute inset-0 scale-125">
                             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
                                 <circle cx="50" cy="50" r="46" fill="none" stroke="white" opacity="0.05" strokeWidth="2" />
@@ -142,9 +168,9 @@ export default function ProfileView({ user, userData }: any) {
                             </svg>
                         </div>
                         
-                        {/* Avatar Trigger */}
                         <div onClick={() => fileInputRef.current?.click()} className="cursor-pointer group relative">
-                            <UserAvatar user={userData} size="xl" />
+                            {/* Pass activeData here to ensure it uses liveFirestore data */}
+                            <UserAvatar user={activeData} size="xl" />
                             <div className="absolute inset-0 bg-black/40 rounded-[35%] opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center backdrop-blur-sm">
                                 <Camera className="text-white mb-1" size={24} />
                                 <span className="text-[8px] font-black text-white uppercase tracking-tighter">Edit</span>
@@ -156,15 +182,14 @@ export default function ProfileView({ user, userData }: any) {
                             )}
                         </div>
 
-                        {/* Level Chip */}
                         <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-white text-slate-900 text-[10px] font-black px-4 py-1 rounded-full shadow-xl border border-slate-100 flex items-center gap-1.5 whitespace-nowrap">
                             <Crown size={10} className="text-indigo-600" /> LVL {level}
                         </div>
                     </div>
 
-                    <h2 className="text-2xl font-black text-white mb-1 tracking-tight">{userData?.name || "User"}</h2>
+                    <h2 className="text-2xl font-black text-white mb-1 tracking-tight">{activeData?.name || "Magister OS User"}</h2>
                     <div className="flex gap-2 mb-8">
-                        <span className="px-3 py-1 bg-white/10 text-white/60 text-[9px] font-black rounded-lg uppercase tracking-widest border border-white/5">{userData?.role}</span>
+                        <span className="px-3 py-1 bg-white/10 text-white/60 text-[9px] font-black rounded-lg uppercase tracking-widest border border-white/5">{activeData?.role}</span>
                         <span className="px-3 py-1 bg-white text-indigo-600 text-[9px] font-black rounded-lg uppercase tracking-widest shadow-lg flex items-center gap-1.5"><Shield size={10}/> {league.name} League</span>
                     </div>
 
@@ -187,10 +212,8 @@ export default function ProfileView({ user, userData }: any) {
             </div>
         </div>
 
-        {/* 2. SYSTEM CONTENT */}
+        {/* 2. BODY CONTENT */}
         <div className="px-6 space-y-6">
-            
-            {/* Pathway Status */}
             <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
                 <div className="flex justify-between items-center mb-5">
                     <h3 className="font-black text-slate-800 uppercase tracking-widest text-[10px] flex items-center gap-2"><Trophy size={14} className="text-amber-500"/> Journey Progress</h3>
@@ -199,29 +222,11 @@ export default function ProfileView({ user, userData }: any) {
                     </div>
                 </div>
                 <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden mb-3 p-1">
-                    <div className="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(99,102,241,0.3)]" style={{ width: `${progressPct}%` }} />
+                    <div className="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 rounded-full transition-all duration-1000" style={{ width: `${progressPct}%` }} />
                 </div>
                 <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">
                     <span>{currentLevelXp} Current</span>
                     <span>{xpToNext - currentLevelXp} to Level {level + 1}</span>
-                </div>
-            </div>
-
-            {/* Velocity / Activity Chart */}
-            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
-                <div className="flex justify-between items-center mb-8">
-                    <h3 className="font-black text-slate-800 uppercase tracking-widest text-[10px] flex items-center gap-2"><Activity size={14} className="text-indigo-600"/> Learning Velocity</h3>
-                    <span className="text-[9px] font-black text-slate-400 uppercase">{stats.totalHours} Active Hours</span>
-                </div>
-                <div className="flex items-end justify-between h-24 gap-2.5 px-1">
-                    {stats.graphData.map((d: any, i: number) => (
-                        <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group">
-                            <div className="w-full bg-slate-50 rounded-lg relative flex items-end h-full mb-3 border border-slate-100 overflow-hidden">
-                                <div className={`w-full transition-all duration-1000 rounded-t-sm ${d.minutes > 0 ? 'bg-indigo-500 group-hover:bg-cyan-400' : 'bg-transparent'}`} style={{ height: `${d.height}%` }} />
-                            </div>
-                            <span className={`text-[8px] font-black uppercase ${d.minutes > 0 ? 'text-slate-900' : 'text-slate-300'}`}>{d.day}</span>
-                        </div>
-                    ))}
                 </div>
             </div>
 
@@ -233,24 +238,11 @@ export default function ProfileView({ user, userData }: any) {
                             <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 group-hover:scale-110 transition-transform"><Settings size={20}/></div>
                             <div className="text-left">
                                 <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">System Context</span>
-                                <span className="text-sm font-black text-slate-800 capitalize">{userData?.role} Mode</span>
+                                <span className="text-sm font-black text-slate-800 capitalize">{activeData?.role} Mode</span>
                             </div>
                         </div>
                         <ChevronRight size={18} className="text-slate-300"/>
                     </button>
-
-                    {userData?.role === 'instructor' && (
-                        <button onClick={deploySystemContent} disabled={deploying} className="w-full p-5 hover:bg-emerald-50 rounded-[2rem] transition-all flex items-center justify-between group">
-                            <div className="flex items-center gap-4">
-                                <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600 group-hover:scale-110 transition-transform"><UploadCloud size={20}/></div>
-                                <div className="text-left">
-                                    <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Infrastructure</span>
-                                    <span className="text-sm font-black text-slate-800">{deploying ? 'Rebuilding...' : 'Synchronize Core'}</span>
-                                </div>
-                            </div>
-                            <ChevronRight size={18} className="text-slate-300"/>
-                        </button>
-                    )}
 
                     <button onClick={handleLogout} className="w-full p-5 hover:bg-rose-50 rounded-[2rem] transition-all flex items-center justify-between group mt-2">
                         <div className="flex items-center gap-4">
