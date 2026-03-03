@@ -8,7 +8,7 @@ import { db, appId } from '../../config/firebase';
 import { 
     Loader, AlertTriangle, Briefcase, Shield, Users, Megaphone, Plus, X, 
     Mail, School, FileText, BookOpen, Database, Check, Tag, Trash2, 
-    ChevronRight, TrendingUp, BarChart, Activity, Clock, Save 
+    ChevronRight, TrendingUp, BarChart, Activity, Clock, Save, AlertCircle 
 } from 'lucide-react';
 import { JuicyToast } from '../Toast';
 
