@@ -41,3 +41,30 @@ export const calculateUserStats = (logs: any[]) => {
         graphData 
     };
 };
+
+// ============================================================================
+//  GAMIFICATION ENGINE MATH
+// ============================================================================
+
+export const calculateLevel = (totalXp: number = 0) => {
+    // A simple scaling curve. Every 500 XP is a new level.
+    const XP_PER_LEVEL = 500;
+    
+    const level = Math.floor(totalXp / XP_PER_LEVEL) + 1;
+    const currentLevelXp = totalXp % XP_PER_LEVEL;
+    const progressPct = Math.round((currentLevelXp / XP_PER_LEVEL) * 100);
+
+    return { 
+        level, 
+        currentLevelXp, 
+        xpToNext: XP_PER_LEVEL, 
+        progressPct 
+    };
+};
+
+export const getLeagueTier = (level: number) => {
+    if (level < 5) return { name: 'Bronze', color: 'text-amber-600', bg: 'bg-amber-100', border: 'border-amber-200' };
+    if (level < 15) return { name: 'Silver', color: 'text-slate-400', bg: 'bg-slate-100', border: 'border-slate-200' };
+    if (level < 30) return { name: 'Gold', color: 'text-yellow-500', bg: 'bg-yellow-50', border: 'border-yellow-200' };
+    return { name: 'Diamond', color: 'text-cyan-400', bg: 'bg-cyan-50', border: 'border-cyan-200' };
+};
