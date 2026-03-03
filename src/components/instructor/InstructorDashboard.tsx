@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { 
   GraduationCap, ChevronLeft, Menu, Activity, PenTool, 
   School, Layers, Inbox, BarChart2, Shield, User, 
-  LogOut, BookOpen, ChevronDown, CheckCircle2, Globe, Plus, Trash2, Edit3 
+  LogOut, BookOpen, CheckCircle2, Briefcase 
 } from 'lucide-react';
 
 // Import the specialized views we extracted earlier
@@ -13,9 +13,9 @@ import LiveActivityFeed from './LiveActivityFeed';
 import InstructorInbox from './InstructorInbox';
 import { AnalyticsDashboard } from './InstructorTools';
 
-// Assuming AdminDashboardView is either in this folder or App.tsx
-// If it's still in App.tsx, you can pass it as a prop or move it next!
-
+// ============================================================================
+//  INSTRUCTOR DASHBOARD (Main Navigation & Hub)
+// ============================================================================
 export default function InstructorDashboard({ 
   user, 
   userData, 
@@ -30,10 +30,11 @@ export default function InstructorDashboard({
   onCreateClass,  
   onDeleteClass,  
   onRenameClass,  
-  onAddStudent,   
+  onAddStudent,
+  onStartPresentation, // <--- PROPS UPDATED HERE
   onSwitchView, 
   onLogout,
-  AdminDashboardView // Received as a prop for now
+  AdminDashboardView 
 }: any) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isRailExpanded, setIsRailExpanded] = useState(false);
@@ -111,6 +112,15 @@ export default function InstructorDashboard({
               <ChevronLeft size={20} />
             </button>
           </div>
+
+          {!isRailExpanded && (
+            <button 
+              onClick={() => setIsRailExpanded(true)}
+              className="absolute -right-3 top-10 w-6 h-12 bg-slate-800 rounded-full flex items-center justify-center text-slate-400 hover:text-indigo-400 border border-slate-700 active:scale-95 shadow-lg md:hidden"
+            >
+              <Menu size={12} />
+            </button>
+          )}
         </div>
 
         <nav className="flex-1 px-3 py-8 space-y-2 overflow-y-auto custom-scrollbar">
@@ -159,6 +169,7 @@ export default function InstructorDashboard({
         </div>
       </aside>
 
+      {/* --- MAIN STAGE: DYNAMIC CONTENT --- */}
       <main className="flex-1 overflow-hidden relative bg-slate-50">
         <div className="h-full w-full">
             
@@ -172,7 +183,19 @@ export default function InstructorDashboard({
              </div>
            ) : activeTab === 'classes' ? (
              <div className="h-full p-6 md:p-12 overflow-y-auto custom-scrollbar animate-in slide-in-from-right-6 duration-500">
-               <ClassManagerView user={user} classes={userData?.classes || []} lessons={lessons} allDecks={allDecks} onAssign={onAssign} onRevoke={onRevoke} onCreateClass={onCreateClass} onDeleteClass={onDeleteClass} onRenameClass={onRenameClass} onAddStudent={onAddStudent} />
+               <ClassManagerView 
+                  user={user} 
+                  classes={userData?.classes || []} 
+                  lessons={lessons} 
+                  allDecks={allDecks} 
+                  onAssign={onAssign} 
+                  onRevoke={onRevoke} 
+                  onCreateClass={onCreateClass} 
+                  onDeleteClass={onDeleteClass} 
+                  onRenameClass={onRenameClass} 
+                  onAddStudent={onAddStudent} 
+                  onStartPresentation={onStartPresentation} // <--- PASSED HERE
+               />
              </div>
            ) : activeTab === 'vault' ? (
              <div className="h-full overflow-y-auto p-6 md:p-12 custom-scrollbar animate-in slide-in-from-bottom-6 duration-500">
