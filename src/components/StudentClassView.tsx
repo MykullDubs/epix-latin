@@ -17,57 +17,192 @@ import LeaderboardView from './LeaderboardView';
 //  INTERNAL FORUM COMPONENT
 // ============================================================================
 const ClassForum = ({ classId, userData }: { classId: string, userData: any }) => {
-  const [messages, setMessages] = useState<any[]>([]);
-  const [newMessage, setNewMessage] = useState("");
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [view, setView] = useState<'list' | 'thread'>('list');
+  const [activeTopic, setActiveTopic] = useState<any>(null);
+  const [topics, setTopics] = useState<any[]>([]);
+  const [responses, setResponses] = useState<any[]>([]);
+  
+  // State for the "Reply" sub-threading
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
+  const [commentText, setCommentText] = useState("");
 
+  // Creation States
+  const [isCreating, setIsCreating] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newContent, setNewContent] = useState("");
+
+  const isInstructor = userData?.role === 'instructor' || userData?.role === 'admin';
+
+  // 1. Fetch Topics
   useEffect(() => {
-    const q = query(
-      collection(db, 'artifacts', appId, 'classes', classId, 'forum'),
-      orderBy('timestamp', 'asc'),
-      limit(100)
-    );
-    return onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }), 100);
-    });
+    const q = query(collection(db, 'artifacts', appId, 'classes', classId, 'forum_topics'), orderBy('timestamp', 'desc'));
+    return onSnapshot(q, (snap) => setTopics(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, [classId]);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim()) return;
-    await addDoc(collection(db, 'artifacts', appId, 'classes', classId, 'forum'), {
-      text: newMessage,
-      senderName: userData?.name || 'Scholar',
-      senderId: auth.currentUser?.uid,
-      role: userData?.role || 'student',
-      timestamp: Date.now()
+  // 2. Fetch Responses & their nested comments
+  useEffect(() => {
+    if (!activeTopic) return;
+    const q = query(collection(db, 'artifacts', appId, 'classes', classId, 'forum_topics', activeTopic.id, 'responses'), orderBy('timestamp', 'asc'));
+    
+    return onSnapshot(q, (snap) => {
+        const resData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setResponses(resData);
     });
-    setNewMessage("");
+  }, [classId, activeTopic]);
+
+  const handleCreateTopic = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle.trim() || !newContent.trim()) return;
+    await addDoc(collection(db, 'artifacts', appId, 'classes', classId, 'forum_topics'), {
+      title: newTitle, content: newContent, authorName: userData?.name || 'Instructor',
+      authorId: auth.currentUser?.uid, role: userData?.role, timestamp: Date.now()
+    });
+    setNewTitle(""); setNewContent(""); setIsCreating(false);
   };
 
-  return (
-    <div className="flex flex-col h-full bg-slate-50 rounded-[2.5rem] overflow-hidden border-2 border-slate-100 shadow-inner">
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-        {messages.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center text-slate-300 opacity-50 p-10 text-center">
-            <MessageSquare size={40} className="mb-4" />
-            <p className="font-black uppercase tracking-tighter text-xs">No questions yet.</p>
-          </div>
-        )}
-        {messages.map((msg) => (
-          <div key={msg.id} className={`flex flex-col ${msg.senderId === auth.currentUser?.uid ? 'items-end' : 'items-start'} animate-in fade-in`}>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mb-1 px-2">{msg.senderName}</span>
-            <div className={`p-4 rounded-[1.5rem] text-sm font-medium leading-relaxed max-w-[85%] ${msg.senderId === auth.currentUser?.uid ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'}`}>
-              {msg.text}
-            </div>
-          </div>
-        ))}
+  const handlePostResponse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle.trim() || !newContent.trim() || !activeTopic) return;
+    await addDoc(collection(db, 'artifacts', appId, 'classes', classId, 'forum_topics', activeTopic.id, 'responses'), {
+      title: newTitle, content: newContent, authorName: userData?.name || 'Scholar',
+      authorId: auth.currentUser?.uid, role: userData?.role, timestamp: Date.now(), comments: []
+    });
+    setNewTitle(""); setNewContent(""); setIsCreating(false);
+  };
+
+  const handlePostComment = async (responseId: string) => {
+    if (!commentText.trim()) return;
+    const responseRef = doc(db, 'artifacts', appId, 'classes', classId, 'forum_topics', activeTopic.id, 'responses', responseId);
+    
+    // Using an arrayUnion for comments to keep it simple and fast
+    await updateDoc(responseRef, {
+        comments: arrayUnion({
+            text: commentText,
+            authorName: userData?.name || 'Scholar',
+            authorId: auth.currentUser?.uid,
+            role: userData?.role,
+            timestamp: Date.now()
+        })
+    });
+    setCommentText("");
+    setReplyingToId(null);
+  };
+
+  if (view === 'list') {
+    return (
+      <div className="flex flex-col h-full bg-slate-50 rounded-[2.5rem] border-2 border-slate-100 shadow-inner p-6 overflow-hidden">
+        <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Discussions</h3>
+            {isInstructor && (
+                <button onClick={() => setIsCreating(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase flex items-center gap-2 shadow-lg shadow-indigo-100"><Plus size={16}/> New Topic</button>
+            )}
+        </div>
+        <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
+            {isCreating && (
+                <form onSubmit={handleCreateTopic} className="bg-white p-6 rounded-[2rem] border-2 border-indigo-100 shadow-xl mb-6">
+                    <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Topic Title..." className="w-full text-lg font-black text-slate-800 outline-none mb-2" />
+                    <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Instructional prompt..." className="w-full text-sm text-slate-500 outline-none min-h-[100px] resize-none" />
+                    <div className="flex gap-2 justify-end mt-4">
+                        <button type="button" onClick={() => setIsCreating(false)} className="text-slate-400 font-bold text-xs uppercase px-3">Cancel</button>
+                        <button type="submit" className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase shadow-lg">Post</button>
+                    </div>
+                </form>
+            )}
+            {topics.map(t => (
+                <button key={t.id} onClick={() => { setActiveTopic(t); setView('thread'); }} className="w-full bg-white p-6 rounded-[2rem] border-2 border-slate-100 shadow-sm hover:border-indigo-300 transition-all text-left group">
+                    <h4 className="text-lg font-black text-slate-800 group-hover:text-indigo-600 mb-1">{t.title}</h4>
+                    <p className="text-sm text-slate-400 line-clamp-1 mb-4">{t.content}</p>
+                    <div className="flex items-center gap-4 text-[10px] font-black uppercase text-slate-400">
+                        <span className="flex items-center gap-1"><User size={12}/> {t.authorName}</span>
+                        <span className="flex items-center gap-1"><MessageSquare size={12}/> {t.replyCount || 0} Discussions</span>
+                    </div>
+                </button>
+            ))}
+        </div>
       </div>
-      <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-100 flex gap-2">
-        <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Ask a question..." className="flex-1 bg-slate-50 rounded-2xl px-5 py-3 text-sm outline-none" />
-        <button type="submit" className="p-4 bg-indigo-600 text-white rounded-2xl active:scale-90 transition-transform"><Send size={20} /></button>
-      </form>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full bg-slate-50 rounded-[2.5rem] border-2 border-slate-100 shadow-inner overflow-hidden animate-in slide-in-from-right-8 duration-500">
+        <div className="bg-white p-6 border-b border-slate-100 flex items-center justify-between shadow-sm z-20">
+            <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-400 font-black text-xs uppercase hover:text-indigo-600 transition-colors"><ArrowLeft size={16}/> Back</button>
+            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-3 py-1.5 rounded-lg">Response Gallery</span>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+            {/* The Master Prompt (Instructor) */}
+            <div className="bg-slate-900 text-white p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
+                <div className="relative z-10">
+                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-4 block">Discussion Prompt</span>
+                    <h2 className="text-2xl font-black mb-4 leading-tight">{activeTopic.title}</h2>
+                    <p className="text-slate-300 font-medium leading-relaxed mb-6">{activeTopic.content}</p>
+                    <button onClick={() => setIsCreating(true)} className="px-6 py-3 bg-white text-slate-900 rounded-xl font-black text-xs uppercase shadow-xl hover:bg-indigo-50 transition-colors">Post My Response</button>
+                </div>
+            </div>
+
+            {/* Response Creation Form */}
+            {isCreating && (
+                <form onSubmit={handlePostResponse} className="bg-white p-6 rounded-[2.5rem] border-2 border-indigo-100 shadow-xl animate-in zoom-in-95">
+                    <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="My Response Title..." className="w-full text-lg font-black text-slate-800 outline-none mb-2" />
+                    <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Contribute to the discussion..." className="w-full text-sm text-slate-500 outline-none min-h-[120px] resize-none" />
+                    <div className="flex gap-2 justify-end mt-4">
+                        <button type="button" onClick={() => setIsCreating(false)} className="text-slate-400 font-bold text-xs uppercase">Cancel</button>
+                        <button type="submit" className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase">Submit</button>
+                    </div>
+                </form>
+            )}
+
+            {/* The Response List (Third Tier Nesting) */}
+            <div className="space-y-8">
+                {responses.map((res) => (
+                    <div key={res.id} className="space-y-4">
+                        <div className="bg-white p-6 rounded-[2rem] border-2 border-slate-100 shadow-sm relative group">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs ${res.role === 'instructor' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>{(res.authorName?.[0] || 'S').toUpperCase()}</div>
+                                <span className="text-xs font-black text-slate-800">{res.authorName}</span>
+                                {res.role === 'instructor' && <span className="text-[8px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded uppercase">Instructor</span>}
+                            </div>
+                            <h4 className="text-xl font-black text-slate-800 mb-2">{res.title}</h4>
+                            <p className="text-sm text-slate-500 leading-relaxed font-medium mb-4">{res.content}</p>
+                            
+                            <button 
+                                onClick={() => setReplyingToId(replyingToId === res.id ? null : res.id)} 
+                                className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 transition-colors"
+                            >
+                                <MessageSquare size={14} /> {replyingToId === res.id ? 'Cancel Reply' : `Reply to ${res.authorName.split(' ')[0]}`}
+                            </button>
+                        </div>
+
+                        {/* Threaded Comments (The replies) */}
+                        <div className="ml-10 space-y-3">
+                            {res.comments?.map((comment: any, idx: number) => (
+                                <div key={idx} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 animate-in slide-in-from-left-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black ${comment.role === 'instructor' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-400 border border-slate-200'}`}>{(comment.authorName?.[0] || 'S').toUpperCase()}</div>
+                                        <span className="text-[10px] font-black text-slate-700">{comment.authorName}</span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 font-medium">{comment.text}</p>
+                                </div>
+                            ))}
+
+                            {/* Inline Reply Form */}
+                            {replyingToId === res.id && (
+                                <div className="flex gap-2 animate-in slide-in-from-top-2">
+                                    <input 
+                                        autoFocus value={commentText} onChange={e => setCommentText(e.target.value)} 
+                                        placeholder="Write a reply..." 
+                                        className="flex-1 bg-white border-2 border-indigo-100 rounded-xl px-4 py-2 text-xs outline-none shadow-lg"
+                                        onKeyDown={(e) => e.key === 'Enter' && handlePostComment(res.id)}
+                                    />
+                                    <button onClick={() => handlePostComment(res.id)} className="p-3 bg-indigo-600 text-white rounded-xl shadow-lg active:scale-90 transition-transform"><Send size={14}/></button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
     </div>
   );
 };
