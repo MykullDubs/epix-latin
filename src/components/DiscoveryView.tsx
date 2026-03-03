@@ -85,7 +85,7 @@ export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, o
     const [activeCategory, setActiveCategory] = useState('All');
     const [sortMode, setSortMode] = useState<'relevance' | 'size' | 'alpha'>('relevance');
 
-    // --- 1. THE FUZZY BRAIN (Now with Arcade Detection) ---
+    // --- 1. THE FUZZY BRAIN ---
     const { processedItems, categories, difficultyGroups } = useMemo(() => {
         
         // A. Normalize Decks (ROSE THEME)
@@ -104,7 +104,6 @@ export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, o
         const lessonEntries = (lessons || [])
             .map((lesson: any) => ({
                 ...lesson,
-                // Check if it's an arcade game from our new BuilderHub logic
                 contentType: lesson.type === 'arcade_game' ? 'arcade' : 'lesson',
                 magnitude: (lesson.blocks?.length || 0) * 3, 
                 displayCount: lesson.type === 'arcade_game' ? `Target: ${lesson.targetScore} Pts` : `${lesson.blocks?.length || 0} Blocks`,
@@ -152,19 +151,25 @@ export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, o
         return { processedItems: entries, categories: cats, difficultyGroups: groups };
     }, [allDecks, lessons, searchTerm, activeCategory, sortMode]);
 
-    // --- 2. QUEST DATA (Juiced up targets) ---
-    const quests = useMemo(() => {
-        const userProgress = userData?.questProgress || {};
-        const Q = [
-            { id: 'q_cards', label: "Review 10 Cards", target: 10, xp: 50, icon: <Layers size={14}/> },
-            { id: 'q_quiz',  label: "Complete a Unit", target: 1,  xp: 100, icon: <BookOpen size={14}/> },
-            { id: 'q_explore', label: "Play an Arcade Game", target: 1,  xp: 75,  icon: <Gamepad2 size={14}/> },
-        ];
-        return Q.map(q => {
-            const current = userProgress[q.id] || 0;
-            return { ...q, current, done: current >= q.target, percent: Math.min(100, (current / q.target) * 100) };
-        });
-    }, [userData]);
+    // --- 2. LIVE DAILY QUEST DATA ---
+    const todayStr = new Date().toDateString();
+    const isToday = userData?.lastActivityDate === todayStr;
+    const todayXp = isToday ? (userData?.dailyXp || 0) : 0;
+    const todayLessons = isToday ? (userData?.dailyLessons || 0) : 0;
+
+    const quests = [
+        { id: 'q_cards', label: "Earn 50 Daily XP", target: 50, current: Math.min(todayXp, 50), xp: 50, icon: <Zap size={14}/> },
+        { id: 'q_quiz',  label: "Complete 1 Unit", target: 1, current: Math.min(todayLessons, 1), xp: 100, icon: <BookOpen size={14}/> },
+    ].map(q => ({
+        ...q,
+        done: q.current >= q.target,
+        percent: Math.min(100, (q.current / q.target) * 100)
+    }));
+
+    // Calculate hours remaining until midnight for the reset label
+    const now = new Date();
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const hoursRemaining = Math.max(1, Math.floor((tomorrow.getTime() - now.getTime()) / (1000 * 60 * 60)));
 
     // Handler
     const handleItemClick = (item: any) => {
@@ -291,7 +296,7 @@ export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, o
                                 <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
                                     <Target size={18} className="text-rose-500"/> Daily Quests
                                 </h3>
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-200 px-2 py-1 rounded-md">Resets in 4h</span>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-200 px-2 py-1 rounded-md">Resets in {hoursRemaining}h</span>
                             </div>
                             
                             <div className="grid grid-cols-1 gap-3">
@@ -304,12 +309,11 @@ export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, o
                                                 </div>
                                                 <div>
                                                     <span className={`text-sm font-black block ${q.done ? 'text-emerald-700' : 'text-slate-800'}`}>{q.label}</span>
-                                                    <span className={`text-[10px] font-bold uppercase tracking-widest ${q.done ? 'text-emerald-500' : 'text-slate-400'}`}>{q.current} / {q.target} Completed</span>
+                                                    <span className={`text-[10px] font-bold uppercase tracking-widest ${q.done ? 'text-emerald-500' : 'text-slate-400'}`}>
+                                                        {q.done ? 'Done' : `${q.current} / ${q.target} Completed`}
+                                                    </span>
                                                 </div>
                                             </div>
-                                            <span className={`text-xs font-black flex items-center gap-1 ${q.done ? 'text-emerald-500' : 'text-indigo-500 bg-indigo-50 px-2 py-1 rounded-lg'}`}>
-                                                <Zap size={12} className={q.done ? '' : 'fill-indigo-500'} /> +{q.xp}
-                                            </span>
                                         </div>
                                         {/* Progress Bar for Incomplete Quests */}
                                         {!q.done && (
