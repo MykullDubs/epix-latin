@@ -17,38 +17,25 @@ export interface LessonViewProps {
 }
 
 // ============================================================================
-//  LESSON VIEW (Modern "Story" Style - Fully Interactive & Remote Synced)
+//  INTERACTIVE RENDERERS 
 // ============================================================================
 
-// --- INTERNAL INTERACTIVE RENDERERS ---
 const QuizBlockRenderer = ({ block }: any) => {
-    // State now tracks the selected option ID, not the string/index
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [isSubmitted, setIsSubmitted] = useState(false);
 
-    // 1. LOCATE THE DATA
     const data = block?.content || block?.data || block || {};
     const question = data.question || "Missing Question Data";
     
-    // 2. EXTRACT OPTIONS (Preserving the {id, text} structure)
     let options = data.options || [];
     if (!Array.isArray(options)) options = [];
 
-    // Normalize options so they definitely have an id and text
     const normalizedOptions = options.map((opt: any, idx: number) => {
-        if (typeof opt === 'string') {
-            return { id: `opt_${idx}`, text: opt };
-        }
-        return {
-            id: opt.id || `opt_${idx}`,
-            text: opt.text || opt.label || opt.value || "Unknown Option"
-        };
+        if (typeof opt === 'string') return { id: `opt_${idx}`, text: opt };
+        return { id: opt.id || `opt_${idx}`, text: opt.text || opt.label || opt.value || "Unknown Option" };
     });
 
-    // 3. EXTRACT THE CORRECT ID
     let correctId = data.correctId;
-    
-    // Fallbacks just in case older lessons used a different format
     if (correctId === undefined) {
          if (data.correctIndex !== undefined) correctId = normalizedOptions[data.correctIndex]?.id;
          else if (data.correctAnswer) {
@@ -56,17 +43,11 @@ const QuizBlockRenderer = ({ block }: any) => {
              correctId = found?.id;
          }
     }
-
-    // Ultimate fallback if data is somehow totally missing
-    if (correctId === undefined && normalizedOptions.length > 0) {
-        correctId = normalizedOptions[0].id;
-    }
-
-    // Is the currently selected ID the correct one?
+    if (correctId === undefined && normalizedOptions.length > 0) correctId = normalizedOptions[0].id;
     const isCorrect = selectedId === correctId;
 
     return (
-        <div className="bg-white p-6 md:p-8 rounded-[2rem] border-2 border-slate-100 shadow-sm my-6 relative overflow-hidden">
+        <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm my-6 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-2 h-full bg-indigo-500" />
             <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center shadow-inner">
@@ -79,7 +60,7 @@ const QuizBlockRenderer = ({ block }: any) => {
             
             <div className="space-y-3">
                 {normalizedOptions.length === 0 ? (
-                    <p className="text-slate-400 font-bold italic p-4 text-center border-2 border-dashed rounded-2xl">No options provided.</p>
+                    <p className="text-slate-400 font-medium italic p-4 text-center border-2 border-dashed rounded-2xl">No options provided.</p>
                 ) : (
                     normalizedOptions.map((opt: any) => {
                         const isSelected = selectedId === opt.id;
@@ -93,9 +74,7 @@ const QuizBlockRenderer = ({ block }: any) => {
 
                         return (
                             <button 
-                                key={opt.id}
-                                disabled={isSubmitted}
-                                onClick={() => setSelectedId(opt.id)}
+                                key={opt.id} disabled={isSubmitted} onClick={() => setSelectedId(opt.id)}
                                 className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 font-bold text-left transition-all active:scale-[0.98] disabled:active:scale-100 ${btnStyle}`}
                             >
                                 <span>{opt.text}</span>
@@ -107,12 +86,8 @@ const QuizBlockRenderer = ({ block }: any) => {
                 )}
             </div>
 
-            {/* Submission & Feedback Controls */}
             {!isSubmitted && selectedId !== null ? (
-                <button 
-                    onClick={() => setIsSubmitted(true)}
-                    className="mt-6 w-full py-4 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 active:scale-95 transition-all shadow-xl"
-                >
+                <button onClick={() => setIsSubmitted(true)} className="mt-6 w-full py-4 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 active:scale-95 transition-all shadow-xl">
                     Check Answer
                 </button>
             ) : isSubmitted && (
@@ -121,10 +96,7 @@ const QuizBlockRenderer = ({ block }: any) => {
                         {isCorrect ? <><CheckCircle2 size={20}/> Correct!</> : <><X size={20}/> Incorrect</>}
                     </span>
                     {!isCorrect && (
-                        <button 
-                            onClick={() => { setIsSubmitted(false); setSelectedId(null); }} 
-                            className="px-4 py-2 bg-white rounded-lg text-xs font-black uppercase tracking-widest shadow-sm hover:shadow active:scale-95 transition-all text-rose-600 border border-rose-200"
-                        >
+                        <button onClick={() => { setIsSubmitted(false); setSelectedId(null); }} className="px-4 py-2 bg-white rounded-lg text-xs font-black uppercase tracking-widest shadow-sm hover:shadow active:scale-95 transition-all text-rose-600 border border-rose-200">
                             Try Again
                         </button>
                     )}
@@ -135,11 +107,9 @@ const QuizBlockRenderer = ({ block }: any) => {
 };
 
 const FillBlankBlockRenderer = ({ block }: any) => {
-    // 1. LOCATE THE DATA (Safely)
     const data = block?.content || block?.data || block || {};
     const rawText = data.text || "Missing text [here].";
     
-    // 2. EXTRACT BLANKS & CORRECT ANSWERS
     const { textParts, correctAnswers } = useMemo(() => {
         const parts = rawText.split(/\[.*?\]/g);
         const matches = Array.from(rawText.matchAll(/\[(.*?)\]/g));
@@ -147,31 +117,25 @@ const FillBlankBlockRenderer = ({ block }: any) => {
         return { textParts: parts, correctAnswers: answers };
     }, [rawText]);
 
-    // 3. EXTRACT DECOYS/OPTIONS (With crash protection!)
     const distractors = useMemo(() => {
         let rawOptions = data.options || data.distractors || [];
-        if (!Array.isArray(rawOptions)) {
-            rawOptions = typeof rawOptions === 'string' ? [rawOptions] : [];
-        }
+        if (!Array.isArray(rawOptions)) rawOptions = typeof rawOptions === 'string' ? [rawOptions] : [];
         return rawOptions.map((opt: any) => {
             if (typeof opt === 'string' || typeof opt === 'number') return String(opt);
             if (opt && typeof opt === 'object') return opt.text || opt.label || opt.value || "";
             return "";
-        }).filter(Boolean); // Removes empty strings
+        }).filter(Boolean);
     }, [data]);
 
     const [wordBank, setWordBank] = useState<string[]>([]);
     const [filledBlanks, setFilledBlanks] = useState<(string | null)[]>(Array(correctAnswers.length).fill(null));
     const [isChecked, setIsChecked] = useState(false);
 
-    // 4. SHUFFLE EVERYTHING TOGETHER
     useEffect(() => {
-        // Combine correct answers and distractors
         const allWords = Array.from(new Set([...correctAnswers, ...distractors]));
         setWordBank(allWords.sort(() => Math.random() - 0.5));
     }, [correctAnswers, distractors]);
 
-    // Interactions
     const handleBankClick = (word: string) => {
         if (isChecked) return;
         const firstEmptyIdx = filledBlanks.indexOf(null);
@@ -198,7 +162,7 @@ const FillBlankBlockRenderer = ({ block }: any) => {
     const isComplete = filledBlanks.every(slot => slot !== null);
 
     return (
-        <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm my-6">
+        <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-100 shadow-sm my-6">
             <div className="flex items-center gap-3 mb-8">
                 <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shadow-inner">
                     <Edit3 size={20} />
@@ -206,7 +170,6 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                 <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Vocabulary Drill</h3>
             </div>
 
-            {/* The Sentence */}
             <div className="text-xl font-medium text-slate-700 leading-loose flex flex-wrap items-center gap-y-4 mb-10">
                 {textParts.map((part: string, i: number) => {
                     const isLast = i === textParts.length - 1;
@@ -233,29 +196,19 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                 })}
             </div>
 
-            {/* The Word Bank */}
             <div className="bg-slate-50 rounded-2xl p-6 border-2 border-slate-100 flex flex-wrap gap-3 min-h-[48px]">
                 {wordBank.map((word, idx) => (
                     <button 
-                        key={`bank-${idx}`}
-                        onClick={() => handleBankClick(word)}
-                        disabled={isChecked}
+                        key={`bank-${idx}`} onClick={() => handleBankClick(word)} disabled={isChecked}
                         className="px-5 py-2.5 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl shadow-sm hover:border-indigo-300 transition-all disabled:opacity-50"
                     >
                         {word}
                     </button>
                 ))}
-                {wordBank.length === 0 && !isChecked && (
-                    <span className="text-slate-400 font-bold text-sm italic py-2">All words placed.</span>
-                )}
             </div>
 
-            {/* Submit Action */}
             {isComplete && !isChecked && (
-                <button 
-                    onClick={() => setIsChecked(true)}
-                    className="mt-6 w-full py-4 bg-emerald-500 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 shadow-lg shadow-emerald-100 active:scale-95 transition-all"
-                >
+                <button onClick={() => setIsChecked(true)} className="mt-6 w-full py-4 bg-emerald-500 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 shadow-lg shadow-emerald-100 active:scale-95 transition-all">
                     Check Answers
                 </button>
             )}
@@ -265,8 +218,6 @@ const FillBlankBlockRenderer = ({ block }: any) => {
 
 const ScenarioBlockRenderer = ({ block }: any) => {
     const [selectedOpt, setSelectedOpt] = useState<string | null>(null);
-    
-    // Robust Data Extraction
     const title = block.title || block?.content?.title || block?.data?.title || "Real-World Scenario";
     const context = block.context || block?.content?.context || block?.data?.context || "Scenario context goes here...";
     const options = block.options || block?.content?.options || block?.data?.options || [];
@@ -274,7 +225,6 @@ const ScenarioBlockRenderer = ({ block }: any) => {
     return (
         <div className="bg-slate-900 p-6 md:p-8 rounded-[2.5rem] shadow-xl my-6 text-white relative overflow-hidden group">
             <div className="absolute -right-20 -top-20 w-64 h-64 bg-rose-500/20 rounded-full blur-[80px] pointer-events-none group-hover:bg-rose-500/30 transition-colors duration-700" />
-            
             <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-6">
                     <div className="w-10 h-10 bg-rose-500/20 text-rose-400 rounded-xl flex items-center justify-center border border-rose-500/30">
@@ -282,31 +232,20 @@ const ScenarioBlockRenderer = ({ block }: any) => {
                     </div>
                     <h3 className="text-xs font-black text-rose-400 uppercase tracking-widest">Interactive Branch</h3>
                 </div>
-
                 <h4 className="text-2xl font-black mb-3 leading-tight">{title}</h4>
-                <p className="text-slate-300 font-medium leading-relaxed mb-8 italic">
-                    "{context}"
-                </p>
-
+                <p className="text-slate-300 font-medium leading-relaxed mb-8 italic">"{context}"</p>
                 <div className="space-y-3">
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">How do you respond?</p>
-                    {options.length === 0 ? (
-                        <p className="text-rose-400 font-bold italic text-sm">No scenario options provided.</p>
-                    ) : (
-                        options.map((opt: string, i: number) => (
-                            <button 
-                                key={i} 
-                                onClick={() => setSelectedOpt(opt)}
-                                className={`w-full p-4 border rounded-2xl text-left font-bold text-sm transition-all active:scale-[0.98] ${
-                                    selectedOpt === opt 
-                                        ? 'bg-rose-500 border-rose-400 text-white shadow-lg shadow-rose-500/20' 
-                                        : 'bg-white/10 hover:bg-white/20 border-white/10'
-                                }`}
-                            >
-                                {opt}
-                            </button>
-                        ))
-                    )}
+                    {options.map((opt: string, i: number) => (
+                        <button 
+                            key={i} onClick={() => setSelectedOpt(opt)}
+                            className={`w-full p-4 border rounded-2xl text-left font-bold text-sm transition-all active:scale-[0.98] ${
+                                selectedOpt === opt ? 'bg-rose-500 border-rose-400 text-white shadow-lg shadow-rose-500/20' : 'bg-white/10 hover:bg-white/20 border-white/10'
+                            }`}
+                        >
+                            {opt}
+                        </button>
+                    ))}
                 </div>
             </div>
         </div>
@@ -322,20 +261,15 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollTimeout = useRef<any>(null); 
 
-  // --- AUTOMATIC VOCABULARY EXTRACTOR ---
   const lessonVocab = useMemo(() => {
-    return lesson?.blocks
-      ?.filter((b: any) => b.type === 'vocab-list')
-      ?.flatMap((b: any) => b.items) || [];
+    return lesson?.blocks?.filter((b: any) => b.type === 'vocab-list')?.flatMap((b: any) => b.items) || [];
   }, [lesson]);
 
-  // --- CRITICAL FIX: PAGINATION LOGIC ---
   const pages = useMemo(() => {
     if (!lesson?.blocks) return [];
     const grouped: any[] = [];
     let buffer: any[] = [];
     lesson.blocks.forEach((b: any) => {
-      // Isolating interactive blocks into their own pages
       if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game'].includes(b.type)) {
         if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
         grouped.push({ type: 'interact', blocks: [b] });
@@ -346,56 +280,32 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
     return grouped;
   }, [lesson]);
 
-  // --- THE SYNC ENGINE ---
   const syncToProjector = useCallback((newIdx: number) => {
     if (!isInstructor) return;
     const syncId = lesson.originalId || lesson.id;
-    setDoc(doc(db, 'live_sessions', syncId), {
-      activePageIdx: newIdx,
-      liveBlockState: null, 
-      lastUpdate: Date.now()
-    }, { merge: true }).catch(console.error);
-  }, [lesson, isInstructor]);
-
-  const handleLiveInteraction = useCallback((state: any) => {
-    if (!isInstructor) return;
-    const syncId = lesson.originalId || lesson.id;
-    setDoc(doc(db, 'live_sessions', syncId), {
-      liveBlockState: state,
-      lastUpdate: Date.now()
-    }, { merge: true }).catch(console.error);
+    setDoc(doc(db, 'live_sessions', syncId), { activePageIdx: newIdx, liveBlockState: null, lastUpdate: Date.now() }, { merge: true }).catch(console.error);
   }, [lesson, isInstructor]);
 
   useEffect(() => {
     if (isInstructor) syncToProjector(0);
   }, [isInstructor, syncToProjector]);
 
-  // --- THROTTLED SCROLL SYNC ---
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !isInstructor) return;
-    
     const handleScroll = () => {
       if (scrollTimeout.current) return; 
-      
       scrollTimeout.current = setTimeout(() => {
         const scrollPercent = container.scrollTop / (container.scrollHeight - container.clientHeight);
         const syncId = lesson.originalId || lesson.id;
-        
-        setDoc(doc(db, 'live_sessions', syncId), {
-          scrollPercent: scrollPercent || 0,
-          lastUpdate: Date.now()
-        }, { merge: true }).catch(e => {});
-        
+        setDoc(doc(db, 'live_sessions', syncId), { scrollPercent: scrollPercent || 0, lastUpdate: Date.now() }, { merge: true }).catch(e => {});
         scrollTimeout.current = null;
       }, 50); 
     };
-
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => container.removeEventListener('scroll', handleScroll);
   }, [lesson, isInstructor]);
 
-  // --- NAVIGATION HANDLERS ---
   const handlePrev = () => {
       const newIdx = Math.max(0, activePageIdx - 1);
       setActivePageIdx(newIdx);
@@ -414,66 +324,80 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
       }
   };
 
- // --- MASTER BLOCK RENDERER ---
+  // --- THE MELLOWED BLOCK RENDERER ---
   const renderBlock = (block: any, idx: number) => {
     const blockKey = `page_${activePageIdx}_block_${idx}`;
 
     switch (block.type) {
       
-      // --- UPGRADED TYPOGRAPHY BLOCKS ---
+      // --- UPGRADED: The Simple Text Block ---
       case 'text':
         return (
-          <div key={blockKey} className="py-10 animate-in fade-in slide-in-from-bottom-3 duration-700">
+          <div key={blockKey} className="py-6 animate-in fade-in slide-in-from-bottom-3 duration-700">
             {block.title && (
                 <span className="inline-block px-3 py-1 rounded-lg bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em] mb-4">
                     {block.title}
                 </span>
             )}
-            <p className="text-4xl md:text-5xl font-black text-slate-900 leading-[1.1] tracking-tight">{block.content}</p>
+            {/* Three Smidges Applied to simple text:
+              - text-4xl down to text-3xl
+              - font-black down to font-bold 
+              - text-slate-900 down to text-slate-700
+              - leading-[1.1] relaxed to leading-snug
+            */}
+            <p className="text-2xl md:text-3xl font-bold text-slate-700 leading-snug tracking-tight">
+              {block.content}
+            </p>
           </div>
         );
 
       case 'essay':
         return (
-          <div key={blockKey} className="py-6 space-y-10 animate-in fade-in">
-            {block.title && (
-                <h2 className="text-3xl font-black text-slate-900 border-l-[6px] border-indigo-600 pl-6 py-1 tracking-tight">
-                    {block.title}
-                </h2>
-            )}
-            <div className="space-y-8">
-              {block.content?.split('\n\n').map((p: string, j: number) => (
-                <p key={j} className="text-xl text-slate-600 font-serif leading-relaxed text-justify first-letter:text-6xl first-letter:font-black first-letter:text-slate-900 first-letter:mr-3 first-letter:float-left first-letter:leading-none">
-                  {p.trim()}
-                </p>
-              ))}
+          <div key={blockKey} className="py-4 space-y-6 animate-in fade-in">
+            <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                {block.title && (
+                    <div className="flex items-center gap-3 mb-6 pb-6 border-b border-slate-50">
+                        <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500">
+                            <BookOpen size={18} />
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-800 tracking-tight">
+                            {block.title}
+                        </h3>
+                    </div>
+                )}
+                <div className="text-slate-600 font-medium text-base md:text-lg leading-relaxed space-y-6 tracking-wide">
+                    {block.content?.split('\n').map((p: string, j: number) => {
+                        if (!p.trim()) return null;
+                        return <p key={j}>{p}</p>;
+                    })}
+                </div>
             </div>
           </div>
         );
 
       case 'callout':
         return (
-          <div key={blockKey} className="my-10 p-8 rounded-[2.5rem] bg-amber-50 border-2 border-amber-100 relative overflow-hidden group shadow-sm">
+          <div key={blockKey} className="my-8 p-8 rounded-[2.5rem] bg-amber-50 border border-amber-100 relative overflow-hidden group shadow-sm">
             <Zap size={100} className="absolute -right-6 -top-6 text-amber-200/40 rotate-12 group-hover:scale-110 transition-transform" fill="currentColor" />
             <div className="relative z-10">
               <div className="flex items-center gap-2 mb-4">
                 <div className="p-1.5 bg-amber-500 text-white rounded-lg shadow-sm"><Info size={16} strokeWidth={3} /></div>
-                <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">{block.label || 'Grammar Spotlight'}</span>
+                <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">{block.label || 'Spotlight'}</span>
               </div>
-              <p className="text-lg text-slate-800 font-bold leading-relaxed italic pr-12">"{block.content}"</p>
+              <p className="text-lg text-slate-700 font-bold leading-relaxed italic pr-12">"{block.content}"</p>
             </div>
           </div>
         );
 
       case 'dialogue':
         return (
-          <div key={blockKey} className="py-8 space-y-6">
+          <div key={blockKey} className="py-6 space-y-6">
             {block.lines?.map((line: any, j: number) => (
               <div key={j} className={`flex items-end gap-3 ${line.side === 'right' ? 'flex-row-reverse' : ''}`}>
-                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-black text-white shrink-0 shadow-md ${line.side === 'right' ? 'bg-indigo-600' : 'bg-slate-800'}`}>{line.speaker?.[0].toUpperCase()}</div>
-                <div className={`max-w-[85%] p-5 rounded-[2rem] text-base font-medium leading-relaxed ${line.side === 'right' ? 'bg-indigo-500 text-white rounded-br-none' : 'bg-white border border-slate-100 text-slate-800 rounded-bl-none shadow-sm'}`}>
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-black text-white shrink-0 shadow-md ${line.side === 'right' ? 'bg-indigo-500' : 'bg-slate-300'}`}>{line.speaker?.[0].toUpperCase()}</div>
+                <div className={`max-w-[85%] p-5 rounded-[2rem] text-base font-medium leading-relaxed ${line.side === 'right' ? 'bg-indigo-50 text-indigo-900 border border-indigo-100 rounded-br-none' : 'bg-white border border-slate-100 text-slate-700 rounded-bl-none shadow-sm'}`}>
                   {line.text}
-                  {line.translation && <p className={`text-xs mt-3 italic opacity-60 font-bold border-t pt-3 ${line.side === 'right' ? 'border-white/20' : 'border-slate-100'}`}>{line.translation}</p>}
+                  {line.translation && <p className={`text-xs mt-3 italic opacity-70 font-bold border-t pt-3 ${line.side === 'right' ? 'border-indigo-200' : 'border-slate-100'}`}>{line.translation}</p>}
                 </div>
               </div>
             ))}
@@ -482,13 +406,13 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
 
       case 'vocab-list':
         return (
-          <div key={blockKey} className="py-6 grid grid-cols-1 gap-4">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-2">Lexicon</h3>
+          <div key={blockKey} className="py-6 grid grid-cols-1 gap-3">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-2 pl-2">Lexicon</h3>
             {block.items?.map((item: any, j: number) => (
-              <div key={j} className="bg-white p-6 rounded-[2rem] border-2 border-slate-50 shadow-sm flex flex-col gap-1 hover:border-indigo-200 transition-all hover:-translate-y-0.5">
-                <span className="text-xl font-black text-indigo-600 tracking-tight">{item.term}</span>
-                <div className="h-0.5 w-12 bg-slate-100 my-2" />
-                <span className="text-sm font-bold text-slate-500 leading-relaxed">{item.definition}</span>
+              <div key={j} className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm flex items-center gap-4 hover:border-indigo-200 transition-all">
+                <span className="text-lg font-bold text-indigo-600 tracking-tight min-w-[100px]">{item.term}</span>
+                <div className="h-6 w-px bg-slate-200" />
+                <span className="text-sm font-medium text-slate-600 flex-1">{item.definition}</span>
               </div>
             ))}
           </div>
@@ -497,7 +421,7 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
       case 'image':
         return (
           <div key={blockKey} className="py-8 animate-in fade-in">
-             <div className="rounded-3xl overflow-hidden shadow-lg border border-slate-100"><img src={block.url} alt="Lesson visual" className="w-full h-auto object-cover max-h-64" /></div>
+             <div className="rounded-[2.5rem] overflow-hidden shadow-md border border-slate-100"><img src={block.url} alt="Lesson visual" className="w-full h-auto object-cover max-h-80" /></div>
              {block.caption && <p className="text-xs font-bold text-slate-400 text-center mt-4 px-4 uppercase tracking-widest">{block.caption}</p>}
           </div>
         );
@@ -505,16 +429,16 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
       case 'discussion':
         return (
           <div key={blockKey} className="py-8 animate-in fade-in">
-            <div className="bg-indigo-50 border-2 border-indigo-100 rounded-[2.5rem] p-8 shadow-sm">
+            <div className="bg-indigo-50 border border-indigo-100 rounded-[2.5rem] p-8 shadow-sm">
               <div className="flex items-center gap-3 mb-8">
-                  <div className="p-3 bg-indigo-600 text-white rounded-xl shadow-md"><MessageCircle size={24} /></div>
-                  <h3 className="text-2xl font-black text-indigo-900">{block.title || "Discussion"}</h3>
+                  <div className="p-3 bg-indigo-500 text-white rounded-xl shadow-md"><MessageCircle size={20} /></div>
+                  <h3 className="text-xl font-bold text-indigo-900">{block.title || "Discussion"}</h3>
               </div>
               <div className="space-y-4">
                 {(block.questions || []).map((q: string, qIdx: number) => (
                   <div key={qIdx} className="bg-white p-5 rounded-2xl shadow-sm border border-indigo-50 flex gap-4 items-start">
-                      <span className="text-indigo-300 font-black text-xl leading-none mt-0.5">{qIdx + 1}</span>
-                      <p className="text-slate-700 font-bold leading-relaxed">{q}</p>
+                      <span className="text-indigo-300 font-black text-lg leading-none mt-1">{qIdx + 1}</span>
+                      <p className="text-slate-600 font-medium leading-relaxed">{q}</p>
                   </div>
                 ))}
               </div>
@@ -522,16 +446,9 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
           </div>
         );
       
-      // --- INTERACTIVE BLOCKS ---
-      case 'quiz':
-        return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><QuizBlockRenderer block={block} /></div>;
-      
-      case 'fill-blank':
-        return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><FillBlankBlockRenderer block={block} /></div>;
-      
-      case 'scenario':
-        return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><ScenarioBlockRenderer block={block} /></div>;
-
+      case 'quiz': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><QuizBlockRenderer block={block} /></div>;
+      case 'fill-blank': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><FillBlankBlockRenderer block={block} /></div>;
+      case 'scenario': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><ScenarioBlockRenderer block={block} /></div>;
       case 'game':
         if (block.gameType === 'connect-three') {
             return (
@@ -540,12 +457,8 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
                         <h3 className="text-2xl font-black text-slate-800">{block.title || "Vocabulary Battle"}</h3>
                         <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">Game Active on Projector</p>
                     </div>
-                    {/* Assuming ConnectThreeVocab is imported and available! */}
-                    {/* <div className="scale-90 origin-top">
-                        <ConnectThreeVocab vocabList={lessonVocab} />
-                    </div> */}
-                    <div className="w-full h-64 bg-amber-50 rounded-[2.5rem] border-2 border-amber-200 flex items-center justify-center text-amber-500 font-black shadow-inner">
-                        [Game Rendered Here]
+                    <div className="w-full h-64 bg-amber-50 rounded-[2.5rem] border border-amber-200 flex items-center justify-center text-amber-500 font-bold shadow-inner">
+                        [Interactive Game View]
                     </div>
                 </div>
             );
@@ -553,14 +466,14 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
         return <div key={blockKey} className="text-rose-500">Unknown Game Type</div>;
 
       default:
-        return <div key={blockKey} className="p-8 bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200 text-center text-xs text-slate-400 font-bold uppercase tracking-widest my-4">Unsupported Module: {block.type}</div>;
+        return <div key={blockKey} className="p-8 bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200 text-center text-xs text-slate-400 font-bold uppercase tracking-widest my-4">Unsupported Module: {block.type}</div>;
     }
   };
 
   if (!pages[activePageIdx]) return null;
 
   return (
-    <div className="flex flex-col h-full bg-slate-50/30 overflow-hidden font-sans relative">
+    <div className="flex flex-col h-full bg-slate-50/50 overflow-hidden font-sans relative">
       <div className="px-6 md:px-8 pt-10 md:pt-14 pb-6 bg-white border-b border-slate-100 shrink-0 shadow-sm relative z-10">
         <div className="flex justify-between items-end">
           <div>
@@ -577,7 +490,7 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
       </div>
       
       <div ref={containerRef} className="flex-1 overflow-y-auto px-6 md:px-10 py-10 pb-48 custom-scrollbar scroll-smooth relative z-0">
-        <div className="max-w-xl mx-auto space-y-4">
+        <div className="max-w-2xl mx-auto space-y-4">
           {pages[activePageIdx].blocks.map((block: any, i: number) => renderBlock(block, i))}
         </div>
       </div>
@@ -585,7 +498,7 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
       <div className="p-8 pb-10 bg-white/90 backdrop-blur-xl border-t border-slate-100 flex justify-between items-center fixed bottom-0 left-0 right-0 z-50 shadow-[0_-20px_40px_rgba(0,0,0,0.05)]">
         <button 
             onClick={handlePrev} 
-            className="p-5 bg-slate-100 text-slate-400 rounded-3xl disabled:opacity-20 active:scale-90 transition-all hover:bg-slate-200" 
+            className="p-5 bg-slate-100 text-slate-400 rounded-[2rem] disabled:opacity-20 active:scale-90 transition-all hover:bg-slate-200" 
             disabled={activePageIdx === 0}
         >
             <ArrowLeft size={24} strokeWidth={3} />
@@ -599,14 +512,14 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
         {activePageIdx < pages.length - 1 ? (
           <button 
             onClick={handleNext} 
-            className="p-5 bg-indigo-600 text-white rounded-3xl shadow-xl shadow-indigo-200 active:scale-90 transition-all hover:bg-indigo-500 hover:-translate-y-1"
+            className="p-5 bg-indigo-600 text-white rounded-[2rem] shadow-xl shadow-indigo-200 active:scale-90 transition-all hover:bg-indigo-500 hover:-translate-y-1"
           >
             <ArrowRight size={24} strokeWidth={3} />
           </button>
         ) : (
           <button 
             onClick={onFinish} 
-            className="px-10 py-5 bg-emerald-500 text-white font-black rounded-3xl shadow-xl shadow-emerald-200 active:scale-95 transition-all text-xs tracking-widest hover:bg-emerald-400 hover:-translate-y-1"
+            className="px-10 py-5 bg-emerald-500 text-white font-black rounded-[2rem] shadow-xl shadow-emerald-200 active:scale-95 transition-all text-xs tracking-widest hover:bg-emerald-400 hover:-translate-y-1"
           >
             FINISH
           </button>
