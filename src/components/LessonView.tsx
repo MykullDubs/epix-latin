@@ -2,7 +2,10 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { HelpCircle, CheckCircle2, X, Edit3, MessageSquare, MessageCircle, ArrowLeft, ArrowRight } from 'lucide-react';
+import { 
+  HelpCircle, CheckCircle2, X, Edit3, MessageSquare, 
+  MessageCircle, ArrowLeft, ArrowRight, Info, Zap 
+} from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
 
 export interface LessonViewProps {
@@ -164,7 +167,6 @@ const FillBlankBlockRenderer = ({ block }: any) => {
     // 4. SHUFFLE EVERYTHING TOGETHER
     useEffect(() => {
         // Combine correct answers and distractors
-        // (Using a Set ensures we don't get duplicates if the Builder accidentally saved the correct answer inside the options array too)
         const allWords = Array.from(new Set([...correctAnswers, ...distractors]));
         setWordBank(allWords.sort(() => Math.random() - 0.5));
     }, [correctAnswers, distractors]);
@@ -196,14 +198,12 @@ const FillBlankBlockRenderer = ({ block }: any) => {
     const isComplete = filledBlanks.every(slot => slot !== null);
 
     return (
-        <div className="bg-white p-6 md:p-8 rounded-[2rem] border-2 border-slate-100 shadow-sm my-6">
-            <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shadow-inner">
-                        <Edit3 size={20} strokeWidth={2.5} />
-                    </div>
-                    <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest">Fill in the Blanks</h3>
+        <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm my-6">
+            <div className="flex items-center gap-3 mb-8">
+                <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shadow-inner">
+                    <Edit3 size={20} />
                 </div>
+                <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Vocabulary Drill</h3>
             </div>
 
             {/* The Sentence */}
@@ -234,33 +234,27 @@ const FillBlankBlockRenderer = ({ block }: any) => {
             </div>
 
             {/* The Word Bank */}
-            <div className="bg-slate-50 rounded-[1.5rem] p-6 border-2 border-slate-100">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center justify-between">
-                    <span>Word Bank</span>
-                    {isComplete && !isChecked && <span className="text-indigo-500">Ready to check!</span>}
-                </h4>
-                <div className="flex flex-wrap gap-3 min-h-[48px]">
-                    {wordBank.map((word, idx) => (
-                        <button 
-                            key={`bank-${idx}`}
-                            onClick={() => handleBankClick(word)}
-                            disabled={isChecked}
-                            className="px-5 py-2.5 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl shadow-sm hover:border-indigo-300 hover:text-indigo-600 hover:-translate-y-1 active:scale-95 transition-all disabled:opacity-50 disabled:hover:translate-y-0"
-                        >
-                            {word}
-                        </button>
-                    ))}
-                    {wordBank.length === 0 && !isChecked && (
-                        <span className="text-slate-400 font-bold text-sm italic py-2">All words placed.</span>
-                    )}
-                </div>
+            <div className="bg-slate-50 rounded-2xl p-6 border-2 border-slate-100 flex flex-wrap gap-3 min-h-[48px]">
+                {wordBank.map((word, idx) => (
+                    <button 
+                        key={`bank-${idx}`}
+                        onClick={() => handleBankClick(word)}
+                        disabled={isChecked}
+                        className="px-5 py-2.5 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl shadow-sm hover:border-indigo-300 transition-all disabled:opacity-50"
+                    >
+                        {word}
+                    </button>
+                ))}
+                {wordBank.length === 0 && !isChecked && (
+                    <span className="text-slate-400 font-bold text-sm italic py-2">All words placed.</span>
+                )}
             </div>
 
             {/* Submit Action */}
             {isComplete && !isChecked && (
                 <button 
                     onClick={() => setIsChecked(true)}
-                    className="mt-6 w-full py-4 bg-emerald-500 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 active:scale-95 transition-all shadow-xl shadow-emerald-200 animate-in slide-in-from-bottom-2 fade-in"
+                    className="mt-6 w-full py-4 bg-emerald-500 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 shadow-lg shadow-emerald-100 active:scale-95 transition-all"
                 >
                     Check Answers
                 </button>
@@ -425,80 +419,123 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
     const blockKey = `page_${activePageIdx}_block_${idx}`;
 
     switch (block.type) {
+      
+      // --- UPGRADED TYPOGRAPHY BLOCKS ---
       case 'text':
         return (
-          <div key={blockKey} className="py-6 text-center animate-in fade-in slide-in-from-bottom-2">
-            {block.title && <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4">{block.title}</h3>}
-            <p className="text-3xl font-black text-slate-900 leading-tight tracking-tighter">{block.content}</p>
+          <div key={blockKey} className="py-10 animate-in fade-in slide-in-from-bottom-3 duration-700">
+            {block.title && (
+                <span className="inline-block px-3 py-1 rounded-lg bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em] mb-4">
+                    {block.title}
+                </span>
+            )}
+            <p className="text-4xl md:text-5xl font-black text-slate-900 leading-[1.1] tracking-tight">{block.content}</p>
           </div>
         );
+
       case 'essay':
         return (
-          <div key={blockKey} className="py-4 space-y-6 animate-in fade-in">
-            <h2 className="text-2xl font-black text-indigo-600 tracking-tight">{block.title}</h2>
-            <div className="space-y-4">{block.content?.split('\n\n').map((p: string, j: number) => <p key={j} className="text-base text-slate-600 font-serif leading-relaxed text-justify">{p.trim()}</p>)}</div>
+          <div key={blockKey} className="py-6 space-y-10 animate-in fade-in">
+            {block.title && (
+                <h2 className="text-3xl font-black text-slate-900 border-l-[6px] border-indigo-600 pl-6 py-1 tracking-tight">
+                    {block.title}
+                </h2>
+            )}
+            <div className="space-y-8">
+              {block.content?.split('\n\n').map((p: string, j: number) => (
+                <p key={j} className="text-xl text-slate-600 font-serif leading-relaxed text-justify first-letter:text-6xl first-letter:font-black first-letter:text-slate-900 first-letter:mr-3 first-letter:float-left first-letter:leading-none">
+                  {p.trim()}
+                </p>
+              ))}
+            </div>
           </div>
         );
+
+      case 'callout':
+        return (
+          <div key={blockKey} className="my-10 p-8 rounded-[2.5rem] bg-amber-50 border-2 border-amber-100 relative overflow-hidden group shadow-sm">
+            <Zap size={100} className="absolute -right-6 -top-6 text-amber-200/40 rotate-12 group-hover:scale-110 transition-transform" fill="currentColor" />
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-1.5 bg-amber-500 text-white rounded-lg shadow-sm"><Info size={16} strokeWidth={3} /></div>
+                <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">{block.label || 'Grammar Spotlight'}</span>
+              </div>
+              <p className="text-lg text-slate-800 font-bold leading-relaxed italic pr-12">"{block.content}"</p>
+            </div>
+          </div>
+        );
+
       case 'dialogue':
         return (
-          <div key={blockKey} className="py-6 space-y-6">
+          <div key={blockKey} className="py-8 space-y-6">
             {block.lines?.map((line: any, j: number) => (
               <div key={j} className={`flex items-end gap-3 ${line.side === 'right' ? 'flex-row-reverse' : ''}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black text-white shrink-0 shadow-lg ${line.side === 'right' ? 'bg-indigo-600' : 'bg-slate-800'}`}>{line.speaker?.[0].toUpperCase()}</div>
-                <div className={`max-w-[80%] p-4 rounded-[1.8rem] shadow-sm text-sm font-medium leading-relaxed ${line.side === 'right' ? 'bg-indigo-500 text-white rounded-br-none' : 'bg-white border border-slate-100 text-slate-800 rounded-bl-none'}`}>
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-black text-white shrink-0 shadow-md ${line.side === 'right' ? 'bg-indigo-600' : 'bg-slate-800'}`}>{line.speaker?.[0].toUpperCase()}</div>
+                <div className={`max-w-[85%] p-5 rounded-[2rem] text-base font-medium leading-relaxed ${line.side === 'right' ? 'bg-indigo-500 text-white rounded-br-none' : 'bg-white border border-slate-100 text-slate-800 rounded-bl-none shadow-sm'}`}>
                   {line.text}
-                  {line.translation && <p className={`text-[10px] mt-2 italic opacity-60 font-bold border-t pt-2 ${line.side === 'right' ? 'border-white/20' : 'border-slate-100'}`}>{line.translation}</p>}
+                  {line.translation && <p className={`text-xs mt-3 italic opacity-60 font-bold border-t pt-3 ${line.side === 'right' ? 'border-white/20' : 'border-slate-100'}`}>{line.translation}</p>}
                 </div>
               </div>
             ))}
           </div>
         );
+
       case 'vocab-list':
         return (
-          <div key={blockKey} className="py-4 grid grid-cols-1 gap-4">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] px-2">Essential Lexicon</h3>
+          <div key={blockKey} className="py-6 grid grid-cols-1 gap-4">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-2">Lexicon</h3>
             {block.items?.map((item: any, j: number) => (
-              <div key={j} className="bg-white p-5 rounded-[2rem] border-2 border-slate-50 shadow-sm flex flex-col gap-1 hover:border-indigo-100 transition-colors">
-                <span className="text-lg font-black text-indigo-600">{item.term}</span><div className="h-px w-8 bg-slate-100 my-1" />
-                <span className="text-xs font-bold text-slate-500 leading-normal">{item.definition}</span>
+              <div key={j} className="bg-white p-6 rounded-[2rem] border-2 border-slate-50 shadow-sm flex flex-col gap-1 hover:border-indigo-200 transition-all hover:-translate-y-0.5">
+                <span className="text-xl font-black text-indigo-600 tracking-tight">{item.term}</span>
+                <div className="h-0.5 w-12 bg-slate-100 my-2" />
+                <span className="text-sm font-bold text-slate-500 leading-relaxed">{item.definition}</span>
               </div>
             ))}
           </div>
         );
+
       case 'image':
         return (
-          <div key={blockKey} className="py-6 animate-in fade-in">
+          <div key={blockKey} className="py-8 animate-in fade-in">
              <div className="rounded-3xl overflow-hidden shadow-lg border border-slate-100"><img src={block.url} alt="Lesson visual" className="w-full h-auto object-cover max-h-64" /></div>
-             {block.caption && <p className="text-xs font-bold text-slate-400 text-center mt-3 px-4">{block.caption}</p>}
+             {block.caption && <p className="text-xs font-bold text-slate-400 text-center mt-4 px-4 uppercase tracking-widest">{block.caption}</p>}
           </div>
         );
+
       case 'discussion':
         return (
-          <div key={blockKey} className="py-6 animate-in fade-in">
-            <div className="bg-indigo-50 border-2 border-indigo-100 rounded-[2rem] p-6 shadow-sm">
-              <div className="flex items-center gap-3 mb-6"><div className="p-3 bg-indigo-600 text-white rounded-xl shadow-md"><MessageCircle size={20} /></div><h3 className="text-xl font-black text-indigo-900">{block.title || "Discussion"}</h3></div>
+          <div key={blockKey} className="py-8 animate-in fade-in">
+            <div className="bg-indigo-50 border-2 border-indigo-100 rounded-[2.5rem] p-8 shadow-sm">
+              <div className="flex items-center gap-3 mb-8">
+                  <div className="p-3 bg-indigo-600 text-white rounded-xl shadow-md"><MessageCircle size={24} /></div>
+                  <h3 className="text-2xl font-black text-indigo-900">{block.title || "Discussion"}</h3>
+              </div>
               <div className="space-y-4">
                 {(block.questions || []).map((q: string, qIdx: number) => (
-                  <div key={qIdx} className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 flex gap-4"><span className="text-indigo-300 font-black text-lg">{qIdx + 1}</span><p className="text-slate-700 font-medium leading-snug">{q}</p></div>
+                  <div key={qIdx} className="bg-white p-5 rounded-2xl shadow-sm border border-indigo-50 flex gap-4 items-start">
+                      <span className="text-indigo-300 font-black text-xl leading-none mt-0.5">{qIdx + 1}</span>
+                      <p className="text-slate-700 font-bold leading-relaxed">{q}</p>
+                  </div>
                 ))}
               </div>
             </div>
           </div>
         );
       
-      // --- NEWLY INJECTED INTERACTIVE BLOCKS ---
+      // --- INTERACTIVE BLOCKS ---
       case 'quiz':
         return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><QuizBlockRenderer block={block} /></div>;
+      
       case 'fill-blank':
         return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><FillBlankBlockRenderer block={block} /></div>;
+      
       case 'scenario':
         return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><ScenarioBlockRenderer block={block} /></div>;
 
-      // --- GAME BLOCK ---
       case 'game':
         if (block.gameType === 'connect-three') {
             return (
-                <div key={blockKey} className="py-6 animate-in fade-in slide-in-from-bottom-4 flex flex-col items-center">
+                <div key={blockKey} className="py-8 animate-in fade-in slide-in-from-bottom-4 flex flex-col items-center">
                     <div className="text-center mb-6">
                         <h3 className="text-2xl font-black text-slate-800">{block.title || "Vocabulary Battle"}</h3>
                         <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">Game Active on Projector</p>
@@ -507,7 +544,7 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
                     {/* <div className="scale-90 origin-top">
                         <ConnectThreeVocab vocabList={lessonVocab} />
                     </div> */}
-                    <div className="w-full h-64 bg-amber-50 rounded-[2rem] border-2 border-amber-200 flex items-center justify-center text-amber-500 font-black">
+                    <div className="w-full h-64 bg-amber-50 rounded-[2.5rem] border-2 border-amber-200 flex items-center justify-center text-amber-500 font-black shadow-inner">
                         [Game Rendered Here]
                     </div>
                 </div>
@@ -516,7 +553,7 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
         return <div key={blockKey} className="text-rose-500">Unknown Game Type</div>;
 
       default:
-        return <div key={blockKey} className="p-8 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 text-center text-xs text-slate-400 font-bold uppercase tracking-widest my-4">Unsupported Module: {block.type}</div>;
+        return <div key={blockKey} className="p-8 bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200 text-center text-xs text-slate-400 font-bold uppercase tracking-widest my-4">Unsupported Module: {block.type}</div>;
     }
   };
 
@@ -539,37 +576,37 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
         </div>
       </div>
       
-      <div ref={containerRef} className="flex-1 overflow-y-auto px-4 md:px-6 py-8 pb-40 custom-scrollbar scroll-smooth relative z-0">
-        <div className="max-w-md mx-auto space-y-12">
+      <div ref={containerRef} className="flex-1 overflow-y-auto px-6 md:px-10 py-10 pb-48 custom-scrollbar scroll-smooth relative z-0">
+        <div className="max-w-xl mx-auto space-y-4">
           {pages[activePageIdx].blocks.map((block: any, i: number) => renderBlock(block, i))}
         </div>
       </div>
       
-      <div className="p-6 md:p-8 pb-safe bg-white/90 backdrop-blur-xl border-t border-slate-100 flex justify-between items-center fixed bottom-0 left-0 right-0 z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+      <div className="p-8 pb-10 bg-white/90 backdrop-blur-xl border-t border-slate-100 flex justify-between items-center fixed bottom-0 left-0 right-0 z-50 shadow-[0_-20px_40px_rgba(0,0,0,0.05)]">
         <button 
             onClick={handlePrev} 
-            className="p-4 bg-slate-100 text-slate-400 rounded-2xl disabled:opacity-20 active:scale-90 transition-all hover:bg-slate-200" 
+            className="p-5 bg-slate-100 text-slate-400 rounded-3xl disabled:opacity-20 active:scale-90 transition-all hover:bg-slate-200" 
             disabled={activePageIdx === 0}
         >
             <ArrowLeft size={24} strokeWidth={3} />
         </button>
         
         <div className="text-center">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Slide</span>
-            <span className="text-xl font-black text-slate-900">{activePageIdx + 1} <span className="text-slate-300">/</span> {pages.length}</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Unit Page</span>
+            <span className="text-2xl font-black text-slate-900">{activePageIdx + 1} <span className="text-slate-300">/</span> {pages.length}</span>
         </div>
         
         {activePageIdx < pages.length - 1 ? (
           <button 
             onClick={handleNext} 
-            className="p-4 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-200 active:scale-90 transition-all hover:bg-indigo-500 hover:-translate-y-1"
+            className="p-5 bg-indigo-600 text-white rounded-3xl shadow-xl shadow-indigo-200 active:scale-90 transition-all hover:bg-indigo-500 hover:-translate-y-1"
           >
             <ArrowRight size={24} strokeWidth={3} />
           </button>
         ) : (
           <button 
             onClick={onFinish} 
-            className="px-8 py-4 bg-emerald-500 text-white font-black rounded-2xl shadow-xl shadow-emerald-200 active:scale-95 transition-all text-xs tracking-widest hover:bg-emerald-400 hover:-translate-y-1"
+            className="px-10 py-5 bg-emerald-500 text-white font-black rounded-3xl shadow-xl shadow-emerald-200 active:scale-95 transition-all text-xs tracking-widest hover:bg-emerald-400 hover:-translate-y-1"
           >
             FINISH
           </button>
