@@ -2,54 +2,56 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { doc, setDoc } from "firebase/firestore"; // Changed from updateDoc to setDoc
 import { storage, db, appId } from "../config/firebase";
 
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { doc, setDoc, updateDoc } from "firebase/firestore";
+import { storage, db, appId } from "../config/firebase";
+
 // ============================================================================
 //  PROFILE PICTURE & AVATAR LOGIC (MAGISTER OS)
 // ============================================================================
 
-/**
- * Uploads a file to Firebase Storage and ensures the Firestore profile exists.
- * Swapped updateDoc for setDoc({merge: true}) to solve the "not-found" mystery.
- */
 export const uploadProfilePicture = async (uid: string, file: File) => {
-    if (!storage) {
-        console.error("CRITICAL: Storage instance is undefined.");
-        throw new Error("storage-not-initialized");
-    }
+    if (!storage) throw new Error("storage-not-initialized");
 
     try {
-        console.log(`Starting upload to: ${storage.app.options.storageBucket}`);
-        
-        // 1. Create a unique reference
+        // 1. Create unique storage path
         const fileName = `avatar_${Date.now()}.jpg`;
         const storageRef = ref(storage, `artifacts/${appId}/profiles/${uid}/${fileName}`);
         
-        // 2. Upload with image metadata
-        const metadata = { contentType: file.type };
+        // 2. Upload with explicit metadata
+        const metadata = { contentType: 'image/jpeg' };
         const snapshot = await uploadBytes(storageRef, file, metadata);
         
-        // 3. Retrieve public URL
-        const downloadURL = await getDownloadURL(snapshot.ref);
+        // 3. Retrieve public URL + Add Cache-Buster
+        // Adding a timestamp ensures the <img> tag refreshes immediately
+        const rawURL = await getDownloadURL(snapshot.ref);
+        const downloadURL = `${rawURL}&t=${Date.now()}`;
         
-        // 4. THE FIX: Update OR Create the user document
+        // 4. THE FIX: Use Dot-Notation for the update
+        // This ensures Firestore targets the specific nested field correctly
         const userRef = doc(db, 'artifacts', appId, 'users', uid);
-        await setDoc(userRef, {
-            profile: {
-                main: {
-                    avatarUrl: downloadURL
+        
+        try {
+            // Try updating just the specific field first (most efficient)
+            await updateDoc(userRef, {
+                'profile.main.avatarUrl': downloadURL
+            });
+        } catch (e) {
+            // Fallback: If the doc doesn't exist, create it with setDoc merge
+            await setDoc(userRef, {
+                profile: {
+                    main: {
+                        avatarUrl: downloadURL
+                    }
                 }
-            }
-        }, { merge: true }); // 'merge: true' creates the doc if missing, updates if present
+            }, { merge: true });
+        }
 
         return downloadURL;
     } catch (error: any) {
-        console.error("Firebase Error Code:", error.code);
-        console.error("Firebase Error Message:", error.message);
+        console.error("Firebase Mastery Error:", error.code);
         throw error;
     }
-};
-
-export const getInitials = (name: string = "Scholar") => {
-    return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
 };
 
 // ============================================================================
