@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { 
   Users, Plus, X, Flame, BookOpen, Edit3, Trash2, Mail, 
-  Activity, Search, Gamepad2, CheckCircle2 
+  Activity, Search, Gamepad2, CheckCircle2, Monitor 
 } from 'lucide-react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
@@ -20,7 +20,8 @@ export default function ClassManagerView({
     onCreateClass, 
     onDeleteClass, 
     onRenameClass, 
-    onAddStudent 
+    onAddStudent,
+    onStartPresentation // <--- NEW PROP ADDED
 }: any) {
     const [selectedClassId, setSelectedClassId] = useState<string | null>(classes[0]?.id || null);
     const [activeTab, setActiveTab] = useState<'roster' | 'assignments'>('roster');
@@ -210,7 +211,7 @@ export default function ClassManagerView({
                                                             <td className="px-6 py-4">
                                                                 <div className="flex items-center gap-4">
                                                                     <div className={`w-10 h-10 rounded-[1rem] font-black flex items-center justify-center text-sm shadow-inner border ${!student.name ? 'bg-slate-50 text-slate-400' : 'bg-indigo-50 text-indigo-600'}`}>{(student.name?.[0] || 'S').toUpperCase()}</div>
-                                                                    <div><span className={`block font-bold mb-0.5 ${!student.name ? 'text-slate-400 italic' : 'text-slate-800'}`}>{student.name || 'Pending'}</span><span className="text-xs font-bold text-slate-400 block">{student.email}</span></div>
+                                                                    <div><span className={`font-bold mb-0.5 ${!student.name ? 'text-slate-400 italic' : 'text-slate-800'}`}>{student.name || 'Pending'}</span><span className="text-xs font-bold text-slate-400 block">{student.email}</span></div>
                                                                 </div>
                                                             </td>
                                                             <td className="px-6 py-4"><div className="h-2 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full w-[45%] rounded-full ${!student.name ? 'bg-slate-300' : 'bg-emerald-500'}`} /></div></td>
@@ -275,7 +276,24 @@ export default function ClassManagerView({
                                                         <div className="w-8 h-8 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center text-[10px] font-black mr-4 shrink-0">{idx + 1}</div>
                                                         <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 mr-4 ${lesson.type === 'arcade_game' ? 'bg-amber-50 text-amber-500' : 'bg-indigo-50 text-indigo-500'}`}>{lesson.type === 'arcade_game' ? <Gamepad2 size={20} /> : <BookOpen size={20} />}</div>
                                                         <div className="flex-1 pr-4"><h4 className="font-black text-slate-800 text-sm mb-0.5">{lesson.title}</h4><span className="text-[10px] font-black uppercase text-slate-400">{lesson.type === 'arcade_game' ? 'Arcade Game' : 'Standard Unit'}</span></div>
-                                                        <button onClick={() => onRevoke(activeClass.id, lesson.id)} className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 hover:bg-rose-500 hover:text-white transition-all shrink-0"><Trash2 size={16} /></button>
+                                                        
+                                                        {/* --- NEW: ACTION BUTTON GROUP --- */}
+                                                        <div className="flex items-center gap-2 shrink-0">
+                                                            <button 
+                                                                onClick={() => onStartPresentation && onStartPresentation(lesson.id)}
+                                                                className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center shadow-sm"
+                                                                title="Launch Projector Mode"
+                                                            >
+                                                                <Monitor size={16} />
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => onRevoke(activeClass.id, lesson.id)} 
+                                                                className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center"
+                                                                title="Revoke Assignment"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>
