@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { 
     Code, Settings, BarChart, Clock, Tag, X, Trash2, 
-    List, Check, CheckCircle2, AlignLeft, Save 
+    List, Check, CheckCircle2, AlignLeft, Save, Plus
 } from 'lucide-react';
 
 // ============================================================================
