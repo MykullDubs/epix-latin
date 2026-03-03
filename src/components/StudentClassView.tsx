@@ -1,13 +1,15 @@
 // src/components/StudentClassView.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  query, collection, where, onSnapshot, orderBy, limit, addDoc 
+  query, collection, where, onSnapshot, orderBy, limit, addDoc,
+  doc, updateDoc, arrayUnion, arrayRemove 
 } from "firebase/firestore";
 import { auth, db, appId } from '../config/firebase';
 import { 
   MessageSquare, Send, ArrowLeft, BookOpen, CheckCircle2, 
   Lock, Play, ChevronRight, Monitor, FileText, ChevronDown, 
-  ChevronUp, Trophy, Zap, Flame 
+  ChevronUp, Trophy, Zap, Flame,
+  Plus, User, Heart 
 } from 'lucide-react';
 
 import StudentGradebook from './StudentGradebook';
