@@ -29,9 +29,10 @@ export default function InstructorDashboard({
   onRevoke,         
   onCreateClass,  
   onDeleteClass,  
-  onRenameClass,  
+  onRenameClass,
+  onUpdateClassDescription, // <--- PROPS UPDATED HERE
   onAddStudent,
-  onStartPresentation, // <--- PROPS UPDATED HERE
+  onStartPresentation, 
   onSwitchView, 
   onLogout,
   AdminDashboardView 
@@ -193,8 +194,9 @@ export default function InstructorDashboard({
                   onCreateClass={onCreateClass} 
                   onDeleteClass={onDeleteClass} 
                   onRenameClass={onRenameClass} 
+                  onUpdateClassDescription={onUpdateClassDescription} // <--- PASSED HERE
                   onAddStudent={onAddStudent} 
-                  onStartPresentation={onStartPresentation} // <--- PASSED HERE
+                  onStartPresentation={onStartPresentation} 
                />
              </div>
            ) : activeTab === 'vault' ? (
