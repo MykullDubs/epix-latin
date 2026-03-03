@@ -1,12 +1,12 @@
 // src/hooks/useMagisterData.ts
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { auth, db, appId } from '../config/firebase';
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { 
   doc, onSnapshot, collection, addDoc, setDoc, updateDoc, 
-  deleteDoc, query, where, collectionGroup, orderBy, limit, increment, arrayUnion, arrayRemove 
+  deleteDoc, query, where, collectionGroup, orderBy, limit, 
+  increment, arrayUnion, arrayRemove 
 } from "firebase/firestore";
-import { GLOBAL_CURRICULUMS } from '../constants/curriculums';
 
 export function useMagisterData() {
   const [user, setUser] = useState<any>(null);
@@ -19,7 +19,6 @@ export function useMagisterData() {
   const [instructorClasses, setInstructorClasses] = useState<any[]>([]); 
   const [allDecks, setAllDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
 
-  // Authentication & Profile Sync
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -58,54 +57,125 @@ export function useMagisterData() {
     return () => unsubAuth();
   }, [user?.uid, user?.email]);
 
-  // Tenant/Org Sync
   useEffect(() => {
     if (userData?.orgId && userData.orgId !== 'global') {
-      return onSnapshot(doc(db, 'artifacts', appId, 'organizations', userData.orgId), (snap) => {
+      const unsubOrg = onSnapshot(doc(db, 'artifacts', appId, 'organizations', userData.orgId), (snap) => {
         if (snap.exists()) setActiveOrg({ id: snap.id, ...snap.data() });
       });
+      return () => unsubOrg();
     } else {
       setActiveOrg(null);
     }
   }, [userData?.orgId]);
 
-  // --- ACTIONS ---
+  // --- REFACTORED ACTIONS ---
   const actions = {
     logout: () => signOut(auth),
     
-    createClass: async (name: string) => {
-        await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), {
-            name, code: Math.random().toString(36).substring(2, 8).toUpperCase(),
-            students: [], studentEmails: [], assignments: [], created: Date.now()
-        });
+    createClass: async (className: string) => {
+      if (!user) return;
+      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), {
+        name: className, 
+        code: Math.random().toString(36).substring(2, 8).toUpperCase(),
+        students: [], 
+        studentEmails: [], 
+        assignments: [], 
+        created: Date.now()
+      });
     },
 
-    saveLesson: async (data: any) => {
-        const id = data.id || `lesson_${Date.now()}`;
-        await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', id), {
-            ...data, id, instructorId: user.uid, updatedAt: Date.now()
-        });
+    deleteClass: async (id: string) => {
+      if (!user) return;
+      await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id));
+    },
+
+    renameClass: async (id: string, newName: string) => {
+      if (!user) return;
+      await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id), { name: newName });
+    },
+
+    addStudent: async (classId: string, email: string) => {
+      if (!user) return;
+      const cleanEmail = email.toLowerCase().trim();
+      const classRef = doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId);
+      await updateDoc(classRef, {
+        students: arrayUnion({ email: cleanEmail, name: null, uid: null }),
+        studentEmails: arrayUnion(cleanEmail)
+      });
+    },
+
+    assignContent: async (classId: string, assignmentId: any) => {
+      if (!user) return;
+      await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), {
+        assignments: arrayUnion(assignmentId)
+      });
+    },
+
+    revokeContent: async (classId: string, assignmentId: any) => {
+      if (!user) return;
+      await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), {
+        assignments: arrayRemove(assignmentId)
+      });
+    },
+
+    assignCurriculum: async (classId: string, curriculumId: string) => {
+      if (!user) return;
+      await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), {
+        assignedCurriculums: arrayUnion(curriculumId)
+      });
+    },
+
+    saveLesson: async (lessonData: any) => {
+      if (!user) return;
+      const lessonId = lessonData.id || `lesson_${Date.now()}`;
+      await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', lessonId), {
+        ...lessonData, id: lessonId, instructorId: user.uid, updatedAt: Date.now()
+      });
+    },
+
+    saveCard: async (cardData: any) => {
+      if (!user) return;
+      const cardId = cardData.id || `card_${Date.now()}`;
+      await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), { 
+        ...cardData, id: cardId, owner: user.uid 
+      });
     },
 
     logActivity: async (itemId: string, xp: number, title: string, details: any = {}) => {
-        await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
-            studentEmail: user.email,
-            studentName: userData?.name || user.email.split('@')[0],
-            type: itemId === 'explore_deck' ? 'explore' : 'completion',
-            activityType: details.mode || 'general',
-            itemTitle: title, itemId, xp, timestamp: Date.now(), ...details
+      if (!user) return;
+      await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
+        studentEmail: user.email,
+        studentName: userData?.name || user.email.split('@')[0],
+        type: itemId.includes('explore') ? 'explore' : 'completion',
+        itemTitle: title,
+        itemId: itemId, 
+        xp: xp,
+        timestamp: Date.now(),
+        ...details
+      });
+      if (xp > 0) {
+        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
+          xp: increment(xp)
         });
-        if (xp > 0) {
-            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), { xp: increment(xp) });
-        }
-    },
-    
-    // Add the rest of your handlers here (handleAssign, handleAddStudent, etc.)
+      }
+    }
   };
 
+  // Combine local and assigned content for the views
+  const allLessons = useMemo(() => {
+    const assignments = enrolledClasses.flatMap(c => c.assignments || []);
+    return [...customLessons, ...assignments];
+  }, [customLessons, enrolledClasses]);
+
   return { 
-    user, userData, authChecked, activeOrg, 
-    customLessons, enrolledClasses, instructorClasses, allDecks, 
+    user, 
+    userData, 
+    authChecked, 
+    activeOrg, 
+    allLessons, 
+    enrolledClasses, 
+    instructorClasses, 
+    allDecks, 
     actions 
   };
 }
