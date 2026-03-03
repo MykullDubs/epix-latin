@@ -1,54 +1,60 @@
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore"; // Changed from updateDoc to setDoc
 import { storage, db, appId } from "../config/firebase";
 
 // ============================================================================
-//  PROFILE PICTURE & AVATAR LOGIC
+//  PROFILE PICTURE & AVATAR LOGIC (MAGISTER OS)
 // ============================================================================
 
+/**
+ * Uploads a file to Firebase Storage and ensures the Firestore profile exists.
+ * Swapped updateDoc for setDoc({merge: true}) to solve the "not-found" mystery.
+ */
 export const uploadProfilePicture = async (uid: string, file: File) => {
-    // DEBUG: Ensure storage is actually connected
     if (!storage) {
-        console.error("CRITICAL: Storage instance is undefined. Check firebase.ts");
+        console.error("CRITICAL: Storage instance is undefined.");
         throw new Error("storage-not-initialized");
     }
 
     try {
-        console.log(`Attempting upload for UID: ${uid} to bucket: ${storage.app.options.storageBucket}`);
+        console.log(`Starting upload to: ${storage.app.options.storageBucket}`);
         
-        // 1. Create a reference
-        // We use a simpler path to ensure no pathing characters are breaking the URL
+        // 1. Create a unique reference
         const fileName = `avatar_${Date.now()}.jpg`;
         const storageRef = ref(storage, `artifacts/${appId}/profiles/${uid}/${fileName}`);
         
-        // 2. Upload with metadata to help the browser identify it as an image
+        // 2. Upload with image metadata
         const metadata = { contentType: file.type };
         const snapshot = await uploadBytes(storageRef, file, metadata);
         
-        console.log("File uploaded successfully, fetching URL...");
-        
-        // 3. Retrieve the public URL
+        // 3. Retrieve public URL
         const downloadURL = await getDownloadURL(snapshot.ref);
         
-        // 4. Update Firestore
+        // 4. THE FIX: Update OR Create the user document
         const userRef = doc(db, 'artifacts', appId, 'users', uid);
-        await updateDoc(userRef, {
-            'profile.main.avatarUrl': downloadURL
-        });
+        await setDoc(userRef, {
+            profile: {
+                main: {
+                    avatarUrl: downloadURL
+                }
+            }
+        }, { merge: true }); // 'merge: true' creates the doc if missing, updates if present
 
         return downloadURL;
     } catch (error: any) {
-        // This will now catch the specific 'not-found' or 'unauthorized' codes
-        console.error("Firebase Storage Error Code:", error.code);
-        console.error("Firebase Storage Error Message:", error.message);
+        console.error("Firebase Error Code:", error.code);
+        console.error("Firebase Error Message:", error.message);
         throw error;
     }
 };
 
-// ... keep getInitials, calculateUserStats, calculateLevel, and getLeagueTier exactly as they are ...
 export const getInitials = (name: string = "Scholar") => {
     return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
 };
+
+// ============================================================================
+//  STATS & ANALYTICS ENGINE
+// ============================================================================
 
 export const calculateUserStats = (logs: any[]) => {
     let totalSeconds = 0;
@@ -68,12 +74,14 @@ export const calculateUserStats = (logs: any[]) => {
     logs.forEach(log => {
         const dateKey = new Date(log.timestamp).toDateString();
         let durationSecs = log.duration || 0;
-        if (!durationSecs && log.xp) durationSecs = log.xp * 18;
+        if (!durationSecs && log.xp) durationSecs = log.xp * 18; // Est duration
+        
         if (timeByDay[dateKey] !== undefined) {
             activityByDay[dateKey] += (log.xp || 0);
             timeByDay[dateKey] += durationSecs;
         }
         totalSeconds += durationSecs;
+        
         if (log.type === 'completion' && log.scoreDetail?.finalScorePct === 100) perfectScores++;
         if (log.type === 'self_study') cardsMastered += 1; 
     });
@@ -92,14 +100,24 @@ export const calculateUserStats = (logs: any[]) => {
     return { totalHours: (totalSeconds / 3600).toFixed(1), cardsMastered, perfectScores, graphData };
 };
 
+// ============================================================================
+//  GAMIFICATION ENGINE MATH
+// ============================================================================
+
 export const calculateLevel = (totalXp: number = 0, totalLikes: number = 0) => {
     const XP_PER_LEVEL = 500;
-    const combinedXp = totalXp + (totalLikes * 10);
+    const SOCIAL_BONUS = totalLikes * 10; // 10 XP per Star received
+    const combinedXp = totalXp + SOCIAL_BONUS;
+    
     const level = Math.floor(combinedXp / XP_PER_LEVEL) + 1;
     const currentLevelXp = combinedXp % XP_PER_LEVEL;
+    const progressPct = Math.round((currentLevelXp / XP_PER_LEVEL) * 100);
+
     return { 
-        level, currentLevelXp, xpToNext: XP_PER_LEVEL, 
-        progressPct: Math.round((currentLevelXp / XP_PER_LEVEL) * 100),
+        level, 
+        currentLevelXp, 
+        xpToNext: XP_PER_LEVEL, 
+        progressPct,
         totalPotentialXp: combinedXp 
     };
 };
