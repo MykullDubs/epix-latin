@@ -4,8 +4,11 @@ import { signOut } from 'firebase/auth';
 import { collection, query, where, orderBy, limit, onSnapshot, doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { auth, db, appId } from '../config/firebase';
 import { INITIAL_SYSTEM_DECKS, INITIAL_SYSTEM_LESSONS } from '../constants/defaults';
-import { calculateUserStats } from '../utils/profileHelpers';
-import { Globe, Flame, Trophy, BarChart3, CheckCircle2, Zap, Settings, ChevronRight, UploadCloud, LogOut } from 'lucide-react';
+import { calculateUserStats, calculateLevel, getLeagueTier } from '../utils/profileHelpers';
+import { 
+  Globe, Flame, Trophy, BarChart3, CheckCircle2, Zap, 
+  Settings, ChevronRight, UploadCloud, LogOut, Shield, Crown 
+} from 'lucide-react';
 
 export default function ProfileView({ user, userData }: any) {
   const [logs, setLogs] = useState<any[]>([]);
@@ -42,52 +45,80 @@ export default function ProfileView({ user, userData }: any) {
       setDeploying(false); 
   };
 
+  // --- GAMIFICATION MATH ---
   const xp = userData?.xp || 0;
-  const level = Math.floor(xp / 1000) + 1;
-  const nextLevelXp = 1000 - (xp % 1000);
-  const progressPct = (xp % 1000) / 10;
+  const streak = userData?.streak || 1;
+  const { level, currentLevelXp, xpToNext, progressPct } = calculateLevel(xp);
+  const league = getLeagueTier(level);
 
   return (
     <div className="h-full flex flex-col bg-slate-50 overflow-y-auto custom-scrollbar pb-32">
         
-        {/* 1. HERO HEADER (Glassmorphism) */}
-        <div className="relative overflow-hidden bg-white pb-8 rounded-b-[3rem] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] z-10 border-b border-slate-100">
-            {/* Background Decoration */}
-            <div className="absolute top-0 left-0 w-full h-48 bg-gradient-to-br from-indigo-600 via-purple-600 to-rose-500"></div>
-            <div className="absolute top-0 left-0 w-full h-48 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20 mix-blend-overlay"></div>
+        {/* 1. HERO HEADER (Gamified Glassmorphism) */}
+        <div className="relative overflow-hidden bg-slate-900 pb-8 rounded-b-[3rem] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] z-10 border-b border-slate-800">
+            {/* Dynamic Background based on League */}
+            <div className="absolute top-0 left-0 w-full h-full opacity-20">
+                <div className={`absolute inset-0 bg-gradient-to-br from-indigo-500 to-transparent`} />
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay" />
+            </div>
             
             <div className="relative pt-12 px-6 flex flex-col items-center">
-                {/* Avatar */}
-                <div className="w-28 h-28 p-1.5 bg-white/20 backdrop-blur-md rounded-full shadow-2xl mb-4 border border-white/30">
-                    <div className="w-full h-full bg-white rounded-full flex items-center justify-center text-4xl font-black text-slate-800 shadow-inner">
+                
+                {/* SVG Progress Ring & Avatar */}
+                <div className="relative w-32 h-32 mx-auto mb-4">
+                    <svg className="w-full h-full transform -rotate-90 drop-shadow-xl" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" className="text-white/10" strokeWidth="6" />
+                        <circle 
+                            cx="50" cy="50" r="45" fill="none" 
+                            stroke="currentColor" strokeWidth="6" 
+                            strokeDasharray="283" strokeDashoffset={283 - (283 * progressPct) / 100} 
+                            className={`${league.color} transition-all duration-1000 ease-out drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]`} 
+                            strokeLinecap="round" 
+                        />
+                    </svg>
+                    <div className="absolute inset-2 bg-white rounded-full flex items-center justify-center border-4 border-slate-800 shadow-inner text-4xl font-black text-slate-800">
                         {userData?.name?.charAt(0).toUpperCase() || "U"}
+                    </div>
+                    {/* Level Badge */}
+                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] font-black px-4 py-1.5 rounded-full border-2 border-slate-700 shadow-xl flex items-center gap-1">
+                        <Crown size={12} className={league.color} /> LVL {level}
                     </div>
                 </div>
                 
                 {/* Name & Role */}
-                <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-1">{userData?.name}</h2>
-                <div className="flex items-center gap-2 mb-6">
-                    <span className="px-3 py-1 bg-slate-100 border border-slate-200 text-slate-500 text-[10px] font-bold rounded-full uppercase tracking-wider">{userData?.role}</span>
-                    <span className="px-3 py-1 bg-indigo-50 border border-indigo-100 text-indigo-600 text-[10px] font-bold rounded-full flex items-center gap-1 uppercase tracking-wider">
+                <h2 className="text-3xl font-black text-white tracking-tight mb-3 mt-2">{userData?.name}</h2>
+                
+                <div className="flex flex-wrap justify-center items-center gap-2 mb-6">
+                    <span className="px-3 py-1 bg-white/10 border border-white/20 text-slate-300 text-[10px] font-bold rounded-full uppercase tracking-wider backdrop-blur-md">
+                        {userData?.role}
+                    </span>
+                    <span className="px-3 py-1 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-[10px] font-bold rounded-full flex items-center gap-1 uppercase tracking-wider backdrop-blur-md">
                         <Globe size={12}/> {userData?.targetLanguage || 'English'}
+                    </span>
+                    <span className={`px-3 py-1 bg-slate-800 border ${league.border} ${league.color} text-[10px] font-black rounded-full flex items-center gap-1 uppercase tracking-widest shadow-lg`}>
+                        <Shield size={12}/> {league.name} League
                     </span>
                 </div>
 
-                {/* Glass Stats Bar */}
-                <div className="w-full bg-white rounded-2xl shadow-xl shadow-slate-200/50 p-4 flex justify-between items-center border border-slate-100">
-                    <div className="text-center flex-1 border-r border-slate-100">
-                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Level</div>
-                        <div className="text-2xl font-black text-slate-800">{level}</div>
+                {/* Core Stats Row */}
+                <div className="w-full bg-slate-800/80 backdrop-blur-xl rounded-2xl shadow-2xl p-4 flex justify-between items-center border border-slate-700">
+                    <div className="text-center flex-1 border-r border-slate-700">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex justify-center items-center gap-1">
+                           <Zap size={12} className="text-yellow-400" /> XP
+                        </div>
+                        <div className="text-xl font-black text-white">{xp}</div>
                     </div>
-                    <div className="text-center flex-1 border-r border-slate-100">
-                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">XP</div>
-                        <div className="text-2xl font-black text-indigo-600">{xp}</div>
+                    <div className="text-center flex-1 border-r border-slate-700">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex justify-center items-center gap-1">
+                            <Flame size={12} className="text-orange-500" /> Streak
+                        </div>
+                        <div className="text-xl font-black text-white">{streak}</div>
                     </div>
                     <div className="text-center flex-1">
-                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Streak</div>
-                        <div className="text-2xl font-black text-orange-500 flex items-center justify-center gap-1">
-                            <Flame size={20} fill="currentColor"/> {userData?.streak || 1}
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex justify-center items-center gap-1">
+                            <CheckCircle2 size={12} className="text-emerald-400" /> Perfect
                         </div>
+                        <div className="text-xl font-black text-white">{stats.perfectScores}</div>
                     </div>
                 </div>
             </div>
@@ -95,38 +126,40 @@ export default function ProfileView({ user, userData }: any) {
 
         <div className="px-6 mt-6 space-y-6">
             
-            {/* 2. PROGRESS BENTO BOX */}
+            {/* 2. NEXT LEVEL TARGET */}
             <div className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm relative overflow-hidden group">
                 <div className="flex justify-between items-end mb-4 relative z-10">
                     <div>
-                        <h3 className="font-black text-slate-800 text-lg">Next Level</h3>
-                        <p className="text-xs text-slate-400 font-bold">{Math.round(nextLevelXp)} XP remaining</p>
+                        <h3 className="font-black text-slate-800 text-lg">Level {level + 1} Target</h3>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{xpToNext - currentLevelXp} XP to go</p>
                     </div>
                     <Trophy size={24} className="text-yellow-500 fill-yellow-500 drop-shadow-sm group-hover:scale-110 transition-transform"/>
                 </div>
-                {/* Juicy Progress Bar */}
-                <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner relative z-10">
-                    <div className="h-full bg-gradient-to-r from-yellow-400 to-orange-500 transition-all duration-1000 relative" style={{ width: `${progressPct}%` }}>
+                <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner relative z-10">
+                    <div className={`h-full ${league.bg.replace('bg-', 'bg-').replace('100', '400').replace('50', '500')} transition-all duration-1000`} style={{ width: `${progressPct}%` }}>
                         <div className="absolute top-0 left-0 w-full h-full bg-[linear-gradient(45deg,rgba(255,255,255,0.2)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.2)_50%,rgba(255,255,255,0.2)_75%,transparent_75%,transparent)] bg-[length:1rem_1rem] opacity-50"></div>
                     </div>
                 </div>
-                {/* Decoration */}
-                <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-yellow-50 rounded-full blur-2xl z-0"></div>
             </div>
 
             {/* 3. ACTIVITY GRAPH */}
             <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-                <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2"><BarChart3 size={18} className="text-indigo-600"/> Activity</h3>
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="font-bold text-slate-800 flex items-center gap-2"><BarChart3 size={18} className="text-indigo-600"/> Activity</h3>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stats.totalHours} Hrs Total</span>
+                </div>
                 <div className="flex items-end justify-between h-24 gap-2">
                     {stats.graphData.map((d: any, i: number) => (
                         <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
                             <div 
-                                className="w-full bg-slate-100 rounded-lg relative group-hover:bg-indigo-500 transition-colors duration-300 overflow-hidden"
-                                style={{ height: `${d.height}%` }}
+                                className="w-full bg-indigo-50 rounded-lg relative group-hover:bg-indigo-500 transition-colors duration-300 overflow-hidden"
+                                style={{ height: `${Math.max(15, d.height)}%` }} // Ensure minimum height so text aligns
                             >
-                                <div className="absolute bottom-0 left-0 w-full h-full bg-indigo-500 opacity-20 group-hover:opacity-100 transition-opacity"></div>
+                                <div className="absolute bottom-0 left-0 w-full h-full bg-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                             </div>
-                            <span className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">{d.date.split('/')[1]}</span>
+                            <span className={`text-[9px] font-bold uppercase tracking-widest ${d.xp > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>
+                                {d.date.split('/')[1]}
+                            </span>
                         </div>
                     ))}
                 </div>
@@ -134,10 +167,10 @@ export default function ProfileView({ user, userData }: any) {
 
             {/* 4. RECENT HISTORY TILES */}
             <div>
-                <h3 className="font-black text-slate-800 mb-4 px-2 text-sm uppercase tracking-wider text-slate-400">Recent History</h3>
+                <h3 className="font-black text-slate-800 mb-4 px-2 text-[10px] uppercase tracking-widest text-slate-400">Recent History</h3>
                 <div className="space-y-3">
                     {logs.slice(0, 5).map((log: any) => (
-                        <div key={log.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center gap-4 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 cursor-default group">
+                        <div key={log.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 hover:-translate-y-1 hover:shadow-md transition-all duration-300 cursor-default group">
                             <div className={`p-3 rounded-2xl shrink-0 ${log.type === 'completion' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
                                 {log.type === 'completion' ? <CheckCircle2 size={20} strokeWidth={2.5}/> : <Zap size={20} strokeWidth={2.5}/>}
                             </div>
