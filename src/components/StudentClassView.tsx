@@ -6,15 +6,10 @@ import {
 import { auth, db, appId } from '../config/firebase';
 import { 
   MessageSquare, Send, ArrowLeft, BookOpen, CheckCircle2, 
-  Lock, Play, ChevronRight, Monitor, FileText 
+  Lock, Play, ChevronRight, Monitor, FileText, ChevronDown, ChevronUp 
 } from 'lucide-react';
 
-// Import the gradebook we extracted earlier
 import StudentGradebook from './StudentGradebook';
-
-// TODO: If ExamPlayerView is extracted later, import it here. 
-// For now, we assume it's passed or available.
-// import ExamPlayerView from './ExamPlayerView'; 
 
 // ============================================================================
 //  INTERNAL FORUM COMPONENT
@@ -76,7 +71,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
 };
 
 // ============================================================================
-//  STUDENT CLASS VIEW (Floating Pillbox Edition)
+//  STUDENT CLASS VIEW
 // ============================================================================
 export default function StudentClassView({ 
     classData, 
@@ -87,17 +82,19 @@ export default function StudentClassView({
     userData, 
     setActiveTab, 
     setSelectedLessonId,
-    ExamPlayerView // Pass this in as a prop if it's still in App.tsx
+    ExamPlayerView 
 }: any) {
   const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'exams' | 'forum' | 'grades'>('lessons');
   const [completedItems, setCompletedItems] = useState<string[]>([]);
   const [activeExam, setActiveExam] = useState<any>(null); 
+  
+  // Accordion State
+  const [expandedRoadmaps, setExpandedRoadmaps] = useState<Record<string, boolean>>({});
 
   // 1. FETCH COMPLETIONS
   useEffect(() => {
     const studentEmail = userData?.email || auth?.currentUser?.email;
-    if (!classData?.assignments && !classData?.assignedCurriculums) return;
-    if (!studentEmail) return;
+    if (!classData || !studentEmail) return;
 
     const q = query(
       collection(db, 'artifacts', appId, 'activity_logs'),
@@ -133,6 +130,22 @@ export default function StudentClassView({
     .map((id: string) => curriculums.find((c: any) => c.id === id))
     .filter(Boolean);
 
+  // 3. SMART EXPAND LOGIC
+  useEffect(() => {
+    if (assignedCurriculums.length > 0 && completedItems.length >= 0) {
+      const updates: Record<string, boolean> = {};
+      assignedCurriculums.forEach((curr: any) => {
+        // Find how many lessons in THIS curriculum are done
+        const doneInCurr = curr.lessonIds.filter((id: string) => completedItems.includes(id)).length;
+        // If the student is on unit 5 or higher (index 4+), auto-expand
+        if (doneInCurr >= 4) {
+          updates[curr.id] = true;
+        }
+      });
+      setExpandedRoadmaps(prev => ({ ...prev, ...updates }));
+    }
+  }, [assignedCurriculums.length, completedItems.length]);
+
   return (
     <div className="h-full flex flex-col bg-white overflow-hidden animate-in fade-in duration-500 font-sans relative">
       
@@ -146,9 +159,9 @@ export default function StudentClassView({
       </div>
 
       {/* --- CONTENT BODY --- */}
-      <div className="flex-1 overflow-y-auto px-6 md:px-8 pb-28 custom-scrollbar relative">
+      <div className="flex-1 overflow-y-auto px-6 md:px-8 pb-32 custom-scrollbar relative">
         
-        {/* TAB: LESSONS & CURRICULUM ROADMAP */}
+        {/* TAB: ROADMAP */}
         {activeSubTab === 'lessons' && (
           <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4">
             
@@ -161,8 +174,15 @@ export default function StudentClassView({
 
             {assignedCurriculums.map((curr: any) => {
                 const currLessons = curr.lessonIds.map((id: string) => lessons.find((l: any) => l.id === id)).filter(Boolean);
-                const completedCount = currLessons.filter((l: any) => completedItems.includes(l.id) || (l.originalId && completedItems.includes(l.originalId)) || completedItems.includes(l.title)).length;
-                const progressPercent = currLessons.length === 0 ? 0 : Math.round((completedCount / currLessons.length) * 100);
+                
+                // Accordion Logic
+                const isExpanded = expandedRoadmaps[curr.id];
+                const visibleLessons = isExpanded ? currLessons : currLessons.slice(0, 4);
+                const remainingCount = currLessons.length - 4;
+                const hasMore = currLessons.length > 4;
+
+                const completedCountInCurr = currLessons.filter((l: any) => completedItems.includes(l.id) || (l.originalId && completedItems.includes(l.originalId))).length;
+                const progressPercent = currLessons.length === 0 ? 0 : Math.round((completedCountInCurr / currLessons.length) * 100);
 
                 return (
                     <div key={curr.id} className="bg-white rounded-[3rem] border-2 border-slate-100 overflow-hidden shadow-sm">
@@ -177,20 +197,19 @@ export default function StudentClassView({
                                 </div>
                                 <div className="text-right">
                                     <span className="text-3xl font-black text-white">{progressPercent}%</span>
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Completed</p>
                                 </div>
                             </div>
-                            <div className="h-3 w-full bg-slate-800 rounded-full overflow-hidden shadow-inner relative z-10">
+                            <div className="h-3 w-full bg-slate-800 rounded-full overflow-hidden relative z-10">
                                 <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${progressPercent}%` }} />
                             </div>
                         </div>
 
                         <div className="p-8">
                             <div className="relative border-l-4 border-slate-100 ml-6 space-y-10 py-4">
-                                {currLessons.map((item: any, index: number) => {
-                                    const isCompleted = completedItems.includes(item.id) || (item.originalId && completedItems.includes(item.originalId)) || completedItems.includes(item.title);
-                                    const isNext = index === completedCount;
-                                    const isLocked = index > completedCount;
+                                {visibleLessons.map((item: any, index: number) => {
+                                    const isCompleted = completedItems.includes(item.id) || (item.originalId && completedItems.includes(item.originalId));
+                                    const isNext = index === completedCountInCurr;
+                                    const isLocked = index > completedCountInCurr;
 
                                     return (
                                         <div key={item.id} className={`relative pl-10 transition-all duration-500 ${isLocked ? 'opacity-50 grayscale' : 'opacity-100'}`}>
@@ -219,59 +238,58 @@ export default function StudentClassView({
                                                     }`}>
                                                         Unit {index + 1} {isNext && '• Up Next'}
                                                     </span>
-                                                    <h4 className="font-black text-slate-800 text-lg group-hover:text-indigo-600 transition-colors">{item.title}</h4>
+                                                    <h4 className="font-black text-slate-800 text-lg leading-tight">{item.title}</h4>
                                                 </div>
-                                                
-                                                {!isLocked && (
-                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-transform ${
-                                                        isNext ? 'bg-indigo-600 text-white group-hover:scale-110' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'
-                                                    }`}>
-                                                        <ChevronRight size={20} />
-                                                    </div>
-                                                )}
+                                                {!isLocked && <ChevronRight size={20} className="text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />}
                                             </button>
                                         </div>
                                     );
                                 })}
+
+                                {hasMore && (
+                                    <div className="relative pl-10">
+                                        <button 
+                                            onClick={() => setExpandedRoadmaps(prev => ({...prev, [curr.id]: !isExpanded}))}
+                                            className="w-full flex items-center justify-center gap-3 py-4 bg-slate-50 hover:bg-slate-100 border-2 border-dashed border-slate-200 rounded-[2rem] transition-all group"
+                                        >
+                                            <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-hover:text-indigo-600 transition-colors">
+                                                {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                                            </div>
+                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                                {isExpanded ? 'Show Less' : `View ${remainingCount} More Units`}
+                                            </span>
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
                 );
             })}
 
+            {/* Standalone Lessons */}
             {lessonList.length > 0 && (
-              <div className="mt-12">
-                  {assignedCurriculums.length > 0 && (
-                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-6 pl-4 border-l-4 border-slate-200">
-                          Additional Assignments
-                      </h3>
-                  )}
-                  <div className="space-y-4">
-                    {lessonList.map((item: any) => {
-                        const isCompleted = completedItems.includes(item.id) || (item.originalId && completedItems.includes(item.originalId)) || completedItems.includes(item.title);
-                        return (
-                            <div key={item.id} className={`group p-5 border-2 ${isCompleted ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-100 bg-white'} rounded-[2.5rem] flex justify-between items-center hover:shadow-xl hover:-translate-y-1 transition-all`}>
-                                <button className="flex items-center gap-4 flex-1 text-left" onClick={() => onSelectLesson(item)}>
-                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-colors ${
-                                        isCompleted ? 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white' : 
-                                        'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'
-                                    }`}>
-                                        {isCompleted ? <CheckCircle2 size={24} /> : <Play size={24} className="ml-1" fill="currentColor" />}
-                                    </div>
-                                    <div>
-                                        <h4 className="font-black text-slate-800 text-lg leading-tight mb-1 group-hover:text-indigo-600 transition-colors">{item.title}</h4>
-                                        <span className={`text-[10px] font-black uppercase tracking-widest ${isCompleted ? 'text-emerald-500' : 'text-indigo-400'}`}>
-                                            {isCompleted ? 'Completed • Review' : 'Stand-Alone Unit'}
-                                        </span>
-                                    </div>
-                                </button>
-                                <button onClick={() => { setSelectedLessonId(item.originalId || item.id); setActiveTab('presentation'); }} className="p-4 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-colors shrink-0" title="Presentation Mode">
-                                    <Monitor size={24} />
-                                </button>
-                            </div>
-                        );
-                    })}
-                  </div>
+              <div className="mt-12 space-y-4">
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] pl-2">Extra Resources</h3>
+                {lessonList.map((item: any) => {
+                    const isCompleted = completedItems.includes(item.id) || (item.originalId && completedItems.includes(item.originalId));
+                    return (
+                        <div key={item.id} className={`group p-5 border-2 ${isCompleted ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-100 bg-white'} rounded-[2.5rem] flex justify-between items-center hover:shadow-xl hover:-translate-y-1 transition-all`}>
+                            <button className="flex items-center gap-4 flex-1 text-left" onClick={() => onSelectLesson(item)}>
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-colors ${
+                                    isCompleted ? 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white' : 
+                                    'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'
+                                }`}>
+                                    {isCompleted ? <CheckCircle2 size={24} /> : <Play size={24} className="ml-1" fill="currentColor" />}
+                                </div>
+                                <div>
+                                    <h4 className="font-black text-slate-800 text-lg leading-tight mb-1 group-hover:text-indigo-600 transition-colors">{item.title}</h4>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Personalized Unit</span>
+                                </div>
+                            </button>
+                        </div>
+                    );
+                })}
               </div>
             )}
           </div>
@@ -287,7 +305,7 @@ export default function StudentClassView({
               </div>
             ) : (
               examList.map((item: any) => {
-                const isCompleted = completedItems.includes(item.id) || (item.originalId && completedItems.includes(item.originalId)) || completedItems.includes(item.title);
+                const isCompleted = completedItems.includes(item.id) || (item.originalId && completedItems.includes(item.originalId));
                 return (
                   <div key={item.id} className={`group p-5 border-2 ${isCompleted ? 'border-emerald-100 bg-emerald-50/20' : 'border-rose-100 bg-white'} rounded-[2.5rem] flex items-center gap-4 cursor-pointer hover:shadow-xl transition-all`} onClick={() => !isCompleted && setActiveExam(item)}>
                     <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-colors ${isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white'}`}>
@@ -296,7 +314,7 @@ export default function StudentClassView({
                     <div>
                       <h4 className="font-black text-slate-800 text-lg leading-tight mb-1 group-hover:text-rose-600 transition-colors">{item.title}</h4>
                       <span className={`text-[10px] font-black uppercase tracking-widest ${isCompleted ? 'text-emerald-500' : 'text-rose-400'}`}>
-                        {isCompleted ? 'Exam Submitted • Review in Grades' : 'Active Exam'}
+                        {isCompleted ? 'Exam Submitted • Review in Grades' : 'High-Stakes Assessment'}
                       </span>
                     </div>
                   </div>
@@ -306,10 +324,8 @@ export default function StudentClassView({
           </div>
         )}
 
-        {/* FORUM */}
+        {/* FORUM & GRADES */}
         {activeSubTab === 'forum' && <div className="h-[60vh]"><ClassForum classId={classData.id} userData={userData} /></div>}
-        
-        {/* GRADES */}
         {activeSubTab === 'grades' && <StudentGradebook classData={classData} user={userData} />}
       </div>
 
