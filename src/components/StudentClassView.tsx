@@ -1,15 +1,17 @@
 // src/components/StudentClassView.tsx
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   query, collection, where, onSnapshot, orderBy, limit, addDoc 
 } from "firebase/firestore";
 import { auth, db, appId } from '../config/firebase';
 import { 
   MessageSquare, Send, ArrowLeft, BookOpen, CheckCircle2, 
-  Lock, Play, ChevronRight, Monitor, FileText, ChevronDown, ChevronUp 
+  Lock, Play, ChevronRight, Monitor, FileText, ChevronDown, 
+  ChevronUp, Trophy, Zap, Flame 
 } from 'lucide-react';
 
 import StudentGradebook from './StudentGradebook';
+import LeaderboardView from './LeaderboardView'; // Integrated our new component
 
 // ============================================================================
 //  INTERNAL FORUM COMPONENT
@@ -84,11 +86,11 @@ export default function StudentClassView({
     setSelectedLessonId,
     ExamPlayerView 
 }: any) {
-  const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'exams' | 'forum' | 'grades'>('lessons');
+  // --- UPDATED TABS (Added Leaderboard) ---
+  const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'leaderboard' | 'exams' | 'forum' | 'grades'>('lessons');
   const [completedItems, setCompletedItems] = useState<string[]>([]);
   const [activeExam, setActiveExam] = useState<any>(null); 
   
-  // Accordion State
   const [expandedRoadmaps, setExpandedRoadmaps] = useState<Record<string, boolean>>({});
 
   // 1. FETCH COMPLETIONS
@@ -130,22 +132,6 @@ export default function StudentClassView({
     .map((id: string) => curriculums.find((c: any) => c.id === id))
     .filter(Boolean);
 
-  // 3. SMART EXPAND LOGIC
-  useEffect(() => {
-    if (assignedCurriculums.length > 0 && completedItems.length >= 0) {
-      const updates: Record<string, boolean> = {};
-      assignedCurriculums.forEach((curr: any) => {
-        // Find how many lessons in THIS curriculum are done
-        const doneInCurr = curr.lessonIds.filter((id: string) => completedItems.includes(id)).length;
-        // If the student is on unit 5 or higher (index 4+), auto-expand
-        if (doneInCurr >= 4) {
-          updates[curr.id] = true;
-        }
-      });
-      setExpandedRoadmaps(prev => ({ ...prev, ...updates }));
-    }
-  }, [assignedCurriculums.length, completedItems.length]);
-
   return (
     <div className="h-full flex flex-col bg-white overflow-hidden animate-in fade-in duration-500 font-sans relative">
       
@@ -155,13 +141,16 @@ export default function StudentClassView({
           <ArrowLeft size={16} /> BACK TO DASHBOARD
         </button>
         <h2 className="text-3xl font-black text-slate-900 leading-tight mb-2">{classData.name}</h2>
-        <p className="text-slate-400 font-bold text-sm line-clamp-1">{classData.description || "Welcome to your active curriculum."}</p>
+        <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <p className="text-slate-400 font-bold text-sm line-clamp-1">{classData.description || "Welcome to your active curriculum."}</p>
+        </div>
       </div>
 
       {/* --- CONTENT BODY --- */}
-      <div className="flex-1 overflow-y-auto px-6 md:px-8 pb-32 custom-scrollbar relative">
+      <div className="flex-1 overflow-y-auto px-6 md:px-8 pb-40 custom-scrollbar relative">
         
-        {/* TAB: ROADMAP */}
+        {/* TAB: ROADMAP (LESSONS) */}
         {activeSubTab === 'lessons' && (
           <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4">
             
@@ -174,8 +163,6 @@ export default function StudentClassView({
 
             {assignedCurriculums.map((curr: any) => {
                 const currLessons = curr.lessonIds.map((id: string) => lessons.find((l: any) => l.id === id)).filter(Boolean);
-                
-                // Accordion Logic
                 const isExpanded = expandedRoadmaps[curr.id];
                 const visibleLessons = isExpanded ? currLessons : currLessons.slice(0, 4);
                 const remainingCount = currLessons.length - 4;
@@ -266,33 +253,12 @@ export default function StudentClassView({
                     </div>
                 );
             })}
-
-            {/* Standalone Lessons */}
-            {lessonList.length > 0 && (
-              <div className="mt-12 space-y-4">
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] pl-2">Extra Resources</h3>
-                {lessonList.map((item: any) => {
-                    const isCompleted = completedItems.includes(item.id) || (item.originalId && completedItems.includes(item.originalId));
-                    return (
-                        <div key={item.id} className={`group p-5 border-2 ${isCompleted ? 'border-emerald-100 bg-emerald-50/30' : 'border-slate-100 bg-white'} rounded-[2.5rem] flex justify-between items-center hover:shadow-xl hover:-translate-y-1 transition-all`}>
-                            <button className="flex items-center gap-4 flex-1 text-left" onClick={() => onSelectLesson(item)}>
-                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-colors ${
-                                    isCompleted ? 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white' : 
-                                    'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'
-                                }`}>
-                                    {isCompleted ? <CheckCircle2 size={24} /> : <Play size={24} className="ml-1" fill="currentColor" />}
-                                </div>
-                                <div>
-                                    <h4 className="font-black text-slate-800 text-lg leading-tight mb-1 group-hover:text-indigo-600 transition-colors">{item.title}</h4>
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Personalized Unit</span>
-                                </div>
-                            </button>
-                        </div>
-                    );
-                })}
-              </div>
-            )}
           </div>
+        )}
+
+        {/* TAB: LEADERBOARD (RANKINGS) */}
+        {activeSubTab === 'leaderboard' && (
+            <LeaderboardView studentEmails={classData.studentEmails} currentUserEmail={userData.email} />
         )}
 
         {/* TAB: EXAMS */}
@@ -307,7 +273,7 @@ export default function StudentClassView({
               examList.map((item: any) => {
                 const isCompleted = completedItems.includes(item.id) || (item.originalId && completedItems.includes(item.originalId));
                 return (
-                  <div key={item.id} className={`group p-5 border-2 ${isCompleted ? 'border-emerald-100 bg-emerald-50/20' : 'border-rose-100 bg-white'} rounded-[2.5rem] flex items-center gap-4 cursor-pointer hover:shadow-xl transition-all`} onClick={() => !isCompleted && setActiveExam(item)}>
+                  <div key={item.id} className={`group p-5 border-2 ${isCompleted ? 'border-emerald-100 bg-emerald-50/20' : 'border-rose-100 bg-white'} rounded-[2.5rem] flex items-center gap-4 cursor-pointer hover:shadow-xl transition-all`} onClick={() => !isCompleted && onSelectLesson(item)}>
                     <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-colors ${isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white'}`}>
                       {isCompleted ? <CheckCircle2 size={24} /> : <FileText size={24} fill="currentColor" />}
                     </div>
@@ -330,46 +296,40 @@ export default function StudentClassView({
       </div>
 
       {/* --- FLOATING BOTTOM PILLBOX NAV --- */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-[400px] z-40">
-          <div className="bg-slate-900/95 backdrop-blur-md p-1.5 rounded-full shadow-2xl border border-white/10 flex items-center justify-between gap-1">
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-[480px] z-[100]">
+          <div className="bg-slate-900/95 backdrop-blur-xl p-2 rounded-full shadow-2xl border border-white/10 flex items-center justify-between gap-1 overflow-x-auto no-scrollbar">
             {[
               { id: 'lessons', label: 'Roadmap', icon: <BookOpen size={18}/> },
+              { id: 'leaderboard', label: 'Rankings', icon: <Trophy size={18}/> },
               { id: 'exams', label: 'Exams', icon: <FileText size={18}/> },
               { id: 'forum', label: 'Forum', icon: <MessageSquare size={18}/> },
               { id: 'grades', label: 'Grades', icon: <CheckCircle2 size={18}/> }
             ].map((tab) => {
               const isActive = activeSubTab === tab.id;
               return (
-                <button 
+                <button
                   key={tab.id}
                   onClick={() => setActiveSubTab(tab.id as any)}
-                  className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-[2rem] transition-all duration-300 ${
-                    isActive 
-                      ? 'bg-indigo-600 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)]' 
-                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  className={`flex flex-1 items-center justify-center gap-2 py-3 px-4 rounded-full transition-all duration-300 relative group ${
+                    isActive ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-white/5'
                   }`}
                 >
-                  <div className={`${isActive ? 'scale-110 mb-1' : 'mb-1'} transition-transform duration-300`}>
-                      {tab.icon}
+                  <div className={`transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
+                    {tab.icon}
                   </div>
-                  <span className={`text-[9px] font-black uppercase tracking-widest ${isActive ? 'opacity-100' : 'opacity-70'}`}>
+                  {isActive && (
+                    <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap animate-in slide-in-from-left-2 fade-in">
                       {tab.label}
-                  </span>
+                    </span>
+                  )}
+                  {isActive && (
+                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-white rounded-full animate-pulse" />
+                  )}
                 </button>
               );
             })}
           </div>
       </div>
-
-      {/* EXAM OVERLAY */}
-      {activeExam && ExamPlayerView && (
-        <div className="absolute inset-0 z-50 bg-white">
-            <ExamPlayerView 
-                exam={activeExam} 
-                onFinish={() => setActiveExam(null)} 
-            />
-        </div>
-      )}
     </div>
   );
 }
