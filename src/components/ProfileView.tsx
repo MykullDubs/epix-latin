@@ -13,7 +13,7 @@ import {
 import { 
   Globe, Flame, Trophy, BarChart3, CheckCircle2, Zap, 
   Settings, ChevronRight, UploadCloud, LogOut, Shield, Crown,
-  Camera, Loader2
+  Camera, Loader2, Heart
 } from 'lucide-react';
 
 // --- SUB-COMPONENT: REUSABLE AVATAR ---
