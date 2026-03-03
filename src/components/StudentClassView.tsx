@@ -1,4 +1,3 @@
-// src/components/StudentClassView.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   query, collection, where, onSnapshot, orderBy, limit, addDoc,
@@ -10,11 +9,43 @@ import {
   MessageSquare, Send, ArrowLeft, BookOpen, CheckCircle2, 
   Lock, Play, ChevronRight, Monitor, FileText, ChevronDown, 
   ChevronUp, Trophy, Zap, Flame, Plus, User, Heart,
-  Mic, Square, Volume2, Loader2 
+  Mic, Square, Volume2, Loader2, Shield 
 } from 'lucide-react';
 
 import StudentGradebook from './StudentGradebook';
 import LeaderboardView from './LeaderboardView';
+
+// ============================================================================
+//  SUB-COMPONENT: FORUM AVATAR
+// ============================================================================
+const ForumAvatar = ({ url, name, role, size = "md" }: any) => {
+    const initials = name?.split(' ').map((n:any) => n[0]).join('').toUpperCase().slice(0, 2) || 'S';
+    const sizeClasses: any = {
+        xs: "w-6 h-6 text-[8px]",
+        sm: "w-8 h-8 text-[10px]",
+        md: "w-10 h-10 text-xs",
+        lg: "w-12 h-12 text-sm"
+    };
+
+    return (
+        <div className={`relative shrink-0 ${sizeClasses[size]}`}>
+            <div className={`w-full h-full rounded-[35%] overflow-hidden flex items-center justify-center font-black transition-all shadow-sm ${
+                url ? 'bg-white' : 'bg-gradient-to-br from-indigo-500 to-cyan-400 text-white'
+            }`}>
+                {url ? (
+                    <img src={url} alt={name} className="w-full h-full object-cover" />
+                ) : (
+                    <span>{initials}</span>
+                )}
+            </div>
+            {role === 'instructor' && (
+                <div className="absolute -top-1 -right-1 bg-indigo-600 rounded-full border-2 border-white p-0.5 shadow-sm">
+                    <Shield size={size === 'xs' ? 6 : 8} className="text-white" />
+                </div>
+            )}
+        </div>
+    );
+};
 
 // ============================================================================
 //  VOICE RECORDER COMPONENT
@@ -29,19 +60,17 @@ const VoiceRecorder = ({ onRecordingComplete, onCancel }: any) => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
       const chunks: Blob[] = [];
-
       recorder.ondataavailable = (e) => chunks.push(e.data);
       recorder.onstop = () => {
         const blob = new Blob(chunks, { type: 'audio/webm' });
         setAudioUrl(URL.createObjectURL(blob));
         onRecordingComplete(blob); 
       };
-
       recorder.start();
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
     } catch (err) {
-      alert("Microphone access denied. Please check your browser settings.");
+      alert("Microphone access denied.");
     }
   };
 
@@ -51,26 +80,19 @@ const VoiceRecorder = ({ onRecordingComplete, onCancel }: any) => {
   };
 
   return (
-    <div className="bg-indigo-50/50 p-4 rounded-2xl border-2 border-indigo-100 flex items-center justify-between animate-in zoom-in-95">
+    <div className="bg-indigo-50/50 p-4 rounded-2xl border-2 border-indigo-100 flex items-center justify-between">
       {!audioUrl ? (
         <div className="flex items-center gap-4 w-full">
           <div className={`w-3 h-3 rounded-full bg-rose-500 ${isRecording ? 'animate-pulse' : 'opacity-30'}`} />
           <span className="text-[10px] font-black text-indigo-900 uppercase tracking-widest flex-1">
-            {isRecording ? "Recording Audio..." : "Ready to Record Voice"}
+            {isRecording ? "Recording..." : "Voice Response"}
           </span>
-          <button 
-            type="button"
-            onClick={isRecording ? stopRecording : startRecording}
-            className={`p-3 rounded-full transition-all shadow-md ${isRecording ? 'bg-rose-500 text-white' : 'bg-indigo-600 text-white'}`}
-          >
+          <button type="button" onClick={isRecording ? stopRecording : startRecording} className={`p-3 rounded-full ${isRecording ? 'bg-rose-500 text-white animate-pulse' : 'bg-indigo-600 text-white'}`}>
             {isRecording ? <Square size={18} fill="white" /> : <Mic size={18} />}
           </button>
         </div>
       ) : (
         <div className="flex items-center gap-3 w-full">
-          <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600">
-            <Volume2 size={16} />
-          </div>
           <audio src={audioUrl} controls className="h-8 flex-1" />
           <button type="button" onClick={() => { setAudioUrl(null); onCancel(); }} className="text-rose-500 text-[10px] font-black uppercase px-2 hover:bg-rose-50 rounded-lg py-2 transition-colors">Discard</button>
         </div>
@@ -98,6 +120,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
   const [pendingAudio, setPendingAudio] = useState<Blob | null>(null);
 
   const isInstructor = userData?.role === 'instructor' || userData?.role === 'admin';
+  const currentAvatar = userData?.profile?.main?.avatarUrl || null;
 
   useEffect(() => {
     const q = query(collection(db, 'artifacts', appId, 'classes', classId, 'forum_topics'), orderBy('timestamp', 'desc'));
@@ -112,52 +135,41 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
 
   const handleToggleLike = async (responseId: string, currentLikes: string[] = [], authorId: string) => {
     if (!auth.currentUser || auth.currentUser.uid === authorId) return;
-    const uid = auth.currentUser.uid;
-    const isLiked = currentLikes.includes(uid);
+    const isLiked = currentLikes.includes(auth.currentUser.uid);
     const responseRef = doc(db, 'artifacts', appId, 'classes', classId, 'forum_topics', activeTopic.id, 'responses', responseId);
-    await updateDoc(responseRef, { likes: isLiked ? arrayRemove(uid) : arrayUnion(uid) });
+    await updateDoc(responseRef, { likes: isLiked ? arrayRemove(auth.currentUser.uid) : arrayUnion(auth.currentUser.uid) });
   };
 
   const handleCreateTopic = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || !newContent.trim()) return;
     await addDoc(collection(db, 'artifacts', appId, 'classes', classId, 'forum_topics'), {
-      title: newTitle, content: newContent, authorName: userData?.name || 'Instructor',
-      authorId: auth.currentUser?.uid, role: userData?.role, timestamp: Date.now(), replyCount: 0
+      title: newTitle, content: newContent, authorName: userData?.name || 'Magister',
+      authorAvatarUrl: currentAvatar, authorId: auth.currentUser?.uid, role: userData?.role, timestamp: Date.now(), replyCount: 0
     });
     setNewTitle(""); setNewContent(""); setIsCreating(false);
   };
 
   const handlePostResponse = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim() || (!newContent.trim() && !pendingAudio)) {
-      alert("Please provide a title and either a message or a recording.");
-      return;
-    }
+    if (!newTitle.trim() || (!newContent.trim() && !pendingAudio)) return;
     if (!activeTopic) return;
     setIsUploading(true);
-
     try {
       let audioUrl = "";
       if (pendingAudio) {
-        const audioPath = `artifacts/${appId}/forum/${auth.currentUser?.uid}_${Date.now()}.webm`;
-        const audioRef = ref(storage, audioPath);
+        const audioRef = ref(storage, `artifacts/${appId}/forum/${auth.currentUser?.uid}_${Date.now()}.webm`);
         const uploadResult = await uploadBytes(audioRef, pendingAudio);
         audioUrl = await getDownloadURL(uploadResult.ref);
       }
-
       await addDoc(collection(db, 'artifacts', appId, 'classes', classId, 'forum_topics', activeTopic.id, 'responses'), {
         title: newTitle, content: newContent || "", audioUrl,
-        authorName: userData?.name || 'Scholar', authorId: auth.currentUser?.uid,
-        role: userData?.role || 'student', timestamp: Date.now(), comments: [], likes: []
+        authorName: userData?.name || 'Scholar', authorAvatarUrl: currentAvatar,
+        authorId: auth.currentUser?.uid, role: userData?.role, timestamp: Date.now(), comments: [], likes: []
       });
-
       setNewTitle(""); setNewContent(""); setPendingAudio(null); setIsCreating(false);
-    } catch (err: any) {
-      alert("Error uploading response: " + err.message);
-    } finally {
-      setIsUploading(false);
-    }
+    } catch (err) { alert("Upload error."); }
+    setIsUploading(false);
   };
 
   const handlePostComment = async (responseId: string) => {
@@ -166,7 +178,8 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
     await updateDoc(responseRef, {
       comments: arrayUnion({
         text: commentText, authorName: userData?.name || 'Scholar',
-        authorId: auth.currentUser?.uid, role: userData?.role, timestamp: Date.now()
+        authorAvatarUrl: currentAvatar, authorId: auth.currentUser?.uid, 
+        role: userData?.role, timestamp: Date.now()
       })
     });
     setCommentText(""); setReplyingToId(null);
@@ -178,37 +191,27 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
         <div className="flex justify-between items-center mb-6 px-2">
             <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Discussions</h3>
             {isInstructor && (
-                <button onClick={() => setIsCreating(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase flex items-center gap-2 shadow-lg hover:bg-indigo-700 transition-all"><Plus size={16}/> New Topic</button>
+                <button onClick={() => setIsCreating(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase flex items-center gap-2 shadow-lg"><Plus size={16}/> New Topic</button>
             )}
         </div>
         <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
             {isCreating && (
-                <form onSubmit={handleCreateTopic} className="bg-white p-6 rounded-[2rem] border-2 border-indigo-100 shadow-xl mb-6 animate-in slide-in-from-top-4">
+                <form onSubmit={handleCreateTopic} className="bg-white p-6 rounded-[2rem] border-2 border-indigo-100 shadow-xl mb-6">
                     <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Topic Title..." className="w-full text-lg font-black text-slate-800 outline-none mb-2" />
-                    <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Instructional prompt..." className="w-full text-sm text-slate-500 outline-none min-h-[100px] resize-none" />
-                    <div className="flex gap-2 justify-end mt-4">
-                        <button type="button" onClick={() => setIsCreating(false)} className="text-slate-400 font-bold text-xs uppercase px-3">Cancel</button>
-                        <button type="submit" className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase shadow-lg">Post</button>
-                    </div>
+                    <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Prompt..." className="w-full text-sm text-slate-500 outline-none min-h-[100px] resize-none" />
+                    <div className="flex gap-2 justify-end mt-4"><button type="submit" className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase">Post</button></div>
                 </form>
             )}
-            {topics.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 opacity-30">
-                    <MessageSquare size={48} className="mb-4" />
-                    <p className="font-black text-xs uppercase tracking-widest text-center leading-loose">No discussions<br/>here yet.</p>
-                </div>
-            ) : (
-                topics.map(t => (
-                    <button key={t.id} onClick={() => { setActiveTopic(t); setView('thread'); }} className="w-full bg-white p-6 rounded-[2.5rem] border-2 border-slate-100 shadow-sm hover:border-indigo-300 transition-all text-left group">
-                        <h4 className="text-lg font-black text-slate-800 group-hover:text-indigo-600 transition-colors mb-1">{t.title}</h4>
-                        <p className="text-sm text-slate-400 line-clamp-1 mb-4 font-medium">{t.content}</p>
-                        <div className="flex items-center gap-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                            <span className="flex items-center gap-1.5"><User size={12}/> {t.authorName}</span>
-                            <span className="flex items-center gap-1.5"><MessageSquare size={12}/> Responses</span>
-                        </div>
-                    </button>
-                ))
-            )}
+            {topics.map(t => (
+                <button key={t.id} onClick={() => { setActiveTopic(t); setView('thread'); }} className="w-full bg-white p-6 rounded-[2.5rem] border-2 border-slate-100 shadow-sm hover:border-indigo-300 transition-all text-left">
+                    <h4 className="text-lg font-black text-slate-800 mb-1">{t.title}</h4>
+                    <p className="text-sm text-slate-400 line-clamp-1 mb-4 font-medium">{t.content}</p>
+                    <div className="flex items-center gap-3 text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                        <ForumAvatar url={t.authorAvatarUrl} name={t.authorName} role={t.role} size="xs" />
+                        <span>{t.authorName}</span>
+                    </div>
+                </button>
+            ))}
         </div>
       </div>
     );
@@ -217,8 +220,8 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
   return (
     <div className="flex flex-col h-full bg-slate-50 rounded-[2.5rem] border-2 border-slate-100 shadow-inner overflow-hidden animate-in slide-in-from-right-8 duration-500">
         <div className="bg-white p-6 border-b border-slate-100 flex items-center justify-between shadow-sm z-20">
-            <button onClick={() => { setView('list'); setPendingAudio(null); setIsCreating(false); }} className="flex items-center gap-2 text-slate-400 font-black text-xs uppercase hover:text-indigo-600 transition-colors"><ArrowLeft size={16}/> Back</button>
-            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-3 py-1.5 rounded-lg">Gallery View</span>
+            <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-400 font-black text-xs uppercase hover:text-indigo-600 transition-colors"><ArrowLeft size={16}/> Back</button>
+            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-3 py-1.5 rounded-lg">Response Gallery</span>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
@@ -228,30 +231,18 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                     <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-4 block">Discussion Prompt</span>
                     <h2 className="text-3xl font-black mb-4 leading-tight">{activeTopic.title}</h2>
                     <p className="text-slate-300 font-medium leading-relaxed mb-6">{activeTopic.content}</p>
-                    <button onClick={() => setIsCreating(true)} className="px-6 py-3 bg-white text-slate-900 rounded-xl font-black text-xs uppercase shadow-xl hover:bg-indigo-50 transition-all active:scale-95">Respond to Prompt</button>
+                    <button onClick={() => setIsCreating(true)} className="px-6 py-3 bg-white text-slate-900 rounded-xl font-black text-xs uppercase shadow-xl">Respond</button>
                 </div>
             </div>
 
             {isCreating && (
-                <form onSubmit={handlePostResponse} className="bg-white p-8 rounded-[2.5rem] border-2 border-indigo-100 shadow-xl animate-in zoom-in-95 space-y-4">
-                    <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Give your response a title..." className="w-full text-xl font-black text-slate-800 outline-none" />
-                    <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Write your thoughts (Optional if recording)..." className="w-full text-sm text-slate-500 outline-none min-h-[100px] resize-none font-medium" />
-                    
-                    <div className="pt-2">
-                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 block">Record Audio Response</span>
-                        <VoiceRecorder onRecordingComplete={setPendingAudio} onCancel={() => setPendingAudio(null)} />
-                    </div>
-
+                <form onSubmit={handlePostResponse} className="bg-white p-8 rounded-[2.5rem] border-2 border-indigo-100 shadow-xl space-y-4">
+                    <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Response title..." className="w-full text-xl font-black text-slate-800 outline-none" />
+                    <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Write thoughts..." className="w-full text-sm text-slate-500 outline-none min-h-[100px] resize-none" />
+                    <VoiceRecorder onRecordingComplete={setPendingAudio} onCancel={() => setPendingAudio(null)} />
                     <div className="flex gap-2 justify-end pt-4 border-t border-slate-50">
-                        <button type="button" onClick={() => { setIsCreating(false); setPendingAudio(null); }} className="text-slate-400 font-bold text-xs uppercase px-4 hover:text-rose-500 transition-colors">Cancel</button>
-                        <button 
-                            type="submit" 
-                            disabled={isUploading || !newTitle.trim() || (!newContent.trim() && !pendingAudio)} 
-                            className={`px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-xl flex items-center gap-3 transition-all ${
-                                isUploading ? 'bg-slate-200 text-slate-400' : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'
-                            }`}
-                        >
-                            {isUploading ? <><Loader2 size={16} className="animate-spin" /> Uploading...</> : 'Post Contribution'}
+                        <button type="submit" disabled={isUploading} className="px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-xl flex items-center gap-3 bg-indigo-600 text-white">
+                            {isUploading ? <Loader2 size={16} className="animate-spin" /> : 'Submit Response'}
                         </button>
                     </div>
                 </form>
@@ -259,48 +250,39 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
 
             <div className="space-y-10">
                 {responses.map((res) => (
-                    <div key={res.id} className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
-                        <div className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm relative group transition-all hover:shadow-xl hover:border-indigo-100">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-inner ${res.role === 'instructor' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>{(res.authorName?.[0] || 'S').toUpperCase()}</div>
+                    <div key={res.id} className="space-y-4">
+                        <div className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm relative group">
+                            <div className="flex items-center gap-4 mb-6">
+                                <ForumAvatar url={res.authorAvatarUrl} name={res.authorName} role={res.role} size="lg" />
                                 <div>
                                     <span className="block text-xs font-black text-slate-800 leading-none mb-1">{res.authorName}</span>
                                     <span className="text-[9px] font-bold text-slate-400 uppercase">{new Date(res.timestamp).toLocaleDateString()}</span>
                                 </div>
-                                {res.role === 'instructor' && <span className="ml-auto text-[8px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg uppercase tracking-widest border border-indigo-100">Verified Instructor</span>}
                             </div>
                             <h4 className="text-2xl font-black text-slate-900 mb-3 tracking-tight">{res.title}</h4>
                             <p className="text-sm text-slate-600 leading-relaxed font-medium mb-6">{res.content}</p>
                             
                             {res.audioUrl && (
-                                <div className="mb-6 p-4 bg-indigo-50/50 rounded-2xl flex items-center gap-4 border border-indigo-100 shadow-inner">
-                                    <Volume2 className="text-indigo-600 shrink-0" size={20} />
+                                <div className="mb-6 p-4 bg-indigo-50/50 rounded-2xl flex items-center gap-4 border border-indigo-100">
+                                    <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white"><Volume2 size={20} /></div>
                                     <audio src={res.audioUrl} controls className="h-8 flex-1 opacity-90" />
                                 </div>
                             )}
 
                             <div className="flex items-center gap-6 pt-6 border-t border-slate-50">
-                                <button 
-                                    onClick={() => handleToggleLike(res.id, res.likes || [], res.authorId)}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all active:scale-125 ${
-                                        res.likes?.includes(auth.currentUser?.uid) 
-                                        ? 'bg-rose-50 text-rose-500 border border-rose-100' 
-                                        : 'bg-slate-50 text-slate-400 border border-transparent hover:border-rose-100 hover:text-rose-400'
-                                    }`}
-                                >
+                                <button onClick={() => handleToggleLike(res.id, res.likes || [], res.authorId)} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${res.likes?.includes(auth.currentUser?.uid) ? 'bg-rose-50 text-rose-500' : 'text-slate-400'}`}>
                                     <Heart size={16} className={res.likes?.includes(auth.currentUser?.uid) ? 'fill-rose-500' : ''} /> 
                                     <span className="text-[11px] font-black uppercase tracking-widest">{res.likes?.length || 0} Appreciations</span>
                                 </button>
-                                <button onClick={() => setReplyingToId(replyingToId === res.id ? null : res.id)} className="flex items-center gap-2 text-[11px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 transition-colors"><MessageSquare size={16} /> Reply</button>
+                                <button onClick={() => setReplyingToId(replyingToId === res.id ? null : res.id)} className="flex items-center gap-2 text-[11px] font-black text-slate-400 uppercase hover:text-indigo-600"><MessageSquare size={16} /> Reply</button>
                             </div>
                         </div>
 
-                        {/* Threaded Comments */}
                         <div className="ml-10 space-y-4">
                             {res.comments?.map((comment: any, idx: number) => (
-                                <div key={idx} className="bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100 animate-in slide-in-from-left-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black ${comment.role === 'instructor' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-400 border border-slate-200'}`}>{(comment.authorName?.[0] || 'S').toUpperCase()}</div>
+                                <div key={idx} className="bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <ForumAvatar url={comment.authorAvatarUrl} name={comment.authorName} role={comment.role} size="xs" />
                                         <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">{comment.authorName}</span>
                                     </div>
                                     <p className="text-xs text-slate-500 font-bold leading-relaxed">{comment.text}</p>
@@ -308,8 +290,8 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                             ))}
                             {replyingToId === res.id && (
                                 <div className="flex gap-2 animate-in slide-in-from-top-2">
-                                    <input autoFocus value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Participate in the thread..." className="flex-1 bg-white border-2 border-indigo-100 rounded-2xl px-5 py-3 text-sm font-medium outline-none shadow-xl" onKeyDown={(e) => e.key === 'Enter' && handlePostComment(res.id)} />
-                                    <button onClick={() => handlePostComment(res.id)} className="p-4 bg-indigo-600 text-white rounded-2xl shadow-xl active:scale-90 transition-transform"><Send size={18}/></button>
+                                    <input autoFocus value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Reply..." className="flex-1 bg-white border-2 border-indigo-100 rounded-2xl px-5 py-3 text-sm font-medium outline-none" onKeyDown={(e) => e.key === 'Enter' && handlePostComment(res.id)} />
+                                    <button onClick={() => handlePostComment(res.id)} className="p-4 bg-indigo-600 text-white rounded-2xl shadow-xl"><Send size={18}/></button>
                                 </div>
                             )}
                         </div>
@@ -322,7 +304,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
 };
 
 // ============================================================================
-//  MAIN STUDENT CLASS VIEW (ENTRY POINT)
+//  STUDENT CLASS VIEW (ENTRY POINT)
 // ============================================================================
 export default function StudentClassView({ 
     classData, lessons = [], curriculums = [], onBack, 
@@ -335,25 +317,14 @@ export default function StudentClassView({
   useEffect(() => {
     const studentEmail = userData?.email || auth?.currentUser?.email;
     if (!classData || !studentEmail) return;
-
-    const q = query(
-      collection(db, 'artifacts', appId, 'activity_logs'),
-      where('studentEmail', '==', studentEmail),
-      where('type', '==', 'completion')
-    );
-
-    const unsub = onSnapshot(q, (snapshot) => {
-      const completedIdentifiers = snapshot.docs.flatMap(d => {
-        const data = d.data();
-        return [data.itemId, data.originalId, data.itemTitle].filter(Boolean);
-      });
-      setCompletedItems(completedIdentifiers);
+    const q = query(collection(db, 'artifacts', appId, 'activity_logs'), where('studentEmail', '==', studentEmail), where('type', '==', 'completion'));
+    return onSnapshot(q, (snapshot) => {
+      const ids = snapshot.docs.flatMap(d => [d.data().itemId, d.data().originalId, d.data().itemTitle].filter(Boolean));
+      setCompletedItems(ids);
     });
-
-    return () => unsub();
   }, [classData, userData]);
 
-  // --- VERIFIED DATA MAPPING ---
+  // --- MAPPED DATA FIX ---
   const populatedAssignments = (classData?.assignments || [])
     .map((assignment: any) => typeof assignment === 'string' ? lessons.find((l: any) => l.id === assignment) : assignment)
     .filter(Boolean);
@@ -367,12 +338,12 @@ export default function StudentClassView({
       
       <div className="p-6 md:p-8 pt-10 md:pt-12 shrink-0 bg-white">
         <button onClick={onBack} className="mb-4 flex items-center gap-2 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-black uppercase tracking-widest active:scale-95 w-fit">
-          <ArrowLeft size={16} /> EXIT TO DASHBOARD
+          <ArrowLeft size={16} /> DASHBOARD
         </button>
         <h2 className="text-3xl font-black text-slate-900 leading-tight mb-2 tracking-tight">{classData.name}</h2>
         <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <p className="text-slate-400 font-bold text-sm line-clamp-1">{classData.description || "Interactive Learning Experience"}</p>
+            <p className="text-slate-400 font-bold text-sm line-clamp-1">{classData.description || "Active Learning Pathway"}</p>
         </div>
       </div>
 
@@ -385,7 +356,6 @@ export default function StudentClassView({
                 const visibleLessons = isExpanded ? currLessons : currLessons.slice(0, 4);
                 const completedCountInCurr = currLessons.filter((l: any) => completedItems.includes(l.id)).length;
                 const progressPercent = currLessons.length > 0 ? Math.round((completedCountInCurr / currLessons.length) * 100) : 0;
-
                 return (
                     <div key={curr.id} className="bg-white rounded-[3.5rem] border-2 border-slate-100 overflow-hidden shadow-sm mb-10">
                         <div className="bg-slate-900 p-8 relative overflow-hidden">
@@ -395,15 +365,12 @@ export default function StudentClassView({
                                     <span className="px-3 py-1 bg-white/20 text-white rounded-lg text-[10px] font-black uppercase tracking-widest backdrop-blur-md mb-3 inline-block">{curr.level} Pathway</span>
                                     <h3 className="text-2xl font-black text-white">{curr.title}</h3>
                                 </div>
-                                <div className="text-right">
-                                    <span className="text-3xl font-black text-white">{progressPercent}%</span>
-                                </div>
+                                <div className="text-right"><span className="text-3xl font-black text-white">{progressPercent}%</span></div>
                             </div>
                             <div className="h-3 w-full bg-slate-800 rounded-full overflow-hidden relative z-10">
                                 <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${progressPercent}%` }} />
                             </div>
                         </div>
-
                         <div className="p-8">
                             <div className="relative border-l-4 border-slate-100 ml-6 space-y-10 py-4">
                                 {visibleLessons.map((item: any, index: number) => {
@@ -464,14 +431,8 @@ export default function StudentClassView({
                     isActive ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'
                   }`}
                 >
-                  <div className={`transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
-                    {tab.icon}
-                  </div>
-                  {isActive && (
-                    <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap animate-in slide-in-from-left-2">
-                      {tab.label}
-                    </span>
-                  )}
+                  <div className={`transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>{tab.icon}</div>
+                  {isActive && <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap animate-in slide-in-from-left-2">{tab.label}</span>}
                 </button>
               );
             })}
