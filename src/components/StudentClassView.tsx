@@ -12,6 +12,7 @@ import {
 
 import StudentGradebook from './StudentGradebook';
 import { useLeaderboard } from '../hooks/useLeaderboard'; 
+import LeaderboardView from './LeaderboardView';
 // ============================================================================
 //  INTERNAL FORUM COMPONENT
 // ============================================================================
