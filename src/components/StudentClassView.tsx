@@ -313,8 +313,6 @@ export default function StudentClassView({
 }: any) {
   const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'leaderboard' | 'exams' | 'forum' | 'grades'>('lessons');
   const [completedItems, setCompletedItems] = useState<string[]>([]);
-  
-  // THE FIX: Accordion State
   const [expandedRoadmaps, setExpandedRoadmaps] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -331,17 +329,27 @@ export default function StudentClassView({
     setExpandedRoadmaps(prev => ({ ...prev, [currId]: !prev[currId] }));
   };
 
+  // --- DATA MAPPING ---
+  // Fully populate assignments with their actual lesson objects
   const populatedAssignments = (classData?.assignments || [])
     .map((assignment: any) => typeof assignment === 'string' ? lessons.find((l: any) => l.id === assignment) : assignment)
     .filter(Boolean);
 
+  // Extract curriculums
   const assignedCurriculums = (classData?.assignedCurriculums || [])
     .map((id: string) => curriculums.find((c: any) => c.id === id))
     .filter(Boolean);
 
+  // Extract standalone lessons (assignments that are NOT inside a curriculum and NOT exams)
+  const standaloneLessons = populatedAssignments.filter((a: any) => a.contentType !== 'exam' && a.contentType !== 'test');
+  
+  // Extract high-stakes exams
+  const examList = populatedAssignments.filter((a: any) => a.contentType === 'exam' || a.contentType === 'test');
+
   return (
     <div className="h-full flex flex-col bg-white overflow-hidden animate-in fade-in duration-500 font-sans relative">
       
+      {/* HEADER */}
       <div className="p-6 md:p-8 pt-10 md:pt-12 shrink-0 bg-white">
         <button onClick={onBack} className="mb-4 flex items-center gap-2 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-black uppercase tracking-widest active:scale-95 w-fit">
           <ArrowLeft size={16} /> DASHBOARD
@@ -354,82 +362,116 @@ export default function StudentClassView({
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 md:px-8 pb-48 custom-scrollbar relative">
+        
+        {/* ROADMAP TAB */}
         {activeSubTab === 'lessons' && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-             {assignedCurriculums.map((curr: any) => {
-                const currLessons = curr.lessonIds.map((id: string) => lessons.find((l: any) => l.id === id)).filter(Boolean);
-                const isExpanded = expandedRoadmaps[curr.id];
-                const completedCountInCurr = currLessons.filter((l: any) => completedItems.includes(l.id)).length;
-                const progressPercent = currLessons.length > 0 ? Math.round((completedCountInCurr / currLessons.length) * 100) : 0;
-                
-                return (
-                    <div key={curr.id} className="bg-white rounded-[3rem] border border-slate-200 overflow-hidden shadow-sm transition-all duration-300">
+          <div className="animate-in fade-in slide-in-from-bottom-4">
+             
+             {/* 1. CURRICULUM ACCORDIONS */}
+             {assignedCurriculums.length > 0 && (
+                 <div className="space-y-8 mb-10">
+                     {assignedCurriculums.map((curr: any) => {
+                        const currLessons = curr.lessonIds.map((id: string) => lessons.find((l: any) => l.id === id)).filter(Boolean);
+                        const isExpanded = expandedRoadmaps[curr.id];
+                        const completedCountInCurr = currLessons.filter((l: any) => completedItems.includes(l.id)).length;
+                        const progressPercent = currLessons.length > 0 ? Math.round((completedCountInCurr / currLessons.length) * 100) : 0;
                         
-                        {/* ACCORDION HEADER */}
-                        <div 
-                            className="bg-slate-900 p-8 relative overflow-hidden cursor-pointer group"
-                            onClick={() => toggleRoadmap(curr.id)}
-                        >
-                            <div className="absolute inset-0 opacity-20 transition-opacity group-hover:opacity-30" style={{ backgroundColor: curr.themeColor }} />
-                            
-                            <div className="relative z-10 flex items-center justify-between mb-4">
-                                <div>
-                                    <span className="px-3 py-1 bg-white/20 text-white rounded-lg text-[10px] font-black uppercase tracking-widest backdrop-blur-md mb-3 inline-block">{curr.level} Pathway</span>
-                                    <h3 className="text-2xl font-black text-white pr-4">{curr.title}</h3>
+                        return (
+                            <div key={curr.id} className="bg-white rounded-[3rem] border border-slate-200 overflow-hidden shadow-sm transition-all duration-300">
+                                <div 
+                                    className="bg-slate-900 p-8 relative overflow-hidden cursor-pointer group"
+                                    onClick={() => toggleRoadmap(curr.id)}
+                                >
+                                    <div className="absolute inset-0 opacity-20 transition-opacity group-hover:opacity-30" style={{ backgroundColor: curr.themeColor }} />
+                                    <div className="relative z-10 flex items-center justify-between mb-4">
+                                        <div>
+                                            <span className="px-3 py-1 bg-white/20 text-white rounded-lg text-[10px] font-black uppercase tracking-widest backdrop-blur-md mb-3 inline-block">{curr.level} Pathway</span>
+                                            <h3 className="text-2xl font-black text-white pr-4">{curr.title}</h3>
+                                        </div>
+                                        <div className="text-right shrink-0 flex flex-col items-end">
+                                            <span className="text-3xl font-black text-white">{progressPercent}%</span>
+                                            <div className="w-10 h-10 mt-2 bg-white/10 rounded-full flex items-center justify-center text-white backdrop-blur-sm transition-transform duration-300">
+                                                {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="h-3 w-full bg-slate-800 rounded-full overflow-hidden relative z-10">
+                                        <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${progressPercent}%` }} />
+                                    </div>
                                 </div>
-                                <div className="text-right shrink-0 flex flex-col items-end">
-                                    <span className="text-3xl font-black text-white">{progressPercent}%</span>
-                                    <div className="w-10 h-10 mt-2 bg-white/10 rounded-full flex items-center justify-center text-white backdrop-blur-sm transition-transform duration-300">
-                                        {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                <div className={`transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                                    <div className="p-8 bg-slate-50 border-t border-slate-100">
+                                        <div className="relative border-l-4 border-slate-200 ml-6 space-y-10 py-4">
+                                            {currLessons.map((item: any, index: number) => {
+                                                const isCompleted = completedItems.includes(item.id);
+                                                const isLocked = index > completedCountInCurr;
+                                                return (
+                                                    <div key={item.id} className={`relative pl-10 ${isLocked ? 'opacity-50 grayscale' : 'animate-in slide-in-from-left-4'}`}>
+                                                        <div className={`absolute -left-[22px] top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center border-4 border-slate-50 shadow-sm z-10 transition-all ${isCompleted ? 'bg-emerald-500 text-white scale-110' : index === completedCountInCurr ? 'bg-indigo-600 text-white ring-4 ring-indigo-200' : 'bg-slate-200 text-slate-400'}`}>
+                                                            {isCompleted ? <CheckCircle2 size={16} strokeWidth={3} /> : <Play size={16} className={index === completedCountInCurr ? "ml-1" : ""} />}
+                                                        </div>
+                                                        <button disabled={isLocked} onClick={() => onSelectLesson(item)} className="w-full text-left p-6 rounded-[2.5rem] border-2 border-transparent bg-white shadow-sm hover:shadow-md hover:border-indigo-100 transition-all group active:scale-95">
+                                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Unit {index + 1}</span>
+                                                            <h4 className="font-black text-slate-800 text-lg leading-tight group-hover:text-indigo-600 transition-colors">{item.title}</h4>
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            
-                            <div className="h-3 w-full bg-slate-800 rounded-full overflow-hidden relative z-10">
-                                <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${progressPercent}%` }} />
-                            </div>
-                        </div>
+                        );
+                     })}
+                 </div>
+             )}
 
-                        {/* ACCORDION BODY */}
-                        <div className={`transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                            <div className="p-8 bg-slate-50 border-t border-slate-100">
-                                <div className="relative border-l-4 border-slate-200 ml-6 space-y-10 py-4">
-                                    {currLessons.map((item: any, index: number) => {
-                                        const isCompleted = completedItems.includes(item.id);
-                                        const isLocked = index > completedCountInCurr;
-                                        
-                                        return (
-                                            <div key={item.id} className={`relative pl-10 ${isLocked ? 'opacity-50 grayscale' : 'animate-in slide-in-from-left-4'}`}>
-                                                <div className={`absolute -left-[22px] top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center border-4 border-slate-50 shadow-sm z-10 transition-all ${isCompleted ? 'bg-emerald-500 text-white scale-110' : index === completedCountInCurr ? 'bg-indigo-600 text-white ring-4 ring-indigo-200' : 'bg-slate-200 text-slate-400'}`}>
-                                                    {isCompleted ? <CheckCircle2 size={16} strokeWidth={3} /> : <Play size={16} className={index === completedCountInCurr ? "ml-1" : ""} />}
-                                                </div>
-                                                <button disabled={isLocked} onClick={() => onSelectLesson(item)} className="w-full text-left p-6 rounded-[2.5rem] border-2 border-transparent bg-white shadow-sm hover:shadow-md hover:border-indigo-100 transition-all group active:scale-95">
-                                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Unit {index + 1}</span>
-                                                    <h4 className="font-black text-slate-800 text-lg leading-tight group-hover:text-indigo-600 transition-colors">{item.title}</h4>
-                                                </button>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-
-                    </div>
-                );
-             })}
+             {/* 2. STANDALONE ASSIGNMENTS */}
+             {standaloneLessons.length > 0 && (
+                 <div className="space-y-4 mb-10">
+                     <div className="flex items-center gap-3 ml-2 mb-6">
+                        <div className="h-0.5 flex-1 bg-slate-100 rounded-full" />
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Individual Assignments</h3>
+                        <div className="h-0.5 flex-1 bg-slate-100 rounded-full" />
+                     </div>
+                     
+                     {standaloneLessons.map((item: any) => {
+                         const isCompleted = completedItems.includes(item.id);
+                         return (
+                             <div key={item.id} className="p-6 border-2 border-slate-100 bg-white rounded-[2.5rem] flex items-center gap-4 cursor-pointer hover:shadow-md hover:border-indigo-100 transition-all active:scale-95 group" onClick={() => onSelectLesson(item)}>
+                                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-colors ${isCompleted ? 'bg-emerald-50 text-emerald-500' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`}>
+                                     {isCompleted ? <CheckCircle2 size={24} strokeWidth={3} /> : <Play size={24} className="ml-1" />}
+                                 </div>
+                                 <div className="flex-1">
+                                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Assigned Activity</span>
+                                     <h4 className="font-black text-slate-800 text-lg leading-tight group-hover:text-indigo-600 transition-colors">{item.title}</h4>
+                                 </div>
+                             </div>
+                         );
+                     })}
+                 </div>
+             )}
           </div>
         )}
 
+        {/* OTHER TABS */}
         {activeSubTab === 'leaderboard' && <LeaderboardView studentEmails={classData.studentEmails} currentUserEmail={userData.email} />}
         
         {activeSubTab === 'exams' && (
           <div className="space-y-4">
-            {populatedAssignments.filter((a: any) => a.contentType === 'exam' || a.contentType === 'test').map((item: any) => (
-              <div key={item.id} className="p-6 border-2 border-rose-100 bg-white rounded-[3rem] flex items-center gap-4 cursor-pointer hover:shadow-xl transition-all" onClick={() => onSelectLesson(item)}>
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-rose-50 text-rose-600 shadow-inner"><FileText size={28} fill="currentColor" /></div>
-                <div><h4 className="font-black text-slate-900 text-xl leading-tight mb-1">{item.title}</h4><span className="text-[10px] font-black uppercase text-rose-400 tracking-widest">High-Stakes Assessment</span></div>
-              </div>
-            ))}
+            {examList.length === 0 ? (
+                <div className="text-center py-20 opacity-40">
+                    <FileText size={48} className="mx-auto mb-4" />
+                    <p className="font-black text-xs uppercase tracking-widest leading-loose">No active exams<br/>assigned to this class.</p>
+                </div>
+            ) : (
+                examList.map((item: any) => (
+                  <div key={item.id} className="p-6 border-2 border-rose-100 bg-white rounded-[3rem] flex items-center gap-4 cursor-pointer hover:shadow-xl transition-all" onClick={() => onSelectLesson(item)}>
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-rose-50 text-rose-600 shadow-inner"><FileText size={28} fill="currentColor" /></div>
+                    <div><h4 className="font-black text-slate-900 text-xl leading-tight mb-1">{item.title}</h4><span className="text-[10px] font-black uppercase text-rose-400 tracking-widest">High-Stakes Assessment</span></div>
+                  </div>
+                ))
+            )}
           </div>
         )}
 
@@ -437,6 +479,7 @@ export default function StudentClassView({
         {activeSubTab === 'grades' && <StudentGradebook classData={classData} user={userData} />}
       </div>
 
+      {/* BOTTOM NAV */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-[550px] z-[100] px-2">
           <div className="bg-slate-900/95 backdrop-blur-2xl p-2 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 flex items-center justify-between gap-1">
             {[
