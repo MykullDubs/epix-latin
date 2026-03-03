@@ -1,6 +1,6 @@
 import React from 'react';
 import { Trophy, Medal, Crown, Zap, Flame } from 'lucide-react';
-
+import { useLeaderboard } from '../hooks/useLeaderboard';
 export default function LeaderboardView({ studentEmails, currentUserEmail }: any) {
     const { rankings, loading } = useLeaderboard(studentEmails);
 
