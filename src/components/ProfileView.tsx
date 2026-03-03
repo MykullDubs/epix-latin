@@ -21,7 +21,6 @@ import {
 } from 'lucide-react';
 
 // --- SUB-COMPONENT: REUSABLE AVATAR ---
-// This now handles the potential delay in image loading
 const UserAvatar = ({ user, size = "md", border = false }: any) => {
     const sizeClasses: any = {
         sm: "w-8 h-8 text-[10px]",
@@ -30,7 +29,6 @@ const UserAvatar = ({ user, size = "md", border = false }: any) => {
         xl: "w-32 h-32 text-2xl"
     };
 
-    // Use dot-access safely
     const avatarUrl = user?.profile?.main?.avatarUrl;
     const name = user?.name || "Scholar";
     const initials = getInitials(name);
@@ -42,7 +40,7 @@ const UserAvatar = ({ user, size = "md", border = false }: any) => {
             } ${border ? 'ring-4 ring-white shadow-xl' : ''}`}>
                 {avatarUrl ? (
                     <img 
-                        key={avatarUrl} // Forces re-render when URL changes
+                        key={avatarUrl} 
                         src={avatarUrl} 
                         alt={name} 
                         className="w-full h-full object-cover animate-in fade-in duration-500" 
@@ -61,24 +59,19 @@ export default function ProfileView({ user, userData: propUserData }: any) {
   const [stats, setStats] = useState<any>({ totalHours: 0, cardsMastered: 0, perfectScores: 0, graphData: [] });
   const [deploying, setDeploying] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  
-  // NEW: Local state for live profile updates
   const [liveProfile, setLiveProfile] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 1. LISTEN TO PROFILE CHANGES (The missing link for the picture)
+  // 1. LIVE LISTENER (Only for avatar & live role changes)
   useEffect(() => {
     if (!user?.uid) return;
     const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
-    const unsub = onSnapshot(userRef, (doc) => {
-        if (doc.exists()) {
-            setLiveProfile(doc.data());
-        }
+    return onSnapshot(userRef, (doc) => {
+        if (doc.exists()) setLiveProfile(doc.data());
     });
-    return () => unsub();
   }, [user]);
 
-  // 2. FETCH ACTIVITY LOGS
+  // 2. ACTIVITY LOGS
   useEffect(() => {
       if(!user) return;
       const q = query(
@@ -87,16 +80,29 @@ export default function ProfileView({ user, userData: propUserData }: any) {
           orderBy('timestamp', 'desc'), 
           limit(100)
       );
-      const unsub = onSnapshot(q, (snapshot) => {
+      return onSnapshot(q, (snapshot) => {
           const data = snapshot.docs.map(d => d.data());
           setLogs(data);
           setStats(calculateUserStats(data));
       });
-      return () => unsub();
   }, [user]);
 
-  // Merge the prop data with the live profile data for absolute reliability
-  const activeData = liveProfile || propUserData;
+  // --- THE MASTER FIX: Deep Merge Data ---
+  // This ensures stats from parent (propUserData) are kept if the 
+  // liveFirestore doc (liveProfile) is missing them.
+  const activeData = {
+      ...propUserData,
+      ...liveProfile,
+      // Deep merge the profile object specifically
+      profile: {
+          ...propUserData?.profile,
+          ...liveProfile?.profile,
+          main: {
+              ...propUserData?.profile?.main,
+              ...liveProfile?.profile?.main
+          }
+      }
+  };
 
   const handleLogout = () => signOut(auth);
   
@@ -109,12 +115,9 @@ export default function ProfileView({ user, userData: propUserData }: any) {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file || !user?.uid) return;
-      if (!file.type.startsWith('image/')) { alert("Upload an image."); return; }
-
       setIsUploading(true);
       try { 
           await uploadProfilePicture(user.uid, file); 
-          // The onSnapshot above will handle the UI update automatically!
       } catch (err: any) { 
           alert(`Upload failed: ${err.message}`); 
       } finally { 
@@ -132,7 +135,7 @@ export default function ProfileView({ user, userData: propUserData }: any) {
       setDeploying(false); 
   };
 
-  // --- AGILE MATH ---
+  // --- AGILE MATH (Using merged data) ---
   const xp = activeData?.xp || 0;
   const streak = activeData?.streak || 0;
   const totalLikes = activeData?.totalLikesReceived || 0;
@@ -142,12 +145,10 @@ export default function ProfileView({ user, userData: propUserData }: any) {
   return (
     <div className="h-full flex flex-col bg-slate-50 overflow-y-auto custom-scrollbar pt-32 pb-40">
         
-        {/* 1. MAGISTER HERO CARD */}
+        {/* 1. HERO CARD */}
         <div className="px-6 mb-8">
             <div className="bg-slate-900 rounded-[3rem] p-8 relative overflow-hidden shadow-2xl border border-white/5">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[80px] -mr-32 -mt-32" />
-                <div className="absolute bottom-0 left-0 w-48 h-48 bg-cyan-400/10 rounded-full blur-[60px] -ml-24 -mb-24" />
-
                 <div className="relative z-10 flex flex-col items-center">
                     <div className="relative mb-6">
                         <div className="absolute inset-0 scale-125">
@@ -161,15 +162,13 @@ export default function ProfileView({ user, userData: propUserData }: any) {
                                 />
                                 <defs>
                                     <linearGradient id="agileGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                        <stop offset="0%" stopColor="#6366f1" />
-                                        <stop offset="100%" stopColor="#22d3ee" />
+                                        <stop offset="0%" stopColor="#6366f1" /><stop offset="100%" stopColor="#22d3ee" />
                                     </linearGradient>
                                 </defs>
                             </svg>
                         </div>
                         
                         <div onClick={() => fileInputRef.current?.click()} className="cursor-pointer group relative">
-                            {/* Pass activeData here to ensure it uses liveFirestore data */}
                             <UserAvatar user={activeData} size="xl" />
                             <div className="absolute inset-0 bg-black/40 rounded-[35%] opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center backdrop-blur-sm">
                                 <Camera className="text-white mb-1" size={24} />
@@ -187,13 +186,12 @@ export default function ProfileView({ user, userData: propUserData }: any) {
                         </div>
                     </div>
 
-                    <h2 className="text-2xl font-black text-white mb-1 tracking-tight">{activeData?.name || "Magister OS User"}</h2>
+                    <h2 className="text-2xl font-black text-white mb-1 tracking-tight">{activeData?.name || "User"}</h2>
                     <div className="flex gap-2 mb-8">
                         <span className="px-3 py-1 bg-white/10 text-white/60 text-[9px] font-black rounded-lg uppercase tracking-widest border border-white/5">{activeData?.role}</span>
                         <span className="px-3 py-1 bg-white text-indigo-600 text-[9px] font-black rounded-lg uppercase tracking-widest shadow-lg flex items-center gap-1.5"><Shield size={10}/> {league.name} League</span>
                     </div>
 
-                    {/* Stats Dashboard */}
                     <div className="grid grid-cols-3 w-full bg-white/5 backdrop-blur-xl rounded-3xl border border-white/10 divide-x divide-white/5">
                         <div className="p-5 text-center">
                             <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1 flex justify-center gap-1"><Zap size={10} className="text-yellow-400"/> XP</div>
@@ -217,20 +215,34 @@ export default function ProfileView({ user, userData: propUserData }: any) {
             <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
                 <div className="flex justify-between items-center mb-5">
                     <h3 className="font-black text-slate-800 uppercase tracking-widest text-[10px] flex items-center gap-2"><Trophy size={14} className="text-amber-500"/> Journey Progress</h3>
-                    <div className="flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full uppercase">
-                        Next: {xpToNext} XP
-                    </div>
+                    <div className="flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full uppercase">Next: {xpToNext} XP</div>
                 </div>
                 <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden mb-3 p-1">
-                    <div className="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 rounded-full transition-all duration-1000" style={{ width: `${progressPct}%` }} />
+                    <div className="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(99,102,241,0.3)]" style={{ width: `${progressPct}%` }} />
                 </div>
                 <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">
                     <span>{currentLevelXp} Current</span>
-                    <span>{xpToNext - currentLevelXp} to Level {level + 1}</span>
+                    <span>{xpToNext - currentLevelXp} remaining</span>
                 </div>
             </div>
 
-            {/* System Control Settings */}
+            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                <div className="flex justify-between items-center mb-8">
+                    <h3 className="font-black text-slate-800 uppercase tracking-widest text-[10px] flex items-center gap-2"><Activity size={14} className="text-indigo-600"/> Learning Velocity</h3>
+                    <span className="text-[9px] font-black text-slate-400 uppercase">{stats.totalHours} Active Hours</span>
+                </div>
+                <div className="flex items-end justify-between h-24 gap-2.5 px-1">
+                    {stats.graphData.map((d: any, i: number) => (
+                        <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group">
+                            <div className="w-full bg-slate-50 rounded-lg relative flex items-end h-full mb-3 border border-slate-100 overflow-hidden">
+                                <div className={`w-full transition-all duration-1000 rounded-t-sm ${d.minutes > 0 ? 'bg-indigo-500 group-hover:bg-cyan-400' : 'bg-transparent'}`} style={{ height: `${d.height}%` }} />
+                            </div>
+                            <span className={`text-[8px] font-black uppercase ${d.minutes > 0 ? 'text-slate-900' : 'text-slate-300'}`}>{d.day}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
             <div className="bg-white rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-sm">
                 <div className="p-2 space-y-1">
                     <button onClick={toggleRole} className="w-full p-5 hover:bg-slate-50 rounded-[2rem] transition-all flex items-center justify-between group">
