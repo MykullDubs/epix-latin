@@ -52,6 +52,25 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
     });
   }, [classId, activeTopic]);
 
+  // --- NEW: VOTE LOGIC ---
+  const handleToggleLike = async (responseId: string, currentLikes: string[] = [], authorId: string) => {
+    if (!auth.currentUser) return;
+    const uid = auth.currentUser.uid;
+    
+    // Prevent self-upvoting
+    if (uid === authorId) {
+        alert("You can't upvote your own contribution, but keep up the great work!");
+        return;
+    }
+
+    const isLiked = currentLikes.includes(uid);
+    const responseRef = doc(db, 'artifacts', appId, 'classes', classId, 'forum_topics', activeTopic.id, 'responses', responseId);
+    
+    await updateDoc(responseRef, {
+        likes: isLiked ? arrayRemove(uid) : arrayUnion(uid)
+    });
+  };
+
   const handleCreateTopic = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || !newContent.trim()) return;
@@ -67,7 +86,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
     if (!newTitle.trim() || !newContent.trim() || !activeTopic) return;
     await addDoc(collection(db, 'artifacts', appId, 'classes', classId, 'forum_topics', activeTopic.id, 'responses'), {
       title: newTitle, content: newContent, authorName: userData?.name || 'Scholar',
-      authorId: auth.currentUser?.uid, role: userData?.role, timestamp: Date.now(), comments: []
+      authorId: auth.currentUser?.uid, role: userData?.role, timestamp: Date.now(), comments: [], likes: []
     });
     setNewTitle(""); setNewContent(""); setIsCreating(false);
   };
@@ -76,7 +95,6 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
     if (!commentText.trim()) return;
     const responseRef = doc(db, 'artifacts', appId, 'classes', classId, 'forum_topics', activeTopic.id, 'responses', responseId);
     
-    // Using an arrayUnion for comments to keep it simple and fast
     await updateDoc(responseRef, {
         comments: arrayUnion({
             text: commentText,
@@ -116,7 +134,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                     <p className="text-sm text-slate-400 line-clamp-1 mb-4">{t.content}</p>
                     <div className="flex items-center gap-4 text-[10px] font-black uppercase text-slate-400">
                         <span className="flex items-center gap-1"><User size={12}/> {t.authorName}</span>
-                        <span className="flex items-center gap-1"><MessageSquare size={12}/> {t.replyCount || 0} Discussions</span>
+                        <span className="flex items-center gap-1"><MessageSquare size={12}/> {topics.length} Discussions</span>
                     </div>
                 </button>
             ))}
@@ -168,12 +186,27 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                             <h4 className="text-xl font-black text-slate-800 mb-2">{res.title}</h4>
                             <p className="text-sm text-slate-500 leading-relaxed font-medium mb-4">{res.content}</p>
                             
-                            <button 
-                                onClick={() => setReplyingToId(replyingToId === res.id ? null : res.id)} 
-                                className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 transition-colors"
-                            >
-                                <MessageSquare size={14} /> {replyingToId === res.id ? 'Cancel Reply' : `Reply to ${res.authorName.split(' ')[0]}`}
-                            </button>
+                            {/* ACTION BAR: LIKES & REPLIES */}
+                            <div className="flex items-center gap-6">
+                                <button 
+                                    onClick={() => handleToggleLike(res.id, res.likes || [], res.authorId)}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all active:scale-125 ${
+                                        res.likes?.includes(auth.currentUser?.uid) 
+                                        ? 'bg-rose-50 text-rose-500 border border-rose-100' 
+                                        : 'bg-slate-50 text-slate-400 border border-transparent hover:border-rose-100 hover:text-rose-400'
+                                    }`}
+                                >
+                                    <Heart size={14} className={res.likes?.includes(auth.currentUser?.uid) ? 'fill-rose-500' : ''} /> 
+                                    <span className="text-[10px] font-black">{res.likes?.length || 0}</span>
+                                </button>
+
+                                <button 
+                                    onClick={() => setReplyingToId(replyingToId === res.id ? null : res.id)} 
+                                    className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 transition-colors"
+                                >
+                                    <MessageSquare size={14} /> {replyingToId === res.id ? 'Cancel' : 'Reply'}
+                                </button>
+                            </div>
                         </div>
 
                         {/* Threaded Comments (The replies) */}
@@ -208,7 +241,6 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
     </div>
   );
 };
-
 // ============================================================================
 //  STUDENT CLASS VIEW
 // ============================================================================
