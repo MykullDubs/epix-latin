@@ -4,35 +4,53 @@ export const calculateUserStats = (logs: any[]) => {
     let totalSeconds = 0;
     let cardsMastered = 0;
     let perfectScores = 0;
+    
     const activityByDay: any = {};
+    const timeByDay: any = {}; 
 
-    // Initialize last 7 days
+    // Initialize last 7 days so empty days still show up on the graph
     for(let i=6; i>=0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        activityByDay[d.toLocaleDateString()] = 0;
+        const dateStr = d.toDateString(); 
+        activityByDay[dateStr] = 0;
+        timeByDay[dateStr] = 0;
     }
 
     logs.forEach(log => {
-        // Time
-        if (log.type === 'time_log') totalSeconds += (log.duration || 0);
+        const dateKey = new Date(log.timestamp).toDateString();
         
-        // Activity Graph
-        const dateKey = new Date(log.timestamp).toLocaleDateString();
-        if (activityByDay[dateKey] !== undefined) {
-            activityByDay[dateKey] += (log.xp || 10);
+        // If duration wasn't logged, estimate it based on XP (e.g. 50 XP = ~15 mins)
+        let durationSecs = log.duration || 0;
+        if (!durationSecs && log.xp) {
+            durationSecs = log.xp * 18; // 1 XP = ~18 seconds
         }
+
+        if (timeByDay[dateKey] !== undefined) {
+            activityByDay[dateKey] += (log.xp || 0);
+            timeByDay[dateKey] += durationSecs;
+        }
+        
+        totalSeconds += durationSecs;
 
         // Achievements
         if (log.type === 'completion' && log.scoreDetail?.finalScorePct === 100) perfectScores++;
-        if (log.type === 'self_study') cardsMastered += 1; // Approx
+        if (log.type === 'self_study') cardsMastered += 1; 
     });
 
-    const graphData = Object.keys(activityByDay).map(date => ({
-        date: date.split('/')[0] + '/' + date.split('/')[1], // Short date
-        xp: activityByDay[date],
-        height: Math.min(100, Math.max(10, (activityByDay[date] / 200) * 100)) // Scale to 100px max
-    }));
+    const graphData = Object.keys(activityByDay).map(dateStr => {
+        const d = new Date(dateStr);
+        const dayName = d.toLocaleDateString('en-US', { weekday: 'short' }); // e.g., "Mon", "Tue"
+        const mins = Math.round(timeByDay[dateStr] / 60);
+        
+        return {
+            day: dayName,
+            xp: activityByDay[dateStr],
+            minutes: mins,
+            // Scale height: 60 minutes = 100% bar height. Minimum visible height is 5% if they have > 0 mins.
+            height: mins > 0 ? Math.min(100, Math.max(10, (mins / 60) * 100)) : 0
+        };
+    });
 
     return { 
         totalHours: (totalSeconds / 3600).toFixed(1),
