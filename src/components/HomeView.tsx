@@ -1,16 +1,21 @@
 // src/components/HomeView.tsx
 import React, { useRef } from 'react';
-import { GraduationCap, Globe, Flame, Zap, Trophy, School, Layers, Feather } from 'lucide-react';
+import { 
+    GraduationCap, Globe, Flame, Zap, Trophy, 
+    School, Layers, Feather, Target, BookOpen, PlayCircle 
+} from 'lucide-react';
+import { calculateLevel } from '../utils/profileHelpers';
 
 export default function HomeView({ setActiveTab, classes, onSelectClass, userData, user, activeOrg }: any) {
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
-  // Calculate Stats
+  // Calculate Gamified Stats
   const xp = userData?.xp || 0;
-  const level = Math.floor(xp / 1000) + 1;
-  const progress = ((xp % 1000) / 1000) * 100;
   const streak = userData?.streak || 1;
   const targetLang = userData?.targetLanguage || "English";
+  
+  // Use our centralized gamification math!
+  const { level, progressPct, xpToNext } = calculateLevel(xp);
 
   // Dynamic Greeting
   const hour = new Date().getHours();
@@ -19,7 +24,14 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
 
   // --- DYNAMIC BRANDING ---
   const themeColor = activeOrg?.themeColor || '#4f46e5'; // Defaults to Indigo-600
-  const themeName = activeOrg?.name || 'LLLMS';
+  const themeName = activeOrg?.name || 'Magister';
+
+  // --- MOCK DAILY QUESTS ---
+  // In a production environment, this checks activity_logs for today's date
+  const dailyQuests = [
+      { id: 1, title: 'Earn 50 XP', target: 50, current: Math.min(xp, 50), icon: <Zap size={16} className="text-yellow-500" /> },
+      { id: 2, title: 'Complete 1 Lesson', target: 1, current: 0, icon: <BookOpen size={16} className="text-indigo-500" /> },
+  ];
 
   return (
     <div className="h-full flex flex-col bg-slate-50">
@@ -55,17 +67,17 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
 
                 {/* STATS BENTO (Colorized by Brand) */}
                 <div className="grid grid-cols-3 gap-3">
-                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center">
+                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center shadow-inner">
                         <Flame size={20} className="text-orange-500 mb-1 fill-orange-500"/>
                         <span className="text-lg font-black" style={{ color: themeColor }}>{streak}</span>
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Day Streak</span>
                     </div>
-                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center">
+                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center shadow-inner">
                         <Zap size={20} className="text-yellow-500 mb-1 fill-yellow-500"/>
                         <span className="text-lg font-black" style={{ color: themeColor }}>{xp}</span>
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Total XP</span>
                     </div>
-                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center">
+                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center shadow-inner">
                         <Trophy size={20} className="text-emerald-500 mb-1 fill-emerald-500"/>
                         <span className="text-lg font-black" style={{ color: themeColor }}>{level}</span>
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Level</span>
@@ -74,19 +86,55 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
 
                 {/* PROGRESS BAR (Colorized by Brand) */}
                 <div className="mt-6 flex items-center gap-3">
-                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
                         <div 
-                            className="h-full transition-all duration-1000" 
-                            style={{ width: `${progress}%`, backgroundColor: themeColor }}
+                            className="h-full transition-all duration-1000 ease-out" 
+                            style={{ width: `${progressPct}%`, backgroundColor: themeColor }}
                         />
                     </div>
-                    <span className="text-[9px] font-bold text-slate-400 whitespace-nowrap">{Math.round(1000 - (xp % 1000))} XP to Level Up</span>
+                    <span className="text-[9px] font-black text-slate-400 whitespace-nowrap uppercase tracking-widest">
+                        {xpToNext} XP to Level Up
+                    </span>
                 </div>
             </div>
 
             <div className="px-6 space-y-8 mt-8">
+
+              {/* 3. NEW: DAILY QUESTS WIDGET */}
+              <div className="bg-white p-6 rounded-[2rem] border-2 border-slate-100 shadow-sm animate-in slide-in-from-bottom-4">
+                  <div className="flex items-center justify-between mb-5">
+                      <h3 className="font-black text-slate-800 flex items-center gap-2">
+                          <Target size={18} className="text-rose-500" /> Daily Quests
+                      </h3>
+                      <span className="text-[9px] font-black text-rose-500 bg-rose-50 px-2 py-1 rounded-md uppercase tracking-widest">
+                          Resets in 12h
+                      </span>
+                  </div>
+
+                  <div className="space-y-4">
+                      {dailyQuests.map(quest => {
+                          const pct = Math.round((quest.current / quest.target) * 100);
+                          const isDone = quest.current >= quest.target;
+                          
+                          return (
+                              <div key={quest.id} className="relative">
+                                  <div className="flex justify-between items-end mb-2">
+                                      <div className="flex items-center gap-2">
+                                          {quest.icon}
+                                          <span className={`text-sm font-bold ${isDone ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{quest.title}</span>
+                                      </div>
+                                      <span className="text-xs font-black text-slate-400">{quest.current}/{quest.target}</span>
+                                  </div>
+                                  <div className="h-2.5 w-full bg-slate-50 rounded-full overflow-hidden border border-slate-100">
+                                      <div className="h-full bg-rose-500 transition-all duration-1000" style={{ width: `${pct}%` }} />
+                                  </div>
+                              </div>
+                          );
+                      })}
+                  </div>
+              </div>
               
-              {/* 3. CLASSES SECTION */}
+              {/* 4. CLASSES SECTION */}
               {classes && classes.length > 0 ? (
                 <div className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
                     <div className="flex justify-between items-end mb-4 ml-1">
@@ -96,7 +144,6 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
                     <div className="flex gap-5 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">
                         {classes.map((cls: any, index: number) => { 
                             const pendingCount = (cls.assignments || []).length;
-                            // Keeping the varied gradients so classes look distinct from one another
                             const gradients = ["from-indigo-600 to-violet-600", "from-emerald-500 to-teal-600", "from-orange-500 to-rose-600"];
                             const themeGradient = gradients[index % gradients.length];
 
@@ -129,7 +176,7 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
                  </div>
               )}
 
-              {/* 4. ACTION CARDS */}
+              {/* 5. ACTION CARDS */}
               <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-bottom-4 duration-500 delay-200">
                 <button 
                     onClick={() => setActiveTab('flashcards')} 
