@@ -20,8 +20,9 @@ export default function ClassManagerView({
     onCreateClass, 
     onDeleteClass, 
     onRenameClass, 
+    onUpdateClassDescription, // <--- NEW PROP ADDED
     onAddStudent,
-    onStartPresentation // <--- NEW PROP ADDED
+    onStartPresentation
 }: any) {
     const [selectedClassId, setSelectedClassId] = useState<string | null>(classes[0]?.id || null);
     const [activeTab, setActiveTab] = useState<'roster' | 'assignments'>('roster');
@@ -29,6 +30,7 @@ export default function ClassManagerView({
     // Form States
     const [newStudentEmail, setNewStudentEmail] = useState('');
     const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [isEditingDesc, setIsEditingDesc] = useState(false); // <--- NEW STATE ADDED
     
     // Creation & Search States
     const [isCreatingCohort, setIsCreatingCohort] = useState(false);
@@ -155,15 +157,30 @@ export default function ClassManagerView({
                             <div className="flex justify-between items-start mb-8">
                                 <div className="flex-1 pr-8">
                                     <span className="inline-block px-3 py-1 bg-slate-200/50 text-slate-500 rounded-lg text-[10px] font-black uppercase mb-3">ID: {activeClass.id}</span>
+                                    
+                                    {/* TITLE INPUT */}
                                     <div className="flex items-center gap-3 group">
                                         <input 
-                                            className="text-3xl md:text-4xl font-black text-slate-900 tracking-tighter bg-transparent border-b-2 border-transparent focus:border-indigo-500 p-0 focus:ring-0 w-full max-w-lg transition-colors"
+                                            className="text-3xl md:text-4xl font-black text-slate-900 tracking-tighter bg-transparent border-b-2 border-transparent focus:border-indigo-500 p-0 focus:ring-0 w-full max-w-lg transition-colors outline-none"
                                             value={activeClass.name}
                                             onChange={(e) => onRenameClass(activeClass.id, e.target.value)}
                                             onFocus={() => setIsEditingTitle(true)}
                                             onBlur={() => setIsEditingTitle(false)}
                                         />
                                         <Edit3 size={18} className={`text-slate-300 ${isEditingTitle ? 'opacity-0' : 'group-hover:text-indigo-400'}`} />
+                                    </div>
+
+                                    {/* DESCRIPTION / SUBTITLE INPUT */}
+                                    <div className="flex items-center gap-3 group mt-1">
+                                        <input 
+                                            className="text-sm font-bold text-slate-400 bg-transparent border-b-2 border-transparent focus:border-indigo-500 p-0 focus:ring-0 w-full max-w-xl transition-colors outline-none placeholder:text-slate-300"
+                                            value={activeClass.description || ''}
+                                            onChange={(e) => onUpdateClassDescription && onUpdateClassDescription(activeClass.id, e.target.value)}
+                                            onFocus={() => setIsEditingDesc(true)}
+                                            onBlur={() => setIsEditingDesc(false)}
+                                            placeholder="Add a cohort description or welcome message..."
+                                        />
+                                        <Edit3 size={14} className={`text-slate-300 ${isEditingDesc ? 'opacity-0' : 'group-hover:text-indigo-400'}`} />
                                     </div>
                                 </div>
                                 <button 
@@ -277,7 +294,7 @@ export default function ClassManagerView({
                                                         <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 mr-4 ${lesson.type === 'arcade_game' ? 'bg-amber-50 text-amber-500' : 'bg-indigo-50 text-indigo-500'}`}>{lesson.type === 'arcade_game' ? <Gamepad2 size={20} /> : <BookOpen size={20} />}</div>
                                                         <div className="flex-1 pr-4"><h4 className="font-black text-slate-800 text-sm mb-0.5">{lesson.title}</h4><span className="text-[10px] font-black uppercase text-slate-400">{lesson.type === 'arcade_game' ? 'Arcade Game' : 'Standard Unit'}</span></div>
                                                         
-                                                        {/* --- NEW: ACTION BUTTON GROUP --- */}
+                                                        {/* --- ACTION BUTTON GROUP --- */}
                                                         <div className="flex items-center gap-2 shrink-0">
                                                             <button 
                                                                 onClick={() => onStartPresentation && onStartPresentation(lesson.id)}
