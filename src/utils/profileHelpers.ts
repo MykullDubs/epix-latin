@@ -1,7 +1,4 @@
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { doc, setDoc } from "firebase/firestore"; // Changed from updateDoc to setDoc
-import { storage, db, appId } from "../config/firebase";
-
+// src/utils/profileHelpers.ts
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { doc, setDoc, updateDoc } from "firebase/firestore";
 import { storage, db, appId } from "../config/firebase";
@@ -10,11 +7,15 @@ import { storage, db, appId } from "../config/firebase";
 //  PROFILE PICTURE & AVATAR LOGIC (MAGISTER OS)
 // ============================================================================
 
+/**
+ * Uploads a file to Firebase Storage and updates the user's Firestore profile.
+ * Uses dot-notation for surgical updates and a cache-buster for instant UI refresh.
+ */
 export const uploadProfilePicture = async (uid: string, file: File) => {
     if (!storage) throw new Error("storage-not-initialized");
 
     try {
-        // 1. Create unique storage path
+        // 1. Create unique storage path (Avatar remains in user-specific folder)
         const fileName = `avatar_${Date.now()}.jpg`;
         const storageRef = ref(storage, `artifacts/${appId}/profiles/${uid}/${fileName}`);
         
@@ -23,21 +24,20 @@ export const uploadProfilePicture = async (uid: string, file: File) => {
         const snapshot = await uploadBytes(storageRef, file, metadata);
         
         // 3. Retrieve public URL + Add Cache-Buster
-        // Adding a timestamp ensures the <img> tag refreshes immediately
+        // Adding a timestamp ensures the <img> tag in UserAvatar refreshes immediately
         const rawURL = await getDownloadURL(snapshot.ref);
         const downloadURL = `${rawURL}&t=${Date.now()}`;
         
-        // 4. THE FIX: Use Dot-Notation for the update
-        // This ensures Firestore targets the specific nested field correctly
+        // 4. Update Firestore using dot-notation to avoid overwriting unrelated profile data
         const userRef = doc(db, 'artifacts', appId, 'users', uid);
         
         try {
-            // Try updating just the specific field first (most efficient)
+            // Standard update for existing users
             await updateDoc(userRef, {
                 'profile.main.avatarUrl': downloadURL
             });
         } catch (e) {
-            // Fallback: If the doc doesn't exist, create it with setDoc merge
+            // Fallback: Create the document if it's the user's first time interacting with the system
             await setDoc(userRef, {
                 profile: {
                     main: {
@@ -54,6 +54,18 @@ export const uploadProfilePicture = async (uid: string, file: File) => {
     }
 };
 
+/**
+ * Helper to get clean initials from a full name (e.g., "John Doe" -> "JD")
+ */
+export const getInitials = (name: string = "Scholar") => {
+    return name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
+};
+
 // ============================================================================
 //  STATS & ANALYTICS ENGINE
 // ============================================================================
@@ -65,6 +77,7 @@ export const calculateUserStats = (logs: any[]) => {
     const activityByDay: any = {};
     const timeByDay: any = {}; 
 
+    // Initialize 7-day window
     for(let i=6; i>=0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
@@ -76,7 +89,7 @@ export const calculateUserStats = (logs: any[]) => {
     logs.forEach(log => {
         const dateKey = new Date(log.timestamp).toDateString();
         let durationSecs = log.duration || 0;
-        if (!durationSecs && log.xp) durationSecs = log.xp * 18; // Est duration
+        if (!durationSecs && log.xp) durationSecs = log.xp * 18; 
         
         if (timeByDay[dateKey] !== undefined) {
             activityByDay[dateKey] += (log.xp || 0);
@@ -99,7 +112,12 @@ export const calculateUserStats = (logs: any[]) => {
         };
     });
 
-    return { totalHours: (totalSeconds / 3600).toFixed(1), cardsMastered, perfectScores, graphData };
+    return { 
+        totalHours: (totalSeconds / 3600).toFixed(1), 
+        cardsMastered, 
+        perfectScores, 
+        graphData 
+    };
 };
 
 // ============================================================================
@@ -108,7 +126,7 @@ export const calculateUserStats = (logs: any[]) => {
 
 export const calculateLevel = (totalXp: number = 0, totalLikes: number = 0) => {
     const XP_PER_LEVEL = 500;
-    const SOCIAL_BONUS = totalLikes * 10; // 10 XP per Star received
+    const SOCIAL_BONUS = totalLikes * 10; 
     const combinedXp = totalXp + SOCIAL_BONUS;
     
     const level = Math.floor(combinedXp / XP_PER_LEVEL) + 1;
