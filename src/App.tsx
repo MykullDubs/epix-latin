@@ -38,7 +38,7 @@ export default function App() {
   if (!user) {
     return showAuth ? (
       <div className="relative min-h-screen bg-slate-50">
-         <button onClick={() => setShowAuth(false)} className="absolute top-6 left-6 z-50 text-slate-400 hover:text-slate-900 font-bold text-sm">← Regresar</button>
+         <button onClick={() => setShowAuth(false)} className="absolute top-6 left-6 z-50 text-slate-400 hover:text-slate-900 font-bold text-sm transition-colors">← Regresar</button>
          <AuthView />
       </div>
     ) : <MarketingSite onLoginClick={() => setShowAuth(true)} />;
@@ -51,7 +51,7 @@ export default function App() {
       <div className="fixed inset-0 z-[5000] bg-slate-900 flex flex-col">
         <div className="h-16 px-6 flex justify-between items-center border-b border-white/10" style={{ backgroundColor: activeOrg?.themeColor || '#4f46e5' }}>
           <span className="font-black text-white uppercase tracking-widest">{activeOrg?.name || 'Magister'} | CLASE EN VIVO</span>
-          <button onClick={() => setPresentationLessonId(null)} className="bg-black/20 text-white px-6 py-2 rounded-full font-black text-xs">Terminar Clase</button>
+          <button onClick={() => setPresentationLessonId(null)} className="bg-black/20 text-white px-6 py-2 rounded-full font-black text-xs hover:bg-rose-600 transition-colors">Terminar Clase</button>
         </div>
         <div className="flex-1 bg-white">
           <ClassView lesson={lesson} userData={userData} activeOrg={activeOrg} />
@@ -62,7 +62,18 @@ export default function App() {
 
   // 3. ADMIN VIEW
   if (currentView === 'admin' && (userData?.role === 'admin' || userData?.role === 'org_admin')) {
-    return <AdminDashboardView user={{...user, ...userData}} activeOrg={activeOrg} onSwitchView={() => setCurrentView('student')} />;
+    return (
+        <div className="h-screen w-full relative">
+            <AdminDashboardView user={{...user, ...userData}} activeOrg={activeOrg} onSwitchView={() => setCurrentView('student')} />
+            <button 
+                onClick={() => setCurrentView('student')}
+                style={{ backgroundColor: activeOrg?.themeColor || '#4f46e5' }}
+                className="fixed bottom-6 right-6 z-[9000] text-white px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest shadow-2xl transition-transform active:scale-95"
+            >
+                👁️ Preview App
+            </button>
+        </div>
+    );
   }
 
   // 4. INSTRUCTOR VIEW
@@ -82,10 +93,12 @@ export default function App() {
         onCreateClass={actions.createClass}
         onDeleteClass={actions.deleteClass}
         onRenameClass={actions.renameClass}
+        onUpdateClassDescription={actions.updateClassDescription} // Passing the new update desc prop!
         onAddStudent={actions.addStudent}
         onStartPresentation={setPresentationLessonId}
         onSwitchView={() => setCurrentView('student')}
         onLogout={actions.logout} 
+        AdminDashboardView={AdminDashboardView}
       />
     );
   }
@@ -110,11 +123,11 @@ export default function App() {
               <LessonView lesson={activeLesson} onFinish={() => { actions.logActivity(activeLesson.id, 50, activeLesson.title, { mode: 'lesson' }); setActiveLesson(null); }} />
             )
           ) : activeStudentClass ? (
-            <StudentClassView classData={activeStudentClass} lessons={allLessons} curriculums={GLOBAL_CURRICULUMS} onBack={() => setActiveStudentClass(null)} onSelectLesson={setActiveLesson} setActiveTab={setActiveTab} setSelectedLessonId={setPresentationLessonId} userData={userData} />
+            <StudentClassView classData={activeStudentClass} lessons={allLessons} curriculums={GLOBAL_CURRICULUMS} onBack={() => setActiveStudentClass(null)} onSelectLesson={setActiveLesson} setActiveTab={setActiveTab} setSelectedLessonId={setPresentationLessonId} userData={userData} ExamPlayerView={ExamPlayerView} />
           ) : activeTab === 'discovery' ? (
             <DiscoveryView allDecks={allDecks} lessons={allLessons} onSelectDeck={(d:any) => { setActiveDeckKey(d.id); setActiveTab('flashcards'); }} onSelectLesson={setActiveLesson} onLogActivity={actions.logActivity} userData={userData} />
           ) : activeTab === 'flashcards' ? (
-            <FlashcardView allDecks={allDecks} selectedDeckKey={activeDeckKey} onSelectDeck={setActiveDeckKey} onLogActivity={actions.logActivity} onSaveCard={actions.saveCard} userData={userData} user={user} />
+            <FlashcardView allDecks={allDecks} selectedDeckKey={activeDeckKey} onSelectDeck={(key:any) => { setActiveDeckKey(key); if(!key) setActiveTab('home'); }} onLogActivity={actions.logActivity} onSaveCard={actions.saveCard} userData={userData} user={user} />
           ) : activeTab === 'profile' ? (
             <ProfileView user={user} userData={userData} />
           ) : (
