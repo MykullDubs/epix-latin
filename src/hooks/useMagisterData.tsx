@@ -93,7 +93,10 @@ export function useMagisterData() {
       if (!user) return;
       await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id), { name: newName });
     },
-
+    updateClassDescription: async (id: string, description: string) => {
+      if (!user) return;
+      await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id), { description });
+    },
     addStudent: async (classId: string, email: string) => {
       if (!user) return;
       const cleanEmail = email.toLowerCase().trim();
