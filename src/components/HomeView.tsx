@@ -11,10 +11,8 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
   
   // Calculate Gamified Stats
   const xp = userData?.xp || 0;
-  const streak = userData?.streak || 1;
+  const streak = userData?.streak || 0;
   const targetLang = userData?.targetLanguage || "English";
-  
-  // Use our centralized gamification math!
   const { level, progressPct, xpToNext } = calculateLevel(xp);
 
   // Dynamic Greeting
@@ -23,15 +21,26 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
   const firstName = userData?.name?.split(' ')[0] || "Scholar";
 
   // --- DYNAMIC BRANDING ---
-  const themeColor = activeOrg?.themeColor || '#4f46e5'; // Defaults to Indigo-600
+  const themeColor = activeOrg?.themeColor || '#4f46e5'; 
   const themeName = activeOrg?.name || 'Magister';
 
-  // --- MOCK DAILY QUESTS ---
-  // In a production environment, this checks activity_logs for today's date
+  // --- DAILY QUEST ENGINE ---
+  const todayStr = new Date().toDateString();
+  const isToday = userData?.lastActivityDate === todayStr;
+  
+  // If they haven't done anything today, show 0. Otherwise, show their live daily stats.
+  const todayXp = isToday ? (userData?.dailyXp || 0) : 0;
+  const todayLessons = isToday ? (userData?.dailyLessons || 0) : 0;
+
   const dailyQuests = [
-      { id: 1, title: 'Earn 50 XP', target: 50, current: Math.min(xp, 50), icon: <Zap size={16} className="text-yellow-500" /> },
-      { id: 2, title: 'Complete 1 Lesson', target: 1, current: 0, icon: <BookOpen size={16} className="text-indigo-500" /> },
+      { id: 1, title: 'Earn 50 XP', target: 50, current: Math.min(todayXp, 50), icon: <Zap size={16} className="text-yellow-500" /> },
+      { id: 2, title: 'Complete 1 Lesson', target: 1, current: Math.min(todayLessons, 1), icon: <BookOpen size={16} className="text-indigo-500" /> },
   ];
+
+  // Calculate hours remaining until midnight for the reset label
+  const now = new Date();
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const hoursRemaining = Math.max(1, Math.floor((tomorrow.getTime() - now.getTime()) / (1000 * 60 * 60)));
 
   return (
     <div className="h-full flex flex-col bg-slate-50">
@@ -65,11 +74,11 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
                     <h1 className="text-4xl font-black text-slate-800 tracking-tight">{firstName}.</h1>
                 </div>
 
-                {/* STATS BENTO (Colorized by Brand) */}
+                {/* STATS BENTO */}
                 <div className="grid grid-cols-3 gap-3">
                     <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center shadow-inner">
-                        <Flame size={20} className="text-orange-500 mb-1 fill-orange-500"/>
-                        <span className="text-lg font-black" style={{ color: themeColor }}>{streak}</span>
+                        <Flame size={20} className={`mb-1 ${streak > 0 && isToday ? 'text-orange-500 fill-orange-500' : 'text-slate-300'}`}/>
+                        <span className={`text-lg font-black ${streak > 0 && isToday ? '' : 'text-slate-400'}`} style={streak > 0 && isToday ? { color: themeColor } : {}}>{streak}</span>
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Day Streak</span>
                     </div>
                     <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center shadow-inner">
@@ -84,7 +93,7 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
                     </div>
                 </div>
 
-                {/* PROGRESS BAR (Colorized by Brand) */}
+                {/* PROGRESS BAR */}
                 <div className="mt-6 flex items-center gap-3">
                     <div className="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
                         <div 
@@ -100,33 +109,35 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
 
             <div className="px-6 space-y-8 mt-8">
 
-              {/* 3. NEW: DAILY QUESTS WIDGET */}
+              {/* 3. DAILY QUESTS WIDGET */}
               <div className="bg-white p-6 rounded-[2rem] border-2 border-slate-100 shadow-sm animate-in slide-in-from-bottom-4">
                   <div className="flex items-center justify-between mb-5">
                       <h3 className="font-black text-slate-800 flex items-center gap-2">
                           <Target size={18} className="text-rose-500" /> Daily Quests
                       </h3>
                       <span className="text-[9px] font-black text-rose-500 bg-rose-50 px-2 py-1 rounded-md uppercase tracking-widest">
-                          Resets in 12h
+                          Resets in {hoursRemaining}h
                       </span>
                   </div>
 
                   <div className="space-y-4">
                       {dailyQuests.map(quest => {
-                          const pct = Math.round((quest.current / quest.target) * 100);
+                          const pct = Math.min(100, Math.round((quest.current / quest.target) * 100));
                           const isDone = quest.current >= quest.target;
                           
                           return (
                               <div key={quest.id} className="relative">
                                   <div className="flex justify-between items-end mb-2">
                                       <div className="flex items-center gap-2">
-                                          {quest.icon}
+                                          <div className={`${isDone ? 'opacity-50 grayscale' : ''} transition-all`}>{quest.icon}</div>
                                           <span className={`text-sm font-bold ${isDone ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{quest.title}</span>
                                       </div>
-                                      <span className="text-xs font-black text-slate-400">{quest.current}/{quest.target}</span>
+                                      <span className={`text-xs font-black ${isDone ? 'text-emerald-500' : 'text-slate-400'}`}>
+                                          {isDone ? 'DONE' : `${quest.current}/${quest.target}`}
+                                      </span>
                                   </div>
                                   <div className="h-2.5 w-full bg-slate-50 rounded-full overflow-hidden border border-slate-100">
-                                      <div className="h-full bg-rose-500 transition-all duration-1000" style={{ width: `${pct}%` }} />
+                                      <div className={`h-full transition-all duration-1000 ${isDone ? 'bg-emerald-500' : 'bg-rose-500'}`} style={{ width: `${pct}%` }} />
                                   </div>
                               </div>
                           );
