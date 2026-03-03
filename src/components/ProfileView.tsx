@@ -62,7 +62,7 @@ export default function ProfileView({ user, userData: propUserData }: any) {
   const [liveProfile, setLiveProfile] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 1. LIVE LISTENER (Only for avatar & live role changes)
+  // 1. LIVE LISTENER
   useEffect(() => {
     if (!user?.uid) return;
     const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
@@ -87,13 +87,10 @@ export default function ProfileView({ user, userData: propUserData }: any) {
       });
   }, [user]);
 
-  // --- THE MASTER FIX: Deep Merge Data ---
-  // This ensures stats from parent (propUserData) are kept if the 
-  // liveFirestore doc (liveProfile) is missing them.
+  // 3. DATA MERGE
   const activeData = {
       ...propUserData,
       ...liveProfile,
-      // Deep merge the profile object specifically
       profile: {
           ...propUserData?.profile,
           ...liveProfile?.profile,
@@ -135,7 +132,7 @@ export default function ProfileView({ user, userData: propUserData }: any) {
       setDeploying(false); 
   };
 
-  // --- AGILE MATH (Using merged data) ---
+  // --- AGILE MATH ---
   const xp = activeData?.xp || 0;
   const streak = activeData?.streak || 0;
   const totalLikes = activeData?.totalLikesReceived || 0;
@@ -226,18 +223,28 @@ export default function ProfileView({ user, userData: propUserData }: any) {
                 </div>
             </div>
 
+            {/* UPGRADED: Activity Graph with Hover Tooltips */}
             <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
                 <div className="flex justify-between items-center mb-8">
                     <h3 className="font-black text-slate-800 uppercase tracking-widest text-[10px] flex items-center gap-2"><Activity size={14} className="text-indigo-600"/> Learning Velocity</h3>
                     <span className="text-[9px] font-black text-slate-400 uppercase">{stats.totalHours} Active Hours</span>
                 </div>
-                <div className="flex items-end justify-between h-24 gap-2.5 px-1">
+                
+                <div className="flex items-end justify-between h-24 gap-2 px-1">
                     {stats.graphData.map((d: any, i: number) => (
-                        <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group">
-                            <div className="w-full bg-slate-50 rounded-lg relative flex items-end h-full mb-3 border border-slate-100 overflow-hidden">
-                                <div className={`w-full transition-all duration-1000 rounded-t-sm ${d.minutes > 0 ? 'bg-indigo-500 group-hover:bg-cyan-400' : 'bg-transparent'}`} style={{ height: `${d.height}%` }} />
+                        <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group cursor-pointer relative">
+                            {/* HOVER TOOLTIP */}
+                            <div className="absolute -top-8 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg whitespace-nowrap z-10">
+                                {d.minutes} mins
                             </div>
-                            <span className={`text-[8px] font-black uppercase ${d.minutes > 0 ? 'text-slate-900' : 'text-slate-300'}`}>{d.day}</span>
+                            
+                            <div className="w-full bg-slate-50 rounded-lg relative flex items-end h-full mb-3 border border-slate-100 overflow-hidden">
+                                <div 
+                                    className={`w-full transition-all duration-1000 rounded-t-sm ${d.minutes > 0 ? 'bg-indigo-500 group-hover:bg-cyan-400' : 'bg-transparent'}`} 
+                                    style={{ height: `${d.height}%` }} 
+                                />
+                            </div>
+                            <span className={`text-[8px] font-black uppercase transition-colors ${d.minutes > 0 ? 'text-slate-900 group-hover:text-indigo-600' : 'text-slate-300'}`}>{d.day}</span>
                         </div>
                     ))}
                 </div>
@@ -255,6 +262,19 @@ export default function ProfileView({ user, userData: propUserData }: any) {
                         </div>
                         <ChevronRight size={18} className="text-slate-300"/>
                     </button>
+
+                    {activeData?.role === 'instructor' && (
+                        <button onClick={deploySystemContent} disabled={deploying} className="w-full p-5 hover:bg-emerald-50 rounded-[2rem] transition-all flex items-center justify-between group">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600 group-hover:scale-110 transition-transform"><UploadCloud size={20}/></div>
+                                <div className="text-left">
+                                    <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Infrastructure</span>
+                                    <span className="text-sm font-black text-slate-800">{deploying ? 'Rebuilding...' : 'Synchronize Core'}</span>
+                                </div>
+                            </div>
+                            <ChevronRight size={18} className="text-slate-300"/>
+                        </button>
+                    )}
 
                     <button onClick={handleLogout} className="w-full p-5 hover:bg-rose-50 rounded-[2rem] transition-all flex items-center justify-between group mt-2">
                         <div className="flex items-center gap-4">
