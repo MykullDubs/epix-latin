@@ -130,13 +130,10 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
 
   const handlePostResponse = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // VERIFIED VALIDATION: Title + (Text OR Audio)
     if (!newTitle.trim() || (!newContent.trim() && !pendingAudio)) {
-      alert("Please provide a title and either a written message or a voice recording.");
+      alert("Please provide a title and either a message or a recording.");
       return;
     }
-
     if (!activeTopic) return;
     setIsUploading(true);
 
@@ -150,20 +147,13 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
       }
 
       await addDoc(collection(db, 'artifacts', appId, 'classes', classId, 'forum_topics', activeTopic.id, 'responses'), {
-        title: newTitle,
-        content: newContent || "", 
-        audioUrl,
-        authorName: userData?.name || 'Scholar',
-        authorId: auth.currentUser?.uid,
-        role: userData?.role || 'student',
-        timestamp: Date.now(),
-        comments: [],
-        likes: []
+        title: newTitle, content: newContent || "", audioUrl,
+        authorName: userData?.name || 'Scholar', authorId: auth.currentUser?.uid,
+        role: userData?.role || 'student', timestamp: Date.now(), comments: [], likes: []
       });
 
       setNewTitle(""); setNewContent(""); setPendingAudio(null); setIsCreating(false);
     } catch (err: any) {
-      console.error("Upload error:", err);
       alert("Error uploading response: " + err.message);
     } finally {
       setIsUploading(false);
@@ -188,7 +178,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
         <div className="flex justify-between items-center mb-6 px-2">
             <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Discussions</h3>
             {isInstructor && (
-                <button onClick={() => setIsCreating(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase flex items-center gap-2 shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"><Plus size={16}/> New Topic</button>
+                <button onClick={() => setIsCreating(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase flex items-center gap-2 shadow-lg hover:bg-indigo-700 transition-all"><Plus size={16}/> New Topic</button>
             )}
         </div>
         <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
@@ -214,7 +204,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                         <p className="text-sm text-slate-400 line-clamp-1 mb-4 font-medium">{t.content}</p>
                         <div className="flex items-center gap-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">
                             <span className="flex items-center gap-1.5"><User size={12}/> {t.authorName}</span>
-                            <span className="flex items-center gap-1.5"><MessageSquare size={12}/> {responses.length} Submissions</span>
+                            <span className="flex items-center gap-1.5"><MessageSquare size={12}/> Responses</span>
                         </div>
                     </button>
                 ))
@@ -284,9 +274,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                             
                             {res.audioUrl && (
                                 <div className="mb-6 p-4 bg-indigo-50/50 rounded-2xl flex items-center gap-4 border border-indigo-100 shadow-inner">
-                                    <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-lg">
-                                        <Volume2 size={20} />
-                                    </div>
+                                    <Volume2 className="text-indigo-600 shrink-0" size={20} />
                                     <audio src={res.audioUrl} controls className="h-8 flex-1 opacity-90" />
                                 </div>
                             )}
@@ -334,7 +322,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
 };
 
 // ============================================================================
-//  STUDENT CLASS VIEW (ENTRY POINT)
+//  MAIN STUDENT CLASS VIEW (ENTRY POINT)
 // ============================================================================
 export default function StudentClassView({ 
     classData, lessons = [], curriculums = [], onBack, 
@@ -365,6 +353,11 @@ export default function StudentClassView({
     return () => unsub();
   }, [classData, userData]);
 
+  // --- VERIFIED DATA MAPPING ---
+  const populatedAssignments = (classData?.assignments || [])
+    .map((assignment: any) => typeof assignment === 'string' ? lessons.find((l: any) => l.id === assignment) : assignment)
+    .filter(Boolean);
+
   const assignedCurriculums = (classData?.assignedCurriculums || [])
     .map((id: string) => curriculums.find((c: any) => c.id === id))
     .filter(Boolean);
@@ -372,7 +365,6 @@ export default function StudentClassView({
   return (
     <div className="h-full flex flex-col bg-white overflow-hidden animate-in fade-in duration-500 font-sans relative">
       
-      {/* HEADER */}
       <div className="p-6 md:p-8 pt-10 md:pt-12 shrink-0 bg-white">
         <button onClick={onBack} className="mb-4 flex items-center gap-2 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-black uppercase tracking-widest active:scale-95 w-fit">
           <ArrowLeft size={16} /> EXIT TO DASHBOARD
@@ -384,7 +376,6 @@ export default function StudentClassView({
         </div>
       </div>
 
-      {/* CONTENT SCROLL AREA */}
       <div className="flex-1 overflow-y-auto px-6 md:px-8 pb-48 custom-scrollbar relative">
         {activeSubTab === 'lessons' && (
           <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4">
@@ -393,7 +384,7 @@ export default function StudentClassView({
                 const isExpanded = expandedRoadmaps[curr.id];
                 const visibleLessons = isExpanded ? currLessons : currLessons.slice(0, 4);
                 const completedCountInCurr = currLessons.filter((l: any) => completedItems.includes(l.id)).length;
-                const progressPercent = Math.round((completedCountInCurr / currLessons.length) * 100);
+                const progressPercent = currLessons.length > 0 ? Math.round((completedCountInCurr / currLessons.length) * 100) : 0;
 
                 return (
                     <div key={curr.id} className="bg-white rounded-[3.5rem] border-2 border-slate-100 overflow-hidden shadow-sm mb-10">
@@ -455,7 +446,6 @@ export default function StudentClassView({
         {activeSubTab === 'grades' && <StudentGradebook classData={classData} user={userData} />}
       </div>
 
-      {/* FIXED BOTTOM PILL NAV */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-[550px] z-[100] px-2">
           <div className="bg-slate-900/95 backdrop-blur-2xl p-2 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 flex items-center justify-between gap-1">
             {[
