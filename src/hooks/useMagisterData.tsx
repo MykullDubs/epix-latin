@@ -4,8 +4,7 @@ import { auth, db, appId } from '../config/firebase';
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { 
   doc, onSnapshot, collection, addDoc, setDoc, updateDoc, 
-  deleteDoc, query, where, collectionGroup, orderBy, limit, 
-  increment, arrayUnion, arrayRemove 
+  deleteDoc, query, where, collectionGroup, increment, arrayUnion, arrayRemove 
 } from "firebase/firestore";
 
 export function useMagisterData() {
@@ -77,10 +76,7 @@ export function useMagisterData() {
       await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), {
         name: className, 
         code: Math.random().toString(36).substring(2, 8).toUpperCase(),
-        students: [], 
-        studentEmails: [], 
-        assignments: [], 
-        created: Date.now()
+        students: [], studentEmails: [], assignments: [], created: Date.now()
       });
     },
 
@@ -93,10 +89,12 @@ export function useMagisterData() {
       if (!user) return;
       await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id), { name: newName });
     },
+
     updateClassDescription: async (id: string, description: string) => {
       if (!user) return;
       await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', id), { description });
     },
+
     addStudent: async (classId: string, email: string) => {
       if (!user) return;
       const cleanEmail = email.toLowerCase().trim();
@@ -144,8 +142,13 @@ export function useMagisterData() {
       });
     },
 
+    // ==========================================
+    // THE STREAK & XP ENGINE
+    // ==========================================
     logActivity: async (itemId: string, xp: number, title: string, details: any = {}) => {
       if (!user) return;
+      
+      // 1. Save the activity for the timeline
       await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
         studentEmail: user.email,
         studentName: userData?.name || user.email.split('@')[0],
@@ -156,9 +159,33 @@ export function useMagisterData() {
         timestamp: Date.now(),
         ...details
       });
+
+      // 2. Calculate Gamification Math
       if (xp > 0) {
+        const today = new Date();
+        const todayStr = today.toDateString(); // e.g., "Tue Jul 11 2025"
+        
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toDateString();
+
+        let newStreak = userData?.streak || 0;
+        const lastActivityDate = userData?.lastActivityDate;
+
+        // Check streak conditions
+        if (lastActivityDate === yesterdayStr) {
+            // They played yesterday! Streak continues.
+            newStreak += 1;
+        } else if (lastActivityDate !== todayStr) {
+            // They missed yesterday (and it's not currently today). Streak breaks.
+            newStreak = 1;
+        }
+
+        // 3. Update the User's Main Profile
         await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
-          xp: increment(xp)
+          xp: increment(xp),
+          streak: newStreak,
+          lastActivityDate: todayStr // Lock in today as their most recent activity
         });
       }
     }
