@@ -17,6 +17,7 @@ import StudentNavBar from './components/StudentNavBar';
 import ExamPlayerView from './components/ExamPlayerView';
 import LessonView from './components/LessonView';
 import ClassView from './components/ClassView'; // Projector view
+import CelebrationScreen from './components/CelebrationScreen';
 
 export default function App() {
   const { user, userData, authChecked, activeOrg, allLessons, enrolledClasses, instructorClasses, allDecks, actions } = useMagisterData();
@@ -31,6 +32,7 @@ export default function App() {
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null); 
   const [presentationLessonId, setPresentationLessonId] = useState<string | null>(null);
   const [activeDeckKey, setActiveDeckKey] = useState<string | null>(null);
+  const [celebrationData, setCelebrationData] = useState<any>(null);
 
   if (!authChecked) return <div className="h-screen flex items-center justify-center bg-slate-50"><div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>;
 
@@ -103,7 +105,7 @@ export default function App() {
     );
   }
 
-  // 5. STUDENT MOBILE APP
+// 5. STUDENT MOBILE APP
   return (
     <div className="bg-slate-50 min-h-screen w-full flex flex-col items-center relative overflow-hidden">
       {/* Switch to Dash Button (For Staff) */}
@@ -116,11 +118,33 @@ export default function App() {
       <div className="w-full bg-white max-w-md h-[100dvh] shadow-2xl relative flex flex-col overflow-hidden">
         <div className="flex-1 overflow-hidden relative bg-slate-50">
           
-          {activeLesson ? (
+          {/* --- NEW: THE CELEBRATION INTERCEPTOR --- */}
+          {celebrationData ? (
+             <CelebrationScreen 
+                data={celebrationData} 
+                userData={userData} 
+                onComplete={() => {
+                    setCelebrationData(null);
+                    setActiveLesson(null); // Clear the lesson AFTER they celebrate
+                }} 
+             />
+          ) : activeLesson ? (
             activeLesson.type === 'exam' || activeLesson.type === 'test' ? (
-              <ExamPlayerView exam={activeLesson} onFinish={(id:any, score:any, title:any, res:any) => { actions.logActivity(id, score, title, { scoreDetail: res }); setActiveLesson(null); }} />
+              <ExamPlayerView 
+                exam={activeLesson} 
+                onFinish={(id:any, score:any, title:any, res:any) => { 
+                    actions.logActivity(id, score, title, { scoreDetail: res }); 
+                    setCelebrationData({ xp: score, title: title }); // <--- TRIGGER CELEBRATION
+                }} 
+              />
             ) : (
-              <LessonView lesson={activeLesson} onFinish={() => { actions.logActivity(activeLesson.id, 50, activeLesson.title, { mode: 'lesson' }); setActiveLesson(null); }} />
+              <LessonView 
+                lesson={activeLesson} 
+                onFinish={() => { 
+                    actions.logActivity(activeLesson.id, 50, activeLesson.title, { mode: 'lesson' }); 
+                    setCelebrationData({ xp: 50, title: activeLesson.title }); // <--- TRIGGER CELEBRATION
+                }} 
+              />
             )
           ) : activeStudentClass ? (
             <StudentClassView classData={activeStudentClass} lessons={allLessons} curriculums={GLOBAL_CURRICULUMS} onBack={() => setActiveStudentClass(null)} onSelectLesson={setActiveLesson} setActiveTab={setActiveTab} setSelectedLessonId={setPresentationLessonId} userData={userData} ExamPlayerView={ExamPlayerView} />
@@ -136,7 +160,8 @@ export default function App() {
 
         </div>
         
-        {!activeLesson && !activeStudentClass && (
+        {/* Hide Nav Bar when in a Lesson OR Celebrating */}
+        {!activeLesson && !activeStudentClass && !celebrationData && (
           <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} activeOrg={activeOrg} />
         )}
       </div>
