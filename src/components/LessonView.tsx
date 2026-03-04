@@ -4,7 +4,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { 
   HelpCircle, CheckCircle2, X, Edit3, MessageSquare, 
-  MessageCircle, ArrowLeft, ArrowRight, Info, Zap 
+  MessageCircle, ArrowLeft, ArrowRight, Info, Zap, BookOpen 
 } from 'lucide-react';
 // import ConnectThreeVocab from './ConnectThreeVocab';
 
