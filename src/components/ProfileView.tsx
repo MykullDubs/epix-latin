@@ -140,8 +140,8 @@ export default function ProfileView({ user, userData: propUserData }: any) {
   const league = getLeagueTier(level);
 
   return (
-    // FIX: Changed pt-32 to pt-8 md:pt-10 to pull the card up to the top
-    <div className="h-full flex flex-col bg-slate-50 overflow-y-auto custom-scrollbar pt-8 md:pt-10 pb-40">
+    // FIX: Changed top padding to pt-2 so the card sits perfectly flush
+    <div className="h-full flex flex-col bg-slate-50 overflow-y-auto custom-scrollbar pt-2 pb-40">
         
         {/* 1. HERO CARD */}
         <div className="px-6 mb-8">
