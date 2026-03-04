@@ -140,7 +140,8 @@ export default function ProfileView({ user, userData: propUserData }: any) {
   const league = getLeagueTier(level);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 overflow-y-auto custom-scrollbar pt-32 pb-40">
+    // FIX: Changed pt-32 to pt-8 md:pt-10 to pull the card up to the top
+    <div className="h-full flex flex-col bg-slate-50 overflow-y-auto custom-scrollbar pt-8 md:pt-10 pb-40">
         
         {/* 1. HERO CARD */}
         <div className="px-6 mb-8">
@@ -151,7 +152,6 @@ export default function ProfileView({ user, userData: propUserData }: any) {
                     {/* AVATAR & SQUIRCLE PROGRESS RING */}
                     <div className="relative mb-6">
                         <div className="absolute inset-0 scale-125">
-                            {/* Updated from <circle> to <rect> with rx="32" */}
                             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
                                 <rect x="4" y="4" width="92" height="92" rx="32" fill="none" stroke="white" opacity="0.05" strokeWidth="2" />
                                 <rect 
