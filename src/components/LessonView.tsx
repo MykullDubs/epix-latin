@@ -4,9 +4,9 @@ import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { 
   HelpCircle, CheckCircle2, X, Edit3, MessageSquare, 
-  MessageCircle, ArrowLeft, ArrowRight, Info, Zap, BookOpen
+  MessageCircle, ArrowLeft, ArrowRight, Info, Zap 
 } from 'lucide-react';
-import ConnectThreeVocab from './ConnectThreeVocab';
+// import ConnectThreeVocab from './ConnectThreeVocab';
 
 export interface LessonViewProps {
     lessonId?: string | null;
@@ -306,11 +306,28 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
     return () => container.removeEventListener('scroll', handleScroll);
   }, [lesson, isInstructor]);
 
+  // --- NEW: Keyboard Navigation ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        // Prevent triggering if user is typing in an input or textarea
+        if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
+        
+        if (e.key === 'ArrowRight') {
+            if (activePageIdx < pages.length - 1) handleNext();
+        } else if (e.key === 'ArrowLeft') {
+            if (activePageIdx > 0) handlePrev();
+        }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activePageIdx, pages.length]);
+
   const handlePrev = () => {
       const newIdx = Math.max(0, activePageIdx - 1);
       setActivePageIdx(newIdx);
       syncToProjector(newIdx);
-      containerRef.current?.scrollTo(0,0);
+      containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleNext = () => {
@@ -318,7 +335,7 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
           const newIdx = activePageIdx + 1;
           setActivePageIdx(newIdx);
           syncToProjector(newIdx); 
-          containerRef.current?.scrollTo(0,0);
+          containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
           onFinish();
       }
@@ -330,7 +347,6 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
 
     switch (block.type) {
       
-      // --- UPGRADED: The Simple Text Block ---
       case 'text':
         return (
           <div key={blockKey} className="py-6 animate-in fade-in slide-in-from-bottom-3 duration-700">
@@ -339,12 +355,6 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
                     {block.title}
                 </span>
             )}
-            {/* Three Smidges Applied to simple text:
-              - text-4xl down to text-3xl
-              - font-black down to font-bold 
-              - text-slate-900 down to text-slate-700
-              - leading-[1.1] relaxed to leading-snug
-            */}
             <p className="text-2xl md:text-3xl font-bold text-slate-700 leading-snug tracking-tight">
               {block.content}
             </p>
@@ -472,54 +482,66 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
 
   if (!pages[activePageIdx]) return null;
 
+  const progressPercent = ((activePageIdx + 1) / pages.length) * 100;
+
   return (
     <div className="flex flex-col h-full bg-slate-50/50 overflow-hidden font-sans relative">
-      <div className="px-6 md:px-8 pt-10 md:pt-14 pb-6 bg-white border-b border-slate-100 shrink-0 shadow-sm relative z-10">
+      
+      {/* SHRUNK HEADER */}
+      <div className="px-6 md:px-8 pt-8 md:pt-10 pb-4 bg-white border-b border-slate-100 shrink-0 shadow-sm relative z-10">
         <div className="flex justify-between items-end">
           <div>
               <h1 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.4em] mb-1">{lesson.title}</h1>
-              <p className="text-2xl font-black text-slate-900 tracking-tighter leading-none">Current Session</p>
+              <p className="text-xl font-black text-slate-900 tracking-tight leading-none">Current Session</p>
           </div>
           {isInstructor && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 rounded-full border border-emerald-100">
+            <div className="flex items-center gap-2 px-2 py-1 bg-emerald-50 rounded-md border border-emerald-100">
                 <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                <span className="text-[9px] font-black text-emerald-600 uppercase">Synced</span>
+                <span className="text-[8px] font-black text-emerald-600 uppercase">Live</span>
             </div>
           )}
         </div>
       </div>
       
-      <div ref={containerRef} className="flex-1 overflow-y-auto px-6 md:px-10 py-10 pb-48 custom-scrollbar scroll-smooth relative z-0">
+      {/* MAIN CONTENT (Reduced bottom padding) */}
+      <div ref={containerRef} className="flex-1 overflow-y-auto px-6 md:px-10 py-8 pb-32 custom-scrollbar scroll-smooth relative z-0">
         <div className="max-w-2xl mx-auto space-y-4">
           {pages[activePageIdx].blocks.map((block: any, i: number) => renderBlock(block, i))}
         </div>
       </div>
       
-      <div className="p-8 pb-10 bg-white/90 backdrop-blur-xl border-t border-slate-100 flex justify-between items-center fixed bottom-0 left-0 right-0 z-50 shadow-[0_-20px_40px_rgba(0,0,0,0.05)]">
+      {/* SLIM & POLISHED BOTTOM NAV */}
+      <div className="px-6 py-4 pb-8 md:pb-5 bg-white/95 backdrop-blur-2xl border-t border-slate-100 flex justify-between items-center fixed bottom-0 left-0 right-0 z-50 shadow-[0_-15px_30px_rgba(0,0,0,0.04)]">
+        
+        {/* Sleek Top-Edge Progress Bar */}
+        <div className="absolute top-0 left-0 h-1 bg-slate-100 w-full overflow-hidden">
+            <div className="h-full bg-indigo-500 transition-all duration-500 ease-out" style={{ width: `${progressPercent}%` }} />
+        </div>
+
         <button 
             onClick={handlePrev} 
-            className="p-5 bg-slate-100 text-slate-400 rounded-[2rem] disabled:opacity-20 active:scale-90 transition-all hover:bg-slate-200" 
+            className="p-4 bg-slate-100 text-slate-500 rounded-2xl disabled:opacity-30 active:scale-95 transition-all hover:bg-slate-200" 
             disabled={activePageIdx === 0}
         >
-            <ArrowLeft size={24} strokeWidth={3} />
+            <ArrowLeft size={20} strokeWidth={2.5} />
         </button>
         
-        <div className="text-center">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Unit Page</span>
-            <span className="text-2xl font-black text-slate-900">{activePageIdx + 1} <span className="text-slate-300">/</span> {pages.length}</span>
+        <div className="text-center flex flex-col items-center">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Progress</span>
+            <span className="text-lg font-black text-slate-900">{activePageIdx + 1} <span className="text-slate-300 mx-0.5">/</span> {pages.length}</span>
         </div>
         
         {activePageIdx < pages.length - 1 ? (
           <button 
             onClick={handleNext} 
-            className="p-5 bg-indigo-600 text-white rounded-[2rem] shadow-xl shadow-indigo-200 active:scale-90 transition-all hover:bg-indigo-500 hover:-translate-y-1"
+            className="p-4 bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-200 active:scale-95 transition-all hover:bg-indigo-500 hover:-translate-y-0.5"
           >
-            <ArrowRight size={24} strokeWidth={3} />
+            <ArrowRight size={20} strokeWidth={2.5} />
           </button>
         ) : (
           <button 
             onClick={onFinish} 
-            className="px-10 py-5 bg-emerald-500 text-white font-black rounded-[2rem] shadow-xl shadow-emerald-200 active:scale-95 transition-all text-xs tracking-widest hover:bg-emerald-400 hover:-translate-y-1"
+            className="px-8 py-4 bg-emerald-500 text-white font-black rounded-2xl shadow-lg shadow-emerald-200 active:scale-95 transition-all text-xs tracking-widest hover:bg-emerald-400 hover:-translate-y-0.5"
           >
             FINISH
           </button>
