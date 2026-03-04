@@ -330,20 +330,15 @@ export default function StudentClassView({
   };
 
   // --- DATA MAPPING ---
-  // Fully populate assignments with their actual lesson objects
   const populatedAssignments = (classData?.assignments || [])
     .map((assignment: any) => typeof assignment === 'string' ? lessons.find((l: any) => l.id === assignment) : assignment)
     .filter(Boolean);
 
-  // Extract curriculums
   const assignedCurriculums = (classData?.assignedCurriculums || [])
     .map((id: string) => curriculums.find((c: any) => c.id === id))
     .filter(Boolean);
 
-  // Extract standalone lessons (assignments that are NOT inside a curriculum and NOT exams)
   const standaloneLessons = populatedAssignments.filter((a: any) => a.contentType !== 'exam' && a.contentType !== 'test');
-  
-  // Extract high-stakes exams
   const examList = populatedAssignments.filter((a: any) => a.contentType === 'exam' || a.contentType === 'test');
 
   return (
@@ -445,6 +440,32 @@ export default function StudentClassView({
                                  <div className="flex-1">
                                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Assigned Activity</span>
                                      <h4 className="font-black text-slate-800 text-lg leading-tight group-hover:text-indigo-600 transition-colors">{item.title}</h4>
+                                 </div>
+                             </div>
+                         );
+                     })}
+                 </div>
+             )}
+
+             {/* 3. ASSESSMENTS & EXAMS (NEW) */}
+             {examList.length > 0 && (
+                 <div className="space-y-4 mb-10">
+                     <div className="flex items-center gap-3 ml-2 mb-6 mt-10">
+                        <div className="h-0.5 flex-1 bg-rose-100 rounded-full" />
+                        <h3 className="text-[10px] font-black text-rose-400 uppercase tracking-widest">Knowledge Checks</h3>
+                        <div className="h-0.5 flex-1 bg-rose-100 rounded-full" />
+                     </div>
+                     
+                     {examList.map((item: any) => {
+                         const isCompleted = completedItems.includes(item.id);
+                         return (
+                             <div key={item.id} className="p-6 border-2 border-rose-100 bg-white rounded-[2.5rem] flex items-center gap-4 cursor-pointer hover:shadow-md hover:border-rose-200 transition-all active:scale-95 group" onClick={() => onSelectLesson(item)}>
+                                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-colors ${isCompleted ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white'}`}>
+                                     {isCompleted ? <CheckCircle2 size={24} strokeWidth={3} /> : <FileText size={24} />}
+                                 </div>
+                                 <div className="flex-1">
+                                     <span className="text-[10px] font-black uppercase tracking-widest text-rose-400 mb-1 block">High-Stakes Assessment</span>
+                                     <h4 className="font-black text-slate-800 text-lg leading-tight group-hover:text-rose-600 transition-colors">{item.title}</h4>
                                  </div>
                              </div>
                          );
