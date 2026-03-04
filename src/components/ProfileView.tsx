@@ -147,14 +147,17 @@ export default function ProfileView({ user, userData: propUserData }: any) {
             <div className="bg-slate-900 rounded-[3rem] p-8 relative overflow-hidden shadow-2xl border border-white/5">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[80px] -mr-32 -mt-32" />
                 <div className="relative z-10 flex flex-col items-center">
+                    
+                    {/* AVATAR & SQUIRCLE PROGRESS RING */}
                     <div className="relative mb-6">
                         <div className="absolute inset-0 scale-125">
+                            {/* Updated from <circle> to <rect> with rx="32" */}
                             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                                <circle cx="50" cy="50" r="46" fill="none" stroke="white" opacity="0.05" strokeWidth="2" />
-                                <circle 
-                                    cx="50" cy="50" r="46" fill="none" 
+                                <rect x="4" y="4" width="92" height="92" rx="32" fill="none" stroke="white" opacity="0.05" strokeWidth="2" />
+                                <rect 
+                                    x="4" y="4" width="92" height="92" rx="32" fill="none" 
                                     stroke="url(#agileGradient)" strokeWidth="3" 
-                                    strokeDasharray="289" strokeDashoffset={289 - (289 * progressPct) / 100} 
+                                    strokeDasharray="314" strokeDashoffset={314 - (314 * progressPct) / 100} 
                                     strokeLinecap="round" className="transition-all duration-1000 ease-out" 
                                 />
                                 <defs>
@@ -178,7 +181,7 @@ export default function ProfileView({ user, userData: propUserData }: any) {
                             )}
                         </div>
 
-                        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-white text-slate-900 text-[10px] font-black px-4 py-1 rounded-full shadow-xl border border-slate-100 flex items-center gap-1.5 whitespace-nowrap">
+                        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-white text-slate-900 text-[10px] font-black px-4 py-1 rounded-full shadow-xl border border-slate-100 flex items-center gap-1.5 whitespace-nowrap z-30">
                             <Crown size={10} className="text-indigo-600" /> LVL {level}
                         </div>
                     </div>
@@ -223,7 +226,6 @@ export default function ProfileView({ user, userData: propUserData }: any) {
                 </div>
             </div>
 
-            {/* UPGRADED: Activity Graph with Hover Tooltips */}
             <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
                 <div className="flex justify-between items-center mb-8">
                     <h3 className="font-black text-slate-800 uppercase tracking-widest text-[10px] flex items-center gap-2"><Activity size={14} className="text-indigo-600"/> Learning Velocity</h3>
@@ -233,7 +235,6 @@ export default function ProfileView({ user, userData: propUserData }: any) {
                 <div className="flex items-end justify-between h-24 gap-2 px-1">
                     {stats.graphData.map((d: any, i: number) => (
                         <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group cursor-pointer relative">
-                            {/* HOVER TOOLTIP */}
                             <div className="absolute -top-8 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg whitespace-nowrap z-10">
                                 {d.minutes} mins
                             </div>
