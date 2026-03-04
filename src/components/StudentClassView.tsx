@@ -400,15 +400,36 @@ export default function StudentClassView({
                                             {currLessons.map((item: any, index: number) => {
                                                 const isCompleted = completedItems.includes(item.id);
                                                 const isLocked = index > completedCountInCurr;
+                                                
+                                                // --- THE FIX: Detect Exam Status inside the Accordion ---
+                                                const isExam = item.contentType === 'exam' || item.contentType === 'test';
+                                                
                                                 return (
                                                     <div key={item.id} className={`relative pl-10 ${isLocked ? 'opacity-50 grayscale' : 'animate-in slide-in-from-left-4'}`}>
-                                                        <div className={`absolute -left-[22px] top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center border-4 border-slate-50 shadow-sm z-10 transition-all ${isCompleted ? 'bg-emerald-500 text-white scale-110' : index === completedCountInCurr ? 'bg-indigo-600 text-white ring-4 ring-indigo-200' : 'bg-slate-200 text-slate-400'}`}>
-                                                            {isCompleted ? <CheckCircle2 size={16} strokeWidth={3} /> : <Play size={16} className={index === completedCountInCurr ? "ml-1" : ""} />}
+                                                        
+                                                        {/* UPGRADED ICON LOGIC */}
+                                                        <div className={`absolute -left-[22px] top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center border-4 border-slate-50 shadow-sm z-10 transition-all ${
+                                                            isCompleted ? 'bg-emerald-500 text-white scale-110' : 
+                                                            isExam && index === completedCountInCurr ? 'bg-rose-500 text-white ring-4 ring-rose-200' : // Active Exam
+                                                            isExam ? 'bg-rose-100 text-rose-400' : // Locked Exam
+                                                            index === completedCountInCurr ? 'bg-indigo-600 text-white ring-4 ring-indigo-200' : // Active Lesson
+                                                            'bg-slate-200 text-slate-400' // Locked Lesson
+                                                        }`}>
+                                                            {isCompleted ? <CheckCircle2 size={16} strokeWidth={3} /> : 
+                                                             isExam ? <FileText size={16} strokeWidth={2.5} /> : 
+                                                             <Play size={16} className={index === completedCountInCurr ? "ml-1" : ""} />}
                                                         </div>
-                                                        <button disabled={isLocked} onClick={() => onSelectLesson(item)} className="w-full text-left p-6 rounded-[2.5rem] border-2 border-transparent bg-white shadow-sm hover:shadow-md hover:border-indigo-100 transition-all group active:scale-95">
-                                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Unit {index + 1}</span>
-                                                            <h4 className="font-black text-slate-800 text-lg leading-tight group-hover:text-indigo-600 transition-colors">{item.title}</h4>
+
+                                                        {/* UPGRADED BUTTON LOGIC */}
+                                                        <button disabled={isLocked} onClick={() => onSelectLesson(item)} className={`w-full text-left p-6 rounded-[2.5rem] border-2 border-transparent bg-white shadow-sm hover:shadow-md transition-all group active:scale-95 ${isExam && !isLocked ? 'hover:border-rose-200' : 'hover:border-indigo-100'}`}>
+                                                            <span className={`text-[10px] font-black uppercase tracking-widest mb-1 block ${isExam ? 'text-rose-400' : 'text-slate-400'}`}>
+                                                                {isExam ? 'Sprint Checkpoint' : `Unit ${index + 1}`}
+                                                            </span>
+                                                            <h4 className={`font-black text-lg leading-tight transition-colors ${isExam ? 'text-slate-900 group-hover:text-rose-600' : 'text-slate-800 group-hover:text-indigo-600'}`}>
+                                                                {item.title}
+                                                            </h4>
                                                         </button>
+
                                                     </div>
                                                 );
                                             })}
@@ -440,32 +461,6 @@ export default function StudentClassView({
                                  <div className="flex-1">
                                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Assigned Activity</span>
                                      <h4 className="font-black text-slate-800 text-lg leading-tight group-hover:text-indigo-600 transition-colors">{item.title}</h4>
-                                 </div>
-                             </div>
-                         );
-                     })}
-                 </div>
-             )}
-
-             {/* 3. ASSESSMENTS & EXAMS (NEW) */}
-             {examList.length > 0 && (
-                 <div className="space-y-4 mb-10">
-                     <div className="flex items-center gap-3 ml-2 mb-6 mt-10">
-                        <div className="h-0.5 flex-1 bg-rose-100 rounded-full" />
-                        <h3 className="text-[10px] font-black text-rose-400 uppercase tracking-widest">Knowledge Checks</h3>
-                        <div className="h-0.5 flex-1 bg-rose-100 rounded-full" />
-                     </div>
-                     
-                     {examList.map((item: any) => {
-                         const isCompleted = completedItems.includes(item.id);
-                         return (
-                             <div key={item.id} className="p-6 border-2 border-rose-100 bg-white rounded-[2.5rem] flex items-center gap-4 cursor-pointer hover:shadow-md hover:border-rose-200 transition-all active:scale-95 group" onClick={() => onSelectLesson(item)}>
-                                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-colors ${isCompleted ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white'}`}>
-                                     {isCompleted ? <CheckCircle2 size={24} strokeWidth={3} /> : <FileText size={24} />}
-                                 </div>
-                                 <div className="flex-1">
-                                     <span className="text-[10px] font-black uppercase tracking-widest text-rose-400 mb-1 block">High-Stakes Assessment</span>
-                                     <h4 className="font-black text-slate-800 text-lg leading-tight group-hover:text-rose-600 transition-colors">{item.title}</h4>
                                  </div>
                              </div>
                          );
