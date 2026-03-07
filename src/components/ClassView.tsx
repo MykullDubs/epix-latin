@@ -1,26 +1,39 @@
 // src/components/ClassView.tsx
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore'; // Added setDoc
 import { db } from '../config/firebase';
-import { MessageSquare, MessageCircle, Gamepad2, CheckCircle2, X, Puzzle } from 'lucide-react';
+import { MessageSquare, MessageCircle, Gamepad2, CheckCircle2, X, Puzzle, ChevronLeft, ChevronRight } from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
 import ClassForum from './ClassForum';
 
 // ============================================================================
-//  CLASS VIEW (The Projector / Big Screen Mode with Live Sync & Fast Scroll)
+//  CLASS VIEW (The Projector / Big Screen Mode with Keyboard Nav)
 // ============================================================================
 export default function ClassView({ lesson, classId, userData }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
   const [showForum, setShowForum] = useState(false);
-  const [liveState, setLiveState] = useState<any>(null); // Holds live interactions
+  const [liveState, setLiveState] = useState<any>(null); 
   const stageRef = useRef<HTMLDivElement>(null);
 
-  // --- AUTOMATIC VOCABULARY EXTRACTOR ---
-  // Scrapes the lesson data to feed the Connect Three game on the big screen
   const lessonVocab = useMemo(() => {
     return lesson?.blocks
       ?.filter((b: any) => b.type === 'vocab-list')
       ?.flatMap((b: any) => b.items) || [];
+  }, [lesson]);
+
+  const pages = useMemo(() => {
+    if (!lesson?.blocks) return [];
+    const grouped: any[] = [];
+    let buffer: any[] = [];
+    lesson.blocks.forEach((b: any) => {
+      if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game'].includes(b.type)) {
+        if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
+        grouped.push({ type: 'interact', blocks: [b] });
+        buffer = [];
+      } else { buffer.push(b); }
+    });
+    if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
+    return grouped;
   }, [lesson]);
 
   // 1. PAGE & SCROLL SYNC: Listen for updates from the Remote
@@ -36,17 +49,14 @@ export default function ClassView({ lesson, classId, userData }: any) {
           setActivePageIdx(data.activePageIdx);
         }
 
-        // Capture interaction state from remote
         if (data.liveBlockState !== undefined) {
             setLiveState(data.liveBlockState);
         } else {
             setLiveState(null);
         }
 
-        // --- FAST SCROLL FIX (30% Faster) ---
         if (typeof data.scrollPercent === 'number' && stageRef.current) {
           const s = stageRef.current;
-          // Multiply the phone's scroll by 1.3. Math.min keeps it from breaking 100%.
           const speedMultiplier = 1.3;
           const targetPercent = Math.min(data.scrollPercent * speedMultiplier, 1);
           const target = targetPercent * (s.scrollHeight - s.clientHeight);
@@ -61,34 +71,86 @@ export default function ClassView({ lesson, classId, userData }: any) {
     return () => unsub();
   }, [lesson]);
 
-  const pages = useMemo(() => {
-    if (!lesson?.blocks) return [];
-    const grouped: any[] = [];
-    let buffer: any[] = [];
-    lesson.blocks.forEach((b: any) => {
-      // THE FIX: Added 'game' to the interactive page-break trigger
-      if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game'].includes(b.type)) {
-        if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
-        grouped.push({ type: 'interact', blocks: [b] });
-        buffer = [];
-      } else { buffer.push(b); }
-    });
-    if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
-    return grouped;
+  // --- NEW: TWO-WAY SYNC HANDLER ---
+  // If we change the page from the projector, we must update Firebase so the instructor's remote updates too.
+  const updateGlobalPage = useCallback((newIdx: number) => {
+      const syncId = lesson?.originalId || lesson?.id;
+      if (!syncId) return;
+
+      setActivePageIdx(newIdx);
+      
+      setDoc(doc(db, 'live_sessions', syncId), {
+          activePageIdx: newIdx,
+          lastUpdate: Date.now()
+      }, { merge: true }).catch(console.error);
+
+      // Reset scroll on page change
+      if (stageRef.current) {
+          stageRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
   }, [lesson]);
+
+  const handleNext = useCallback(() => {
+      if (activePageIdx < pages.length - 1) {
+          updateGlobalPage(activePageIdx + 1);
+      }
+  }, [activePageIdx, pages.length, updateGlobalPage]);
+
+  const handlePrev = useCallback(() => {
+      if (activePageIdx > 0) {
+          updateGlobalPage(activePageIdx - 1);
+      }
+  }, [activePageIdx, updateGlobalPage]);
+
+  // --- NEW: KEYBOARD NAVIGATION LISTENER ---
+  useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+          // Prevent triggering if typing in an input
+          if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
+          
+          if (e.key === 'ArrowRight' || e.key === ' ') { // Right Arrow or Spacebar goes forward
+              handleNext();
+          } else if (e.key === 'ArrowLeft') {
+              handlePrev();
+          }
+      };
+      
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleNext, handlePrev]);
 
   if (!lesson || !pages[activePageIdx]) return null;
 
   return (
     <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col overflow-hidden">
-      <div className="h-[12vh] px-16 flex items-center justify-between border-b">
+      <div className="h-[12vh] px-16 flex items-center justify-between border-b relative">
         <div className="h-3 flex-1 bg-slate-100 rounded-full mr-12 overflow-hidden">
           <div className="h-full bg-indigo-600 transition-all duration-1000" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} />
         </div>
         <span className="text-[3vh] font-black text-slate-300">{activePageIdx + 1} / {pages.length}</span>
       </div>
 
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex overflow-hidden relative group/canvas">
+        
+        {/* --- ON-SCREEN MOUSE NAVIGATION CONTROLS --- */}
+        {activePageIdx > 0 && (
+            <button 
+                onClick={handlePrev} 
+                className="absolute left-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/10 hover:bg-slate-900/30 text-slate-800 rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110"
+            >
+                <ChevronLeft size={48} />
+            </button>
+        )}
+        
+        {activePageIdx < pages.length - 1 && (
+            <button 
+                onClick={handleNext} 
+                className="absolute right-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/10 hover:bg-slate-900/30 text-slate-800 rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110"
+            >
+                <ChevronRight size={48} />
+            </button>
+        )}
+
         <div ref={stageRef} className={`flex-1 overflow-y-auto px-16 py-12 flex flex-col items-center transition-all duration-500 ${showForum ? 'mr-[450px]' : ''}`}>
           <div className="w-full max-w-7xl space-y-20 pb-40">
             {pages[activePageIdx].blocks.map((block: any, i: number) => (
@@ -121,7 +183,6 @@ export default function ClassView({ lesson, classId, userData }: any) {
                   </div>
                 )}
 
-                {/* --- NEW SYNCED GAME BLOCK --- */}
                 {block.type === 'game' && block.gameType === 'connect-three' && (
                   <div className="w-full max-w-6xl mx-auto flex flex-col items-center">
                     <div className="text-center mb-12">
@@ -131,15 +192,12 @@ export default function ClassView({ lesson, classId, userData }: any) {
                         <h3 className="text-[6vh] font-black text-slate-800 leading-none">{block.title || "Vocabulary Battle"}</h3>
                         <p className="text-[3vh] font-bold text-slate-400 uppercase tracking-[0.4em] mt-4">Local Multiplayer Mode</p>
                     </div>
-                    
-                    {/* Scaling it up so it looks massive on the projector screen */}
                     <div className="scale-[1.2] origin-top mt-8 w-full flex justify-center pointer-events-auto">
                         <ConnectThreeVocab vocabList={lessonVocab} />
                     </div>
                   </div>
                 )}
 
-                {/* --- SYNCED QUIZ BLOCK --- */}
                 {block.type === 'quiz' && (
                   <div className="w-full max-w-5xl mx-auto bg-slate-900 rounded-[4rem] p-16 text-white shadow-2xl transition-colors duration-500">
                     <span className="text-[2vh] font-black text-indigo-400 uppercase tracking-widest block mb-6">Class Question</span>
@@ -171,7 +229,6 @@ export default function ClassView({ lesson, classId, userData }: any) {
                   </div>
                 )}
 
-                {/* --- SYNCED SCENARIO BLOCK --- */}
                 {block.type === 'scenario' && (() => {
                     const activeNodeId = liveState?.currentNodeId || block.nodes?.[0]?.id;
                     const currentNode = block.nodes?.find((n:any) => n.id === activeNodeId) || block.nodes?.[0];
@@ -189,7 +246,6 @@ export default function ClassView({ lesson, classId, userData }: any) {
                     );
                 })()}
 
-                {/* --- SYNCED FILL IN THE BLANK BLOCK --- */}
                 {block.type === 'fill-blank' && (
                   <div className="w-full max-w-6xl mx-auto bg-white p-16 rounded-[4rem] border-4 border-slate-100 shadow-2xl">
                     <h3 className="text-[4vh] font-bold text-slate-800 mb-12 flex items-center gap-4">
@@ -251,7 +307,7 @@ export default function ClassView({ lesson, classId, userData }: any) {
         )}
       </div>
 
-      <div className="h-[12vh] px-16 border-t flex justify-between items-center bg-white">
+      <div className="h-[12vh] px-16 border-t flex justify-between items-center bg-white relative z-50">
         <span className="font-black text-[2.5vh] text-slate-400 uppercase tracking-widest">Live Presentation</span>
         <div className="flex items-center gap-6">
           <button onClick={() => setShowForum(!showForum)} className={`px-8 py-4 rounded-2xl font-black text-[2.5vh] transition-all shadow-md ${showForum ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>
