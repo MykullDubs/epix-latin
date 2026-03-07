@@ -1,6 +1,6 @@
 // src/components/ClassView.tsx
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore'; // Added setDoc
+import { doc, onSnapshot, setDoc } from 'firebase/firestore'; 
 import { db } from '../config/firebase';
 import { MessageSquare, MessageCircle, Gamepad2, CheckCircle2, X, Puzzle, ChevronLeft, ChevronRight } from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
@@ -71,8 +71,7 @@ export default function ClassView({ lesson, classId, userData }: any) {
     return () => unsub();
   }, [lesson]);
 
-  // --- NEW: TWO-WAY SYNC HANDLER ---
-  // If we change the page from the projector, we must update Firebase so the instructor's remote updates too.
+  // TWO-WAY SYNC HANDLER (Updates Firebase when navigating via Keyboard/Mouse)
   const updateGlobalPage = useCallback((newIdx: number) => {
       const syncId = lesson?.originalId || lesson?.id;
       if (!syncId) return;
@@ -84,34 +83,38 @@ export default function ClassView({ lesson, classId, userData }: any) {
           lastUpdate: Date.now()
       }, { merge: true }).catch(console.error);
 
-      // Reset scroll on page change
       if (stageRef.current) {
           stageRef.current.scrollTo({ top: 0, behavior: 'smooth' });
       }
   }, [lesson]);
 
   const handleNext = useCallback(() => {
-      if (activePageIdx < pages.length - 1) {
-          updateGlobalPage(activePageIdx + 1);
-      }
+      if (activePageIdx < pages.length - 1) updateGlobalPage(activePageIdx + 1);
   }, [activePageIdx, pages.length, updateGlobalPage]);
 
   const handlePrev = useCallback(() => {
-      if (activePageIdx > 0) {
-          updateGlobalPage(activePageIdx - 1);
-      }
+      if (activePageIdx > 0) updateGlobalPage(activePageIdx - 1);
   }, [activePageIdx, updateGlobalPage]);
 
-  // --- NEW: KEYBOARD NAVIGATION LISTENER ---
+  // --- UPGRADED: KEYBOARD NAVIGATION LISTENER ---
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
-          // Prevent triggering if typing in an input
           if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
           
-          if (e.key === 'ArrowRight' || e.key === ' ') { // Right Arrow or Spacebar goes forward
+          if (e.key === 'ArrowRight' || e.key === ' ') { 
+              e.preventDefault(); // Stops spacebar from aggressively scrolling
               handleNext();
           } else if (e.key === 'ArrowLeft') {
+              e.preventDefault();
               handlePrev();
+          } else if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              // Scroll down smoothly by roughly 40% of the screen height
+              if (stageRef.current) stageRef.current.scrollBy({ top: window.innerHeight * 0.4, behavior: 'smooth' });
+          } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              // Scroll up smoothly by roughly 40% of the screen height
+              if (stageRef.current) stageRef.current.scrollBy({ top: -(window.innerHeight * 0.4), behavior: 'smooth' });
           }
       };
       
