@@ -21,11 +21,12 @@ import LeaderboardView from './LeaderboardView';
 // ============================================================================
 const ForumAvatar = ({ url, name, role, size = "md" }: any) => {
     const initials = name?.split(' ').map((n:any) => n[0]).join('').toUpperCase().slice(0, 2) || 'S';
+    // Upgraded base sizes for better visual accessibility
     const sizeClasses: any = {
-        xs: "w-6 h-6 text-[8px]",
-        sm: "w-8 h-8 text-[10px]",
-        md: "w-10 h-10 text-xs",
-        lg: "w-12 h-12 text-sm"
+        xs: "w-6 h-6 text-[10px]",
+        sm: "w-8 h-8 text-xs",
+        md: "w-10 h-10 text-sm",
+        lg: "w-12 h-12 text-base"
     };
 
     return (
@@ -34,14 +35,14 @@ const ForumAvatar = ({ url, name, role, size = "md" }: any) => {
                 url ? 'bg-white' : 'bg-gradient-to-br from-indigo-500 to-cyan-400 text-white'
             }`}>
                 {url ? (
-                    <img src={url} alt={name} className="w-full h-full object-cover" />
+                    <img src={url} alt={`${name}'s avatar`} className="w-full h-full object-cover" />
                 ) : (
-                    <span>{initials}</span>
+                    <span aria-hidden="true">{initials}</span>
                 )}
             </div>
             {role === 'instructor' && (
-                <div className="absolute -top-1 -right-1 bg-indigo-600 rounded-full border-2 border-white p-0.5 shadow-sm">
-                    <Shield size={size === 'xs' ? 6 : 8} className="text-white" />
+                <div className="absolute -top-1 -right-1 bg-indigo-600 rounded-full border-2 border-white p-0.5 shadow-sm" aria-label="Instructor Badge">
+                    <Shield size={size === 'xs' ? 8 : 10} className="text-white" aria-hidden="true" />
                 </div>
             )}
         </div>
@@ -84,18 +85,29 @@ const VoiceRecorder = ({ onRecordingComplete, onCancel }: any) => {
     <div className="bg-indigo-50/50 p-4 rounded-2xl border-2 border-indigo-100 flex items-center justify-between">
       {!audioUrl ? (
         <div className="flex items-center gap-4 w-full">
-          <div className={`w-3 h-3 rounded-full bg-rose-500 ${isRecording ? 'animate-pulse' : 'opacity-30'}`} />
-          <span className="text-[10px] font-black text-indigo-900 uppercase tracking-widest flex-1">
+          <div className={`w-3 h-3 rounded-full bg-rose-500 ${isRecording ? 'animate-pulse' : 'opacity-30'}`} aria-hidden="true" />
+          <span className="text-xs font-black text-indigo-900 uppercase tracking-widest flex-1">
             {isRecording ? "Recording..." : "Voice Response"}
           </span>
-          <button type="button" onClick={isRecording ? stopRecording : startRecording} className={`p-3 rounded-full ${isRecording ? 'bg-rose-500 text-white animate-pulse' : 'bg-indigo-600 text-white'}`}>
-            {isRecording ? <Square size={18} fill="white" /> : <Mic size={18} />}
+          <button 
+            type="button" 
+            onClick={isRecording ? stopRecording : startRecording} 
+            aria-label={isRecording ? "Stop Recording" : "Start Recording"}
+            className={`p-3 rounded-full focus:outline-none focus:ring-4 focus:ring-indigo-500 ${isRecording ? 'bg-rose-500 text-white animate-pulse' : 'bg-indigo-600 text-white hover:bg-indigo-700 transition-colors'}`}
+          >
+            {isRecording ? <Square size={18} fill="white" aria-hidden="true" /> : <Mic size={18} aria-hidden="true" />}
           </button>
         </div>
       ) : (
-        <div className="flex items-center gap-3 w-full">
-          <audio src={audioUrl} controls className="h-8 flex-1" />
-          <button type="button" onClick={() => { setAudioUrl(null); onCancel(); }} className="text-rose-500 text-[10px] font-black uppercase px-2 hover:bg-rose-50 rounded-lg py-2 transition-colors">Discard</button>
+        <div className="flex items-center gap-3 w-full animate-in fade-in">
+          <audio src={audioUrl} controls className="h-8 flex-1" aria-label="Audio playback preview" />
+          <button 
+            type="button" 
+            onClick={() => { setAudioUrl(null); onCancel(); }} 
+            className="text-rose-500 text-xs font-black uppercase px-2 hover:bg-rose-50 rounded-lg py-2 transition-colors focus:outline-none focus:ring-2 focus:ring-rose-500"
+          >
+            Discard
+          </button>
         </div>
       )}
     </div>
@@ -143,7 +155,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
 
   const handleCreateTopic = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim() || !newContent.trim()) return;
+    if (!newTitle.trim() || (!newContent.trim() && !pendingAudio)) return;
     await addDoc(collection(db, 'artifacts', appId, 'classes', classId, 'forum_topics'), {
       title: newTitle, content: newContent, authorName: userData?.name || 'Magister',
       authorAvatarUrl: currentAvatar, authorId: auth.currentUser?.uid, role: userData?.role, timestamp: Date.now(), replyCount: 0
@@ -188,26 +200,46 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
 
   if (view === 'list') {
     return (
-      <div className="flex flex-col h-full bg-slate-50 rounded-[2.5rem] border-2 border-slate-100 shadow-inner p-6 overflow-hidden animate-in fade-in duration-500">
-        <div className="flex justify-between items-center mb-6 px-2">
+      <div className="flex flex-col h-full bg-slate-50 rounded-[2.5rem] border-2 border-slate-100 shadow-inner p-6 overflow-hidden animate-in fade-in duration-500 font-sans">
+        <header className="flex justify-between items-center mb-6 px-2">
             <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Discussions</h3>
             {isInstructor && (
-                <button onClick={() => setIsCreating(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase flex items-center gap-2 shadow-lg"><Plus size={16}/> New Topic</button>
+                <button 
+                  onClick={() => setIsCreating(true)} 
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-black text-xs uppercase flex items-center gap-2 shadow-lg transition-colors focus:outline-none focus:ring-4 focus:ring-indigo-500"
+                >
+                  <Plus size={16} aria-hidden="true"/> New Topic
+                </button>
             )}
-        </div>
+        </header>
         <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
             {isCreating && (
                 <form onSubmit={handleCreateTopic} className="bg-white p-6 rounded-[2rem] border-2 border-indigo-100 shadow-xl mb-6">
-                    <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Topic Title..." className="w-full text-lg font-black text-slate-800 outline-none mb-2" />
-                    <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Prompt..." className="w-full text-sm text-slate-500 outline-none min-h-[100px] resize-none" />
-                    <div className="flex gap-2 justify-end mt-4"><button type="submit" className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase">Post</button></div>
+                    <input 
+                      autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} 
+                      placeholder="Topic Title..." aria-label="Topic Title"
+                      className="w-full text-lg font-black text-slate-800 outline-none mb-2 focus:ring-2 focus:ring-indigo-100 rounded-md px-1" 
+                    />
+                    <textarea 
+                      value={newContent} onChange={e => setNewContent(e.target.value)} 
+                      placeholder="Prompt..." aria-label="Topic Prompt"
+                      className="w-full text-sm text-slate-500 outline-none min-h-[100px] resize-none focus:ring-2 focus:ring-indigo-100 rounded-md px-1 py-1" 
+                    />
+                    <div className="flex gap-2 justify-end mt-4">
+                      <button type="submit" className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs uppercase focus:outline-none focus:ring-4 focus:ring-indigo-500 transition-colors">Post</button>
+                    </div>
                 </form>
             )}
             {topics.map(t => (
-                <button key={t.id} onClick={() => { setActiveTopic(t); setView('thread'); }} className="w-full bg-white p-6 rounded-[2.5rem] border-2 border-slate-100 shadow-sm hover:border-indigo-300 transition-all text-left">
+                <button 
+                  key={t.id} 
+                  onClick={() => { setActiveTopic(t); setView('thread'); }} 
+                  aria-label={`Open discussion: ${t.title}`}
+                  className="w-full bg-white p-6 rounded-[2.5rem] border-2 border-slate-100 shadow-sm hover:border-indigo-300 transition-all text-left focus:outline-none focus:ring-4 focus:ring-indigo-500"
+                >
                     <h4 className="text-lg font-black text-slate-800 mb-1">{t.title}</h4>
                     <p className="text-sm text-slate-400 line-clamp-1 mb-4 font-medium">{t.content}</p>
-                    <div className="flex items-center gap-3 text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                    <div className="flex items-center gap-3 text-xs font-black uppercase text-slate-400 tracking-widest">
                         <ForumAvatar url={t.authorAvatarUrl} name={t.authorName} role={t.role} size="xs" />
                         <span>{t.authorName}</span>
                     </div>
@@ -219,31 +251,52 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
   }
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 rounded-[2.5rem] border-2 border-slate-100 shadow-inner overflow-hidden animate-in slide-in-from-right-8 duration-500">
-        <div className="bg-white p-6 border-b border-slate-100 flex items-center justify-between shadow-sm z-20">
-            <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-400 font-black text-xs uppercase hover:text-indigo-600 transition-colors"><ArrowLeft size={16}/> Back</button>
-            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-3 py-1.5 rounded-lg">Response Gallery</span>
-        </div>
+    <div className="flex flex-col h-full bg-slate-50 rounded-[2.5rem] border-2 border-slate-100 shadow-inner overflow-hidden animate-in slide-in-from-right-8 duration-500 font-sans">
+        <header className="bg-white p-6 border-b border-slate-100 flex items-center justify-between shadow-sm z-20">
+            <button 
+              onClick={() => setView('list')} 
+              className="flex items-center gap-2 text-slate-400 font-black text-xs uppercase hover:text-indigo-600 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md px-2 py-1"
+            >
+              <ArrowLeft size={16} aria-hidden="true"/> Back
+            </button>
+            <span className="text-xs font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-3 py-1.5 rounded-lg">Response Gallery</span>
+        </header>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
-            <div className="bg-slate-900 text-white p-8 rounded-[3rem] shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-8 opacity-10"><Zap size={80} /></div>
+            <section className="bg-slate-900 text-white p-8 rounded-[3rem] shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-8 opacity-10" aria-hidden="true"><Zap size={80} /></div>
                 <div className="relative z-10">
-                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-4 block">Discussion Prompt</span>
+                    <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.3em] mb-4 block">Discussion Prompt</span>
                     <h2 className="text-3xl font-black mb-4 leading-tight">{activeTopic.title}</h2>
                     <p className="text-slate-300 font-medium leading-relaxed mb-6">{activeTopic.content}</p>
-                    <button onClick={() => setIsCreating(true)} className="px-6 py-3 bg-white text-slate-900 rounded-xl font-black text-xs uppercase shadow-xl">Respond</button>
+                    <button 
+                      onClick={() => setIsCreating(true)} 
+                      className="px-6 py-3 bg-white hover:bg-slate-100 text-slate-900 rounded-xl font-black text-xs uppercase shadow-xl transition-colors focus:outline-none focus:ring-4 focus:ring-indigo-500"
+                    >
+                      Respond
+                    </button>
                 </div>
-            </div>
+            </section>
 
             {isCreating && (
                 <form onSubmit={handlePostResponse} className="bg-white p-8 rounded-[2.5rem] border-2 border-indigo-100 shadow-xl space-y-4">
-                    <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Response title..." className="w-full text-xl font-black text-slate-800 outline-none" />
-                    <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Write thoughts..." className="w-full text-sm text-slate-500 outline-none min-h-[100px] resize-none" />
+                    <input 
+                      autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} 
+                      placeholder="Response title..." aria-label="Response Title"
+                      className="w-full text-xl font-black text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100 rounded-md px-2" 
+                    />
+                    <textarea 
+                      value={newContent} onChange={e => setNewContent(e.target.value)} 
+                      placeholder="Write thoughts..." aria-label="Response Content"
+                      className="w-full text-sm text-slate-500 outline-none min-h-[100px] resize-none focus:ring-2 focus:ring-indigo-100 rounded-md px-2 py-2" 
+                    />
                     <VoiceRecorder onRecordingComplete={setPendingAudio} onCancel={() => setPendingAudio(null)} />
                     <div className="flex gap-2 justify-end pt-4 border-t border-slate-50">
-                        <button type="submit" disabled={isUploading} className="px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-xl flex items-center gap-3 bg-indigo-600 text-white">
-                            {isUploading ? <Loader2 size={16} className="animate-spin" /> : 'Submit Response'}
+                        <button 
+                          type="submit" disabled={isUploading} 
+                          className="px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-xl flex items-center gap-3 bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 transition-colors focus:outline-none focus:ring-4 focus:ring-indigo-500"
+                        >
+                            {isUploading ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : 'Submit Response'}
                         </button>
                     </div>
                 </form>
@@ -251,13 +304,13 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
 
             <div className="space-y-10">
                 {responses.map((res) => (
-                    <div key={res.id} className="space-y-4">
+                    <article key={res.id} className="space-y-4">
                         <div className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm relative group">
                             <div className="flex items-center gap-4 mb-6">
                                 <ForumAvatar url={res.authorAvatarUrl} name={res.authorName} role={res.role} size="lg" />
                                 <div>
-                                    <span className="block text-xs font-black text-slate-800 leading-none mb-1">{res.authorName}</span>
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase">{new Date(res.timestamp).toLocaleDateString()}</span>
+                                    <span className="block text-sm font-black text-slate-800 leading-none mb-1">{res.authorName}</span>
+                                    <span className="text-xs font-bold text-slate-400 uppercase">{new Date(res.timestamp).toLocaleDateString()}</span>
                                 </div>
                             </div>
                             <h4 className="text-2xl font-black text-slate-900 mb-3 tracking-tight">{res.title}</h4>
@@ -265,17 +318,25 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                             
                             {res.audioUrl && (
                                 <div className="mb-6 p-4 bg-indigo-50/50 rounded-2xl flex items-center gap-4 border border-indigo-100">
-                                    <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white"><Volume2 size={20} /></div>
-                                    <audio src={res.audioUrl} controls className="h-8 flex-1 opacity-90" />
+                                    <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white" aria-hidden="true"><Volume2 size={20} /></div>
+                                    <audio src={res.audioUrl} controls className="h-8 flex-1 opacity-90" aria-label={`Voice response from ${res.authorName}`} />
                                 </div>
                             )}
 
                             <div className="flex items-center gap-6 pt-6 border-t border-slate-50">
-                                <button onClick={() => handleToggleLike(res.id, res.likes || [], res.authorId)} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${res.likes?.includes(auth.currentUser?.uid) ? 'bg-rose-50 text-rose-500' : 'text-slate-400'}`}>
-                                    <Heart size={16} className={res.likes?.includes(auth.currentUser?.uid) ? 'fill-rose-500' : ''} /> 
-                                    <span className="text-[11px] font-black uppercase tracking-widest">{res.likes?.length || 0} Appreciations</span>
+                                <button 
+                                  onClick={() => handleToggleLike(res.id, res.likes || [], res.authorId)} 
+                                  className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-rose-200 ${res.likes?.includes(auth.currentUser?.uid) ? 'bg-rose-50 text-rose-500' : 'text-slate-400 hover:bg-slate-50 hover:text-rose-400'}`}
+                                >
+                                    <Heart size={16} className={res.likes?.includes(auth.currentUser?.uid) ? 'fill-rose-500' : ''} aria-hidden="true" /> 
+                                    <span className="text-xs font-black uppercase tracking-widest">{res.likes?.length || 0} Appreciations</span>
                                 </button>
-                                <button onClick={() => setReplyingToId(replyingToId === res.id ? null : res.id)} className="flex items-center gap-2 text-[11px] font-black text-slate-400 uppercase hover:text-indigo-600"><MessageSquare size={16} /> Reply</button>
+                                <button 
+                                  onClick={() => setReplyingToId(replyingToId === res.id ? null : res.id)} 
+                                  className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase hover:text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100 rounded-lg px-2 py-1"
+                                >
+                                  <MessageSquare size={16} aria-hidden="true" /> Reply
+                                </button>
                             </div>
                         </div>
 
@@ -284,19 +345,30 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                                 <div key={idx} className="bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100">
                                     <div className="flex items-center gap-3 mb-2">
                                         <ForumAvatar url={comment.authorAvatarUrl} name={comment.authorName} role={comment.role} size="xs" />
-                                        <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">{comment.authorName}</span>
+                                        <span className="text-xs font-black text-slate-700 uppercase tracking-widest">{comment.authorName}</span>
                                     </div>
-                                    <p className="text-xs text-slate-500 font-bold leading-relaxed">{comment.text}</p>
+                                    <p className="text-sm text-slate-600 font-bold leading-relaxed">{comment.text}</p>
                                 </div>
                             ))}
                             {replyingToId === res.id && (
                                 <div className="flex gap-2 animate-in slide-in-from-top-2">
-                                    <input autoFocus value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Reply..." className="flex-1 bg-white border-2 border-indigo-100 rounded-2xl px-5 py-3 text-sm font-medium outline-none" onKeyDown={(e) => e.key === 'Enter' && handlePostComment(res.id)} />
-                                    <button onClick={() => handlePostComment(res.id)} className="p-4 bg-indigo-600 text-white rounded-2xl shadow-xl"><Send size={18}/></button>
+                                    <input 
+                                      autoFocus value={commentText} onChange={e => setCommentText(e.target.value)} 
+                                      placeholder="Reply..." aria-label="Reply text"
+                                      className="flex-1 bg-white border-2 border-indigo-100 rounded-2xl px-5 py-3 text-sm font-medium outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" 
+                                      onKeyDown={(e) => e.key === 'Enter' && handlePostComment(res.id)} 
+                                    />
+                                    <button 
+                                      onClick={() => handlePostComment(res.id)} 
+                                      aria-label="Send reply"
+                                      className="p-4 bg-indigo-600 hover:bg-indigo-700 transition-colors text-white rounded-2xl shadow-xl focus:outline-none focus:ring-4 focus:ring-indigo-500"
+                                    >
+                                      <Send size={18} aria-hidden="true" />
+                                    </button>
                                 </div>
                             )}
                         </div>
-                    </div>
+                    </article>
                 ))}
             </div>
         </div>
@@ -345,18 +417,21 @@ export default function StudentClassView({
     <div className="h-full flex flex-col bg-white overflow-hidden animate-in fade-in duration-500 font-sans relative">
       
       {/* HEADER */}
-      <div className="p-6 md:p-8 pt-10 md:pt-12 shrink-0 bg-white">
-        <button onClick={onBack} className="mb-4 flex items-center gap-2 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-black uppercase tracking-widest active:scale-95 w-fit">
-          <ArrowLeft size={16} /> DASHBOARD
+      <header className="p-6 md:p-8 pt-10 md:pt-12 shrink-0 bg-white z-10 relative">
+        <button 
+          onClick={onBack} 
+          className="mb-4 flex items-center gap-2 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-black uppercase tracking-widest active:scale-95 w-fit focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md px-2 py-1 -ml-2"
+        >
+          <ArrowLeft size={16} aria-hidden="true" /> DASHBOARD
         </button>
         <h2 className="text-3xl font-black text-slate-900 leading-tight mb-2 tracking-tight">{classData.name}</h2>
         <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
             <p className="text-slate-400 font-bold text-sm line-clamp-1">{classData.description || "Active Learning Pathway"}</p>
         </div>
-      </div>
+      </header>
 
-      <div className="flex-1 overflow-y-auto px-6 md:px-8 pb-48 custom-scrollbar relative">
+      <main className="flex-1 overflow-y-auto px-6 md:px-8 pb-48 custom-scrollbar relative">
         
         {/* ROADMAP TAB */}
         {activeSubTab === 'lessons' && (
@@ -364,108 +439,39 @@ export default function StudentClassView({
              
              {/* 1. CURRICULUM ACCORDIONS */}
              {assignedCurriculums.length > 0 && (
-                 <div className="space-y-8 mb-10">
-                     {assignedCurriculums.map((curr: any) => {
-                        const currLessons = curr.lessonIds.map((id: string) => lessons.find((l: any) => l.id === id)).filter(Boolean);
-                        const isExpanded = expandedRoadmaps[curr.id];
-                        const completedCountInCurr = currLessons.filter((l: any) => completedItems.includes(l.id)).length;
-                        const progressPercent = currLessons.length > 0 ? Math.round((completedCountInCurr / currLessons.length) * 100) : 0;
-                        
-                        return (
-                            <div key={curr.id} className="bg-white rounded-[3rem] border border-slate-200 overflow-hidden shadow-sm transition-all duration-300">
-                                <div 
-                                    className="bg-slate-900 p-8 relative overflow-hidden cursor-pointer group"
-                                    onClick={() => toggleRoadmap(curr.id)}
-                                >
-                                    <div className="absolute inset-0 opacity-20 transition-opacity group-hover:opacity-30" style={{ backgroundColor: curr.themeColor }} />
-                                    <div className="relative z-10 flex items-center justify-between mb-4">
-                                        <div>
-                                            <span className="px-3 py-1 bg-white/20 text-white rounded-lg text-[10px] font-black uppercase tracking-widest backdrop-blur-md mb-3 inline-block">{curr.level} Pathway</span>
-                                            <h3 className="text-2xl font-black text-white pr-4">{curr.title}</h3>
-                                        </div>
-                                        <div className="text-right shrink-0 flex flex-col items-end">
-                                            <span className="text-3xl font-black text-white">{progressPercent}%</span>
-                                            <div className="w-10 h-10 mt-2 bg-white/10 rounded-full flex items-center justify-center text-white backdrop-blur-sm transition-transform duration-300">
-                                                {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="h-3 w-full bg-slate-800 rounded-full overflow-hidden relative z-10">
-                                        <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${progressPercent}%` }} />
-                                    </div>
-                                </div>
-                                <div className={`transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                                    <div className="p-8 bg-slate-50 border-t border-slate-100">
-                                        <div className="relative border-l-4 border-slate-200 ml-6 space-y-10 py-4">
-                                            {currLessons.map((item: any, index: number) => {
-                                                const isCompleted = completedItems.includes(item.id);
-                                                const isLocked = index > completedCountInCurr;
-                                                
-                                                // --- THE FIX: Detect Exam Status inside the Accordion ---
-                                                const isExam = item.contentType === 'exam' || item.contentType === 'test';
-                                                
-                                                return (
-                                                    <div key={item.id} className={`relative pl-10 ${isLocked ? 'opacity-50 grayscale' : 'animate-in slide-in-from-left-4'}`}>
-                                                        
-                                                        {/* UPGRADED ICON LOGIC */}
-                                                        <div className={`absolute -left-[22px] top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center border-4 border-slate-50 shadow-sm z-10 transition-all ${
-                                                            isCompleted ? 'bg-emerald-500 text-white scale-110' : 
-                                                            isExam && index === completedCountInCurr ? 'bg-rose-500 text-white ring-4 ring-rose-200' : // Active Exam
-                                                            isExam ? 'bg-rose-100 text-rose-400' : // Locked Exam
-                                                            index === completedCountInCurr ? 'bg-indigo-600 text-white ring-4 ring-indigo-200' : // Active Lesson
-                                                            'bg-slate-200 text-slate-400' // Locked Lesson
-                                                        }`}>
-                                                            {isCompleted ? <CheckCircle2 size={16} strokeWidth={3} /> : 
-                                                             isExam ? <FileText size={16} strokeWidth={2.5} /> : 
-                                                             <Play size={16} className={index === completedCountInCurr ? "ml-1" : ""} />}
-                                                        </div>
-
-                                                        {/* UPGRADED BUTTON LOGIC */}
-                                                        <button disabled={isLocked} onClick={() => onSelectLesson(item)} className={`w-full text-left p-6 rounded-[2.5rem] border-2 border-transparent bg-white shadow-sm hover:shadow-md transition-all group active:scale-95 ${isExam && !isLocked ? 'hover:border-rose-200' : 'hover:border-indigo-100'}`}>
-                                                            <span className={`text-[10px] font-black uppercase tracking-widest mb-1 block ${isExam ? 'text-rose-400' : 'text-slate-400'}`}>
-                                                                {isExam ? 'Sprint Checkpoint' : `Unit ${index + 1}`}
-                                                            </span>
-                                                            <h4 className={`font-black text-lg leading-tight transition-colors ${isExam ? 'text-slate-900 group-hover:text-rose-600' : 'text-slate-800 group-hover:text-indigo-600'}`}>
-                                                                {item.title}
-                                                            </h4>
-                                                        </button>
-
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                     })}
-                 </div>
+                 <section className="space-y-8 mb-10" aria-label="Curriculum Roadmaps">
+                     {assignedCurriculums.map((curr: any) => (
+                         <CurriculumPathway 
+                            key={curr.id}
+                            curr={curr}
+                            lessons={lessons}
+                            completedItems={completedItems}
+                            isExpanded={!!expandedRoadmaps[curr.id]}
+                            onToggle={() => toggleRoadmap(curr.id)}
+                            onSelectLesson={onSelectLesson}
+                         />
+                     ))}
+                 </section>
              )}
 
              {/* 2. STANDALONE ASSIGNMENTS */}
              {standaloneLessons.length > 0 && (
-                 <div className="space-y-4 mb-10">
-                     <div className="flex items-center gap-3 ml-2 mb-6">
+                 <section className="space-y-4 mb-10" aria-label="Individual Assignments">
+                     <div className="flex items-center gap-3 ml-2 mb-6" aria-hidden="true">
                         <div className="h-0.5 flex-1 bg-slate-100 rounded-full" />
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Individual Assignments</h3>
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Individual Assignments</h3>
                         <div className="h-0.5 flex-1 bg-slate-100 rounded-full" />
                      </div>
                      
-                     {standaloneLessons.map((item: any) => {
-                         const isCompleted = completedItems.includes(item.id);
-                         return (
-                             <div key={item.id} className="p-6 border-2 border-slate-100 bg-white rounded-[2.5rem] flex items-center gap-4 cursor-pointer hover:shadow-md hover:border-indigo-100 transition-all active:scale-95 group" onClick={() => onSelectLesson(item)}>
-                                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-colors ${isCompleted ? 'bg-emerald-50 text-emerald-500' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`}>
-                                     {isCompleted ? <CheckCircle2 size={24} strokeWidth={3} /> : <Play size={24} className="ml-1" />}
-                                 </div>
-                                 <div className="flex-1">
-                                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Assigned Activity</span>
-                                     <h4 className="font-black text-slate-800 text-lg leading-tight group-hover:text-indigo-600 transition-colors">{item.title}</h4>
-                                 </div>
-                             </div>
-                         );
-                     })}
-                 </div>
+                     {standaloneLessons.map((item: any) => (
+                         <StandaloneAssignmentCard 
+                            key={item.id}
+                            item={item}
+                            isCompleted={completedItems.includes(item.id)}
+                            onSelectLesson={onSelectLesson}
+                         />
+                     ))}
+                 </section>
              )}
           </div>
         )}
@@ -474,53 +480,167 @@ export default function StudentClassView({
         {activeSubTab === 'leaderboard' && <LeaderboardView studentEmails={classData.studentEmails} currentUserEmail={userData.email} />}
         
         {activeSubTab === 'exams' && (
-          <div className="space-y-4">
+          <section className="space-y-4" aria-label="Exams">
             {examList.length === 0 ? (
                 <div className="text-center py-20 opacity-40">
-                    <FileText size={48} className="mx-auto mb-4" />
+                    <FileText size={48} className="mx-auto mb-4" aria-hidden="true" />
                     <p className="font-black text-xs uppercase tracking-widest leading-loose">No active exams<br/>assigned to this class.</p>
                 </div>
             ) : (
                 examList.map((item: any) => (
-                  <div key={item.id} className="p-6 border-2 border-rose-100 bg-white rounded-[3rem] flex items-center gap-4 cursor-pointer hover:shadow-xl transition-all" onClick={() => onSelectLesson(item)}>
-                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-rose-50 text-rose-600 shadow-inner"><FileText size={28} fill="currentColor" /></div>
-                    <div><h4 className="font-black text-slate-900 text-xl leading-tight mb-1">{item.title}</h4><span className="text-[10px] font-black uppercase text-rose-400 tracking-widest">High-Stakes Assessment</span></div>
-                  </div>
+                  <ExamCard key={item.id} item={item} onSelectLesson={onSelectLesson} />
                 ))
             )}
-          </div>
+          </section>
         )}
 
         {activeSubTab === 'forum' && <div className="h-[70vh]"><ClassForum classId={classData.id} userData={userData} /></div>}
         {activeSubTab === 'grades' && <StudentGradebook classData={classData} user={userData} />}
-      </div>
+      </main>
 
       {/* BOTTOM NAV */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-[550px] z-[100] px-2">
+      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-[550px] z-[100] px-2" aria-label="Bottom Navigation">
           <div className="bg-slate-900/95 backdrop-blur-2xl p-2 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 flex items-center justify-between gap-1">
             {[
-              { id: 'lessons', label: 'Roadmap', icon: <BookOpen size={18}/> },
-              { id: 'leaderboard', label: 'Rankings', icon: <Trophy size={18}/> },
-              { id: 'exams', label: 'Exams', icon: <FileText size={18}/> },
-              { id: 'forum', label: 'Forum', icon: <MessageSquare size={18}/> },
-              { id: 'grades', label: 'Grades', icon: <CheckCircle2 size={18}/> }
+              { id: 'lessons', label: 'Roadmap', icon: <BookOpen size={18} aria-hidden="true" /> },
+              { id: 'leaderboard', label: 'Rankings', icon: <Trophy size={18} aria-hidden="true" /> },
+              { id: 'exams', label: 'Exams', icon: <FileText size={18} aria-hidden="true" /> },
+              { id: 'forum', label: 'Forum', icon: <MessageSquare size={18} aria-hidden="true" /> },
+              { id: 'grades', label: 'Grades', icon: <CheckCircle2 size={18} aria-hidden="true" /> }
             ].map((tab) => {
               const isActive = activeSubTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveSubTab(tab.id as any)}
-                  className={`flex flex-1 items-center justify-center gap-2 py-3.5 px-4 rounded-full transition-all duration-300 relative group ${
+                  aria-label={tab.label}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`flex flex-1 items-center justify-center gap-2 py-3.5 px-4 rounded-full transition-all duration-300 relative group focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${
                     isActive ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'
                   }`}
                 >
                   <div className={`transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>{tab.icon}</div>
-                  {isActive && <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap animate-in slide-in-from-left-2">{tab.label}</span>}
+                  {isActive && <span className="text-xs font-black uppercase tracking-widest whitespace-nowrap animate-in slide-in-from-left-2">{tab.label}</span>}
                 </button>
               );
             })}
           </div>
-      </div>
+      </nav>
     </div>
   );
 }
+
+// ============================================================================
+//  INTERNAL BLOCK RENDERERS (Clean Architecture)
+// ============================================================================
+
+const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle, onSelectLesson }: any) => {
+    const currLessons = curr.lessonIds.map((id: string) => lessons.find((l: any) => l.id === id)).filter(Boolean);
+    const completedCountInCurr = currLessons.filter((l: any) => completedItems.includes(l.id)).length;
+    const progressPercent = currLessons.length > 0 ? Math.round((completedCountInCurr / currLessons.length) * 100) : 0;
+    
+    return (
+        <article className="bg-white rounded-[3rem] border border-slate-200 overflow-hidden shadow-sm transition-all duration-300">
+            <button 
+                className="w-full text-left bg-slate-900 p-8 relative overflow-hidden group focus:outline-none focus:ring-4 focus:ring-indigo-500"
+                onClick={onToggle}
+                aria-expanded={isExpanded}
+            >
+                <div className="absolute inset-0 opacity-20 transition-opacity group-hover:opacity-30" style={{ backgroundColor: curr.themeColor }} />
+                <div className="relative z-10 flex items-center justify-between mb-4">
+                    <div>
+                        <span className="px-3 py-1 bg-white/20 text-white rounded-lg text-xs font-black uppercase tracking-widest backdrop-blur-md mb-3 inline-block">
+                            {curr.level} Pathway
+                        </span>
+                        <h3 className="text-2xl font-black text-white pr-4">{curr.title}</h3>
+                    </div>
+                    <div className="text-right shrink-0 flex flex-col items-end">
+                        <span className="text-3xl font-black text-white">{progressPercent}%</span>
+                        <div className="w-10 h-10 mt-2 bg-white/10 rounded-full flex items-center justify-center text-white backdrop-blur-sm transition-transform duration-300" aria-hidden="true">
+                            {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                        </div>
+                    </div>
+                </div>
+                <div className="h-3 w-full bg-slate-800 rounded-full overflow-hidden relative z-10" aria-label={`Pathway progress: ${progressPercent}%`}>
+                    <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${progressPercent}%` }} />
+                </div>
+            </button>
+            
+            <div className={`transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0 invisible'}`}>
+                <div className="p-8 bg-slate-50 border-t border-slate-100">
+                    <div className="relative border-l-4 border-slate-200 ml-6 space-y-10 py-4">
+                        {currLessons.map((item: any, index: number) => {
+                            const isCompleted = completedItems.includes(item.id);
+                            const isLocked = index > completedCountInCurr;
+                            const isExam = item.contentType === 'exam' || item.contentType === 'test';
+                            
+                            return (
+                                <div key={item.id} className={`relative pl-10 ${isLocked ? 'opacity-50 grayscale' : 'animate-in slide-in-from-left-4'}`}>
+                                    
+                                    {/* ICON LOGIC */}
+                                    <div className={`absolute -left-[22px] top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center border-4 border-slate-50 shadow-sm z-10 transition-all ${
+                                        isCompleted ? 'bg-emerald-500 text-white scale-110' : 
+                                        isExam && index === completedCountInCurr ? 'bg-rose-500 text-white ring-4 ring-rose-200' : 
+                                        isExam ? 'bg-rose-100 text-rose-400' : 
+                                        index === completedCountInCurr ? 'bg-indigo-600 text-white ring-4 ring-indigo-200' : 
+                                        'bg-slate-200 text-slate-400' 
+                                    }`} aria-hidden="true">
+                                        {isCompleted ? <CheckCircle2 size={16} strokeWidth={3} /> : 
+                                         isExam ? <FileText size={16} strokeWidth={2.5} /> : 
+                                         <Play size={16} className={index === completedCountInCurr ? "ml-1" : ""} />}
+                                    </div>
+
+                                    {/* BUTTON LOGIC */}
+                                    <button 
+                                      disabled={isLocked} 
+                                      onClick={() => onSelectLesson(item)} 
+                                      aria-label={`${isExam ? 'Sprint Checkpoint' : `Unit ${index + 1}`}: ${item.title}`}
+                                      className={`w-full text-left p-6 rounded-[2.5rem] border-2 border-transparent bg-white shadow-sm transition-all group focus:outline-none focus:ring-4 focus:ring-indigo-500 ${isLocked ? 'cursor-not-allowed' : 'hover:shadow-md active:scale-95 cursor-pointer'} ${isExam && !isLocked ? 'hover:border-rose-200' : 'hover:border-indigo-100'}`}
+                                    >
+                                        <span className={`text-xs font-black uppercase tracking-widest mb-1 block ${isExam ? 'text-rose-400' : 'text-slate-400'}`}>
+                                            {isExam ? 'Sprint Checkpoint' : `Unit ${index + 1}`}
+                                        </span>
+                                        <h4 className={`font-black text-lg leading-tight transition-colors ${isExam ? 'text-slate-900 group-hover:text-rose-600' : 'text-slate-800 group-hover:text-indigo-600'}`}>
+                                            {item.title}
+                                        </h4>
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+        </article>
+    );
+};
+
+const StandaloneAssignmentCard = ({ item, isCompleted, onSelectLesson }: any) => (
+    <button 
+      className="w-full text-left p-6 border-2 border-slate-100 bg-white rounded-[2.5rem] flex items-center gap-4 cursor-pointer hover:shadow-md hover:border-indigo-100 transition-all active:scale-95 group focus:outline-none focus:ring-4 focus:ring-indigo-500" 
+      onClick={() => onSelectLesson(item)}
+      aria-label={`Assigned Activity: ${item.title}`}
+    >
+        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-colors shrink-0 ${isCompleted ? 'bg-emerald-50 text-emerald-500' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`} aria-hidden="true">
+            {isCompleted ? <CheckCircle2 size={24} strokeWidth={3} /> : <Play size={24} className="ml-1" />}
+        </div>
+        <div className="flex-1">
+            <span className="text-xs font-black uppercase tracking-widest text-slate-400 mb-1 block">Assigned Activity</span>
+            <h4 className="font-black text-slate-800 text-lg leading-tight group-hover:text-indigo-600 transition-colors">{item.title}</h4>
+        </div>
+    </button>
+);
+
+const ExamCard = ({ item, onSelectLesson }: any) => (
+    <button 
+      className="w-full text-left p-6 border-2 border-rose-100 bg-white rounded-[3rem] flex items-center gap-4 cursor-pointer hover:shadow-xl transition-all group focus:outline-none focus:ring-4 focus:ring-rose-500" 
+      onClick={() => onSelectLesson(item)}
+    >
+      <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-rose-50 text-rose-600 shadow-inner group-hover:bg-rose-600 group-hover:text-white transition-colors shrink-0" aria-hidden="true">
+        <FileText size={28} fill="currentColor" />
+      </div>
+      <div>
+        <h4 className="font-black text-slate-900 text-xl leading-tight mb-1 group-hover:text-rose-600 transition-colors">{item.title}</h4>
+        <span className="text-xs font-black uppercase text-rose-400 tracking-widest">High-Stakes Assessment</span>
+      </div>
+    </button>
+);
