@@ -44,8 +44,8 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
   const todayLessons = isToday ? (userData?.dailyLessons || 0) : 0;
 
   const dailyQuests = [
-      { id: 1, title: 'Earn 50 XP', target: 50, current: Math.min(todayXp, 50), icon: <Zap size={16} className="text-yellow-500" /> },
-      { id: 2, title: 'Complete 1 Lesson', target: 1, current: Math.min(todayLessons, 1), icon: <BookOpen size={16} className="text-indigo-500" /> },
+      { id: 1, title: 'Earn 50 XP', target: 50, current: Math.min(todayXp, 50), icon: <Zap size={16} className="text-yellow-500" aria-hidden="true" /> },
+      { id: 2, title: 'Complete 1 Lesson', target: 1, current: Math.min(todayLessons, 1), icon: <BookOpen size={16} className="text-indigo-500" aria-hidden="true" /> },
   ];
 
   const now = new Date();
@@ -53,15 +53,15 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
   const hoursRemaining = Math.max(1, Math.floor((tomorrow.getTime() - now.getTime()) / (1000 * 60 * 60)));
 
   return (
-    <div className="h-full flex flex-col bg-slate-50">
+    <div className="h-full flex flex-col bg-slate-50 font-sans">
         
         {/* 1. DYNAMIC APP BAR */}
-        <div className="bg-white/90 backdrop-blur-md border-b border-slate-100 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
+        <header className="bg-white/90 backdrop-blur-md border-b border-slate-100 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
             <div className="flex items-center gap-3">
                 {activeOrg?.logoUrl ? (
-                    <img src={activeOrg.logoUrl} alt="Organization Logo" className="w-8 h-8 object-contain rounded-md" />
+                    <img src={activeOrg.logoUrl} alt={`${themeName} Logo`} className="w-8 h-8 object-contain rounded-md" />
                 ) : (
-                    <div className="text-white p-1.5 rounded-lg shadow-sm" style={{ backgroundColor: themeColor }}>
+                    <div className="text-white p-1.5 rounded-lg shadow-sm" style={{ backgroundColor: themeColor }} aria-hidden="true">
                         <GraduationCap size={18} strokeWidth={3}/>
                     </div>
                 )}
@@ -69,63 +69,63 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
                     {themeName}
                 </span>
             </div>
-            <div className="px-3 py-1.5 bg-slate-100 rounded-full border border-slate-200 flex items-center gap-1.5 shrink-0">
-                <Globe size={14} className="text-slate-400"/>
-                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">{targetLang}</span>
+            <div className="px-3 py-1.5 bg-slate-100 rounded-full border border-slate-200 flex items-center gap-1.5 shrink-0" aria-label={`Target Language: ${targetLang}`}>
+                <Globe size={14} className="text-slate-400" aria-hidden="true"/>
+                <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">{targetLang}</span>
             </div>
-        </div>
+        </header>
 
-        <div ref={scrollViewportRef} className="flex-1 overflow-y-auto custom-scrollbar pb-32">
+        <main ref={scrollViewportRef} className="flex-1 overflow-y-auto custom-scrollbar pb-32 focus:outline-none" tabIndex={-1}>
             
             {/* 2. HERO SECTION */}
-            <div className="bg-white pt-6 pb-8 px-6 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 relative z-10">
+            <section className="bg-white pt-6 pb-8 px-6 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 relative z-10">
                 <div className="mb-8">
                     <h1 className="text-3xl font-medium text-slate-400 tracking-tight">{greeting},</h1>
-                    <h1 className="text-4xl font-black text-slate-800 tracking-tight">{firstName}.</h1>
+                    <h2 className="text-4xl font-black text-slate-800 tracking-tight">{firstName}.</h2>
                 </div>
 
                 {/* STATS BENTO */}
                 <div className="grid grid-cols-3 gap-3">
                     <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center shadow-inner">
-                        <Flame size={20} className={`mb-1 ${streak > 0 && isToday ? 'text-orange-500 fill-orange-500' : 'text-slate-300'}`}/>
+                        <Flame size={20} aria-hidden="true" className={`mb-1 ${streak > 0 && isToday ? 'text-orange-500 fill-orange-500' : 'text-slate-300'}`}/>
                         <span className={`text-lg font-black ${streak > 0 && isToday ? '' : 'text-slate-400'}`} style={streak > 0 && isToday ? { color: themeColor } : {}}>{streak}</span>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Day Streak</span>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider text-center">Day Streak</span>
                     </div>
                     <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center shadow-inner">
-                        <Zap size={20} className="text-yellow-500 mb-1 fill-yellow-500"/>
+                        <Zap size={20} aria-hidden="true" className="text-yellow-500 mb-1 fill-yellow-500"/>
                         <span className="text-lg font-black" style={{ color: themeColor }}>{xp}</span>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Total XP</span>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider text-center">Total XP</span>
                     </div>
                     <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center shadow-inner">
-                        <Trophy size={20} className="text-emerald-500 mb-1 fill-emerald-500"/>
+                        <Trophy size={20} aria-hidden="true" className="text-emerald-500 mb-1 fill-emerald-500"/>
                         <span className="text-lg font-black" style={{ color: themeColor }}>{level}</span>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Level</span>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider text-center">Level</span>
                     </div>
                 </div>
 
                 {/* PROGRESS BAR */}
-                <div className="mt-6 flex items-center gap-3">
+                <div className="mt-6 flex items-center gap-3" aria-label={`Progress to next level: ${progressPct}%`}>
                     <div className="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
                         <div 
                             className="h-full transition-all duration-1000 ease-out" 
                             style={{ width: `${progressPct}%`, backgroundColor: themeColor }}
                         />
                     </div>
-                    <span className="text-[9px] font-black text-slate-400 whitespace-nowrap uppercase tracking-widest">
+                    <span className="text-xs font-black text-slate-400 whitespace-nowrap uppercase tracking-widest">
                         {xpToNext} XP to Level Up
                     </span>
                 </div>
-            </div>
+            </section>
 
             <div className="px-6 space-y-8 mt-8">
 
               {/* 3. DAILY QUESTS WIDGET */}
-              <div className="bg-white p-6 rounded-[2rem] border-2 border-slate-100 shadow-sm animate-in slide-in-from-bottom-4">
+              <section className="bg-white p-6 rounded-[2rem] border-2 border-slate-100 shadow-sm animate-in slide-in-from-bottom-4">
                   <div className="flex items-center justify-between mb-5">
                       <h3 className="font-black text-slate-800 flex items-center gap-2">
-                          <Target size={18} className="text-rose-500" /> Daily Quests
+                          <Target size={18} className="text-rose-500" aria-hidden="true" /> Daily Quests
                       </h3>
-                      <span className="text-[9px] font-black text-rose-500 bg-rose-50 px-2 py-1 rounded-md uppercase tracking-widest">
+                      <span className="text-xs font-black text-rose-500 bg-rose-50 px-2 py-1 rounded-md uppercase tracking-widest">
                           Resets in {hoursRemaining}h
                       </span>
                   </div>
@@ -136,7 +136,7 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
                           const isDone = quest.current >= quest.target;
                           
                           return (
-                              <div key={quest.id} className="relative">
+                              <div key={quest.id} className="relative" aria-label={`${quest.title}: ${isDone ? 'Completed' : `${quest.current} out of ${quest.target}`}`}>
                                   <div className="flex justify-between items-end mb-2">
                                       <div className="flex items-center gap-2">
                                           <div className={`${isDone ? 'opacity-50 grayscale' : ''} transition-all`}>{quest.icon}</div>
@@ -153,14 +153,20 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
                           );
                       })}
                   </div>
-              </div>
+              </section>
               
-              {/* 4. ACTIVE SUBJECTS SECTION (Upgraded from Classes) */}
+              {/* 4. ACTIVE SUBJECTS SECTION */}
               {classes && classes.length > 0 ? (
-                <div className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
+                <section className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
                     <div className="flex justify-between items-end mb-4 ml-1">
                         <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Active Subjects</h3>
-                        <button onClick={() => setActiveTab('classes')} className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline">View All</button>
+                        <button 
+                            onClick={() => setActiveTab('classes')} 
+                            className="text-xs font-black text-indigo-600 uppercase tracking-widest hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-sm"
+                            aria-label="View all active subjects"
+                        >
+                            View All
+                        </button>
                     </div>
                     
                     <div className="flex gap-4 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">
@@ -173,14 +179,15 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
                                 <button 
                                     key={cls.id} 
                                     onClick={() => onSelectClass(cls)} 
-                                    className="snap-start min-w-[260px] bg-white rounded-[2rem] shadow-sm border-2 border-slate-100 transition-all hover:-translate-y-1 hover:shadow-xl hover:border-indigo-100 group relative overflow-hidden flex flex-col text-left p-6 active:scale-95"
+                                    aria-label={`Open subject ${cls.name}, ${pendingCount} pending tasks`}
+                                    className="snap-start min-w-[260px] bg-white rounded-[2rem] shadow-sm border-2 border-slate-100 transition-all hover:-translate-y-1 hover:shadow-xl hover:border-indigo-100 group relative overflow-hidden flex flex-col text-left p-6 active:scale-95 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                 >
-                                    <div className="flex justify-between items-start mb-6">
+                                    <div className="flex justify-between items-start mb-6 w-full">
                                         <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center shadow-inner transition-colors duration-500 ${theme.bg} ${theme.color} group-hover:bg-indigo-600 group-hover:text-white`}>
-                                            <Icon size={24} strokeWidth={2.5} />
+                                            <Icon size={24} strokeWidth={2.5} aria-hidden="true" />
                                         </div>
                                         {pendingCount > 0 && (
-                                            <div className="bg-rose-50 border border-rose-100 text-rose-600 text-[9px] font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 uppercase tracking-widest">
+                                            <div className="bg-rose-50 border border-rose-100 text-rose-600 text-xs font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 uppercase tracking-widest">
                                               <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></div>
                                               {pendingCount} Tasks
                                             </div>
@@ -188,53 +195,72 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
                                     </div>
                                     
                                     <div>
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">{cls.subject || 'General'}</span>
+                                        <span className="text-xs font-black uppercase tracking-widest text-slate-400 block mb-1">{cls.subject || 'General'}</span>
                                         <h4 className="font-black text-slate-800 text-xl truncate leading-tight group-hover:text-indigo-600 transition-colors">{cls.name}</h4>
                                     </div>
                                 </button> 
                             ); 
                         })}
                     </div>
-                </div>
+                </section>
               ) : (
-                 <div className="p-6 border-2 border-dashed border-slate-200 rounded-[2rem] text-center">
-                    <School size={32} className="mx-auto text-slate-300 mb-2"/>
+                 <section className="p-6 border-2 border-dashed border-slate-200 rounded-[2rem] text-center">
+                    <School size={32} className="mx-auto text-slate-300 mb-2" aria-hidden="true"/>
                     <p className="text-sm text-slate-400 font-bold mb-4">No active subjects right now.</p>
-                    <button onClick={() => setActiveTab('classes')} className="px-6 py-3 bg-indigo-50 text-indigo-600 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-indigo-100 transition-colors">
+                    <button 
+                        onClick={() => setActiveTab('classes')} 
+                        className="px-6 py-3 bg-indigo-50 text-indigo-600 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-indigo-100 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
                         Browse Campus
                     </button>
-                 </div>
+                 </section>
               )}
 
               {/* 5. ACTION CARDS */}
-              <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-bottom-4 duration-500 delay-200">
+              <section className="grid grid-cols-2 gap-4 animate-in slide-in-from-bottom-4 duration-500 delay-200">
                 <button 
-                    onClick={() => setActiveTab('flashcards')} 
-                    className="relative h-32 rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 group text-left transition-all active:scale-95 hover:shadow-lg"
+                    onClick={() => setActiveTab('practice')} 
+                    aria-label="Navigate to Practice and Memory Vault"
+                    className="relative h-32 rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 group text-left transition-all active:scale-95 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
                 >
                     <div className="absolute inset-0 bg-white"></div>
-                    <div className="absolute -right-4 -bottom-4 text-orange-500 opacity-10 transform rotate-12 group-hover:scale-125 transition-transform duration-700"><Layers size={80} /></div>
+                    <div className="absolute -right-4 -bottom-4 text-orange-500 opacity-10 transform rotate-12 group-hover:scale-125 transition-transform duration-700">
+                        <Layers size={80} aria-hidden="true" />
+                    </div>
                     <div className="relative z-10 p-5 h-full flex flex-col justify-between">
-                        <div className="w-8 h-8 bg-orange-50 rounded-xl flex items-center justify-center text-orange-500"><Layers size={16} /></div>
-                        <div><h3 className="text-slate-800 font-black text-lg mb-0.5 leading-none">Practice</h3><p className="text-slate-400 text-[9px] font-bold uppercase tracking-wider">Memory Vault</p></div>
+                        <div className="w-8 h-8 bg-orange-50 rounded-xl flex items-center justify-center text-orange-500">
+                            <Layers size={16} aria-hidden="true" />
+                        </div>
+                        <div>
+                            <h3 className="text-slate-800 font-black text-lg mb-0.5 leading-none">Practice</h3>
+                            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Memory Vault</p>
+                        </div>
                     </div>
                 </button>
 
                 <button 
                     onClick={() => setActiveTab('create')} 
-                    className="relative h-32 rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 group text-left transition-all active:scale-95 hover:shadow-lg"
+                    aria-label="Navigate to Studio to Create Content"
+                    className="relative h-32 rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 group text-left transition-all active:scale-95 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
                 >
                     <div className="absolute inset-0 bg-white"></div>
-                    <div className="absolute -right-4 -bottom-4 text-emerald-500 opacity-10 transform -rotate-12 group-hover:scale-125 transition-transform duration-700"><Feather size={80} /></div>
+                    <div className="absolute -right-4 -bottom-4 text-emerald-500 opacity-10 transform -rotate-12 group-hover:scale-125 transition-transform duration-700">
+                        <Feather size={80} aria-hidden="true" />
+                    </div>
                     <div className="relative z-10 p-5 h-full flex flex-col justify-between">
-                        <div className="w-8 h-8 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600"><Feather size={16} /></div>
-                        <div><h3 className="text-slate-800 font-black text-lg mb-0.5 leading-none">Studio</h3><p className="text-slate-400 text-[9px] font-bold uppercase tracking-wider">Create Content</p></div>
+                        <div className="w-8 h-8 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600">
+                            <Feather size={16} aria-hidden="true" />
+                        </div>
+                        <div>
+                            <h3 className="text-slate-800 font-black text-lg mb-0.5 leading-none">Studio</h3>
+                            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Create Content</p>
+                        </div>
                     </div>
                 </button>
-              </div>
+              </section>
 
             </div>
-        </div>
+        </main>
     </div>
   );
 }
