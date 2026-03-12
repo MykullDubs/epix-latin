@@ -2,9 +2,21 @@
 import React, { useRef } from 'react';
 import { 
     GraduationCap, Globe, Flame, Zap, Trophy, 
-    School, Layers, Feather, Target, BookOpen, PlayCircle 
+    School, Layers, Feather, Target, BookOpen, 
+    Microscope, Terminal, Calculator, Palette, BookText
 } from 'lucide-react';
 import { calculateLevel } from '../utils/profileHelpers';
+
+// --- NEW THEME HELPER (Must match StudentDashboardHub) ---
+const getSubjectTheme = (subject: string) => {
+    const sub = subject.toLowerCase();
+    if (sub.includes('bio') || sub.includes('science') || sub.includes('phys')) return { icon: Microscope, color: 'text-emerald-500', bg: 'bg-emerald-50', gradient: 'from-emerald-500 to-teal-400' };
+    if (sub.includes('code') || sub.includes('comp') || sub.includes('tech')) return { icon: Terminal, color: 'text-slate-800', bg: 'bg-slate-200', gradient: 'from-slate-800 to-slate-600' };
+    if (sub.includes('math') || sub.includes('calc') || sub.includes('alg')) return { icon: Calculator, color: 'text-rose-500', bg: 'bg-rose-50', gradient: 'from-rose-500 to-orange-400' };
+    if (sub.includes('art') || sub.includes('design')) return { icon: Palette, color: 'text-fuchsia-500', bg: 'bg-fuchsia-50', gradient: 'from-fuchsia-500 to-pink-400' };
+    if (sub.includes('hist') || sub.includes('lit') || sub.includes('read')) return { icon: BookText, color: 'text-amber-600', bg: 'bg-amber-50', gradient: 'from-amber-500 to-yellow-400' };
+    return { icon: Globe, color: 'text-indigo-600', bg: 'bg-indigo-50', gradient: 'from-indigo-600 to-cyan-500' };
+};
 
 export default function HomeView({ setActiveTab, classes, onSelectClass, userData, user, activeOrg }: any) {
   const scrollViewportRef = useRef<HTMLDivElement>(null);
@@ -28,7 +40,6 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
   const todayStr = new Date().toDateString();
   const isToday = userData?.lastActivityDate === todayStr;
   
-  // If they haven't done anything today, show 0. Otherwise, show their live daily stats.
   const todayXp = isToday ? (userData?.dailyXp || 0) : 0;
   const todayLessons = isToday ? (userData?.dailyLessons || 0) : 0;
 
@@ -37,7 +48,6 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
       { id: 2, title: 'Complete 1 Lesson', target: 1, current: Math.min(todayLessons, 1), icon: <BookOpen size={16} className="text-indigo-500" /> },
   ];
 
-  // Calculate hours remaining until midnight for the reset label
   const now = new Date();
   const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const hoursRemaining = Math.max(1, Math.floor((tomorrow.getTime() - now.getTime()) / (1000 * 60 * 60)));
@@ -145,35 +155,41 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
                   </div>
               </div>
               
-              {/* 4. CLASSES SECTION */}
+              {/* 4. ACTIVE SUBJECTS SECTION (Upgraded from Classes) */}
               {classes && classes.length > 0 ? (
                 <div className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
                     <div className="flex justify-between items-end mb-4 ml-1">
-                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">My Classes</h3>
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Active Subjects</h3>
+                        <button onClick={() => setActiveTab('classes')} className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline">View All</button>
                     </div>
                     
-                    <div className="flex gap-5 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">
-                        {classes.map((cls: any, index: number) => { 
+                    <div className="flex gap-4 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">
+                        {classes.map((cls: any) => { 
                             const pendingCount = (cls.assignments || []).length;
-                            const gradients = ["from-indigo-600 to-violet-600", "from-emerald-500 to-teal-600", "from-orange-500 to-rose-600"];
-                            const themeGradient = gradients[index % gradients.length];
+                            const theme = getSubjectTheme(cls.subject || 'General');
+                            const Icon = theme.icon;
 
                             return ( 
-                                <button key={cls.id} onClick={() => onSelectClass(cls)} className="snap-start min-w-[280px] h-[180px] bg-white rounded-[2rem] shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-slate-100 transition-all hover:-translate-y-1 hover:shadow-xl group relative overflow-hidden flex flex-col text-left">
-                                    <div className={`h-24 w-full bg-gradient-to-r ${themeGradient} relative p-5 flex justify-between items-start`}>
-                                        <div className="w-12 h-12 bg-white/20 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-sm">{cls.name.charAt(0)}</div>
+                                <button 
+                                    key={cls.id} 
+                                    onClick={() => onSelectClass(cls)} 
+                                    className="snap-start min-w-[260px] bg-white rounded-[2rem] shadow-sm border-2 border-slate-100 transition-all hover:-translate-y-1 hover:shadow-xl hover:border-indigo-100 group relative overflow-hidden flex flex-col text-left p-6 active:scale-95"
+                                >
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center shadow-inner transition-colors duration-500 ${theme.bg} ${theme.color} group-hover:bg-indigo-600 group-hover:text-white`}>
+                                            <Icon size={24} strokeWidth={2.5} />
+                                        </div>
                                         {pendingCount > 0 && (
-                                            <div className="bg-white text-rose-600 text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5">
+                                            <div className="bg-rose-50 border border-rose-100 text-rose-600 text-[9px] font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 uppercase tracking-widest">
                                               <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></div>
-                                              {pendingCount} Assigned
+                                              {pendingCount} Tasks
                                             </div>
                                         )}
                                     </div>
-                                    <div className="p-5 flex-1 relative">
-                                        <h4 className="font-black text-slate-800 text-xl truncate leading-tight transition-colors" style={{ color: themeColor }}>{cls.name}</h4>
-                                        <div className="flex items-center gap-2 mt-2">
-                                          <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100">{cls.code}</span>
-                                        </div>
+                                    
+                                    <div>
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">{cls.subject || 'General'}</span>
+                                        <h4 className="font-black text-slate-800 text-xl truncate leading-tight group-hover:text-indigo-600 transition-colors">{cls.name}</h4>
                                     </div>
                                 </button> 
                             ); 
@@ -181,9 +197,12 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
                     </div>
                 </div>
               ) : (
-                 <div className="p-6 border-2 border-dashed border-slate-200 rounded-3xl text-center">
+                 <div className="p-6 border-2 border-dashed border-slate-200 rounded-[2rem] text-center">
                     <School size={32} className="mx-auto text-slate-300 mb-2"/>
-                    <p className="text-sm text-slate-400 font-bold">No classes joined yet.</p>
+                    <p className="text-sm text-slate-400 font-bold mb-4">No active subjects right now.</p>
+                    <button onClick={() => setActiveTab('classes')} className="px-6 py-3 bg-indigo-50 text-indigo-600 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-indigo-100 transition-colors">
+                        Browse Campus
+                    </button>
                  </div>
               )}
 
@@ -191,25 +210,25 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
               <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-bottom-4 duration-500 delay-200">
                 <button 
                     onClick={() => setActiveTab('flashcards')} 
-                    className="relative h-40 rounded-[2rem] overflow-hidden shadow-lg group text-left transition-all active:scale-95"
+                    className="relative h-32 rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 group text-left transition-all active:scale-95 hover:shadow-lg"
                 >
-                    <div className="absolute inset-0 bg-gradient-to-br from-orange-400 to-red-500 group-hover:scale-110 transition-transform duration-700"></div>
-                    <div className="absolute -right-4 -bottom-4 text-white opacity-20 transform rotate-12 group-hover:scale-125 transition-transform duration-700"><Layers size={100} /></div>
+                    <div className="absolute inset-0 bg-white"></div>
+                    <div className="absolute -right-4 -bottom-4 text-orange-500 opacity-10 transform rotate-12 group-hover:scale-125 transition-transform duration-700"><Layers size={80} /></div>
                     <div className="relative z-10 p-5 h-full flex flex-col justify-between">
-                        <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center text-white"><Layers size={20} /></div>
-                        <div><h3 className="text-white font-black text-xl mb-1 leading-none">Vocab Gym</h3><p className="text-orange-100 text-[10px] font-bold uppercase tracking-wider">Practice</p></div>
+                        <div className="w-8 h-8 bg-orange-50 rounded-xl flex items-center justify-center text-orange-500"><Layers size={16} /></div>
+                        <div><h3 className="text-slate-800 font-black text-lg mb-0.5 leading-none">Practice</h3><p className="text-slate-400 text-[9px] font-bold uppercase tracking-wider">Memory Vault</p></div>
                     </div>
                 </button>
 
                 <button 
                     onClick={() => setActiveTab('create')} 
-                    className="relative h-40 rounded-[2rem] overflow-hidden shadow-lg group text-left transition-all active:scale-95"
+                    className="relative h-32 rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 group text-left transition-all active:scale-95 hover:shadow-lg"
                 >
-                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-teal-600 group-hover:scale-110 transition-transform duration-700"></div>
-                    <div className="absolute -right-4 -bottom-4 text-white opacity-20 transform -rotate-12 group-hover:scale-125 transition-transform duration-700"><Feather size={100} /></div>
+                    <div className="absolute inset-0 bg-white"></div>
+                    <div className="absolute -right-4 -bottom-4 text-emerald-500 opacity-10 transform -rotate-12 group-hover:scale-125 transition-transform duration-700"><Feather size={80} /></div>
                     <div className="relative z-10 p-5 h-full flex flex-col justify-between">
-                        <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center text-white"><Feather size={20} /></div>
-                        <div><h3 className="text-white font-black text-xl mb-1 leading-none">Studio</h3><p className="text-emerald-100 text-[10px] font-bold uppercase tracking-wider">Creator</p></div>
+                        <div className="w-8 h-8 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600"><Feather size={16} /></div>
+                        <div><h3 className="text-slate-800 font-black text-lg mb-0.5 leading-none">Studio</h3><p className="text-slate-400 text-[9px] font-bold uppercase tracking-wider">Create Content</p></div>
                     </div>
                 </button>
               </div>
