@@ -155,7 +155,7 @@ export default function App() {
           ) : activeTab === 'profile' ? (
             <ProfileView user={user} userData={userData} />
           ) : (
-            <HomeView classes={enrolledClasses} onSelectClass={setActiveStudentClass} userData={userData} activeOrg={activeOrg} setActiveTab={setActiveTab} />
+            <HomeView classes={enrolledClasses} curriculums={GLOBAL_CURRICULUMS} onSelectClass={setActiveStudentClass} userData={userData} activeOrg={activeOrg} setActiveTab={setActiveTab} />
           )}
 
         </div>
