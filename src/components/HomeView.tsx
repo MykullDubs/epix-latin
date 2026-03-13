@@ -21,7 +21,6 @@ const getSubjectTheme = (subject: string) => {
     return { icon: Globe, color: 'text-indigo-500', bg: 'bg-indigo-50', border: 'border-indigo-100', hover: 'hover:border-indigo-300 hover:shadow-indigo-100' };
 };
 
-// ADDED curriculums = [] TO PROPS
 export default function HomeView({ setActiveTab, classes, curriculums = [], onSelectClass, userData, user, activeOrg }: any) {
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
@@ -141,28 +140,18 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
 
             <div className="px-6 space-y-8 mt-8">
 
-              {/* 3. DAILY QUESTS WIDGET */}
-              <section className="bg-white p-6 rounded-[2rem] border-2 border-slate-100 shadow-sm animate-in slide-in-from-bottom-4">
-                  <div className="flex items-center justify-between mb-5">
-                      <h3 className="font-black text-slate-800 flex items-center gap-2">
-                          <Target size={18} className="text-rose-500" aria-hidden="true" /> Daily Quests
-                      </h3>
-                      <span className="text-xs font-black text-rose-500 bg-rose-50 px-2 py-1 rounded-md uppercase tracking-widest">
-                          Resets in {hoursRemaining}h
-                      </span>
-                  </div>
-
-                  {visibleQuests.length === 0 ? (
-                      <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center gap-4 animate-in fade-in zoom-in-95">
-                          <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-500 shrink-0">
-                              <Trophy size={24} className="fill-emerald-500" />
-                          </div>
-                          <div>
-                              <h4 className="font-black text-emerald-800 text-sm">All Quests Cleared!</h4>
-                              <p className="text-xs font-bold text-emerald-600 mt-0.5">Great job! Come back tomorrow for more rewards.</p>
-                          </div>
+              {/* 3. DAILY QUESTS WIDGET (ONLY RENDER IF THERE ARE VISIBLE QUESTS) */}
+              {visibleQuests.length > 0 && (
+                  <section className="bg-white p-6 rounded-[2rem] border-2 border-slate-100 shadow-sm animate-in slide-in-from-bottom-4 transition-all duration-500">
+                      <div className="flex items-center justify-between mb-5">
+                          <h3 className="font-black text-slate-800 flex items-center gap-2">
+                              <Target size={18} className="text-rose-500" aria-hidden="true" /> Daily Quests
+                          </h3>
+                          <span className="text-xs font-black text-rose-500 bg-rose-50 px-2 py-1 rounded-md uppercase tracking-widest">
+                              Resets in {hoursRemaining}h
+                          </span>
                       </div>
-                  ) : (
+
                       <div className="space-y-4">
                           {visibleQuests.map(quest => {
                               const pct = Math.min(100, Math.round((quest.current / quest.target) * 100));
@@ -196,8 +185,8 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                               );
                           })}
                       </div>
-                  )}
-              </section>
+                  </section>
+              )}
               
               {/* 4. ACTIVE SUBJECTS SECTION */}
               {classes && classes.length > 0 ? (
