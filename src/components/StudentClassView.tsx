@@ -10,18 +10,27 @@ import {
   MessageSquare, Send, ArrowLeft, BookOpen, CheckCircle2, 
   Lock, Play, ChevronRight, Monitor, FileText, ChevronDown, 
   ChevronUp, Trophy, Zap, Flame, Plus, User, Heart,
-  Mic, Square, Volume2, Loader2, Shield 
+  Mic, Square, Volume2, Loader2, Shield, Map
 } from 'lucide-react';
 
 import StudentGradebook from './StudentGradebook';
 import LeaderboardView from './LeaderboardView';
+
+// --- NEW THEME HELPER (Matches your Hub!) ---
+const getSubjectTheme = (subject: string) => {
+    const sub = subject?.toLowerCase() || '';
+    if (sub.includes('math')) return { color: 'text-rose-500', bg: 'bg-rose-500', light: 'bg-rose-100', border: 'border-rose-200' };
+    if (sub.includes('science') || sub.includes('bio')) return { color: 'text-emerald-500', bg: 'bg-emerald-500', light: 'bg-emerald-100', border: 'border-emerald-200' };
+    if (sub.includes('social') || sub.includes('history')) return { color: 'text-amber-500', bg: 'bg-amber-500', light: 'bg-amber-100', border: 'border-amber-200' };
+    if (sub.includes('read') || sub.includes('english')) return { color: 'text-cyan-500', bg: 'bg-cyan-500', light: 'bg-cyan-100', border: 'border-cyan-200' };
+    return { color: 'text-indigo-500', bg: 'bg-indigo-500', light: 'bg-indigo-100', border: 'border-indigo-200' };
+};
 
 // ============================================================================
 //  SUB-COMPONENT: FORUM AVATAR
 // ============================================================================
 const ForumAvatar = ({ url, name, role, size = "md" }: any) => {
     const initials = name?.split(' ').map((n:any) => n[0]).join('').toUpperCase().slice(0, 2) || 'S';
-    // Upgraded base sizes for better visual accessibility
     const sizeClasses: any = {
         xs: "w-6 h-6 text-[10px]",
         sm: "w-8 h-8 text-xs",
@@ -136,6 +145,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
   const currentAvatar = userData?.profile?.main?.avatarUrl || null;
 
   useEffect(() => {
+    if (!classId) return;
     const q = query(collection(db, 'artifacts', appId, 'classes', classId, 'forum_topics'), orderBy('timestamp', 'desc'));
     return onSnapshot(q, (snap) => setTopics(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, [classId]);
@@ -385,7 +395,13 @@ export default function StudentClassView({
 }: any) {
   const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'leaderboard' | 'exams' | 'forum' | 'grades'>('lessons');
   const [completedItems, setCompletedItems] = useState<string[]>([]);
-  const [expandedRoadmaps, setExpandedRoadmaps] = useState<Record<string, boolean>>({});
+  
+  // Start with the first roadmap expanded by default for juiciness
+  const [expandedRoadmaps, setExpandedRoadmaps] = useState<Record<string, boolean>>({ 
+      [classData?.assignedCurriculums?.[0]]: true 
+  });
+
+  const theme = getSubjectTheme(classData?.subject);
 
   useEffect(() => {
     const studentEmail = userData?.email || auth?.currentUser?.email;
@@ -402,43 +418,62 @@ export default function StudentClassView({
   };
 
   // --- DATA MAPPING ---
-  const populatedAssignments = (classData?.assignments || [])
+  // Ensure we are working with arrays to prevent crash
+  const rawAssignments = Array.isArray(classData?.assignments) ? classData.assignments : [];
+  const rawCurriculums = Array.isArray(classData?.assignedCurriculums) ? classData.assignedCurriculums : [];
+
+  const populatedAssignments = rawAssignments
     .map((assignment: any) => typeof assignment === 'string' ? lessons.find((l: any) => l.id === assignment) : assignment)
     .filter(Boolean);
 
-  const assignedCurriculums = (classData?.assignedCurriculums || [])
+  const assignedCurriculums = rawCurriculums
     .map((id: string) => curriculums.find((c: any) => c.id === id))
     .filter(Boolean);
 
-  const standaloneLessons = populatedAssignments.filter((a: any) => a.contentType !== 'exam' && a.contentType !== 'test');
+  // Standalone lessons are any lessons that are assigned to the class BUT NOT found inside a curriculum
+  const standaloneLessons = populatedAssignments.filter((a: any) => {
+      const isExam = a.contentType === 'exam' || a.contentType === 'test';
+      const isCurriculumLesson = assignedCurriculums.some(c => c.lessonIds?.includes(a.id));
+      return !isExam && !isCurriculumLesson;
+  });
+  
   const examList = populatedAssignments.filter((a: any) => a.contentType === 'exam' || a.contentType === 'test');
 
   return (
-    <div className="h-full flex flex-col bg-white overflow-hidden animate-in fade-in duration-500 font-sans relative">
+    <div className="h-full flex flex-col bg-slate-50 overflow-hidden animate-in fade-in duration-500 font-sans relative">
       
-      {/* HEADER */}
-      <header className="p-6 md:p-8 pt-10 md:pt-12 shrink-0 bg-white z-10 relative">
+      {/* HEADER: DYNAMIC SUBJECT THEME */}
+      <header className={`p-6 md:p-10 pt-10 md:pt-16 shrink-0 z-10 relative rounded-b-[3rem] shadow-xl ${theme.bg}`}>
+        {/* Abstract Background Shapes for extra flavor */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+        
         <button 
           onClick={onBack} 
-          className="mb-4 flex items-center gap-2 text-slate-400 hover:text-indigo-600 transition-colors text-xs font-black uppercase tracking-widest active:scale-95 w-fit focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md px-2 py-1 -ml-2"
+          className="mb-6 flex items-center gap-2 text-white/70 hover:text-white transition-colors text-xs font-black uppercase tracking-widest active:scale-95 w-fit focus:outline-none focus:ring-2 focus:ring-white rounded-md px-2 py-1 -ml-2"
         >
-          <ArrowLeft size={16} aria-hidden="true" /> DASHBOARD
+          <ArrowLeft size={16} aria-hidden="true" /> BACK TO HUB
         </button>
-        <h2 className="text-3xl font-black text-slate-900 leading-tight mb-2 tracking-tight">{classData.name}</h2>
-        <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
-            <p className="text-slate-400 font-bold text-sm line-clamp-1">{classData.description || "Active Learning Pathway"}</p>
+        
+        <div className="relative z-10">
+            <span className="inline-block px-3 py-1.5 bg-black/20 text-white rounded-xl text-[10px] font-black uppercase tracking-widest mb-3 backdrop-blur-md border border-white/10 shadow-inner">
+                {classData?.grade || 'General'} • {classData?.subject || 'Subject'}
+            </span>
+            <h2 className="text-4xl md:text-5xl font-black text-white leading-tight mb-2 tracking-tighter drop-shadow-sm">{classData.name}</h2>
+            <div className="flex items-center gap-2 mt-4">
+                <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse shadow-[0_0_10px_rgba(255,255,255,0.8)]" aria-hidden="true" />
+                <p className="text-white/90 font-bold text-sm md:text-base line-clamp-1">{classData.description || "Your learning adventure starts here."}</p>
+            </div>
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-6 md:px-8 pb-48 custom-scrollbar relative">
+      <main className="flex-1 overflow-y-auto custom-scrollbar relative px-2 md:px-6 pb-48 pt-6">
         
         {/* ROADMAP TAB */}
         {activeSubTab === 'lessons' && (
           <div className="animate-in fade-in slide-in-from-bottom-4">
              
-             {/* 1. CURRICULUM ACCORDIONS */}
-             {assignedCurriculums.length > 0 && (
+             {/* 1. CURRICULUM ACCORDIONS (THE CANDY LAND MAP) */}
+             {assignedCurriculums.length > 0 ? (
                  <section className="space-y-8 mb-10" aria-label="Curriculum Roadmaps">
                      {assignedCurriculums.map((curr: any) => (
                          <CurriculumPathway 
@@ -449,18 +484,25 @@ export default function StudentClassView({
                             isExpanded={!!expandedRoadmaps[curr.id]}
                             onToggle={() => toggleRoadmap(curr.id)}
                             onSelectLesson={onSelectLesson}
+                            theme={theme}
                          />
                      ))}
                  </section>
+             ) : (
+                <div className="text-center p-12 bg-white rounded-[3rem] shadow-sm border-2 border-dashed border-slate-200 m-4">
+                    <Map size={48} className="mx-auto text-slate-300 mb-4" />
+                    <h3 className="text-2xl font-black text-slate-800 mb-2">Map Loading...</h3>
+                    <p className="text-slate-500 font-bold">Your instructor hasn't drawn the path yet.</p>
+                </div>
              )}
 
              {/* 2. STANDALONE ASSIGNMENTS */}
              {standaloneLessons.length > 0 && (
-                 <section className="space-y-4 mb-10" aria-label="Individual Assignments">
+                 <section className="space-y-4 mb-10 px-4" aria-label="Individual Assignments">
                      <div className="flex items-center gap-3 ml-2 mb-6" aria-hidden="true">
-                        <div className="h-0.5 flex-1 bg-slate-100 rounded-full" />
-                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Individual Assignments</h3>
-                        <div className="h-0.5 flex-1 bg-slate-100 rounded-full" />
+                        <div className="h-1 flex-1 bg-slate-200 rounded-full" />
+                        <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Bonus Quests</h3>
+                        <div className="h-1 flex-1 bg-slate-200 rounded-full" />
                      </div>
                      
                      {standaloneLessons.map((item: any) => (
@@ -469,6 +511,7 @@ export default function StudentClassView({
                             item={item}
                             isCompleted={completedItems.includes(item.id)}
                             onSelectLesson={onSelectLesson}
+                            theme={theme}
                          />
                      ))}
                  </section>
@@ -480,7 +523,7 @@ export default function StudentClassView({
         {activeSubTab === 'leaderboard' && <LeaderboardView studentEmails={classData.studentEmails} currentUserEmail={userData.email} />}
         
         {activeSubTab === 'exams' && (
-          <section className="space-y-4" aria-label="Exams">
+          <section className="space-y-4 px-4" aria-label="Exams">
             {examList.length === 0 ? (
                 <div className="text-center py-20 opacity-40">
                     <FileText size={48} className="mx-auto mb-4" aria-hidden="true" />
@@ -520,7 +563,7 @@ export default function StudentClassView({
                   }`}
                 >
                   <div className={`transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>{tab.icon}</div>
-                  {isActive && <span className="text-xs font-black uppercase tracking-widest whitespace-nowrap animate-in slide-in-from-left-2">{tab.label}</span>}
+                  {isActive && <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap animate-in slide-in-from-left-2">{tab.label}</span>}
                 </button>
               );
             })}
@@ -531,116 +574,169 @@ export default function StudentClassView({
 }
 
 // ============================================================================
-//  INTERNAL BLOCK RENDERERS (Clean Architecture)
+//  INTERNAL BLOCK RENDERERS (The Juicy Candy Land Roadmap)
 // ============================================================================
 
-const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle, onSelectLesson }: any) => {
-    const currLessons = curr.lessonIds.map((id: string) => lessons.find((l: any) => l.id === id)).filter(Boolean);
+const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle, onSelectLesson, theme }: any) => {
+    // Look up the actual lesson objects from the IDs array
+    const currLessons = (curr.lessonIds || [])
+        .map((id: string) => lessons.find((l: any) => l.id === id))
+        .filter(Boolean); // Filter out any missing items
+        
     const completedCountInCurr = currLessons.filter((l: any) => completedItems.includes(l.id)).length;
     const progressPercent = currLessons.length > 0 ? Math.round((completedCountInCurr / currLessons.length) * 100) : 0;
     
+    // Find first incomplete for the bouncing active node
+    const activeNodeIndex = currLessons.findIndex((l: any) => !completedItems.includes(l.id));
+    const normalizedActiveIndex = activeNodeIndex === -1 ? currLessons.length - 1 : activeNodeIndex;
+
+    // Use the curriculum's native color if provided, fallback to the Subject Theme
+    const headerAccent = curr.themeColor || '#6366f1';
+
     return (
-        <article className="bg-white rounded-[3rem] border border-slate-200 overflow-hidden shadow-sm transition-all duration-300">
+        <article className="bg-transparent overflow-hidden transition-all duration-500 relative">
+            
+            {/* The Accordion Toggle Header */}
             <button 
-                className="w-full text-left bg-slate-900 p-8 relative overflow-hidden group focus:outline-none focus:ring-4 focus:ring-indigo-500"
+                className="w-full text-left bg-white p-6 md:p-8 rounded-[3rem] border-2 border-slate-100 shadow-lg relative overflow-hidden group focus:outline-none focus:ring-4 focus:ring-indigo-500 z-20"
                 onClick={onToggle}
                 aria-expanded={isExpanded}
             >
-                <div className="absolute inset-0 opacity-20 transition-opacity group-hover:opacity-30" style={{ backgroundColor: curr.themeColor }} />
-                <div className="relative z-10 flex items-center justify-between mb-4">
+                <div className="absolute inset-0 opacity-10 transition-opacity group-hover:opacity-20" style={{ backgroundColor: headerAccent }} />
+                <div className="relative z-10 flex items-center justify-between mb-6">
                     <div>
-                        <span className="px-3 py-1 bg-white/20 text-white rounded-lg text-xs font-black uppercase tracking-widest backdrop-blur-md mb-3 inline-block">
-                            {curr.level} Pathway
+                        <span className="px-3 py-1.5 bg-slate-100 text-slate-500 rounded-xl text-[10px] font-black uppercase tracking-widest mb-3 inline-block shadow-inner">
+                            {curr.grade || 'Pathway'}
                         </span>
-                        <h3 className="text-2xl font-black text-white pr-4">{curr.title}</h3>
+                        <h3 className="text-2xl md:text-3xl font-black text-slate-800 pr-4 leading-tight">{curr.title}</h3>
                     </div>
                     <div className="text-right shrink-0 flex flex-col items-end">
-                        <span className="text-3xl font-black text-white">{progressPercent}%</span>
-                        <div className="w-10 h-10 mt-2 bg-white/10 rounded-full flex items-center justify-center text-white backdrop-blur-sm transition-transform duration-300" aria-hidden="true">
-                            {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                        <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-slate-200 transition-colors shadow-inner" aria-hidden="true">
+                            {isExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
                         </div>
                     </div>
                 </div>
-                <div className="h-3 w-full bg-slate-800 rounded-full overflow-hidden relative z-10" aria-label={`Pathway progress: ${progressPercent}%`}>
-                    <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${progressPercent}%` }} />
+                
+                <div className="flex items-center gap-4">
+                    <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden relative shadow-inner flex-1">
+                        <div className="h-full transition-all duration-1000" style={{ width: `${progressPercent}%`, backgroundColor: headerAccent }} />
+                    </div>
+                    <span className="text-sm font-black text-slate-400 shrink-0">{progressPercent}%</span>
                 </div>
             </button>
             
-            <div className={`transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0 invisible'}`}>
-                <div className="p-8 bg-slate-50 border-t border-slate-100">
-                    <div className="relative border-l-4 border-slate-200 ml-6 space-y-10 py-4">
-                        {currLessons.map((item: any, index: number) => {
-                            const isCompleted = completedItems.includes(item.id);
-                            const isLocked = index > completedCountInCurr;
-                            const isExam = item.contentType === 'exam' || item.contentType === 'test';
-                            
-                            return (
-                                <div key={item.id} className={`relative pl-10 ${isLocked ? 'opacity-50 grayscale' : 'animate-in slide-in-from-left-4'}`}>
-                                    
-                                    {/* ICON LOGIC */}
-                                    <div className={`absolute -left-[22px] top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center border-4 border-slate-50 shadow-sm z-10 transition-all ${
-                                        isCompleted ? 'bg-emerald-500 text-white scale-110' : 
-                                        isExam && index === completedCountInCurr ? 'bg-rose-500 text-white ring-4 ring-rose-200' : 
-                                        isExam ? 'bg-rose-100 text-rose-400' : 
-                                        index === completedCountInCurr ? 'bg-indigo-600 text-white ring-4 ring-indigo-200' : 
-                                        'bg-slate-200 text-slate-400' 
-                                    }`} aria-hidden="true">
-                                        {isCompleted ? <CheckCircle2 size={16} strokeWidth={3} /> : 
-                                         isExam ? <FileText size={16} strokeWidth={2.5} /> : 
-                                         <Play size={16} className={index === completedCountInCurr ? "ml-1" : ""} />}
-                                    </div>
+            {/* The Candy Land Roadmap Canvas */}
+            <div className={`transition-all duration-700 ease-in-out origin-top ${isExpanded ? 'max-h-[5000px] opacity-100 scale-y-100 mt-[-2rem]' : 'max-h-0 opacity-0 scale-y-0'}`}>
+                <div className="pt-16 pb-12 bg-slate-100/50 rounded-b-[3rem] border-2 border-t-0 border-slate-100 relative">
+                    
+                    {currLessons.length === 0 ? (
+                        <div className="text-center p-8">
+                            <Map size={32} className="mx-auto text-slate-300 mb-2" />
+                            <p className="text-sm font-bold text-slate-500">No modules found in this pathway.</p>
+                        </div>
+                    ) : (
+                        <>
+                            {/* The Center Line SVG Path */}
+                            <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-4 bg-slate-200 rounded-full" />
+                            <div 
+                                className="absolute top-0 left-1/2 -translate-x-1/2 w-4 rounded-full transition-all duration-1000 z-0 shadow-[0_0_15px_rgba(0,0,0,0.1)]" 
+                                style={{ height: `${currLessons.length > 1 ? (normalizedActiveIndex / (currLessons.length - 1)) * 100 : 100}%`, backgroundColor: headerAccent }}
+                            />
 
-                                    {/* BUTTON LOGIC */}
-                                    <button 
-                                      disabled={isLocked} 
-                                      onClick={() => onSelectLesson(item)} 
-                                      aria-label={`${isExam ? 'Sprint Checkpoint' : `Unit ${index + 1}`}: ${item.title}`}
-                                      className={`w-full text-left p-6 rounded-[2.5rem] border-2 border-transparent bg-white shadow-sm transition-all group focus:outline-none focus:ring-4 focus:ring-indigo-500 ${isLocked ? 'cursor-not-allowed' : 'hover:shadow-md active:scale-95 cursor-pointer'} ${isExam && !isLocked ? 'hover:border-rose-200' : 'hover:border-indigo-100'}`}
-                                    >
-                                        <span className={`text-xs font-black uppercase tracking-widest mb-1 block ${isExam ? 'text-rose-400' : 'text-slate-400'}`}>
-                                            {isExam ? 'Sprint Checkpoint' : `Unit ${index + 1}`}
-                                        </span>
-                                        <h4 className={`font-black text-lg leading-tight transition-colors ${isExam ? 'text-slate-900 group-hover:text-rose-600' : 'text-slate-800 group-hover:text-indigo-600'}`}>
-                                            {item.title}
-                                        </h4>
-                                    </button>
-                                </div>
-                            );
-                        })}
-                    </div>
+                            {/* The Nodes */}
+                            <div className="relative z-10 flex flex-col gap-12 py-8">
+                                {currLessons.map((item: any, index: number) => {
+                                    const isCompleted = completedItems.includes(item.id);
+                                    const isCurrent = index === normalizedActiveIndex;
+                                    const isLocked = index > normalizedActiveIndex;
+                                    const isExam = item.contentType === 'exam' || item.contentType === 'test';
+                                    
+                                    // Wiggle layout (Left / Right stagger)
+                                    const isLeft = index % 2 === 0;
+                                    // Add a little sinusoidal wave to the margin
+                                    const offset = isLeft ? 'mr-16 md:mr-32' : 'ml-16 md:ml-32';
+
+                                    return (
+                                        <div key={item.id} className={`relative flex items-center justify-center ${offset} ${isLocked ? 'opacity-60 grayscale-[0.5]' : ''}`}>
+                                            
+                                            {/* Title Card Wrapper (Floats next to the node) */}
+                                            <div className={`absolute w-[140px] md:w-[200px] ${isLeft ? 'right-[calc(50%+3rem)] md:right-[calc(50%+4rem)] text-right' : 'left-[calc(50%+3rem)] md:left-[calc(50%+4rem)] text-left'}`}>
+                                                <div className={`bg-white p-3 md:p-4 rounded-2xl shadow-md border-2 ${isCurrent ? 'border-indigo-200 scale-105' : 'border-slate-100'} transition-transform duration-300`}>
+                                                    <span className={`text-[9px] font-black uppercase tracking-widest block mb-1 ${isCurrent ? 'text-indigo-500' : 'text-slate-400'}`}>
+                                                        {isExam ? 'Checkpoint' : `Module ${index + 1}`}
+                                                    </span>
+                                                    <h4 className="font-black text-xs md:text-sm text-slate-800 leading-tight line-clamp-2">
+                                                        {item.title}
+                                                    </h4>
+                                                </div>
+                                            </div>
+
+                                            {/* The Interactive Node Button */}
+                                            <button 
+                                                disabled={isLocked} 
+                                                onClick={() => onSelectLesson(item)} 
+                                                aria-label={`${isExam ? 'Exam' : 'Lesson'}: ${item.title}`}
+                                                className={`relative w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center border-8 transition-all duration-300 shadow-xl z-20 focus:outline-none focus:ring-4 focus:ring-indigo-500
+                                                    ${isCompleted ? 'bg-emerald-500 border-white text-white' : 
+                                                      isCurrent ? `bg-white border-[${headerAccent}] text-slate-800 scale-110 animate-bounce-slow shadow-[0_10px_30px_rgba(0,0,0,0.15)]` : 
+                                                      'bg-slate-100 border-white text-slate-400 cursor-not-allowed'
+                                                    }
+                                                    ${isExam && !isCompleted ? 'border-rose-400 bg-white text-rose-500' : ''}
+                                                `}
+                                                // Overriding border color dynamically if it's the current node
+                                                style={isCurrent && !isExam ? { borderColor: headerAccent, color: headerAccent } : {}}
+                                            >
+                                                {isCompleted ? <CheckCircle2 size={32} strokeWidth={3} /> : 
+                                                 isLocked ? <Lock size={28} /> : 
+                                                 isExam ? <Trophy size={32} fill={isCurrent ? "currentColor" : "none"} /> : 
+                                                 <Play size={32} className="ml-1" fill={isCurrent ? "currentColor" : "none"} />}
+
+                                                {/* Glowing Pulse Ring for the Active Node */}
+                                                {isCurrent && (
+                                                    <div className="absolute inset-0 -m-4 border-4 rounded-full animate-ping opacity-40 pointer-events-none" style={{ borderColor: isExam ? '#f43f5e' : headerAccent }} />
+                                                )}
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
         </article>
     );
 };
 
-const StandaloneAssignmentCard = ({ item, isCompleted, onSelectLesson }: any) => (
+const StandaloneAssignmentCard = ({ item, isCompleted, onSelectLesson, theme }: any) => (
     <button 
-      className="w-full text-left p-6 border-2 border-slate-100 bg-white rounded-[2.5rem] flex items-center gap-4 cursor-pointer hover:shadow-md hover:border-indigo-100 transition-all active:scale-95 group focus:outline-none focus:ring-4 focus:ring-indigo-500" 
+      className={`w-full text-left p-5 border-4 bg-white rounded-[2.5rem] flex items-center gap-4 cursor-pointer transition-all active:scale-95 group focus:outline-none focus:ring-4 focus:ring-indigo-500 ${isCompleted ? 'border-emerald-100 shadow-sm' : 'border-slate-100 shadow-md hover:shadow-xl hover:border-indigo-100'}`} 
       onClick={() => onSelectLesson(item)}
       aria-label={`Assigned Activity: ${item.title}`}
     >
-        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner transition-colors shrink-0 ${isCompleted ? 'bg-emerald-50 text-emerald-500' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`} aria-hidden="true">
-            {isCompleted ? <CheckCircle2 size={24} strokeWidth={3} /> : <Play size={24} className="ml-1" />}
+        <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center border-4 border-white shadow-inner transition-colors shrink-0 ${isCompleted ? 'bg-emerald-500 text-white' : `${theme.bg} text-white group-hover:scale-105`}`} aria-hidden="true">
+            {isCompleted ? <CheckCircle2 size={28} strokeWidth={3} /> : item.type === 'arcade_game' ? <Gamepad2 size={28} /> : <Play size={28} className="ml-1" fill="currentColor" />}
         </div>
-        <div className="flex-1">
-            <span className="text-xs font-black uppercase tracking-widest text-slate-400 mb-1 block">Assigned Activity</span>
-            <h4 className="font-black text-slate-800 text-lg leading-tight group-hover:text-indigo-600 transition-colors">{item.title}</h4>
+        <div className="flex-1 pr-2">
+            <span className={`text-[10px] font-black uppercase tracking-widest mb-1 block ${isCompleted ? 'text-emerald-500' : 'text-slate-400'}`}>
+                {isCompleted ? 'Completed' : item.type === 'arcade_game' ? 'Arcade Quest' : 'Special Assignment'}
+            </span>
+            <h4 className="font-black text-slate-800 text-xl leading-tight group-hover:text-indigo-600 transition-colors">{item.title}</h4>
         </div>
     </button>
 );
 
 const ExamCard = ({ item, onSelectLesson }: any) => (
     <button 
-      className="w-full text-left p-6 border-2 border-rose-100 bg-white rounded-[3rem] flex items-center gap-4 cursor-pointer hover:shadow-xl transition-all group focus:outline-none focus:ring-4 focus:ring-rose-500" 
+      className="w-full text-left p-6 border-4 border-rose-100 bg-rose-50/50 rounded-[3rem] flex items-center gap-5 cursor-pointer hover:shadow-xl hover:bg-rose-50 transition-all group focus:outline-none focus:ring-4 focus:ring-rose-500" 
       onClick={() => onSelectLesson(item)}
     >
-      <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-rose-50 text-rose-600 shadow-inner group-hover:bg-rose-600 group-hover:text-white transition-colors shrink-0" aria-hidden="true">
-        <FileText size={28} fill="currentColor" />
+      <div className="w-20 h-20 rounded-[2rem] flex items-center justify-center bg-white text-rose-500 shadow-lg border-4 border-rose-100 group-hover:scale-105 transition-transform shrink-0" aria-hidden="true">
+        <Trophy size={36} fill="currentColor" />
       </div>
       <div>
-        <h4 className="font-black text-slate-900 text-xl leading-tight mb-1 group-hover:text-rose-600 transition-colors">{item.title}</h4>
-        <span className="text-xs font-black uppercase text-rose-400 tracking-widest">High-Stakes Assessment</span>
+        <span className="text-[10px] font-black uppercase text-rose-500 tracking-widest bg-rose-100 px-3 py-1 rounded-lg mb-2 inline-block shadow-inner">High-Stakes Assessment</span>
+        <h4 className="font-black text-slate-900 text-2xl leading-tight transition-colors">{item.title}</h4>
       </div>
     </button>
 );
