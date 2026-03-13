@@ -586,16 +586,15 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
     const activeNodeIndex = currLessons.findIndex((l: any) => !completedItems.includes(l.id));
     const normalizedActiveIndex = activeNodeIndex === -1 ? currLessons.length - 1 : activeNodeIndex;
 
-    // Use the curriculum's native color if provided, fallback to the Subject Theme
     const headerAccent = curr.themeColor || '#6366f1';
 
     return (
-        // FIX 1: Removed overflow-hidden from the article so the box-shadow isn't clipped
-        <article className="bg-transparent transition-all duration-500 relative">
+        // FIX 1: Added pb-8 so there is guaranteed safe space at the bottom of the card for the shadow to cast!
+        <article className="bg-transparent relative pb-8">
             
             {/* The Accordion Toggle Header */}
             <button 
-                className="w-full text-left bg-white p-6 md:p-8 rounded-[3rem] border-2 border-slate-100 shadow-lg relative overflow-hidden group focus:outline-none z-20"
+                className="w-full text-left bg-white p-6 md:p-8 rounded-[3rem] border-2 border-slate-100 shadow-[0_15px_40px_-15px_rgba(0,0,0,0.1)] relative overflow-hidden group focus:outline-none z-20"
                 onClick={onToggle}
                 aria-expanded={isExpanded}
                 style={{ WebkitTapHighlightColor: 'transparent' }}
@@ -624,9 +623,9 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
             </button>
             
             {/* The Candy Land Roadmap Canvas (FLEX GRID REWRITE) */}
-            {/* FIX 2: Added overflow-hidden HERE to safely hide the map when closed without breaking the card shadow */}
-            <div className={`overflow-hidden transition-all duration-700 ease-in-out origin-top ${isExpanded ? 'max-h-[5000px] opacity-100 scale-y-100 mt-[-2rem]' : 'max-h-0 opacity-0 scale-y-0'}`}>
-                <div className="pt-16 pb-12 px-1 sm:px-4 bg-slate-100/50 rounded-b-[3rem] border-2 border-t-0 border-slate-100 relative">
+            {/* FIX 2: Simplified transition, removed scale-y-0 which crushes borders into a flat line */}
+            <div className={`overflow-hidden transition-all duration-700 ease-in-out relative z-10 ${isExpanded ? 'max-h-[5000px] opacity-100 mt-[-2rem]' : 'max-h-0 opacity-0 mt-0 pointer-events-none'}`}>
+                <div className="pt-16 pb-12 px-2 sm:px-4 bg-slate-100/50 rounded-b-[3rem] border-2 border-t-0 border-slate-100 relative">
                     
                     {currLessons.length === 0 ? (
                         <div className="text-center p-8">
@@ -636,10 +635,10 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
                     ) : (
                         <div className="relative max-w-sm mx-auto w-full">
                             {/* The Center Line Background */}
-                            <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-4 sm:w-6 bg-slate-200/60 rounded-full z-0" />
+                            <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-6 sm:w-8 bg-slate-200/60 rounded-full z-0" />
                             {/* The Progress Fill Line */}
                             <div 
-                                className="absolute top-0 left-1/2 -translate-x-1/2 w-4 sm:w-6 rounded-full transition-all duration-1000 z-0 shadow-inner" 
+                                className="absolute top-0 left-1/2 -translate-x-1/2 w-6 sm:w-8 rounded-full transition-all duration-1000 z-0 shadow-inner" 
                                 style={{ height: `${currLessons.length > 1 ? (normalizedActiveIndex / (currLessons.length - 1)) * 100 : 100}%`, backgroundColor: headerAccent }}
                             />
 
