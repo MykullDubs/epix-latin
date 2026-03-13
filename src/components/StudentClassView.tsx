@@ -430,10 +430,10 @@ export default function StudentClassView({
     .map((id: string) => curriculums.find((c: any) => c.id === id))
     .filter(Boolean);
 
-  // Standalone lessons are any lessons that are assigned to the class BUT NOT found inside a curriculum
-  const standaloneLessons = populatedAssignments.filter((a: any) => {
+const standaloneLessons = populatedAssignments.filter((a: any) => {
       const isExam = a.contentType === 'exam' || a.contentType === 'test';
-      const isCurriculumLesson = assignedCurriculums.some(c => c.lessonIds?.includes(a.id));
+      // FIX: Added (c: any) right here 👇
+      const isCurriculumLesson = assignedCurriculums.some((c: any) => c.lessonIds?.includes(a.id));
       return !isExam && !isCurriculumLesson;
   });
   
