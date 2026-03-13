@@ -3,17 +3,121 @@
 export interface Curriculum {
   id: string;
   title: string;
-  level: 'A1' | 'A2' | 'B1' | 'B2' | 'C1';
+  
+  // --- NEW TAXONOMY FIELDS ---
+  subject: string;       // e.g., 'Social Studies', 'Mathematics', 'ESL'
+  grade?: string;        // e.g., 'Grade 1'
+  strand?: string;       // e.g., 'Early Mexican History', 'Phonics'
+  level?: 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | string; // Kept for ESL backwards compatibility
+  
   description: string;
   coverImage: string;
   themeColor: string;
-  lessonIds: string[];
+  lessonIds: string[];   // The array that populates the Roadmap
 }
 
 export const GLOBAL_CURRICULUMS: Curriculum[] = [
+  
+  // ============================================================================
+  //  PRIMARY SCHOOL: GRADE 1 (Year-Long Roadmaps)
+  // ============================================================================
+  
+  {
+    id: 'curr_g1_social_studies',
+    title: 'Grade 1 Social Studies',
+    subject: 'Social Studies',
+    grade: 'Grade 1',
+    strand: 'History & Geography',
+    description: 'A complete school year journey through community roles, basic geography, and Early Mexican History.',
+    coverImage: 'https://images.unsplash.com/photo-1596464716127-f2a82984de30?q=80&w=800&auto=format&fit=crop', // Pyramids/History aesthetic
+    themeColor: '#f59e0b', // Amber
+    lessonIds: [
+      // Quarter 1: Community & Geography
+      'lesson_g1_ss_01', 'lesson_g1_ss_02', 'lesson_g1_ss_03', 'lesson_g1_ss_04',
+      'exam_g1_ss_q1', // Q1 Checkpoint
+      
+      // Quarter 2: Early Mexican History (Olmecs, Maya)
+      'lesson_g1_ss_05', 'lesson_g1_ss_06', 'lesson_g1_ss_07', 'lesson_g1_ss_08',
+      'exam_g1_ss_q2', // Mid-Term
+      
+      // Quarter 3: Culture & Traditions
+      'lesson_g1_ss_09', 'lesson_g1_ss_10', 'lesson_g1_ss_11', 'lesson_g1_ss_12',
+      'exam_g1_ss_q3', 
+      
+      // Quarter 4: Modern Mexico & Our World
+      'lesson_g1_ss_13', 'lesson_g1_ss_14', 'lesson_g1_ss_15', 'lesson_g1_ss_16',
+      'exam_g1_ss_final' // Year-End Boss Battle
+    ]
+  },
+  {
+    id: 'curr_g1_math',
+    title: 'Grade 1 Mathematics',
+    subject: 'Mathematics',
+    grade: 'Grade 1',
+    strand: 'Arithmetic & Geometry',
+    description: 'A full year of foundational math: counting to 120, basic addition/subtraction, and 2D/3D shapes.',
+    coverImage: 'https://images.unsplash.com/photo-1518133910546-b6c2fb7d79e3?q=80&w=800&auto=format&fit=crop',
+    themeColor: '#ef4444', // Red
+    lessonIds: [
+      'lesson_g1_math_01', 'lesson_g1_math_02', 'lesson_g1_math_03', 'lesson_g1_math_04',
+      'exam_g1_math_q1', 
+      'lesson_g1_math_05', 'lesson_g1_math_06', 'lesson_g1_math_07', 'lesson_g1_math_08',
+      'exam_g1_math_q2', 
+      'lesson_g1_math_09', 'lesson_g1_math_10', 'lesson_g1_math_11', 'lesson_g1_math_12',
+      'exam_g1_math_q3', 
+      'lesson_g1_math_13', 'lesson_g1_math_14', 'lesson_g1_math_15', 'lesson_g1_math_16',
+      'exam_g1_math_final' 
+    ]
+  },
+  {
+    id: 'curr_g1_science',
+    title: 'Grade 1 Science',
+    subject: 'Science',
+    grade: 'Grade 1',
+    strand: 'Earth & Life Science',
+    description: 'Explore the natural world! A year-long curriculum covering plant life cycles, animal habitats, and the solar system.',
+    coverImage: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?q=80&w=800&auto=format&fit=crop',
+    themeColor: '#10b981', // Emerald
+    lessonIds: [
+      'lesson_g1_sci_01', 'lesson_g1_sci_02', 'lesson_g1_sci_03', 'lesson_g1_sci_04',
+      'exam_g1_sci_q1', 
+      'lesson_g1_sci_05', 'lesson_g1_sci_06', 'lesson_g1_sci_07', 'lesson_g1_sci_08',
+      'exam_g1_sci_q2', 
+      'lesson_g1_sci_09', 'lesson_g1_sci_10', 'lesson_g1_sci_11', 'lesson_g1_sci_12',
+      'exam_g1_sci_q3', 
+      'lesson_g1_sci_13', 'lesson_g1_sci_14', 'lesson_g1_sci_15', 'lesson_g1_sci_16',
+      'exam_g1_sci_final' 
+    ]
+  },
+  {
+    id: 'curr_g1_reading',
+    title: 'Grade 1 Reading & Language Arts',
+    subject: 'Reading',
+    grade: 'Grade 1',
+    strand: 'Phonics & Comprehension',
+    description: 'Master the alphabet, phonics, sight words, and basic story comprehension over the school year.',
+    coverImage: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=800&auto=format&fit=crop',
+    themeColor: '#0ea5e9', // Cyan
+    lessonIds: [
+      'lesson_g1_read_01', 'lesson_g1_read_02', 'lesson_g1_read_03', 'lesson_g1_read_04',
+      'exam_g1_read_q1', 
+      'lesson_g1_read_05', 'lesson_g1_read_06', 'lesson_g1_read_07', 'lesson_g1_read_08',
+      'exam_g1_read_q2', 
+      'lesson_g1_read_09', 'lesson_g1_read_10', 'lesson_g1_read_11', 'lesson_g1_read_12',
+      'exam_g1_read_q3', 
+      'lesson_g1_read_13', 'lesson_g1_read_14', 'lesson_g1_read_15', 'lesson_g1_read_16',
+      'exam_g1_read_final' 
+    ]
+  },
+
+  // ============================================================================
+  //  LANGUAGE LEARNING: ESL (Legacy / Adult)
+  // ============================================================================
+
   {
     id: 'curr_a1_foundations',
     title: 'A1 Foundations',
+    subject: 'ESL',
     level: 'A1',
     description: 'The complete beginner pathway for navigating daily life and basic conversations in English.',
     coverImage: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=800&auto=format&fit=crop',
@@ -32,6 +136,7 @@ export const GLOBAL_CURRICULUMS: Curriculum[] = [
   {
     id: 'curr_a2_elementary',
     title: 'A2 Elementary',
+    subject: 'ESL',
     level: 'A2',
     description: 'Build confidence with past tenses, daily routines, and essential workplace communication.',
     coverImage: 'https://images.unsplash.com/photo-1516321497487-e288fb19713f?q=80&w=800&auto=format&fit=crop',
@@ -50,6 +155,7 @@ export const GLOBAL_CURRICULUMS: Curriculum[] = [
   {
     id: 'curr_b1_intermediate',
     title: 'B1 Intermediate',
+    subject: 'ESL',
     level: 'B1',
     description: 'Unlock complex grammar, professional emails, and conversational fluency for travel.',
     coverImage: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=800&auto=format&fit=crop',
@@ -68,6 +174,7 @@ export const GLOBAL_CURRICULUMS: Curriculum[] = [
   {
     id: 'curr_b2_upper_intermediate',
     title: 'B2 Upper Intermediate',
+    subject: 'ESL',
     level: 'B2',
     description: 'Master nuanced arguments, spontaneous discussions, and advanced professional interactions.',
     coverImage: 'https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=800&auto=format&fit=crop',
@@ -86,6 +193,7 @@ export const GLOBAL_CURRICULUMS: Curriculum[] = [
   {
     id: 'curr_c1_advanced',
     title: 'C1 Advanced',
+    subject: 'ESL',
     level: 'C1',
     description: 'Achieve near-native fluency, idiomatic mastery, and executive-level business communication.',
     coverImage: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=800&auto=format&fit=crop',
