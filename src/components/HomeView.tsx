@@ -1,9 +1,10 @@
 // src/components/HomeView.tsx
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { 
     GraduationCap, Globe, Flame, Zap, Trophy, 
     School, Layers, Feather, Target, BookOpen, 
-    Microscope, Terminal, Calculator, Palette, BookText
+    Microscope, Terminal, Calculator, Palette, BookText,
+    Check
 } from 'lucide-react';
 import { calculateLevel } from '../utils/profileHelpers';
 
@@ -50,6 +51,24 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
       { id: 2, title: 'Complete 1 Lesson', target: 1, current: Math.min(todayLessons, 1), icon: <BookOpen size={16} className="text-indigo-500" aria-hidden="true" /> },
   ];
 
+  // Persistent Dismissed Quests State (Clears automatically the next day because of the todayStr key)
+  const [dismissedQuests, setDismissedQuests] = useState<number[]>(() => {
+      try {
+          const saved = localStorage.getItem(`dismissedQuests_${todayStr}`);
+          return saved ? JSON.parse(saved) : [];
+      } catch (e) {
+          return [];
+      }
+  });
+
+  const handleDismissQuest = (questId: number) => {
+      const updated = [...dismissedQuests, questId];
+      setDismissedQuests(updated);
+      localStorage.setItem(`dismissedQuests_${todayStr}`, JSON.stringify(updated));
+  };
+
+  const visibleQuests = dailyQuests.filter(q => !dismissedQuests.includes(q.id));
+
   const now = new Date();
   const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const hoursRemaining = Math.max(1, Math.floor((tomorrow.getTime() - now.getTime()) / (1000 * 60 * 60)));
@@ -91,17 +110,17 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
                     <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center shadow-inner">
                         <Flame size={20} aria-hidden="true" className={`mb-1 ${streak > 0 && isToday ? 'text-orange-500 fill-orange-500' : 'text-slate-300'}`}/>
                         <span className={`text-lg font-black ${streak > 0 && isToday ? '' : 'text-slate-400'}`} style={streak > 0 && isToday ? { color: themeColor } : {}}>{streak}</span>
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider text-center">Day Streak</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">Day Streak</span>
                     </div>
                     <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center shadow-inner">
                         <Zap size={20} aria-hidden="true" className="text-yellow-500 mb-1 fill-yellow-500"/>
                         <span className="text-lg font-black" style={{ color: themeColor }}>{xp}</span>
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider text-center">Total XP</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">Total XP</span>
                     </div>
                     <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center shadow-inner">
                         <Trophy size={20} aria-hidden="true" className="text-emerald-500 mb-1 fill-emerald-500"/>
                         <span className="text-lg font-black" style={{ color: themeColor }}>{level}</span>
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider text-center">Level</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">Level</span>
                     </div>
                 </div>
 
@@ -132,29 +151,51 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
                       </span>
                   </div>
 
-                  <div className="space-y-4">
-                      {dailyQuests.map(quest => {
-                          const pct = Math.min(100, Math.round((quest.current / quest.target) * 100));
-                          const isDone = quest.current >= quest.target;
-                          
-                          return (
-                              <div key={quest.id} className="relative" aria-label={`${quest.title}: ${isDone ? 'Completed' : `${quest.current} out of ${quest.target}`}`}>
-                                  <div className="flex justify-between items-end mb-2">
-                                      <div className="flex items-center gap-2">
-                                          <div className={`${isDone ? 'opacity-50 grayscale' : ''} transition-all`}>{quest.icon}</div>
-                                          <span className={`text-sm font-bold ${isDone ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{quest.title}</span>
+                  {visibleQuests.length === 0 ? (
+                      <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center gap-4 animate-in fade-in zoom-in-95">
+                          <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-500 shrink-0">
+                              <Trophy size={24} className="fill-emerald-500" />
+                          </div>
+                          <div>
+                              <h4 className="font-black text-emerald-800 text-sm">All Quests Cleared!</h4>
+                              <p className="text-xs font-bold text-emerald-600 mt-0.5">Great job! Come back tomorrow for more rewards.</p>
+                          </div>
+                      </div>
+                  ) : (
+                      <div className="space-y-4">
+                          {visibleQuests.map(quest => {
+                              const pct = Math.min(100, Math.round((quest.current / quest.target) * 100));
+                              const isDone = quest.current >= quest.target;
+                              
+                              return (
+                                  <div key={quest.id} className="relative animate-in fade-in" aria-label={`${quest.title}: ${isDone ? 'Completed' : `${quest.current} out of ${quest.target}`}`}>
+                                      <div className="flex justify-between items-end mb-2">
+                                          <div className="flex items-center gap-2">
+                                              <div className={`${isDone ? 'opacity-50 grayscale' : ''} transition-all`}>{quest.icon}</div>
+                                              <span className={`text-sm font-bold ${isDone ? 'text-emerald-600' : 'text-slate-700'}`}>{quest.title}</span>
+                                          </div>
+                                          
+                                          {isDone ? (
+                                              <button 
+                                                  onClick={() => handleDismissQuest(quest.id)}
+                                                  className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-600 text-white px-2.5 py-1 rounded-lg text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm"
+                                              >
+                                                  <Check size={14} strokeWidth={3} /> Clear
+                                              </button>
+                                          ) : (
+                                              <span className="text-xs font-black text-slate-400">
+                                                  {quest.current}/{quest.target}
+                                              </span>
+                                          )}
                                       </div>
-                                      <span className={`text-xs font-black ${isDone ? 'text-emerald-500' : 'text-slate-400'}`}>
-                                          {isDone ? 'DONE' : `${quest.current}/${quest.target}`}
-                                      </span>
+                                      <div className="h-2.5 w-full bg-slate-50 rounded-full overflow-hidden border border-slate-100">
+                                          <div className={`h-full transition-all duration-1000 ${isDone ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]' : 'bg-rose-500'}`} style={{ width: `${pct}%` }} />
+                                      </div>
                                   </div>
-                                  <div className="h-2.5 w-full bg-slate-50 rounded-full overflow-hidden border border-slate-100">
-                                      <div className={`h-full transition-all duration-1000 ${isDone ? 'bg-emerald-500' : 'bg-rose-500'}`} style={{ width: `${pct}%` }} />
-                                  </div>
-                              </div>
-                          );
-                      })}
-                  </div>
+                              );
+                          })}
+                      </div>
+                  )}
               </section>
               
               {/* 4. ACTIVE SUBJECTS SECTION */}
@@ -177,6 +218,9 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
                             const theme = getSubjectTheme(cls.subject);
                             const Icon = theme.icon;
                             const progress = cls.progressPct || Math.floor(Math.random() * 60) + 10; // Mock progress
+                            
+                            // Guaranteed Grade Level Display
+                            const displayGrade = cls.grade || cls.level || 'All Grades';
 
                             return ( 
                                 <button 
@@ -190,8 +234,8 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
                                         <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${theme.bg} ${theme.color}`}>
                                             {cls.subject || 'General Studies'}
                                         </div>
-                                        <div className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-500">
-                                            {cls.grade || 'All Grades'}
+                                        <div className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-slate-800 text-white shadow-sm">
+                                            {displayGrade}
                                         </div>
                                     </div>
                                     
@@ -253,7 +297,7 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
                         </div>
                         <div>
                             <h3 className="text-slate-800 font-black text-lg mb-0.5 leading-none">Practice</h3>
-                            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Memory Vault</p>
+                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Memory Vault</p>
                         </div>
                     </div>
                 </button>
@@ -273,7 +317,7 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
                         </div>
                         <div>
                             <h3 className="text-slate-800 font-black text-lg mb-0.5 leading-none">Studio</h3>
-                            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Create Content</p>
+                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Create Content</p>
                         </div>
                     </div>
                 </button>
