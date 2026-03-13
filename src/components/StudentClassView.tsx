@@ -418,7 +418,6 @@ export default function StudentClassView({
   };
 
   // --- DATA MAPPING ---
-  // Ensure we are working with arrays to prevent crash
   const rawAssignments = Array.isArray(classData?.assignments) ? classData.assignments : [];
   const rawCurriculums = Array.isArray(classData?.assignedCurriculums) ? classData.assignedCurriculums : [];
 
@@ -444,16 +443,13 @@ export default function StudentClassView({
       
       {/* HEADER: DYNAMIC SUBJECT THEME */}
       <header className={`p-6 md:p-10 pt-10 md:pt-16 shrink-0 z-10 relative rounded-b-[3rem] shadow-xl ${theme.bg}`}>
-        {/* Abstract Background Shapes for extra flavor */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
-        
         <button 
           onClick={onBack} 
           className="mb-6 flex items-center gap-2 text-white/70 hover:text-white transition-colors text-xs font-black uppercase tracking-widest active:scale-95 w-fit focus:outline-none focus:ring-2 focus:ring-white rounded-md px-2 py-1 -ml-2"
         >
           <ArrowLeft size={16} aria-hidden="true" /> BACK TO HUB
         </button>
-        
         <div className="relative z-10">
             <span className="inline-block px-3 py-1.5 bg-black/20 text-white rounded-xl text-[10px] font-black uppercase tracking-widest mb-3 backdrop-blur-md border border-white/10 shadow-inner">
                 {classData?.grade || 'General'} • {classData?.subject || 'Subject'}
@@ -590,10 +586,12 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
     const activeNodeIndex = currLessons.findIndex((l: any) => !completedItems.includes(l.id));
     const normalizedActiveIndex = activeNodeIndex === -1 ? currLessons.length - 1 : activeNodeIndex;
 
+    // Use the curriculum's native color if provided, fallback to the Subject Theme
     const headerAccent = curr.themeColor || '#6366f1';
 
     return (
-        <article className="bg-transparent overflow-hidden transition-all duration-500 relative">
+        // FIX 1: Removed overflow-hidden from the article so the box-shadow isn't clipped
+        <article className="bg-transparent transition-all duration-500 relative">
             
             {/* The Accordion Toggle Header */}
             <button 
@@ -625,9 +623,10 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
                 </div>
             </button>
             
-            {/* The Candy Land Roadmap Canvas (RESPONSIVE FIX) */}
-            <div className={`transition-all duration-700 ease-in-out origin-top ${isExpanded ? 'max-h-[5000px] opacity-100 scale-y-100 mt-[-2rem]' : 'max-h-0 opacity-0 scale-y-0'}`}>
-                <div className={`pt-16 px-1 sm:px-4 bg-slate-100/50 rounded-b-[3rem] border-2 border-t-0 border-slate-100 relative ${isExpanded ? 'pb-12' : 'pb-0'}`}>
+            {/* The Candy Land Roadmap Canvas (FLEX GRID REWRITE) */}
+            {/* FIX 2: Added overflow-hidden HERE to safely hide the map when closed without breaking the card shadow */}
+            <div className={`overflow-hidden transition-all duration-700 ease-in-out origin-top ${isExpanded ? 'max-h-[5000px] opacity-100 scale-y-100 mt-[-2rem]' : 'max-h-0 opacity-0 scale-y-0'}`}>
+                <div className="pt-16 pb-12 px-1 sm:px-4 bg-slate-100/50 rounded-b-[3rem] border-2 border-t-0 border-slate-100 relative">
                     
                     {currLessons.length === 0 ? (
                         <div className="text-center p-8">
@@ -658,7 +657,7 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
                                     return (
                                         <div key={item.id} className={`relative flex w-full items-center min-h-[90px] sm:min-h-[100px] ${isLocked ? 'opacity-60 grayscale-[0.5]' : ''}`}>
                                             
-                                            {/* LEFT HALF: Increased pr-10 on mobile to avoid overlap */}
+                                            {/* LEFT HALF */}
                                             <div className={`w-1/2 flex justify-end pr-10 sm:pr-14 z-10 ${!isLeft ? 'invisible' : ''}`}>
                                                 <div className={`bg-white p-3 sm:p-4 rounded-2xl shadow-sm border-2 ${isCurrent ? 'border-indigo-300 scale-105 shadow-md' : 'border-slate-100'} transition-transform duration-300 w-full max-w-[150px] text-right`}>
                                                     <span className={`text-[9px] font-black uppercase tracking-widest block mb-1 ${isCurrent ? 'text-indigo-500' : 'text-slate-400'}`}>
@@ -670,7 +669,7 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
                                                 </div>
                                             </div>
 
-                                            {/* THE NODE: Mathematical offset adjusted to safely clear the text boxes */}
+                                            {/* THE NODE */}
                                             <div className={`absolute left-1/2 top-1/2 -translate-y-1/2 z-20 transition-transform duration-300 ${isLeft ? '-translate-x-[30%]' : '-translate-x-[70%]'}`}>
                                                 <button 
                                                     disabled={isLocked} 
@@ -699,7 +698,7 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
                                                 </button>
                                             </div>
 
-                                            {/* RIGHT HALF: Increased pl-10 on mobile to avoid overlap */}
+                                            {/* RIGHT HALF */}
                                             <div className={`w-1/2 flex justify-start pl-10 sm:pl-14 z-10 ${isLeft ? 'invisible' : ''}`}>
                                                 <div className={`bg-white p-3 sm:p-4 rounded-2xl shadow-sm border-2 ${isCurrent ? 'border-indigo-300 scale-105 shadow-md' : 'border-slate-100'} transition-transform duration-300 w-full max-w-[150px] text-left`}>
                                                     <span className={`text-[9px] font-black uppercase tracking-widest block mb-1 ${isCurrent ? 'text-indigo-500' : 'text-slate-400'}`}>
