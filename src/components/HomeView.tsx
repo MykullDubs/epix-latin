@@ -21,7 +21,8 @@ const getSubjectTheme = (subject: string) => {
     return { icon: Globe, color: 'text-indigo-500', bg: 'bg-indigo-50', border: 'border-indigo-100', hover: 'hover:border-indigo-300 hover:shadow-indigo-100' };
 };
 
-export default function HomeView({ setActiveTab, classes, onSelectClass, userData, user, activeOrg }: any) {
+// ADDED curriculums = [] TO PROPS
+export default function HomeView({ setActiveTab, classes, curriculums = [], onSelectClass, userData, user, activeOrg }: any) {
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
   // Calculate Gamified Stats
@@ -214,13 +215,18 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
                     
                     <div className="flex gap-4 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">
                         {classes.map((cls: any) => { 
-                            const pendingCount = (cls.assignments || []).length;
-                            const theme = getSubjectTheme(cls.subject);
-                            const Icon = theme.icon;
-                            const progress = cls.progressPct || Math.floor(Math.random() * 60) + 10; // Mock progress
+                            // INTELLIGENT CURRICULUM INHERITANCE
+                            // Find the first assigned curriculum object if it exists
+                            const primaryCurriculum = curriculums?.find((c: any) => cls.assignedCurriculums?.includes(c.id));
                             
-                            // Guaranteed Grade Level Display
-                            const displayGrade = cls.grade || cls.level || 'All Grades';
+                            // Inherit values, falling back to class data, then to defaults
+                            const effectiveSubject = cls.subject || primaryCurriculum?.subject || 'General Studies';
+                            const effectiveGrade = cls.grade || cls.level || primaryCurriculum?.grade || primaryCurriculum?.level || 'All Grades';
+                            
+                            const pendingCount = (cls.assignments || []).length;
+                            const theme = getSubjectTheme(effectiveSubject);
+                            const Icon = theme.icon;
+                            const progress = cls.progressPct || Math.floor(Math.random() * 60) + 10;
 
                             return ( 
                                 <button 
@@ -229,13 +235,13 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
                                     aria-label={`Open subject ${cls.name}, ${pendingCount} pending tasks`}
                                     className={`snap-start min-w-[280px] text-left bg-white p-6 rounded-[2.5rem] border-2 transition-all duration-300 flex flex-col active:scale-[0.98] shadow-sm hover:-translate-y-1 ${theme.border} ${theme.hover} group`}
                                 >
-                                    {/* Header: Subject & Grade */}
+                                    {/* Header: Subject & Grade Pills */}
                                     <div className="flex justify-between items-start mb-4 w-full">
                                         <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${theme.bg} ${theme.color}`}>
-                                            {cls.subject || 'General Studies'}
+                                            {effectiveSubject}
                                         </div>
                                         <div className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-slate-800 text-white shadow-sm">
-                                            {displayGrade}
+                                            {effectiveGrade}
                                         </div>
                                     </div>
                                     
