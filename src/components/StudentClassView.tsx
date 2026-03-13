@@ -10,7 +10,7 @@ import {
   MessageSquare, Send, ArrowLeft, BookOpen, CheckCircle2, 
   Lock, Play, ChevronRight, Monitor, FileText, ChevronDown, 
   ChevronUp, Trophy, Zap, Flame, Plus, User, Heart,
-  Mic, Square, Volume2, Loader2, Shield, Map
+  Mic, Square, Volume2, Loader2, Shield, Map, Gamepad2
 } from 'lucide-react';
 
 import StudentGradebook from './StudentGradebook';
