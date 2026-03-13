@@ -8,7 +8,7 @@ import { collection, addDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 // ============================================================================
-//  CLASS MANAGER VIEW (Multi-Subject Curriculum Architecture)
+//  CLASS MANAGER VIEW (Scroll Bug Fixed)
 // ============================================================================
 export default function ClassManagerView({ 
     user, 
@@ -29,7 +29,7 @@ export default function ClassManagerView({
     const [selectedClassId, setSelectedClassId] = useState<string | null>(classes[0]?.id || null);
     const [activeTab, setActiveTab] = useState<'roster' | 'assignments'>('roster');
     
-    // NEW: Toggle between bulk assign and single assign
+    // Toggle between bulk assign and single assign
     const [assignMode, setAssignMode] = useState<'packages' | 'standalone'>('packages');
     
     // Form States
@@ -40,8 +40,8 @@ export default function ClassManagerView({
     // Creation & Search States
     const [isCreatingCohort, setIsCreatingCohort] = useState(false);
     const [newCohortName, setNewCohortName] = useState('');
-    const [searchQuery, setSearchQuery] = useState(''); // For Curriculums
-    const [lessonSearch, setLessonSearch] = useState(''); // For Individual Lessons
+    const [searchQuery, setSearchQuery] = useState(''); 
+    const [lessonSearch, setLessonSearch] = useState(''); 
     const [activeSubjectFilter, setActiveSubjectFilter] = useState('All'); 
 
     const activeClass = classes.find((c: any) => c.id === selectedClassId);
@@ -90,11 +90,13 @@ export default function ClassManagerView({
     };
 
     return (
-        <div className="h-full max-w-7xl mx-auto flex flex-col md:flex-row gap-6 pb-32 animate-in fade-in duration-500 font-sans">
+        // FIXED: Added min-h-0 to the master container to establish scroll boundaries
+        <div className="h-full max-w-7xl mx-auto flex flex-col md:flex-row gap-6 pb-24 animate-in fade-in duration-500 font-sans min-h-0">
             
             {/* LEFT PANE: THE COHORT LIST (MASTER) */}
-            <div className="w-full md:w-[340px] flex flex-col gap-6 shrink-0">
-                <div className="flex items-center justify-between bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden group">
+            {/* FIXED: Added min-h-0 here as well so the roster list scrolls perfectly */}
+            <div className="w-full md:w-[340px] flex flex-col gap-6 shrink-0 min-h-0">
+                <div className="flex items-center justify-between bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden group shrink-0">
                     <div className="absolute -right-4 -top-4 text-indigo-50 opacity-50 rotate-12 pointer-events-none transition-transform group-hover:scale-110 duration-700">
                         <Users size={100} />
                     </div>
@@ -115,7 +117,7 @@ export default function ClassManagerView({
                     </button>
                 </div>
 
-                <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-2 pb-12">
+                <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-2 pb-4">
                     {isCreatingCohort && (
                         <div className="p-5 bg-indigo-600 rounded-[2rem] shadow-xl shadow-indigo-200 animate-in slide-in-from-top-4 fade-in duration-300">
                             <label className="text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-2 block">Forge New Cohort</label>
@@ -168,7 +170,8 @@ export default function ClassManagerView({
             </div>
 
             {/* RIGHT PANE: COHORT DETAILS (DETAIL) */}
-            <div className="flex-1 flex flex-col bg-white rounded-[3rem] border border-slate-200 shadow-xl shadow-slate-200/40 overflow-hidden relative min-h-[600px]">
+            {/* FIXED: Replaced min-h-[600px] with min-h-0 to force internal scrolling */}
+            <div className="flex-1 flex flex-col bg-white rounded-[3rem] border border-slate-200 shadow-xl shadow-slate-200/40 overflow-hidden relative min-h-0">
                 {!activeClass ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-center p-12 bg-slate-50/50">
                         <div className="w-24 h-24 bg-white shadow-sm border border-slate-100 rounded-[2.5rem] flex items-center justify-center text-slate-300 mb-6 rotate-12 transition-transform hover:rotate-0 duration-500">
@@ -178,8 +181,11 @@ export default function ClassManagerView({
                         <p className="text-slate-500 font-bold max-w-sm">Manage subject assignments, class rosters, and live sessions.</p>
                     </div>
                 ) : (
-                    <div className="flex-1 flex flex-col animate-in slide-in-from-right-8 duration-500 fade-in">
-                        <header className="px-8 md:px-10 pt-10 pb-0 border-b border-slate-100 bg-slate-50/50 relative">
+                    // FIXED: Added min-h-0 to the inner flex container
+                    <div className="flex-1 flex flex-col animate-in slide-in-from-right-8 duration-500 fade-in min-h-0">
+                        
+                        {/* FIXED: Added shrink-0 to the header so it doesn't compress */}
+                        <header className="px-8 md:px-10 pt-10 pb-0 border-b border-slate-100 bg-slate-50/50 relative shrink-0">
                             <div className="flex justify-between items-start mb-8">
                                 <div className="flex-1 pr-8">
                                     <span className="inline-block px-3 py-1 bg-slate-200/50 text-slate-500 rounded-lg text-[10px] font-black uppercase mb-3">ID: {activeClass.id}</span>
@@ -220,7 +226,8 @@ export default function ClassManagerView({
                             </div>
                         </header>
 
-                        <div className="flex-1 overflow-y-auto custom-scrollbar p-8 md:p-10 bg-white relative">
+                        {/* FIXED: The actual scrolling container. Added pb-10 so the bottom items aren't cut off */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-8 md:p-10 pb-20 bg-white relative">
                             
                             {/* --- TAB: ROSTER --- */}
                             {activeTab === 'roster' && (
@@ -270,10 +277,9 @@ export default function ClassManagerView({
 
                             {/* --- TAB: CURRICULUM HUB --- */}
                             {activeTab === 'assignments' && (
-                                <div className="space-y-10 animate-in fade-in slide-in-from-bottom-2">
+                                <div className="space-y-12 animate-in fade-in slide-in-from-bottom-2">
                                     
-                                    {/* NEW: SEGMENTED CONTROL FOR DEPLOYMENT TYPE */}
-                                    <div className="flex bg-slate-100 p-1.5 rounded-2xl w-fit mb-2 shadow-inner">
+                                    <div className="flex bg-slate-100 p-1.5 rounded-2xl w-fit shadow-inner">
                                         <button 
                                             onClick={() => setAssignMode('packages')}
                                             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${assignMode === 'packages' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
@@ -290,7 +296,7 @@ export default function ClassManagerView({
 
                                     {/* MODE 1: CURRICULUM PACKAGES (BULK) */}
                                     {assignMode === 'packages' && (
-                                        <div className="bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
+                                        <div className="bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300 shrink-0">
                                             <div className="absolute top-0 right-0 p-10 opacity-5"><Library size={120} /></div>
                                             <div className="relative z-10">
                                                 <h3 className="text-2xl font-black text-white mb-2 tracking-tight">Curriculum Library</h3>
@@ -340,6 +346,9 @@ export default function ClassManagerView({
                                                             </div>
                                                         </div>
                                                     ))}
+                                                    {filteredCurriculums.length === 0 && (
+                                                        <div className="col-span-full py-8 text-center text-slate-500 font-bold">No curriculums match your search.</div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -347,7 +356,7 @@ export default function ClassManagerView({
 
                                     {/* MODE 2: STANDALONE MODULES (INDIVIDUAL) */}
                                     {assignMode === 'standalone' && (
-                                        <div className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100 relative animate-in zoom-in-95 duration-300">
+                                        <div className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100 relative animate-in zoom-in-95 duration-300 shrink-0">
                                             <h3 className="text-lg font-black text-slate-800 mb-1">Add Individual Module</h3>
                                             <p className="text-xs font-bold text-slate-400 mb-5">Search your library for specific lessons, arcades, or exams.</p>
                                             <div className="relative group">
@@ -392,7 +401,7 @@ export default function ClassManagerView({
                                     )}
 
                                     {/* ACTIVE PLAYLIST SECTION */}
-                                    <div>
+                                    <div className="shrink-0">
                                         <div className="flex items-center justify-between mb-6 border-b-2 border-slate-100 pb-3">
                                             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-500" /> Active Playlist</h3>
                                             <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-lg">{assignedLessons.length} Modules</span>
