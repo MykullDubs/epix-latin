@@ -9,13 +9,15 @@ import { calculateLevel } from '../utils/profileHelpers';
 
 // --- NEW THEME HELPER (Must match StudentDashboardHub) ---
 const getSubjectTheme = (subject: string) => {
-    const sub = subject.toLowerCase();
-    if (sub.includes('bio') || sub.includes('science') || sub.includes('phys')) return { icon: Microscope, color: 'text-emerald-500', bg: 'bg-emerald-50', gradient: 'from-emerald-500 to-teal-400' };
-    if (sub.includes('code') || sub.includes('comp') || sub.includes('tech')) return { icon: Terminal, color: 'text-slate-800', bg: 'bg-slate-200', gradient: 'from-slate-800 to-slate-600' };
-    if (sub.includes('math') || sub.includes('calc') || sub.includes('alg')) return { icon: Calculator, color: 'text-rose-500', bg: 'bg-rose-50', gradient: 'from-rose-500 to-orange-400' };
-    if (sub.includes('art') || sub.includes('design')) return { icon: Palette, color: 'text-fuchsia-500', bg: 'bg-fuchsia-50', gradient: 'from-fuchsia-500 to-pink-400' };
-    if (sub.includes('hist') || sub.includes('lit') || sub.includes('read')) return { icon: BookText, color: 'text-amber-600', bg: 'bg-amber-50', gradient: 'from-amber-500 to-yellow-400' };
-    return { icon: Globe, color: 'text-indigo-600', bg: 'bg-indigo-50', gradient: 'from-indigo-600 to-cyan-500' };
+    const sub = subject?.toLowerCase() || '';
+    if (sub.includes('math')) return { icon: Calculator, color: 'text-rose-500', bg: 'bg-rose-50', border: 'border-rose-100', hover: 'hover:border-rose-300 hover:shadow-rose-100' };
+    if (sub.includes('science') || sub.includes('bio') || sub.includes('phys')) return { icon: Microscope, color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-100', hover: 'hover:border-emerald-300 hover:shadow-emerald-100' };
+    if (sub.includes('social') || sub.includes('history')) return { icon: BookText, color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-100', hover: 'hover:border-amber-300 hover:shadow-amber-100' };
+    if (sub.includes('read') || sub.includes('english') || sub.includes('lit')) return { icon: BookOpen, color: 'text-cyan-500', bg: 'bg-cyan-50', border: 'border-cyan-100', hover: 'hover:border-cyan-300 hover:shadow-cyan-100' };
+    if (sub.includes('code') || sub.includes('comp') || sub.includes('tech')) return { icon: Terminal, color: 'text-slate-800', bg: 'bg-slate-200', border: 'border-slate-300', hover: 'hover:border-slate-400 hover:shadow-slate-200' };
+    if (sub.includes('art') || sub.includes('design')) return { icon: Palette, color: 'text-fuchsia-500', bg: 'bg-fuchsia-50', border: 'border-fuchsia-100', hover: 'hover:border-fuchsia-300 hover:shadow-fuchsia-100' };
+    
+    return { icon: Globe, color: 'text-indigo-500', bg: 'bg-indigo-50', border: 'border-indigo-100', hover: 'hover:border-indigo-300 hover:shadow-indigo-100' };
 };
 
 export default function HomeView({ setActiveTab, classes, onSelectClass, userData, user, activeOrg }: any) {
@@ -172,33 +174,51 @@ export default function HomeView({ setActiveTab, classes, onSelectClass, userDat
                     <div className="flex gap-4 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">
                         {classes.map((cls: any) => { 
                             const pendingCount = (cls.assignments || []).length;
-                            const theme = getSubjectTheme(cls.subject || 'General');
+                            const theme = getSubjectTheme(cls.subject);
                             const Icon = theme.icon;
+                            const progress = cls.progressPct || Math.floor(Math.random() * 60) + 10; // Mock progress
 
                             return ( 
                                 <button 
                                     key={cls.id} 
-                                    onClick={() => onSelectClass(cls)} 
+                                    onClick={() => onSelectClass(cls)}
                                     aria-label={`Open subject ${cls.name}, ${pendingCount} pending tasks`}
-                                    className="snap-start min-w-[260px] bg-white rounded-[2rem] shadow-sm border-2 border-slate-100 transition-all hover:-translate-y-1 hover:shadow-xl hover:border-indigo-100 group relative overflow-hidden flex flex-col text-left p-6 active:scale-95 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    className={`snap-start min-w-[280px] text-left bg-white p-6 rounded-[2.5rem] border-2 transition-all duration-300 flex flex-col active:scale-[0.98] shadow-sm hover:-translate-y-1 ${theme.border} ${theme.hover} group`}
                                 >
-                                    <div className="flex justify-between items-start mb-6 w-full">
-                                        <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center shadow-inner transition-colors duration-500 ${theme.bg} ${theme.color} group-hover:bg-indigo-600 group-hover:text-white`}>
-                                            <Icon size={24} strokeWidth={2.5} aria-hidden="true" />
+                                    {/* Header: Subject & Grade */}
+                                    <div className="flex justify-between items-start mb-4 w-full">
+                                        <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${theme.bg} ${theme.color}`}>
+                                            {cls.subject || 'General Studies'}
                                         </div>
-                                        {pendingCount > 0 && (
-                                            <div className="bg-rose-50 border border-rose-100 text-rose-600 text-xs font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 uppercase tracking-widest">
-                                              <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></div>
-                                              {pendingCount} Tasks
-                                            </div>
-                                        )}
+                                        <div className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-500">
+                                            {cls.grade || 'All Grades'}
+                                        </div>
                                     </div>
                                     
-                                    <div>
-                                        <span className="text-xs font-black uppercase tracking-widest text-slate-400 block mb-1">{cls.subject || 'General'}</span>
-                                        <h4 className="font-black text-slate-800 text-xl truncate leading-tight group-hover:text-indigo-600 transition-colors">{cls.name}</h4>
+                                    {/* Body: Icon & Title */}
+                                    <div className="flex items-center gap-4 mb-8 mt-2">
+                                        <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center shadow-inner transition-colors duration-500 shrink-0 ${theme.bg} ${theme.color} group-hover:bg-opacity-80`}>
+                                            <Icon size={24} strokeWidth={2.5} aria-hidden="true" />
+                                        </div>
+                                        <h3 className="text-xl font-black text-slate-800 leading-tight line-clamp-2">
+                                            {cls.title || cls.name}
+                                        </h3>
                                     </div>
-                                </button> 
+
+                                    {/* Footer: Progress Bar */}
+                                    <div className="w-full mt-auto pt-5 border-t border-slate-50">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Year Progress</span>
+                                            <span className={`text-xs font-black ${theme.color}`}>{progress}%</span>
+                                        </div>
+                                        <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                            <div 
+                                                className={`h-full transition-all duration-1000 ${theme.bg.replace('bg-', 'bg-').replace('50', '500')}`} 
+                                                style={{ width: `${progress}%`, backgroundColor: 'currentColor' }} 
+                                            />
+                                        </div>
+                                    </div>
+                                </button>
                             ); 
                         })}
                     </div>
