@@ -1,5 +1,5 @@
 // src/App.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useMagisterData } from './hooks/useMagisterData';
 import { GLOBAL_CURRICULUMS } from './constants/curriculums';
 
@@ -33,6 +33,87 @@ export default function App() {
   const [presentationLessonId, setPresentationLessonId] = useState<string | null>(null);
   const [activeDeckKey, setActiveDeckKey] = useState<string | null>(null);
   const [celebrationData, setCelebrationData] = useState<any>(null);
+
+  // ==========================================================================
+  //  THE URL ROUTING ENGINE (Handles Refreshes & The Browser Back Button)
+  // ==========================================================================
+  const isHydrated = useRef(false);
+
+  // 1. READ FROM URL (Triggers once on load to survive page refreshes)
+  useEffect(() => {
+    if (!authChecked || isHydrated.current) return;
+
+    const params = new URLSearchParams(window.location.search);
+    
+    if (params.get('view')) setCurrentView(params.get('view') as any);
+    if (params.get('tab')) setActiveTab(params.get('tab')!);
+    if (params.get('deckId')) setActiveDeckKey(params.get('deckId'));
+
+    // Hydrate complex objects based on their IDs from the URL
+    const urlClassId = params.get('classId');
+    if (urlClassId && enrolledClasses.length > 0) {
+      const foundClass = enrolledClasses.find((c: any) => c.id === urlClassId);
+      if (foundClass) setActiveStudentClass(foundClass);
+    }
+
+    const urlLessonId = params.get('lessonId');
+    if (urlLessonId && allLessons.length > 0) {
+      const foundLesson = allLessons.find((l: any) => l.id === urlLessonId);
+      if (foundLesson) setActiveLesson(foundLesson);
+    }
+
+    // Mark as hydrated so we don't accidentally overwrite state during load
+    if (enrolledClasses.length > 0 || allLessons.length > 0) {
+        isHydrated.current = true;
+    }
+  }, [authChecked, enrolledClasses, allLessons]);
+
+  // 2. WRITE TO URL (Updates the browser history when you click things)
+  useEffect(() => {
+    if (!isHydrated.current) return; // Don't write to URL until initial load is done
+
+    const params = new URLSearchParams(window.location.search);
+    params.set('view', currentView);
+    params.set('tab', activeTab);
+    
+    if (activeStudentClass) params.set('classId', activeStudentClass.id);
+    else params.delete('classId');
+
+    if (activeLesson) params.set('lessonId', activeLesson.id);
+    else params.delete('lessonId');
+
+    if (activeDeckKey) params.set('deckId', activeDeckKey);
+    else params.delete('deckId');
+
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+
+    // Only push to browser history if the URL actually changed
+    if (window.location.search !== `?${params.toString()}`) {
+      window.history.pushState({}, '', newUrl);
+    }
+  }, [currentView, activeTab, activeStudentClass, activeLesson, activeDeckKey]);
+
+  // 3. LISTEN FOR "BACK" BUTTON (Detects when user hits back on their phone/browser)
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      
+      setCurrentView((params.get('view') as any) || 'student');
+      setActiveTab(params.get('tab') || 'home');
+      setActiveDeckKey(params.get('deckId'));
+
+      const classId = params.get('classId');
+      setActiveStudentClass(classId ? enrolledClasses.find((c: any) => c.id === classId) || null : null);
+
+      const lessonId = params.get('lessonId');
+      setActiveLesson(lessonId ? allLessons.find((l: any) => l.id === lessonId) || null : null);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [enrolledClasses, allLessons]);
+  // ==========================================================================
+
 
   if (!authChecked) return <div className="h-screen flex items-center justify-center bg-slate-50"><div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>;
 
@@ -95,7 +176,7 @@ export default function App() {
         onCreateClass={actions.createClass}
         onDeleteClass={actions.deleteClass}
         onRenameClass={actions.renameClass}
-        onUpdateClassDescription={actions.updateClassDescription} // Passing the new update desc prop!
+        onUpdateClassDescription={actions.updateClassDescription}
         onAddStudent={actions.addStudent}
         onStartPresentation={setPresentationLessonId}
         onSwitchView={() => setCurrentView('student')}
@@ -105,7 +186,7 @@ export default function App() {
     );
   }
 
-// 5. STUDENT MOBILE APP
+  // 5. STUDENT MOBILE APP
   return (
     <div className="bg-slate-50 min-h-screen w-full flex flex-col items-center relative overflow-hidden">
       {/* Switch to Dash Button (For Staff) */}
@@ -134,7 +215,7 @@ export default function App() {
                 exam={activeLesson} 
                 onFinish={(id:any, score:any, title:any, res:any) => { 
                     actions.logActivity(id, score, title, { scoreDetail: res }); 
-                    setCelebrationData({ xp: score, title: title }); // <--- TRIGGER CELEBRATION
+                    setCelebrationData({ xp: score, title: title }); 
                 }} 
               />
             ) : (
@@ -142,7 +223,7 @@ export default function App() {
                 lesson={activeLesson} 
                 onFinish={() => { 
                     actions.logActivity(activeLesson.id, 50, activeLesson.title, { mode: 'lesson' }); 
-                    setCelebrationData({ xp: 50, title: activeLesson.title }); // <--- TRIGGER CELEBRATION
+                    setCelebrationData({ xp: 50, title: activeLesson.title }); 
                 }} 
               />
             )
