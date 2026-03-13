@@ -594,13 +594,15 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
     const headerAccent = curr.themeColor || '#6366f1';
 
     return (
+        // FIX: Added overflow-hidden to the parent article to prevent bottom padding from leaking out when closed!
         <article className="bg-transparent overflow-hidden transition-all duration-500 relative">
             
             {/* The Accordion Toggle Header */}
             <button 
-                className="w-full text-left bg-white p-6 md:p-8 rounded-[3rem] border-2 border-slate-100 shadow-lg relative overflow-hidden group focus:outline-none focus:ring-4 focus:ring-indigo-500 z-20"
+                className="w-full text-left bg-white p-6 md:p-8 rounded-[3rem] border-2 border-slate-100 shadow-lg relative overflow-hidden group focus:outline-none z-20"
                 onClick={onToggle}
                 aria-expanded={isExpanded}
+                style={{ WebkitTapHighlightColor: 'transparent' }}
             >
                 <div className="absolute inset-0 opacity-10 transition-opacity group-hover:opacity-20" style={{ backgroundColor: headerAccent }} />
                 <div className="relative z-10 flex items-center justify-between mb-6">
@@ -625,9 +627,10 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
                 </div>
             </button>
             
-            {/* The Candy Land Roadmap Canvas (FLEX GRID REWRITE) */}
+            {/* The Candy Land Roadmap Canvas */}
             <div className={`transition-all duration-700 ease-in-out origin-top ${isExpanded ? 'max-h-[5000px] opacity-100 scale-y-100 mt-[-2rem]' : 'max-h-0 opacity-0 scale-y-0'}`}>
-                <div className="pt-16 pb-12 px-2 sm:px-4 bg-slate-100/50 rounded-b-[3rem] border-2 border-t-0 border-slate-100 relative">
+                {/* FIX: Removed bottom padding from this inner container when not expanded to prevent cutoff artifacts */}
+                <div className={`pt-16 px-2 sm:px-4 bg-slate-100/50 rounded-b-[3rem] border-2 border-t-0 border-slate-100 relative ${isExpanded ? 'pb-12' : 'pb-0'}`}>
                     
                     {currLessons.length === 0 ? (
                         <div className="text-center p-8">
@@ -670,20 +673,23 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
                                                 </div>
                                             </div>
 
-                                            {/* THE NODE (Anchored perfectly to the center, wiggled slightly) */}
+                                            {/* THE NODE */}
                                             <div className={`absolute left-1/2 top-1/2 -translate-y-1/2 z-20 transition-transform duration-300 ${isLeft ? '-translate-x-[65%]' : '-translate-x-[35%]'}`}>
                                                 <button 
                                                     disabled={isLocked} 
                                                     onClick={() => onSelectLesson(item)} 
                                                     aria-label={`${isExam ? 'Exam' : 'Lesson'}: ${item.title}`}
-                                                    className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center border-[6px] transition-all duration-300 shadow-xl focus:outline-none focus:ring-4 focus:ring-indigo-500
+                                                    className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center border-[6px] transition-all duration-300 shadow-xl focus:outline-none
                                                         ${isCompleted ? 'bg-emerald-500 border-white text-white' : 
                                                           isCurrent ? `bg-white border-[${headerAccent}] text-slate-800 scale-110 animate-bounce-slow shadow-[0_10px_20px_rgba(0,0,0,0.15)]` : 
                                                           'bg-slate-100 border-white text-slate-400 cursor-not-allowed'
                                                         }
                                                         ${isExam && !isCompleted ? 'border-rose-400 bg-white text-rose-500' : ''}
                                                     `}
-                                                    style={isCurrent && !isExam ? { borderColor: headerAccent, color: headerAccent } : {}}
+                                                    style={{
+                                                        ...(isCurrent && !isExam ? { borderColor: headerAccent, color: headerAccent } : {}),
+                                                        WebkitTapHighlightColor: 'transparent'
+                                                    }}
                                                 >
                                                     {isCompleted ? <CheckCircle2 size={24} strokeWidth={3} /> : 
                                                      isLocked ? <Lock size={20} /> : 
@@ -722,9 +728,10 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
 
 const StandaloneAssignmentCard = ({ item, isCompleted, onSelectLesson, theme }: any) => (
     <button 
-      className={`w-full text-left p-5 border-4 bg-white rounded-[2.5rem] flex items-center gap-4 cursor-pointer transition-all active:scale-95 group focus:outline-none focus:ring-4 focus:ring-indigo-500 ${isCompleted ? 'border-emerald-100 shadow-sm' : 'border-slate-100 shadow-md hover:shadow-xl hover:border-indigo-100'}`} 
+      className={`w-full text-left p-5 border-4 bg-white rounded-[2.5rem] flex items-center gap-4 cursor-pointer transition-all active:scale-95 group focus:outline-none ${isCompleted ? 'border-emerald-100 shadow-sm' : 'border-slate-100 shadow-md hover:shadow-xl hover:border-indigo-100'}`} 
       onClick={() => onSelectLesson(item)}
       aria-label={`Assigned Activity: ${item.title}`}
+      style={{ WebkitTapHighlightColor: 'transparent' }}
     >
         <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center border-4 border-white shadow-inner transition-colors shrink-0 ${isCompleted ? 'bg-emerald-500 text-white' : `${theme.bg} text-white group-hover:scale-105`}`} aria-hidden="true">
             {isCompleted ? <CheckCircle2 size={28} strokeWidth={3} /> : item.type === 'arcade_game' ? <Gamepad2 size={28} /> : <Play size={28} className="ml-1" fill="currentColor" />}
@@ -740,8 +747,9 @@ const StandaloneAssignmentCard = ({ item, isCompleted, onSelectLesson, theme }: 
 
 const ExamCard = ({ item, onSelectLesson }: any) => (
     <button 
-      className="w-full text-left p-6 border-4 border-rose-100 bg-rose-50/50 rounded-[3rem] flex items-center gap-5 cursor-pointer hover:shadow-xl hover:bg-rose-50 transition-all group focus:outline-none focus:ring-4 focus:ring-rose-500" 
+      className="w-full text-left p-6 border-4 border-rose-100 bg-rose-50/50 rounded-[3rem] flex items-center gap-5 cursor-pointer hover:shadow-xl hover:bg-rose-50 transition-all group focus:outline-none" 
       onClick={() => onSelectLesson(item)}
+      style={{ WebkitTapHighlightColor: 'transparent' }}
     >
       <div className="w-20 h-20 rounded-[2rem] flex items-center justify-center bg-white text-rose-500 shadow-lg border-4 border-rose-100 group-hover:scale-105 transition-transform shrink-0" aria-hidden="true">
         <Trophy size={36} fill="currentColor" />
