@@ -10,7 +10,7 @@ import {
   MessageSquare, Send, ArrowLeft, BookOpen, CheckCircle2, 
   Lock, Play, ChevronRight, Monitor, FileText, ChevronDown, 
   ChevronUp, Trophy, Zap, Flame, Plus, User, Heart,
-  Mic, Square, Volume2, Loader2, Shield, Map, Gamepad2
+  Mic, Square, Volume2, Loader2, Shield, Map
 } from 'lucide-react';
 
 import StudentGradebook from './StudentGradebook';
@@ -430,9 +430,9 @@ export default function StudentClassView({
     .map((id: string) => curriculums.find((c: any) => c.id === id))
     .filter(Boolean);
 
-const standaloneLessons = populatedAssignments.filter((a: any) => {
+  // Standalone lessons are any lessons that are assigned to the class BUT NOT found inside a curriculum
+  const standaloneLessons = populatedAssignments.filter((a: any) => {
       const isExam = a.contentType === 'exam' || a.contentType === 'test';
-      // FIX: Added (c: any) right here 👇
       const isCurriculumLesson = assignedCurriculums.some((c: any) => c.lessonIds?.includes(a.id));
       return !isExam && !isCurriculumLesson;
   });
@@ -474,7 +474,7 @@ const standaloneLessons = populatedAssignments.filter((a: any) => {
              
              {/* 1. CURRICULUM ACCORDIONS (THE CANDY LAND MAP) */}
              {assignedCurriculums.length > 0 ? (
-                 <section className="space-y-8 mb-10" aria-label="Curriculum Roadmaps">
+                 <section className="space-y-8 mb-10 max-w-lg mx-auto" aria-label="Curriculum Roadmaps">
                      {assignedCurriculums.map((curr: any) => (
                          <CurriculumPathway 
                             key={curr.id}
@@ -498,7 +498,7 @@ const standaloneLessons = populatedAssignments.filter((a: any) => {
 
              {/* 2. STANDALONE ASSIGNMENTS */}
              {standaloneLessons.length > 0 && (
-                 <section className="space-y-4 mb-10 px-4" aria-label="Individual Assignments">
+                 <section className="space-y-4 mb-10 px-4 max-w-lg mx-auto" aria-label="Individual Assignments">
                      <div className="flex items-center gap-3 ml-2 mb-6" aria-hidden="true">
                         <div className="h-1 flex-1 bg-slate-200 rounded-full" />
                         <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Bonus Quests</h3>
@@ -523,7 +523,7 @@ const standaloneLessons = populatedAssignments.filter((a: any) => {
         {activeSubTab === 'leaderboard' && <LeaderboardView studentEmails={classData.studentEmails} currentUserEmail={userData.email} />}
         
         {activeSubTab === 'exams' && (
-          <section className="space-y-4 px-4" aria-label="Exams">
+          <section className="space-y-4 px-4 max-w-lg mx-auto" aria-label="Exams">
             {examList.length === 0 ? (
                 <div className="text-center py-20 opacity-40">
                     <FileText size={48} className="mx-auto mb-4" aria-hidden="true" />
@@ -574,7 +574,7 @@ const standaloneLessons = populatedAssignments.filter((a: any) => {
 }
 
 // ============================================================================
-//  INTERNAL BLOCK RENDERERS (The Juicy Candy Land Roadmap)
+//  INTERNAL BLOCK RENDERERS (The Safe Candy Land Roadmap)
 // ============================================================================
 
 const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle, onSelectLesson, theme }: any) => {
@@ -625,9 +625,9 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
                 </div>
             </button>
             
-            {/* The Candy Land Roadmap Canvas */}
+            {/* The Candy Land Roadmap Canvas (FLEX GRID REWRITE) */}
             <div className={`transition-all duration-700 ease-in-out origin-top ${isExpanded ? 'max-h-[5000px] opacity-100 scale-y-100 mt-[-2rem]' : 'max-h-0 opacity-0 scale-y-0'}`}>
-                <div className="pt-16 pb-12 bg-slate-100/50 rounded-b-[3rem] border-2 border-t-0 border-slate-100 relative">
+                <div className="pt-16 pb-12 px-2 sm:px-4 bg-slate-100/50 rounded-b-[3rem] border-2 border-t-0 border-slate-100 relative">
                     
                     {currLessons.length === 0 ? (
                         <div className="text-center p-8">
@@ -635,72 +635,84 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
                             <p className="text-sm font-bold text-slate-500">No modules found in this pathway.</p>
                         </div>
                     ) : (
-                        <>
-                            {/* The Center Line SVG Path */}
-                            <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-4 bg-slate-200 rounded-full" />
+                        <div className="relative max-w-sm mx-auto w-full">
+                            {/* The Center Line Background */}
+                            <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-6 sm:w-8 bg-slate-200/60 rounded-full z-0" />
+                            {/* The Progress Fill Line */}
                             <div 
-                                className="absolute top-0 left-1/2 -translate-x-1/2 w-4 rounded-full transition-all duration-1000 z-0 shadow-[0_0_15px_rgba(0,0,0,0.1)]" 
+                                className="absolute top-0 left-1/2 -translate-x-1/2 w-6 sm:w-8 rounded-full transition-all duration-1000 z-0 shadow-inner" 
                                 style={{ height: `${currLessons.length > 1 ? (normalizedActiveIndex / (currLessons.length - 1)) * 100 : 100}%`, backgroundColor: headerAccent }}
                             />
 
-                            {/* The Nodes */}
-                            <div className="relative z-10 flex flex-col gap-12 py-8">
+                            {/* The Flex Grid of Nodes */}
+                            <div className="relative z-10 flex flex-col gap-8 sm:gap-12 py-8">
                                 {currLessons.map((item: any, index: number) => {
                                     const isCompleted = completedItems.includes(item.id);
                                     const isCurrent = index === normalizedActiveIndex;
                                     const isLocked = index > normalizedActiveIndex;
                                     const isExam = item.contentType === 'exam' || item.contentType === 'test';
                                     
-                                    // Wiggle layout (Left / Right stagger)
+                                    // Staggering Logic
                                     const isLeft = index % 2 === 0;
-                                    // Add a little sinusoidal wave to the margin
-                                    const offset = isLeft ? 'mr-16 md:mr-32' : 'ml-16 md:ml-32';
 
                                     return (
-                                        <div key={item.id} className={`relative flex items-center justify-center ${offset} ${isLocked ? 'opacity-60 grayscale-[0.5]' : ''}`}>
+                                        <div key={item.id} className={`relative flex w-full items-center min-h-[90px] sm:min-h-[100px] ${isLocked ? 'opacity-60 grayscale-[0.5]' : ''}`}>
                                             
-                                            {/* Title Card Wrapper (Floats next to the node) */}
-                                            <div className={`absolute w-[140px] md:w-[200px] ${isLeft ? 'right-[calc(50%+3rem)] md:right-[calc(50%+4rem)] text-right' : 'left-[calc(50%+3rem)] md:left-[calc(50%+4rem)] text-left'}`}>
-                                                <div className={`bg-white p-3 md:p-4 rounded-2xl shadow-md border-2 ${isCurrent ? 'border-indigo-200 scale-105' : 'border-slate-100'} transition-transform duration-300`}>
+                                            {/* LEFT HALF (Holds card if isLeft is False, otherwise empty to push node to center) */}
+                                            <div className={`w-1/2 flex justify-end pr-6 sm:pr-10 z-10 ${!isLeft ? 'invisible' : ''}`}>
+                                                <div className={`bg-white p-3 sm:p-4 rounded-2xl shadow-sm border-2 ${isCurrent ? 'border-indigo-300 scale-105 shadow-md' : 'border-slate-100'} transition-transform duration-300 w-full max-w-[160px] text-right`}>
                                                     <span className={`text-[9px] font-black uppercase tracking-widest block mb-1 ${isCurrent ? 'text-indigo-500' : 'text-slate-400'}`}>
                                                         {isExam ? 'Checkpoint' : `Module ${index + 1}`}
                                                     </span>
-                                                    <h4 className="font-black text-xs md:text-sm text-slate-800 leading-tight line-clamp-2">
+                                                    <h4 className="font-black text-xs sm:text-sm text-slate-800 leading-tight line-clamp-2">
                                                         {item.title}
                                                     </h4>
                                                 </div>
                                             </div>
 
-                                            {/* The Interactive Node Button */}
-                                            <button 
-                                                disabled={isLocked} 
-                                                onClick={() => onSelectLesson(item)} 
-                                                aria-label={`${isExam ? 'Exam' : 'Lesson'}: ${item.title}`}
-                                                className={`relative w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center border-8 transition-all duration-300 shadow-xl z-20 focus:outline-none focus:ring-4 focus:ring-indigo-500
-                                                    ${isCompleted ? 'bg-emerald-500 border-white text-white' : 
-                                                      isCurrent ? `bg-white border-[${headerAccent}] text-slate-800 scale-110 animate-bounce-slow shadow-[0_10px_30px_rgba(0,0,0,0.15)]` : 
-                                                      'bg-slate-100 border-white text-slate-400 cursor-not-allowed'
-                                                    }
-                                                    ${isExam && !isCompleted ? 'border-rose-400 bg-white text-rose-500' : ''}
-                                                `}
-                                                // Overriding border color dynamically if it's the current node
-                                                style={isCurrent && !isExam ? { borderColor: headerAccent, color: headerAccent } : {}}
-                                            >
-                                                {isCompleted ? <CheckCircle2 size={32} strokeWidth={3} /> : 
-                                                 isLocked ? <Lock size={28} /> : 
-                                                 isExam ? <Trophy size={32} fill={isCurrent ? "currentColor" : "none"} /> : 
-                                                 <Play size={32} className="ml-1" fill={isCurrent ? "currentColor" : "none"} />}
+                                            {/* THE NODE (Anchored perfectly to the center, wiggled slightly) */}
+                                            <div className={`absolute left-1/2 top-1/2 -translate-y-1/2 z-20 transition-transform duration-300 ${isLeft ? '-translate-x-[65%]' : '-translate-x-[35%]'}`}>
+                                                <button 
+                                                    disabled={isLocked} 
+                                                    onClick={() => onSelectLesson(item)} 
+                                                    aria-label={`${isExam ? 'Exam' : 'Lesson'}: ${item.title}`}
+                                                    className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center border-[6px] transition-all duration-300 shadow-xl focus:outline-none focus:ring-4 focus:ring-indigo-500
+                                                        ${isCompleted ? 'bg-emerald-500 border-white text-white' : 
+                                                          isCurrent ? `bg-white border-[${headerAccent}] text-slate-800 scale-110 animate-bounce-slow shadow-[0_10px_20px_rgba(0,0,0,0.15)]` : 
+                                                          'bg-slate-100 border-white text-slate-400 cursor-not-allowed'
+                                                        }
+                                                        ${isExam && !isCompleted ? 'border-rose-400 bg-white text-rose-500' : ''}
+                                                    `}
+                                                    style={isCurrent && !isExam ? { borderColor: headerAccent, color: headerAccent } : {}}
+                                                >
+                                                    {isCompleted ? <CheckCircle2 size={24} strokeWidth={3} /> : 
+                                                     isLocked ? <Lock size={20} /> : 
+                                                     isExam ? <Trophy size={24} fill={isCurrent ? "currentColor" : "none"} /> : 
+                                                     <Play size={24} className="ml-1" fill={isCurrent ? "currentColor" : "none"} />}
 
-                                                {/* Glowing Pulse Ring for the Active Node */}
-                                                {isCurrent && (
-                                                    <div className="absolute inset-0 -m-4 border-4 rounded-full animate-ping opacity-40 pointer-events-none" style={{ borderColor: isExam ? '#f43f5e' : headerAccent }} />
-                                                )}
-                                            </button>
+                                                    {isCurrent && (
+                                                        <div className="absolute inset-0 -m-3 border-4 rounded-full animate-ping opacity-40 pointer-events-none" style={{ borderColor: isExam ? '#f43f5e' : headerAccent }} />
+                                                    )}
+                                                </button>
+                                            </div>
+
+                                            {/* RIGHT HALF */}
+                                            <div className={`w-1/2 flex justify-start pl-6 sm:pl-10 z-10 ${isLeft ? 'invisible' : ''}`}>
+                                                <div className={`bg-white p-3 sm:p-4 rounded-2xl shadow-sm border-2 ${isCurrent ? 'border-indigo-300 scale-105 shadow-md' : 'border-slate-100'} transition-transform duration-300 w-full max-w-[160px] text-left`}>
+                                                    <span className={`text-[9px] font-black uppercase tracking-widest block mb-1 ${isCurrent ? 'text-indigo-500' : 'text-slate-400'}`}>
+                                                        {isExam ? 'Checkpoint' : `Module ${index + 1}`}
+                                                    </span>
+                                                    <h4 className="font-black text-xs sm:text-sm text-slate-800 leading-tight line-clamp-2">
+                                                        {item.title}
+                                                    </h4>
+                                                </div>
+                                            </div>
+
                                         </div>
                                     );
                                 })}
                             </div>
-                        </>
+                        </div>
                     )}
                 </div>
             </div>
