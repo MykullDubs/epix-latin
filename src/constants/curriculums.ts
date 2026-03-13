@@ -24,11 +24,11 @@ export const GLOBAL_CURRICULUMS: Curriculum[] = [
   
   {
     id: 'curr_g1_social_studies',
-    title: 'Grade 1 Social Studies',
-    subject: 'Social Studies',
-    grade: 'Grade 1',
-    strand: 'History & Geography',
-    description: 'A complete school year journey through community roles, basic geography, and Early Mexican History.',
+  title: 'Estudios Sociales - 1er Grado',
+    subject: 'Estudios Sociales',
+    grade: '1er Grado',
+    strand: 'Historia y Geografía',
+    description: 'Un recorrido completo durante el año escolar a través de los roles en la comunidad, la geografía básica y los inicios de la historia de México.',
     coverImage: 'https://images.unsplash.com/photo-1596464716127-f2a82984de30?q=80&w=800&auto=format&fit=crop', // Pyramids/History aesthetic
     themeColor: '#f59e0b', // Amber
     lessonIds: [
