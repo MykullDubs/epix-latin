@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { 
     Users, Plus, X, Flame, BookOpen, Edit3, Trash2, Mail, 
-    Activity, Search, Gamepad2, CheckCircle2, Monitor, Filter, Library 
+    Activity, Search, Gamepad2, CheckCircle2, Monitor, Filter, Library, Package, Puzzle 
 } from 'lucide-react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
@@ -14,10 +14,10 @@ export default function ClassManagerView({
     user, 
     classes = [], 
     lessons = [], 
-    curriculums = [], // <--- NEW PROP ADDED
+    curriculums = [], 
     allDecks = [],
     onAssign, 
-    onAssignCurriculum, // <--- NEW METHOD FOR BULK ASSIGN
+    onAssignCurriculum, 
     onRevoke, 
     onCreateClass, 
     onDeleteClass, 
@@ -29,6 +29,9 @@ export default function ClassManagerView({
     const [selectedClassId, setSelectedClassId] = useState<string | null>(classes[0]?.id || null);
     const [activeTab, setActiveTab] = useState<'roster' | 'assignments'>('roster');
     
+    // NEW: Toggle between bulk assign and single assign
+    const [assignMode, setAssignMode] = useState<'packages' | 'standalone'>('packages');
+    
     // Form States
     const [newStudentEmail, setNewStudentEmail] = useState('');
     const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -37,23 +40,30 @@ export default function ClassManagerView({
     // Creation & Search States
     const [isCreatingCohort, setIsCreatingCohort] = useState(false);
     const [newCohortName, setNewCohortName] = useState('');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [activeSubjectFilter, setActiveSubjectFilter] = useState('All'); // New Subject Filter
+    const [searchQuery, setSearchQuery] = useState(''); // For Curriculums
+    const [lessonSearch, setLessonSearch] = useState(''); // For Individual Lessons
+    const [activeSubjectFilter, setActiveSubjectFilter] = useState('All'); 
 
     const activeClass = classes.find((c: any) => c.id === selectedClassId);
 
     // --- ASSIGNMENT DATA LOGIC ---
-    // Extract unique subjects from Curriculums for the filter pills
     const availableSubjects = ['All', ...Array.from(new Set(curriculums.map((c: any) => c.subject || 'General')))];
 
-    // Active playlist mapping
     const assignedLessons = lessons.filter((l: any) => activeClass?.assignments?.includes(l.id));
+    const unassignedLessons = lessons.filter((l: any) => !activeClass?.assignments?.includes(l.id));
     
-    // Filter Curriculums for the "Add to Cohort" section
+    // Filter Curriculums
     const filteredCurriculums = curriculums.filter((c: any) => {
         const matchesSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase()) || c.description.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesSubject = activeSubjectFilter === 'All' || c.subject === activeSubjectFilter;
         return matchesSearch && matchesSubject;
+    });
+
+    // Filter Individual Lessons
+    const filteredUnassigned = unassignedLessons.filter((l: any) => {
+        if (!lessonSearch.trim()) return true;
+        const searchStr = `${l.title || 'Untitled'} ${l.type === 'arcade_game' ? 'arcade' : 'unit'} ${l.subject || ''}`.toLowerCase();
+        return searchStr.includes(lessonSearch.toLowerCase());
     });
 
     const handleCreateSubmit = () => {
@@ -72,12 +82,9 @@ export default function ClassManagerView({
 
     const handleBulkAssign = (curriculum: any) => {
         if (!window.confirm(`Deploy ${curriculum.title} (${curriculum.lessonIds.length} items) to this cohort?`)) return;
-        
-        // We pass the curriculum ID to the parent, which should append all lessonIds to the class
         if (onAssignCurriculum) {
             onAssignCurriculum(activeClass.id, curriculum);
         } else {
-            // Fallback if parent only supports assigning individual lessons
             curriculum.lessonIds.forEach((id: string) => onAssign(activeClass.id, id));
         }
     };
@@ -177,7 +184,6 @@ export default function ClassManagerView({
                                 <div className="flex-1 pr-8">
                                     <span className="inline-block px-3 py-1 bg-slate-200/50 text-slate-500 rounded-lg text-[10px] font-black uppercase mb-3">ID: {activeClass.id}</span>
                                     
-                                    {/* TITLE INPUT */}
                                     <div className="flex items-center gap-3 group">
                                         <input 
                                             className="text-3xl md:text-4xl font-black text-slate-900 tracking-tighter bg-transparent border-b-2 border-transparent focus:border-indigo-500 p-0 focus:ring-0 w-full max-w-lg transition-colors outline-none"
@@ -189,7 +195,6 @@ export default function ClassManagerView({
                                         <Edit3 size={18} className={`text-slate-300 ${isEditingTitle ? 'opacity-0' : 'group-hover:text-indigo-400'}`} />
                                     </div>
 
-                                    {/* DESCRIPTION / SUBTITLE INPUT */}
                                     <div className="flex items-center gap-3 group mt-1">
                                         <input 
                                             className="text-sm font-bold text-slate-400 bg-transparent border-b-2 border-transparent focus:border-indigo-500 p-0 focus:ring-0 w-full max-w-xl transition-colors outline-none placeholder:text-slate-300"
@@ -263,83 +268,141 @@ export default function ClassManagerView({
                                 </div>
                             )}
 
-                            {/* --- TAB: CURRICULUM HUB (MASSIVELY UPGRADED) --- */}
+                            {/* --- TAB: CURRICULUM HUB --- */}
                             {activeTab === 'assignments' && (
-                                <div className="space-y-12 animate-in fade-in slide-in-from-bottom-2">
+                                <div className="space-y-10 animate-in fade-in slide-in-from-bottom-2">
                                     
-                                    {/* BROWSE CURRICULUMS SECTION */}
-                                    <div className="bg-slate-900 rounded-[2.5rem] p-8 md:p-10 shadow-2xl relative overflow-hidden">
-                                        <div className="absolute top-0 right-0 p-10 opacity-5"><Library size={120} /></div>
-                                        <div className="relative z-10">
-                                            <h3 className="text-2xl font-black text-white mb-2 tracking-tight">Curriculum Library</h3>
-                                            <p className="text-slate-400 font-medium mb-8">Deploy full-year curriculums or standalone modules to this cohort.</p>
-                                            
-                                            {/* Filters & Search */}
-                                            <div className="flex flex-col md:flex-row gap-4 mb-8">
-                                                <div className="relative flex-1">
-                                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                                                    <input 
-                                                        type="text"
-                                                        placeholder="Search subjects, topics, or grades..."
-                                                        value={searchQuery}
-                                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                                        className="w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 pl-12 pr-4 py-3 rounded-xl font-bold focus:outline-none focus:border-indigo-400 focus:bg-white/20 transition-all"
-                                                    />
+                                    {/* NEW: SEGMENTED CONTROL FOR DEPLOYMENT TYPE */}
+                                    <div className="flex bg-slate-100 p-1.5 rounded-2xl w-fit mb-2 shadow-inner">
+                                        <button 
+                                            onClick={() => setAssignMode('packages')}
+                                            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${assignMode === 'packages' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            <Package size={14} /> Full Packages
+                                        </button>
+                                        <button 
+                                            onClick={() => setAssignMode('standalone')}
+                                            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${assignMode === 'standalone' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            <Puzzle size={14} /> Standalone Modules
+                                        </button>
+                                    </div>
+
+                                    {/* MODE 1: CURRICULUM PACKAGES (BULK) */}
+                                    {assignMode === 'packages' && (
+                                        <div className="bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
+                                            <div className="absolute top-0 right-0 p-10 opacity-5"><Library size={120} /></div>
+                                            <div className="relative z-10">
+                                                <h3 className="text-2xl font-black text-white mb-2 tracking-tight">Curriculum Library</h3>
+                                                <p className="text-slate-400 font-medium mb-8">Deploy full-year curriculums to this cohort in one click.</p>
+                                                
+                                                <div className="flex flex-col md:flex-row gap-4 mb-8">
+                                                    <div className="relative flex-1">
+                                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                                                        <input 
+                                                            type="text"
+                                                            placeholder="Search subjects, topics, or grades..."
+                                                            value={searchQuery}
+                                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                                            className="w-full bg-white/10 border border-white/20 text-white placeholder-slate-400 pl-12 pr-4 py-3 rounded-xl font-bold focus:outline-none focus:border-indigo-400 focus:bg-white/20 transition-all"
+                                                        />
+                                                    </div>
+                                                    <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-2 md:pb-0">
+                                                        <Filter size={16} className="text-slate-500 mr-1 shrink-0" />
+                                                        {availableSubjects.map(sub => (
+                                                            <button 
+                                                                key={sub as string}
+                                                                onClick={() => setActiveSubjectFilter(sub as string)}
+                                                                className={`px-4 py-2 rounded-lg font-black text-[10px] uppercase tracking-widest shrink-0 transition-colors ${activeSubjectFilter === sub ? 'bg-indigo-500 text-white' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}
+                                                            >
+                                                                {sub as string}
+                                                            </button>
+                                                        ))}
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-2 md:pb-0">
-                                                    <Filter size={16} className="text-slate-500 mr-1 shrink-0" />
-                                                    {availableSubjects.map(sub => (
-                                                        <button 
-                                                            key={sub as string}
-                                                            onClick={() => setActiveSubjectFilter(sub as string)}
-                                                            className={`px-4 py-2 rounded-lg font-black text-[10px] uppercase tracking-widest shrink-0 transition-colors ${activeSubjectFilter === sub ? 'bg-indigo-500 text-white' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}
-                                                        >
-                                                            {sub as string}
-                                                        </button>
+
+                                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                                    {filteredCurriculums.map((curr: any) => (
+                                                        <div key={curr.id} className="bg-white/5 border border-white/10 rounded-2xl p-5 hover:bg-white/10 transition-colors flex items-start gap-4">
+                                                            <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-indigo-500 to-cyan-400 shrink-0 overflow-hidden shadow-inner">
+                                                                {curr.coverImage && <img src={curr.coverImage} alt={curr.title} className="w-full h-full object-cover mix-blend-overlay" />}
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <span className="text-[9px] font-black uppercase tracking-widest text-indigo-300 block mb-1">{curr.subject || 'General'} • {curr.grade || curr.level}</span>
+                                                                <h4 className="text-lg font-black text-white leading-tight mb-1">{curr.title}</h4>
+                                                                <p className="text-xs text-slate-400 font-medium line-clamp-1 mb-3">{curr.lessonIds?.length} Modules</p>
+                                                                <button 
+                                                                    onClick={() => handleBulkAssign(curr)}
+                                                                    className="px-4 py-2 bg-white text-slate-900 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-indigo-50 hover:text-indigo-700 transition-colors active:scale-95"
+                                                                >
+                                                                    Deploy to Cohort
+                                                                </button>
+                                                            </div>
+                                                        </div>
                                                     ))}
                                                 </div>
                                             </div>
+                                        </div>
+                                    )}
 
-                                            {/* Results Grid */}
-                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                                {filteredCurriculums.map((curr: any) => (
-                                                    <div key={curr.id} className="bg-white/5 border border-white/10 rounded-2xl p-5 hover:bg-white/10 transition-colors flex items-start gap-4">
-                                                        <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-indigo-500 to-cyan-400 shrink-0 overflow-hidden shadow-inner">
-                                                            {curr.coverImage && <img src={curr.coverImage} alt={curr.title} className="w-full h-full object-cover mix-blend-overlay" />}
-                                                        </div>
-                                                        <div className="flex-1">
-                                                            <span className="text-[9px] font-black uppercase tracking-widest text-indigo-300 block mb-1">{curr.subject || 'General'} • {curr.grade || curr.level}</span>
-                                                            <h4 className="text-lg font-black text-white leading-tight mb-1">{curr.title}</h4>
-                                                            <p className="text-xs text-slate-400 font-medium line-clamp-1 mb-3">{curr.lessonIds?.length} Modules</p>
-                                                            <button 
-                                                                onClick={() => handleBulkAssign(curr)}
-                                                                className="px-4 py-2 bg-white text-slate-900 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-indigo-50 hover:text-indigo-700 transition-colors active:scale-95"
-                                                            >
-                                                                Deploy to Cohort
-                                                            </button>
-                                                        </div>
+                                    {/* MODE 2: STANDALONE MODULES (INDIVIDUAL) */}
+                                    {assignMode === 'standalone' && (
+                                        <div className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100 relative animate-in zoom-in-95 duration-300">
+                                            <h3 className="text-lg font-black text-slate-800 mb-1">Add Individual Module</h3>
+                                            <p className="text-xs font-bold text-slate-400 mb-5">Search your library for specific lessons, arcades, or exams.</p>
+                                            <div className="relative group">
+                                                <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500" size={18} />
+                                                <input 
+                                                    type="text"
+                                                    placeholder="Search standalone modules..."
+                                                    value={lessonSearch}
+                                                    onChange={(e) => setLessonSearch(e.target.value)}
+                                                    className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-200 focus:border-indigo-500 rounded-2xl text-sm font-bold text-slate-800 outline-none transition-colors"
+                                                />
+                                                {lessonSearch.trim() && (
+                                                    <div className="absolute top-[110%] left-0 right-0 bg-white border border-slate-200 shadow-2xl rounded-2xl overflow-hidden max-h-72 overflow-y-auto z-50">
+                                                        {filteredUnassigned.length === 0 ? (
+                                                            <div className="p-6 text-center text-sm font-bold text-slate-400">No unassigned modules found.</div>
+                                                        ) : (
+                                                            filteredUnassigned.map((lesson: any) => (
+                                                                <button
+                                                                    key={lesson.id}
+                                                                    onClick={() => { onAssign(activeClass.id, lesson.id); setLessonSearch(''); }}
+                                                                    className="w-full flex items-center justify-between p-4 hover:bg-indigo-50 border-b border-slate-50 text-left group"
+                                                                >
+                                                                    <div className="flex items-center gap-4">
+                                                                        <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center shrink-0">
+                                                                            {lesson.contentType === 'exam' ? <CheckCircle2 size={18} className="text-rose-500"/> : lesson.type === 'arcade_game' ? <Gamepad2 size={18} /> : <BookOpen size={18} />}
+                                                                        </div>
+                                                                        <div>
+                                                                            <p className="font-bold text-sm text-slate-800">{lesson.title || 'Untitled'}</p>
+                                                                            <p className="text-[10px] font-black text-slate-400 uppercase">
+                                                                                {lesson.contentType === 'exam' ? 'Assessment' : lesson.type === 'arcade_game' ? 'Arcade' : 'Standard'} • {lesson.subject || 'General'}
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="w-8 h-8 rounded-full bg-white border-2 border-slate-200 flex items-center justify-center text-transparent group-hover:border-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all"><Plus size={16} strokeWidth={3} /></div>
+                                                                </button>
+                                                            ))
+                                                        )}
                                                     </div>
-                                                ))}
-                                                {filteredCurriculums.length === 0 && (
-                                                    <div className="col-span-full py-8 text-center text-slate-500 font-bold">No curriculums match your search.</div>
                                                 )}
                                             </div>
                                         </div>
-                                    </div>
+                                    )}
 
                                     {/* ACTIVE PLAYLIST SECTION */}
                                     <div>
                                         <div className="flex items-center justify-between mb-6 border-b-2 border-slate-100 pb-3">
                                             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-500" /> Active Playlist</h3>
-                                            <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-lg">{assignedLessons.length} Modules Assigned</span>
+                                            <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-lg">{assignedLessons.length} Modules</span>
                                         </div>
                                         
                                         {assignedLessons.length === 0 ? (
-                                            <div className="text-center p-12 border-2 border-dashed border-slate-200 rounded-[2rem]"><BookOpen size={32} className="mx-auto text-slate-300 mb-3" /><p className="text-sm font-bold text-slate-500">Playlist is empty. Add a curriculum above.</p></div>
+                                            <div className="text-center p-12 border-2 border-dashed border-slate-200 rounded-[2rem]"><BookOpen size={32} className="mx-auto text-slate-300 mb-3" /><p className="text-sm font-bold text-slate-500">Playlist is empty. Add modules above.</p></div>
                                         ) : (
                                             <div className="space-y-3">
                                                 {assignedLessons.map((lesson: any, idx: number) => {
-                                                    // Detect if it's an exam to style it red
                                                     const isExam = lesson.contentType === 'exam';
                                                     
                                                     return (
