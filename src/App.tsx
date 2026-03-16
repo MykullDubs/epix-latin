@@ -17,6 +17,7 @@ import StudentNavBar from './components/StudentNavBar';
 import ExamPlayerView from './components/ExamPlayerView';
 import LessonView from './components/LessonView';
 import ClassView from './components/ClassView'; // Projector view
+import LiveVocabProjector from './components/LiveVocabProjector'; // NEW: Vocab Projector
 import CelebrationScreen from './components/CelebrationScreen';
 
 export default function App() {
@@ -33,8 +34,9 @@ export default function App() {
   const [activeDeckKey, setActiveDeckKey] = useState<string | null>(null);
   const [celebrationData, setCelebrationData] = useState<any>(null);
 
-  // FIX: This now holds BOTH the lesson and the class it belongs to!
+  // Live Presentation States
   const [activePresentation, setActivePresentation] = useState<{lessonId: string, classId: string} | null>(null);
+  const [activeVocabGame, setActiveVocabGame] = useState<{deckId: string, classId: string} | null>(null); // NEW: Vocab Game State
 
   // ==========================================================================
   //  THE URL ROUTING ENGINE (Handles Refreshes & The Browser Back Button)
@@ -74,7 +76,7 @@ export default function App() {
   useEffect(() => {
     if (!isHydrated.current) return; // Don't write to URL until initial load is done
 
-    const params = new URLSearchParams(window.location.search);
+    const params = newSearchParams(window.location.search);
     params.set('view', currentView);
     params.set('tab', activeTab);
     
@@ -151,6 +153,27 @@ export default function App() {
     );
   }
 
+  // NEW: PROJECTOR MODE (Live Vocab Game)
+  if (activeVocabGame) {
+    const deck = allDecks[activeVocabGame.deckId] || allDecks.custom;
+    return (
+      <div className="fixed inset-0 z-[5000] bg-black flex flex-col">
+        <div className="h-16 px-6 flex justify-between items-center border-b border-white/10" style={{ backgroundColor: activeOrg?.themeColor || '#4f46e5' }}>
+          <span className="font-black text-white uppercase tracking-widest">{activeOrg?.name || 'Magister'} | VOCABULARY PROTOCOL</span>
+          <button onClick={() => setActiveVocabGame(null)} className="bg-white/10 text-white px-6 py-2 rounded-full font-black text-xs hover:bg-rose-600 transition-colors">Abort Run</button>
+        </div>
+        <div className="flex-1 bg-black relative">
+          <LiveVocabProjector 
+             deck={deck} 
+             classId={activeVocabGame.classId} 
+             activeOrg={activeOrg} 
+             onExit={() => setActiveVocabGame(null)} 
+          />
+        </div>
+      </div>
+    );
+  }
+
   // 3. ADMIN VIEW
   if (currentView === 'admin' && (userData?.role === 'admin' || userData?.role === 'org_admin')) {
     return (
@@ -187,6 +210,7 @@ export default function App() {
         onUpdateClassDescription={actions.updateClassDescription}
         onAddStudent={actions.addStudent}
         onStartPresentation={(lessonId: string, classId: string) => setActivePresentation({ lessonId, classId })}
+        onStartVocabGame={(deckId: string, classId: string) => setActiveVocabGame({ deckId, classId })} // NEW: Vocab Launch Trigger
         onSwitchView={() => setCurrentView('student')}
         onLogout={actions.logout} 
         AdminDashboardView={AdminDashboardView}
