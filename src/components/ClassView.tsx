@@ -2,18 +2,21 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore'; 
 import { db } from '../config/firebase';
-import { MessageSquare, MessageCircle, Gamepad2, CheckCircle2, X, Puzzle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useLiveClass } from '../hooks/useLiveClass';
+import { MessageSquare, MessageCircle, Gamepad2, CheckCircle2, X, Puzzle, ChevronLeft, ChevronRight, Zap, Users } from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
 // import ClassForum from './ClassForum'; // Ensure this exists
 
 // ============================================================================
 //  CLASS VIEW (The Projector / Big Screen Mode with Keyboard Nav)
 // ============================================================================
-export default function ClassView({ lesson, classId, userData }: any) {
+export default function ClassView({ lesson, classId, userData, activeOrg, onExit }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
   const [showForum, setShowForum] = useState(false);
-  const [liveState, setLiveState] = useState<any>(null); 
   const stageRef = useRef<HTMLDivElement>(null);
+
+  // Initialize the Instructor Live Game Sync Engine
+  const { liveState, startLiveClass, endLiveClass, changeSlide, triggerQuiz } = useLiveClass(classId, true);
 
   const lessonVocab = useMemo(() => {
     return lesson?.blocks
@@ -21,11 +24,18 @@ export default function ClassView({ lesson, classId, userData }: any) {
       ?.flatMap((b: any) => b.items) || [];
   }, [lesson]);
 
+  // When the projector starts, broadcast to the room!
+  useEffect(() => {
+      startLiveClass(lesson.id);
+      return () => { endLiveClass(); }; // Kill the session when teacher closes it
+  }, [lesson.id]);
+
   const pages = useMemo(() => {
     if (!lesson?.blocks) return [];
     const grouped: any[] = [];
     let buffer: any[] = [];
     lesson.blocks.forEach((b: any) => {
+      // Isolate interactive blocks so they get their own full-screen page
       if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game'].includes(b.type)) {
         if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
         grouped.push({ type: 'interact', blocks: [b] });
@@ -36,64 +46,25 @@ export default function ClassView({ lesson, classId, userData }: any) {
     return grouped;
   }, [lesson]);
 
-  // 1. PAGE & SCROLL SYNC: Listen for updates from the Remote
-  useEffect(() => {
-    const syncId = lesson?.originalId || lesson?.id;
-    if (!syncId) return;
-
-    const unsub = onSnapshot(doc(db, 'live_sessions', syncId), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        
-        if (typeof data.activePageIdx === 'number') {
-          setActivePageIdx(data.activePageIdx);
-        }
-
-        if (data.liveBlockState !== undefined) {
-            setLiveState(data.liveBlockState);
-        } else {
-            setLiveState(null);
-        }
-
-        if (typeof data.scrollPercent === 'number' && stageRef.current) {
-          const s = stageRef.current;
-          const speedMultiplier = 1.3;
-          const targetPercent = Math.min(data.scrollPercent * speedMultiplier, 1);
-          const target = targetPercent * (s.scrollHeight - s.clientHeight);
-          
-          s.scrollTo({ top: target, behavior: 'smooth' });
-        }
-      }
-    });
-    return () => unsub();
-  }, [lesson]);
-
-  // TWO-WAY SYNC HANDLER
-  const updateGlobalPage = useCallback((newIdx: number) => {
-      const syncId = lesson?.originalId || lesson?.id;
-      if (!syncId) return;
-
-      setActivePageIdx(newIdx);
-      
-      setDoc(doc(db, 'live_sessions', syncId), {
-          activePageIdx: newIdx,
-          lastUpdate: Date.now()
-      }, { merge: true }).catch(console.error);
-
-      if (stageRef.current) {
-          stageRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-  }, [lesson]);
-
+  // KEYBOARD NAVIGATION LISTENER
   const handleNext = useCallback(() => {
-      if (activePageIdx < pages.length - 1) updateGlobalPage(activePageIdx + 1);
-  }, [activePageIdx, pages.length, updateGlobalPage]);
+      if (activePageIdx < pages.length - 1) {
+          const nextIdx = activePageIdx + 1;
+          setActivePageIdx(nextIdx);
+          changeSlide(nextIdx); // Broadcast page change to student phones
+          if (stageRef.current) stageRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+  }, [activePageIdx, pages.length, changeSlide]);
 
   const handlePrev = useCallback(() => {
-      if (activePageIdx > 0) updateGlobalPage(activePageIdx - 1);
-  }, [activePageIdx, updateGlobalPage]);
+      if (activePageIdx > 0) {
+          const prevIdx = activePageIdx - 1;
+          setActivePageIdx(prevIdx);
+          changeSlide(prevIdx); // Broadcast page change to student phones
+          if (stageRef.current) stageRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+  }, [activePageIdx, changeSlide]);
 
-  // KEYBOARD NAVIGATION LISTENER
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
           if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
@@ -120,24 +91,27 @@ export default function ClassView({ lesson, classId, userData }: any) {
   if (!lesson || !pages[activePageIdx]) return null;
 
   return (
-    <div className="h-screen w-screen bg-white fixed inset-0 z-[100] flex flex-col overflow-hidden font-sans">
+    <div className="h-screen w-screen bg-slate-900 text-white fixed inset-0 z-[5000] flex flex-col overflow-hidden font-sans selection:bg-indigo-500">
       
-      {/* HEADER PROGRESS BAR */}
-      <header className="h-[12vh] px-16 flex items-center justify-between border-b border-slate-100 relative">
-        <div className="h-3 flex-1 bg-slate-100 rounded-full mr-12 overflow-hidden" aria-label={`Page ${activePageIdx + 1} of ${pages.length}`}>
-          <div className="h-full bg-indigo-600 transition-all duration-1000 ease-out" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} />
-        </div>
-        <span className="text-[3vh] font-black text-slate-300" aria-hidden="true">{activePageIdx + 1} / {pages.length}</span>
+      {/* HEADER CONTROLS (Replacing default app header) */}
+      <header className="h-16 px-6 flex justify-between items-center border-b border-white/10 shrink-0" style={{ backgroundColor: activeOrg?.themeColor || '#4f46e5' }}>
+        <span className="font-black text-white uppercase tracking-widest flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.8)]" />
+            {activeOrg?.name || 'Magister'} | CLASE EN VIVO
+        </span>
+        <button onClick={onExit} className="bg-black/20 hover:bg-rose-600 text-white px-6 py-2 rounded-full font-black text-xs uppercase tracking-widest transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-white">
+            Terminar Clase
+        </button>
       </header>
 
-      <main className="flex-1 flex overflow-hidden relative group/canvas">
+      <main className="flex-1 flex overflow-hidden relative group/canvas bg-white text-slate-900">
         
         {/* MOUSE NAVIGATION CONTROLS */}
         {activePageIdx > 0 && (
             <button 
                 onClick={handlePrev} 
                 aria-label="Previous Slide"
-                className="absolute left-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/10 hover:bg-slate-900/30 text-slate-800 rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-4 focus:ring-indigo-500 focus:opacity-100"
+                className="absolute left-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/10 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 focus:outline-none shadow-lg"
             >
                 <ChevronLeft size={48} aria-hidden="true" />
             </button>
@@ -147,28 +121,86 @@ export default function ClassView({ lesson, classId, userData }: any) {
             <button 
                 onClick={handleNext} 
                 aria-label="Next Slide"
-                className="absolute right-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/10 hover:bg-slate-900/30 text-slate-800 rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-4 focus:ring-indigo-500 focus:opacity-100"
+                className="absolute right-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/10 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 focus:outline-none shadow-lg"
             >
                 <ChevronRight size={48} aria-hidden="true" />
             </button>
         )}
 
-        <div ref={stageRef} className={`flex-1 overflow-y-auto px-16 py-12 flex flex-col items-center transition-all duration-500 ${showForum ? 'mr-[450px]' : ''}`}>
-          <div className="w-full max-w-7xl space-y-20 pb-40">
-            {pages[activePageIdx].blocks.map((block: any, i: number) => (
-              <div key={i} className="animate-in fade-in duration-700 w-full">
-                {block.type === 'text' && <TextBlock block={block} />}
-                {block.type === 'essay' && <EssayBlock block={block} />}
-                {block.type === 'image' && <ImageBlock block={block} />}
-                {block.type === 'dialogue' && <DialogueBlock block={block} />}
-                {block.type === 'vocab-list' && <VocabListBlock block={block} />}
-                {block.type === 'discussion' && <DiscussionBlock block={block} />}
-                {block.type === 'game' && block.gameType === 'connect-three' && <GameBlock block={block} lessonVocab={lessonVocab} />}
-                {block.type === 'quiz' && <QuizBlock block={block} liveState={liveState} />}
-                {block.type === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
-                {block.type === 'fill-blank' && <FillBlankBlock block={block} liveState={liveState} />}
-              </div>
-            ))}
+        <div ref={stageRef} className={`flex-1 overflow-y-auto px-16 py-12 flex flex-col items-center justify-center transition-all duration-500 ${showForum ? 'mr-[450px]' : ''}`}>
+          <div className="w-full max-w-7xl space-y-20">
+            {pages[activePageIdx].blocks.map((block: any, i: number) => {
+              const isQuiz = block.type === 'quiz';
+              const answerCount = Object.keys(liveState?.answers || {}).length;
+
+              return (
+                <div key={i} className="animate-in fade-in zoom-in-95 duration-700 w-full">
+                  
+                  {/* MULTIPLAYER QUIZ BLOCK INTERCEPTOR */}
+                  {isQuiz ? (
+                    <div className="bg-slate-900 text-white border-4 border-slate-800 rounded-[4rem] p-16 shadow-2xl text-center animate-in slide-in-from-bottom-12 duration-500 mx-auto max-w-5xl">
+                        <span className="text-[2vh] font-black text-indigo-400 uppercase tracking-widest block mb-6">Class Question</span>
+                        <h2 className="text-[5vh] md:text-[6vh] font-black mb-12 leading-tight">{block.content?.question || block.question}</h2>
+                        
+                        {/* State 1: Waiting to Start */}
+                        {liveState?.quizState === 'waiting' && (
+                            <button 
+                                onClick={() => triggerQuiz('active')}
+                                className="bg-rose-500 hover:bg-rose-600 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest shadow-[0_0_40px_rgba(244,63,94,0.5)] transition-transform active:scale-95 flex items-center gap-4 mx-auto focus:outline-none focus:ring-4 focus:ring-rose-400"
+                            >
+                                <Zap size={40} fill="currentColor" /> Launch Trivia Protocol
+                            </button>
+                        )}
+
+                        {/* State 2: Active Game (Waiting for answers) */}
+                        {liveState?.quizState === 'active' && (
+                            <div className="space-y-12 animate-in fade-in duration-500">
+                                <div className="flex flex-col items-center justify-center gap-4 text-[6vh] font-black text-indigo-400">
+                                    <div className="flex items-center gap-6 bg-slate-800 px-10 py-6 rounded-[2rem] shadow-inner border border-slate-700">
+                                        <Users size={64} className="animate-pulse" /> 
+                                        <span>{answerCount} Students Locked In</span>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => triggerQuiz('revealed')}
+                                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest transition-transform active:scale-95 shadow-xl mx-auto focus:outline-none focus:ring-4 focus:ring-indigo-400"
+                                >
+                                    Reveal Correct Answer
+                                </button>
+                            </div>
+                        )}
+
+                        {/* State 3: The Reveal (Shows Correct Answer) */}
+                        {liveState?.quizState === 'revealed' && (
+                            <div className="animate-in zoom-in duration-500 flex flex-col items-center">
+                                <div className="inline-flex items-center gap-4 bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/50 px-10 py-5 rounded-[2rem] text-[4vh] font-black mb-12 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
+                                    <CheckCircle2 size={48} /> Correct Answer Displayed!
+                                </div>
+                                
+                                {/* Show the correct answer prominently */}
+                                <div className="bg-emerald-500 text-white p-8 rounded-[2rem] shadow-xl text-[4vh] font-bold border-4 border-emerald-400 min-w-[50%]">
+                                    {block.content?.options?.find((o:any) => o.id === block.content.correctId)?.text || "Answer Revealed on Devices"}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                  ) : (
+                    /* STANDARD BLOCKS */
+                    <>
+                        {block.type === 'text' && <TextBlock block={block} />}
+                        {block.type === 'essay' && <EssayBlock block={block} />}
+                        {block.type === 'image' && <ImageBlock block={block} />}
+                        {block.type === 'dialogue' && <DialogueBlock block={block} />}
+                        {block.type === 'vocab-list' && <VocabListBlock block={block} />}
+                        {block.type === 'discussion' && <DiscussionBlock block={block} />}
+                        {block.type === 'game' && block.gameType === 'connect-three' && <GameBlock block={block} lessonVocab={lessonVocab} />}
+                        {block.type === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
+                        {block.type === 'fill-blank' && <FillBlankBlock block={block} liveState={liveState} />}
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -181,21 +213,19 @@ export default function ClassView({ lesson, classId, userData }: any) {
         )}
       </main>
 
-      {/* FOOTER CONTROLS */}
-      <footer className="h-[12vh] px-16 border-t border-slate-100 flex justify-between items-center bg-white relative z-50">
-        <span className="font-black text-[2.5vh] text-slate-400 uppercase tracking-widest">Live Presentation</span>
-        <div className="flex items-center gap-6">
-          <button 
-            onClick={() => setShowForum(!showForum)} 
-            aria-expanded={showForum}
-            aria-label="Toggle class forum"
-            className={`px-8 py-4 rounded-2xl font-black text-[2.5vh] transition-all shadow-md focus:outline-none focus:ring-4 focus:ring-indigo-500 ${showForum ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
-          >
-            {showForum ? "HIDE CHAT" : "SHOW CHAT"}
-          </button>
-          <div className="h-16 w-1 bg-slate-100 mx-4 rounded-full" aria-hidden="true" />
-          <h2 className="text-[3vh] font-black text-slate-900 opacity-30 uppercase tracking-widest">{lesson.title}</h2>
-        </div>
+      {/* FOOTER PROGRESS INDICATOR */}
+      <footer className="h-20 bg-slate-900 border-t border-slate-800 flex items-center justify-between px-12 shrink-0">
+          <div className="flex items-center gap-6">
+              <h2 className="text-xl font-black text-slate-500 uppercase tracking-widest">{lesson.title}</h2>
+          </div>
+          <div className="flex items-center gap-6">
+              <div className="w-48 h-2 bg-slate-800 rounded-full overflow-hidden">
+                  <div className="h-full bg-indigo-500 transition-all duration-500" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} />
+              </div>
+              <span className="font-black text-slate-400 tracking-widest uppercase">
+                  Slide {activePageIdx + 1} of {pages.length}
+              </span>
+          </div>
       </footer>
     </div>
   );
@@ -207,7 +237,7 @@ export default function ClassView({ lesson, classId, userData }: any) {
 
 const TextBlock = ({ block }: { block: any }) => (
   <div className="text-center">
-    {block.title && <h3 className="text-[3vh] font-black text-indigo-400 uppercase tracking-widest mb-6">{block.title}</h3>}
+    {block.title && <h3 className="text-[3vh] font-black text-indigo-500 uppercase tracking-widest mb-6">{block.title}</h3>}
     <p className="text-[6vh] font-bold text-slate-800 leading-tight">{block.content}</p>
   </div>
 );
@@ -289,37 +319,6 @@ const GameBlock = ({ block, lessonVocab }: { block: any, lessonVocab: any }) => 
   </div>
 );
 
-const QuizBlock = ({ block, liveState }: { block: any, liveState: any }) => (
-  <div className="w-full max-w-5xl mx-auto bg-slate-900 rounded-[4rem] p-16 text-white shadow-2xl transition-colors duration-500">
-    <span className="text-[2vh] font-black text-indigo-400 uppercase tracking-widest block mb-6">Class Question</span>
-    <h3 className="text-[5vh] font-bold mb-12 leading-tight">{block.question}</h3>
-    <div className="grid grid-cols-2 gap-6">
-      {block.options?.map((opt: any, j: number) => {
-        const isSelected = liveState?.selected === opt.id;
-        const isSubmitted = liveState?.submitted;
-        const isCorrectOption = block.correctId === opt.id;
-
-        let style = "bg-white/10 border-white/20"; 
-        if (isSelected && !isSubmitted) style = "bg-indigo-500 border-indigo-400 ring-8 ring-indigo-500/50 scale-105 transition-all";
-        if (isSubmitted) {
-          if (isCorrectOption) style = "bg-emerald-500 border-emerald-400 scale-105 transition-all";
-          else if (isSelected) style = "bg-rose-500 border-rose-400 opacity-50 scale-95";
-          else style = "opacity-30 grayscale";
-        }
-
-        return (
-          <div key={j} className={`p-8 border-4 rounded-[2rem] flex items-center gap-6 text-[3vh] font-bold duration-300 ${style}`}>
-            <span className="inline-block w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center shrink-0 shadow-inner">{opt.id.toUpperCase()}</span>
-            <span className="text-left">{opt.text}</span>
-            {isSubmitted && isCorrectOption && <CheckCircle2 size={48} aria-label="Correct Answer" className="ml-auto text-white animate-in zoom-in" />}
-            {isSubmitted && isSelected && !isCorrectOption && <X size={48} aria-label="Incorrect Answer" className="ml-auto text-white animate-in zoom-in" />}
-          </div>
-        );
-      })}
-    </div>
-  </div>
-);
-
 const ScenarioBlock = ({ block, liveState }: { block: any, liveState: any }) => {
   const activeNodeId = liveState?.currentNodeId || block.nodes?.[0]?.id;
   const currentNode = block.nodes?.find((n:any) => n.id === activeNodeId) || block.nodes?.[0];
@@ -338,7 +337,6 @@ const ScenarioBlock = ({ block, liveState }: { block: any, liveState: any }) => 
 };
 
 const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) => {
-  // Fix: Memoize the shuffled array so it doesn't reshuffle visually on every render state change!
   const shuffledWords = useMemo(() => {
     const extractedWords = block.text?.match(/\[(.*?)\]/g)?.map((s:string) => s.replace(/\[|\]/g, '')) || [];
     const allWords = block.distractors ? [...block.distractors, ...extractedWords] : extractedWords;
