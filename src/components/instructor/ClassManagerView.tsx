@@ -430,12 +430,11 @@ export default function ClassManagerView({
                                                             {/* ACTION BUTTON GROUP */}
                                                             <div className="flex items-center gap-2 shrink-0">
                                                                 <button 
-                                                                    onClick={() => onStartPresentation && onStartPresentation(lesson.id)}
-                                                                    className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center shadow-sm"
-                                                                    title="Launch Projector Mode"
-                                                                >
-                                                                    <Monitor size={16} />
-                                                                </button>
+                                                                    onClick={() => onStartPresentation(lesson.id, activeClass.id)} // ✅ FIX: Passes BOTH!
+                                                                    className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-lg text-xs font-black uppercase tracking-widest transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                                                                        >
+                                                                <Play size={14} fill="currentColor" /> Present
+                                                                    </button>
                                                                 <button 
                                                                     onClick={() => onRevoke(activeClass.id, lesson.id)} 
                                                                     className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center"
