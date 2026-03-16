@@ -400,6 +400,7 @@ const SHAPE_THEMES = [
 const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) => {
     const activeLesson = lessons.find((l: any) => l.id === liveSession?.lessonId);
     
+    // Group blocks into pages (for standard lessons)
     const pages = useMemo(() => {
         if (!activeLesson?.blocks) return [];
         const grouped: any[] = [];
@@ -415,15 +416,18 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) 
         return grouped;
     }, [activeLesson]);
 
+    // 🔥 THE FIX: Fall back to liveSession.currentQuestion if it's a dynamic vocab game!
     const currentPage = pages[liveSession?.currentBlockIndex || 0];
-    const currentBlock = currentPage?.blocks?.[0]; 
+    const currentBlock = liveSession?.currentQuestion || currentPage?.blocks?.[0]; 
     
-    const isQuiz = currentBlock?.type === 'quiz';
+    // If currentQuestion exists (Vocab Game) OR it's a quiz block (Lesson Game)
+    const isQuiz = !!liveSession?.currentQuestion || currentBlock?.type === 'quiz';
+    
     const safeEmail = (studentEmail || 'unknown@student').replace(/\./g, ',');
     const myAnswer = liveSession?.answers?.[safeEmail];
     const isRevealed = liveSession?.quizState === 'revealed';
 
-    // 🔥 THE FIX: Safely extract quiz data whether it's directly on the block or nested in .content!
+    // Safely extract the question data regardless of JSON nesting
     const quizQuestion = currentBlock?.question || currentBlock?.content?.question || "Loading Question...";
     const quizOptions = currentBlock?.options || currentBlock?.content?.options || [];
     const quizCorrectId = currentBlock?.correctId || currentBlock?.content?.correctId;
