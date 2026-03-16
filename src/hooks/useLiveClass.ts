@@ -6,61 +6,54 @@ import { db, appId } from '../config/firebase';
 export const useLiveClass = (classId: string, isInstructor: boolean = false) => {
     const [liveState, setLiveState] = useState<any>(null);
 
-    // Listen to the live session in real-time
     useEffect(() => {
         if (!classId) return;
         const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
-        
         const unsubscribe = onSnapshot(sessionRef, (docSnap) => {
-            if (docSnap.exists()) {
-                setLiveState(docSnap.data());
-            } else {
-                setLiveState(null);
-            }
+            if (docSnap.exists()) setLiveState(docSnap.data());
+            else setLiveState(null);
         });
-
         return () => unsubscribe();
     }, [classId]);
 
     // --- INSTRUCTOR CONTROLS ---
-    const startLiveClass = async (lessonId: string) => {
-        if (!isInstructor) return;
+    // ADDED: type and initialQuestion
+    const startLiveClass = async (lessonId: string, type: 'lesson' | 'vocab' = 'lesson', initialQuestion: any = null) => {
+        if (!isInstructor || !classId) return;
         const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
         await setDoc(sessionRef, {
             lessonId,
+            type, // 'lesson' or 'vocab'
             currentBlockIndex: 0,
-            quizState: 'waiting', // 'waiting' | 'active' | 'revealed'
-            answers: {}, // { "student@email,com": "opt_1" }
+            currentQuestion: initialQuestion, // Dynamic payload for Vocab games
+            quizState: 'waiting', 
+            answers: {}, 
             timestamp: Date.now()
         });
     };
 
     const endLiveClass = async () => {
-        if (!isInstructor) return;
+        if (!isInstructor || !classId) return;
         await deleteDoc(doc(db, 'artifacts', appId, 'live_sessions', classId));
     };
 
-    const changeSlide = async (index: number) => {
-        if (!isInstructor) return;
+    // ADDED: questionPayload
+    const changeSlide = async (index: number, questionPayload: any = null) => {
+        if (!isInstructor || !classId) return;
         await updateDoc(doc(db, 'artifacts', appId, 'live_sessions', classId), {
             currentBlockIndex: index,
+            currentQuestion: questionPayload, // Broadcast new question
             quizState: 'waiting',
-            answers: {} // Wipe previous answers
+            answers: {} 
         });
     };
 
     const triggerQuiz = async (state: 'active' | 'revealed') => {
-        if (!isInstructor) return;
+        if (!isInstructor || !classId) return;
         await updateDoc(doc(db, 'artifacts', appId, 'live_sessions', classId), {
             quizState: state
         });
     };
 
-    return { 
-        liveState, 
-        startLiveClass, 
-        endLiveClass, 
-        changeSlide, 
-        triggerQuiz
-    };
+    return { liveState, startLiveClass, endLiveClass, changeSlide, triggerQuiz };
 };
