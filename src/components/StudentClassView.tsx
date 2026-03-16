@@ -1,5 +1,5 @@
 // src/components/StudentClassView.tsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   query, collection, where, onSnapshot, orderBy, limit, addDoc,
   doc, updateDoc, arrayUnion, arrayRemove 
@@ -399,10 +399,29 @@ const SHAPE_THEMES = [
 
 const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) => {
     const activeLesson = lessons.find((l: any) => l.id === liveSession?.lessonId);
-    const currentBlock = activeLesson?.blocks?.[liveSession?.currentBlockIndex || 0];
+    
+    // 🔥 THE FIX: Group the blocks exactly the way the teacher's projector does!
+    const pages = useMemo(() => {
+        if (!activeLesson?.blocks) return [];
+        const grouped: any[] = [];
+        let buffer: any[] = [];
+        activeLesson.blocks.forEach((b: any) => {
+            if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game'].includes(b.type)) {
+                if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
+                grouped.push({ type: 'interact', blocks: [b] });
+                buffer = [];
+            } else { buffer.push(b); }
+        });
+        if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
+        return grouped;
+    }, [activeLesson]);
+
+    // Use the translated page index to grab the correct block
+    const currentPage = pages[liveSession?.currentBlockIndex || 0];
+    const currentBlock = currentPage?.blocks?.[0]; // Interactive pages only have 1 block
     
     const isQuiz = currentBlock?.type === 'quiz';
-    const safeEmail = studentEmail.replace(/\./g, ',');
+    const safeEmail = (studentEmail || 'unknown@student').replace(/\./g, ',');
     const myAnswer = liveSession?.answers?.[safeEmail];
     const isRevealed = liveSession?.quizState === 'revealed';
 
