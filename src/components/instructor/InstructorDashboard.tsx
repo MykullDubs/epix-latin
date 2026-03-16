@@ -25,14 +25,15 @@ export default function InstructorDashboard({
   onAssignCurriculum,
   onSaveLesson, 
   onSaveCard, 
-  onAssign,         
-  onRevoke,         
+  onAssign,          
+  onRevoke,          
   onCreateClass,  
   onDeleteClass,  
   onRenameClass,
-  onUpdateClassDescription, // <--- PROPS UPDATED HERE
+  onUpdateClassDescription,
   onAddStudent,
   onStartPresentation, 
+  onStartVocabGame, // <--- NEW PROP ADDED HERE
   onSwitchView, 
   onLogout,
   AdminDashboardView 
@@ -143,7 +144,7 @@ export default function InstructorDashboard({
                 <Shield size={20} className={activeTab === 'admin' ? 'text-emerald-400' : 'text-slate-500 group-hover:text-emerald-400 transition-colors'} />
               </div>
               <span className={`font-black text-[11px] uppercase tracking-[0.2em] whitespace-nowrap transition-all duration-300 ${activeTab === 'admin' ? 'text-emerald-400' : 'text-slate-500 group-hover:text-slate-300'} ${isRailExpanded ? 'opacity-100' : 'opacity-0 -translate-x-4'}`}>
-                  Command Center
+                 Command Center
               </span>
             </button>
           )}
@@ -189,14 +190,17 @@ export default function InstructorDashboard({
                   classes={userData?.classes || []} 
                   lessons={lessons} 
                   allDecks={allDecks} 
+                  curriculums={curriculums}
                   onAssign={onAssign} 
+                  onAssignCurriculum={onAssignCurriculum}
                   onRevoke={onRevoke} 
                   onCreateClass={onCreateClass} 
                   onDeleteClass={onDeleteClass} 
                   onRenameClass={onRenameClass} 
-                  onUpdateClassDescription={onUpdateClassDescription} // <--- PASSED HERE
+                  onUpdateClassDescription={onUpdateClassDescription} 
                   onAddStudent={onAddStudent} 
                   onStartPresentation={onStartPresentation} 
+                  onStartVocabGame={onStartVocabGame} // <--- PASSED TO CLASS MANAGER
                />
              </div>
            ) : activeTab === 'vault' ? (
