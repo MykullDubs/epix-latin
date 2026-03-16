@@ -36,7 +36,7 @@ export default function App() {
 
   // Live Presentation States
   const [activePresentation, setActivePresentation] = useState<{lessonId: string, classId: string} | null>(null);
-  const [activeVocabGame, setActiveVocabGame] = useState<{deckId: string, classId: string} | null>(null); // NEW: Vocab Game State
+  const [activeVocabGame, setActiveVocabGame] = useState<{deckId: string, classId: string} | null>(null);
 
   // ==========================================================================
   //  THE URL ROUTING ENGINE (Handles Refreshes & The Browser Back Button)
@@ -76,7 +76,7 @@ export default function App() {
   useEffect(() => {
     if (!isHydrated.current) return; // Don't write to URL until initial load is done
 
-    const params = newSearchParams(window.location.search);
+    const params = new URLSearchParams(window.location.search); // ✅ FIXED TYPO HERE
     params.set('view', currentView);
     params.set('tab', activeTab);
     
@@ -210,7 +210,7 @@ export default function App() {
         onUpdateClassDescription={actions.updateClassDescription}
         onAddStudent={actions.addStudent}
         onStartPresentation={(lessonId: string, classId: string) => setActivePresentation({ lessonId, classId })}
-        onStartVocabGame={(deckId: string, classId: string) => setActiveVocabGame({ deckId, classId })} // NEW: Vocab Launch Trigger
+        onStartVocabGame={(deckId: string, classId: string) => setActiveVocabGame({ deckId, classId })}
         onSwitchView={() => setCurrentView('student')}
         onLogout={actions.logout} 
         AdminDashboardView={AdminDashboardView}
