@@ -30,9 +30,11 @@ export default function App() {
   // Content State
   const [activeLesson, setActiveLesson] = useState<any>(null); 
   const [activeStudentClass, setActiveStudentClass] = useState<any>(null); 
-  const [presentationLessonId, setPresentationLessonId] = useState<string | null>(null);
   const [activeDeckKey, setActiveDeckKey] = useState<string | null>(null);
   const [celebrationData, setCelebrationData] = useState<any>(null);
+
+  // FIX: This now holds BOTH the lesson and the class it belongs to!
+  const [activePresentation, setActivePresentation] = useState<{lessonId: string, classId: string} | null>(null);
 
   // ==========================================================================
   //  THE URL ROUTING ENGINE (Handles Refreshes & The Browser Back Button)
@@ -128,16 +130,22 @@ export default function App() {
   }
 
   // 2. PROJECTOR / PRESENTATION MODE (Full-screen overlay)
-  if (presentationLessonId) {
-    const lesson = allLessons.find(l => l.id === presentationLessonId);
+  if (activePresentation) {
+    const lesson = allLessons.find(l => l.id === activePresentation.lessonId);
     return (
       <div className="fixed inset-0 z-[5000] bg-slate-900 flex flex-col">
         <div className="h-16 px-6 flex justify-between items-center border-b border-white/10" style={{ backgroundColor: activeOrg?.themeColor || '#4f46e5' }}>
           <span className="font-black text-white uppercase tracking-widest">{activeOrg?.name || 'Magister'} | CLASE EN VIVO</span>
-          <button onClick={() => setPresentationLessonId(null)} className="bg-black/20 text-white px-6 py-2 rounded-full font-black text-xs hover:bg-rose-600 transition-colors">Terminar Clase</button>
+          <button onClick={() => setActivePresentation(null)} className="bg-black/20 text-white px-6 py-2 rounded-full font-black text-xs hover:bg-rose-600 transition-colors">Terminar Clase</button>
         </div>
         <div className="flex-1 bg-white">
-          <ClassView lesson={lesson} userData={userData} activeOrg={activeOrg} />
+          <ClassView 
+            lesson={lesson} 
+            classId={activePresentation.classId} 
+            userData={userData} 
+            activeOrg={activeOrg} 
+            onExit={() => setActivePresentation(null)}
+          />
         </div>
       </div>
     );
@@ -178,7 +186,7 @@ export default function App() {
         onRenameClass={actions.renameClass}
         onUpdateClassDescription={actions.updateClassDescription}
         onAddStudent={actions.addStudent}
-        onStartPresentation={setPresentationLessonId}
+        onStartPresentation={(lessonId: string, classId: string) => setActivePresentation({ lessonId, classId })}
         onSwitchView={() => setCurrentView('student')}
         onLogout={actions.logout} 
         AdminDashboardView={AdminDashboardView}
@@ -228,7 +236,17 @@ export default function App() {
               />
             )
           ) : activeStudentClass ? (
-            <StudentClassView classData={activeStudentClass} lessons={allLessons} curriculums={GLOBAL_CURRICULUMS} onBack={() => setActiveStudentClass(null)} onSelectLesson={setActiveLesson} setActiveTab={setActiveTab} setSelectedLessonId={setPresentationLessonId} userData={userData} ExamPlayerView={ExamPlayerView} />
+            <StudentClassView 
+               classData={activeStudentClass} 
+               lessons={allLessons} 
+               curriculums={GLOBAL_CURRICULUMS} 
+               onBack={() => setActiveStudentClass(null)} 
+               onSelectLesson={setActiveLesson} 
+               setActiveTab={setActiveTab} 
+               setSelectedLessonId={(lessonId: string) => setActivePresentation({ lessonId, classId: activeStudentClass.id })} 
+               userData={userData} 
+               ExamPlayerView={ExamPlayerView} 
+            />
           ) : activeTab === 'discovery' ? (
             <DiscoveryView allDecks={allDecks} lessons={allLessons} onSelectDeck={(d:any) => { setActiveDeckKey(d.id); setActiveTab('flashcards'); }} onSelectLesson={setActiveLesson} onLogActivity={actions.logActivity} userData={userData} />
           ) : activeTab === 'flashcards' ? (
