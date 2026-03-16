@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { 
     Users, Plus, X, Flame, BookOpen, Edit3, Trash2, Mail, 
-    Activity, Search, Gamepad2, CheckCircle2, Monitor, Filter, Library, Package, Puzzle, Play // <--- ADDED PLAY HERE
+    Activity, Search, Gamepad2, CheckCircle2, Monitor, Filter, Library, Package, Puzzle, Play
 } from 'lucide-react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
@@ -24,7 +24,8 @@ export default function ClassManagerView({
     onRenameClass, 
     onUpdateClassDescription,
     onAddStudent,
-    onStartPresentation
+    onStartPresentation,
+    onStartVocabGame // <--- NEW PROP ADDED HERE
 }: any) {
     const [selectedClassId, setSelectedClassId] = useState<string | null>(classes[0]?.id || null);
     const [activeTab, setActiveTab] = useState<'roster' | 'assignments'>('roster');
@@ -90,11 +91,9 @@ export default function ClassManagerView({
     };
 
     return (
-        // FIXED: Added min-h-0 to the master container to establish scroll boundaries
         <div className="h-full max-w-7xl mx-auto flex flex-col md:flex-row gap-6 pb-24 animate-in fade-in duration-500 font-sans min-h-0">
             
             {/* LEFT PANE: THE COHORT LIST (MASTER) */}
-            {/* FIXED: Added min-h-0 here as well so the roster list scrolls perfectly */}
             <div className="w-full md:w-[340px] flex flex-col gap-6 shrink-0 min-h-0">
                 <div className="flex items-center justify-between bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden group shrink-0">
                     <div className="absolute -right-4 -top-4 text-indigo-50 opacity-50 rotate-12 pointer-events-none transition-transform group-hover:scale-110 duration-700">
@@ -170,7 +169,6 @@ export default function ClassManagerView({
             </div>
 
             {/* RIGHT PANE: COHORT DETAILS (DETAIL) */}
-            {/* FIXED: Replaced min-h-[600px] with min-h-0 to force internal scrolling */}
             <div className="flex-1 flex flex-col bg-white rounded-[3rem] border border-slate-200 shadow-xl shadow-slate-200/40 overflow-hidden relative min-h-0">
                 {!activeClass ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-center p-12 bg-slate-50/50">
@@ -181,10 +179,8 @@ export default function ClassManagerView({
                         <p className="text-slate-500 font-bold max-w-sm">Manage subject assignments, class rosters, and live sessions.</p>
                     </div>
                 ) : (
-                    // FIXED: Added min-h-0 to the inner flex container
                     <div className="flex-1 flex flex-col animate-in slide-in-from-right-8 duration-500 fade-in min-h-0">
                         
-                        {/* FIXED: Added shrink-0 to the header so it doesn't compress */}
                         <header className="px-8 md:px-10 pt-10 pb-0 border-b border-slate-100 bg-slate-50/50 relative shrink-0">
                             <div className="flex justify-between items-start mb-8">
                                 <div className="flex-1 pr-8">
@@ -226,7 +222,6 @@ export default function ClassManagerView({
                             </div>
                         </header>
 
-                        {/* FIXED: The actual scrolling container. Added pb-10 so the bottom items aren't cut off */}
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-8 md:p-10 pb-20 bg-white relative">
                             
                             {/* --- TAB: ROSTER --- */}
@@ -418,6 +413,15 @@ export default function ClassManagerView({
                                             <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-lg">{assignedLessons.length} Modules</span>
                                         </div>
                                         
+                                        {/* --- NEW: LAUNCH VOCAB GAME BUTTON --- */}
+                                        <button 
+                                            onClick={() => onStartVocabGame && onStartVocabGame('custom', activeClass.id)}
+                                            className="w-full mb-6 p-4 bg-slate-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl hover:bg-indigo-600 transition-all active:scale-95 flex items-center justify-center gap-3 group"
+                                        >
+                                            <Monitor size={20} className="text-indigo-400 group-hover:text-white transition-colors" /> 
+                                            Launch Live Vocab Protocol
+                                        </button>
+
                                         {assignedLessons.length === 0 ? (
                                             <div className="text-center p-12 border-2 border-dashed border-slate-200 rounded-[2rem]"><BookOpen size={32} className="mx-auto text-slate-300 mb-3" /><p className="text-sm font-bold text-slate-500">Playlist is empty. Add modules above.</p></div>
                                         ) : (
@@ -441,7 +445,7 @@ export default function ClassManagerView({
                                                             {/* ACTION BUTTON GROUP */}
                                                             <div className="flex items-center gap-2 shrink-0">
                                                                 <button 
-                                                                    onClick={() => onStartPresentation(lesson.id, activeClass.id)} // ✅ PASSES BOTH IDs
+                                                                    onClick={() => onStartPresentation(lesson.id, activeClass.id)} 
                                                                     className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-lg text-xs font-black uppercase tracking-widest transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
                                                                 >
                                                                     <Play size={14} fill="currentColor" /> Present
