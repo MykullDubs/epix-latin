@@ -13,7 +13,9 @@ export function useMagisterData() {
   const [authChecked, setAuthChecked] = useState(false);
   const [activeOrg, setActiveOrg] = useState<any>(null);
   
-  const [customLessons, setCustomLessons] = useState<any[]>([]);
+  // FIX 1: Replaced customLessons with a global lesson state
+  const [allAppLessons, setAllAppLessons] = useState<any[]>([]);
+  
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [instructorClasses, setInstructorClasses] = useState<any[]>([]); 
   const [allDecks, setAllDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
@@ -33,8 +35,11 @@ export function useMagisterData() {
         setAuthChecked(true);
       });
 
-      const unsubLessons = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons'), (snap) => {
-        setCustomLessons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      // FIX 2: The Magic Vacuum! collectionGroup pulls ALL lessons from ALL instructors
+      // so students can actually see the curriculum the teacher deployed.
+      const unsubLessons = onSnapshot(collectionGroup(db, 'custom_lessons'), (snap) => {
+        const fetchedLessons = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setAllAppLessons(fetchedLessons);
       });
 
       const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => {
@@ -129,8 +134,9 @@ export function useMagisterData() {
     saveLesson: async (lessonData: any) => {
       if (!user) return;
       const lessonId = lessonData.id || `lesson_${Date.now()}`;
+      // Added appId to payload to future-proof the collectionGroup query
       await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', lessonId), {
-        ...lessonData, id: lessonId, instructorId: user.uid, updatedAt: Date.now()
+        ...lessonData, id: lessonId, instructorId: user.uid, appId: appId, updatedAt: Date.now()
       });
     },
 
@@ -163,7 +169,7 @@ export function useMagisterData() {
       // 2. Calculate Gamification Math
       if (xp > 0) {
         const today = new Date();
-        const todayStr = today.toDateString(); // e.g., "Tue Jul 11 2025"
+        const todayStr = today.toDateString();
         
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
@@ -177,16 +183,13 @@ export function useMagisterData() {
         const isLesson = details.mode === 'lesson' || !itemId.includes('explore');
 
         if (lastActivityDate === todayStr) {
-            // Same day: Accumulate stats
             newDailyXp += xp;
             if (isLesson) newDailyLessons += 1;
         } else if (lastActivityDate === yesterdayStr) {
-            // New day, streak continues: Reset daily stats, increment streak
             newStreak += 1;
             newDailyXp = xp;
             newDailyLessons = isLesson ? 1 : 0;
         } else {
-            // Streak broken (missed yesterday): Reset everything
             newStreak = 1;
             newDailyXp = xp;
             newDailyLessons = isLesson ? 1 : 0;
@@ -202,13 +205,12 @@ export function useMagisterData() {
         });
       }
     }
-  }; // <-- ADDED THE MISSING BRACE HERE
+  };
 
-  // Combine local and assigned content for the views
+  // FIX 3: Removed the array corruption! We just pass the clean, fully-populated objects directly.
   const allLessons = useMemo(() => {
-    const assignments = enrolledClasses.flatMap(c => c.assignments || []);
-    return [...customLessons, ...assignments];
-  }, [customLessons, enrolledClasses]);
+    return allAppLessons;
+  }, [allAppLessons]);
 
   return { 
     user, 
