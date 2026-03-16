@@ -11,7 +11,7 @@ import {
   Lock, Play, ChevronRight, Monitor, FileText, ChevronDown, 
   ChevronUp, Trophy, Zap, Flame, Plus, User, Heart,
   Mic, Square, Volume2, Loader2, Shield, Map, Gamepad2,
-  Triangle, Circle, Hexagon, XCircle
+  Triangle, Circle, XCircle, X
 } from 'lucide-react';
 
 import StudentGradebook from './StudentGradebook';
@@ -32,13 +32,29 @@ const getSubjectTheme = (subject: string) => {
 // ============================================================================
 const ForumAvatar = ({ url, name, role, size = "md" }: any) => {
     const initials = name?.split(' ').map((n:any) => n[0]).join('').toUpperCase().slice(0, 2) || 'S';
-    const sizeClasses: any = { xs: "w-6 h-6 text-[10px]", sm: "w-8 h-8 text-xs", md: "w-10 h-10 text-sm", lg: "w-12 h-12 text-base" };
+    const sizeClasses: any = {
+        xs: "w-6 h-6 text-[10px]",
+        sm: "w-8 h-8 text-xs",
+        md: "w-10 h-10 text-sm",
+        lg: "w-12 h-12 text-base"
+    };
+
     return (
         <div className={`relative shrink-0 ${sizeClasses[size]}`}>
-            <div className={`w-full h-full rounded-[35%] overflow-hidden flex items-center justify-center font-black transition-all shadow-sm ${url ? 'bg-white' : 'bg-gradient-to-br from-indigo-500 to-cyan-400 text-white'}`}>
-                {url ? <img src={url} alt={`${name}'s avatar`} className="w-full h-full object-cover" /> : <span aria-hidden="true">{initials}</span>}
+            <div className={`w-full h-full rounded-[35%] overflow-hidden flex items-center justify-center font-black transition-all shadow-sm ${
+                url ? 'bg-white' : 'bg-gradient-to-br from-indigo-500 to-cyan-400 text-white'
+            }`}>
+                {url ? (
+                    <img src={url} alt={`${name}'s avatar`} className="w-full h-full object-cover" />
+                ) : (
+                    <span aria-hidden="true">{initials}</span>
+                )}
             </div>
-            {role === 'instructor' && <div className="absolute -top-1 -right-1 bg-indigo-600 rounded-full border-2 border-white p-0.5 shadow-sm" aria-label="Instructor Badge"><Shield size={size === 'xs' ? 8 : 10} className="text-white" aria-hidden="true" /></div>}
+            {role === 'instructor' && (
+                <div className="absolute -top-1 -right-1 bg-indigo-600 rounded-full border-2 border-white p-0.5 shadow-sm" aria-label="Instructor Badge">
+                    <Shield size={size === 'xs' ? 8 : 10} className="text-white" aria-hidden="true" />
+                </div>
+            )}
         </div>
     );
 };
@@ -65,25 +81,43 @@ const VoiceRecorder = ({ onRecordingComplete, onCancel }: any) => {
       recorder.start();
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
-    } catch (err) { alert("Microphone access denied."); }
+    } catch (err) {
+      alert("Microphone access denied.");
+    }
   };
 
-  const stopRecording = () => { mediaRecorderRef.current?.stop(); setIsRecording(false); };
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
+  };
 
   return (
     <div className="bg-indigo-50/50 p-4 rounded-2xl border-2 border-indigo-100 flex items-center justify-between">
       {!audioUrl ? (
         <div className="flex items-center gap-4 w-full">
           <div className={`w-3 h-3 rounded-full bg-rose-500 ${isRecording ? 'animate-pulse' : 'opacity-30'}`} aria-hidden="true" />
-          <span className="text-xs font-black text-indigo-900 uppercase tracking-widest flex-1">{isRecording ? "Recording..." : "Voice Response"}</span>
-          <button type="button" onClick={isRecording ? stopRecording : startRecording} className={`p-3 rounded-full focus:outline-none ${isRecording ? 'bg-rose-500 text-white animate-pulse' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
+          <span className="text-xs font-black text-indigo-900 uppercase tracking-widest flex-1">
+            {isRecording ? "Recording..." : "Voice Response"}
+          </span>
+          <button 
+            type="button" 
+            onClick={isRecording ? stopRecording : startRecording} 
+            aria-label={isRecording ? "Stop Recording" : "Start Recording"}
+            className={`p-3 rounded-full focus:outline-none focus:ring-4 focus:ring-indigo-500 ${isRecording ? 'bg-rose-500 text-white animate-pulse' : 'bg-indigo-600 text-white hover:bg-indigo-700 transition-colors'}`}
+          >
             {isRecording ? <Square size={18} fill="white" aria-hidden="true" /> : <Mic size={18} aria-hidden="true" />}
           </button>
         </div>
       ) : (
         <div className="flex items-center gap-3 w-full animate-in fade-in">
-          <audio src={audioUrl} controls className="h-8 flex-1" />
-          <button type="button" onClick={() => { setAudioUrl(null); onCancel(); }} className="text-rose-500 text-xs font-black uppercase px-2 hover:bg-rose-50 rounded-lg py-2 transition-colors">Discard</button>
+          <audio src={audioUrl} controls className="h-8 flex-1" aria-label="Audio playback preview" />
+          <button 
+            type="button" 
+            onClick={() => { setAudioUrl(null); onCancel(); }} 
+            className="text-rose-500 text-xs font-black uppercase px-2 hover:bg-rose-50 rounded-lg py-2 transition-colors focus:outline-none focus:ring-2 focus:ring-rose-500"
+          >
+            Discard
+          </button>
         </div>
       )}
     </div>
@@ -133,13 +167,17 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
   const handleCreateTopic = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || (!newContent.trim() && !pendingAudio)) return;
-    await addDoc(collection(db, 'artifacts', appId, 'classes', classId, 'forum_topics'), { title: newTitle, content: newContent, authorName: userData?.name || 'Magister', authorAvatarUrl: currentAvatar, authorId: auth.currentUser?.uid, role: userData?.role, timestamp: Date.now(), replyCount: 0 });
+    await addDoc(collection(db, 'artifacts', appId, 'classes', classId, 'forum_topics'), {
+      title: newTitle, content: newContent, authorName: userData?.name || 'Magister',
+      authorAvatarUrl: currentAvatar, authorId: auth.currentUser?.uid, role: userData?.role, timestamp: Date.now(), replyCount: 0
+    });
     setNewTitle(""); setNewContent(""); setIsCreating(false);
   };
 
   const handlePostResponse = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim() || (!newContent.trim() && !pendingAudio) || !activeTopic) return;
+    if (!newTitle.trim() || (!newContent.trim() && !pendingAudio)) return;
+    if (!activeTopic) return;
     setIsUploading(true);
     try {
       let audioUrl = "";
@@ -148,7 +186,11 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
         const uploadResult = await uploadBytes(audioRef, pendingAudio);
         audioUrl = await getDownloadURL(uploadResult.ref);
       }
-      await addDoc(collection(db, 'artifacts', appId, 'classes', classId, 'forum_topics', activeTopic.id, 'responses'), { title: newTitle, content: newContent || "", audioUrl, authorName: userData?.name || 'Scholar', authorAvatarUrl: currentAvatar, authorId: auth.currentUser?.uid, role: userData?.role, timestamp: Date.now(), comments: [], likes: [] });
+      await addDoc(collection(db, 'artifacts', appId, 'classes', classId, 'forum_topics', activeTopic.id, 'responses'), {
+        title: newTitle, content: newContent || "", audioUrl,
+        authorName: userData?.name || 'Scholar', authorAvatarUrl: currentAvatar,
+        authorId: auth.currentUser?.uid, role: userData?.role, timestamp: Date.now(), comments: [], likes: []
+      });
       setNewTitle(""); setNewContent(""); setPendingAudio(null); setIsCreating(false);
     } catch (err) { alert("Upload error."); }
     setIsUploading(false);
@@ -157,7 +199,13 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
   const handlePostComment = async (responseId: string) => {
     if (!commentText.trim()) return;
     const responseRef = doc(db, 'artifacts', appId, 'classes', classId, 'forum_topics', activeTopic.id, 'responses', responseId);
-    await updateDoc(responseRef, { comments: arrayUnion({ text: commentText, authorName: userData?.name || 'Scholar', authorAvatarUrl: currentAvatar, authorId: auth.currentUser?.uid, role: userData?.role, timestamp: Date.now() }) });
+    await updateDoc(responseRef, {
+      comments: arrayUnion({
+        text: commentText, authorName: userData?.name || 'Scholar',
+        authorAvatarUrl: currentAvatar, authorId: auth.currentUser?.uid, 
+        role: userData?.role, timestamp: Date.now()
+      })
+    });
     setCommentText(""); setReplyingToId(null);
   };
 
@@ -166,21 +214,46 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
       <div className="flex flex-col h-full bg-slate-50 rounded-[2.5rem] border-2 border-slate-100 shadow-inner p-6 overflow-hidden animate-in fade-in duration-500 font-sans">
         <header className="flex justify-between items-center mb-6 px-2">
             <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Discussions</h3>
-            {isInstructor && <button onClick={() => setIsCreating(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-black text-xs uppercase flex items-center gap-2 shadow-lg transition-colors focus:outline-none focus:ring-4 focus:ring-indigo-500"><Plus size={16} aria-hidden="true"/> New Topic</button>}
+            {isInstructor && (
+                <button 
+                  onClick={() => setIsCreating(true)} 
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-black text-xs uppercase flex items-center gap-2 shadow-lg transition-colors focus:outline-none focus:ring-4 focus:ring-indigo-500"
+                >
+                  <Plus size={16} aria-hidden="true"/> New Topic
+                </button>
+            )}
         </header>
         <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
             {isCreating && (
                 <form onSubmit={handleCreateTopic} className="bg-white p-6 rounded-[2rem] border-2 border-indigo-100 shadow-xl mb-6">
-                    <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Topic Title..." className="w-full text-lg font-black text-slate-800 outline-none mb-2 focus:ring-2 focus:ring-indigo-100 rounded-md px-1" />
-                    <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Prompt..." className="w-full text-sm text-slate-500 outline-none min-h-[100px] resize-none focus:ring-2 focus:ring-indigo-100 rounded-md px-1 py-1" />
-                    <div className="flex gap-2 justify-end mt-4"><button type="submit" className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs uppercase focus:outline-none focus:ring-4 focus:ring-indigo-500 transition-colors">Post</button></div>
+                    <input 
+                      autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} 
+                      placeholder="Topic Title..." aria-label="Topic Title"
+                      className="w-full text-lg font-black text-slate-800 outline-none mb-2 focus:ring-2 focus:ring-indigo-100 rounded-md px-1" 
+                    />
+                    <textarea 
+                      value={newContent} onChange={e => setNewContent(e.target.value)} 
+                      placeholder="Prompt..." aria-label="Topic Prompt"
+                      className="w-full text-sm text-slate-500 outline-none min-h-[100px] resize-none focus:ring-2 focus:ring-indigo-100 rounded-md px-1 py-1" 
+                    />
+                    <div className="flex gap-2 justify-end mt-4">
+                      <button type="submit" className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs uppercase focus:outline-none focus:ring-4 focus:ring-indigo-500 transition-colors">Post</button>
+                    </div>
                 </form>
             )}
             {topics.map(t => (
-                <button key={t.id} onClick={() => { setActiveTopic(t); setView('thread'); }} className="w-full bg-white p-6 rounded-[2.5rem] border-2 border-slate-100 shadow-sm hover:border-indigo-300 transition-all text-left focus:outline-none focus:ring-4 focus:ring-indigo-500">
+                <button 
+                  key={t.id} 
+                  onClick={() => { setActiveTopic(t); setView('thread'); }} 
+                  aria-label={`Open discussion: ${t.title}`}
+                  className="w-full bg-white p-6 rounded-[2.5rem] border-2 border-slate-100 shadow-sm hover:border-indigo-300 transition-all text-left focus:outline-none focus:ring-4 focus:ring-indigo-500"
+                >
                     <h4 className="text-lg font-black text-slate-800 mb-1">{t.title}</h4>
                     <p className="text-sm text-slate-400 line-clamp-1 mb-4 font-medium">{t.content}</p>
-                    <div className="flex items-center gap-3 text-xs font-black uppercase text-slate-400 tracking-widest"><ForumAvatar url={t.authorAvatarUrl} name={t.authorName} role={t.role} size="xs" /><span>{t.authorName}</span></div>
+                    <div className="flex items-center gap-3 text-xs font-black uppercase text-slate-400 tracking-widest">
+                        <ForumAvatar url={t.authorAvatarUrl} name={t.authorName} role={t.role} size="xs" />
+                        <span>{t.authorName}</span>
+                    </div>
                 </button>
             ))}
         </div>
@@ -191,28 +264,49 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
   return (
     <div className="flex flex-col h-full bg-slate-50 rounded-[2.5rem] border-2 border-slate-100 shadow-inner overflow-hidden animate-in slide-in-from-right-8 duration-500 font-sans">
         <header className="bg-white p-6 border-b border-slate-100 flex items-center justify-between shadow-sm z-20">
-            <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-400 font-black text-xs uppercase hover:text-indigo-600 transition-colors"><ArrowLeft size={16} aria-hidden="true"/> Back</button>
+            <button 
+              onClick={() => setView('list')} 
+              className="flex items-center gap-2 text-slate-400 font-black text-xs uppercase hover:text-indigo-600 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md px-2 py-1"
+            >
+              <ArrowLeft size={16} aria-hidden="true"/> Back
+            </button>
             <span className="text-xs font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-3 py-1.5 rounded-lg">Response Gallery</span>
         </header>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
             <section className="bg-slate-900 text-white p-8 rounded-[3rem] shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-8 opacity-10"><Zap size={80} /></div>
+                <div className="absolute top-0 right-0 p-8 opacity-10" aria-hidden="true"><Zap size={80} /></div>
                 <div className="relative z-10">
                     <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.3em] mb-4 block">Discussion Prompt</span>
                     <h2 className="text-3xl font-black mb-4 leading-tight">{activeTopic.title}</h2>
                     <p className="text-slate-300 font-medium leading-relaxed mb-6">{activeTopic.content}</p>
-                    <button onClick={() => setIsCreating(true)} className="px-6 py-3 bg-white hover:bg-slate-100 text-slate-900 rounded-xl font-black text-xs uppercase shadow-xl transition-colors">Respond</button>
+                    <button 
+                      onClick={() => setIsCreating(true)} 
+                      className="px-6 py-3 bg-white hover:bg-slate-100 text-slate-900 rounded-xl font-black text-xs uppercase shadow-xl transition-colors focus:outline-none focus:ring-4 focus:ring-indigo-500"
+                    >
+                      Respond
+                    </button>
                 </div>
             </section>
 
             {isCreating && (
                 <form onSubmit={handlePostResponse} className="bg-white p-8 rounded-[2.5rem] border-2 border-indigo-100 shadow-xl space-y-4">
-                    <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Response title..." className="w-full text-xl font-black text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100 rounded-md px-2" />
-                    <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Write thoughts..." className="w-full text-sm text-slate-500 outline-none min-h-[100px] resize-none focus:ring-2 focus:ring-indigo-100 rounded-md px-2 py-2" />
+                    <input 
+                      autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} 
+                      placeholder="Response title..." aria-label="Response Title"
+                      className="w-full text-xl font-black text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100 rounded-md px-2" 
+                    />
+                    <textarea 
+                      value={newContent} onChange={e => setNewContent(e.target.value)} 
+                      placeholder="Write thoughts..." aria-label="Response Content"
+                      className="w-full text-sm text-slate-500 outline-none min-h-[100px] resize-none focus:ring-2 focus:ring-indigo-100 rounded-md px-2 py-2" 
+                    />
                     <VoiceRecorder onRecordingComplete={setPendingAudio} onCancel={() => setPendingAudio(null)} />
                     <div className="flex gap-2 justify-end pt-4 border-t border-slate-50">
-                        <button type="submit" disabled={isUploading} className="px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-xl flex items-center gap-3 bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 transition-colors">
+                        <button 
+                          type="submit" disabled={isUploading} 
+                          className="px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-xl flex items-center gap-3 bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 transition-colors focus:outline-none focus:ring-4 focus:ring-indigo-500"
+                        >
                             {isUploading ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : 'Submit Response'}
                         </button>
                     </div>
@@ -225,22 +319,34 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                         <div className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm relative group">
                             <div className="flex items-center gap-4 mb-6">
                                 <ForumAvatar url={res.authorAvatarUrl} name={res.authorName} role={res.role} size="lg" />
-                                <div><span className="block text-sm font-black text-slate-800 leading-none mb-1">{res.authorName}</span><span className="text-xs font-bold text-slate-400 uppercase">{new Date(res.timestamp).toLocaleDateString()}</span></div>
+                                <div>
+                                    <span className="block text-sm font-black text-slate-800 leading-none mb-1">{res.authorName}</span>
+                                    <span className="text-xs font-bold text-slate-400 uppercase">{new Date(res.timestamp).toLocaleDateString()}</span>
+                                </div>
                             </div>
                             <h4 className="text-2xl font-black text-slate-900 mb-3 tracking-tight">{res.title}</h4>
                             <p className="text-sm text-slate-600 leading-relaxed font-medium mb-6">{res.content}</p>
+                            
                             {res.audioUrl && (
                                 <div className="mb-6 p-4 bg-indigo-50/50 rounded-2xl flex items-center gap-4 border border-indigo-100">
-                                    <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white"><Volume2 size={20} /></div>
-                                    <audio src={res.audioUrl} controls className="h-8 flex-1 opacity-90" />
+                                    <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white" aria-hidden="true"><Volume2 size={20} /></div>
+                                    <audio src={res.audioUrl} controls className="h-8 flex-1 opacity-90" aria-label={`Voice response from ${res.authorName}`} />
                                 </div>
                             )}
+
                             <div className="flex items-center gap-6 pt-6 border-t border-slate-50">
-                                <button onClick={() => handleToggleLike(res.id, res.likes || [], res.authorId)} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-rose-200 ${res.likes?.includes(auth.currentUser?.uid) ? 'bg-rose-50 text-rose-500' : 'text-slate-400 hover:bg-slate-50 hover:text-rose-400'}`}>
-                                    <Heart size={16} className={res.likes?.includes(auth.currentUser?.uid) ? 'fill-rose-500' : ''} /> <span className="text-xs font-black uppercase tracking-widest">{res.likes?.length || 0} Appreciations</span>
+                                <button 
+                                  onClick={() => handleToggleLike(res.id, res.likes || [], res.authorId)} 
+                                  className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-rose-200 ${res.likes?.includes(auth.currentUser?.uid) ? 'bg-rose-50 text-rose-500' : 'text-slate-400 hover:bg-slate-50 hover:text-rose-400'}`}
+                                >
+                                    <Heart size={16} className={res.likes?.includes(auth.currentUser?.uid) ? 'fill-rose-500' : ''} aria-hidden="true" /> 
+                                    <span className="text-xs font-black uppercase tracking-widest">{res.likes?.length || 0} Appreciations</span>
                                 </button>
-                                <button onClick={() => setReplyingToId(replyingToId === res.id ? null : res.id)} className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase hover:text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100 rounded-lg px-2 py-1">
-                                  <MessageSquare size={16} /> Reply
+                                <button 
+                                  onClick={() => setReplyingToId(replyingToId === res.id ? null : res.id)} 
+                                  className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase hover:text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100 rounded-lg px-2 py-1"
+                                >
+                                  <MessageSquare size={16} aria-hidden="true" /> Reply
                                 </button>
                             </div>
                         </div>
@@ -257,8 +363,19 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                             ))}
                             {replyingToId === res.id && (
                                 <div className="flex gap-2 animate-in slide-in-from-top-2">
-                                    <input autoFocus value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Reply..." className="flex-1 bg-white border-2 border-indigo-100 rounded-2xl px-5 py-3 text-sm font-medium outline-none focus:border-indigo-500" onKeyDown={(e) => e.key === 'Enter' && handlePostComment(res.id)} />
-                                    <button onClick={() => handlePostComment(res.id)} className="p-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl shadow-xl"><Send size={18} /></button>
+                                    <input 
+                                      autoFocus value={commentText} onChange={e => setCommentText(e.target.value)} 
+                                      placeholder="Reply..." aria-label="Reply text"
+                                      className="flex-1 bg-white border-2 border-indigo-100 rounded-2xl px-5 py-3 text-sm font-medium outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" 
+                                      onKeyDown={(e) => e.key === 'Enter' && handlePostComment(res.id)} 
+                                    />
+                                    <button 
+                                      onClick={() => handlePostComment(res.id)} 
+                                      aria-label="Send reply"
+                                      className="p-4 bg-indigo-600 hover:bg-indigo-700 transition-colors text-white rounded-2xl shadow-xl focus:outline-none focus:ring-4 focus:ring-indigo-500"
+                                    >
+                                      <Send size={18} aria-hidden="true" />
+                                    </button>
                                 </div>
                             )}
                         </div>
@@ -270,24 +387,21 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
   );
 };
 
-
 // ============================================================================
-//  NEW: THE KAHOOT-STYLE LIVE TRIVIA REMOTE
+//  NEW: THE MONOCHROMATIC (PSX / SQUID GAME) LIVE TRIVIA REMOTE
 // ============================================================================
 const SHAPE_THEMES = [
-    { color: 'bg-rose-500 hover:bg-rose-600 active:bg-rose-700', shadow: 'shadow-[0_8px_0_rgb(159,18,57)]', icon: Triangle },
-    { color: 'bg-indigo-500 hover:bg-indigo-600 active:bg-indigo-700', shadow: 'shadow-[0_8px_0_rgb(55,48,163)]', icon: Square },
-    { color: 'bg-amber-400 hover:bg-amber-500 active:bg-amber-600', shadow: 'shadow-[0_8px_0_rgb(180,83,9)]', icon: Circle },
-    { color: 'bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700', shadow: 'shadow-[0_8px_0_rgb(6,95,70)]', icon: Hexagon }
+    { color: 'bg-slate-800 hover:bg-slate-900 active:bg-black', shadow: 'shadow-[0_8px_0_rgb(15,23,42)]', icon: Triangle }, // △
+    { color: 'bg-slate-800 hover:bg-slate-900 active:bg-black', shadow: 'shadow-[0_8px_0_rgb(15,23,42)]', icon: Square }, // ⬜
+    { color: 'bg-slate-800 hover:bg-slate-900 active:bg-black', shadow: 'shadow-[0_8px_0_rgb(15,23,42)]', icon: Circle }, // O
+    { color: 'bg-slate-800 hover:bg-slate-900 active:bg-black', shadow: 'shadow-[0_8px_0_rgb(15,23,42)]', icon: X } // X
 ];
 
 const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) => {
-    // Look up the active lesson from the live session
     const activeLesson = lessons.find((l: any) => l.id === liveSession?.lessonId);
     const currentBlock = activeLesson?.blocks?.[liveSession?.currentBlockIndex || 0];
     
     const isQuiz = currentBlock?.type === 'quiz';
-    // Firebase document keys can't have periods, so we replace them with commas for the email mapping
     const safeEmail = studentEmail.replace(/\./g, ',');
     const myAnswer = liveSession?.answers?.[safeEmail];
     const isRevealed = liveSession?.quizState === 'revealed';
@@ -300,44 +414,44 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) 
         });
     };
 
-    // STATE 1: Not a quiz slide, or teacher hasn't clicked "Start Quiz" yet
+    // STATE 1: Waiting
     if (!isQuiz || liveSession?.quizState === 'waiting') {
         return (
-            <div className="h-full bg-slate-900 rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500 border-[8px] border-slate-800">
+            <div className="h-full bg-black rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500 border-4 border-slate-800 shadow-[inset_0_0_100px_rgba(255,255,255,0.05)]">
                 <div className="relative w-32 h-32 mb-8">
-                    <div className="absolute inset-0 bg-indigo-500 rounded-full blur-xl opacity-20 animate-pulse" />
-                    <Monitor size={128} className="text-indigo-400 relative z-10 animate-bounce-slow" />
+                    <div className="absolute inset-0 bg-white rounded-full blur-2xl opacity-10 animate-pulse" />
+                    <Monitor size={128} className="text-white relative z-10 animate-bounce-slow" strokeWidth={1} />
                 </div>
-                <h2 className="text-3xl font-black text-white mb-3 tracking-tight">Eyes up front!</h2>
-                <p className="text-slate-400 font-bold text-lg max-w-[250px] leading-snug">Look at the projector. Waiting for the teacher to start the next question...</p>
+                <h2 className="text-3xl font-black text-white mb-3 tracking-widest uppercase">Eyes Up</h2>
+                <p className="text-slate-400 font-bold text-sm max-w-[250px] uppercase tracking-widest leading-loose">Awaiting instructor signal...</p>
             </div>
         );
     }
 
-    // STATE 2: The Reveal (Did they get it right?)
+    // STATE 2: The Reveal
     if (isRevealed) {
         const isCorrect = myAnswer === currentBlock.content.correctId;
         return (
-            <div className={`h-full rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-500 border-[8px] ${isCorrect ? 'bg-emerald-500 border-emerald-600' : 'bg-rose-500 border-rose-600'}`}>
-                {isCorrect ? <CheckCircle2 size={120} className="text-white mb-6 animate-bounce" /> : <XCircle size={120} className="text-white mb-6 opacity-80" />}
+            <div className={`h-full rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-500 border-[8px] ${isCorrect ? 'bg-slate-900 border-white' : 'bg-black border-slate-800'}`}>
+                {isCorrect ? <CheckCircle2 size={120} className="text-white mb-6 animate-bounce" strokeWidth={3} /> : <XCircle size={120} className="text-slate-700 mb-6" strokeWidth={2} />}
                 <h2 className="text-5xl font-black text-white mb-4 tracking-tighter drop-shadow-md">
-                    {isCorrect ? 'Genius!' : 'Nice Try!'}
+                    {isCorrect ? 'VALID' : 'ELIMINATED'}
                 </h2>
-                <p className="text-white/90 font-black text-xl bg-black/10 px-6 py-3 rounded-full backdrop-blur-sm">
-                    {isCorrect ? '+50 XP Added to Leaderboard' : 'Keep your head up!'}
+                <p className="text-white/90 font-black text-xl bg-white/10 px-6 py-3 rounded-full backdrop-blur-sm border border-white/20">
+                    {isCorrect ? '+50 XP Awarded' : 'Await next round'}
                 </p>
             </div>
         );
     }
 
-    // STATE 3: The Active Game Controller (Kahoot style)
+    // STATE 3: The Active Game Controller (Monochromatic PSX Style)
     return (
-        <div className="h-full bg-slate-100 rounded-[2.5rem] p-4 flex flex-col border-[8px] border-slate-200">
-            <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-4 text-center shrink-0">
-                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500 bg-indigo-50 px-3 py-1 rounded-lg inline-block mb-3">
-                    Question {liveSession.currentBlockIndex + 1}
+        <div className="h-full bg-slate-950 rounded-[2.5rem] p-4 flex flex-col border-[4px] border-slate-800 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)]">
+            <div className="bg-slate-900 p-6 rounded-[2rem] shadow-sm border border-slate-800 mb-4 text-center shrink-0">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 bg-black px-3 py-1 rounded-lg inline-block mb-3 border border-slate-700">
+                    Target {liveSession.currentBlockIndex + 1}
                 </span>
-                <h2 className="text-xl md:text-2xl font-black text-slate-800 leading-tight">
+                <h2 className="text-xl md:text-2xl font-bold text-white leading-tight">
                     {currentBlock.content.question}
                 </h2>
             </div>
@@ -354,21 +468,21 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) 
                             disabled={!!myAnswer}
                             onClick={() => submitAnswer(opt.id)}
                             style={{ WebkitTapHighlightColor: 'transparent' }}
-                            className={`relative rounded-[2rem] flex flex-col items-center justify-center p-4 transition-all duration-150 focus:outline-none border-2 border-transparent
+                            className={`relative rounded-[2rem] flex flex-col items-center justify-center p-4 transition-all duration-150 focus:outline-none border-4
                                 ${Theme.color} 
-                                ${myAnswer && !isSelected ? 'opacity-30 grayscale translate-y-2 shadow-none' : Theme.shadow}
-                                ${isSelected ? 'ring-8 ring-white scale-95 translate-y-2 shadow-none border-white/50' : 'hover:-translate-y-1 active:translate-y-2 active:shadow-none'}
+                                ${myAnswer && !isSelected ? 'opacity-20 grayscale translate-y-2 shadow-none border-transparent' : 'border-slate-700 ' + Theme.shadow}
+                                ${isSelected ? 'ring-4 ring-slate-400 scale-95 translate-y-2 shadow-none bg-black border-slate-500' : 'hover:-translate-y-1 active:translate-y-2 active:shadow-none'}
                             `}
                         >
-                            <Icon size={56} className="text-white mb-4 drop-shadow-md" fill="currentColor" />
-                            <span className="text-white font-black text-sm md:text-base leading-tight drop-shadow-md px-2 break-words text-center">
+                            <Icon size={64} strokeWidth={2.5} className="text-white mb-4 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]" />
+                            <span className="text-white font-bold text-sm md:text-base leading-tight px-2 break-words text-center tracking-wide opacity-90">
                                 {opt.text}
                             </span>
                             
                             {/* Selected Indicator */}
                             {isSelected && (
-                                <div className="absolute top-4 right-4 bg-white rounded-full p-1 shadow-md">
-                                    <CheckCircle2 size={16} className="text-slate-800" />
+                                <div className="absolute top-4 right-4 bg-white rounded-full p-1 shadow-[0_0_15px_rgba(255,255,255,0.8)]">
+                                    <CheckCircle2 size={16} className="text-black" strokeWidth={3} />
                                 </div>
                             )}
                         </button>
@@ -378,7 +492,6 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) 
         </div>
     );
 };
-
 
 // ============================================================================
 //  MAIN STUDENT CLASS VIEW (ENTRY POINT)
@@ -421,7 +534,6 @@ export default function StudentClassView({
         }
     });
   }, [classData.id, activeSubTab]);
-
 
   const toggleRoadmap = (currId: string) => {
     setExpandedRoadmaps(prev => ({ ...prev, [currId]: !prev[currId] }));
@@ -473,27 +585,27 @@ export default function StudentClassView({
 
       <main className="flex-1 overflow-y-auto custom-scrollbar relative px-2 md:px-6 pb-48 pt-6">
         
-        {/* NEW: LIVE GAME INTRUSION BANNER */}
+        {/* NEW: LIVE GAME INTRUSION BANNER (Only shows when a game is active and they aren't on the live tab) */}
         {liveSession && activeSubTab !== 'live' && (
             <div className="px-4 mb-6 animate-in slide-in-from-top-4 fade-in duration-500">
                 <button 
                     onClick={() => setActiveSubTab('live')}
-                    className="w-full bg-slate-900 rounded-[2rem] p-1 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] group transition-transform active:scale-95 focus:outline-none relative overflow-hidden"
+                    className="w-full bg-black rounded-[2rem] p-1 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] group transition-transform active:scale-95 focus:outline-none relative overflow-hidden"
                 >
                     {/* Glowing background animation */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-rose-500 via-indigo-500 to-emerald-500 opacity-50 animate-pulse" />
+                    <div className="absolute inset-0 bg-white opacity-10 animate-pulse" />
                     
-                    <div className="relative bg-slate-900 rounded-[1.8rem] p-4 flex items-center justify-between border border-white/10">
+                    <div className="relative bg-slate-950 rounded-[1.8rem] p-4 flex items-center justify-between border border-slate-800">
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-rose-500 rounded-full flex items-center justify-center animate-bounce-slow shadow-[0_0_20px_rgba(244,63,94,0.6)]">
-                                <Flame size={24} className="text-white" fill="currentColor" />
+                            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center animate-bounce-slow shadow-[0_0_20px_rgba(255,255,255,0.4)]">
+                                <Zap size={24} className="text-black" fill="currentColor" />
                             </div>
                             <div className="text-left">
-                                <h4 className="text-white font-black text-lg tracking-tight">LIVE TRIVIA ACTIVE!</h4>
-                                <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">Join the classroom game now</p>
+                                <h4 className="text-white font-black text-lg tracking-widest uppercase">LIVE TRIVIA ACTIVE!</h4>
+                                <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Join the classroom protocol now</p>
                             </div>
                         </div>
-                        <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white backdrop-blur-sm group-hover:bg-white group-hover:text-slate-900 transition-colors">
+                        <div className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center text-white backdrop-blur-sm group-hover:bg-white group-hover:text-black transition-colors">
                             <ChevronRight size={20} strokeWidth={3} />
                         </div>
                     </div>
@@ -645,7 +757,7 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
             </button>
             
             <div className={`overflow-hidden transition-all duration-700 ease-in-out relative z-10 ${isExpanded ? 'max-h-[5000px] opacity-100 mt-[-2rem]' : 'max-h-0 opacity-0 mt-0 pointer-events-none'}`}>
-                <div className="pt-16 pb-12 px-2 sm:px-4 bg-slate-100/50 rounded-b-[3rem] border-2 border-t-0 border-slate-100 relative">
+                <div className="pt-16 pb-12 px-1 sm:px-4 bg-slate-100/50 rounded-b-[3rem] border-2 border-t-0 border-slate-100 relative">
                     {currLessons.length === 0 ? (
                         <div className="text-center p-8"><Map size={32} className="mx-auto text-slate-300 mb-2" /><p className="text-sm font-bold text-slate-500">No modules found in this pathway.</p></div>
                     ) : (
