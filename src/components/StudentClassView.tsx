@@ -400,7 +400,6 @@ const SHAPE_THEMES = [
 const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) => {
     const activeLesson = lessons.find((l: any) => l.id === liveSession?.lessonId);
     
-    // 🔥 THE FIX: Group the blocks exactly the way the teacher's projector does!
     const pages = useMemo(() => {
         if (!activeLesson?.blocks) return [];
         const grouped: any[] = [];
@@ -416,14 +415,18 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) 
         return grouped;
     }, [activeLesson]);
 
-    // Use the translated page index to grab the correct block
     const currentPage = pages[liveSession?.currentBlockIndex || 0];
-    const currentBlock = currentPage?.blocks?.[0]; // Interactive pages only have 1 block
+    const currentBlock = currentPage?.blocks?.[0]; 
     
     const isQuiz = currentBlock?.type === 'quiz';
     const safeEmail = (studentEmail || 'unknown@student').replace(/\./g, ',');
     const myAnswer = liveSession?.answers?.[safeEmail];
     const isRevealed = liveSession?.quizState === 'revealed';
+
+    // 🔥 THE FIX: Safely extract quiz data whether it's directly on the block or nested in .content!
+    const quizQuestion = currentBlock?.question || currentBlock?.content?.question || "Loading Question...";
+    const quizOptions = currentBlock?.options || currentBlock?.content?.options || [];
+    const quizCorrectId = currentBlock?.correctId || currentBlock?.content?.correctId;
 
     const submitAnswer = async (optionId: string) => {
         if (liveSession?.quizState !== 'active' || myAnswer) return;
@@ -449,7 +452,7 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) 
 
     // STATE 2: The Reveal
     if (isRevealed) {
-        const isCorrect = myAnswer === currentBlock.content.correctId;
+        const isCorrect = myAnswer === quizCorrectId;
         return (
             <div className={`h-full rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-500 border-[8px] ${isCorrect ? 'bg-slate-900 border-white' : 'bg-black border-slate-800'}`}>
                 {isCorrect ? <CheckCircle2 size={120} className="text-white mb-6 animate-bounce" strokeWidth={3} /> : <XCircle size={120} className="text-slate-700 mb-6" strokeWidth={2} />}
@@ -471,12 +474,12 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) 
                     Target {liveSession.currentBlockIndex + 1}
                 </span>
                 <h2 className="text-xl md:text-2xl font-bold text-white leading-tight">
-                    {currentBlock.content.question}
+                    {quizQuestion}
                 </h2>
             </div>
             
             <div className="flex-1 grid grid-cols-2 gap-4 pb-2">
-                {currentBlock.content.options.map((opt: any, idx: number) => {
+                {quizOptions.map((opt: any, idx: number) => {
                     const Theme = SHAPE_THEMES[idx % 4];
                     const Icon = Theme.icon;
                     const isSelected = myAnswer === opt.id;
