@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { 
     Users, Plus, X, Flame, BookOpen, Edit3, Trash2, Mail, 
-    Activity, Search, Gamepad2, CheckCircle2, Monitor, Filter, Library, Package, Puzzle 
+    Activity, Search, Gamepad2, CheckCircle2, Monitor, Filter, Library, Package, Puzzle, Play // <--- ADDED PLAY HERE
 } from 'lucide-react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
@@ -328,7 +328,10 @@ export default function ClassManagerView({
                                                 </div>
 
                                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                                    {filteredCurriculums.map((curr: any) => (
+                                                    {filteredCurriculums.map((curr: any) => {
+                                                        const isAssigned = activeClass?.assignedCurriculums?.includes(curr.id);
+
+                                                        return (
                                                         <div key={curr.id} className="bg-white/5 border border-white/10 rounded-2xl p-5 hover:bg-white/10 transition-colors flex items-start gap-4">
                                                             <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-indigo-500 to-cyan-400 shrink-0 overflow-hidden shadow-inner">
                                                                 {curr.coverImage && <img src={curr.coverImage} alt={curr.title} className="w-full h-full object-cover mix-blend-overlay" />}
@@ -337,15 +340,23 @@ export default function ClassManagerView({
                                                                 <span className="text-[9px] font-black uppercase tracking-widest text-indigo-300 block mb-1">{curr.subject || 'General'} • {curr.grade || curr.level}</span>
                                                                 <h4 className="text-lg font-black text-white leading-tight mb-1">{curr.title}</h4>
                                                                 <p className="text-xs text-slate-400 font-medium line-clamp-1 mb-3">{curr.lessonIds?.length} Modules</p>
-                                                                <button 
-                                                                    onClick={() => handleBulkAssign(curr)}
-                                                                    className="px-4 py-2 bg-white text-slate-900 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-indigo-50 hover:text-indigo-700 transition-colors active:scale-95"
-                                                                >
-                                                                    Deploy to Cohort
-                                                                </button>
+                                                                
+                                                                {isAssigned ? (
+                                                                    <div className="px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 border border-emerald-500/30">
+                                                                        <CheckCircle2 size={14} /> Active
+                                                                    </div>
+                                                                ) : (
+                                                                    <button 
+                                                                        onClick={() => handleBulkAssign(curr)}
+                                                                        className="w-full px-4 py-2 bg-white text-slate-900 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-indigo-50 hover:text-indigo-700 transition-colors active:scale-95"
+                                                                    >
+                                                                        Deploy to Cohort
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         </div>
-                                                    ))}
+                                                        );
+                                                    })}
                                                     {filteredCurriculums.length === 0 && (
                                                         <div className="col-span-full py-8 text-center text-slate-500 font-bold">No curriculums match your search.</div>
                                                     )}
@@ -430,11 +441,11 @@ export default function ClassManagerView({
                                                             {/* ACTION BUTTON GROUP */}
                                                             <div className="flex items-center gap-2 shrink-0">
                                                                 <button 
-                                                                    onClick={() => onStartPresentation(lesson.id, activeClass.id)} // ✅ FIX: Passes BOTH!
+                                                                    onClick={() => onStartPresentation(lesson.id, activeClass.id)} // ✅ PASSES BOTH IDs
                                                                     className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-lg text-xs font-black uppercase tracking-widest transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
-                                                                        >
-                                                                <Play size={14} fill="currentColor" /> Present
-                                                                    </button>
+                                                                >
+                                                                    <Play size={14} fill="currentColor" /> Present
+                                                                </button>
                                                                 <button 
                                                                     onClick={() => onRevoke(activeClass.id, lesson.id)} 
                                                                     className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center"
