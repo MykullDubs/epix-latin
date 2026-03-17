@@ -7,6 +7,7 @@ import {
     Check
 } from 'lucide-react';
 import { calculateLevel } from '../utils/profileHelpers';
+import InstallPWA from './InstallPWA'; // 🔥 IMPORTED THE INSTALL COMPONENT
 
 // --- NEW THEME HELPER (Must match StudentDashboardHub) ---
 const getSubjectTheme = (subject: string) => {
@@ -139,6 +140,9 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
             </section>
 
             <div className="px-6 space-y-8 mt-8">
+
+              {/* 🔥 2.5 INSTALL APP PROMPT */}
+              <InstallPWA />
 
               {/* 3. DAILY QUESTS WIDGET (ONLY RENDER IF THERE ARE VISIBLE QUESTS) */}
               {visibleQuests.length > 0 && (
