@@ -264,7 +264,7 @@ export default function ClassManagerView({
                                                         <div className="w-8 h-8 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center text-[10px] font-black mr-4">{idx + 1}</div>
                                                         <div className="flex-1 pr-4"><h4 className="font-black text-sm text-slate-800">{l.title}</h4><span className="text-[10px] font-black uppercase text-slate-400">{l.subject || 'Module'}</span></div>
                                                         <div className="flex gap-2">
-                                                            <button onClick={() => onStartPresentation(l.id, activeClass.id)} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-lg text-xs font-black uppercase tracking-widest transition-colors"><Play size={14} fill="currentColor" /> Present</button>
+                                                            <button onClick={() => onStartPresentation(l.id, activeClass.id)} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-lg text-xs font-black uppercase transition-colors"><Play size={14} fill="currentColor" /> Present</button>
                                                             <button onClick={() => onRevoke(activeClass.id, l.id)} className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center"><Trash2 size={16} /></button>
                                                         </div>
                                                     </div>
