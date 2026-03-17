@@ -1,6 +1,6 @@
 // src/components/FlashcardView.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, X, Dumbbell, Layers, Play, Zap, HelpCircle, Puzzle, Flame, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, X, Dumbbell, Layers, Play, Zap, HelpCircle, Puzzle, Flame, CheckCircle2, XCircle, Globe, Users, Filter } from 'lucide-react';
 import { JuicyDeckBlock } from './LessonBlocks';
 
 // ============================================================================
@@ -11,10 +11,9 @@ function MatchingGame({ deckCards, onGameEnd }: any) {
     const [flipped, setFlipped] = useState<number[]>([]);
     const [solved, setSolved] = useState<number[]>([]);
     const [moves, setMoves] = useState(0);
-    const [isLocked, setIsLocked] = useState(false); // Prevents spam-clicking
+    const [isLocked, setIsLocked] = useState(false);
 
     useEffect(() => {
-        // Take up to 6 cards (12 pairs total)
         const gameItems = deckCards.slice(0, 6).flatMap((c: any) => [
             { id: c.id, text: c.front, type: 'front', pairId: c.id },
             { id: c.id + '_back', text: c.back, type: 'back', pairId: c.id }
@@ -30,24 +29,21 @@ function MatchingGame({ deckCards, onGameEnd }: any) {
         
         if (newFlipped.length === 2) {
             setMoves(m => m + 1);
-            setIsLocked(true); // Lock the board while animating
+            setIsLocked(true);
             const [idx1, idx2] = newFlipped;
             
             if (cards[idx1].pairId === cards[idx2].pairId) {
-                // Match!
                 setTimeout(() => {
                     setSolved(prev => [...prev, idx1, idx2]);
                     setFlipped([]);
                     setIsLocked(false);
                     if (solved.length + 2 === cards.length) {
-                        // Calculate score based on moves (perfect score = pairs count)
                         const pairs = cards.length / 2;
                         const accuracy = Math.max(0, 100 - ((moves + 1 - pairs) * 5));
                         setTimeout(() => onGameEnd(accuracy), 600);
                     }
                 }, 600);
             } else {
-                // No match
                 setTimeout(() => {
                     setFlipped([]);
                     setIsLocked(false);
@@ -80,7 +76,6 @@ function MatchingGame({ deckCards, onGameEnd }: any) {
                                 'bg-white border-[3px] border-slate-200 text-slate-600 hover:border-indigo-300 hover:-translate-y-1 shadow-[0_4px_0_rgb(226,232,240)] active:shadow-none active:translate-y-1'
                             }`}
                         >
-                            {/* Only show text if flipped, otherwise show a cool pattern */}
                             {isFlipped ? card.text : <Puzzle size={24} className="text-slate-300 opacity-50" />}
                         </button>
                     );
@@ -105,7 +100,7 @@ function QuizSessionView({ deckCards, onGameEnd }: any) {
     const options = useMemo(() => {
         if (!currentCard) return [];
         const distractors = deckCards
-            .filter((c: any) => c.id !== currentCard.id && c.back !== currentCard.back) // Ensure no duplicate answers
+            .filter((c: any) => c.id !== currentCard.id && c.back !== currentCard.back)
             .sort(() => 0.5 - Math.random())
             .slice(0, 3)
             .map((c: any) => c.back);
@@ -145,7 +140,6 @@ function QuizSessionView({ deckCards, onGameEnd }: any) {
 
     return (
         <div className="flex flex-col h-full max-w-md mx-auto p-6">
-            {/* Header & Progress */}
             <div className="mb-6 flex items-center gap-4">
                 <div className="flex-1">
                     <div className="h-3 bg-slate-200 rounded-full overflow-hidden shadow-inner">
@@ -157,7 +151,6 @@ function QuizSessionView({ deckCards, onGameEnd }: any) {
                 </div>
             </div>
 
-            {/* The Question Card */}
             <div className="bg-white rounded-[2.5rem] shadow-sm border-2 border-slate-100 p-8 flex flex-col items-center justify-center text-center min-h-[220px] mb-8 relative animate-in slide-in-from-right-8 duration-300" key={index}>
                 {selectedOption && (
                     <div className="absolute -top-4 right-4">
@@ -172,7 +165,6 @@ function QuizSessionView({ deckCards, onGameEnd }: any) {
                 {currentCard.ipa && <p className="text-sm font-bold text-slate-400 mt-4 bg-slate-50 px-3 py-1 rounded-lg">{currentCard.ipa}</p>}
             </div>
 
-            {/* 3D Options */}
             <div className="space-y-3 flex-1">
                 {options.map((opt, idx) => {
                     let btnClass = "bg-white border-2 border-b-[6px] border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-b-[6px] hover:border-indigo-200 active:border-b-2 active:translate-y-[4px]"; 
@@ -210,6 +202,9 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const [internalMode, setInternalMode] = useState<'library' | 'menu' | 'playing'>('library');
     const [activeGame, setActiveGame] = useState<'standard' | 'quiz' | 'match' | 'tower'>('standard');
     
+    // 🔥 NEW: Filter State for the Library
+    const [deckFilter, setDeckFilter] = useState<'all' | 'personal' | 'network'>('all');
+    
     const resolvedDeck = activeDeckOverride || allDecks[selectedDeckKey] || Object.values(allDecks)[0];
     const cards = resolvedDeck?.cards || [];
     const deckTitle = resolvedDeck?.title === "✍️ Scriptorium" ? "My Collection" : resolvedDeck?.title;
@@ -232,7 +227,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     };
 
     const handleGameFinish = (scorePct: number) => {
-        // 🔥 DYNAMIC XP ALGO: Scale XP based on deck size and performance!
         const baseMultiplier = activeGame === 'quiz' ? 10 : activeGame === 'match' ? 15 : 5;
         const maxPotentialXP = cards.length * baseMultiplier;
         const earnedXP = Math.round(maxPotentialXP * (scorePct / 100)); 
@@ -240,7 +234,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         onLogActivity(resolvedDeck.id || 'custom', earnedXP, `${deckTitle} (${activeGame})`, { scorePct, mode: activeGame });
         
         setInternalMode('menu');
-        // You can replace this alert with your CelebrationScreen trigger if you want!
         alert(`Workout Complete! Accuracy: ${Math.round(scorePct)}% | +${earnedXP} XP Earned!`);
     };
 
@@ -248,11 +241,19 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     if (internalMode === 'library') {
         const totalCards = Object.values(allDecks).reduce((acc: number, curr: any) => acc + (curr.cards?.length || 0), 0);
 
+        // 🔥 FILTER LOGIC
+        const filteredDecks = Object.entries(allDecks).filter(([key, deck]: any) => {
+            if (deckFilter === 'all') return true;
+            if (deckFilter === 'personal') return !deck.isPublished;
+            if (deckFilter === 'network') return deck.isPublished;
+            return true;
+        });
+
         return (
             <div className="h-full flex flex-col bg-slate-50 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-orange-400/10 rounded-full blur-[80px] pointer-events-none" />
                 
-                <div className="bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 py-5 flex justify-between items-center sticky top-0 z-50 shadow-sm">
+                <div className="bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 py-5 flex justify-between items-center sticky top-0 z-40 shadow-sm">
                     <div className="flex items-center gap-3">
                         <div className="bg-gradient-to-br from-orange-400 to-rose-500 text-white p-2 rounded-xl shadow-md">
                             <Dumbbell size={20} strokeWidth={3}/>
@@ -262,49 +263,91 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     <div className="bg-slate-100 px-3 py-1 rounded-full text-xs font-black text-slate-500 uppercase tracking-widest">{totalCards} Cards</div>
                 </div>
 
+                {/* 🔥 THE NEW FILTER BAR */}
+                <div className="bg-white/60 backdrop-blur-md border-b border-slate-200 px-6 py-3 flex items-center gap-2 overflow-x-auto custom-scrollbar sticky top-[76px] z-30">
+                    <Filter size={14} className="text-slate-400 shrink-0 mr-2" />
+                    <button 
+                        onClick={() => setDeckFilter('all')} 
+                        className={`shrink-0 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${deckFilter === 'all' ? 'bg-slate-800 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                    >
+                        All Decks
+                    </button>
+                    <button 
+                        onClick={() => setDeckFilter('personal')} 
+                        className={`shrink-0 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${deckFilter === 'personal' ? 'bg-orange-500 text-white shadow-md shadow-orange-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                    >
+                        My Library
+                    </button>
+                    <button 
+                        onClick={() => setDeckFilter('network')} 
+                        className={`shrink-0 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${deckFilter === 'network' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                    >
+                        Network Decks
+                    </button>
+                </div>
+
                 <div className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar pb-32 relative z-10">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        {Object.entries(allDecks).map(([key, deck]: any) => {
-                            const dTitle = deck.title === "✍️ Scriptorium" ? "My Collection" : deck.title;
-                            const cardCount = deck.cards?.length || 0;
-                            const mastery = Math.floor(Math.random() * 100); 
-                            
-                            return (
-                                <button 
-                                    key={key} 
-                                    onClick={() => { onSelectDeck(key); setInternalMode('menu'); }}
-                                    className="group relative bg-white rounded-[2rem] p-6 shadow-sm border-[3px] border-slate-100 hover:border-orange-300 hover:shadow-xl hover:-translate-y-1 active:translate-y-0 active:shadow-sm transition-all duration-300 text-left overflow-hidden w-full"
-                                >
-                                    <div className="relative z-10 flex justify-between items-start">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-16 h-16 bg-gradient-to-br from-orange-50 to-rose-50 text-orange-500 rounded-2xl flex items-center justify-center text-2xl shadow-inner border border-orange-100/50 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
-                                                {deck.icon || <Layers size={28}/>}
-                                            </div>
-                                            <div>
-                                                <h3 className="font-black text-slate-800 text-xl leading-tight group-hover:text-orange-600 transition-colors">{dTitle}</h3>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span className="text-xs text-slate-400 font-black uppercase tracking-widest bg-slate-50 px-2 py-0.5 rounded-md">{cardCount} Cards</span>
+                    {filteredDecks.length === 0 ? (
+                        <div className="text-center p-10 text-slate-400 animate-in fade-in">
+                            <Layers size={40} className="mx-auto mb-4 opacity-20" />
+                            <p className="font-black uppercase tracking-widest text-xs">No decks found in this category.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 animate-in fade-in duration-500">
+                            {filteredDecks.map(([key, deck]: any) => {
+                                const dTitle = deck.title === "✍️ Scriptorium" ? "My Collection" : deck.title;
+                                const cardCount = deck.cards?.length || 0;
+                                const mastery = Math.floor(Math.random() * 100); 
+                                
+                                return (
+                                    <button 
+                                        key={key} 
+                                        onClick={() => { onSelectDeck(key); setInternalMode('menu'); }}
+                                        className="group relative bg-white rounded-[2rem] p-6 shadow-sm border-[3px] border-slate-100 hover:border-orange-300 hover:shadow-xl hover:-translate-y-1 active:translate-y-0 active:shadow-sm transition-all duration-300 text-left overflow-hidden w-full"
+                                    >
+                                        <div className="relative z-10 flex justify-between items-start">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-16 h-16 bg-gradient-to-br from-orange-50 to-rose-50 text-orange-500 rounded-2xl flex items-center justify-center text-2xl shadow-inner border border-orange-100/50 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300 shrink-0">
+                                                    {deck.icon || <Layers size={28}/>}
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-black text-slate-800 text-xl leading-tight group-hover:text-orange-600 transition-colors line-clamp-1">{dTitle}</h3>
+                                                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                                                        <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest bg-slate-50 px-2 py-1 rounded-md border border-slate-100">{cardCount} Cards</span>
+                                                        
+                                                        {/* 🔥 THE INJECTED NETWORK BADGES */}
+                                                        {deck.isPublished && deck.visibility === 'public' && (
+                                                            <span className="text-[9px] text-emerald-600 font-black uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded-md flex items-center gap-1 border border-emerald-100">
+                                                                <Globe size={10}/> Global
+                                                            </span>
+                                                        )}
+                                                        {deck.isPublished && deck.visibility === 'restricted' && (
+                                                            <span className="text-[9px] text-indigo-600 font-black uppercase tracking-widest bg-indigo-50 px-2 py-1 rounded-md flex items-center gap-1 border border-indigo-100">
+                                                                <Users size={10}/> Cohort
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
+                                            <div className="bg-orange-50 w-10 h-10 rounded-full flex items-center justify-center text-orange-500 opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all duration-300 shrink-0">
+                                                <Play size={18} fill="currentColor" className="ml-1"/>
+                                            </div>
                                         </div>
-                                        <div className="bg-orange-50 w-10 h-10 rounded-full flex items-center justify-center text-orange-500 opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all duration-300">
-                                            <Play size={18} fill="currentColor" className="ml-1"/>
-                                        </div>
-                                    </div>
 
-                                    <div className="relative z-10 mt-6">
-                                        <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">
-                                            <span>Mastery</span>
-                                            <span className="text-orange-500">{mastery}%</span>
+                                        <div className="relative z-10 mt-6">
+                                            <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">
+                                                <span>Mastery</span>
+                                                <span className="text-orange-500">{mastery}%</span>
+                                            </div>
+                                            <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                                                <div className="h-full bg-gradient-to-r from-orange-400 to-rose-500 transition-all duration-1000" style={{ width: `${mastery}%` }}></div>
+                                            </div>
                                         </div>
-                                        <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                                            <div className="h-full bg-gradient-to-r from-orange-400 to-rose-500 transition-all duration-1000" style={{ width: `${mastery}%` }}></div>
-                                        </div>
-                                    </div>
-                                </button>
-                            );
-                        })}
-                    </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -325,9 +368,17 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     <div className="flex items-center gap-3 mb-2">
                         <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter">{deckTitle}</h1>
                     </div>
-                    <p className="text-indigo-500 text-xs font-black uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-lg w-fit mt-2">
-                        {cards.length} Configured Targets
-                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                        <span className="text-indigo-500 text-[10px] font-black uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-lg">
+                            {cards.length} Configured Targets
+                        </span>
+                        {/* Show badge in menu too! */}
+                        {resolvedDeck.isPublished && resolvedDeck.visibility === 'public' && (
+                            <span className="text-emerald-600 text-[10px] font-black uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-lg flex items-center gap-1">
+                                <Globe size={12}/> Global Network
+                            </span>
+                        )}
+                    </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 custom-scrollbar pb-32 relative z-10">
@@ -349,28 +400,24 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             </h3>
                             
                             <div className="grid grid-cols-2 gap-4">
-                                {/* STANDARD MODE */}
                                 <button onClick={() => launchGame('standard')} className="bg-white p-6 rounded-[2.5rem] border-[3px] border-slate-100 shadow-sm hover:shadow-xl hover:border-blue-300 hover:-translate-y-1 active:translate-y-0 transition-all group text-left">
                                     <div className="w-14 h-14 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-6 transition-transform"><Layers size={28}/></div>
                                     <h4 className="font-black text-slate-800 text-xl leading-none mb-2">Review</h4>
                                     <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Standard Mode</p>
                                 </button>
                                 
-                                {/* QUIZ MODE */}
                                 <button onClick={() => launchGame('quiz')} className="bg-white p-6 rounded-[2.5rem] border-[3px] border-slate-100 shadow-sm hover:shadow-xl hover:border-emerald-300 hover:-translate-y-1 active:translate-y-0 transition-all group text-left">
                                     <div className="w-14 h-14 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 group-hover:-rotate-6 transition-transform"><HelpCircle size={28}/></div>
                                     <h4 className="font-black text-slate-800 text-xl leading-none mb-2">Quiz</h4>
                                     <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Multiple Choice</p>
                                 </button>
                                 
-                                {/* MATCH MODE */}
                                 <button onClick={() => launchGame('match')} className="bg-white p-6 rounded-[2.5rem] border-[3px] border-slate-100 shadow-sm hover:shadow-xl hover:border-purple-300 hover:-translate-y-1 active:translate-y-0 transition-all group text-left">
                                     <div className="w-14 h-14 bg-purple-50 text-purple-500 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-12 transition-transform"><Puzzle size={28}/></div>
                                     <h4 className="font-black text-slate-800 text-xl leading-none mb-2">Match</h4>
                                     <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Speed Pairs</p>
                                 </button>
                                 
-                                {/* TOWER MODE */}
                                 <button onClick={() => launchGame('tower')} className="bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-800 shadow-xl hover:shadow-2xl hover:border-orange-500 hover:-translate-y-1 active:translate-y-0 transition-all group text-left relative overflow-hidden">
                                     <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-black opacity-50"></div>
                                     <div className="relative z-10">
@@ -394,9 +441,9 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 <button onClick={handleBack} className="p-3 bg-slate-50 rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition-colors"><X size={20} strokeWidth={3}/></button>
                 <div className="flex flex-col items-center">
                     <span className="text-[9px] font-black text-indigo-500 uppercase tracking-[0.2em] mb-0.5">{activeGame === 'tower' ? 'Survival' : activeGame} Protocol</span>
-                    <span className="text-sm font-black text-slate-900">{deckTitle}</span>
+                    <span className="text-sm font-black text-slate-900 line-clamp-1">{deckTitle}</span>
                 </div>
-                <div className="w-11"></div> {/* Spacer for center alignment */}
+                <div className="w-11"></div>
             </div>
 
             <div className="flex-1 overflow-hidden relative">
