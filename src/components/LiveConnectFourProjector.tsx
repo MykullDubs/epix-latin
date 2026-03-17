@@ -181,51 +181,97 @@ export default function LiveConnectFourProjector({ deck, classId, activeClass, o
     }
 
     // ACTIVE GAME VIEW
-    if (gameState === 'active') {
-        const teamAnswers = Object.entries(liveState?.answers || {}).filter(([email]) => teams[email] === currentTurn);
-        const totalOnActiveTeam = Object.values(teams).filter(t => t === currentTurn).length;
+// 1. Add Timer State near other states
+const [turnTimeLeft, setTurnTimeLeft] = useState(20);
+const turnTimerRef = useRef<any>(null);
 
-        return (
-            <div className="h-full flex flex-col bg-slate-950 text-white font-sans relative overflow-hidden">
-                <div className={`absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] opacity-20 pointer-events-none transition-colors duration-1000 ${currentTurn === 1 ? 'from-rose-600 via-slate-950 to-black' : 'from-indigo-600 via-slate-950 to-black'}`} />
-                <div className="flex justify-between items-start p-12 relative z-20">
-                     <div className={`p-6 rounded-[2.5rem] border-4 transition-all ${currentTurn === 1 ? 'bg-rose-500/10 border-rose-500 shadow-[0_0_40px_rgba(244,63,94,0.3)] scale-105' : 'bg-slate-900 border-slate-800 opacity-50'}`}>
-                         <h3 className="font-black text-xl uppercase tracking-widest text-rose-500 mb-2">Team Red</h3>
-                         <div className="flex gap-2">{Object.entries(teams).filter(([_, t]) => t === 1).map(([e], i) => <div key={i} className="w-8 h-8 rounded-full bg-rose-500/20 border-2 border-rose-500 flex items-center justify-center text-xs font-black">{e[0].toUpperCase()}</div>)}</div>
-                     </div>
-                     <div className={`p-6 rounded-[2.5rem] border-4 transition-all ${currentTurn === 2 ? 'bg-indigo-500/10 border-indigo-500 shadow-[0_0_40px_rgba(99,102,241,0.3)] scale-105' : 'bg-slate-900 border-slate-800 opacity-50'}`}>
-                         <h3 className="font-black text-xl uppercase tracking-widest text-indigo-500 mb-2 text-right">Team Blue</h3>
-                         <div className="flex gap-2 justify-end">{Object.entries(teams).filter(([_, t]) => t === 2).map(([e], i) => <div key={i} className="w-8 h-8 rounded-full bg-indigo-500/20 border-2 border-indigo-500 flex items-center justify-center text-xs font-black">{e[0].toUpperCase()}</div>)}</div>
-                     </div>
-                </div>
+// 2. Add Turn Timer Logic
+useEffect(() => {
+    if (gameState !== 'active') return;
 
-                <div className="flex-1 flex flex-col items-center justify-center z-10 px-8 pb-12">
-                    <div className="text-center mb-8">
-                        <span className={`text-sm font-black uppercase tracking-[0.3em] block mb-2 ${currentTurn === 1 ? 'text-rose-400' : 'text-indigo-400'}`}>{currentTurn === 1 ? 'Red Team' : 'Blue Team'} Decoding...</span>
-                        <h2 className="text-5xl md:text-7xl font-black tracking-tighter uppercase italic">{liveState?.currentQuestion?.question}</h2>
-                    </div>
+    clearInterval(turnTimerRef.current);
+    setTurnTimeLeft(20); // Reset to 20s every turn change
 
-                    <div className="bg-slate-800 p-6 rounded-[3rem] border-8 border-slate-700 shadow-2xl">
-                        <div className="flex gap-4">
-                            {grid.map((col, colIdx) => (
-                                <div key={colIdx} className="flex flex-col-reverse gap-4">
-                                    {Array.from({ length: ROWS }).map((_, rowIdx) => {
-                                        const token = col[rowIdx];
-                                        let style = 'bg-slate-900 border-4 border-slate-950 shadow-inner';
-                                        if (token === 1) style = 'bg-rose-500 border-4 border-rose-400 shadow-[0_0_30px_rgba(244,63,94,0.5)]';
-                                        if (token === 2) style = 'bg-indigo-500 border-4 border-indigo-400 shadow-[0_0_30px_rgba(99,102,241,0.5)]';
-                                        return (
-                                            <div key={rowIdx} className="w-16 h-16 md:w-20 md:h-20 rounded-full relative overflow-hidden flex items-center justify-center">
-                                                <div className={`w-full h-full rounded-full transition-all duration-500 ${style} ${token ? 'animate-in slide-in-from-top-24 duration-700 ease-bounce' : ''}`} />
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
+    turnTimerRef.current = setInterval(() => {
+        setTurnTimeLeft((prev) => {
+            if (prev <= 1) {
+                handleSkipTurn();
+                return 0;
+            }
+            return prev - 1;
+        });
+    }, 1000);
+
+    return () => clearInterval(turnTimerRef.current);
+}, [currentTurn, gameState]);
+
+const handleSkipTurn = () => {
+    const nextTeam = currentTurn === 1 ? 2 : 1;
+    setCurrentTurn(nextTeam);
+    const nextQ = generateQuestion();
+    
+    const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
+    updateDoc(sessionRef, { 
+        currentTurn: nextTeam,
+        currentQuestion: nextQ,
+        answers: {},
+        lastMove: null 
+    });
+};
+
+// 3. Update the Board Render to include the Last Move Indicator
+// Inside the return, replace the Board div:
+
+<div className="flex-1 flex flex-col items-center justify-center z-10 px-8 pb-12">
+    <div className="flex items-center gap-8 mb-8">
+        <div className={`flex flex-col items-center gap-1 transition-opacity ${currentTurn === 1 ? 'opacity-100' : 'opacity-30'}`}>
+            <span className="text-[10px] font-black text-rose-500 uppercase">Red Timer</span>
+            <div className="text-4xl font-black tabular-nums text-white bg-rose-600 px-6 py-2 rounded-2xl shadow-[0_0_20px_rgba(244,63,94,0.3)] border-2 border-rose-400">
+                {currentTurn === 1 ? turnTimeLeft : '--'}s
             </div>
+        </div>
+
+        <div className="text-center">
+            <span className="text-sm font-black uppercase tracking-[0.3em] block mb-2 text-slate-500">Squad Intelligence Task</span>
+            <h2 className="text-5xl md:text-6xl font-black tracking-tighter uppercase italic">{liveState?.currentQuestion?.question}</h2>
+        </div>
+
+        <div className={`flex flex-col items-center gap-1 transition-opacity ${currentTurn === 2 ? 'opacity-100' : 'opacity-30'}`}>
+            <span className="text-[10px] font-black text-indigo-500 uppercase">Blue Timer</span>
+            <div className="text-4xl font-black tabular-nums text-white bg-indigo-600 px-6 py-2 rounded-2xl shadow-[0_0_20px_rgba(99,102,241,0.3)] border-2 border-indigo-400">
+                {currentTurn === 2 ? turnTimeLeft : '--'}s
+            </div>
+        </div>
+    </div>
+
+    <div className="bg-slate-800 p-6 rounded-[3rem] border-8 border-slate-700 shadow-2xl relative">
+        <div className="flex gap-4">
+            {grid.map((col, colIdx) => (
+                <div key={colIdx} className="flex flex-col-reverse gap-4">
+                    {Array.from({ length: ROWS }).map((_, rowIdx) => {
+                        const token = col[rowIdx];
+                        const isLastMove = liveState?.lastMove?.col === colIdx && liveState?.lastMove?.row === rowIdx;
+                        
+                        let style = 'bg-slate-900 border-4 border-slate-950 shadow-inner';
+                        if (token === 1) style = 'bg-rose-500 border-4 border-rose-400 shadow-[0_0_30px_rgba(244,63,94,0.5)]';
+                        if (token === 2) style = 'bg-indigo-500 border-4 border-indigo-400 shadow-[0_0_30px_rgba(99,102,241,0.5)]';
+                        
+                        return (
+                            <div key={rowIdx} className="w-16 h-16 md:w-20 md:h-20 rounded-full relative flex items-center justify-center">
+                                <div className={`w-full h-full rounded-full transition-all duration-500 ${style} ${token ? 'animate-in slide-in-from-top-24 duration-700 ease-bounce' : ''}`} />
+                                
+                                {/* 🔥 LAST MOVE INDICATOR */}
+                                {isLastMove && (
+                                    <div className="absolute inset-0 border-4 border-white rounded-full animate-ping pointer-events-none" />
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            ))}
+        </div>
+    </div>
+</div>
         );
     }
 
