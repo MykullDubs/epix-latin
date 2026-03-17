@@ -458,7 +458,134 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) 
         </div>
     );
 };
+// ============================================================================
+//  CONNECT FOUR: STUDENT REMOTE
+// ============================================================================
+const ConnectFourRemote = ({ liveSession, classId, studentEmail }: any) => {
+    const safeEmail = (studentEmail || 'scholar@magister').replace(/\./g, ',');
+    const myTeam = liveSession?.teams?.[safeEmail]; // 1 = Red, 2 = Blue
+    const isMyTurn = liveSession?.currentTurn === myTeam;
+    const isRevealed = liveSession?.quizState === 'finished';
 
+    const currentQ = liveSession?.currentQuestion;
+    const myAnswer = liveSession?.answers?.[safeEmail];
+    const teamHasAnswered = Object.entries(liveSession?.answers || {}).some(
+        ([email, ansId]) => liveSession.teams[email] === myTeam && ansId === currentQ?.correctId
+    );
+
+    const submitAnswer = async (optionId: string) => {
+        if (!isMyTurn || myAnswer || teamHasAnswered) return;
+        const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
+        await updateDoc(sessionRef, {
+            [`answers.${safeEmail}`]: optionId
+        });
+    };
+
+    const handleDrop = async (colIndex: number) => {
+        if (!isMyTurn || !teamHasAnswered) return;
+        
+        // Find the next available row in this column
+        const currentColumn = liveSession.board?.[colIndex] || [];
+        if (currentColumn.length >= 6) return; // Column full
+
+        const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
+        
+        // We broadcast the 'lastMove' which the Projector will hear and process
+        await updateDoc(sessionRef, {
+            lastMove: {
+                col: colIndex,
+                row: currentColumn.length,
+                team: myTeam,
+                timestamp: Date.now()
+            }
+        });
+    };
+
+    // STATE: Victory / Defeat
+    if (isRevealed) {
+        const iWon = liveSession.winningTeam === myTeam;
+        return (
+            <div className={`h-full rounded-[3rem] flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-500 border-[12px] ${iWon ? 'bg-slate-900 border-emerald-500' : 'bg-black border-rose-900'}`}>
+                {iWon ? <Trophy size={120} className="text-emerald-400 mb-6 animate-bounce" /> : <XCircle size={120} className="text-rose-900 mb-6" />}
+                <h2 className="text-5xl font-black text-white mb-4 tracking-tighter">
+                    {iWon ? 'VICTORY' : 'DEFEATED'}
+                </h2>
+                <p className="text-white/60 font-black uppercase tracking-widest">
+                    {iWon ? 'Squad Superiority Established' : 'Tactical Withdrawal Required'}
+                </p>
+            </div>
+        );
+    }
+
+    // STATE: Enemy Turn
+    if (!isMyTurn) {
+        return (
+            <div className="h-full bg-black rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center border-4 border-slate-900 shadow-inner">
+                <div className="relative w-32 h-32 mb-8 opacity-20">
+                    <Shield size={128} className="text-slate-500 animate-pulse" />
+                </div>
+                <h2 className="text-2xl font-black text-slate-700 mb-2 tracking-widest uppercase text-balance">Enemy Squad Engaging...</h2>
+                <p className="text-slate-800 font-bold text-xs uppercase tracking-widest">Hold your position</p>
+            </div>
+        );
+    }
+
+    // STATE: Active Turn - Step 2 (The Drop)
+    if (teamHasAnswered) {
+        return (
+            <div className="h-full bg-slate-950 rounded-[2.5rem] p-4 flex flex-col border-4 border-slate-800 shadow-2xl">
+                <div className={`p-6 rounded-[2rem] mb-6 text-center shadow-lg border-b-8 ${myTeam === 1 ? 'bg-rose-600 border-rose-800' : 'bg-indigo-600 border-indigo-800'}`}>
+                    <Zap size={32} fill="white" className="mx-auto mb-2 text-white" />
+                    <h2 className="text-2xl font-black text-white uppercase tracking-tight">Access Granted</h2>
+                    <p className="text-white/80 font-bold text-[10px] uppercase tracking-[0.2em]">Select Deployment Zone</p>
+                </div>
+
+                <div className="flex-1 grid grid-cols-4 gap-3 pb-4">
+                    {[0, 1, 2, 3, 4, 5, 6].map((col) => (
+                        <button
+                            key={col}
+                            onClick={() => handleDrop(col)}
+                            className={`rounded-2xl flex flex-col items-center justify-center font-black text-2xl transition-all active:scale-90 border-b-4 ${
+                                myTeam === 1 
+                                ? 'bg-rose-500 border-rose-700 text-white' 
+                                : 'bg-indigo-500 border-indigo-700 text-white'
+                            }`}
+                        >
+                            <ArrowDownCircle size={24} className="mb-2" />
+                            {col + 1}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
+    // STATE: Active Turn - Step 1 (The Question)
+    return (
+        <div className="h-full bg-slate-950 rounded-[2.5rem] p-4 flex flex-col border-4 border-slate-800">
+            <div className={`p-6 rounded-[2rem] mb-4 text-center border-b-4 ${myTeam === 1 ? 'bg-rose-900/50 border-rose-500' : 'bg-indigo-900/50 border-indigo-500'}`}>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Squad Intelligence Task</span>
+                <h2 className="text-xl font-bold text-white leading-tight">"{currentQ?.question}"</h2>
+            </div>
+            
+            <div className="flex-1 flex flex-col gap-3">
+                {currentQ?.options.map((opt: any) => (
+                    <button
+                        key={opt.id}
+                        onClick={() => submitAnswer(opt.id)}
+                        className={`flex-1 rounded-2xl p-4 font-black text-sm uppercase tracking-widest transition-all border-2 ${
+                            myAnswer === opt.id 
+                            ? 'bg-white text-black border-white' 
+                            : 'bg-slate-900 text-slate-400 border-slate-800 active:bg-slate-800'
+                        }`}
+                    >
+                        {opt.text}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+};
 // ============================================================================
 //  MAIN STUDENT CLASS VIEW (ENTRY POINT)
 // ============================================================================
