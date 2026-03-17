@@ -4,7 +4,7 @@ import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useGlobalLeaderboard } from '../hooks/useGlobalLeaderboard';
 import { getInitials } from '../utils/profileHelpers';
 
-// --- REUSABLE AVATAR SUB-COMPONENT ---
+// --- REUSABLE AVATAR SUB-COMONENT ---
 const UserAvatar = ({ user, size = "md", isMe = false }: any) => {
     const sizeClasses: any = {
         sm: "w-8 h-8 text-[10px]",
