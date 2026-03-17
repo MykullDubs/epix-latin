@@ -15,8 +15,16 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
 
   const [importMode, setImportMode] = useState<boolean>(false);
   const [jsonInput, setJsonInput] = useState<string>('');
-  const [isImporting, setIsImporting] = useState<boolean>(false); // NEW: Track import status
+  const [isImporting, setIsImporting] = useState<boolean>(false);
   const [importProgress, setImportProgress] = useState<{current: number, total: number} | null>(null);
+
+  // 🔥 NEW: Optimistic Local State to prevent the dropdown from blanking out while Firebase syncs
+  const [localOptimisticDecks, setLocalOptimisticDecks] = useState<any>({});
+
+  // Merge the real decks from Firebase with our instant local decks
+  const validDecks = { ...availableDecks, ...localOptimisticDecks };
+  const deckOptions = Object.entries(validDecks).map(([key, deck]: any) => ({ id: key, title: deck.title })); 
+  const currentDeckCards = validDecks[formData.deckId] ? validDecks[formData.deckId].cards || [] : validDecks['custom'] ? validDecks['custom'].cards || [] : [];
 
   useEffect(() => { if (initialDeckId) setFormData(prev => ({...prev, deckId: initialDeckId})); }, [initialDeckId]);
   
@@ -71,6 +79,14 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
         grammar_tags: formData.grammarTags ? formData.grammarTags.split(',').map(t => t.trim()) : ["Custom"] 
     }; 
 
+    // Optimistically update local UI instantly
+    if (!editingId) {
+        setLocalOptimisticDecks((prev: any) => {
+            const existingDeck = prev[finalDeckId] || validDecks[finalDeckId] || { title: finalDeckTitle || 'Custom Deck', cards: [] };
+            return { ...prev, [finalDeckId]: { ...existingDeck, title: finalDeckTitle || existingDeck.title, cards: [...existingDeck.cards, { id: `temp_${Date.now()}`, ...cardData }] } };
+        });
+    }
+
     if (editingId) { 
         await onUpdateCard(editingId, cardData); 
         setToastMsg("Target Updated Successfully"); 
@@ -87,7 +103,6 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
     } 
   };
 
-  // 🔥 THROTTLED BULK IMPORT ENGINE
   const handleBulkImport = async () => {
     try {
         const cards = JSON.parse(jsonInput);
@@ -100,6 +115,12 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
             finalDeckId = `custom_${Date.now()}`;
             finalDeckTitle = newDeckTitle;
         }
+
+        // Instantly register the deck locally so the dropdown doesn't break
+        setLocalOptimisticDecks((prev: any) => ({
+            ...prev,
+            [finalDeckId]: prev[finalDeckId] || validDecks[finalDeckId] || { title: finalDeckTitle || 'Custom Deck', cards: [] }
+        }));
 
         setIsImporting(true);
         setImportProgress({ current: 0, total: cards.length });
@@ -128,7 +149,12 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                 successCount++;
                 setImportProgress({ current: successCount, total: cards.length });
                 
-                // THE THROTTLE: Wait 250ms between saves so Firebase doesn't drop packets
+                // Push card to local inventory instantly so user can watch it populate
+                setLocalOptimisticDecks((prev: any) => {
+                    const existingDeck = prev[finalDeckId];
+                    return { ...prev, [finalDeckId]: { ...existingDeck, cards: [...existingDeck.cards, { id: `temp_${Date.now()}_${i}`, ...cardData }] } };
+                });
+
                 await new Promise(resolve => setTimeout(resolve, 250));
             } catch (err) {
                 console.error(`Failed to save target: ${card.front}`, err);
@@ -152,10 +178,6 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
         setImportProgress(null);
     }
   };
-  
-  const validDecks = availableDecks || {}; 
-  const deckOptions = Object.entries(validDecks).map(([key, deck]: any) => ({ id: key, title: deck.title })); 
-  const currentDeckCards = validDecks[formData.deckId] ? validDecks[formData.deckId].cards || [] : validDecks['custom'] ? validDecks['custom'].cards || [] : [];
   
   useEffect(() => { if (editingId && !currentDeckCards.some((c: any) => c.id === editingId)) { handleClear(); } }, [currentDeckCards, editingId]);
 
