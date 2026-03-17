@@ -1,7 +1,7 @@
 // src/components/LiveVocabProjector.tsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLiveClass } from '../hooks/useLiveClass';
-import { Users, Timer, Zap, ArrowRight, X, Trophy, CheckCircle2, Settings } from 'lucide-react';
+import { Users, Timer, Zap, ArrowRight, X, CheckCircle2, Settings, Hand } from 'lucide-react';
 
 export default function LiveVocabProjector({ deck, classId, activeClass, onExit }: any) {
     const { liveState, startLiveClass, endLiveClass, changeSlide, triggerQuiz } = useLiveClass(classId, true);
@@ -55,20 +55,19 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
         };
     }, [classId, safeDeckId, quizQuestions]); 
 
-    // 🔥 THE FIX: AUTO-SKIP ENGINE (Now looks at the Lobby, not the Roster)
+    // AUTO-SKIP ENGINE (Only runs if AutoPilot is ON)
     useEffect(() => {
         if (liveState?.quizState === 'active' && isAutoPilot) {
             const currentAnswers = Object.keys(liveState?.answers || {}).length;
             const joinedStudentsCount = Object.keys(liveState?.joined || {}).length;
             
-            // If we have at least 1 person in the lobby, and all of them answered... skip!
             if (joinedStudentsCount > 0 && currentAnswers >= joinedStudentsCount) {
                 setTimeLeft(0); 
             }
         }
     }, [liveState?.answers, liveState?.joined, isAutoPilot]);
 
-    // MAIN GAME LOOP
+    // TIMER LOOP
     useEffect(() => {
         if (!isAutoPilot) return;
         
@@ -109,10 +108,16 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
         }
     };
 
-    const startRun = () => {
+    // TWO LAUNCH MODES
+    const startAutoPilotRun = () => {
         setIsAutoPilot(true);
         triggerQuiz('active');
         setTimeLeft(gameSettings.qTime);
+    };
+
+    const startManualRun = () => {
+        setIsAutoPilot(false);
+        triggerQuiz('active');
     };
 
     const currentQ = quizQuestions[currentIndex];
@@ -124,12 +129,13 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
     // ========================================================================
     //  PHASE 1: THE LOBBY
     // ========================================================================
-    if (!isAutoPilot && (!liveState?.quizState || liveState?.quizState === 'waiting')) {
+    if (!liveState?.quizState || liveState?.quizState === 'waiting') {
         return (
-            <div className="h-full bg-slate-950 text-white flex flex-col items-center justify-center p-12 relative overflow-hidden">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-900/20 via-slate-950 to-black" />
+            <div className="h-full bg-slate-950 text-white flex flex-col relative overflow-hidden font-sans">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-900/20 via-slate-950 to-black pointer-events-none" />
                 
-                <div className="absolute top-8 left-8 right-8 flex items-center justify-between z-20">
+                {/* TOP BAR */}
+                <div className="flex items-center justify-between z-20 p-8 shrink-0">
                     <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center font-black shadow-lg shadow-indigo-500/20">
                             <Zap size={24} fill="white" />
@@ -137,7 +143,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                         <div>
                             <h3 className="font-black text-xl uppercase tracking-tighter text-white">{deck.title || 'Custom Deck'}</h3>
                             <div className="flex items-center gap-3">
-                                <span className="text-[10px] text-indigo-400 font-black uppercase tracking-widest">Live Arena Protocol</span>
+                                <span className="text-[10px] text-indigo-400 font-black uppercase tracking-widest">Live Arena</span>
                                 <div className="h-1 w-1 rounded-full bg-slate-700" />
                                 <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{activeClass?.name || 'Classroom'}</span>
                             </div>
@@ -146,6 +152,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
 
                     <div className="flex bg-slate-900 border border-slate-800 p-1.5 rounded-2xl gap-2 items-center px-4">
                         <Settings size={14} className="text-slate-500 mr-2" />
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-2">Auto-Timer:</span>
                         {[10, 15, 30].map(t => (
                             <button 
                                 key={t}
@@ -155,22 +162,22 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                                 {t}s
                             </button>
                         ))}
+                        <button onClick={onExit} className="ml-4 text-slate-600 hover:text-rose-500 p-2 transition-colors"><X size={24} /></button>
                     </div>
                 </div>
 
-                <div className="z-10 text-center max-w-5xl w-full mt-12">
-                    <div className="w-24 h-24 bg-indigo-600 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-[0_0_50px_rgba(79,70,229,0.4)] animate-bounce-slow">
-                        <Zap size={48} fill="white" />
+                {/* SCROLLABLE GRID AREA (Fixes the cut-off button issue) */}
+                <div className="flex-1 flex flex-col min-h-0 px-8 pb-8 z-10">
+                    
+                    <div className="text-center shrink-0 mb-8 mt-4">
+                        <h1 className="text-6xl font-black uppercase tracking-tighter mb-4 italic">Arena Lobby</h1>
+                        <p className={`font-black uppercase tracking-[0.4em] text-sm ${joinedCount > 0 ? 'text-emerald-400 animate-pulse' : 'text-indigo-400'}`}>
+                            {joinedCount > 0 ? 'Ready For Protocol' : 'Awaiting Connections...'}
+                        </p>
                     </div>
-                    <h1 className="text-6xl font-black uppercase tracking-tighter mb-4 italic">Arena Lobby</h1>
                     
-                    {/* Visual tweak: Lets the instructor know they can start */}
-                    <p className={`font-black uppercase tracking-[0.4em] mb-12 ${joinedCount > 0 ? 'text-emerald-400 animate-pulse' : 'text-indigo-400'}`}>
-                        {joinedCount > 0 ? 'Ready For Protocol' : 'Awaiting Connections'}
-                    </p>
-                    
-                    <div className="bg-slate-900/50 border-2 border-slate-800 rounded-[3rem] p-12 mb-12">
-                        <div className="flex items-center justify-between mb-8 border-b border-slate-800 pb-6">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-900/50 border-2 border-slate-800 rounded-[3rem] p-8 md:p-12 w-full max-w-5xl mx-auto shadow-inner">
+                        <div className="flex items-center justify-between mb-8 border-b border-slate-800 pb-6 shrink-0">
                             <span className="text-xl font-black uppercase tracking-widest text-slate-500">Connected Scholars</span>
                             <span className="bg-indigo-600 px-6 py-2 rounded-full font-black text-2xl">{joinedCount} / {activeClass?.students?.length || 0}</span>
                         </div>
@@ -192,20 +199,27 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                                 );
                             })}
                             {(!activeClass?.students || activeClass.students.length === 0) && (
-                                <div className="col-span-full py-8 text-slate-600 font-black uppercase tracking-widest text-sm">No students enrolled in this cohort yet.</div>
+                                <div className="col-span-full py-8 text-slate-600 font-black uppercase tracking-widest text-sm text-center">No students enrolled in this cohort yet.</div>
                             )}
                         </div>
                     </div>
 
-                    <button 
-                        onClick={startRun} 
-                        className="bg-white text-black px-16 py-6 rounded-full font-black text-3xl uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-[0_0_60px_rgba(255,255,255,0.2)]"
-                    >
-                        Initialize Run
-                    </button>
+                    {/* ALWAYS VISIBLE LAUNCH CONTROLS */}
+                    <div className="shrink-0 flex flex-col sm:flex-row items-center justify-center gap-6 mt-6">
+                        <button 
+                            onClick={startManualRun} 
+                            className="px-10 py-5 bg-slate-800 text-white rounded-full font-black text-xl uppercase tracking-widest hover:bg-slate-700 transition-colors border-2 border-slate-700 flex items-center gap-3 active:scale-95"
+                        >
+                            <Hand size={24} /> Manual Mode
+                        </button>
+                        <button 
+                            onClick={startAutoPilotRun} 
+                            className="bg-white text-black px-12 py-5 rounded-full font-black text-xl uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-[0_0_60px_rgba(255,255,255,0.2)] flex items-center gap-3"
+                        >
+                            <Zap size={24} fill="currentColor" /> Auto-Pilot Mode
+                        </button>
+                    </div>
                 </div>
-                
-                <button onClick={onExit} className="absolute top-8 right-8 text-slate-600 hover:text-rose-500 p-2 transition-colors z-50"><X size={40} /></button>
             </div>
         );
     }
@@ -217,17 +231,25 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
     // ========================================================================
     return (
         <div className="h-full flex flex-col bg-slate-950 text-white font-sans relative overflow-hidden">
-            <div className="absolute top-0 left-0 h-1.5 bg-indigo-500 transition-all duration-1000 ease-linear z-50"
-                style={{ width: `${(timeLeft / (liveState?.quizState === 'revealed' ? gameSettings.rTime : gameSettings.qTime)) * 100}%` }} />
+            {isAutoPilot && (
+                <div className="absolute top-0 left-0 h-1.5 bg-indigo-500 transition-all duration-1000 ease-linear z-50"
+                    style={{ width: `${(timeLeft / (liveState?.quizState === 'revealed' ? gameSettings.rTime : gameSettings.qTime)) * 100}%` }} />
+            )}
 
             <div className="absolute inset-0 bg-black opacity-60" />
             
             <div className="flex-1 flex flex-col items-center justify-center p-12 relative z-10">
                 
-                <div className={`mb-8 flex items-center gap-4 px-8 py-4 rounded-full border-2 transition-all ${timeLeft <= 5 && liveState?.quizState !== 'revealed' ? 'border-rose-500 text-rose-500 animate-pulse bg-rose-500/10' : 'border-slate-700 text-slate-400 bg-slate-900/50'}`}>
-                    <Timer size={32} />
-                    <span className="text-5xl font-black tabular-nums">{timeLeft}s</span>
-                </div>
+                {isAutoPilot ? (
+                    <div className={`mb-8 flex items-center gap-4 px-8 py-4 rounded-full border-2 transition-all ${timeLeft <= 5 && liveState?.quizState !== 'revealed' ? 'border-rose-500 text-rose-500 animate-pulse bg-rose-500/10' : 'border-slate-700 text-slate-400 bg-slate-900/50'}`}>
+                        <Timer size={32} />
+                        <span className="text-5xl font-black tabular-nums">{timeLeft}s</span>
+                    </div>
+                ) : (
+                    <div className="mb-8 flex items-center gap-4 px-8 py-4 rounded-full border-2 border-slate-700 text-slate-400 bg-slate-900/50 uppercase tracking-widest text-sm font-black">
+                        <Hand size={20} /> Instructor Controlled
+                    </div>
+                )}
 
                 <div className="max-w-6xl w-full bg-slate-900/80 border-4 border-slate-800 rounded-[4rem] p-16 shadow-2xl text-center relative backdrop-blur-xl">
                     <span className="text-sm font-black text-indigo-500 uppercase tracking-[0.3em] block mb-6">Target {currentIndex + 1} / {quizQuestions.length}</span>
@@ -242,12 +264,21 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                                     <div className="absolute inset-0 bg-indigo-500 blur-3xl opacity-20 animate-pulse" />
                                 </div>
                                 <div className="text-left">
-                                    {/* Show them how many out of the active lobby have answered */}
-                                    <span className="block text-7xl font-black leading-none">{answerCount} <span className="text-4xl text-slate-600">/ {joinedCount}</span></span>
+                                    <span className="block text-7xl font-black leading-none">{answerCount} <span className="text-4xl text-slate-600">/ {joinedCount > 0 ? joinedCount : '∞'}</span></span>
                                     <span className="text-sm font-black text-slate-500 uppercase tracking-[0.3em]">Responses In</span>
                                 </div>
                             </div>
-                            <p className="text-slate-500 font-bold uppercase tracking-widest text-sm animate-pulse">Awaiting remaining signals...</p>
+                            
+                            {isAutoPilot ? (
+                                <p className="text-slate-500 font-bold uppercase tracking-widest text-sm animate-pulse">Awaiting remaining signals...</p>
+                            ) : (
+                                <button 
+                                    onClick={() => triggerQuiz('revealed')}
+                                    className="mt-8 bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-6 rounded-full font-black text-2xl uppercase tracking-widest transition-transform active:scale-95 shadow-xl"
+                                >
+                                    Reveal Answer
+                                </button>
+                            )}
                         </div>
                     )}
 
@@ -271,13 +302,21 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                                                 <div className={`w-14 h-14 rounded-2xl border-2 flex items-center justify-center font-black text-xl shadow-lg transition-all ${isCorrect ? 'bg-emerald-500 border-emerald-300 text-white shadow-emerald-500/20' : 'bg-slate-800 border-slate-700 text-slate-500 opacity-50'}`}>
                                                     {initial}
                                                 </div>
-                                                {isCorrect && <CheckCircle2 size={14} className="text-emerald-400" />}
                                             </div>
                                         );
                                     })}
                                     {answerCount === 0 && <p className="text-slate-600 font-bold italic">No responses received this round.</p>}
                                 </div>
                             </div>
+
+                            {!isAutoPilot && (
+                                <button 
+                                    onClick={handleNext}
+                                    className="mt-12 flex items-center gap-4 text-slate-400 hover:text-white font-black text-2xl uppercase tracking-[0.2em] transition-all hover:gap-6 mx-auto"
+                                >
+                                    {currentIndex < quizQuestions.length - 1 ? 'Next Target' : 'Protocol Complete'} <ArrowRight size={32} />
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>
