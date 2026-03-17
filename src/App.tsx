@@ -221,6 +221,7 @@ export default function App() {
         curriculums={allCurriculums} // 🔥 PASSING THE BLENDED ARRAY DOWN
         onAssignCurriculum={actions.assignCurriculum} 
         onSaveLesson={actions.saveLesson} 
+        onSaveCurriculum={actions.saveCurriculum}
         onSaveCard={actions.saveCard}
         onAssign={actions.assignContent}
         onRevoke={actions.revokeContent}
