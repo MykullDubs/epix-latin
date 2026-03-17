@@ -1,18 +1,20 @@
 // src/components/instructor/BuilderHub.tsx
 import React, { useState, useEffect } from 'react';
-import { Layers, BookOpen, FileText, Gamepad2, X, Edit3, Eye, Zap } from 'lucide-react';
+import { Layers, BookOpen, FileText, Gamepad2, X, Edit3, Eye, Zap, Map } from 'lucide-react';
 import { JuicyToast } from '../Toast';
 import CardBuilderView from './CardBuilderView';
 import LessonBuilderView from './LessonBuilderView';
 import ExamBuilderView from './ExamBuilderView';
 import ArcadeBuilderView from './ArcadeBuilderView';
+import CurriculumBuilderView from './CurriculumBuilderView'; // 🔥 IMPORT NEW BUILDER
 import LivePreview from '../LivePreview';
 
 export default function BuilderHub({ 
   onSaveCard, 
   onUpdateCard, 
   onDeleteCard, 
-  onSaveLesson, 
+  onSaveLesson,
+  onSaveCurriculum, // 🔥 NEW PROP 
   allDecks, 
   onPublishDeck,       
   instructorClasses,    
@@ -21,17 +23,19 @@ export default function BuilderHub({
   onClearMode 
 }: any) {
   const [lessonData, setLessonData] = useState<any>({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
-  const [mode, setMode] = useState<'card' | 'lesson' | 'exam' | 'arcade'>(initialMode || 'card'); 
+  const [mode, setMode] = useState<'card' | 'lesson' | 'exam' | 'arcade' | 'curriculum'>(initialMode || 'card'); 
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   useEffect(() => { if (initialMode) setMode(initialMode); }, [initialMode]);
 
+  // 🔥 ADDED CURRICULUM TAB
   const modes = [
     { id: 'card', label: 'Scriptorium', icon: <Layers size={18}/>, color: 'text-indigo-600', bg: 'bg-indigo-50' },
     { id: 'lesson', label: 'Curriculum', icon: <BookOpen size={18}/>, color: 'text-emerald-600', bg: 'bg-emerald-50' },
     { id: 'exam', label: 'Assessment', icon: <FileText size={18}/>, color: 'text-rose-600', bg: 'bg-rose-50' },
-    { id: 'arcade', label: 'Arcade', icon: <Gamepad2 size={18}/>, color: 'text-amber-600', bg: 'bg-amber-50' }
+    { id: 'arcade', label: 'Arcade', icon: <Gamepad2 size={18}/>, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { id: 'curriculum', label: 'Pathway Map', icon: <Map size={18}/>, color: 'text-cyan-600', bg: 'bg-cyan-50' } 
   ];
 
   const handleCommit = () => {
@@ -92,7 +96,8 @@ export default function BuilderHub({
             </button>
           )}
           
-          {mode !== 'exam' && (
+          {/* Hide the manual commit button for Exam and Curriculum, as they have their own save buttons inside */}
+          {mode !== 'exam' && mode !== 'curriculum' && (
             <button 
                onClick={handleCommit}
                className={`hidden sm:flex text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all ${mode === 'arcade' ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-200' : 'bg-slate-900 hover:bg-slate-800'}`}
@@ -137,8 +142,8 @@ export default function BuilderHub({
                     onUpdateCard={onUpdateCard} 
                     onDeleteCard={onDeleteCard} 
                     availableDecks={allDecks} 
-                    onPublishDeck={onPublishDeck}           // 🔥 Added missing prop
-                    instructorClasses={instructorClasses}   // 🔥 Added missing prop
+                    onPublishDeck={onPublishDeck}           
+                    instructorClasses={instructorClasses}   
                 />
               )}
               
@@ -167,6 +172,16 @@ export default function BuilderHub({
                     availableDecks={allDecks} 
                 />
               )}
+
+              {/* 🔥 NEW CURRICULUM BUILDER */}
+              {mode === 'curriculum' && (
+                <div className="-mx-2 md:-mx-8">
+                   <CurriculumBuilderView 
+                      availableLessons={lessons} 
+                      onSaveCurriculum={onSaveCurriculum} 
+                   />
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -182,6 +197,15 @@ export default function BuilderHub({
                     <FileText size={64} className="text-slate-200 mb-6" />
                     <h3 className="text-lg font-black text-slate-800 mb-2">Exam Preview</h3>
                     <p className="text-sm font-bold text-slate-400">Assessments are rendered dynamically in the student's isolated testing environment.</p>
+                </div>
+            )}
+
+            {/* 🔥 CURRICULUM PREVIEW PLACEHOLDER */}
+            {mode === 'curriculum' && (
+                <div className="w-full max-w-xs aspect-[9/16] bg-white border-4 border-dashed border-cyan-200 rounded-[3rem] shadow-sm flex flex-col items-center justify-center p-8 text-center animate-in zoom-in-95 duration-500">
+                    <Map size={64} className="text-cyan-200 mb-6" />
+                    <h3 className="text-lg font-black text-cyan-900 mb-2">Pathway Preview</h3>
+                    <p className="text-sm font-bold text-cyan-700/60">Curriculums are beautifully rendered as a continuous journey in the global vault.</p>
                 </div>
             )}
 
@@ -226,7 +250,7 @@ export default function BuilderHub({
                 </>
             )}
 
-            {mode !== 'exam' && (
+            {mode !== 'exam' && mode !== 'curriculum' && (
                 <button 
                     onClick={handleCommit}
                     className={`absolute -bottom-6 left-1/2 -translate-x-1/2 text-white px-10 py-5 rounded-[2rem] font-black text-[10px] uppercase tracking-[0.3em] shadow-2xl md:hidden flex items-center gap-3 active:scale-90 transition-all ${mode === 'arcade' ? 'bg-amber-500' : 'bg-slate-900'}`}
