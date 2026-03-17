@@ -23,7 +23,7 @@ export default function InstructorDashboard({
   lessons, 
   curriculums,
   onAssignCurriculum,
-  onSaveCurriculum,
+  onSaveCurriculum, // <-- You successfully caught it here!
   onSaveLesson, 
   onSaveCard, 
   onAssign,            
@@ -36,7 +36,7 @@ export default function InstructorDashboard({
   onStartPresentation, 
   onStartVocabGame,
   onStartConnectFour, 
-  onPublishDeck, // <--- 🔥 NEW PROP FOR PUBLISHING TO NETWORK
+  onPublishDeck, 
   onSwitchView, 
   onLogout,
   AdminDashboardView 
@@ -184,10 +184,11 @@ export default function InstructorDashboard({
              </div>
            ) : activeTab === 'studio' ? (
              <div className="h-full animate-in zoom-in-95 duration-500">
-               {/* 🔥 PASSED PUBLISHING PROPS DOWN TO BUILDER HUB */}
+               {/* 🔥 HERE IS THE FIX: I added onSaveCurriculum to BuilderHub! */}
                <BuilderHub 
                  onSaveLesson={onSaveLesson} 
                  onSaveCard={onSaveCard} 
+                 onSaveCurriculum={onSaveCurriculum} 
                  lessons={lessons} 
                  allDecks={allDecks} 
                  onPublishDeck={onPublishDeck} 
