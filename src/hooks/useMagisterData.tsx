@@ -17,7 +17,10 @@ export function useMagisterData() {
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [instructorClasses, setInstructorClasses] = useState<any[]>([]); 
   
-  // 🔥 THE UPGRADE: Split the streams to prevent data collisions!
+  // 🔥 NEW: Custom Curriculums State
+  const [customCurriculums, setCustomCurriculums] = useState<any[]>([]);
+  
+  // Split the streams to prevent data collisions
   const [privateDecks, setPrivateDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
   const [publishedDecks, setPublishedDecks] = useState<any[]>([]);
 
@@ -55,7 +58,7 @@ export function useMagisterData() {
           }
           decks[dId].cards.push(card);
         });
-        setPrivateDecks(decks); // Save to isolated private stream
+        setPrivateDecks(decks); 
       });
 
       // 4. Classes (Student View)
@@ -69,14 +72,20 @@ export function useMagisterData() {
         setInstructorClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
-      // 🔥 6. THE NETWORK STREAM: Listen for global/restricted published decks
+      // 6. THE NETWORK STREAM: Listen for global/restricted published decks
       const unsubPublished = onSnapshot(collection(db, 'artifacts', appId, 'published_decks'), (snap) => {
         setPublishedDecks(snap.docs.map(d => d.data()));
       });
 
+      // 🔥 7. THE PATHWAY STREAM: Listen for custom curriculums
+      const unsubCurriculums = onSnapshot(collectionGroup(db, 'custom_curriculums'), (snap) => {
+        const fetchedCurriculums = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setCustomCurriculums(fetchedCurriculums);
+      });
+
       return () => { 
           unsubAuth(); unsubProfile(); unsubLessons(); unsubCards(); 
-          unsubClasses(); unsubInstructorClasses(); unsubPublished(); 
+          unsubClasses(); unsubInstructorClasses(); unsubPublished(); unsubCurriculums();
       };
     }
     return () => unsubAuth();
@@ -93,7 +102,6 @@ export function useMagisterData() {
     }
   }, [userData?.orgId]);
 
-  // 🔥 THE MERGE ENGINE: Evaluates access control and seamlessly blends the decks
   const allDecks = useMemo(() => {
       const merged = { ...privateDecks };
       const myClassIds = enrolledClasses.map(c => c.id);
@@ -104,12 +112,8 @@ export function useMagisterData() {
           const isRestrictedAccess = pubDeck.visibility === 'restricted' && 
                                      pubDeck.allowedClasses?.some((id: string) => myClassIds.includes(id));
 
-          // If the user has clearance, inject it into their Library
           if (isPublic || isInstructor || isRestrictedAccess) {
-              merged[pubDeck.id] = { 
-                  ...pubDeck, 
-                  isPublished: true // Flags the UI so you can show a little "Globe" icon if you want
-              };
+              merged[pubDeck.id] = { ...pubDeck, isPublished: true };
           }
       });
 
@@ -191,57 +195,46 @@ export function useMagisterData() {
       });
     },
 
-    // 🔥 THE PUBLISHING ACTION: Moves private decks to the global network
     publishDeck: async (deckId: string, deckTitle: string, cards: any[], visibility: 'private' | 'restricted' | 'public', allowedClasses: string[] = []) => {
       if (!user) return;
       const deckRef = doc(db, 'artifacts', appId, 'published_decks', deckId);
       
       if (visibility === 'private') {
-          // If revoked to private, rip it off the global shelf
           await deleteDoc(deckRef).catch(e => console.log("Deck already private"));
       } else {
-          // Publish the fully assembled deck to the network
           await setDoc(deckRef, {
-              id: deckId,
-              title: deckTitle,
-              cards: cards,
-              instructorId: user.uid,
-              instructorName: userData?.name || 'Instructor',
-              visibility: visibility,
-              allowedClasses: allowedClasses,
-              updatedAt: Date.now()
+              id: deckId, title: deckTitle, cards: cards,
+              instructorId: user.uid, instructorName: userData?.name || 'Instructor',
+              visibility: visibility, allowedClasses: allowedClasses, updatedAt: Date.now()
           });
       }
     },
 
-    // ==========================================
-    // THE STREAK & XP ENGINE
-    // ==========================================
+    // 🔥 NEW: SAVE THE CURRICULUM TO FIRESTORE
+    saveCurriculum: async (curriculumData: any) => {
+      if (!user) return;
+      const currId = curriculumData.id || `curriculum_${Date.now()}`;
+      await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_curriculums', currId), {
+        ...curriculumData, 
+        id: currId, 
+        instructorId: user.uid, 
+        updatedAt: Date.now()
+      });
+    },
+
     logActivity: async (itemId: string, xp: number, title: string, details: any = {}) => {
       if (!user || !user.uid) return;
       
       try {
-          // 1. Push to Activity Log
           await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
-            studentEmail: user.email,
-            studentName: userData?.name || user.email.split('@')[0],
-            studentId: user.uid,
-            type: itemId.includes('explore') ? 'explore' : 'completion',
-            itemTitle: title,
-            itemId: itemId, 
-            xp: xp,
-            timestamp: Date.now(),
-            ...details
+            studentEmail: user.email, studentName: userData?.name || user.email.split('@')[0], studentId: user.uid,
+            type: itemId.includes('explore') ? 'explore' : 'completion', itemTitle: title, itemId: itemId, 
+            xp: xp, timestamp: Date.now(), ...details
           });
 
-          // 2. Perform Gamification Math
           if (xp > 0) {
-            const today = new Date();
-            const todayStr = today.toDateString();
-            
-            const yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
-            const yesterdayStr = yesterday.toDateString();
+            const today = new Date(); const todayStr = today.toDateString();
+            const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1); const yesterdayStr = yesterday.toDateString();
 
             let newStreak = userData?.streak || 0;
             let newDailyXp = userData?.dailyXp || 0;
@@ -251,32 +244,19 @@ export function useMagisterData() {
             const isLesson = details.mode === 'lesson' || !itemId.includes('explore');
 
             if (lastActivityDate === todayStr) {
-                newDailyXp += xp;
-                if (isLesson) newDailyLessons += 1;
+                newDailyXp += xp; if (isLesson) newDailyLessons += 1;
             } else if (lastActivityDate === yesterdayStr) {
-                newStreak += 1;
-                newDailyXp = xp;
-                newDailyLessons = isLesson ? 1 : 0;
+                newStreak += 1; newDailyXp = xp; newDailyLessons = isLesson ? 1 : 0;
             } else {
-                newStreak = 1;
-                newDailyXp = xp;
-                newDailyLessons = isLesson ? 1 : 0;
+                newStreak = 1; newDailyXp = xp; newDailyLessons = isLesson ? 1 : 0;
             }
 
-            // 3. Update Subcollection
             await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
-              xp: increment(xp),
-              streak: newStreak,
-              dailyXp: newDailyXp,
-              dailyLessons: newDailyLessons,
-              lastActivityDate: todayStr
+              xp: increment(xp), streak: newStreak, dailyXp: newDailyXp, dailyLessons: newDailyLessons, lastActivityDate: todayStr
             }).catch(e => console.log("Subcollection update skipped", e));
 
-            // 4. Update Parent map for Leaderboard
             await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid), {
-              'profile.main.xp': increment(xp),
-              'profile.main.streak': newStreak,
-              'xp': increment(xp)
+              'profile.main.xp': increment(xp), 'profile.main.streak': newStreak, 'xp': increment(xp)
             }).catch(e => console.log("Parent doc update skipped", e));
           }
       } catch (err) {
@@ -287,5 +267,6 @@ export function useMagisterData() {
 
   const allLessons = useMemo(() => allAppLessons, [allAppLessons]);
 
-  return { user, userData, authChecked, activeOrg, allLessons, enrolledClasses, instructorClasses, allDecks, actions };
+  // 🔥 IMPORTANT: Added customCurriculums to the return object!
+  return { user, userData, authChecked, activeOrg, allLessons, enrolledClasses, instructorClasses, allDecks, customCurriculums, actions };
 }
