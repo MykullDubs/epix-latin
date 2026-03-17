@@ -1,5 +1,5 @@
 // src/App.tsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useMagisterData } from './hooks/useMagisterData';
 import { GLOBAL_CURRICULUMS } from './constants/curriculums';
 
@@ -22,8 +22,8 @@ import LiveConnectFourProjector from './components/LiveConnectFourProjector';
 import CelebrationScreen from './components/CelebrationScreen';
 
 export default function App() {
-  // 🔥 FIX: We no longer rename allDecks to rawDecks because useMagisterData does the sorting now!
-  const { user, userData, authChecked, activeOrg, allLessons, enrolledClasses, instructorClasses, allDecks, actions } = useMagisterData();
+  // 🔥 THE UPGRADE: We are now pulling customCurriculums out of the Magic Vacuum!
+  const { user, userData, authChecked, activeOrg, allLessons, enrolledClasses, instructorClasses, allDecks, customCurriculums, actions } = useMagisterData();
   
   // Navigation State
   const [currentView, setCurrentView] = useState<'student' | 'instructor' | 'admin'>('student');
@@ -40,6 +40,11 @@ export default function App() {
   const [activePresentation, setActivePresentation] = useState<{lessonId: string, classId: string} | null>(null);
   const [activeVocabGame, setActiveVocabGame] = useState<{deckId: string, classId: string} | null>(null);
   const [activeConnectFour, setActiveConnectFour] = useState<{deckId: string, classId: string} | null>(null);
+
+  // 🔥 THE CURRICULUM MERGER: Blends hardcoded templates with dynamically forged pathways
+  const allCurriculums = useMemo(() => {
+      return [...GLOBAL_CURRICULUMS, ...(customCurriculums || [])];
+  }, [customCurriculums]);
 
   // ==========================================================================
   //  THE URL ROUTING ENGINE
@@ -213,7 +218,7 @@ export default function App() {
         userData={{ ...userData, classes: instructorClasses }} 
         allDecks={allDecks} 
         lessons={allLessons} 
-        curriculums={GLOBAL_CURRICULUMS} 
+        curriculums={allCurriculums} // 🔥 PASSING THE BLENDED ARRAY DOWN
         onAssignCurriculum={actions.assignCurriculum} 
         onSaveLesson={actions.saveLesson} 
         onSaveCard={actions.saveCard}
@@ -227,10 +232,7 @@ export default function App() {
         onStartPresentation={(lessonId: string, classId: string) => setActivePresentation({ lessonId, classId })}
         onStartVocabGame={(deckId: string, classId: string) => setActiveVocabGame({ deckId, classId })}
         onStartConnectFour={(deckId: string, classId: string) => setActiveConnectFour({ deckId, classId })}
-        
-        // 🔥 THE MISSING LINK IS NOW WIRED UP!
         onPublishDeck={actions.publishDeck}
-        
         onSwitchView={() => setCurrentView('student')}
         onLogout={actions.logout} 
         AdminDashboardView={AdminDashboardView}
@@ -282,7 +284,7 @@ export default function App() {
             <StudentClassView 
                classData={activeStudentClass} 
                lessons={allLessons} 
-               curriculums={GLOBAL_CURRICULUMS} 
+               curriculums={allCurriculums} // 🔥 PASSING THE BLENDED ARRAY TO THE STUDENT CLASS HUB
                onBack={() => setActiveStudentClass(null)} 
                onSelectLesson={setActiveLesson} 
                setActiveTab={setActiveTab} 
@@ -298,7 +300,14 @@ export default function App() {
           ) : activeTab === 'profile' ? (
             <ProfileView user={user} userData={userData} />
           ) : (
-            <HomeView classes={enrolledClasses} curriculums={GLOBAL_CURRICULUMS} onSelectClass={setActiveStudentClass} userData={userData} activeOrg={activeOrg} setActiveTab={setActiveTab} />
+            <HomeView 
+               classes={enrolledClasses} 
+               curriculums={allCurriculums} // 🔥 PASSING THE BLENDED ARRAY TO THE STUDENT HOME DASHBOARD
+               onSelectClass={setActiveStudentClass} 
+               userData={userData} 
+               activeOrg={activeOrg} 
+               setActiveTab={setActiveTab} 
+            />
           )}
         </div>
         
