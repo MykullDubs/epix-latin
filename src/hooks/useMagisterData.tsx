@@ -12,10 +12,14 @@ export function useMagisterData() {
   const [userData, setUserData] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [activeOrg, setActiveOrg] = useState<any>(null);
+  
   const [allAppLessons, setAllAppLessons] = useState<any[]>([]);
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [instructorClasses, setInstructorClasses] = useState<any[]>([]); 
-  const [allDecks, setAllDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
+  
+  // 🔥 THE UPGRADE: Split the streams to prevent data collisions!
+  const [privateDecks, setPrivateDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
+  const [publishedDecks, setPublishedDecks] = useState<any[]>([]);
 
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
@@ -39,7 +43,7 @@ export function useMagisterData() {
         setAllAppLessons(fetchedLessons);
       });
 
-      // 3. Card & Deck Logic: Sorts cards into their respective custom deck containers
+      // 3. Card & Deck Logic (Private / Local Cards)
       const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => {
         const cards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         const decks: any = { custom: { title: 'Scriptorium', cards: [] } };
@@ -51,7 +55,7 @@ export function useMagisterData() {
           }
           decks[dId].cards.push(card);
         });
-        setAllDecks(decks);
+        setPrivateDecks(decks); // Save to isolated private stream
       });
 
       // 4. Classes (Student View)
@@ -65,7 +69,15 @@ export function useMagisterData() {
         setInstructorClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
-      return () => { unsubAuth(); unsubProfile(); unsubLessons(); unsubCards(); unsubClasses(); unsubInstructorClasses(); };
+      // 🔥 6. THE NETWORK STREAM: Listen for global/restricted published decks
+      const unsubPublished = onSnapshot(collection(db, 'artifacts', appId, 'published_decks'), (snap) => {
+        setPublishedDecks(snap.docs.map(d => d.data()));
+      });
+
+      return () => { 
+          unsubAuth(); unsubProfile(); unsubLessons(); unsubCards(); 
+          unsubClasses(); unsubInstructorClasses(); unsubPublished(); 
+      };
     }
     return () => unsubAuth();
   }, [user?.uid, user?.email]);
@@ -80,6 +92,30 @@ export function useMagisterData() {
       setActiveOrg(null);
     }
   }, [userData?.orgId]);
+
+  // 🔥 THE MERGE ENGINE: Evaluates access control and seamlessly blends the decks
+  const allDecks = useMemo(() => {
+      const merged = { ...privateDecks };
+      const myClassIds = enrolledClasses.map(c => c.id);
+
+      publishedDecks.forEach(pubDeck => {
+          const isPublic = pubDeck.visibility === 'public';
+          const isInstructor = pubDeck.instructorId === user?.uid;
+          const isRestrictedAccess = pubDeck.visibility === 'restricted' && 
+                                     pubDeck.allowedClasses?.some((id: string) => myClassIds.includes(id));
+
+          // If the user has clearance, inject it into their Library
+          if (isPublic || isInstructor || isRestrictedAccess) {
+              merged[pubDeck.id] = { 
+                  ...pubDeck, 
+                  isPublished: true // Flags the UI so you can show a little "Globe" icon if you want
+              };
+          }
+      });
+
+      return merged;
+  }, [privateDecks, publishedDecks, enrolledClasses, user?.uid]);
+
 
   const actions = {
     logout: () => signOut(auth),
@@ -155,14 +191,37 @@ export function useMagisterData() {
       });
     },
 
+    // 🔥 THE PUBLISHING ACTION: Moves private decks to the global network
+    publishDeck: async (deckId: string, deckTitle: string, cards: any[], visibility: 'private' | 'restricted' | 'public', allowedClasses: string[] = []) => {
+      if (!user) return;
+      const deckRef = doc(db, 'artifacts', appId, 'published_decks', deckId);
+      
+      if (visibility === 'private') {
+          // If revoked to private, rip it off the global shelf
+          await deleteDoc(deckRef).catch(e => console.log("Deck already private"));
+      } else {
+          // Publish the fully assembled deck to the network
+          await setDoc(deckRef, {
+              id: deckId,
+              title: deckTitle,
+              cards: cards,
+              instructorId: user.uid,
+              instructorName: userData?.name || 'Instructor',
+              visibility: visibility,
+              allowedClasses: allowedClasses,
+              updatedAt: Date.now()
+          });
+      }
+    },
+
     // ==========================================
-    // THE STREAK & XP ENGINE (Now with Real-Time Jamming)
+    // THE STREAK & XP ENGINE
     // ==========================================
     logActivity: async (itemId: string, xp: number, title: string, details: any = {}) => {
       if (!user || !user.uid) return;
       
       try {
-          // 1. Push to Activity Log (The Timeline)
+          // 1. Push to Activity Log
           await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
             studentEmail: user.email,
             studentName: userData?.name || user.email.split('@')[0],
@@ -204,9 +263,7 @@ export function useMagisterData() {
                 newDailyLessons = isLesson ? 1 : 0;
             }
 
-            // 3. Update the User's Main Profile (Atomic Increment)
-            
-            // A. Update the subcollection (for the student's personal Profile View)
+            // 3. Update Subcollection
             await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
               xp: increment(xp),
               streak: newStreak,
@@ -215,11 +272,11 @@ export function useMagisterData() {
               lastActivityDate: todayStr
             }).catch(e => console.log("Subcollection update skipped", e));
 
-            // 🔥 B. THE FIX: Update the parent document's nested map (for the Leaderboard View!)
+            // 4. Update Parent map for Leaderboard
             await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid), {
               'profile.main.xp': increment(xp),
               'profile.main.streak': newStreak,
-              'xp': increment(xp) // Backup flat field just to be bulletproof
+              'xp': increment(xp)
             }).catch(e => console.log("Parent doc update skipped", e));
           }
       } catch (err) {
