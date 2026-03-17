@@ -332,25 +332,21 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) 
         }
     }, [classId, studentEmail, liveSession?.quizState, liveSession?.joined, safeEmail]);
 
-    useEffect(() => {
+useEffect(() => {
         if (isFinished && !xpLogged && xpEarned > 0) {
-            const logActivity = async () => {
-                try {
-                    await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
-                        studentEmail: studentEmail,
-                        studentId: auth.currentUser?.uid || 'anonymous',
-                        type: 'completion',
-                        itemId: `arena_run_${Date.now()}`,
-                        itemTitle: 'Live Arena Protocol',
-                        score: xpEarned,
-                        timestamp: Date.now()
-                    });
-                    setXpLogged(true);
-                } catch (e) { console.error("Failed to sync XP:", e); }
+            const syncArenaXP = async () => {
+                if (onLogActivity) {
+                    await onLogActivity(
+                        `arena_run_${classId}_${Date.now()}`,
+                        xpEarned,
+                        'Live Arena Protocol'
+                    );
+                }
+                setXpLogged(true);
             };
-            logActivity();
+            syncArenaXP();
         }
-    }, [isFinished, xpLogged, xpEarned, studentEmail]);
+    }, [isFinished, xpLogged, xpEarned, classId, onLogActivity]);
 
     const submitAnswer = async (optionId: string) => {
         if (liveSession?.quizState !== 'active' || myAnswer) return;
@@ -437,7 +433,7 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) 
 // ============================================================================
 //  CONNECT FOUR: STUDENT REMOTE
 // ============================================================================
-const ConnectFourRemote = ({ liveSession, classId, studentEmail }: any) => {
+const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity }: any) => {
     const safeEmail = (studentEmail || 'scholar@magister').replace(/\./g, ',');
     const myTeam = liveSession?.teams?.[safeEmail]; 
     const isMyTurn = liveSession?.currentTurn === myTeam;
@@ -448,6 +444,26 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail }: any) => {
 
     // FIX: Check current student's specific correct status to unlock drop
     const iHaveUnlockedDrop = myAnswer === currentQ?.correctId;
+
+    // 🔥 THE FIX: Add the Victory XP trigger state
+    const [xpLogged, setXpLogged] = useState(false);
+
+    // 🔥 THE FIX: Award XP automatically if their team wins
+    useEffect(() => {
+        if (isFinished && liveSession?.winningTeam === myTeam && !xpLogged) {
+            const handleVictory = async () => {
+                if (onLogActivity) {
+                    await onLogActivity(
+                        `c4_victory_${classId}_${Date.now()}`, 
+                        100, // 100 XP for the win!
+                        'Connect Four: Squad Victory'
+                    );
+                }
+                setXpLogged(true);
+            };
+            handleVictory();
+        }
+    }, [isFinished, liveSession?.winningTeam, myTeam, xpLogged, classId, onLogActivity]);
 
     const submitAnswer = async (optionId: string) => {
         if (!isMyTurn || myAnswer) return;
@@ -481,6 +497,13 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail }: any) => {
                 {iWon ? <Trophy size={120} className="text-emerald-400 mb-6 animate-bounce" /> : <XCircle size={120} className="text-rose-900 mb-6" />}
                 <h2 className="text-5xl font-black text-white mb-4 tracking-tighter">{iWon ? 'VICTORY' : 'DEFEATED'}</h2>
                 <p className="text-white/60 font-black uppercase tracking-widest">{iWon ? 'Squad Superiority Established' : 'Tactical Withdrawal Required'}</p>
+                
+                {/* Optional: Show them that XP was logged */}
+                {iWon && (
+                    <div className="mt-8 text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
+                        {xpLogged ? <><CheckCircle2 size={14} /> 100 XP Synced to Profile</> : <><Loader2 size={14} className="animate-spin" /> Syncing XP...</>}
+                    </div>
+                )}
             </div>
         );
     }
@@ -587,10 +610,20 @@ export default function StudentClassView({
               <button onClick={() => setActiveSubTab('lessons')} className="absolute top-6 left-6 z-50 p-2 text-slate-500 hover:text-white rounded-full bg-slate-900 border border-slate-800"><X size={20} /></button>
               <div className="flex-1 w-full h-full p-4 md:p-8 pt-20">
                   {liveSession.type === 'connect_four' ? (
-                      <ConnectFourRemote liveSession={liveSession} classId={classData.id} studentEmail={userData?.email || auth?.currentUser?.email} />
+                    <ConnectFourRemote 
+    liveSession={liveSession} 
+    classId={classData.id} 
+    studentEmail={userData?.email || auth?.currentUser?.email} 
+    onLogActivity={onLogActivity} // <--- This must be here!
+/>
                   ) : (
-                      <LiveTriviaRemote liveSession={liveSession} lessons={lessons} classId={classData.id} studentEmail={userData?.email || auth?.currentUser?.email} />
-                  )}
+<LiveTriviaRemote 
+    liveSession={liveSession} 
+    lessons={lessons} 
+    classId={classData.id} 
+    studentEmail={userData?.email || auth?.currentUser?.email} 
+    onLogActivity={onLogActivity} // 🔥 ADD THIS LINE!
+/>                  )}
               </div>
           </div>
       );
