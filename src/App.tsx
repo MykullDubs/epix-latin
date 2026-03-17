@@ -1,5 +1,5 @@
 // src/App.tsx
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useMagisterData } from './hooks/useMagisterData';
 import { GLOBAL_CURRICULUMS } from './constants/curriculums';
 
@@ -18,11 +18,12 @@ import ExamPlayerView from './components/ExamPlayerView';
 import LessonView from './components/LessonView';
 import ClassView from './components/ClassView'; 
 import LiveVocabProjector from './components/LiveVocabProjector'; 
-import LiveConnectFourProjector from './components/LiveConnectFourProjector'; // NEW: Connect 4
+import LiveConnectFourProjector from './components/LiveConnectFourProjector';
 import CelebrationScreen from './components/CelebrationScreen';
 
 export default function App() {
-  const { user, userData, authChecked, activeOrg, allLessons, enrolledClasses, instructorClasses, allDecks: rawDecks, actions } = useMagisterData();
+  // 🔥 FIX: We no longer rename allDecks to rawDecks because useMagisterData does the sorting now!
+  const { user, userData, authChecked, activeOrg, allLessons, enrolledClasses, instructorClasses, allDecks, actions } = useMagisterData();
   
   // Navigation State
   const [currentView, setCurrentView] = useState<'student' | 'instructor' | 'admin'>('student');
@@ -38,40 +39,7 @@ export default function App() {
   // Live Presentation States
   const [activePresentation, setActivePresentation] = useState<{lessonId: string, classId: string} | null>(null);
   const [activeVocabGame, setActiveVocabGame] = useState<{deckId: string, classId: string} | null>(null);
-  const [activeConnectFour, setActiveConnectFour] = useState<{deckId: string, classId: string} | null>(null); // NEW: Connect 4 State
-
-  // ==========================================================================
-  //  🔥 THE DECK INTERCEPTOR
-  // ==========================================================================
-  const allDecks = useMemo(() => {
-      if (!rawDecks) return {};
-      
-      const processedDecks = JSON.parse(JSON.stringify(rawDecks));
-      
-      const dumpedCards = processedDecks.custom?.cards || [];
-      const trueScriptoriumCards: any[] = [];
-
-      dumpedCards.forEach((card: any) => {
-          if (card.deckId && card.deckId !== 'custom') {
-              if (!processedDecks[card.deckId]) {
-                  processedDecks[card.deckId] = {
-                      id: card.deckId,
-                      title: card.deckTitle || 'Arena Deck',
-                      cards: []
-                  };
-              }
-              processedDecks[card.deckId].cards.push(card);
-          } else {
-              trueScriptoriumCards.push(card);
-          }
-      });
-
-      if (processedDecks.custom) {
-          processedDecks.custom.cards = trueScriptoriumCards;
-      }
-
-      return processedDecks;
-  }, [rawDecks]);
+  const [activeConnectFour, setActiveConnectFour] = useState<{deckId: string, classId: string} | null>(null);
 
   // ==========================================================================
   //  THE URL ROUTING ENGINE
@@ -258,7 +226,11 @@ export default function App() {
         onAddStudent={actions.addStudent}
         onStartPresentation={(lessonId: string, classId: string) => setActivePresentation({ lessonId, classId })}
         onStartVocabGame={(deckId: string, classId: string) => setActiveVocabGame({ deckId, classId })}
-        onStartConnectFour={(deckId: string, classId: string) => setActiveConnectFour({ deckId, classId })} // NEW: Passed prop down to InstructorHub
+        onStartConnectFour={(deckId: string, classId: string) => setActiveConnectFour({ deckId, classId })}
+        
+        // 🔥 THE MISSING LINK IS NOW WIRED UP!
+        onPublishDeck={actions.publishDeck}
+        
         onSwitchView={() => setCurrentView('student')}
         onLogout={actions.logout} 
         AdminDashboardView={AdminDashboardView}
