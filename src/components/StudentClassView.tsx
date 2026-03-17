@@ -559,7 +559,7 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity }
 // ============================================================================
 export default function StudentClassView({ 
     classData, lessons = [], curriculums = [], onBack, 
-    onSelectLesson, userData, setActiveTab, setSelectedLessonId, ExamPlayerView 
+    onSelectLesson, userData, setActiveTab, setSelectedLessonId, ExamPlayerView, onLogActivity 
 }: any) {
   const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'leaderboard' | 'exams' | 'forum' | 'grades' | 'live'>('lessons');
   const [completedItems, setCompletedItems] = useState<string[]>([]);
