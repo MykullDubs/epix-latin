@@ -3,15 +3,18 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ArrowLeft, X, Dumbbell, Layers, Play, Zap, HelpCircle, Puzzle, Flame, CheckCircle2, XCircle, Globe, Users, Filter, ChevronLeft, ChevronRight, RotateCw } from 'lucide-react';
 
 // ============================================================================
-//  1. STUDY MODE (NEW: Swipe Physics & Desktop Buttons)
+//  1. STUDY MODE (Upgraded Swipe Physics & Animations)
 // ============================================================================
 function StudyModePlayer({ deckCards }: any) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     
-    // Swipe Physics State
+    // Swipe Physics & Animation State
     const [startX, setStartX] = useState<number | null>(null);
+    const [startY, setStartY] = useState<number | null>(null);
     const [dragX, setDragX] = useState(0);
+    const [dragY, setDragY] = useState(0);
+    const [slideDirection, setSlideDirection] = useState<'right' | 'left' | 'up'>('right');
 
     const currentCard = deckCards[currentIndex];
 
@@ -19,6 +22,7 @@ function StudyModePlayer({ deckCards }: any) {
     const handleNext = (e?: any) => {
         e?.stopPropagation();
         if (currentIndex < deckCards.length - 1) {
+            setSlideDirection('right');
             setCurrentIndex(i => i + 1);
             setIsFlipped(false);
         }
@@ -27,6 +31,7 @@ function StudyModePlayer({ deckCards }: any) {
     const handlePrev = (e?: any) => {
         e?.stopPropagation();
         if (currentIndex > 0) {
+            setSlideDirection('left');
             setCurrentIndex(i => i - 1);
             setIsFlipped(false);
         }
@@ -35,49 +40,70 @@ function StudyModePlayer({ deckCards }: any) {
     // --- Touch/Mouse Physics ---
     const handlePointerDown = (e: React.TouchEvent | React.MouseEvent) => {
         const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+        const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
         setStartX(clientX);
+        setStartY(clientY);
+        setDragX(0);
+        setDragY(0);
     };
 
     const handlePointerMove = (e: React.TouchEvent | React.MouseEvent) => {
-        if (startX === null) return;
+        if (startX === null || startY === null) return;
         const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
-        const currentDrag = clientX - startX;
+        const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
         
-        // Add resistance if they are trying to drag past the first or last card
-        if ((currentIndex === 0 && currentDrag > 0) || (currentIndex === deckCards.length - 1 && currentDrag < 0)) {
-            setDragX(currentDrag * 0.2); // Heavy resistance
+        const currentDragX = clientX - startX;
+        const currentDragY = clientY - startY;
+        
+        // Add horizontal resistance on edges
+        if ((currentIndex === 0 && currentDragX > 0) || (currentIndex === deckCards.length - 1 && currentDragX < 0)) {
+            setDragX(currentDragX * 0.2); 
         } else {
-            setDragX(currentDrag);
+            setDragX(currentDragX);
         }
+
+        // Only track upward drag for the visual flip effect, prevent dragging it down
+        setDragY(currentDragY < 0 ? currentDragY : 0);
     };
 
     const handlePointerUp = () => {
-        if (startX === null) return;
+        if (startX === null || startY === null) return;
         
-        const SWIPE_THRESHOLD = 75; // Pixels required to trigger a swipe
+        const SWIPE_THRESHOLD_X = 75; // Pixels required to trigger next/prev
+        const SWIPE_THRESHOLD_Y = -60; // Pixels required to trigger a flip (negative is up)
         
-        if (dragX > SWIPE_THRESHOLD && currentIndex > 0) {
+        if (dragX > SWIPE_THRESHOLD_X && currentIndex > 0) {
             handlePrev();
-        } else if (dragX < -SWIPE_THRESHOLD && currentIndex < deckCards.length - 1) {
+        } else if (dragX < -SWIPE_THRESHOLD_X && currentIndex < deckCards.length - 1) {
             handleNext();
-        } else if (Math.abs(dragX) < 10) {
-            // If they barely moved the mouse/finger, treat it as a tap to flip
+        } else if (dragY < SWIPE_THRESHOLD_Y) {
+            // They swiped up! Trigger the flip
+            setIsFlipped(!isFlipped);
+        } else if (Math.abs(dragX) < 10 && Math.abs(dragY) < 10) {
+            // Keep tap as a fallback just in case
             setIsFlipped(!isFlipped);
         }
         
         // Reset physics
         setStartX(null);
+        setStartY(null);
         setDragX(0);
+        setDragY(0);
     };
 
     if (!currentCard) return null;
 
     const progress = ((currentIndex + 1) / deckCards.length) * 100;
 
+    // Dynamic animation class based on which way we are going
+    const animationClass = slideDirection === 'right' 
+        ? 'animate-in fade-in slide-in-from-right-12 duration-300' 
+        : 'animate-in fade-in slide-in-from-left-12 duration-300';
+
     return (
-        <div className="flex flex-col h-full max-w-md mx-auto p-6 w-full">
+        <div className="flex flex-col h-full max-w-md mx-auto p-6 w-full overflow-hidden">
             {/* Header & Progress */}
-            <div className="mb-8">
+            <div className="mb-8 shrink-0">
                 <div className="flex justify-between text-xs font-black text-slate-400 uppercase tracking-widest mb-3">
                     <span>Target {currentIndex + 1}</span>
                     <span>{deckCards.length} Total</span>
@@ -88,7 +114,8 @@ function StudyModePlayer({ deckCards }: any) {
             </div>
 
             {/* The Draggable Card Container */}
-            <div className="flex-1 relative flex items-center justify-center perspective-[1000px] mb-8">
+            {/* 🔥 NOTE: The key={currentIndex} forces React to remount the DOM node, triggering the fresh slide animation! */}
+            <div key={currentIndex} className={`flex-1 relative flex items-center justify-center perspective-[1000px] mb-8 ${animationClass}`}>
                 <div 
                     onTouchStart={handlePointerDown}
                     onTouchMove={handlePointerMove}
@@ -99,15 +126,16 @@ function StudyModePlayer({ deckCards }: any) {
                     onMouseLeave={handlePointerUp}
                     className={`relative w-full aspect-square max-h-[400px] cursor-grab active:cursor-grabbing ${startX === null ? 'transition-all duration-300' : ''}`}
                     style={{ 
-                        transform: `translateX(${dragX}px) rotate(${dragX * 0.05}deg)`,
+                        // We tilt the card horizontally based on X drag, and slide it up slightly based on Y drag!
+                        transform: `translateX(${dragX}px) translateY(${dragY * 0.4}px) rotate(${dragX * 0.05}deg)`,
                         transformStyle: 'preserve-3d'
                     }}
                 >
                     {/* The Flipping Inner Card */}
                     <div 
-                        className="absolute inset-0 w-full h-full transition-transform duration-500 ease-in-out"
+                        className="absolute inset-0 w-full h-full transition-transform duration-500 ease-out"
                         style={{ 
-                            transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                            transform: isFlipped ? 'rotateX(180deg)' : 'rotateX(0deg)',
                             transformStyle: 'preserve-3d' 
                         }}
                     >
@@ -116,20 +144,25 @@ function StudyModePlayer({ deckCards }: any) {
                             className="absolute inset-0 w-full h-full bg-white rounded-[3rem] border-2 border-b-[8px] border-slate-200 shadow-xl flex flex-col items-center justify-center p-8 text-center"
                             style={{ backfaceVisibility: 'hidden' }}
                         >
-                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest absolute top-6">Front</span>
+                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest absolute top-6 bg-indigo-50 px-3 py-1 rounded-full">Front</span>
+                            
                             <h2 className="text-4xl md:text-5xl font-black text-slate-800 leading-tight">{currentCard.front}</h2>
                             {currentCard.ipa && <p className="text-sm font-bold text-slate-400 mt-4 bg-slate-50 px-3 py-1 rounded-lg">{currentCard.ipa}</p>}
-                            <div className="absolute bottom-6 flex items-center gap-2 text-[10px] font-black text-slate-300 uppercase tracking-widest">
-                                <RotateCw size={12} /> Tap to Flip
+                            
+                            {/* 🔥 NEW SWIPE INSTRUCTION */}
+                            <div className="absolute bottom-8 flex flex-col items-center gap-1 text-[10px] font-black text-indigo-400 uppercase tracking-widest opacity-60">
+                                <ArrowUp size={16} strokeWidth={3} className="animate-bounce" /> 
+                                Slide up to flip
                             </div>
                         </div>
 
                         {/* BACK FACE */}
                         <div 
                             className="absolute inset-0 w-full h-full bg-indigo-50 rounded-[3rem] border-2 border-b-[8px] border-indigo-200 shadow-xl flex flex-col items-center justify-center p-8 text-center"
-                            style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+                            style={{ backfaceVisibility: 'hidden', transform: 'rotateX(180deg)' }}
                         >
-                            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest absolute top-6">Back</span>
+                            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest absolute top-6 bg-white px-3 py-1 rounded-full shadow-sm">Back</span>
+                            
                             <h2 className="text-3xl md:text-4xl font-black text-indigo-900 leading-tight">{currentCard.back}</h2>
                             
                             {/* Optional morphological breakdown */}
@@ -143,13 +176,19 @@ function StudyModePlayer({ deckCards }: any) {
                                     ))}
                                 </div>
                             )}
+
+                            {/* 🔥 REVERSE SWIPE INSTRUCTION */}
+                            <div className="absolute bottom-8 flex flex-col items-center gap-1 text-[10px] font-black text-indigo-400/60 uppercase tracking-widest">
+                                <ArrowUp size={16} strokeWidth={3} className="animate-bounce" /> 
+                                Slide up to return
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* Desktop / Manual Navigation Buttons */}
-            <div className="flex items-center justify-between px-4 pb-8 shrink-0">
+            <div className="flex items-center justify-between px-4 pb-8 shrink-0 z-10">
                 <button 
                     onClick={handlePrev}
                     disabled={currentIndex === 0}
@@ -158,7 +197,16 @@ function StudyModePlayer({ deckCards }: any) {
                     <ChevronLeft size={24} strokeWidth={3} />
                 </button>
                 
-                <span className="text-xs font-black text-slate-300 uppercase tracking-widest">Swipe or Tap</span>
+                <div className="flex gap-1.5">
+                    {/* Render up to 5 little dots to show deck progression visually */}
+                    {deckCards.slice(0, 5).map((_: any, idx: number) => {
+                        // Calculate relative active dot if deck is larger than 5
+                        const activeDot = Math.floor((currentIndex / deckCards.length) * Math.min(5, deckCards.length));
+                        return (
+                            <div key={idx} className={`h-1.5 rounded-full transition-all duration-300 ${idx === activeDot ? 'w-4 bg-indigo-500' : 'w-1.5 bg-slate-200'}`} />
+                        );
+                    })}
+                </div>
                 
                 <button 
                     onClick={handleNext}
