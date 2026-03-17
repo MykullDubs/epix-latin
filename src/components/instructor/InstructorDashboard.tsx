@@ -23,6 +23,7 @@ export default function InstructorDashboard({
   lessons, 
   curriculums,
   onAssignCurriculum,
+  onSaveCurriculum,
   onSaveLesson, 
   onSaveCard, 
   onAssign,            
