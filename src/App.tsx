@@ -317,6 +317,7 @@ export default function App() {
                setSelectedLessonId={(lessonId: string) => setActivePresentation({ lessonId, classId: activeStudentClass.id })} 
                userData={userData} 
                ExamPlayerView={ExamPlayerView} 
+               onLogActivity={actions.logActivity}
             />
           ) : activeTab === 'discovery' ? (
             <DiscoveryView allDecks={allDecks} lessons={allLessons} onSelectDeck={(d:any) => { setActiveDeckKey(d.id); setActiveTab('flashcards'); }} onSelectLesson={setActiveLesson} onLogActivity={actions.logActivity} userData={userData} />
