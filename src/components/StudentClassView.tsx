@@ -312,6 +312,7 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogAc
     const currentBlock = liveSession?.currentQuestion || currentPage?.blocks?.[0]; 
     const isQuiz = !!liveSession?.currentQuestion || currentBlock?.type === 'quiz';
     const safeEmail = (studentEmail || 'unknown@student').replace(/\./g, ',');
+    
     const myAnswer = liveSession?.answers?.[safeEmail];
     const isRevealed = liveSession?.quizState === 'revealed';
     const isFinished = liveSession?.quizState === 'finished';
@@ -320,8 +321,9 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogAc
     const quizOptions = currentBlock?.options || currentBlock?.content?.options || [];
     const quizCorrectId = currentBlock?.correctId || currentBlock?.content?.correctId;
 
-    const finalCorrectCount = liveSession?.finalScores?.[safeEmail] || 0;
-    const xpEarned = finalCorrectCount * 10;
+    // 🔥 SPEED ALGO: Pull the massive aggregated XP from the projector's math
+    const xpEarned = liveSession?.finalScores?.[safeEmail] || 0;
+    const pointsThisRound = liveSession?.roundPoints?.[safeEmail] || 0;
     const [xpLogged, setXpLogged] = useState(false);
 
     useEffect(() => {
@@ -332,7 +334,8 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogAc
         }
     }, [classId, studentEmail, liveSession?.quizState, liveSession?.joined, safeEmail]);
 
-useEffect(() => {
+    // 🔥 TRIGGER GLOBAL XP LOGGING ON FINISH
+    useEffect(() => {
         if (isFinished && !xpLogged && xpEarned > 0) {
             const syncArenaXP = async () => {
                 if (onLogActivity) {
@@ -348,10 +351,15 @@ useEffect(() => {
         }
     }, [isFinished, xpLogged, xpEarned, classId, onLogActivity]);
 
+    // 🔥 SPEED ALGO: Timestamp their answer!
     const submitAnswer = async (optionId: string) => {
         if (liveSession?.quizState !== 'active' || myAnswer) return;
         const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
-        await updateDoc(sessionRef, { [`answers.${safeEmail}`]: optionId });
+        
+        await updateDoc(sessionRef, { 
+            [`answers.${safeEmail}`]: optionId,
+            [`answerTimes.${safeEmail}`]: Date.now() // Log exact millisecond for speed math!
+        });
     };
 
     if (!isQuiz || liveSession?.quizState === 'waiting') {
@@ -376,13 +384,10 @@ useEffect(() => {
                     <h2 className="text-3xl font-black text-white mb-2 tracking-widest uppercase">Protocol Complete</h2>
                     <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mb-10">Simulation Terminated</p>
                     <div className="bg-slate-900/80 backdrop-blur-xl border-2 border-slate-800 rounded-3xl p-6 w-full mb-8 shadow-2xl">
-                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-800">
-                            <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Valid Targets Hit</span>
-                            <span className="text-3xl font-black text-emerald-400">{finalCorrectCount}</span>
-                        </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-xs font-black text-slate-500 uppercase tracking-widest">XP Awarded</span>
-                            <span className="text-3xl font-black text-indigo-400">+{xpEarned}</span>
+                            <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Total XP Earned</span>
+                            {/* Massive numbers for the final score */}
+                            <span className="text-4xl font-black text-indigo-400">+{xpEarned.toLocaleString()}</span> 
                         </div>
                     </div>
                     <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
@@ -393,17 +398,27 @@ useEffect(() => {
         );
     }
 
+    // ROUND REVEAL: Show exactly how much Speed Bonus they got!
     if (isRevealed) {
         const isCorrect = myAnswer === quizCorrectId;
         return (
             <div className={`h-full rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-500 border-[8px] ${isCorrect ? 'bg-slate-900 border-emerald-500/50 shadow-[inset_0_0_100px_rgba(16,185,129,0.2)]' : 'bg-black border-slate-800'}`}>
                 {isCorrect ? <CheckCircle2 size={120} className="text-emerald-400 mb-6 animate-bounce" strokeWidth={3} /> : <XCircle size={120} className="text-slate-700 mb-6" strokeWidth={2} />}
                 <h2 className="text-5xl font-black text-white mb-4 tracking-tighter drop-shadow-md">{isCorrect ? 'VALID' : 'ELIMINATED'}</h2>
-                <p className="text-white/90 font-black text-xl bg-white/10 px-6 py-3 rounded-full backdrop-blur-sm border border-white/20">{isCorrect ? '+10 XP Pending' : 'Await next round'}</p>
+                
+                {isCorrect ? (
+                    <div className="flex flex-col items-center gap-2 mt-4 animate-in slide-in-from-bottom-4 duration-700">
+                        <span className="text-emerald-400 font-black text-4xl tabular-nums">+{pointsThisRound}</span>
+                        {pointsThisRound > 850 && <span className="text-yellow-400 text-[10px] font-black uppercase tracking-[0.3em] flex items-center gap-1"><Zap size={12}/> Lightning Speed!</span>}
+                    </div>
+                ) : (
+                    <p className="text-slate-500 font-black text-xl uppercase tracking-widest mt-4">0 XP</p>
+                )}
             </div>
         );
     }
 
+    // ACTIVE QUESTION (Buttons)
     return (
         <div className="h-full bg-slate-950 rounded-[2.5rem] p-4 flex flex-col border-[4px] border-slate-800 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)]">
             <div className="bg-slate-900 p-6 rounded-[2rem] shadow-sm border border-slate-800 mb-4 text-center shrink-0">
