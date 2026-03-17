@@ -671,7 +671,7 @@ return (
       {/* 🔥 ATTACH THE SCROLL LISTENER HERE */}
       <main className="flex-1 overflow-y-auto custom-scrollbar relative px-2 md:px-6 pb-48 pt-6" onScroll={handleScroll}>
 
-      <main className="flex-1 overflow-y-auto custom-scrollbar relative px-2 md:px-6 pb-48 pt-6">
+  
         {liveSession && activeSubTab !== 'live' && (
             <div className="px-4 mb-6 animate-in slide-in-from-top-4 fade-in duration-500">
                 <button onClick={() => setActiveSubTab('live')} className="w-full bg-black rounded-[2rem] p-1 shadow-2xl relative overflow-hidden group">
