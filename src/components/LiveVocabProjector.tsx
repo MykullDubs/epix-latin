@@ -12,8 +12,8 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
     const [isAutoPilot, setIsAutoPilot] = useState(false);
     const [isFinished, setIsFinished] = useState(false); 
     
+    // Track cumulative XP instead of just correct counts
     const scoresRef = useRef<{ [email: string]: number }>({});
-    const scoredRoundRef = useRef<number>(-1);
     
     const [gameSettings, setGameSettings] = useState({ qTime: 15, rTime: 6 });
     const [timeLeft, setTimeLeft] = useState(gameSettings.qTime);
@@ -40,21 +40,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
         return () => { endLiveClass(); clearInterval(timerRef.current); };
     }, [classId, safeDeckId, quizQuestions]); 
 
-    useEffect(() => {
-        if (liveState?.quizState === 'revealed' && scoredRoundRef.current !== currentIndex) {
-            const currentAnswers = liveState.answers || {};
-            const currentQ = quizQuestions[currentIndex];
-            const newScores = { ...scoresRef.current };
-            
-            Object.entries(currentAnswers).forEach(([email, ansId]: any) => {
-                if (ansId === currentQ.correctId) newScores[email] = (newScores[email] || 0) + 1; 
-                else if (newScores[email] === undefined) newScores[email] = 0; 
-            });
-            scoresRef.current = newScores;
-            scoredRoundRef.current = currentIndex; 
-        }
-    }, [liveState?.quizState, currentIndex, quizQuestions, liveState?.answers]);
-
+    // Auto-skip if all students have answered
     useEffect(() => {
         if (liveState?.quizState === 'active' && isAutoPilot) {
             const currentAnswers = Object.keys(liveState?.answers || {}).length;
@@ -63,6 +49,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
         }
     }, [liveState?.answers, liveState?.joined, isAutoPilot]);
 
+    // Timer Countdown Logic
     useEffect(() => {
         if (!isAutoPilot || isFinished) return;
         clearInterval(timerRef.current);
@@ -78,11 +65,52 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
     const handleTimerEnd = () => {
         clearInterval(timerRef.current);
         if (liveState?.quizState === 'active') {
-            triggerQuiz('revealed');
+            handleReveal();
             setTimeLeft(gameSettings.rTime);
         } else if (liveState?.quizState === 'revealed') {
             handleNext();
         }
+    };
+
+    // 🔥 THE MATH ENGINE: Calculates the Dynamic Speed Multiplier!
+    const handleReveal = async () => {
+        clearInterval(timerRef.current);
+        const currentQ = quizQuestions[currentIndex];
+        const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
+        
+        const newScores = { ...scoresRef.current };
+        const roundPoints: any = {}; 
+        const answers = liveState?.answers || {};
+        
+        Object.entries(answers).forEach(([email, ansId]: any) => {
+            if (ansId === currentQ.correctId) {
+                const answerTime = liveState?.answerTimes?.[email] || Date.now();
+                const startTime = liveState?.currentQuestion?.startTime || (Date.now() - (gameSettings.qTime * 1000));
+                const timeLimit = liveState?.currentQuestion?.timeLimit || (gameSettings.qTime * 1000);
+                
+                const timeTaken = Math.max(0, answerTime - startTime);
+                const tLeft = Math.max(0, timeLimit - timeTaken);
+                
+                // 500 Base + Up to 500 Speed Bonus
+                const speedBonus = Math.round(500 * (tLeft / timeLimit));
+                const pointsEarned = 500 + speedBonus;
+                
+                roundPoints[email] = pointsEarned;
+                newScores[email] = (newScores[email] || 0) + pointsEarned;
+            } else {
+                roundPoints[email] = 0; // Wrong answer = 0 XP
+            }
+        });
+
+        scoresRef.current = newScores;
+
+        await updateDoc(sessionRef, {
+            quizState: 'revealed',
+            finalScores: newScores,
+            roundPoints: roundPoints 
+        });
+
+        triggerQuiz('revealed');
     };
 
     const handleNext = () => {
@@ -90,20 +118,26 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
             const nextIdx = currentIndex + 1;
             setCurrentIndex(nextIdx);
             setTimeLeft(gameSettings.qTime);
-            changeSlide(nextIdx, quizQuestions[nextIdx]);
-            triggerQuiz('active');
+            
             const questionPayload = {
                 ...quizQuestions[nextIdx],
-                startTime: Date.now(),
+                startTime: Date.now(), // Stamp the start time!
                 timeLimit: gameSettings.qTime * 1000
             };
             
+            changeSlide(nextIdx, questionPayload);
+            triggerQuiz('active');
+            
             const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
-            updateDoc(sessionRef, { answers: {} }).catch(e => console.error("Failed to clear answers", e));
+            updateDoc(sessionRef, { 
+                currentQuestion: questionPayload,
+                answers: {}, 
+                answerTimes: {}, 
+                roundPoints: {} 
+            }).catch(e => console.error("Failed to clear answers", e));
         } else {
             setIsFinished(true);
             clearInterval(timerRef.current);
-            // 🔥 NEW: Broadcast the final game state and scores to the students' phones
             const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
             updateDoc(sessionRef, {
                 quizState: 'finished',
@@ -112,8 +146,33 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
         }
     };
 
-    const startAutoPilotRun = () => { setIsAutoPilot(true); triggerQuiz('active'); setTimeLeft(gameSettings.qTime); };
-    const startManualRun = () => { setIsAutoPilot(false); triggerQuiz('active'); };
+    // Helper to start the match cleanly
+    const startRun = (auto: boolean) => {
+        setIsAutoPilot(auto);
+        setTimeLeft(gameSettings.qTime);
+        
+        const questionPayload = {
+            ...quizQuestions[0],
+            startTime: Date.now(),
+            timeLimit: gameSettings.qTime * 1000
+        };
+        
+        changeSlide(0, questionPayload);
+        triggerQuiz('active');
+        
+        const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
+        updateDoc(sessionRef, { 
+            currentQuestion: questionPayload, 
+            answers: {}, 
+            answerTimes: {}, 
+            roundPoints: {},
+            finalScores: {} // Wipe scores if restarting
+        });
+        scoresRef.current = {};
+    };
+
+    const startAutoPilotRun = () => startRun(true);
+    const startManualRun = () => startRun(false);
 
     const currentQ = quizQuestions[currentIndex];
     const answers = liveState?.answers || {};
@@ -148,12 +207,11 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                     <div className="flex justify-center items-end gap-4 md:gap-8 mb-16 h-64 border-b-2 border-slate-800 pb-0">
                         {second && (
                             <div className="flex flex-col items-center animate-in slide-in-from-bottom-8 duration-700 delay-300 fill-mode-backwards w-1/3 max-w-[160px]">
-                                {/* 🔥 FIX: Generous margin-bottom and strict z-20 layering */}
                                 <div className="text-xl md:text-2xl font-black mb-8 text-slate-300 relative z-20 truncate w-full px-2 text-center">{second.name}</div>
                                 <div className="w-full h-36 bg-slate-800 border-t-4 border-slate-400 rounded-t-2xl flex flex-col items-center justify-start pt-8 relative shadow-[0_-20px_50px_rgba(148,163,184,0.1)]">
                                     <div className="absolute -top-6 w-12 h-12 bg-slate-300 text-slate-900 rounded-full flex items-center justify-center font-black text-xl shadow-lg border-4 border-slate-950">2</div>
-                                    <span className="font-black text-3xl text-white">{second.score}</span>
-                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest mt-1">Targets</span>
+                                    <span className="font-black text-3xl text-white">{Number(second.score).toLocaleString()}</span>
+                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest mt-1">Total XP</span>
                                 </div>
                             </div>
                         )}
@@ -161,24 +219,22 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                         {first && (
                             <div className="flex flex-col items-center animate-in slide-in-from-bottom-12 duration-700 delay-700 fill-mode-backwards w-1/3 max-w-[200px]">
                                 <Crown size={32} className="text-yellow-400 mb-2 drop-shadow-[0_0_15px_rgba(250,204,21,0.5)] relative z-20" />
-                                {/* 🔥 FIX: Generous margin-bottom and strict z-20 layering */}
                                 <div className="text-2xl md:text-3xl font-black mb-10 text-yellow-400 relative z-20 truncate w-full px-2 text-center">{first.name}</div>
                                 <div className="w-full h-48 bg-slate-800 border-t-4 border-yellow-400 rounded-t-2xl flex flex-col items-center justify-start pt-10 relative shadow-[0_-20px_60px_rgba(250,204,21,0.15)] z-10">
                                     <div className="absolute -top-8 w-16 h-16 bg-yellow-400 text-yellow-900 rounded-full flex items-center justify-center font-black text-3xl shadow-xl border-4 border-slate-950">1</div>
-                                    <span className="font-black text-5xl text-white">{first.score}</span>
-                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest mt-2">Targets</span>
+                                    <span className="font-black text-5xl text-white">{Number(first.score).toLocaleString()}</span>
+                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest mt-2">Total XP</span>
                                 </div>
                             </div>
                         )}
 
                         {third && (
                             <div className="flex flex-col items-center animate-in slide-in-from-bottom-8 duration-700 delay-100 fill-mode-backwards w-1/3 max-w-[160px]">
-                                {/* 🔥 FIX: Generous margin-bottom and strict z-20 layering */}
                                 <div className="text-xl md:text-2xl font-black mb-8 text-amber-600 relative z-20 truncate w-full px-2 text-center">{third.name}</div>
                                 <div className="w-full h-28 bg-slate-800 border-t-4 border-amber-600 rounded-t-2xl flex flex-col items-center justify-start pt-6 relative shadow-[0_-20px_40px_rgba(217,119,6,0.1)]">
                                     <div className="absolute -top-6 w-12 h-12 bg-amber-600 text-amber-950 rounded-full flex items-center justify-center font-black text-xl shadow-lg border-4 border-slate-950">3</div>
-                                    <span className="font-black text-2xl text-white">{third.score}</span>
-                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest mt-1">Targets</span>
+                                    <span className="font-black text-2xl text-white">{Number(third.score).toLocaleString()}</span>
+                                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest mt-1">Total XP</span>
                                 </div>
                             </div>
                         )}
@@ -299,7 +355,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                             {isAutoPilot ? (
                                 <p className="text-slate-500 font-bold uppercase tracking-widest text-sm animate-pulse">Awaiting remaining signals...</p>
                             ) : (
-                                <button onClick={() => triggerQuiz('revealed')} className="mt-8 bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-6 rounded-full font-black text-2xl uppercase tracking-widest transition-transform active:scale-95 shadow-xl">
+                                <button onClick={handleReveal} className="mt-8 bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-6 rounded-full font-black text-2xl uppercase tracking-widest transition-transform active:scale-95 shadow-xl">
                                     Reveal Answer
                                 </button>
                             )}
