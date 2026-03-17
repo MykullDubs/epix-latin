@@ -14,6 +14,8 @@ export default function BuilderHub({
   onDeleteCard, 
   onSaveLesson, 
   allDecks, 
+  onPublishDeck,       
+  instructorClasses,    
   lessons, 
   initialMode, 
   onClearMode 
@@ -135,6 +137,8 @@ export default function BuilderHub({
                     onUpdateCard={onUpdateCard} 
                     onDeleteCard={onDeleteCard} 
                     availableDecks={allDecks} 
+                    onPublishDeck={onPublishDeck}           // 🔥 Added missing prop
+                    instructorClasses={instructorClasses}   // 🔥 Added missing prop
                 />
               )}
               
