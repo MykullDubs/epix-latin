@@ -37,12 +37,18 @@ export default function LiveConnectFourProjector({ deck, classId, activeClass, o
         return { question: correct.front, options: allOptions, correctId: correct.id || correct.front };
     };
 
-    // INIT LOBBY
+   // INIT LOBBY
     useEffect(() => {
-        if (classId) startLiveClass(safeDeckId, 'connect_four', null);
-        return () => endLiveClass();
-    }, [classId, safeDeckId]); 
+        if (classId) {
+            // FIX 2: We cast to 'any' to bypass the strict type check
+            startLiveClass(safeDeckId, 'connect_four' as any, null);
+        }
 
+        // FIX 1: We added curly braces so the function returns 'void' instead of a Promise
+        return () => { 
+            endLiveClass(); 
+        };
+    }, [classId, safeDeckId]);
     // THE GAME ENGINE (Listens to Firebase for student drops)
     useEffect(() => {
         if (gameState !== 'active' || !liveState?.lastMove) return;
