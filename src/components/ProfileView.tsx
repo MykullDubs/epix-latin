@@ -17,7 +17,7 @@ import {
 import { 
   Globe, Flame, Trophy, BarChart3, CheckCircle2, Zap, 
   Settings, ChevronRight, UploadCloud, LogOut, Shield, Crown,
-  Camera, Loader2, Heart, Activity, AlertCircle
+  Camera, Loader2, Heart, Activity, AlertCircle, History, Target
 } from 'lucide-react';
 
 // --- SUB-COMPONENT: REUSABLE AVATAR ---
@@ -29,9 +29,9 @@ const UserAvatar = ({ user, size = "md", border = false }: any) => {
         xl: "w-32 h-32 text-2xl"
     };
 
-    const avatarUrl = user?.profile?.main?.avatarUrl;
+    const avatarUrl = user?.profile?.main?.avatarUrl || user?.avatarUrl;
     const name = user?.name || "Scholar";
-    const initials = getInitials(name);
+    const initials = getInitials ? getInitials(name) : name[0].toUpperCase();
 
     return (
         <div className={`relative shrink-0 ${sizeClasses[size]}`}>
@@ -66,8 +66,8 @@ export default function ProfileView({ user, userData: propUserData }: any) {
   useEffect(() => {
     if (!user?.uid) return;
     const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
-    return onSnapshot(userRef, (doc) => {
-        if (doc.exists()) setLiveProfile(doc.data());
+    return onSnapshot(userRef, (docSnap) => {
+        if (docSnap.exists()) setLiveProfile(docSnap.data());
     });
   }, [user]);
 
@@ -83,7 +83,10 @@ export default function ProfileView({ user, userData: propUserData }: any) {
       return onSnapshot(q, (snapshot) => {
           const data = snapshot.docs.map(d => d.data());
           setLogs(data);
-          setStats(calculateUserStats(data));
+          // Only calculate stats if the helper exists
+          if (calculateUserStats) {
+              setStats(calculateUserStats(data));
+          }
       });
   }, [user]);
 
@@ -114,7 +117,7 @@ export default function ProfileView({ user, userData: propUserData }: any) {
       if (!file || !user?.uid) return;
       setIsUploading(true);
       try { 
-          await uploadProfilePicture(user.uid, file); 
+          if (uploadProfilePicture) await uploadProfilePicture(user.uid, file); 
       } catch (err: any) { 
           alert(`Upload failed: ${err.message}`); 
       } finally { 
@@ -132,15 +135,15 @@ export default function ProfileView({ user, userData: propUserData }: any) {
       setDeploying(false); 
   };
 
-  // --- AGILE MATH ---
-  const xp = activeData?.xp || 0;
-  const streak = activeData?.streak || 0;
-  const totalLikes = activeData?.totalLikesReceived || 0;
-  const { level, currentLevelXp, xpToNext, progressPct } = calculateLevel(xp, totalLikes);
-  const league = getLeagueTier(level);
+  // 🔥 THE FIX: Bulletproof Agile Math checking both root and nested fields
+  const xp = activeData?.profile?.main?.xp || activeData?.xp || 0;
+  const streak = activeData?.profile?.main?.streak || activeData?.streak || 0;
+  const totalLikes = activeData?.profile?.main?.totalLikesReceived || activeData?.totalLikesReceived || 0;
+  
+  const { level, currentLevelXp, xpToNext, progressPct } = calculateLevel ? calculateLevel(xp, totalLikes) : { level: 1, currentLevelXp: xp, xpToNext: 100, progressPct: 0 };
+  const league = getLeagueTier ? getLeagueTier(level) : { name: 'Bronze' };
 
   return (
-    // FIX: Changed top padding to pt-2 so the card sits perfectly flush
     <div className="h-full flex flex-col bg-slate-50 overflow-y-auto custom-scrollbar pt-2 pb-40">
         
         {/* 1. HERO CARD */}
@@ -194,15 +197,15 @@ export default function ProfileView({ user, userData: propUserData }: any) {
 
                     <div className="grid grid-cols-3 w-full bg-white/5 backdrop-blur-xl rounded-3xl border border-white/10 divide-x divide-white/5">
                         <div className="p-5 text-center">
-                            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1 flex justify-center gap-1"><Zap size={10} className="text-yellow-400"/> XP</div>
+                            <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 flex justify-center gap-1"><Zap size={10} className="text-yellow-400"/> Total XP</div>
                             <div className="text-xl font-black text-white">{xp.toLocaleString()}</div>
                         </div>
                         <div className="p-5 text-center">
-                            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1 flex justify-center gap-1"><Flame size={10} className="text-orange-500"/> Streak</div>
+                            <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 flex justify-center gap-1"><Flame size={10} className="text-orange-500"/> Streak</div>
                             <div className="text-xl font-black text-white">{streak}</div>
                         </div>
                         <div className="p-5 text-center">
-                            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1 flex justify-center gap-1"><Heart size={10} className="text-rose-500"/> Stars</div>
+                            <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 flex justify-center gap-1"><Heart size={10} className="text-rose-500"/> Stars</div>
                             <div className="text-xl font-black text-white">{totalLikes}</div>
                         </div>
                     </div>
@@ -212,6 +215,7 @@ export default function ProfileView({ user, userData: propUserData }: any) {
 
         {/* 2. BODY CONTENT */}
         <div className="px-6 space-y-6">
+            
             <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
                 <div className="flex justify-between items-center mb-5">
                     <h3 className="font-black text-slate-800 uppercase tracking-widest text-[10px] flex items-center gap-2"><Trophy size={14} className="text-amber-500"/> Journey Progress</h3>
@@ -226,30 +230,64 @@ export default function ProfileView({ user, userData: propUserData }: any) {
                 </div>
             </div>
 
-            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
-                <div className="flex justify-between items-center mb-8">
-                    <h3 className="font-black text-slate-800 uppercase tracking-widest text-[10px] flex items-center gap-2"><Activity size={14} className="text-indigo-600"/> Learning Velocity</h3>
-                    <span className="text-[9px] font-black text-slate-400 uppercase">{stats.totalHours} Active Hours</span>
-                </div>
-                
-                <div className="flex items-end justify-between h-24 gap-2 px-1">
-                    {stats.graphData.map((d: any, i: number) => (
-                        <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group cursor-pointer relative">
-                            <div className="absolute -top-8 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg whitespace-nowrap z-10">
-                                {d.minutes} mins
+            {/* 🔥 NEW: RECENT ACTIVITY TIMELINE */}
+            {logs.length > 0 && (
+                <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="font-black text-slate-800 uppercase tracking-widest text-[10px] flex items-center gap-2"><History size={14} className="text-indigo-600"/> Recent Protocols</h3>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{logs.length} Total</span>
+                    </div>
+                    <div className="space-y-3">
+                        {logs.slice(0, 4).map((log, i) => (
+                            <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100/50">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-white rounded-[10px] shadow-sm flex items-center justify-center text-indigo-500 border border-slate-100">
+                                        <Target size={16} />
+                                    </div>
+                                    <div>
+                                        <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">
+                                            {new Date(log.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                        </span>
+                                        <span className="block text-xs font-black text-slate-700 truncate max-w-[150px]">
+                                            {log.itemTitle || 'Arena Match'}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-100/50">
+                                    +{log.score || log.xp || 0} XP
+                                </div>
                             </div>
-                            
-                            <div className="w-full bg-slate-50 rounded-lg relative flex items-end h-full mb-3 border border-slate-100 overflow-hidden">
-                                <div 
-                                    className={`w-full transition-all duration-1000 rounded-t-sm ${d.minutes > 0 ? 'bg-indigo-500 group-hover:bg-cyan-400' : 'bg-transparent'}`} 
-                                    style={{ height: `${d.height}%` }} 
-                                />
-                            </div>
-                            <span className={`text-[8px] font-black uppercase transition-colors ${d.minutes > 0 ? 'text-slate-900 group-hover:text-indigo-600' : 'text-slate-300'}`}>{d.day}</span>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
-            </div>
+            )}
+
+            {stats?.graphData?.length > 0 && (
+                <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                    <div className="flex justify-between items-center mb-8">
+                        <h3 className="font-black text-slate-800 uppercase tracking-widest text-[10px] flex items-center gap-2"><Activity size={14} className="text-indigo-600"/> Learning Velocity</h3>
+                        <span className="text-[9px] font-black text-slate-400 uppercase">{stats.totalHours} Active Hours</span>
+                    </div>
+                    
+                    <div className="flex items-end justify-between h-24 gap-2 px-1">
+                        {stats.graphData.map((d: any, i: number) => (
+                            <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group cursor-pointer relative">
+                                <div className="absolute -top-8 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg whitespace-nowrap z-10">
+                                    {d.minutes} mins
+                                </div>
+                                
+                                <div className="w-full bg-slate-50 rounded-lg relative flex items-end h-full mb-3 border border-slate-100 overflow-hidden">
+                                    <div 
+                                        className={`w-full transition-all duration-1000 rounded-t-sm ${d.minutes > 0 ? 'bg-indigo-500 group-hover:bg-cyan-400' : 'bg-transparent'}`} 
+                                        style={{ height: `${d.height}%` }} 
+                                    />
+                                </div>
+                                <span className={`text-[8px] font-black uppercase transition-colors ${d.minutes > 0 ? 'text-slate-900 group-hover:text-indigo-600' : 'text-slate-300'}`}>{d.day}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <div className="bg-white rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-sm">
                 <div className="p-2 space-y-1">
