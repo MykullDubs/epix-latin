@@ -8,7 +8,7 @@ import { collection, addDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 // ============================================================================
-//  CLASS MANAGER VIEW (Strict Type Safe & Live Arena Enabled)
+//  CLASS MANAGER VIEW (Quick-Launch Restored)
 // ============================================================================
 export default function ClassManagerView({ 
     user, 
@@ -43,7 +43,7 @@ export default function ClassManagerView({
 
     const activeClass = classes.find((c: any) => c.id === selectedClassId);
 
-    // --- DATA LOGIC (Bulletproof Strict Type Fix Applied) ---
+    // --- DATA LOGIC ---
     const rawSubjects = curriculums.map((c: any) => String(c.subject || 'General'));
     const uniqueSubjects = new Set<string>(rawSubjects);
     const availableSubjects: string[] = ['All', ...Array.from(uniqueSubjects)];
@@ -85,6 +85,9 @@ export default function ClassManagerView({
         if (onAssignCurriculum) onAssignCurriculum(activeClass.id, curriculum.id);
         else curriculum.lessonIds.forEach((id: string) => onAssign(activeClass.id, id));
     };
+
+    // Find a fallback deck to use for the Quick Launch button
+    const defaultDeckKey = Object.keys(allDecks)[0] || 'custom';
 
     return (
         <div className="h-full max-w-7xl mx-auto flex flex-col md:flex-row gap-6 pb-24 animate-in fade-in duration-500 font-sans min-h-0">
@@ -175,7 +178,7 @@ export default function ClassManagerView({
                                             <tbody className="divide-y-2 divide-slate-50">
                                                 {activeClass.students?.map((s: any, idx: number) => (
                                                     <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                                        <td className="px-6 py-4"><div className="flex items-center gap-4"><div className="w-10 h-10 rounded-xl font-black flex items-center justify-center bg-indigo-50 text-indigo-600 border">{(s.name?.[0] || s.email[0]).toUpperCase()}</div><div><span className="font-bold text-slate-800 block">{s.name || 'Scholar'}</span><span className="text-xs font-bold text-slate-400">{s.email}</span></div></div></td>
+                                                        <td className="px-6 py-4"><div className="flex items-center gap-4"><div className="w-10 h-10 rounded-[1rem] font-black flex items-center justify-center text-sm bg-indigo-50 text-indigo-600 border">{(s.name?.[0] || s.email[0]).toUpperCase()}</div><div><span className="font-bold text-slate-800 block">{s.name || 'Scholar'}</span><span className="text-xs font-bold text-slate-400">{s.email}</span></div></div></td>
                                                         <td className="px-6 py-4 text-right"><button className="p-2 text-slate-300 hover:text-rose-500 transition-colors"><X size={16} /></button></td>
                                                     </tr>
                                                 ))}
@@ -252,8 +255,24 @@ export default function ClassManagerView({
                                         </div>
                                     )}
 
+                                    {/* 🔥 THE RESTORED QUICK-LAUNCH BUTTON & PLAYLIST */}
                                     <div className="shrink-0 pt-8 border-t-2 border-slate-100">
-                                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-500" /> Active Playlist</h3>
+                                        <div className="flex items-center justify-between mb-6">
+                                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-500" /> Active Playlist</h3>
+                                            <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-lg">{assignedLessons.length} Modules</span>
+                                        </div>
+
+                                        {/* QUICK LAUNCH BUTTON */}
+                                        <button 
+                                            onClick={() => onStartVocabGame(defaultDeckKey, activeClass.id)}
+                                            className="w-full mb-8 p-5 bg-slate-900 text-white rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-xl hover:bg-indigo-600 hover:shadow-indigo-500/30 transition-all active:scale-95 flex items-center justify-center gap-3 group border-2 border-slate-800 hover:border-indigo-500"
+                                        >
+                                            <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                <Zap size={20} fill="white" />
+                                            </div>
+                                            Quick-Launch Live Arena
+                                        </button>
+
                                         <div className="space-y-3">
                                             {assignedLessons.length === 0 ? (
                                                 <p className="text-slate-300 font-bold text-center py-8">Playlist is empty.</p>
