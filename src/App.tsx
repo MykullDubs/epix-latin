@@ -1,5 +1,5 @@
 // src/App.tsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useMagisterData } from './hooks/useMagisterData';
 import { GLOBAL_CURRICULUMS } from './constants/curriculums';
 
@@ -16,12 +16,13 @@ import StudentClassView from './components/StudentClassView';
 import StudentNavBar from './components/StudentNavBar';
 import ExamPlayerView from './components/ExamPlayerView';
 import LessonView from './components/LessonView';
-import ClassView from './components/ClassView'; // Projector view
-import LiveVocabProjector from './components/LiveVocabProjector'; // Vocab Projector
+import ClassView from './components/ClassView'; 
+import LiveVocabProjector from './components/LiveVocabProjector'; 
 import CelebrationScreen from './components/CelebrationScreen';
 
 export default function App() {
-  const { user, userData, authChecked, activeOrg, allLessons, enrolledClasses, instructorClasses, allDecks, actions } = useMagisterData();
+  // 🚨 Notice we rename allDecks to rawDecks here so we can intercept it!
+  const { user, userData, authChecked, activeOrg, allLessons, enrolledClasses, instructorClasses, allDecks: rawDecks, actions } = useMagisterData();
   
   // Navigation State
   const [currentView, setCurrentView] = useState<'student' | 'instructor' | 'admin'>('student');
@@ -37,6 +38,47 @@ export default function App() {
   // Live Presentation States
   const [activePresentation, setActivePresentation] = useState<{lessonId: string, classId: string} | null>(null);
   const [activeVocabGame, setActiveVocabGame] = useState<{deckId: string, classId: string} | null>(null);
+
+  // ==========================================================================
+  //  🔥 THE DECK INTERCEPTOR (Fixes the Scriptorium dumping issue)
+  // ==========================================================================
+  const allDecks = useMemo(() => {
+      if (!rawDecks) return {};
+      
+      // Clone the incoming decks so we don't mutate state directly
+      const processedDecks = JSON.parse(JSON.stringify(rawDecks));
+      
+      // Grab all the cards that the backend dumped into 'custom'
+      const dumpedCards = processedDecks.custom?.cards || [];
+      const trueScriptoriumCards: any[] = [];
+
+      dumpedCards.forEach((card: any) => {
+          // If the card has a specific deckId that IS NOT 'custom'
+          if (card.deckId && card.deckId !== 'custom') {
+              // If this folder doesn't exist yet, create it
+              if (!processedDecks[card.deckId]) {
+                  processedDecks[card.deckId] = {
+                      id: card.deckId,
+                      title: card.deckTitle || 'Arena Deck',
+                      cards: []
+                  };
+              }
+              // Push the card into its proper folder
+              processedDecks[card.deckId].cards.push(card);
+          } else {
+              // If it actually belongs in Scriptorium, keep it here
+              trueScriptoriumCards.push(card);
+          }
+      });
+
+      // Update Scriptorium to ONLY hold cards that actually belong there
+      if (processedDecks.custom) {
+          processedDecks.custom.cards = trueScriptoriumCards;
+      }
+
+      return processedDecks;
+  }, [rawDecks]);
+
 
   // ==========================================================================
   //  THE URL ROUTING ENGINE
@@ -112,7 +154,6 @@ export default function App() {
   }, [enrolledClasses, allLessons]);
   // ==========================================================================
 
-
   if (!authChecked) return <div className="h-screen flex items-center justify-center bg-slate-50"><div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>;
 
   // 1. PUBLIC / AUTH GATES
@@ -150,7 +191,6 @@ export default function App() {
   // 3. PROJECTOR MODE (Live Vocab Game)
   if (activeVocabGame) {
     const deck = allDecks[activeVocabGame.deckId] || allDecks.custom;
-    // We find the class data and pass it to the projector so it knows who is joining!
     const activeClassForVocab = instructorClasses.find(c => c.id === activeVocabGame.classId) || enrolledClasses.find(c => c.id === activeVocabGame.classId);
 
     return (
@@ -219,7 +259,6 @@ export default function App() {
   // 6. STUDENT MOBILE APP
   return (
     <div className="bg-slate-50 min-h-screen w-full flex flex-col items-center relative overflow-hidden">
-      {/* Switch to Dash Button (For Staff) */}
       {userData?.role !== 'student' && (
         <button onClick={() => setCurrentView(userData?.role === 'instructor' ? 'instructor' : 'admin')} className="fixed top-6 right-6 z-[1000] bg-slate-900 text-white px-8 py-3 rounded-full font-black text-xs uppercase shadow-2xl transition-all hover:scale-105 active:scale-95">
           {userData?.role === 'instructor' ? '🎓 Magister Command' : '🛡️ Command Center'}
@@ -236,7 +275,7 @@ export default function App() {
                 userData={userData} 
                 onComplete={() => {
                     setCelebrationData(null);
-                    setActiveLesson(null); // Clear the lesson AFTER they celebrate
+                    setActiveLesson(null); 
                 }} 
              />
           ) : activeLesson ? (
@@ -278,10 +317,8 @@ export default function App() {
           ) : (
             <HomeView classes={enrolledClasses} curriculums={GLOBAL_CURRICULUMS} onSelectClass={setActiveStudentClass} userData={userData} activeOrg={activeOrg} setActiveTab={setActiveTab} />
           )}
-
         </div>
         
-        {/* Hide Nav Bar when in a Lesson OR Celebrating */}
         {!activeLesson && !activeStudentClass && !celebrationData && (
           <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} activeOrg={activeOrg} />
         )}
