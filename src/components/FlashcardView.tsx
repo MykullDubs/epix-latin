@@ -1,7 +1,7 @@
 // src/components/FlashcardView.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { ArrowLeft, X, Library, Layers, Play, Zap, HelpCircle, Puzzle, Flame, CheckCircle2, XCircle, Globe, Users, Filter, ChevronLeft, ChevronRight, RotateCw, ArrowUp } from 'lucide-react';
-import { Toast } from '../Toast'; // Ensure this path matches your project structure!
+import { Toast } from './Toast'; // Ensure this path matches your project structure!
 
 // ============================================================================
 //  1. STUDY MODE (Swipe Physics & Animations)
