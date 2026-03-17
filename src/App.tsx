@@ -17,7 +17,7 @@ import StudentNavBar from './components/StudentNavBar';
 import ExamPlayerView from './components/ExamPlayerView';
 import LessonView from './components/LessonView';
 import ClassView from './components/ClassView'; // Projector view
-import LiveVocabProjector from './components/LiveVocabProjector'; // NEW: Vocab Projector
+import LiveVocabProjector from './components/LiveVocabProjector'; // Vocab Projector
 import CelebrationScreen from './components/CelebrationScreen';
 
 export default function App() {
@@ -39,11 +39,10 @@ export default function App() {
   const [activeVocabGame, setActiveVocabGame] = useState<{deckId: string, classId: string} | null>(null);
 
   // ==========================================================================
-  //  THE URL ROUTING ENGINE (Handles Refreshes & The Browser Back Button)
+  //  THE URL ROUTING ENGINE
   // ==========================================================================
   const isHydrated = useRef(false);
 
-  // 1. READ FROM URL (Triggers once on load to survive page refreshes)
   useEffect(() => {
     if (!authChecked || isHydrated.current) return;
 
@@ -53,7 +52,6 @@ export default function App() {
     if (params.get('tab')) setActiveTab(params.get('tab')!);
     if (params.get('deckId')) setActiveDeckKey(params.get('deckId'));
 
-    // Hydrate complex objects based on their IDs from the URL
     const urlClassId = params.get('classId');
     if (urlClassId && enrolledClasses.length > 0) {
       const foundClass = enrolledClasses.find((c: any) => c.id === urlClassId);
@@ -66,17 +64,15 @@ export default function App() {
       if (foundLesson) setActiveLesson(foundLesson);
     }
 
-    // Mark as hydrated so we don't accidentally overwrite state during load
     if (enrolledClasses.length > 0 || allLessons.length > 0) {
         isHydrated.current = true;
     }
   }, [authChecked, enrolledClasses, allLessons]);
 
-  // 2. WRITE TO URL (Updates the browser history when you click things)
   useEffect(() => {
-    if (!isHydrated.current) return; // Don't write to URL until initial load is done
+    if (!isHydrated.current) return;
 
-    const params = new URLSearchParams(window.location.search); // ✅ FIXED TYPO HERE
+    const params = new URLSearchParams(window.location.search);
     params.set('view', currentView);
     params.set('tab', activeTab);
     
@@ -91,13 +87,11 @@ export default function App() {
 
     const newUrl = `${window.location.pathname}?${params.toString()}`;
 
-    // Only push to browser history if the URL actually changed
     if (window.location.search !== `?${params.toString()}`) {
       window.history.pushState({}, '', newUrl);
     }
   }, [currentView, activeTab, activeStudentClass, activeLesson, activeDeckKey]);
 
-  // 3. LISTEN FOR "BACK" BUTTON (Detects when user hits back on their phone/browser)
   useEffect(() => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
@@ -131,7 +125,7 @@ export default function App() {
     ) : <MarketingSite onLoginClick={() => setShowAuth(true)} />;
   }
 
-  // 2. PROJECTOR / PRESENTATION MODE (Full-screen overlay)
+  // 2. PROJECTOR / PRESENTATION MODE
   if (activePresentation) {
     const lesson = allLessons.find(l => l.id === activePresentation.lessonId);
     return (
@@ -153,9 +147,12 @@ export default function App() {
     );
   }
 
-  // NEW: PROJECTOR MODE (Live Vocab Game)
+  // 3. PROJECTOR MODE (Live Vocab Game)
   if (activeVocabGame) {
     const deck = allDecks[activeVocabGame.deckId] || allDecks.custom;
+    // We find the class data and pass it to the projector so it knows who is joining!
+    const activeClassForVocab = instructorClasses.find(c => c.id === activeVocabGame.classId) || enrolledClasses.find(c => c.id === activeVocabGame.classId);
+
     return (
       <div className="fixed inset-0 z-[5000] bg-black flex flex-col">
         <div className="h-16 px-6 flex justify-between items-center border-b border-white/10" style={{ backgroundColor: activeOrg?.themeColor || '#4f46e5' }}>
@@ -166,6 +163,7 @@ export default function App() {
           <LiveVocabProjector 
              deck={deck} 
              classId={activeVocabGame.classId} 
+             activeClass={activeClassForVocab} 
              activeOrg={activeOrg} 
              onExit={() => setActiveVocabGame(null)} 
           />
@@ -174,7 +172,7 @@ export default function App() {
     );
   }
 
-  // 3. ADMIN VIEW
+  // 4. ADMIN VIEW
   if (currentView === 'admin' && (userData?.role === 'admin' || userData?.role === 'org_admin')) {
     return (
         <div className="h-screen w-full relative">
@@ -190,7 +188,7 @@ export default function App() {
     );
   }
 
-  // 4. INSTRUCTOR VIEW
+  // 5. INSTRUCTOR VIEW
   if (currentView === 'instructor' && userData?.role !== 'student') {
     return (
       <InstructorDashboard 
@@ -218,7 +216,7 @@ export default function App() {
     );
   }
 
-  // 5. STUDENT MOBILE APP
+  // 6. STUDENT MOBILE APP
   return (
     <div className="bg-slate-50 min-h-screen w-full flex flex-col items-center relative overflow-hidden">
       {/* Switch to Dash Button (For Staff) */}
@@ -231,7 +229,7 @@ export default function App() {
       <div className="w-full bg-white max-w-md h-[100dvh] shadow-2xl relative flex flex-col overflow-hidden">
         <div className="flex-1 overflow-hidden relative bg-slate-50">
           
-          {/* --- NEW: THE CELEBRATION INTERCEPTOR --- */}
+          {/* CELEBRATION INTERCEPTOR */}
           {celebrationData ? (
              <CelebrationScreen 
                 data={celebrationData} 
