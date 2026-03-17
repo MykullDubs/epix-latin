@@ -92,6 +92,11 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
             setTimeLeft(gameSettings.qTime);
             changeSlide(nextIdx, quizQuestions[nextIdx]);
             triggerQuiz('active');
+            const questionPayload = {
+                ...quizQuestions[nextIdx],
+                startTime: Date.now(),
+                timeLimit: gameSettings.qTime * 1000
+            };
             
             const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
             updateDoc(sessionRef, { answers: {} }).catch(e => console.error("Failed to clear answers", e));
