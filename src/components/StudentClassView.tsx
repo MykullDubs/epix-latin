@@ -567,7 +567,10 @@ export default function StudentClassView({
   const [expandedRoadmaps, setExpandedRoadmaps] = useState<Record<string, boolean>>({ 
       [classData?.assignedCurriculums?.[0]]: true 
   });
-
+const [isScrolled, setIsScrolled] = useState(false);
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+      setIsScrolled(e.currentTarget.scrollTop > 40);
+  };
   const theme = getSubjectTheme(classData?.subject);
   const safeEmail = (userData?.email || auth?.currentUser?.email || 'unknown').replace(/\./g, ',');
 
@@ -629,17 +632,44 @@ export default function StudentClassView({
       );
   }
 
-  return (
+return (
     <div className="h-full flex flex-col bg-slate-50 overflow-hidden animate-in fade-in duration-500 font-sans relative">
-      <header className={`p-6 md:p-10 pt-10 md:pt-16 shrink-0 z-10 relative rounded-b-[3rem] shadow-xl ${theme.bg}`}>
+      
+      {/* 🔥 UPGRADED DYNAMIC HEADER */}
+      <header className={`shrink-0 z-10 relative shadow-xl transition-all duration-500 ease-in-out overflow-hidden ${theme.bg} ${isScrolled ? 'rounded-b-3xl p-5 md:p-6' : 'rounded-b-[3rem] p-6 md:p-10 pt-10 md:pt-16'}`}>
         <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
-        <button onClick={onBack} className="mb-6 flex items-center gap-2 text-white/70 hover:text-white transition-colors text-xs font-black uppercase tracking-widest active:scale-95"><ArrowLeft size={16} /> BACK TO HUB</button>
-        <div className="relative z-10">
-            <span className="inline-block px-3 py-1.5 bg-black/20 text-white rounded-xl text-[10px] font-black uppercase tracking-widest mb-3 backdrop-blur-md border border-white/10 shadow-inner">{classData?.grade || 'General'} • {classData?.subject || 'Subject'}</span>
-            <h2 className="text-4xl md:text-5xl font-black text-white leading-tight mb-2 tracking-tighter drop-shadow-sm">{classData.name}</h2>
-            <div className="flex items-center gap-2 mt-4"><div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" /><p className="text-white/90 font-bold text-sm md:text-base line-clamp-1">{classData.description || "Your learning adventure starts here."}</p></div>
+        
+        {/* Top Bar: Always Visible */}
+        <div className="flex items-center justify-between relative z-20">
+            <button onClick={onBack} className="flex items-center gap-2 text-white/90 hover:text-white transition-colors text-xs font-black uppercase tracking-widest active:scale-95">
+                <ArrowLeft size={16} /> BACK TO HUB
+            </button>
+
+            {/* Mini Title: Fades in when the big banner collapses */}
+            <span className={`text-white font-black text-xs uppercase tracking-widest truncate max-w-[150px] md:max-w-xs transition-all duration-500 ${isScrolled ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 pointer-events-none'}`}>
+                {classData.name}
+            </span>
+        </div>
+
+        {/* The Collapsible Banner Content */}
+        <div className={`relative z-10 transition-all duration-500 ease-in-out origin-top ${isScrolled ? 'max-h-0 opacity-0 scale-95' : 'max-h-[500px] opacity-100 scale-100 mt-6'}`}>
+            <span className="inline-block px-3 py-1.5 bg-black/20 text-white rounded-xl text-[10px] font-black uppercase tracking-widest mb-3 backdrop-blur-md border border-white/10 shadow-inner">
+                {classData?.grade || 'General'} • {classData?.subject || 'Subject'}
+            </span>
+            <h2 className="text-4xl md:text-5xl font-black text-white leading-tight mb-2 tracking-tighter drop-shadow-sm">
+                {classData.name}
+            </h2>
+            <div className="flex items-center gap-2 mt-4">
+                <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
+                <p className="text-white/90 font-bold text-sm md:text-base line-clamp-1">
+                    {classData.description || "Your learning adventure starts here."}
+                </p>
+            </div>
         </div>
       </header>
+
+      {/* 🔥 ATTACH THE SCROLL LISTENER HERE */}
+      <main className="flex-1 overflow-y-auto custom-scrollbar relative px-2 md:px-6 pb-48 pt-6" onScroll={handleScroll}>
 
       <main className="flex-1 overflow-y-auto custom-scrollbar relative px-2 md:px-6 pb-48 pt-6">
         {liveSession && activeSubTab !== 'live' && (
