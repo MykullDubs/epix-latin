@@ -1,9 +1,10 @@
 // src/components/FlashcardView.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, X, Dumbbell, Layers, Play, Zap, HelpCircle, Puzzle, Flame, CheckCircle2, XCircle, Globe, Users, Filter, ChevronLeft, ChevronRight, RotateCw, ArrowUp } from 'lucide-react';
+import { ArrowLeft, X, Library, Layers, Play, Zap, HelpCircle, Puzzle, Flame, CheckCircle2, XCircle, Globe, Users, Filter, ChevronLeft, ChevronRight, RotateCw, ArrowUp } from 'lucide-react';
+import { Toast } from '../Toast'; // Ensure this path matches your project structure!
 
 // ============================================================================
-//  1. STUDY MODE (Upgraded Swipe Physics & Animations)
+//  1. STUDY MODE (Swipe Physics & Animations)
 // ============================================================================
 function StudyModePlayer({ deckCards }: any) {
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -114,7 +115,6 @@ function StudyModePlayer({ deckCards }: any) {
             </div>
 
             {/* The Draggable Card Container */}
-            {/* 🔥 NOTE: The key={currentIndex} forces React to remount the DOM node, triggering the fresh slide animation! */}
             <div key={currentIndex} className={`flex-1 relative flex items-center justify-center perspective-[1000px] mb-8 ${animationClass}`}>
                 <div 
                     onTouchStart={handlePointerDown}
@@ -126,7 +126,6 @@ function StudyModePlayer({ deckCards }: any) {
                     onMouseLeave={handlePointerUp}
                     className={`relative w-full aspect-square max-h-[400px] cursor-grab active:cursor-grabbing ${startX === null ? 'transition-all duration-300' : ''}`}
                     style={{ 
-                        // We tilt the card horizontally based on X drag, and slide it up slightly based on Y drag!
                         transform: `translateX(${dragX}px) translateY(${dragY * 0.4}px) rotate(${dragX * 0.05}deg)`,
                         transformStyle: 'preserve-3d'
                     }}
@@ -149,7 +148,6 @@ function StudyModePlayer({ deckCards }: any) {
                             <h2 className="text-4xl md:text-5xl font-black text-slate-800 leading-tight">{currentCard.front}</h2>
                             {currentCard.ipa && <p className="text-sm font-bold text-slate-400 mt-4 bg-slate-50 px-3 py-1 rounded-lg">{currentCard.ipa}</p>}
                             
-                            {/* 🔥 NEW SWIPE INSTRUCTION */}
                             <div className="absolute bottom-8 flex flex-col items-center gap-1 text-[10px] font-black text-indigo-400 uppercase tracking-widest opacity-60">
                                 <ArrowUp size={16} strokeWidth={3} className="animate-bounce" /> 
                                 Slide up to flip
@@ -165,7 +163,6 @@ function StudyModePlayer({ deckCards }: any) {
                             
                             <h2 className="text-3xl md:text-4xl font-black text-indigo-900 leading-tight">{currentCard.back}</h2>
                             
-                            {/* Optional morphological breakdown */}
                             {currentCard.morphology && currentCard.morphology.length > 0 && (
                                 <div className="flex flex-wrap justify-center gap-2 mt-6">
                                     {currentCard.morphology.map((m: any, i: number) => (
@@ -177,7 +174,6 @@ function StudyModePlayer({ deckCards }: any) {
                                 </div>
                             )}
 
-                            {/* 🔥 REVERSE SWIPE INSTRUCTION */}
                             <div className="absolute bottom-8 flex flex-col items-center gap-1 text-[10px] font-black text-indigo-400/60 uppercase tracking-widest">
                                 <ArrowUp size={16} strokeWidth={3} className="animate-bounce" /> 
                                 Slide up to return
@@ -198,9 +194,7 @@ function StudyModePlayer({ deckCards }: any) {
                 </button>
                 
                 <div className="flex gap-1.5">
-                    {/* Render up to 5 little dots to show deck progression visually */}
                     {deckCards.slice(0, 5).map((_: any, idx: number) => {
-                        // Calculate relative active dot if deck is larger than 5
                         const activeDot = Math.floor((currentIndex / deckCards.length) * Math.min(5, deckCards.length));
                         return (
                             <div key={idx} className={`h-1.5 rounded-full transition-all duration-300 ${idx === activeDot ? 'w-4 bg-indigo-500' : 'w-1.5 bg-slate-200'}`} />
@@ -413,13 +407,14 @@ function QuizSessionView({ deckCards, onGameEnd }: any) {
 }
 
 // ============================================================================
-//  4. MAIN GYM HUB
+//  4. MAIN STUDY HUB
 // ============================================================================
 export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, activeDeckOverride, onComplete, onLogActivity, userData, user, onDeleteDeck }: any) {
     const [internalMode, setInternalMode] = useState<'library' | 'menu' | 'playing'>('library');
     const [activeGame, setActiveGame] = useState<'standard' | 'quiz' | 'match' | 'tower'>('standard');
     
     const [deckFilter, setDeckFilter] = useState<'all' | 'personal' | 'network'>('all');
+    const [toastMsg, setToastMsg] = useState<string | null>(null);
     
     const resolvedDeck = activeDeckOverride || allDecks[selectedDeckKey] || Object.values(allDecks)[0];
     const cards = resolvedDeck?.cards || [];
@@ -450,7 +445,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         onLogActivity(resolvedDeck.id || 'custom', earnedXP, `${deckTitle} (${activeGame})`, { scorePct, mode: activeGame });
         
         setInternalMode('menu');
-        alert(`Workout Complete! Accuracy: ${Math.round(scorePct)}% | +${earnedXP} XP Earned!`);
+        setToastMsg(`Practice Complete! Accuracy: ${Math.round(scorePct)}% | +${earnedXP} XP Earned!`);
     };
 
     // --- 1. LIBRARY VIEW ---
@@ -466,14 +461,15 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
         return (
             <div className="h-full flex flex-col bg-slate-50 relative overflow-hidden">
+                {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
                 <div className="absolute top-0 right-0 w-64 h-64 bg-orange-400/10 rounded-full blur-[80px] pointer-events-none" />
                 
                 <div className="bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 py-5 flex justify-between items-center sticky top-0 z-40 shadow-sm">
                     <div className="flex items-center gap-3">
                         <div className="bg-gradient-to-br from-orange-400 to-rose-500 text-white p-2 rounded-xl shadow-md">
-                            <Dumbbell size={20} strokeWidth={3}/>
+                            <Library size={20} strokeWidth={3}/>
                         </div>
-                        <span className="font-black text-slate-800 tracking-tighter text-xl uppercase">Vocab Gym</span>
+                        <span className="font-black text-slate-800 tracking-tighter text-xl uppercase">Study Hub</span>
                     </div>
                     <div className="bg-slate-100 px-3 py-1 rounded-full text-xs font-black text-slate-500 uppercase tracking-widest">{totalCards} Cards</div>
                 </div>
@@ -573,6 +569,9 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         return (
             <div className="h-full flex flex-col bg-slate-50 animate-in slide-in-from-right-8 duration-300 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/5 rounded-full blur-[100px] pointer-events-none" />
+                
+                {/* 🔥 The newly implemented Toast! */}
+                {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
 
                 <div className="px-6 pt-8 pb-4 relative z-10">
                     <button onClick={handleBack} className="flex items-center text-slate-400 hover:text-indigo-600 mb-6 text-xs font-black uppercase tracking-widest transition-colors bg-white px-4 py-2 rounded-full border border-slate-200 shadow-sm w-fit active:scale-95">
@@ -598,7 +597,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         <div className="text-center py-16 border-4 border-dashed border-slate-200 rounded-[3rem] bg-white">
                             <Layers size={64} className="text-slate-200 mx-auto mb-4"/>
                             <h3 className="font-black text-2xl text-slate-400">Not Enough Targets</h3>
-                            <p className="text-sm font-bold text-slate-400 mt-2 mb-8 max-w-[200px] mx-auto">You need at least 4 cards to unlock the arena simulations.</p>
+                            <p className="text-sm font-bold text-slate-400 mt-2 mb-8 max-w-[200px] mx-auto">You need at least 4 cards to unlock the practice modules.</p>
                             {(!resolvedDeck.id || resolvedDeck.id === 'custom') && (
                                 <button onClick={() => alert("Go to Studio tab to add cards!")} className="px-8 py-4 bg-slate-900 text-white rounded-full font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all hover:bg-indigo-600">
                                     Open Studio Config
@@ -608,7 +607,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     ) : (
                         <div className="space-y-6">
                             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                <Zap size={14} className="text-yellow-400" fill="currentColor"/> Select Protocol
+                                <Zap size={14} className="text-yellow-400" fill="currentColor"/> Select Practice Mode
                             </h3>
                             
                             <div className="grid grid-cols-2 gap-4">
@@ -659,7 +658,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             </div>
 
             <div className="flex-1 overflow-hidden relative">
-                {/* 🔥 REPLACED JUICYDECKBLOCK WITH THE NEW SWIPE PLAYER */}
                 {activeGame === 'standard' && <StudyModePlayer deckCards={cards} />}
                 
                 {activeGame === 'quiz' && <div className="h-full overflow-y-auto"><QuizSessionView deckCards={cards} onGameEnd={(res: any) => handleGameFinish(res.score ? (res.score/res.total)*100 : 0)} /></div>}
@@ -670,9 +668,9 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             <Flame size={48} className="text-orange-500" fill="currentColor"/>
                         </div>
                         <h2 className="text-4xl font-black text-white uppercase tracking-tighter italic mb-4">The Tower</h2>
-                        <p className="text-slate-400 font-bold uppercase tracking-widest text-xs mb-10 max-w-[250px] leading-loose">This protocol is currently under construction by the architects.</p>
+                        <p className="text-slate-400 font-bold uppercase tracking-widest text-xs mb-10 max-w-[250px] leading-loose">This module is currently under construction.</p>
                         <button onClick={handleBack} className="px-10 py-4 bg-white text-black font-black text-xs uppercase tracking-widest rounded-full hover:bg-slate-200 active:scale-95 transition-all shadow-xl">
-                            Return to Base
+                            Return to Hub
                         </button>
                     </div>
                 )}
