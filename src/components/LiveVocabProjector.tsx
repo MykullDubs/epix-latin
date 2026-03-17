@@ -12,7 +12,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
     const [isAutoPilot, setIsAutoPilot] = useState(false);
     const [isFinished, setIsFinished] = useState(false); 
     
-    // Track cumulative XP instead of just correct counts
+    // Track cumulative XP
     const scoresRef = useRef<{ [email: string]: number }>({});
     
     const [gameSettings, setGameSettings] = useState({ qTime: 15, rTime: 6 });
@@ -20,6 +20,15 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
     
     const timerRef = useRef<any>(null);
     const safeDeckId = deck?.id || deck?.key || 'custom_vocab_run';
+
+    // 🔥 THE FIX: Anti-Stale-Closure Refs
+    // These refs will secretly hold the freshest possible data at all times
+    // so the timer can access it without causing infinite re-renders.
+    const liveStateRef = useRef(liveState);
+    const currentIndexRef = useRef(currentIndex);
+
+    useEffect(() => { liveStateRef.current = liveState; }, [liveState]);
+    useEffect(() => { currentIndexRef.current = currentIndex; }, [currentIndex]);
 
     const quizQuestions = useMemo(() => {
         if (!deck?.cards || deck.cards.length === 0) return [];
@@ -40,13 +49,13 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
         return () => { endLiveClass(); clearInterval(timerRef.current); };
     }, [classId, safeDeckId, quizQuestions]); 
 
-// 1. Auto-skip if all students have answered
+    // 1. Auto-skip if all students have answered
     useEffect(() => {
         if (liveState?.quizState === 'active' && isAutoPilot) {
             const currentAnswers = Object.keys(liveState?.answers || {}).length;
             const joinedStudentsCount = Object.keys(liveState?.joined || {}).length;
             if (joinedStudentsCount > 0 && currentAnswers >= joinedStudentsCount) {
-                setTimeLeft(0); // Instantly snap timer to 0 to trigger reveal
+                setTimeLeft(0); 
             }
         }
     }, [liveState?.answers, liveState?.joined, isAutoPilot, liveState?.quizState]);
@@ -60,7 +69,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
         return () => clearInterval(timer);
     }, [isAutoPilot, isFinished, timeLeft]);
 
-    // 3. Smart Phase Controller (Runs on fresh render when timer hits 0!)
+    // 3. Smart Phase Controller
     useEffect(() => {
         if (timeLeft === 0 && isAutoPilot && !isFinished) {
             if (liveState?.quizState === 'active') {
@@ -72,24 +81,27 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [timeLeft, isAutoPilot, isFinished]); 
-    // We intentionally omit handleReveal/handleNext from deps to prevent infinite loops
 
     // 🔥 THE BULLETPROOF MATH ENGINE
     const handleReveal = async () => {
-        const currentQ = quizQuestions[currentIndex];
+        // Pull the absolutely freshest state from our refs!
+        const freshestLiveState = liveStateRef.current;
+        const freshestIndex = currentIndexRef.current;
+        
+        const currentQ = quizQuestions[freshestIndex];
         const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
         
         const newScores = { ...scoresRef.current };
         const roundPoints: any = {}; 
         
-        // Because this is triggered by the useEffect above, liveState is 100% fresh!
-        const answers = liveState?.answers || {};
+        const answers = freshestLiveState?.answers || {};
+        const answerTimes = freshestLiveState?.answerTimes || {};
         
         Object.entries(answers).forEach(([email, ansId]: any) => {
             if (ansId === currentQ.correctId) {
-                const answerTime = liveState?.answerTimes?.[email] || Date.now();
-                const startTime = liveState?.currentQuestion?.startTime || (Date.now() - (gameSettings.qTime * 1000));
-                const timeLimit = liveState?.currentQuestion?.timeLimit || (gameSettings.qTime * 1000);
+                const answerTime = answerTimes[email] || Date.now();
+                const startTime = freshestLiveState?.currentQuestion?.startTime || (Date.now() - (gameSettings.qTime * 1000));
+                const timeLimit = freshestLiveState?.currentQuestion?.timeLimit || (gameSettings.qTime * 1000);
                 
                 const timeTaken = Math.max(0, answerTime - startTime);
                 const tLeft = Math.max(0, timeLimit - timeTaken);
@@ -101,7 +113,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                 roundPoints[email] = pointsEarned;
                 newScores[email] = (newScores[email] || 0) + pointsEarned;
             } else {
-                roundPoints[email] = 0; // Wrong answer = 0 XP
+                roundPoints[email] = 0; // Wrong answer
             }
         });
 
@@ -117,14 +129,16 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
     };
 
     const handleNext = () => {
-        if (currentIndex < quizQuestions.length - 1) {
-            const nextIdx = currentIndex + 1;
+        const freshestIndex = currentIndexRef.current;
+        
+        if (freshestIndex < quizQuestions.length - 1) {
+            const nextIdx = freshestIndex + 1;
             setCurrentIndex(nextIdx);
             setTimeLeft(gameSettings.qTime);
             
             const questionPayload = {
                 ...quizQuestions[nextIdx],
-                startTime: Date.now(), // Stamp the exact start time
+                startTime: Date.now(), 
                 timeLimit: gameSettings.qTime * 1000
             };
             
@@ -147,10 +161,11 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
             }).catch(e => console.error("Could not broadcast end game:", e));
         }
     };
-    // Helper to start the match cleanly
+
     const startRun = (auto: boolean) => {
         setIsAutoPilot(auto);
         setTimeLeft(gameSettings.qTime);
+        setCurrentIndex(0); // Reset index safely
         
         const questionPayload = {
             ...quizQuestions[0],
@@ -167,7 +182,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
             answers: {}, 
             answerTimes: {}, 
             roundPoints: {},
-            finalScores: {} // Wipe scores if restarting
+            finalScores: {}
         });
         scoresRef.current = {};
     };
@@ -182,7 +197,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
     const joinedCount = Object.keys(joinedStudents).length;
 
     // ========================================================================
-    //  PHASE 4: THE POST-GAME LEADERBOARD (Z-Index Fixed)
+    //  PHASE 4: THE POST-GAME LEADERBOARD
     // ========================================================================
     if (isFinished) {
         const sortedScores = Object.entries(scoresRef.current)
