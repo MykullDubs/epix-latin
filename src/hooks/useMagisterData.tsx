@@ -205,14 +205,22 @@ export function useMagisterData() {
             }
 
             // 3. Update the User's Main Profile (Atomic Increment)
-            // This is the specific write that 'useLeaderboard' is listening for!
+            
+            // A. Update the subcollection (for the student's personal Profile View)
             await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
               xp: increment(xp),
               streak: newStreak,
               dailyXp: newDailyXp,
               dailyLessons: newDailyLessons,
               lastActivityDate: todayStr
-            });
+            }).catch(e => console.log("Subcollection update skipped", e));
+
+            // 🔥 B. THE FIX: Update the parent document's nested map (for the Leaderboard View!)
+            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid), {
+              'profile.main.xp': increment(xp),
+              'profile.main.streak': newStreak,
+              'xp': increment(xp) // Backup flat field just to be bulletproof
+            }).catch(e => console.log("Parent doc update skipped", e));
           }
       } catch (err) {
           console.error("Critical Failure in XP Pipeline:", err);
