@@ -8,7 +8,7 @@ import { collection, addDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 // ============================================================================
-//  CLASS MANAGER VIEW (Multi-Mode Hub - Fixed Types)
+//  CLASS MANAGER VIEW (Strict Type Fixes & Vocab Arena)
 // ============================================================================
 export default function ClassManagerView({ 
     user, 
@@ -43,8 +43,9 @@ export default function ClassManagerView({
 
     const activeClass = classes.find((c: any) => c.id === selectedClassId);
 
-    // --- DATA LOGIC ---
-    const availableSubjects: string[] = ['All', ...Array.from(new Set(curriculums.map((c: any) => c.subject || 'General')))];
+    // --- DATA LOGIC (Explicitly Typed string[]) ---
+    const availableSubjects: string[] = ['All', ...Array.from(new Set(curriculums.map((c: any) => (c.subject as string) || 'General')))];
+
     const assignedLessons = lessons.filter((l: any) => activeClass?.assignments?.includes(l.id));
     const unassignedLessons = lessons.filter((l: any) => !activeClass?.assignments?.includes(l.id));
     
@@ -76,13 +77,17 @@ export default function ClassManagerView({
 
     const handleBulkAssign = (curriculum: any) => {
         if (!window.confirm(`Deploy ${curriculum.title} to this cohort?`)) return;
-        if (onAssignCurriculum) onAssignCurriculum(activeClass.id, curriculum.id);
+        if (onAssignCurriculum) {
+            onAssignCurriculum(activeClass.id, curriculum);
+        } else {
+            curriculum.lessonIds.forEach((id: string) => onAssign(activeClass.id, id));
+        }
     };
 
     return (
         <div className="h-full max-w-7xl mx-auto flex flex-col md:flex-row gap-6 pb-24 animate-in fade-in duration-500 font-sans min-h-0">
             
-            {/* LEFT PANE: THE COHORT LIST */}
+            {/* Master Roster Pane */}
             <div className="w-full md:w-[340px] flex flex-col gap-6 shrink-0 min-h-0">
                 <div className="flex items-center justify-between bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden group shrink-0">
                     <div className="absolute -right-4 -top-4 text-indigo-50 opacity-50 rotate-12 pointer-events-none transition-transform group-hover:scale-110 duration-700">
@@ -94,7 +99,7 @@ export default function ClassManagerView({
                     </div>
                     <button 
                         onClick={() => { setIsCreatingCohort(!isCreatingCohort); setNewCohortName(''); }}
-                        className={`relative z-10 w-12 h-12 rounded-[1.25rem] flex items-center justify-center shadow-lg transition-all active:scale-95 ${isCreatingCohort ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-slate-900 text-white hover:bg-slate-800'}`}
+                        className={`relative z-10 w-12 h-12 rounded-[1.25rem] flex items-center justify-center shadow-lg transition-all active:scale-95 ${isCreatingCohort ? 'bg-rose-500 text-white hover:bg-rose-600 shadow-rose-200' : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-200'}`}
                     >
                         {isCreatingCohort ? <X size={24} /> : <Plus size={24} />}
                     </button>
@@ -102,7 +107,7 @@ export default function ClassManagerView({
 
                 <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-2 pb-4">
                     {isCreatingCohort && (
-                        <div className="p-5 bg-indigo-600 rounded-[2rem] shadow-xl animate-in slide-in-from-top-4 duration-300">
+                        <div className="p-5 bg-indigo-600 rounded-[2rem] shadow-xl shadow-indigo-200 animate-in slide-in-from-top-4 duration-300">
                             <label className="text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-2 block">Forge New Cohort</label>
                             <input 
                                 autoFocus value={newCohortName} onChange={e => setNewCohortName(e.target.value)}
@@ -113,6 +118,7 @@ export default function ClassManagerView({
                             <button disabled={!newCohortName.trim()} onClick={handleCreateSubmit} className="w-full py-3 bg-white text-indigo-600 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"><Flame size={16} /> Deploy</button>
                         </div>
                     )}
+
                     {classes.map((cls: any) => (
                         <button 
                             key={cls.id} onClick={() => setSelectedClassId(cls.id)}
@@ -131,8 +137,8 @@ export default function ClassManagerView({
                 </div>
             </div>
 
-            {/* RIGHT PANE: COHORT DETAILS */}
-            <div className="flex-1 flex flex-col bg-white rounded-[3rem] border border-slate-200 shadow-xl overflow-hidden relative min-h-0">
+            {/* Detail Pane */}
+            <div className="flex-1 flex flex-col bg-white rounded-[3rem] border border-slate-200 shadow-xl relative min-h-0">
                 {!activeClass ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-center p-12 bg-slate-50/50">
                         <div className="w-24 h-24 bg-white shadow-sm border border-slate-100 rounded-[2.5rem] flex items-center justify-center text-slate-300 mb-6 rotate-12 transition-transform hover:rotate-0 duration-500">
@@ -142,13 +148,13 @@ export default function ClassManagerView({
                         <p className="text-slate-500 font-bold max-w-sm">Manage subject assignments and live sessions.</p>
                     </div>
                 ) : (
-                    <div className="flex-1 flex flex-col animate-in slide-in-from-right-8 duration-500 fade-in min-h-0">
+                    <div className="flex-1 flex flex-col animate-in slide-in-from-right-8 duration-500 min-h-0">
                         <header className="px-8 md:px-10 pt-10 pb-0 border-b border-slate-100 bg-slate-50/50 relative shrink-0">
                             <div className="flex justify-between items-start mb-8">
                                 <div className="flex-1 pr-8">
                                     <span className="inline-block px-3 py-1 bg-slate-200/50 text-slate-500 rounded-lg text-[10px] font-black uppercase mb-3">ID: {activeClass.id}</span>
                                     <div className="flex items-center gap-3 group">
-                                        <input className="text-3xl md:text-4xl font-black text-slate-900 tracking-tighter bg-transparent border-b-2 border-transparent focus:border-indigo-500 p-0 focus:ring-0 w-full max-w-lg transition-colors outline-none"
+                                        <input className="text-3xl md:text-4xl font-black text-slate-900 tracking-tighter bg-transparent border-b-2 border-transparent focus:border-indigo-500 p-0 focus:ring-0 w-full transition-colors outline-none"
                                             value={activeClass.name} onChange={(e) => onRenameClass(activeClass.id, e.target.value)} />
                                         <Edit3 size={18} className="text-slate-300" />
                                     </div>
@@ -212,15 +218,16 @@ export default function ClassManagerView({
                                         ))}
                                     </div>
 
-                                    {/* FIX: Explicitly cast 'sub' as string to satisfy TS */}
+                                    {/* MODE 1: PACKAGES (Strict Typing Added) */}
                                     {assignMode === 'packages' && (
                                         <div className="bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
                                             <div className="relative z-10">
-                                                <h3 className="text-2xl font-black text-white mb-2 tracking-tight">Curriculum Library</h3>
+                                                <h3 className="text-2xl font-black text-white mb-2 tracking-tight uppercase italic">Curriculum Library</h3>
                                                 <div className="flex flex-col md:flex-row gap-4 mb-8">
                                                     <div className="relative flex-1"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} /><input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-white/10 border border-white/20 text-white pl-12 pr-4 py-3 rounded-xl font-bold outline-none" /></div>
                                                     <div className="flex items-center gap-2 overflow-x-auto pb-2">
                                                         <Filter size={16} className="text-slate-500" />
+                                                        {/* FIXED: sub typed as string */}
                                                         {availableSubjects.map((sub: string) => (
                                                             <button key={sub} onClick={() => setActiveSubjectFilter(sub)} className={`px-4 py-2 rounded-lg font-black text-[10px] uppercase shrink-0 transition-colors ${activeSubjectFilter === sub ? 'bg-indigo-500 text-white' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}>
                                                                 {sub}
@@ -233,7 +240,7 @@ export default function ClassManagerView({
                                                         <div key={curr.id} className="bg-white/5 border border-white/10 rounded-2xl p-5 hover:bg-white/10 transition-colors flex items-start gap-4">
                                                             <div className="w-16 h-16 rounded-xl bg-indigo-600 shrink-0 overflow-hidden">{curr.coverImage && <img src={curr.coverImage} className="w-full h-full object-cover mix-blend-overlay" />}</div>
                                                             <div className="flex-1"><h4 className="text-lg font-black text-white leading-tight mb-1">{curr.title}</h4><p className="text-xs text-slate-400 mb-3">{curr.lessonIds?.length} Units</p>
-                                                                <button onClick={() => handleBulkAssign(curr)} className="px-4 py-2 bg-white text-slate-900 rounded-lg text-[10px] font-black uppercase hover:bg-indigo-50">Deploy</button>
+                                                                <button onClick={() => handleBulkAssign(curr)} className="px-4 py-2 bg-white text-slate-900 rounded-lg text-[10px] font-black uppercase hover:bg-indigo-50 transition-all active:scale-95">Deploy</button>
                                                             </div>
                                                         </div>
                                                     ))}
@@ -242,6 +249,7 @@ export default function ClassManagerView({
                                         </div>
                                     )}
 
+                                    {/* MODE 2: STANDALONE */}
                                     {assignMode === 'standalone' && (
                                         <div className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100">
                                             <div className="relative"><Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input type="text" placeholder="Search standalone modules..." value={lessonSearch} onChange={(e) => setLessonSearch(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-200 focus:border-indigo-500 rounded-2xl text-sm font-bold text-slate-800 outline-none" />
@@ -259,7 +267,7 @@ export default function ClassManagerView({
                                         </div>
                                     )}
 
-                                    {/* FIX: Explicitly handle deck entries with type safety */}
+                                    {/* MODE 3: LIVE ARENA (Strict Destructuring) */}
                                     {assignMode === 'vocab' && (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in zoom-in-95 duration-300">
                                             {Object.entries(allDecks).map(([key, deck]: [string, any]) => (
@@ -271,19 +279,26 @@ export default function ClassManagerView({
                                         </div>
                                     )}
 
+                                    {/* Footer Content: Playlist */}
                                     <div className="shrink-0 pt-8 border-t-2 border-slate-100">
-                                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Active Playlist</h3>
+                                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                            <CheckCircle2 size={16} className="text-emerald-500" /> Active Playlist
+                                        </h3>
                                         <div className="space-y-3">
-                                            {assignedLessons.map((lesson: any, idx: number) => (
-                                                <div key={lesson.id} className="flex items-center p-4 rounded-2xl border-2 border-slate-100 bg-white group">
-                                                    <div className="w-8 h-8 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center text-[10px] font-black mr-4">{idx + 1}</div>
-                                                    <div className="flex-1 pr-4"><h4 className="font-black text-sm text-slate-800">{lesson.title}</h4><span className="text-[10px] font-black uppercase text-slate-400">{lesson.subject || 'Standard'}</span></div>
-                                                    <div className="flex gap-2">
-                                                        <button onClick={() => onStartPresentation(lesson.id, activeClass.id)} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-lg text-xs font-black uppercase transition-colors"><Play size={14} fill="currentColor" /> Present</button>
-                                                        <button onClick={() => onRevoke(activeClass.id, lesson.id)} className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center"><Trash2 size={16} /></button>
+                                            {assignedLessons.length === 0 ? (
+                                                <p className="text-slate-300 font-bold text-center py-8">Playlist is empty.</p>
+                                            ) : (
+                                                assignedLessons.map((lesson: any, idx: number) => (
+                                                    <div key={lesson.id} className="flex items-center p-4 rounded-2xl border-2 border-slate-100 bg-white group">
+                                                        <div className="w-8 h-8 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center text-[10px] font-black mr-4">{idx + 1}</div>
+                                                        <div className="flex-1 pr-4"><h4 className="font-black text-sm text-slate-800">{lesson.title}</h4><span className="text-[10px] font-black uppercase text-slate-400">{lesson.subject || 'Module'}</span></div>
+                                                        <div className="flex gap-2">
+                                                            <button onClick={() => onStartPresentation(lesson.id, activeClass.id)} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-lg text-xs font-black uppercase transition-colors"><Play size={14} fill="currentColor" /> Present</button>
+                                                            <button onClick={() => onRevoke(activeClass.id, lesson.id)} className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center"><Trash2 size={16} /></button>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))}
+                                                ))
+                                            )}
                                         </div>
                                     </div>
                                 </div>
