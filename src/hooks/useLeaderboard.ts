@@ -7,7 +7,6 @@ export function useLeaderboard(studentEmails: string[]) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Handle empty class state
         if (!studentEmails || studentEmails.length === 0) {
             setRankings([]);
             setLoading(false);
@@ -15,48 +14,42 @@ export function useLeaderboard(studentEmails: string[]) {
         }
 
         setLoading(true);
+        // Clean the emails to ensure perfect matching
+        const cleanEmails = studentEmails.map(e => e.toLowerCase().trim()).slice(0, 30);
 
-        /**
-         * STRATEGY:
-         * We listen to the entire users collection but filter locally for performance 
-         * if the class is small, OR we use the list of emails.
-         * * Note: For massive production apps, you'd add a 'classId' or 'cohortId' 
-         * string to the user profile and query by that instead of emails.
-         */
-        
-        // We still respect the 30-email limit for this specific query type
-        const limitedEmails = studentEmails.slice(0, 30);
-
+        // 🔥 THE FIX: Query the root 'email' field instead of 'profile.main.email'
         const q = query(
             collection(db, 'artifacts', appId, 'users'),
-            where('profile.main.email', 'in', limitedEmails)
+            where('email', 'in', cleanEmails)
         );
 
-        // 🔥 switch getDocs to onSnapshot for real-time jamming
         const unsubscribe = onSnapshot(q, (snap) => {
             const data = snap.docs.map(doc => {
                 const rawData = doc.data();
+                // Safely grab data whether it's in the profile map or at the root
+                const profile = rawData.profile?.main || {}; 
+                
                 return {
                     uid: doc.id,
-                    name: rawData.profile?.main?.name || rawData.name || 'Anonymous Scholar',
-                    email: rawData.profile?.main?.email || 'No Email',
-                    xp: rawData.profile?.main?.xp || 0, // Ensure XP is pulled correctly
-                    avatarUrl: rawData.profile?.main?.avatarUrl || null,
-                    level: Math.floor((rawData.profile?.main?.xp || 0) / 100) + 1 // Optional: Dynamic level calculation
+                    name: profile.name || rawData.name || 'Anonymous Scholar',
+                    email: profile.email || rawData.email || 'No Email',
+                    xp: profile.xp || rawData.xp || 0,
+                    avatarUrl: profile.avatarUrl || rawData.avatarUrl || null,
+                    streak: profile.streak || 0,
+                    level: Math.floor((profile.xp || rawData.xp || 0) / 100) + 1,
+                    totalLikesReceived: profile.totalLikesReceived || 0
                 };
             });
 
-            // Sort by XP descending (Highest at the top)
+            // Sort by XP descending
             const sorted = data.sort((a, b) => (b.xp || 0) - (a.xp || 0));
-            
             setRankings(sorted);
             setLoading(false);
         }, (error) => {
-            console.error("Real-time leaderboard sync failed:", error);
+            console.error("Cohort leaderboard sync failed:", error);
             setLoading(false);
         });
 
-        // Cleanup listener on unmount
         return () => unsubscribe();
     }, [studentEmails]);
 
