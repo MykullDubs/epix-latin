@@ -291,7 +291,7 @@ const SHAPE_THEMES = [
     { color: 'bg-slate-800 hover:bg-slate-900 active:bg-black', shadow: 'shadow-[0_8px_0_rgb(15,23,42)]', icon: X }
 ];
 
-const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) => {
+const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogActivity }: any) => {
     const activeLesson = lessons.find((l: any) => l.id === liveSession?.lessonId);
     const pages = useMemo(() => {
         if (!activeLesson?.blocks) return [];
