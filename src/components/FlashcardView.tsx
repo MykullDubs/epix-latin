@@ -1,10 +1,179 @@
 // src/components/FlashcardView.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, X, Dumbbell, Layers, Play, Zap, HelpCircle, Puzzle, Flame, CheckCircle2, XCircle, Globe, Users, Filter } from 'lucide-react';
-import { JuicyDeckBlock } from './LessonBlocks';
+import { ArrowLeft, X, Dumbbell, Layers, Play, Zap, HelpCircle, Puzzle, Flame, CheckCircle2, XCircle, Globe, Users, Filter, ChevronLeft, ChevronRight, RotateCw } from 'lucide-react';
 
 // ============================================================================
-//  1. MATCHING GAME (With Anti-Spam & 3D Flips)
+//  1. STUDY MODE (NEW: Swipe Physics & Desktop Buttons)
+// ============================================================================
+function StudyModePlayer({ deckCards }: any) {
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [isFlipped, setIsFlipped] = useState(false);
+    
+    // Swipe Physics State
+    const [startX, setStartX] = useState<number | null>(null);
+    const [dragX, setDragX] = useState(0);
+
+    const currentCard = deckCards[currentIndex];
+
+    // --- Handlers ---
+    const handleNext = (e?: any) => {
+        e?.stopPropagation();
+        if (currentIndex < deckCards.length - 1) {
+            setCurrentIndex(i => i + 1);
+            setIsFlipped(false);
+        }
+    };
+
+    const handlePrev = (e?: any) => {
+        e?.stopPropagation();
+        if (currentIndex > 0) {
+            setCurrentIndex(i => i - 1);
+            setIsFlipped(false);
+        }
+    };
+
+    // --- Touch/Mouse Physics ---
+    const handlePointerDown = (e: React.TouchEvent | React.MouseEvent) => {
+        const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+        setStartX(clientX);
+    };
+
+    const handlePointerMove = (e: React.TouchEvent | React.MouseEvent) => {
+        if (startX === null) return;
+        const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+        const currentDrag = clientX - startX;
+        
+        // Add resistance if they are trying to drag past the first or last card
+        if ((currentIndex === 0 && currentDrag > 0) || (currentIndex === deckCards.length - 1 && currentDrag < 0)) {
+            setDragX(currentDrag * 0.2); // Heavy resistance
+        } else {
+            setDragX(currentDrag);
+        }
+    };
+
+    const handlePointerUp = () => {
+        if (startX === null) return;
+        
+        const SWIPE_THRESHOLD = 75; // Pixels required to trigger a swipe
+        
+        if (dragX > SWIPE_THRESHOLD && currentIndex > 0) {
+            handlePrev();
+        } else if (dragX < -SWIPE_THRESHOLD && currentIndex < deckCards.length - 1) {
+            handleNext();
+        } else if (Math.abs(dragX) < 10) {
+            // If they barely moved the mouse/finger, treat it as a tap to flip
+            setIsFlipped(!isFlipped);
+        }
+        
+        // Reset physics
+        setStartX(null);
+        setDragX(0);
+    };
+
+    if (!currentCard) return null;
+
+    const progress = ((currentIndex + 1) / deckCards.length) * 100;
+
+    return (
+        <div className="flex flex-col h-full max-w-md mx-auto p-6 w-full">
+            {/* Header & Progress */}
+            <div className="mb-8">
+                <div className="flex justify-between text-xs font-black text-slate-400 uppercase tracking-widest mb-3">
+                    <span>Target {currentIndex + 1}</span>
+                    <span>{deckCards.length} Total</span>
+                </div>
+                <div className="h-2 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                    <div className="h-full bg-indigo-500 transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
+                </div>
+            </div>
+
+            {/* The Draggable Card Container */}
+            <div className="flex-1 relative flex items-center justify-center perspective-[1000px] mb-8">
+                <div 
+                    onTouchStart={handlePointerDown}
+                    onTouchMove={handlePointerMove}
+                    onTouchEnd={handlePointerUp}
+                    onMouseDown={handlePointerDown}
+                    onMouseMove={handlePointerMove}
+                    onMouseUp={handlePointerUp}
+                    onMouseLeave={handlePointerUp}
+                    className={`relative w-full aspect-square max-h-[400px] cursor-grab active:cursor-grabbing ${startX === null ? 'transition-all duration-300' : ''}`}
+                    style={{ 
+                        transform: `translateX(${dragX}px) rotate(${dragX * 0.05}deg)`,
+                        transformStyle: 'preserve-3d'
+                    }}
+                >
+                    {/* The Flipping Inner Card */}
+                    <div 
+                        className="absolute inset-0 w-full h-full transition-transform duration-500 ease-in-out"
+                        style={{ 
+                            transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                            transformStyle: 'preserve-3d' 
+                        }}
+                    >
+                        {/* FRONT FACE */}
+                        <div 
+                            className="absolute inset-0 w-full h-full bg-white rounded-[3rem] border-2 border-b-[8px] border-slate-200 shadow-xl flex flex-col items-center justify-center p-8 text-center"
+                            style={{ backfaceVisibility: 'hidden' }}
+                        >
+                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest absolute top-6">Front</span>
+                            <h2 className="text-4xl md:text-5xl font-black text-slate-800 leading-tight">{currentCard.front}</h2>
+                            {currentCard.ipa && <p className="text-sm font-bold text-slate-400 mt-4 bg-slate-50 px-3 py-1 rounded-lg">{currentCard.ipa}</p>}
+                            <div className="absolute bottom-6 flex items-center gap-2 text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                                <RotateCw size={12} /> Tap to Flip
+                            </div>
+                        </div>
+
+                        {/* BACK FACE */}
+                        <div 
+                            className="absolute inset-0 w-full h-full bg-indigo-50 rounded-[3rem] border-2 border-b-[8px] border-indigo-200 shadow-xl flex flex-col items-center justify-center p-8 text-center"
+                            style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+                        >
+                            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest absolute top-6">Back</span>
+                            <h2 className="text-3xl md:text-4xl font-black text-indigo-900 leading-tight">{currentCard.back}</h2>
+                            
+                            {/* Optional morphological breakdown */}
+                            {currentCard.morphology && currentCard.morphology.length > 0 && (
+                                <div className="flex flex-wrap justify-center gap-2 mt-6">
+                                    {currentCard.morphology.map((m: any, i: number) => (
+                                        <div key={i} className="bg-white border border-indigo-100 px-3 py-1.5 rounded-xl shadow-sm text-[10px] uppercase tracking-wider">
+                                            <span className="font-black text-indigo-600 mr-1">{m.part}</span>
+                                            <span className="font-bold text-slate-400">{m.meaning}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Desktop / Manual Navigation Buttons */}
+            <div className="flex items-center justify-between px-4 pb-8 shrink-0">
+                <button 
+                    onClick={handlePrev}
+                    disabled={currentIndex === 0}
+                    className="w-14 h-14 bg-white rounded-full flex items-center justify-center text-slate-400 shadow-md border border-slate-100 disabled:opacity-30 disabled:shadow-none hover:bg-slate-50 hover:text-indigo-600 transition-colors active:scale-95"
+                >
+                    <ChevronLeft size={24} strokeWidth={3} />
+                </button>
+                
+                <span className="text-xs font-black text-slate-300 uppercase tracking-widest">Swipe or Tap</span>
+                
+                <button 
+                    onClick={handleNext}
+                    disabled={currentIndex === deckCards.length - 1}
+                    className="w-14 h-14 bg-white rounded-full flex items-center justify-center text-slate-400 shadow-md border border-slate-100 disabled:opacity-30 disabled:shadow-none hover:bg-slate-50 hover:text-indigo-600 transition-colors active:scale-95"
+                >
+                    <ChevronRight size={24} strokeWidth={3} />
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// ============================================================================
+//  2. MATCHING GAME
 // ============================================================================
 function MatchingGame({ deckCards, onGameEnd }: any) {
     const [cards, setCards] = useState<any[]>([]);
@@ -70,9 +239,9 @@ function MatchingGame({ deckCards, onGameEnd }: any) {
                             key={i} 
                             onClick={() => handleCardClick(i)}
                             disabled={isSolved}
-                            className={`relative aspect-square rounded-2xl text-sm md:text-base font-bold flex items-center justify-center p-2 text-center transition-all duration-300 transform preserve-3d ${
+                            className={`relative aspect-square rounded-2xl text-sm md:text-base font-bold flex items-center justify-center p-2 text-center transition-all duration-300 transform ${
                                 isSolved ? 'opacity-0 scale-75 pointer-events-none' : 
-                                isFlipped ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 scale-105 rotate-y-0' : 
+                                isFlipped ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 scale-105' : 
                                 'bg-white border-[3px] border-slate-200 text-slate-600 hover:border-indigo-300 hover:-translate-y-1 shadow-[0_4px_0_rgb(226,232,240)] active:shadow-none active:translate-y-1'
                             }`}
                         >
@@ -86,7 +255,7 @@ function MatchingGame({ deckCards, onGameEnd }: any) {
 }
 
 // ============================================================================
-//  2. QUIZ SESSION (Duolingo-Style 3D Buttons)
+//  3. QUIZ SESSION 
 // ============================================================================
 function QuizSessionView({ deckCards, onGameEnd }: any) {
     const [index, setIndex] = useState(0);
@@ -196,13 +365,12 @@ function QuizSessionView({ deckCards, onGameEnd }: any) {
 }
 
 // ============================================================================
-//  3. MAIN GYM HUB
+//  4. MAIN GYM HUB
 // ============================================================================
 export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onSaveCard, activeDeckOverride, onComplete, onLogActivity, userData, user, onDeleteDeck }: any) {
     const [internalMode, setInternalMode] = useState<'library' | 'menu' | 'playing'>('library');
     const [activeGame, setActiveGame] = useState<'standard' | 'quiz' | 'match' | 'tower'>('standard');
     
-    // 🔥 NEW: Filter State for the Library
     const [deckFilter, setDeckFilter] = useState<'all' | 'personal' | 'network'>('all');
     
     const resolvedDeck = activeDeckOverride || allDecks[selectedDeckKey] || Object.values(allDecks)[0];
@@ -241,7 +409,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     if (internalMode === 'library') {
         const totalCards = Object.values(allDecks).reduce((acc: number, curr: any) => acc + (curr.cards?.length || 0), 0);
 
-        // 🔥 FILTER LOGIC
         const filteredDecks = Object.entries(allDecks).filter(([key, deck]: any) => {
             if (deckFilter === 'all') return true;
             if (deckFilter === 'personal') return !deck.isPublished;
@@ -263,7 +430,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     <div className="bg-slate-100 px-3 py-1 rounded-full text-xs font-black text-slate-500 uppercase tracking-widest">{totalCards} Cards</div>
                 </div>
 
-                {/* 🔥 THE NEW FILTER BAR */}
                 <div className="bg-white/60 backdrop-blur-md border-b border-slate-200 px-6 py-3 flex items-center gap-2 overflow-x-auto custom-scrollbar sticky top-[76px] z-30">
                     <Filter size={14} className="text-slate-400 shrink-0 mr-2" />
                     <button 
@@ -315,7 +481,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                                     <div className="flex flex-wrap items-center gap-2 mt-2">
                                                         <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest bg-slate-50 px-2 py-1 rounded-md border border-slate-100">{cardCount} Cards</span>
                                                         
-                                                        {/* 🔥 THE INJECTED NETWORK BADGES */}
                                                         {deck.isPublished && deck.visibility === 'public' && (
                                                             <span className="text-[9px] text-emerald-600 font-black uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded-md flex items-center gap-1 border border-emerald-100">
                                                                 <Globe size={10}/> Global
@@ -372,7 +537,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         <span className="text-indigo-500 text-[10px] font-black uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-lg">
                             {cards.length} Configured Targets
                         </span>
-                        {/* Show badge in menu too! */}
                         {resolvedDeck.isPublished && resolvedDeck.visibility === 'public' && (
                             <span className="text-emerald-600 text-[10px] font-black uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-lg flex items-center gap-1">
                                 <Globe size={12}/> Global Network
@@ -447,7 +611,9 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             </div>
 
             <div className="flex-1 overflow-hidden relative">
-                {activeGame === 'standard' && <div className="h-full flex flex-col justify-center pb-20"><JuicyDeckBlock items={cards} title="Study Mode" /></div>}
+                {/* 🔥 REPLACED JUICYDECKBLOCK WITH THE NEW SWIPE PLAYER */}
+                {activeGame === 'standard' && <StudyModePlayer deckCards={cards} />}
+                
                 {activeGame === 'quiz' && <div className="h-full overflow-y-auto"><QuizSessionView deckCards={cards} onGameEnd={(res: any) => handleGameFinish(res.score ? (res.score/res.total)*100 : 0)} /></div>}
                 {activeGame === 'match' && <div className="h-full overflow-y-auto pt-6"><MatchingGame deckCards={cards} onGameEnd={(scorePct: number) => handleGameFinish(scorePct)} /></div>}
                 {activeGame === 'tower' && (
