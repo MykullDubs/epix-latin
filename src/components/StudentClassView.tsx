@@ -400,7 +400,6 @@ const SHAPE_THEMES = [
 const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) => {
     const activeLesson = lessons.find((l: any) => l.id === liveSession?.lessonId);
     
-    // Group blocks into pages (for standard lessons)
     const pages = useMemo(() => {
         if (!activeLesson?.blocks) return [];
         const grouped: any[] = [];
@@ -416,21 +415,30 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) 
         return grouped;
     }, [activeLesson]);
 
-    // 🔥 THE FIX: Fall back to liveSession.currentQuestion if it's a dynamic vocab game!
     const currentPage = pages[liveSession?.currentBlockIndex || 0];
     const currentBlock = liveSession?.currentQuestion || currentPage?.blocks?.[0]; 
     
-    // If currentQuestion exists (Vocab Game) OR it's a quiz block (Lesson Game)
     const isQuiz = !!liveSession?.currentQuestion || currentBlock?.type === 'quiz';
-    
     const safeEmail = (studentEmail || 'unknown@student').replace(/\./g, ',');
     const myAnswer = liveSession?.answers?.[safeEmail];
     const isRevealed = liveSession?.quizState === 'revealed';
 
-    // Safely extract the question data regardless of JSON nesting
     const quizQuestion = currentBlock?.question || currentBlock?.content?.question || "Loading Question...";
     const quizOptions = currentBlock?.options || currentBlock?.content?.options || [];
     const quizCorrectId = currentBlock?.correctId || currentBlock?.content?.correctId;
+
+    // 🔥 NEW PRESENCE PING: Tell the projector we arrived in the lobby!
+    useEffect(() => {
+        if (!classId || !studentEmail || !liveSession) return;
+        
+        // If the game is in the lobby ('waiting') and we haven't pinged our arrival yet
+        if (liveSession.quizState === 'waiting' && !liveSession.joined?.[safeEmail]) {
+            const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
+            updateDoc(sessionRef, {
+                [`joined.${safeEmail}`]: true
+            }).catch(e => console.log("Could not ping lobby arrival:", e));
+        }
+    }, [classId, studentEmail, liveSession?.quizState, liveSession?.joined, safeEmail]);
 
     const submitAnswer = async (optionId: string) => {
         if (liveSession?.quizState !== 'active' || myAnswer) return;
@@ -445,11 +453,11 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) 
         return (
             <div className="h-full bg-black rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500 border-4 border-slate-800 shadow-[inset_0_0_100px_rgba(255,255,255,0.05)]">
                 <div className="relative w-32 h-32 mb-8">
-                    <div className="absolute inset-0 bg-white rounded-full blur-2xl opacity-10 animate-pulse" />
-                    <Monitor size={128} className="text-white relative z-10 animate-bounce-slow" strokeWidth={1} />
+                    <div className="absolute inset-0 bg-emerald-500 rounded-full blur-2xl opacity-20 animate-pulse" />
+                    <Monitor size={128} className="text-emerald-400 relative z-10 animate-bounce-slow" strokeWidth={1} />
                 </div>
-                <h2 className="text-3xl font-black text-white mb-3 tracking-widest uppercase">Eyes Up</h2>
-                <p className="text-slate-400 font-bold text-sm max-w-[250px] uppercase tracking-widest leading-loose">Awaiting instructor signal...</p>
+                <h2 className="text-3xl font-black text-white mb-3 tracking-widest uppercase">Connection Secured</h2>
+                <p className="text-slate-400 font-bold text-sm max-w-[250px] uppercase tracking-widest leading-loose">Awaiting protocol launch...</p>
             </div>
         );
     }
@@ -470,7 +478,7 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) 
         );
     }
 
-    // STATE 3: The Active Game Controller (Monochromatic PSX Style)
+    // STATE 3: The Active Game Controller
     return (
         <div className="h-full bg-slate-950 rounded-[2.5rem] p-4 flex flex-col border-[4px] border-slate-800 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)]">
             <div className="bg-slate-900 p-6 rounded-[2rem] shadow-sm border border-slate-800 mb-4 text-center shrink-0">
