@@ -12,10 +12,7 @@ export function useMagisterData() {
   const [userData, setUserData] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [activeOrg, setActiveOrg] = useState<any>(null);
-  
-  // FIX 1: Replaced customLessons with a global lesson state
   const [allAppLessons, setAllAppLessons] = useState<any[]>([]);
-  
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [instructorClasses, setInstructorClasses] = useState<any[]>([]); 
   const [allDecks, setAllDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
@@ -30,28 +27,40 @@ export function useMagisterData() {
     });
 
     if (user?.uid) {
+      // 1. Monitor User Profile (XP, Streaks, Roles)
       const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
         if (snap.exists()) setUserData(snap.data());
         setAuthChecked(true);
       });
 
-      // FIX 2: The Magic Vacuum! collectionGroup pulls ALL lessons from ALL instructors
-      // so students can actually see the curriculum the teacher deployed.
+      // 2. Magic Vacuum: Pull all lessons available in this appId
       const unsubLessons = onSnapshot(collectionGroup(db, 'custom_lessons'), (snap) => {
         const fetchedLessons = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         setAllAppLessons(fetchedLessons);
       });
 
+      // 3. Card & Deck Logic: Sorts cards into their respective custom deck containers
       const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => {
         const cards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setAllDecks((prev: any) => ({ ...prev, custom: { ...prev.custom, cards } }));
+        const decks: any = { custom: { title: 'Scriptorium', cards: [] } };
+        
+        cards.forEach((card: any) => {
+          const dId = card.deckId || 'custom';
+          if (!decks[dId]) {
+            decks[dId] = { id: dId, title: card.deckTitle || 'Unnamed Deck', cards: [] };
+          }
+          decks[dId].cards.push(card);
+        });
+        setAllDecks(decks);
       });
 
+      // 4. Classes (Student View)
       const qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
       const unsubClasses = onSnapshot(qClasses, (snap) => {
         setEnrolledClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
+      // 5. Classes (Instructor View)
       const unsubInstructorClasses = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), (snap) => {
         setInstructorClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
@@ -72,7 +81,6 @@ export function useMagisterData() {
     }
   }, [userData?.orgId]);
 
-  // --- REFACTORED ACTIONS ---
   const actions = {
     logout: () => signOut(auth),
     
@@ -134,7 +142,6 @@ export function useMagisterData() {
     saveLesson: async (lessonData: any) => {
       if (!user) return;
       const lessonId = lessonData.id || `lesson_${Date.now()}`;
-      // Added appId to payload to future-proof the collectionGroup query
       await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', lessonId), {
         ...lessonData, id: lessonId, instructorId: user.uid, appId: appId, updatedAt: Date.now()
       });
@@ -149,78 +156,71 @@ export function useMagisterData() {
     },
 
     // ==========================================
-    // THE STREAK & XP ENGINE
+    // THE STREAK & XP ENGINE (Now with Real-Time Jamming)
     // ==========================================
     logActivity: async (itemId: string, xp: number, title: string, details: any = {}) => {
-      if (!user) return;
+      if (!user || !user.uid) return;
       
-      // 1. Save the activity for the timeline
-      await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
-        studentEmail: user.email,
-        studentName: userData?.name || user.email.split('@')[0],
-        type: itemId.includes('explore') ? 'explore' : 'completion',
-        itemTitle: title,
-        itemId: itemId, 
-        xp: xp,
-        timestamp: Date.now(),
-        ...details
-      });
+      try {
+          // 1. Push to Activity Log (The Timeline)
+          await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
+            studentEmail: user.email,
+            studentName: userData?.name || user.email.split('@')[0],
+            studentId: user.uid,
+            type: itemId.includes('explore') ? 'explore' : 'completion',
+            itemTitle: title,
+            itemId: itemId, 
+            xp: xp,
+            timestamp: Date.now(),
+            ...details
+          });
 
-      // 2. Calculate Gamification Math
-      if (xp > 0) {
-        const today = new Date();
-        const todayStr = today.toDateString();
-        
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = yesterday.toDateString();
+          // 2. Perform Gamification Math
+          if (xp > 0) {
+            const today = new Date();
+            const todayStr = today.toDateString();
+            
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toDateString();
 
-        let newStreak = userData?.streak || 0;
-        let newDailyXp = userData?.dailyXp || 0;
-        let newDailyLessons = userData?.dailyLessons || 0;
-        const lastActivityDate = userData?.lastActivityDate;
+            let newStreak = userData?.streak || 0;
+            let newDailyXp = userData?.dailyXp || 0;
+            let newDailyLessons = userData?.dailyLessons || 0;
+            const lastActivityDate = userData?.lastActivityDate;
 
-        const isLesson = details.mode === 'lesson' || !itemId.includes('explore');
+            const isLesson = details.mode === 'lesson' || !itemId.includes('explore');
 
-        if (lastActivityDate === todayStr) {
-            newDailyXp += xp;
-            if (isLesson) newDailyLessons += 1;
-        } else if (lastActivityDate === yesterdayStr) {
-            newStreak += 1;
-            newDailyXp = xp;
-            newDailyLessons = isLesson ? 1 : 0;
-        } else {
-            newStreak = 1;
-            newDailyXp = xp;
-            newDailyLessons = isLesson ? 1 : 0;
-        }
+            if (lastActivityDate === todayStr) {
+                newDailyXp += xp;
+                if (isLesson) newDailyLessons += 1;
+            } else if (lastActivityDate === yesterdayStr) {
+                newStreak += 1;
+                newDailyXp = xp;
+                newDailyLessons = isLesson ? 1 : 0;
+            } else {
+                newStreak = 1;
+                newDailyXp = xp;
+                newDailyLessons = isLesson ? 1 : 0;
+            }
 
-        // 3. Update the User's Main Profile
-        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
-          xp: increment(xp),
-          streak: newStreak,
-          dailyXp: newDailyXp,
-          dailyLessons: newDailyLessons,
-          lastActivityDate: todayStr
-        });
+            // 3. Update the User's Main Profile (Atomic Increment)
+            // This is the specific write that 'useLeaderboard' is listening for!
+            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
+              xp: increment(xp),
+              streak: newStreak,
+              dailyXp: newDailyXp,
+              dailyLessons: newDailyLessons,
+              lastActivityDate: todayStr
+            });
+          }
+      } catch (err) {
+          console.error("Critical Failure in XP Pipeline:", err);
       }
     }
   };
 
-  // FIX 3: Removed the array corruption! We just pass the clean, fully-populated objects directly.
-  const allLessons = useMemo(() => {
-    return allAppLessons;
-  }, [allAppLessons]);
+  const allLessons = useMemo(() => allAppLessons, [allAppLessons]);
 
-  return { 
-    user, 
-    userData, 
-    authChecked, 
-    activeOrg, 
-    allLessons, 
-    enrolledClasses, 
-    instructorClasses, 
-    allDecks, 
-    actions 
-  };
+  return { user, userData, authChecked, activeOrg, allLessons, enrolledClasses, instructorClasses, allDecks, actions };
 }
