@@ -40,46 +40,49 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
         return () => { endLiveClass(); clearInterval(timerRef.current); };
     }, [classId, safeDeckId, quizQuestions]); 
 
-    // Auto-skip if all students have answered
+// 1. Auto-skip if all students have answered
     useEffect(() => {
         if (liveState?.quizState === 'active' && isAutoPilot) {
             const currentAnswers = Object.keys(liveState?.answers || {}).length;
             const joinedStudentsCount = Object.keys(liveState?.joined || {}).length;
-            if (joinedStudentsCount > 0 && currentAnswers >= joinedStudentsCount) setTimeLeft(0); 
+            if (joinedStudentsCount > 0 && currentAnswers >= joinedStudentsCount) {
+                setTimeLeft(0); // Instantly snap timer to 0 to trigger reveal
+            }
         }
-    }, [liveState?.answers, liveState?.joined, isAutoPilot]);
+    }, [liveState?.answers, liveState?.joined, isAutoPilot, liveState?.quizState]);
 
-    // Timer Countdown Logic
+    // 2. Pure "Dumb" Timer (Just ticks down)
     useEffect(() => {
-        if (!isAutoPilot || isFinished) return;
-        clearInterval(timerRef.current);
-        timerRef.current = setInterval(() => {
-            setTimeLeft((prev) => {
-                if (prev <= 1) { handleTimerEnd(); return 0; }
-                return prev - 1;
-            });
+        if (!isAutoPilot || isFinished || timeLeft <= 0) return;
+        const timer = setInterval(() => {
+            setTimeLeft((prev) => prev - 1);
         }, 1000);
-        return () => clearInterval(timerRef.current);
-    }, [isAutoPilot, liveState?.quizState, currentIndex, gameSettings, isFinished]);
+        return () => clearInterval(timer);
+    }, [isAutoPilot, isFinished, timeLeft]);
 
-    const handleTimerEnd = () => {
-        clearInterval(timerRef.current);
-        if (liveState?.quizState === 'active') {
-            handleReveal();
-            setTimeLeft(gameSettings.rTime);
-        } else if (liveState?.quizState === 'revealed') {
-            handleNext();
+    // 3. Smart Phase Controller (Runs on fresh render when timer hits 0!)
+    useEffect(() => {
+        if (timeLeft === 0 && isAutoPilot && !isFinished) {
+            if (liveState?.quizState === 'active') {
+                handleReveal();
+                setTimeLeft(gameSettings.rTime);
+            } else if (liveState?.quizState === 'revealed') {
+                handleNext();
+            }
         }
-    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [timeLeft, isAutoPilot, isFinished]); 
+    // We intentionally omit handleReveal/handleNext from deps to prevent infinite loops
 
-    // 🔥 THE MATH ENGINE: Calculates the Dynamic Speed Multiplier!
+    // 🔥 THE BULLETPROOF MATH ENGINE
     const handleReveal = async () => {
-        clearInterval(timerRef.current);
         const currentQ = quizQuestions[currentIndex];
         const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
         
         const newScores = { ...scoresRef.current };
         const roundPoints: any = {}; 
+        
+        // Because this is triggered by the useEffect above, liveState is 100% fresh!
         const answers = liveState?.answers || {};
         
         Object.entries(answers).forEach(([email, ansId]: any) => {
@@ -121,7 +124,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
             
             const questionPayload = {
                 ...quizQuestions[nextIdx],
-                startTime: Date.now(), // Stamp the start time!
+                startTime: Date.now(), // Stamp the exact start time
                 timeLimit: gameSettings.qTime * 1000
             };
             
@@ -137,7 +140,6 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
             }).catch(e => console.error("Failed to clear answers", e));
         } else {
             setIsFinished(true);
-            clearInterval(timerRef.current);
             const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
             updateDoc(sessionRef, {
                 quizState: 'finished',
@@ -145,7 +147,6 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
             }).catch(e => console.error("Could not broadcast end game:", e));
         }
     };
-
     // Helper to start the match cleanly
     const startRun = (auto: boolean) => {
         setIsAutoPilot(auto);
