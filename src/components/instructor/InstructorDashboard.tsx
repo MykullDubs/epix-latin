@@ -6,7 +6,7 @@ import {
   LogOut, BookOpen, CheckCircle2, Briefcase 
 } from 'lucide-react';
 
-// Import the specialized views we extracted earlier
+// Import the specialized views
 import BuilderHub from './BuilderHub';
 import ClassManagerView from './ClassManagerView';
 import LiveActivityFeed from './LiveActivityFeed';
@@ -25,15 +25,16 @@ export default function InstructorDashboard({
   onAssignCurriculum,
   onSaveLesson, 
   onSaveCard, 
-  onAssign,          
-  onRevoke,          
+  onAssign,           
+  onRevoke,           
   onCreateClass,  
   onDeleteClass,  
   onRenameClass,
   onUpdateClassDescription,
   onAddStudent,
   onStartPresentation, 
-  onStartVocabGame, // <--- NEW PROP ADDED HERE
+  onStartVocabGame,
+  onStartConnectFour, // <--- 🔥 NEW PROP ADDED FOR CONNECT 4
   onSwitchView, 
   onLogout,
   AdminDashboardView 
@@ -144,7 +145,7 @@ export default function InstructorDashboard({
                 <Shield size={20} className={activeTab === 'admin' ? 'text-emerald-400' : 'text-slate-500 group-hover:text-emerald-400 transition-colors'} />
               </div>
               <span className={`font-black text-[11px] uppercase tracking-[0.2em] whitespace-nowrap transition-all duration-300 ${activeTab === 'admin' ? 'text-emerald-400' : 'text-slate-500 group-hover:text-slate-300'} ${isRailExpanded ? 'opacity-100' : 'opacity-0 -translate-x-4'}`}>
-                 Command Center
+                  Command Center
               </span>
             </button>
           )}
@@ -171,7 +172,7 @@ export default function InstructorDashboard({
         </div>
       </aside>
 
-      {/* --- MAIN STAGE: DYNAMIC CONTENT --- */}
+      {/* --- MAIN STAGE --- */}
       <main className="flex-1 overflow-hidden relative bg-slate-50">
         <div className="h-full w-full">
             
@@ -200,7 +201,8 @@ export default function InstructorDashboard({
                   onUpdateClassDescription={onUpdateClassDescription} 
                   onAddStudent={onAddStudent} 
                   onStartPresentation={onStartPresentation} 
-                  onStartVocabGame={onStartVocabGame} // <--- PASSED TO CLASS MANAGER
+                  onStartVocabGame={onStartVocabGame}
+                  onStartConnectFour={onStartConnectFour} // <--- 🔥 PASSED THROUGH TO MANAGER
                />
              </div>
            ) : activeTab === 'vault' ? (
