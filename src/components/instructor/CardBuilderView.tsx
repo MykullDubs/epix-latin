@@ -1,32 +1,35 @@
 // src/components/instructor/CardBuilderView.tsx
 import React, { useState, useEffect } from 'react';
-import { Layers, Plus, X, Save, Edit3, Trash2, FileJson, Database, Loader2 } from 'lucide-react';
+import { Layers, Plus, X, Save, Edit3, Trash2, FileJson, Database, Loader2, FolderPlus, FolderOpen } from 'lucide-react';
 import { INITIAL_SYSTEM_DECKS } from '../../constants/defaults';
 import { Toast } from '../Toast';
-// 🔥 NEW: Firebase imports to explicitly create the Deck document
 import { doc, setDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard, availableDecks, initialDeckId }: any) {
+  // Single Card States
   const [formData, setFormData] = useState({ front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '', deckId: initialDeckId || 'custom' });
   const [isCreatingDeck, setIsCreatingDeck] = useState(false);
   const [newDeckTitle, setNewDeckTitle] = useState('');
   const [morphology, setMorphology] = useState<any[]>([]);
   const [newMorphPart, setNewMorphPart] = useState({ part: '', meaning: '', type: 'root' });
+  
+  // Global States
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-
+  const [localOptimisticDecks, setLocalOptimisticDecks] = useState<any>({});
+  
+  // Bulk Import States
   const [importMode, setImportMode] = useState<boolean>(false);
   const [jsonInput, setJsonInput] = useState<string>('');
   const [isImporting, setIsImporting] = useState<boolean>(false);
   const [importProgress, setImportProgress] = useState<{current: number, total: number} | null>(null);
-
-  const [localOptimisticDecks, setLocalOptimisticDecks] = useState<any>({});
+  const [bulkDestination, setBulkDestination] = useState<'new' | 'existing'>('new');
+  const [bulkNewTitle, setBulkNewTitle] = useState('');
+  const [bulkExistingId, setBulkExistingId] = useState('custom');
 
   const validDecks = { ...availableDecks, ...localOptimisticDecks };
   const deckOptions = Object.entries(validDecks).map(([key, deck]: any) => ({ id: key, title: deck.title })); 
-  
-  // 🔥 FIX: Removed the buggy fallback to 'custom' so cards don't look like they are in Scriptorium
   const currentDeckCards = validDecks[formData.deckId] ? validDecks[formData.deckId].cards || [] : [];
 
   useEffect(() => { if (initialDeckId) setFormData(prev => ({...prev, deckId: initialDeckId})); }, [initialDeckId]);
@@ -62,20 +65,12 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
     setMorphology([]); 
   };
 
-  // 🔥 NEW: Engine to explicitly create the deck document in Firebase so it shows up in the Arena
+  // Explicitly force Firebase to recognize the new Deck Folder
   const registerNewDeck = async (deckId: string, deckTitle: string) => {
       try {
           const deckRef = doc(db, 'artifacts', appId, 'decks', deckId);
-          await setDoc(deckRef, {
-              id: deckId,
-              key: deckId,
-              title: deckTitle,
-              type: 'vocabulary',
-              createdAt: new Date().toISOString()
-          }, { merge: true });
-      } catch (err) {
-          console.error("Failed to register deck metadata in Firebase:", err);
-      }
+          await setDoc(deckRef, { id: deckId, key: deckId, title: deckTitle, type: 'vocabulary', createdAt: new Date().toISOString() }, { merge: true });
+      } catch (err) { console.error("Failed to register deck:", err); }
   };
 
   const handleSubmit = async (e: any) => { 
@@ -87,10 +82,8 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
     
     if (formData.deckId === 'new') { 
         if (!newDeckTitle) return alert("Please name your new deck."); 
-        finalDeckId = `custom_${Date.now()}`; 
+        finalDeckId = `deck_${Date.now()}`; 
         finalDeckTitle = newDeckTitle; 
-        
-        // Lock the deck into the database
         await registerNewDeck(finalDeckId, finalDeckTitle);
     } 
 
@@ -130,21 +123,19 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
         const cards = JSON.parse(jsonInput);
         if (!Array.isArray(cards)) throw new Error("JSON must be an array");
 
-        let finalDeckId = formData.deckId;
-        let finalDeckTitle = null;
+        let finalDeckId = bulkExistingId;
+        let finalDeckTitle = validDecks[bulkExistingId]?.title || 'Custom Deck';
         
-        if (formData.deckId === 'new') {
-            if (!newDeckTitle) return alert("Please name your new deck.");
-            finalDeckId = `custom_${Date.now()}`;
-            finalDeckTitle = newDeckTitle;
-
-            // Lock the deck into the database
+        if (bulkDestination === 'new') {
+            if (!bulkNewTitle.trim()) return alert("Please name your new deck in the input field above.");
+            finalDeckId = `deck_${Date.now()}`;
+            finalDeckTitle = bulkNewTitle.trim();
             await registerNewDeck(finalDeckId, finalDeckTitle);
         }
 
         setLocalOptimisticDecks((prev: any) => ({
             ...prev,
-            [finalDeckId]: prev[finalDeckId] || validDecks[finalDeckId] || { title: finalDeckTitle || 'Custom Deck', cards: [] }
+            [finalDeckId]: prev[finalDeckId] || validDecks[finalDeckId] || { title: finalDeckTitle, cards: [] }
         }));
 
         setIsImporting(true);
@@ -180,18 +171,17 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                 });
 
                 await new Promise(resolve => setTimeout(resolve, 250));
-            } catch (err) {
-                console.error(`Failed to save target: ${card.front}`, err);
-            }
+            } catch (err) { console.error(`Failed to save target: ${card.front}`, err); }
         }
 
-        setToastMsg(`Successfully forged ${successCount} targets into ${finalDeckTitle || 'Scriptorium'}!`);
+        setToastMsg(`Successfully forged ${successCount} targets into ${finalDeckTitle}!`);
         setJsonInput('');
-        setImportMode(false);
-
-        if (isCreatingDeck) {
-            setIsCreatingDeck(false);
-            setNewDeckTitle('');
+        
+        // Reset bulk state and sync single card state so inventory updates
+        if (bulkDestination === 'new') {
+            setBulkNewTitle('');
+            setBulkDestination('existing');
+            setBulkExistingId(finalDeckId);
             setFormData(prev => ({ ...prev, deckId: finalDeckId }));
         }
 
@@ -208,28 +198,13 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
   const jsonTemplate = `[\n  { "front": "canis", "back": "dog", "type": "noun" },\n  { "front": "videre", "back": "to see", "type": "verb" }\n]`;
 
   return (
-    <div className="space-y-6 relative pb-12">
+    <div className="space-y-6 relative pb-12 font-sans">
       {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
       
       <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 text-sm text-indigo-800 flex justify-between items-center">
         <div><p className="font-bold flex items-center gap-2"><Layers size={16}/> Deck Builder</p></div>
         {editingId && <button onClick={handleClear} className="text-xs font-bold bg-white px-3 py-1 rounded-lg shadow-sm hover:text-indigo-600">Cancel Edit</button>}
       </div>
-      
-      {/* UNIVERSAL DECK SELECTION */}
-      <section className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-        <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest mb-4 flex items-center gap-2">
-            <Database size={16} className="text-indigo-500" /> Target Deck
-        </h3>
-        <select name="deckId" value={formData.deckId} onChange={handleChange} disabled={!!editingId || isImporting} className="w-full p-4 rounded-xl border-2 border-slate-200 bg-indigo-50/30 font-black text-indigo-900 focus:border-indigo-500 outline-none transition-colors mb-3 cursor-pointer">
-            <option value="custom">✍️ Scriptorium (My Deck)</option>
-            {deckOptions.filter(d => d.id !== 'custom').map(d => (<option key={d.id} value={d.id}>{d.title}</option>))}
-            <option value="new">✨ + Create New Deck</option>
-        </select>
-        {isCreatingDeck && (
-            <input value={newDeckTitle} onChange={(e) => setNewDeckTitle(e.target.value)} disabled={isImporting} placeholder="Enter new deck name..." className="w-full p-4 rounded-xl border-2 border-indigo-500 bg-white font-black outline-none shadow-sm animate-in slide-in-from-top-2" autoFocus />
-        )}
-      </section>
 
       {/* TABS FOR CREATION MODE */}
       <div className="flex gap-6 border-b-2 border-slate-100 relative bottom-[-1px]">
@@ -241,9 +216,23 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
           </button>
       </div>
 
-      {/* MODE: SINGLE CARD */}
+      {/* MODE 1: SINGLE CARD (Has its own destination dropdown) */}
       {!importMode ? (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+            <section className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <Database size={16} className="text-indigo-500" /> Target Deck
+                </h3>
+                <select name="deckId" value={formData.deckId} onChange={handleChange} disabled={!!editingId} className="w-full p-4 rounded-xl border-2 border-slate-200 bg-indigo-50/30 font-black text-indigo-900 focus:border-indigo-500 outline-none transition-colors mb-3 cursor-pointer">
+                    <option value="custom">✍️ Scriptorium (My Deck)</option>
+                    {deckOptions.filter(d => d.id !== 'custom').map(d => (<option key={d.id} value={d.id}>{d.title}</option>))}
+                    <option value="new">✨ + Create New Deck</option>
+                </select>
+                {isCreatingDeck && (
+                    <input value={newDeckTitle} onChange={(e) => setNewDeckTitle(e.target.value)} placeholder="Enter new deck name..." className="w-full p-4 rounded-xl border-2 border-indigo-500 bg-white font-black outline-none shadow-sm animate-in slide-in-from-top-2" autoFocus />
+                )}
+            </section>
+
             <section className="space-y-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                 <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest">Core Data</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -274,8 +263,31 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
             </button>
           </div>
       ) : (
-          /* MODE: BULK IMPORT */
+          /* MODE 2: BULK IMPORT (Has strict destination controls) */
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+              
+              {/* BULK DESTINATION CONTROL */}
+              <section className="bg-slate-50 p-6 rounded-3xl border-2 border-slate-200 shadow-sm">
+                  <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest mb-4">Destination Deck</h3>
+                  <div className="flex flex-col md:flex-row gap-4 mb-4">
+                      <button onClick={() => setBulkDestination('new')} disabled={isImporting} className={`flex-1 p-4 rounded-xl border-2 flex items-center gap-3 transition-colors ${bulkDestination === 'new' ? 'border-indigo-600 bg-white text-indigo-700 shadow-sm' : 'border-slate-200 bg-transparent text-slate-500 hover:bg-slate-100'} disabled:opacity-50`}>
+                          <FolderPlus size={20} /> <span className="font-black text-sm uppercase">Create New</span>
+                      </button>
+                      <button onClick={() => setBulkDestination('existing')} disabled={isImporting} className={`flex-1 p-4 rounded-xl border-2 flex items-center gap-3 transition-colors ${bulkDestination === 'existing' ? 'border-indigo-600 bg-white text-indigo-700 shadow-sm' : 'border-slate-200 bg-transparent text-slate-500 hover:bg-slate-100'} disabled:opacity-50`}>
+                          <FolderOpen size={20} /> <span className="font-black text-sm uppercase">Add to Existing</span>
+                      </button>
+                  </div>
+                  
+                  {bulkDestination === 'new' ? (
+                      <input value={bulkNewTitle} onChange={(e) => setBulkNewTitle(e.target.value)} disabled={isImporting} placeholder="Name your new deck (e.g. Unit 1 Vocab)" className="w-full p-4 rounded-xl border-2 border-indigo-500 bg-white font-black outline-none shadow-sm animate-in fade-in" autoFocus />
+                  ) : (
+                      <select value={bulkExistingId} onChange={(e) => setBulkExistingId(e.target.value)} disabled={isImporting} className="w-full p-4 rounded-xl border-2 border-indigo-500 bg-white font-black outline-none shadow-sm animate-in fade-in cursor-pointer">
+                          <option value="custom">✍️ Scriptorium (My Deck)</option>
+                          {deckOptions.filter(d => d.id !== 'custom').map(d => (<option key={d.id} value={d.id}>{d.title}</option>))}
+                      </select>
+                  )}
+              </section>
+
               <section className="bg-slate-900 p-6 rounded-3xl border-4 border-slate-800 shadow-xl">
                   <div className="flex items-center justify-between mb-4">
                       <h3 className="font-black text-white text-sm uppercase tracking-widest">JSON Payload</h3>
