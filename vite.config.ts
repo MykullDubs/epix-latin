@@ -7,12 +7,13 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      // 🔥 Updated to match your actual files
+      includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png'], 
       manifest: {
-        name: 'LinguistFlow',
-        short_name: 'LinguistFlow',
-        description: 'Master Latin with Flashcards and Lessons',
-        theme_color: '#4f46e5',
+        name: 'Magister OS',
+        short_name: 'Magister',
+        description: 'Master your curriculum with Magister OS',
+        theme_color: '#0f172a', // Slate 900
         background_color: '#f8fafc',
         display: "standalone",
         scope: "/",
@@ -20,14 +21,42 @@ export default defineConfig({
         orientation: "portrait",
         icons: [
           {
-            src: 'pwa-192x192.png',
+            src: 'icon-192.png',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any maskable'
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'icon-512.png',
             sizes: '512x512',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any maskable'
+          }
+        ],
+        // 🔥 Ported your Widget over so Vite includes it!
+        widgets: [
+          {
+            name: "Magister Study Hub",
+            short_name: "Study Hub",
+            description: "Track your daily targets and pathway progress at a glance.",
+            tag: "magister-hub-widget",
+            template: "hub-widget",
+            ms_ac_template: "widgets/hub.json",
+            data: { content: "daily-target" },
+            type: "application/json",
+            screenshots: [
+              {
+                src: "/widget-preview.png",
+                sizes: "300x300",
+                label: "Study Hub Widget Preview"
+              }
+            ],
+            icons: [
+              {
+                src: "/icon-192.png",
+                sizes: "192x192"
+              }
+            ]
           }
         ]
       }
