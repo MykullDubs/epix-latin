@@ -125,26 +125,41 @@ export const calculateUserStats = (logs: any[]) => {
 // ============================================================================
 
 export const calculateLevel = (totalXp: number = 0, totalLikes: number = 0) => {
-    const XP_PER_LEVEL = 500;
+    // The curve multiplier. 0.05 gives a solid RPG scaling curve for an economy of 1000-5000 XP per game.
+    const CONSTANT = 0.05;
+    
+    // Calculate total effective XP (adding a flat bonus for social engagement)
     const SOCIAL_BONUS = totalLikes * 10; 
     const combinedXp = totalXp + SOCIAL_BONUS;
-    
-    const level = Math.floor(combinedXp / XP_PER_LEVEL) + 1;
-    const currentLevelXp = combinedXp % XP_PER_LEVEL;
-    const progressPct = Math.round((currentLevelXp / XP_PER_LEVEL) * 100);
 
-    return { 
-        level, 
-        currentLevelXp, 
-        xpToNext: XP_PER_LEVEL, 
+    // 1. Calculate current level based on the quadratic curve
+    const level = Math.floor(CONSTANT * Math.sqrt(combinedXp)) + 1;
+
+    // 2. Calculate absolute XP boundaries for the current level bracket
+    const currentLevelBaseXp = Math.pow((level - 1) / CONSTANT, 2);
+    const nextLevelBaseXp = Math.pow(level / CONSTANT, 2);
+
+    // 3. Calculate progress strictly within this level's brackets
+    const currentLevelProgress = combinedXp - currentLevelBaseXp;
+    const xpRequiredForNextLevel = nextLevelBaseXp - currentLevelBaseXp;
+
+    // 4. Progress percentage for the UI squircle rings
+    const progressPct = Math.min(100, Math.max(0, (currentLevelProgress / xpRequiredForNextLevel) * 100));
+
+    return {
+        level,
+        currentLevelXp: Math.floor(currentLevelProgress),
+        xpToNext: Math.floor(xpRequiredForNextLevel),
         progressPct,
-        totalPotentialXp: combinedXp 
+        totalPotentialXp: combinedXp
     };
 };
 
 export const getLeagueTier = (level: number) => {
-    if (level < 5) return { name: 'Bronze', color: 'text-amber-600', bg: 'bg-amber-100', border: 'border-amber-200' };
-    if (level < 15) return { name: 'Silver', color: 'text-slate-400', bg: 'bg-slate-100', border: 'border-slate-200' };
-    if (level < 30) return { name: 'Gold', color: 'text-yellow-500', bg: 'bg-yellow-50', border: 'border-yellow-200' };
-    return { name: 'Diamond', color: 'text-cyan-400', bg: 'bg-cyan-50', border: 'border-cyan-200' };
+    if (level >= 100) return { name: 'Magister', color: 'text-fuchsia-500', bg: 'bg-fuchsia-100', border: 'border-fuchsia-200' };
+    if (level >= 50) return { name: 'Diamond', color: 'text-cyan-500', bg: 'bg-cyan-100', border: 'border-cyan-200' };
+    if (level >= 25) return { name: 'Platinum', color: 'text-teal-500', bg: 'bg-teal-100', border: 'border-teal-200' };
+    if (level >= 10) return { name: 'Gold', color: 'text-yellow-500', bg: 'bg-yellow-100', border: 'border-yellow-200' };
+    if (level >= 5) return { name: 'Silver', color: 'text-slate-400', bg: 'bg-slate-100', border: 'border-slate-200' };
+    return { name: 'Bronze', color: 'text-amber-600', bg: 'bg-amber-100', border: 'border-amber-200' };
 };
