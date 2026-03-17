@@ -2,13 +2,13 @@
 import React, { useState } from 'react';
 import { 
     Users, Plus, X, Flame, BookOpen, Edit3, Trash2, Mail, 
-    Activity, Search, Gamepad2, CheckCircle2, Monitor, Filter, Library, Package, Puzzle, Play, Zap 
+    Activity, Search, Gamepad2, CheckCircle2, Monitor, Filter, Library, Package, Puzzle, Play, Zap, Swords 
 } from 'lucide-react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
 
 // ============================================================================
-//  CLASS MANAGER VIEW (Quick-Launch Restored)
+//  CLASS MANAGER VIEW (Dual-Launch Enabled)
 // ============================================================================
 export default function ClassManagerView({ 
     user, 
@@ -25,7 +25,8 @@ export default function ClassManagerView({
     onUpdateClassDescription,
     onAddStudent,
     onStartPresentation,
-    onStartVocabGame 
+    onStartVocabGame,
+    onStartConnectFour // 🔥 NEW PROP RECEIVED
 }: any) {
     const [selectedClassId, setSelectedClassId] = useState<string | null>(classes[0]?.id || null);
     const [activeTab, setActiveTab] = useState<'roster' | 'assignments'>('roster');
@@ -86,7 +87,7 @@ export default function ClassManagerView({
         else curriculum.lessonIds.forEach((id: string) => onAssign(activeClass.id, id));
     };
 
-    // Find a fallback deck to use for the Quick Launch button
+    // Find a fallback deck to use for the Quick Launch buttons
     const defaultDeckKey = Object.keys(allDecks)[0] || 'custom';
 
     return (
@@ -247,31 +248,46 @@ export default function ClassManagerView({
                                     {assignMode === 'vocab' && (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in zoom-in-95 duration-300">
                                             {Object.entries(allDecks).map(([key, deck]: [string, any]) => (
-                                                <button key={key} onClick={() => onStartVocabGame(key, activeClass.id)} className="flex items-center gap-4 p-5 bg-slate-900 border-2 border-slate-800 rounded-[2rem] hover:border-indigo-500 transition-all text-left shadow-xl group">
-                                                    <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform"><Zap size={24} fill="currentColor" /></div>
-                                                    <div><h4 className="font-black text-white text-base leading-tight mb-1">{deck.title || 'Untitled'}</h4><p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{deck.cards?.length || 0} Targets • Launch</p></div>
-                                                </button>
+                                                <div key={key} className="flex flex-col bg-slate-900 border-2 border-slate-800 rounded-[2rem] hover:border-indigo-500 transition-all shadow-xl overflow-hidden group">
+                                                    <div className="flex items-center gap-4 p-5 text-left border-b border-slate-800">
+                                                        <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform"><Zap size={24} fill="currentColor" /></div>
+                                                        <div><h4 className="font-black text-white text-base leading-tight mb-1">{deck.title || 'Untitled'}</h4><p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{deck.cards?.length || 0} Targets Available</p></div>
+                                                    </div>
+                                                    <div className="flex bg-slate-950">
+                                                        <button onClick={() => onStartVocabGame(key, activeClass.id)} className="flex-1 p-3 text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:bg-indigo-600 hover:text-white transition-colors border-r border-slate-800 flex items-center justify-center gap-2">
+                                                            <Zap size={14} /> Classic Arena
+                                                        </button>
+                                                        <button onClick={() => onStartConnectFour(key, activeClass.id)} className="flex-1 p-3 text-[10px] font-black uppercase tracking-widest text-rose-400 hover:bg-rose-600 hover:text-white transition-colors flex items-center justify-center gap-2">
+                                                            <Swords size={14} /> Connect 4
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             ))}
                                         </div>
                                     )}
 
-                                    {/* 🔥 THE RESTORED QUICK-LAUNCH BUTTON & PLAYLIST */}
+                                    {/* 🔥 THE QUICK-LAUNCH BUTTONS */}
                                     <div className="shrink-0 pt-8 border-t-2 border-slate-100">
                                         <div className="flex items-center justify-between mb-6">
                                             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-500" /> Active Playlist</h3>
                                             <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-lg">{assignedLessons.length} Modules</span>
                                         </div>
 
-                                        {/* QUICK LAUNCH BUTTON */}
-                                        <button 
-                                            onClick={() => onStartVocabGame(defaultDeckKey, activeClass.id)}
-                                            className="w-full mb-8 p-5 bg-slate-900 text-white rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-xl hover:bg-indigo-600 hover:shadow-indigo-500/30 transition-all active:scale-95 flex items-center justify-center gap-3 group border-2 border-slate-800 hover:border-indigo-500"
-                                        >
-                                            <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                                                <Zap size={20} fill="white" />
-                                            </div>
-                                            Quick-Launch Live Arena
-                                        </button>
+                                        <div className="flex flex-col md:flex-row gap-4 mb-8">
+                                            <button 
+                                                onClick={() => onStartVocabGame(defaultDeckKey, activeClass.id)}
+                                                className="flex-1 p-5 bg-slate-900 text-white rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-xl hover:bg-indigo-600 hover:shadow-indigo-500/30 transition-all active:scale-95 flex items-center justify-center gap-3 border-2 border-slate-800 hover:border-indigo-500"
+                                            >
+                                                <Zap size={20} fill="currentColor" /> Live Vocab Arena
+                                            </button>
+                                            
+                                            <button 
+                                                onClick={() => onStartConnectFour(defaultDeckKey, activeClass.id)}
+                                                className="flex-1 p-5 bg-slate-900 text-white rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-xl hover:bg-rose-600 hover:shadow-rose-500/30 transition-all active:scale-95 flex items-center justify-center gap-3 border-2 border-slate-800 hover:border-rose-500"
+                                            >
+                                                <Swords size={20} /> Connect 4 Battle
+                                            </button>
+                                        </div>
 
                                         <div className="space-y-3">
                                             {assignedLessons.length === 0 ? (
