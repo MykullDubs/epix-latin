@@ -25,8 +25,8 @@ export default function InstructorDashboard({
   onAssignCurriculum,
   onSaveLesson, 
   onSaveCard, 
-  onAssign,           
-  onRevoke,           
+  onAssign,            
+  onRevoke,            
   onCreateClass,  
   onDeleteClass,  
   onRenameClass,
@@ -34,7 +34,8 @@ export default function InstructorDashboard({
   onAddStudent,
   onStartPresentation, 
   onStartVocabGame,
-  onStartConnectFour, // <--- 🔥 NEW PROP ADDED FOR CONNECT 4
+  onStartConnectFour, 
+  onPublishDeck, // <--- 🔥 NEW PROP FOR PUBLISHING TO NETWORK
   onSwitchView, 
   onLogout,
   AdminDashboardView 
@@ -182,7 +183,15 @@ export default function InstructorDashboard({
              </div>
            ) : activeTab === 'studio' ? (
              <div className="h-full animate-in zoom-in-95 duration-500">
-               <BuilderHub onSaveLesson={onSaveLesson} onSaveCard={onSaveCard} lessons={lessons} allDecks={allDecks} />
+               {/* 🔥 PASSED PUBLISHING PROPS DOWN TO BUILDER HUB */}
+               <BuilderHub 
+                 onSaveLesson={onSaveLesson} 
+                 onSaveCard={onSaveCard} 
+                 lessons={lessons} 
+                 allDecks={allDecks} 
+                 onPublishDeck={onPublishDeck} 
+                 instructorClasses={userData?.classes || []}
+               />
              </div>
            ) : activeTab === 'classes' ? (
              <div className="h-full p-6 md:p-12 overflow-y-auto custom-scrollbar animate-in slide-in-from-right-6 duration-500">
@@ -202,7 +211,7 @@ export default function InstructorDashboard({
                   onAddStudent={onAddStudent} 
                   onStartPresentation={onStartPresentation} 
                   onStartVocabGame={onStartVocabGame}
-                  onStartConnectFour={onStartConnectFour} // <--- 🔥 PASSED THROUGH TO MANAGER
+                  onStartConnectFour={onStartConnectFour} 
                />
              </div>
            ) : activeTab === 'vault' ? (
