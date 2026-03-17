@@ -43,18 +43,17 @@ export default function ClassManagerView({
 
     const activeClass = classes.find((c: any) => c.id === selectedClassId);
 
-    // --- DATA LOGIC (Strict Type Fix Applied) ---
-    const availableSubjects: string[] = [
-        'All', 
-        ...Array.from(new Set(curriculums.map((c: any) => (c.subject as string) || 'General')))
-    ];
+    // --- DATA LOGIC (Bulletproof Strict Type Fix Applied) ---
+    const rawSubjects = curriculums.map((c: any) => String(c.subject || 'General'));
+    const uniqueSubjects = new Set<string>(rawSubjects);
+    const availableSubjects: string[] = ['All', ...Array.from(uniqueSubjects)];
 
     const assignedLessons = lessons.filter((l: any) => activeClass?.assignments?.includes(l.id));
     const unassignedLessons = lessons.filter((l: any) => !activeClass?.assignments?.includes(l.id));
     
     const filteredCurriculums = curriculums.filter((c: any) => {
-        const title = (c.title as string) || '';
-        const description = (c.description as string) || '';
+        const title = String(c.title || '');
+        const description = String(c.description || '');
         const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                              description.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesSubject = activeSubjectFilter === 'All' || c.subject === activeSubjectFilter;
