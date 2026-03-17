@@ -441,29 +441,40 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail }: any) => {
     const safeEmail = (studentEmail || 'scholar@magister').replace(/\./g, ',');
     const myTeam = liveSession?.teams?.[safeEmail]; 
     const isMyTurn = liveSession?.currentTurn === myTeam;
-    const isRevealed = liveSession?.quizState === 'finished';
+    const isFinished = liveSession?.quizState === 'finished';
 
     const currentQ = liveSession?.currentQuestion;
     const myAnswer = liveSession?.answers?.[safeEmail];
-    const teamHasAnswered = Object.entries(liveSession?.answers || {}).some(
-        ([email, ansId]) => liveSession.teams[email] === myTeam && ansId === currentQ?.correctId
-    );
+
+    // FIX: Check current student's specific correct status to unlock drop
+    const iHaveUnlockedDrop = myAnswer === currentQ?.correctId;
 
     const submitAnswer = async (optionId: string) => {
-        if (!isMyTurn || myAnswer || teamHasAnswered) return;
+        if (!isMyTurn || myAnswer) return;
         const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
         await updateDoc(sessionRef, { [`answers.${safeEmail}`]: optionId });
     };
 
     const handleDrop = async (colIndex: number) => {
-        if (!isMyTurn || !teamHasAnswered) return;
-        const currentColumn = liveSession.board?.[colIndex] || [];
+        if (!isMyTurn || !iHaveUnlockedDrop) return;
+        
+        // SYNC FIX: Ensure we check the correct grid property name
+        const currentGrid = liveSession.grid || Array(7).fill([]);
+        const currentColumn = currentGrid[colIndex] || [];
         if (currentColumn.length >= 6) return;
+
         const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
-        await updateDoc(sessionRef, { lastMove: { col: colIndex, row: currentColumn.length, team: myTeam, timestamp: Date.now() } });
+        await updateDoc(sessionRef, { 
+            lastMove: { 
+                col: colIndex, 
+                row: currentColumn.length, 
+                team: myTeam, 
+                timestamp: Date.now() 
+            } 
+        });
     };
 
-    if (isRevealed) {
+    if (isFinished) {
         const iWon = liveSession.winningTeam === myTeam;
         return (
             <div className={`h-full rounded-[3rem] flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-500 border-[12px] ${iWon ? 'bg-slate-900 border-emerald-500' : 'bg-black border-rose-900'}`}>
@@ -484,7 +495,7 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail }: any) => {
         );
     }
 
-    if (teamHasAnswered) {
+    if (iHaveUnlockedDrop) {
         return (
             <div className="h-full bg-slate-950 rounded-[2.5rem] p-4 flex flex-col border-4 border-slate-800 shadow-2xl">
                 <div className={`p-6 rounded-[2rem] mb-6 text-center shadow-lg border-b-8 ${myTeam === 1 ? 'bg-rose-600 border-rose-800' : 'bg-indigo-600 border-indigo-800'}`}>
@@ -599,7 +610,7 @@ export default function StudentClassView({
 
       <main className="flex-1 overflow-y-auto custom-scrollbar relative px-2 md:px-6 pb-48 pt-6">
         {liveSession && activeSubTab !== 'live' && (
-            <div className="px-4 mb-6 animate-in slide-in-from-top-4 duration-500">
+            <div className="px-4 mb-6 animate-in slide-in-from-top-4 fade-in duration-500">
                 <button onClick={() => setActiveSubTab('live')} className="w-full bg-black rounded-[2rem] p-1 shadow-2xl relative overflow-hidden group">
                     <div className="absolute inset-0 bg-white opacity-10 animate-pulse" />
                     <div className="relative bg-slate-950 rounded-[1.8rem] p-4 flex items-center justify-between border border-slate-800">
