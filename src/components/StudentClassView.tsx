@@ -323,12 +323,17 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) 
     const safeEmail = (studentEmail || 'unknown@student').replace(/\./g, ',');
     const myAnswer = liveSession?.answers?.[safeEmail];
     const isRevealed = liveSession?.quizState === 'revealed';
+    const isFinished = liveSession?.quizState === 'finished';
 
     const quizQuestion = currentBlock?.question || currentBlock?.content?.question || "Loading Question...";
     const quizOptions = currentBlock?.options || currentBlock?.content?.options || [];
     const quizCorrectId = currentBlock?.correctId || currentBlock?.content?.correctId;
 
-    // PRESENCE PING
+    // 🔥 NEW: Calculate final scores and XP on the student's end
+    const finalCorrectCount = liveSession?.finalScores?.[safeEmail] || 0;
+    const xpEarned = finalCorrectCount * 10; // 10 XP per correct target
+    const [xpLogged, setXpLogged] = useState(false);
+
     useEffect(() => {
         if (!classId || !studentEmail || !liveSession) return;
         if (liveSession.quizState === 'waiting' && !liveSession.joined?.[safeEmail]) {
@@ -336,6 +341,29 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) 
             updateDoc(sessionRef, { [`joined.${safeEmail}`]: true }).catch(e => console.log("Could not ping lobby arrival:", e));
         }
     }, [classId, studentEmail, liveSession?.quizState, liveSession?.joined, safeEmail]);
+
+    // 🔥 NEW: Silently log the XP to the student's profile when the game finishes
+    useEffect(() => {
+        if (isFinished && !xpLogged && xpEarned > 0) {
+            const logActivity = async () => {
+                try {
+                    await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
+                        studentEmail: studentEmail,
+                        studentId: auth.currentUser?.uid || 'anonymous',
+                        type: 'completion',
+                        itemId: `arena_run_${Date.now()}`,
+                        itemTitle: 'Live Arena Protocol',
+                        score: xpEarned,
+                        timestamp: Date.now()
+                    });
+                    setXpLogged(true);
+                } catch (e) {
+                    console.error("Failed to sync XP:", e);
+                }
+            };
+            logActivity();
+        }
+    }, [isFinished, xpLogged, xpEarned, studentEmail]);
 
     const submitAnswer = async (optionId: string) => {
         if (liveSession?.quizState !== 'active' || myAnswer) return;
@@ -357,14 +385,48 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId }: any) 
         );
     }
 
+    // STATE 4: THE POST-GAME REPORT (Must come before the reveal check)
+    if (isFinished) {
+        return (
+            <div className="h-full bg-slate-950 rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-500 border-[4px] border-slate-800 shadow-[inset_0_0_100px_rgba(79,70,229,0.15)] relative overflow-hidden">
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/40 via-slate-950 to-black pointer-events-none" />
+                
+                <div className="relative z-10 flex flex-col items-center w-full max-w-sm">
+                    <Trophy size={80} className="text-yellow-400 mb-6 drop-shadow-[0_0_30px_rgba(250,204,21,0.3)] animate-bounce-slow" strokeWidth={1.5} />
+                    <h2 className="text-3xl font-black text-white mb-2 tracking-widest uppercase">Protocol Complete</h2>
+                    <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mb-10">Simulation Terminated</p>
+                    
+                    <div className="bg-slate-900/80 backdrop-blur-xl border-2 border-slate-800 rounded-3xl p-6 w-full mb-8 shadow-2xl">
+                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-800">
+                            <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Valid Targets Hit</span>
+                            <span className="text-3xl font-black text-emerald-400">{finalCorrectCount}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-xs font-black text-slate-500 uppercase tracking-widest">XP Awarded</span>
+                            <span className="text-3xl font-black text-indigo-400">+{xpEarned}</span>
+                        </div>
+                    </div>
+                    
+                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                        {xpLogged || xpEarned === 0 ? (
+                            <><CheckCircle2 size={12} className="text-emerald-500" /> XP Synced to Profile</>
+                        ) : (
+                            <><Loader2 size={12} className="animate-spin text-indigo-400" /> Syncing XP...</>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     // STATE 2: The Reveal
     if (isRevealed) {
         const isCorrect = myAnswer === quizCorrectId;
         return (
-            <div className={`h-full rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-500 border-[8px] ${isCorrect ? 'bg-slate-900 border-white' : 'bg-black border-slate-800'}`}>
-                {isCorrect ? <CheckCircle2 size={120} className="text-white mb-6 animate-bounce" strokeWidth={3} /> : <XCircle size={120} className="text-slate-700 mb-6" strokeWidth={2} />}
+            <div className={`h-full rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-500 border-[8px] ${isCorrect ? 'bg-slate-900 border-emerald-500/50 shadow-[inset_0_0_100px_rgba(16,185,129,0.2)]' : 'bg-black border-slate-800'}`}>
+                {isCorrect ? <CheckCircle2 size={120} className="text-emerald-400 mb-6 animate-bounce" strokeWidth={3} /> : <XCircle size={120} className="text-slate-700 mb-6" strokeWidth={2} />}
                 <h2 className="text-5xl font-black text-white mb-4 tracking-tighter drop-shadow-md">{isCorrect ? 'VALID' : 'ELIMINATED'}</h2>
-                <p className="text-white/90 font-black text-xl bg-white/10 px-6 py-3 rounded-full backdrop-blur-sm border border-white/20">{isCorrect ? '+50 XP Awarded' : 'Await next round'}</p>
+                <p className="text-white/90 font-black text-xl bg-white/10 px-6 py-3 rounded-full backdrop-blur-sm border border-white/20">{isCorrect ? '+10 XP Pending' : 'Await next round'}</p>
             </div>
         );
     }
