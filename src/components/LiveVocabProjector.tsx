@@ -5,53 +5,85 @@ import { Users, Timer, Zap, ArrowRight, X, Trophy, CheckCircle2, Settings } from
 
 export default function LiveVocabProjector({ deck, classId, activeClass, onExit }: any) {
     const { liveState, startLiveClass, endLiveClass, changeSlide, triggerQuiz } = useLiveClass(classId, true);
+    
+    // Core Game State
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isAutoPilot, setIsAutoPilot] = useState(false);
+    
+    // Configurable Settings
     const [gameSettings, setGameSettings] = useState({ qTime: 15, rTime: 6 });
     const [timeLeft, setTimeLeft] = useState(gameSettings.qTime);
     
     const timerRef = useRef<any>(null);
     const safeDeckId = deck?.id || deck?.key || 'custom_vocab_run';
 
+    // DYNAMIC QUIZ GENERATOR
     const quizQuestions = useMemo(() => {
         if (!deck?.cards || deck.cards.length === 0) return [];
+        
         const shuffledDeck = [...deck.cards].sort(() => 0.5 - Math.random());
+        
         return shuffledDeck.map((card) => {
             const distractors = deck.cards
                 .filter((c: any) => (c.id || c.front) !== (card.id || card.front))
                 .sort(() => 0.5 - Math.random())
                 .slice(0, 3);
+                
             const options = [card, ...distractors]
-                .map((c: any) => ({ id: c.id || c.front, text: c.back }))
+                .map((c: any) => ({ 
+                    id: c.id || c.front, 
+                    text: c.back 
+                }))
                 .sort(() => 0.5 - Math.random());
-            return { question: card.front, options: options, correctId: card.id || card.front };
+
+            return { 
+                question: card.front, 
+                options: options, 
+                correctId: card.id || card.front 
+            };
         });
     }, [deck]);
 
+    // BROADCAST INIT
     useEffect(() => {
-        if (quizQuestions.length > 0 && classId) startLiveClass(safeDeckId, 'vocab', quizQuestions[0]);
-        return () => { endLiveClass(); clearInterval(timerRef.current); };
+        if (quizQuestions.length > 0 && classId) {
+            startLiveClass(safeDeckId, 'vocab', quizQuestions[0]);
+        }
+        return () => { 
+            endLiveClass(); 
+            clearInterval(timerRef.current); 
+        };
     }, [classId, safeDeckId, quizQuestions]); 
 
+    // 🔥 THE FIX: AUTO-SKIP ENGINE (Now looks at the Lobby, not the Roster)
     useEffect(() => {
         if (liveState?.quizState === 'active' && isAutoPilot) {
             const currentAnswers = Object.keys(liveState?.answers || {}).length;
-            const totalStudents = activeClass?.students?.length || 0;
-            if (totalStudents > 0 && currentAnswers >= totalStudents) {
+            const joinedStudentsCount = Object.keys(liveState?.joined || {}).length;
+            
+            // If we have at least 1 person in the lobby, and all of them answered... skip!
+            if (joinedStudentsCount > 0 && currentAnswers >= joinedStudentsCount) {
                 setTimeLeft(0); 
             }
         }
-    }, [liveState?.answers, isAutoPilot, activeClass]);
+    }, [liveState?.answers, liveState?.joined, isAutoPilot]);
 
+    // MAIN GAME LOOP
     useEffect(() => {
         if (!isAutoPilot) return;
+        
         clearInterval(timerRef.current);
+        
         timerRef.current = setInterval(() => {
             setTimeLeft((prev) => {
-                if (prev <= 1) { handleTimerEnd(); return 0; }
+                if (prev <= 1) {
+                    handleTimerEnd();
+                    return 0;
+                }
                 return prev - 1;
             });
         }, 1000);
+        
         return () => clearInterval(timerRef.current);
     }, [isAutoPilot, liveState?.quizState, currentIndex, gameSettings]);
 
@@ -86,8 +118,6 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
     const currentQ = quizQuestions[currentIndex];
     const answers = liveState?.answers || {};
     const answerCount = Object.keys(answers).length;
-    
-    // 🔥 LOBBY CONNECTION TRACKING
     const joinedStudents = liveState?.joined || {};
     const joinedCount = Object.keys(joinedStudents).length;
 
@@ -101,24 +131,43 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                 
                 <div className="absolute top-8 left-8 right-8 flex items-center justify-between z-20">
                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center font-black shadow-lg shadow-indigo-500/20"><Zap size={24} fill="white" /></div>
+                        <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center font-black shadow-lg shadow-indigo-500/20">
+                            <Zap size={24} fill="white" />
+                        </div>
                         <div>
                             <h3 className="font-black text-xl uppercase tracking-tighter text-white">{deck.title || 'Custom Deck'}</h3>
-                            <div className="flex items-center gap-3"><span className="text-[10px] text-indigo-400 font-black uppercase tracking-widest">Live Arena</span><div className="h-1 w-1 rounded-full bg-slate-700" /><span className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{activeClass?.name || 'Classroom'}</span></div>
+                            <div className="flex items-center gap-3">
+                                <span className="text-[10px] text-indigo-400 font-black uppercase tracking-widest">Live Arena Protocol</span>
+                                <div className="h-1 w-1 rounded-full bg-slate-700" />
+                                <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{activeClass?.name || 'Classroom'}</span>
+                            </div>
                         </div>
                     </div>
+
                     <div className="flex bg-slate-900 border border-slate-800 p-1.5 rounded-2xl gap-2 items-center px-4">
                         <Settings size={14} className="text-slate-500 mr-2" />
                         {[10, 15, 30].map(t => (
-                            <button key={t} onClick={() => setGameSettings(s => ({...s, qTime: t}))} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${gameSettings.qTime === t ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>{t}s</button>
+                            <button 
+                                key={t}
+                                onClick={() => setGameSettings(s => ({...s, qTime: t}))}
+                                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${gameSettings.qTime === t ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                            >
+                                {t}s
+                            </button>
                         ))}
                     </div>
                 </div>
 
                 <div className="z-10 text-center max-w-5xl w-full mt-12">
-                    <div className="w-24 h-24 bg-indigo-600 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-[0_0_50px_rgba(79,70,229,0.4)] animate-bounce-slow"><Zap size={48} fill="white" /></div>
+                    <div className="w-24 h-24 bg-indigo-600 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-[0_0_50px_rgba(79,70,229,0.4)] animate-bounce-slow">
+                        <Zap size={48} fill="white" />
+                    </div>
                     <h1 className="text-6xl font-black uppercase tracking-tighter mb-4 italic">Arena Lobby</h1>
-                    <p className="text-indigo-400 font-black uppercase tracking-[0.4em] mb-12">Awaiting Connections</p>
+                    
+                    {/* Visual tweak: Lets the instructor know they can start */}
+                    <p className={`font-black uppercase tracking-[0.4em] mb-12 ${joinedCount > 0 ? 'text-emerald-400 animate-pulse' : 'text-indigo-400'}`}>
+                        {joinedCount > 0 ? 'Ready For Protocol' : 'Awaiting Connections'}
+                    </p>
                     
                     <div className="bg-slate-900/50 border-2 border-slate-800 rounded-[3rem] p-12 mb-12">
                         <div className="flex items-center justify-between mb-8 border-b border-slate-800 pb-6">
@@ -148,7 +197,10 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                         </div>
                     </div>
 
-                    <button onClick={startRun} className="bg-white text-black px-16 py-6 rounded-full font-black text-3xl uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-[0_0_60px_rgba(255,255,255,0.2)]">
+                    <button 
+                        onClick={startRun} 
+                        className="bg-white text-black px-16 py-6 rounded-full font-black text-3xl uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-[0_0_60px_rgba(255,255,255,0.2)]"
+                    >
                         Initialize Run
                     </button>
                 </div>
@@ -171,6 +223,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
             <div className="absolute inset-0 bg-black opacity-60" />
             
             <div className="flex-1 flex flex-col items-center justify-center p-12 relative z-10">
+                
                 <div className={`mb-8 flex items-center gap-4 px-8 py-4 rounded-full border-2 transition-all ${timeLeft <= 5 && liveState?.quizState !== 'revealed' ? 'border-rose-500 text-rose-500 animate-pulse bg-rose-500/10' : 'border-slate-700 text-slate-400 bg-slate-900/50'}`}>
                     <Timer size={32} />
                     <span className="text-5xl font-black tabular-nums">{timeLeft}s</span>
@@ -180,6 +233,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                     <span className="text-sm font-black text-indigo-500 uppercase tracking-[0.3em] block mb-6">Target {currentIndex + 1} / {quizQuestions.length}</span>
                     <h2 className="text-6xl md:text-8xl font-black mb-12 leading-tight tracking-tighter uppercase italic">{currentQ.question}</h2>
                     
+                    {/* ACTIVE STATE */}
                     {liveState?.quizState === 'active' && (
                         <div className="flex flex-col items-center animate-in fade-in duration-500">
                             <div className="flex items-center justify-center gap-8 bg-black/40 p-10 rounded-[3rem] border border-white/5 w-fit mx-auto mb-6">
@@ -188,7 +242,8 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                                     <div className="absolute inset-0 bg-indigo-500 blur-3xl opacity-20 animate-pulse" />
                                 </div>
                                 <div className="text-left">
-                                    <span className="block text-7xl font-black leading-none">{answerCount}</span>
+                                    {/* Show them how many out of the active lobby have answered */}
+                                    <span className="block text-7xl font-black leading-none">{answerCount} <span className="text-4xl text-slate-600">/ {joinedCount}</span></span>
                                     <span className="text-sm font-black text-slate-500 uppercase tracking-[0.3em]">Responses In</span>
                                 </div>
                             </div>
@@ -196,6 +251,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                         </div>
                     )}
 
+                    {/* REVEALED STATE (Results Snapshot) */}
                     {liveState?.quizState === 'revealed' && (
                         <div className="animate-in zoom-in-95 duration-500 space-y-12">
                             <div className="bg-emerald-500 text-white p-12 rounded-[3rem] shadow-[0_20px_80px_rgba(16,185,129,0.3)] text-5xl font-black border-4 border-emerald-400 inline-block mx-auto min-w-[50%]">
@@ -212,9 +268,10 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
 
                                         return (
                                             <div key={i} className="flex flex-col items-center gap-2 animate-in slide-in-from-bottom-4" style={{ animationDelay: `${i * 100}ms` }}>
-                                                <div className={`w-14 h-14 rounded-2xl border-2 flex items-center justify-center font-black text-xl shadow-lg transition-all ${isCorrect ? 'bg-emerald-500 border-emerald-300 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 'bg-slate-800 border-slate-700 text-slate-500 opacity-50'}`}>
+                                                <div className={`w-14 h-14 rounded-2xl border-2 flex items-center justify-center font-black text-xl shadow-lg transition-all ${isCorrect ? 'bg-emerald-500 border-emerald-300 text-white shadow-emerald-500/20' : 'bg-slate-800 border-slate-700 text-slate-500 opacity-50'}`}>
                                                     {initial}
                                                 </div>
+                                                {isCorrect && <CheckCircle2 size={14} className="text-emerald-400" />}
                                             </div>
                                         );
                                     })}
