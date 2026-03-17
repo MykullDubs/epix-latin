@@ -3,6 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { Layers, Plus, X, Save, Edit3, Trash2, FileJson, Database, Loader2 } from 'lucide-react';
 import { INITIAL_SYSTEM_DECKS } from '../../constants/defaults';
 import { Toast } from '../Toast';
+// 🔥 NEW: Firebase imports to explicitly create the Deck document
+import { doc, setDoc } from 'firebase/firestore';
+import { db, appId } from '../../config/firebase';
 
 export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard, availableDecks, initialDeckId }: any) {
   const [formData, setFormData] = useState({ front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '', deckId: initialDeckId || 'custom' });
@@ -18,13 +21,13 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
   const [isImporting, setIsImporting] = useState<boolean>(false);
   const [importProgress, setImportProgress] = useState<{current: number, total: number} | null>(null);
 
-  // 🔥 NEW: Optimistic Local State to prevent the dropdown from blanking out while Firebase syncs
   const [localOptimisticDecks, setLocalOptimisticDecks] = useState<any>({});
 
-  // Merge the real decks from Firebase with our instant local decks
   const validDecks = { ...availableDecks, ...localOptimisticDecks };
   const deckOptions = Object.entries(validDecks).map(([key, deck]: any) => ({ id: key, title: deck.title })); 
-  const currentDeckCards = validDecks[formData.deckId] ? validDecks[formData.deckId].cards || [] : validDecks['custom'] ? validDecks['custom'].cards || [] : [];
+  
+  // 🔥 FIX: Removed the buggy fallback to 'custom' so cards don't look like they are in Scriptorium
+  const currentDeckCards = validDecks[formData.deckId] ? validDecks[formData.deckId].cards || [] : [];
 
   useEffect(() => { if (initialDeckId) setFormData(prev => ({...prev, deckId: initialDeckId})); }, [initialDeckId]);
   
@@ -59,16 +62,36 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
     setMorphology([]); 
   };
 
+  // 🔥 NEW: Engine to explicitly create the deck document in Firebase so it shows up in the Arena
+  const registerNewDeck = async (deckId: string, deckTitle: string) => {
+      try {
+          const deckRef = doc(db, 'artifacts', appId, 'decks', deckId);
+          await setDoc(deckRef, {
+              id: deckId,
+              key: deckId,
+              title: deckTitle,
+              type: 'vocabulary',
+              createdAt: new Date().toISOString()
+          }, { merge: true });
+      } catch (err) {
+          console.error("Failed to register deck metadata in Firebase:", err);
+      }
+  };
+
   const handleSubmit = async (e: any) => { 
     e.preventDefault(); 
     if (!formData.front || !formData.back) return; 
     
     let finalDeckId = formData.deckId; 
     let finalDeckTitle = null; 
+    
     if (formData.deckId === 'new') { 
         if (!newDeckTitle) return alert("Please name your new deck."); 
         finalDeckId = `custom_${Date.now()}`; 
         finalDeckTitle = newDeckTitle; 
+        
+        // Lock the deck into the database
+        await registerNewDeck(finalDeckId, finalDeckTitle);
     } 
 
     const cardData = { 
@@ -79,7 +102,6 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
         grammar_tags: formData.grammarTags ? formData.grammarTags.split(',').map(t => t.trim()) : ["Custom"] 
     }; 
 
-    // Optimistically update local UI instantly
     if (!editingId) {
         setLocalOptimisticDecks((prev: any) => {
             const existingDeck = prev[finalDeckId] || validDecks[finalDeckId] || { title: finalDeckTitle || 'Custom Deck', cards: [] };
@@ -110,13 +132,16 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
 
         let finalDeckId = formData.deckId;
         let finalDeckTitle = null;
+        
         if (formData.deckId === 'new') {
             if (!newDeckTitle) return alert("Please name your new deck.");
             finalDeckId = `custom_${Date.now()}`;
             finalDeckTitle = newDeckTitle;
+
+            // Lock the deck into the database
+            await registerNewDeck(finalDeckId, finalDeckTitle);
         }
 
-        // Instantly register the deck locally so the dropdown doesn't break
         setLocalOptimisticDecks((prev: any) => ({
             ...prev,
             [finalDeckId]: prev[finalDeckId] || validDecks[finalDeckId] || { title: finalDeckTitle || 'Custom Deck', cards: [] }
@@ -149,7 +174,6 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                 successCount++;
                 setImportProgress({ current: successCount, total: cards.length });
                 
-                // Push card to local inventory instantly so user can watch it populate
                 setLocalOptimisticDecks((prev: any) => {
                     const existingDeck = prev[finalDeckId];
                     return { ...prev, [finalDeckId]: { ...existingDeck, cards: [...existingDeck.cards, { id: `temp_${Date.now()}_${i}`, ...cardData }] } };
