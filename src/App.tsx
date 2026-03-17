@@ -18,10 +18,10 @@ import ExamPlayerView from './components/ExamPlayerView';
 import LessonView from './components/LessonView';
 import ClassView from './components/ClassView'; 
 import LiveVocabProjector from './components/LiveVocabProjector'; 
+import LiveConnectFourProjector from './components/LiveConnectFourProjector'; // NEW: Connect 4
 import CelebrationScreen from './components/CelebrationScreen';
 
 export default function App() {
-  // 🚨 Notice we rename allDecks to rawDecks here so we can intercept it!
   const { user, userData, authChecked, activeOrg, allLessons, enrolledClasses, instructorClasses, allDecks: rawDecks, actions } = useMagisterData();
   
   // Navigation State
@@ -38,24 +38,21 @@ export default function App() {
   // Live Presentation States
   const [activePresentation, setActivePresentation] = useState<{lessonId: string, classId: string} | null>(null);
   const [activeVocabGame, setActiveVocabGame] = useState<{deckId: string, classId: string} | null>(null);
+  const [activeConnectFour, setActiveConnectFour] = useState<{deckId: string, classId: string} | null>(null); // NEW: Connect 4 State
 
   // ==========================================================================
-  //  🔥 THE DECK INTERCEPTOR (Fixes the Scriptorium dumping issue)
+  //  🔥 THE DECK INTERCEPTOR
   // ==========================================================================
   const allDecks = useMemo(() => {
       if (!rawDecks) return {};
       
-      // Clone the incoming decks so we don't mutate state directly
       const processedDecks = JSON.parse(JSON.stringify(rawDecks));
       
-      // Grab all the cards that the backend dumped into 'custom'
       const dumpedCards = processedDecks.custom?.cards || [];
       const trueScriptoriumCards: any[] = [];
 
       dumpedCards.forEach((card: any) => {
-          // If the card has a specific deckId that IS NOT 'custom'
           if (card.deckId && card.deckId !== 'custom') {
-              // If this folder doesn't exist yet, create it
               if (!processedDecks[card.deckId]) {
                   processedDecks[card.deckId] = {
                       id: card.deckId,
@@ -63,22 +60,18 @@ export default function App() {
                       cards: []
                   };
               }
-              // Push the card into its proper folder
               processedDecks[card.deckId].cards.push(card);
           } else {
-              // If it actually belongs in Scriptorium, keep it here
               trueScriptoriumCards.push(card);
           }
       });
 
-      // Update Scriptorium to ONLY hold cards that actually belong there
       if (processedDecks.custom) {
           processedDecks.custom.cards = trueScriptoriumCards;
       }
 
       return processedDecks;
   }, [rawDecks]);
-
 
   // ==========================================================================
   //  THE URL ROUTING ENGINE
@@ -152,7 +145,6 @@ export default function App() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [enrolledClasses, allLessons]);
-  // ==========================================================================
 
   if (!authChecked) return <div className="h-screen flex items-center justify-center bg-slate-50"><div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>;
 
@@ -212,7 +204,24 @@ export default function App() {
     );
   }
 
-  // 4. ADMIN VIEW
+  // 4. PROJECTOR MODE (Live Connect 4 Battle)
+  if (activeConnectFour) {
+    const deck = allDecks[activeConnectFour.deckId] || allDecks.custom;
+    const activeClassForC4 = instructorClasses.find(c => c.id === activeConnectFour.classId) || enrolledClasses.find(c => c.id === activeConnectFour.classId);
+
+    return (
+      <div className="fixed inset-0 z-[5000] bg-black flex flex-col">
+        <LiveConnectFourProjector 
+             deck={deck} 
+             classId={activeConnectFour.classId} 
+             activeClass={activeClassForC4} 
+             onExit={() => setActiveConnectFour(null)} 
+          />
+      </div>
+    );
+  }
+
+  // 5. ADMIN VIEW
   if (currentView === 'admin' && (userData?.role === 'admin' || userData?.role === 'org_admin')) {
     return (
         <div className="h-screen w-full relative">
@@ -228,7 +237,7 @@ export default function App() {
     );
   }
 
-  // 5. INSTRUCTOR VIEW
+  // 6. INSTRUCTOR VIEW
   if (currentView === 'instructor' && userData?.role !== 'student') {
     return (
       <InstructorDashboard 
@@ -249,6 +258,7 @@ export default function App() {
         onAddStudent={actions.addStudent}
         onStartPresentation={(lessonId: string, classId: string) => setActivePresentation({ lessonId, classId })}
         onStartVocabGame={(deckId: string, classId: string) => setActiveVocabGame({ deckId, classId })}
+        onStartConnectFour={(deckId: string, classId: string) => setActiveConnectFour({ deckId, classId })} // NEW: Passed prop down to InstructorHub
         onSwitchView={() => setCurrentView('student')}
         onLogout={actions.logout} 
         AdminDashboardView={AdminDashboardView}
@@ -256,7 +266,7 @@ export default function App() {
     );
   }
 
-  // 6. STUDENT MOBILE APP
+  // 7. STUDENT MOBILE APP
   return (
     <div className="bg-slate-50 min-h-screen w-full flex flex-col items-center relative overflow-hidden">
       {userData?.role !== 'student' && (
