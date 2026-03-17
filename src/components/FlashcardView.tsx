@@ -1,6 +1,6 @@
 // src/components/FlashcardView.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, X, Dumbbell, Layers, Play, Zap, HelpCircle, Puzzle, Flame, CheckCircle2, XCircle, Globe, Users, Filter, ChevronLeft, ChevronRight, RotateCw } from 'lucide-react';
+import { ArrowLeft, X, Dumbbell, Layers, Play, Zap, HelpCircle, Puzzle, Flame, CheckCircle2, XCircle, Globe, Users, Filter, ChevronLeft, ChevronRight, RotateCw, ArrowUp } from 'lucide-react';
 
 // ============================================================================
 //  1. STUDY MODE (Upgraded Swipe Physics & Animations)
