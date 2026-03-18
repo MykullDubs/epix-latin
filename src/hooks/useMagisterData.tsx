@@ -159,22 +159,27 @@ export function useMagisterData() {
     },
 
     // 🔥 NEW: Removal action to fix your roster bug
-    removeStudent: async (classId: string, studentEmail: string) => {
-      if (!user) return;
-      const classRef = doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId);
+removeStudent: async (classId: string, studentEmail: string) => {
+  if (!user) return;
+  try {
+    const classRef = doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId);
+    const classSnap = await getDoc(classRef);
+    
+    if (classSnap.exists()) {
+      const data = classSnap.data();
+      // Find the EXACT student object in the array to satisfy Firestore's pickiness
+      const studentToRemove = data.students?.find((s: any) => s.email === studentEmail);
       
-      const classSnap = await getDoc(classRef);
-      if (!classSnap.exists()) return;
-      
-      const classData = classSnap.data();
-      // Find the exact object in the array to ensure arrayRemove works
-      const studentObject = classData.students?.find((s: any) => s.email === studentEmail);
-
       await updateDoc(classRef, {
         studentEmails: arrayRemove(studentEmail),
-        ...(studentObject ? { students: arrayRemove(studentObject) } : {})
+        // If we found the object, remove it. If not, just remove the string.
+        ...(studentToRemove ? { students: arrayRemove(studentToRemove) } : {})
       });
-    },
+    }
+  } catch (err) {
+    console.error("Decommission protocol failed:", err);
+  }
+},
 
     assignContent: async (classId: string, assignmentId: any) => {
       if (!user) return;
