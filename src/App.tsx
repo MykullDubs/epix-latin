@@ -1,5 +1,7 @@
 // src/App.tsx
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { doc, setDoc } from 'firebase/firestore'; // 🔥 IMPORTED FIREBASE FUNCTIONS
+import { db, appId } from './config/firebase';   // 🔥 IMPORTED DB CONFIG
 import { useMagisterData } from './hooks/useMagisterData';
 import { GLOBAL_CURRICULUMS } from './constants/curriculums';
 
@@ -22,7 +24,6 @@ import LiveConnectFourProjector from './components/LiveConnectFourProjector';
 import CelebrationScreen from './components/CelebrationScreen';
 
 export default function App() {
-  // 🔥 THE UPGRADE: We are now pulling customCurriculums out of the Magic Vacuum!
   const { user, userData, authChecked, activeOrg, allLessons, enrolledClasses, instructorClasses, allDecks, customCurriculums, actions } = useMagisterData();
   
   // Navigation State
@@ -41,10 +42,57 @@ export default function App() {
   const [activeVocabGame, setActiveVocabGame] = useState<{deckId: string, classId: string} | null>(null);
   const [activeConnectFour, setActiveConnectFour] = useState<{deckId: string, classId: string} | null>(null);
 
-  // 🔥 THE CURRICULUM MERGER: Blends hardcoded templates with dynamically forged pathways
   const allCurriculums = useMemo(() => {
       return [...GLOBAL_CURRICULUMS, ...(customCurriculums || [])];
   }, [customCurriculums]);
+
+  // ==========================================================================
+  //  🔥 THE FIX: FIREBASE LIVE ARENA LAUNCHERS
+  // ==========================================================================
+  const handleStartVocabGame = async (classId: string, deckId: string) => {
+      try {
+          // 1. LIGHT THE SIGNAL FLARE FOR STUDENTS (Creates the Firebase Doc)
+          const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
+          await setDoc(sessionRef, {
+              type: 'trivia',
+              lessonId: deckId, 
+              quizState: 'waiting', // Puts students in the "Awaiting Protocol" lobby
+              currentBlockIndex: 0,
+              joined: {},
+              answers: {},
+              scores: {},
+              timestamp: Date.now()
+          });
+
+          // 2. ROUTE THE INSTRUCTOR TO THE PROJECTOR VIEW
+          setActiveVocabGame({ deckId, classId });
+      } catch (error) {
+          console.error("Failed to launch Live Arena:", error);
+      }
+  };
+
+  const handleStartConnectFour = async (classId: string, deckId: string) => {
+      try {
+          // 1. LIGHT THE SIGNAL FLARE FOR STUDENTS
+          const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
+          await setDoc(sessionRef, {
+              type: 'connect_four',
+              lessonId: deckId,
+              quizState: 'waiting',
+              currentTurn: 1, // Team 1 starts
+              grid: Array(7).fill([]), // Empty Connect 4 board
+              teams: {}, // We assign students to teams as they join
+              joined: {},
+              answers: {},
+              timestamp: Date.now()
+          });
+
+          // 2. ROUTE THE INSTRUCTOR TO THE PROJECTOR VIEW
+          setActiveConnectFour({ deckId, classId });
+      } catch (error) {
+          console.error("Failed to launch Squad Strike:", error);
+      }
+  };
 
   // ==========================================================================
   //  THE URL ROUTING ENGINE
@@ -119,13 +167,13 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [enrolledClasses, allLessons]);
 
-  if (!authChecked) return <div className="h-screen flex items-center justify-center bg-slate-50"><div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>;
+  if (!authChecked) return <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors duration-300"><div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>;
 
   // 1. PUBLIC / AUTH GATES
   if (!user) {
     return showAuth ? (
-      <div className="relative min-h-screen bg-slate-50">
-         <button onClick={() => setShowAuth(false)} className="absolute top-6 left-6 z-50 text-slate-400 hover:text-slate-900 font-bold text-sm transition-colors">← Regresar</button>
+      <div className="relative min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+         <button onClick={() => setShowAuth(false)} className="absolute top-6 left-6 z-50 text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold text-sm transition-colors">← Regresar</button>
          <AuthView />
       </div>
     ) : <MarketingSite onLoginClick={() => setShowAuth(true)} />;
@@ -218,7 +266,7 @@ export default function App() {
         userData={{ ...userData, classes: instructorClasses }} 
         allDecks={allDecks} 
         lessons={allLessons} 
-        curriculums={allCurriculums} // 🔥 PASSING THE BLENDED ARRAY DOWN
+        curriculums={allCurriculums}
         onAssignCurriculum={actions.assignCurriculum} 
         onSaveLesson={actions.saveLesson} 
         onSaveCurriculum={actions.saveCurriculum}
@@ -231,8 +279,8 @@ export default function App() {
         onUpdateClassDescription={actions.updateClassDescription}
         onAddStudent={actions.addStudent}
         onStartPresentation={(lessonId: string, classId: string) => setActivePresentation({ lessonId, classId })}
-        onStartVocabGame={(deckId: string, classId: string) => setActiveVocabGame({ deckId, classId })}
-        onStartConnectFour={(deckId: string, classId: string) => setActiveConnectFour({ deckId, classId })}
+        onStartVocabGame={handleStartVocabGame}      // 🔥 WIRED UP
+        onStartConnectFour={handleStartConnectFour}  // 🔥 WIRED UP
         onPublishDeck={actions.publishDeck}
         onSwitchView={() => setCurrentView('student')}
         onLogout={actions.logout} 
@@ -243,15 +291,15 @@ export default function App() {
 
   // 7. STUDENT MOBILE APP
   return (
-    <div className="bg-slate-50 min-h-screen w-full flex flex-col items-center relative overflow-hidden">
+    <div className="bg-slate-50 dark:bg-slate-950 min-h-screen w-full flex flex-col items-center relative overflow-hidden transition-colors duration-300">
       {userData?.role !== 'student' && (
         <button onClick={() => setCurrentView(userData?.role === 'instructor' ? 'instructor' : 'admin')} className="fixed top-6 right-6 z-[1000] bg-slate-900 text-white px-8 py-3 rounded-full font-black text-xs uppercase shadow-2xl transition-all hover:scale-105 active:scale-95">
           {userData?.role === 'instructor' ? '🎓 Magister Command' : '🛡️ Command Center'}
         </button>
       )}
 
-      <div className="w-full bg-white max-w-md h-[100dvh] shadow-2xl relative flex flex-col overflow-hidden">
-        <div className="flex-1 overflow-hidden relative bg-slate-50">
+      <div className="w-full bg-white dark:bg-slate-950 max-w-md h-[100dvh] shadow-2xl relative flex flex-col overflow-hidden transition-colors duration-300">
+        <div className="flex-1 overflow-hidden relative bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
           
           {/* CELEBRATION INTERCEPTOR */}
           {celebrationData ? (
@@ -285,7 +333,7 @@ export default function App() {
             <StudentClassView 
                classData={activeStudentClass} 
                lessons={allLessons} 
-               curriculums={allCurriculums} // 🔥 PASSING THE BLENDED ARRAY TO THE STUDENT CLASS HUB
+               curriculums={allCurriculums}
                onBack={() => setActiveStudentClass(null)} 
                onSelectLesson={setActiveLesson} 
                setActiveTab={setActiveTab} 
@@ -303,7 +351,7 @@ export default function App() {
           ) : (
             <HomeView 
                classes={enrolledClasses} 
-               curriculums={allCurriculums} // 🔥 PASSING THE BLENDED ARRAY TO THE STUDENT HOME DASHBOARD
+               curriculums={allCurriculums} 
                onSelectClass={setActiveStudentClass} 
                userData={userData} 
                activeOrg={activeOrg} 
