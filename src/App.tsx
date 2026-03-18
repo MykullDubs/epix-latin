@@ -271,6 +271,7 @@ export default function App() {
         onSaveLesson={actions.saveLesson} 
         onSaveCurriculum={actions.saveCurriculum}
         onSaveCard={actions.saveCard}
+        onUpdateCard={actions.updateCard}
         onAssign={actions.assignContent}
         onRevoke={actions.revokeContent}
         onCreateClass={actions.createClass}
