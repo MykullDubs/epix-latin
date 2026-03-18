@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLiveClass } from '../hooks/useLiveClass';
 import { 
-    X, Zap, Shield, Crown, Gauge, Rocket, Activity, AlertTriangle
+    X, Zap, Shield, Crown, Gauge, Rocket, Activity, AlertTriangle, Users // 🔥 ADDED Users
 } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, appId } from '../config/firebase';
@@ -210,8 +210,8 @@ export default function LiveSlipstreamProjector({ deck, classId, activeClass, on
                 )}
             </main>
 
-            {/* Inject Global CSS for the floor scroll animation */}
-            <style dangerouslySetInlineStyle={{__html: `
+            {/* 🔥 FIXED: dangerouslySetInnerHTML used instead of dangerouslySetInlineStyle */}
+            <style dangerouslySetInnerHTML={{__html: `
                 @keyframes grid-scroll {
                     0% { transform: perspective(400px) rotateX(70deg) translateY(0); }
                     100% { transform: perspective(400px) rotateX(70deg) translateY(50px); }
