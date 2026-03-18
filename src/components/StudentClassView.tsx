@@ -17,6 +17,9 @@ import {
 import StudentGradebook from './StudentGradebook';
 import LeaderboardView from './LeaderboardView';
 
+// 🔥 IMPORT THE NEW SLIPSTREAM VIEW
+import StudentSlipstreamView from './StudentSlipstreamView';
+
 // --- THEME HELPER (Dark Mode Upgraded) ---
 const getSubjectTheme = (subject: string) => {
     const sub = subject?.toLowerCase() || '';
@@ -565,6 +568,11 @@ export default function StudentClassView({
   const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'leaderboard' | 'exams' | 'forum' | 'grades' | 'live'>('lessons');
   const [completedItems, setCompletedItems] = useState<string[]>([]);
   const [liveSession, setLiveSession] = useState<any>(null);
+  
+  // 🔥 FETCH DECK DATA FOR SLIPSTREAM
+  // We need to pull the specific deck referenced in the live session so the student device can render it
+  const [activeDeck, setActiveDeck] = useState<any>(null);
+
   const [expandedRoadmaps, setExpandedRoadmaps] = useState<Record<string, boolean>>({ 
       [classData?.assignedCurriculums?.[0]]: true 
   });
@@ -588,11 +596,27 @@ export default function StudentClassView({
   useEffect(() => {
     if (!classData?.id) return;
     const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classData.id);
-    return onSnapshot(sessionRef, (docSnap) => {
+    return onSnapshot(sessionRef, async (docSnap) => {
         if (docSnap.exists()) {
-            setLiveSession(docSnap.data());
+            const sessionData = docSnap.data();
+            setLiveSession(sessionData);
+            
+            // 🔥 If it's slipstream, pre-load the deck content for local rendering
+            if (sessionData.type === 'slipstream' && sessionData.lessonId) {
+                // If it's a published deck, it might be in 'published_decks'
+                // Otherwise we look in the instructor's 'custom_cards'
+                // For simplicity here, we assume `StudentClassView` receives `allDecks` from `App.tsx` 
+                // OR we can fetch it dynamically. Since it's not passed, let's just listen to it.
+                const deckQuery = query(collection(db, 'artifacts', appId, 'published_decks'), where('id', '==', sessionData.lessonId));
+                onSnapshot(deckQuery, (snap) => {
+                   if (!snap.empty) {
+                       setActiveDeck(snap.docs[0].data());
+                   }
+                });
+            }
         } else {
             setLiveSession(null);
+            setActiveDeck(null);
             if (activeSubTab === 'live') setActiveSubTab('lessons');
         }
     });
@@ -613,8 +637,18 @@ export default function StudentClassView({
       return (
           <div className="fixed inset-0 z-[9999] bg-black flex flex-col animate-in slide-in-from-bottom-8 duration-500 font-sans">
               <button onClick={() => setActiveSubTab('lessons')} className="absolute top-6 left-6 z-50 p-2 text-slate-500 hover:text-white rounded-full bg-slate-900 border border-slate-800"><X size={20} /></button>
+              
+              {/* 🔥 LIVE ARENA ROUTING HUB */}
               <div className="flex-1 w-full h-full p-4 md:p-8 pt-20">
-                  {liveSession.type === 'connect_four' ? (
+                  {liveSession.type === 'slipstream' ? (
+                      <StudentSlipstreamView 
+                          user={userData || auth?.currentUser}
+                          classId={classData.id}
+                          deck={activeDeck || { cards: [] }} // Fallback while deck loads
+                          liveState={liveSession}
+                          onExit={() => setActiveSubTab('lessons')}
+                      />
+                  ) : liveSession.type === 'connect_four' ? (
                     <ConnectFourRemote 
                         liveSession={liveSession} 
                         classId={classData.id} 
