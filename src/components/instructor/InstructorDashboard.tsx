@@ -45,6 +45,7 @@ export default function InstructorDashboard({
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isRailExpanded, setIsRailExpanded] = useState(false);
   const [selectedClassId, setSelectedClassId] = useState<string>(''); 
+  const [dashCohortId, setDashCohortId] = useState<string>(userData?.classes?.[0]?.id || '');
   
   // 🔥 STATE FOR LIVE ARENA MODAL
   const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
@@ -301,13 +302,15 @@ export default function InstructorDashboard({
            ) : (
              <div className="h-full overflow-y-auto custom-scrollbar animate-in fade-in duration-700">
                 {activeTab === 'dashboard' && (
-                    <CommandCenter 
-                        classData={userData?.classes?.[0]} 
-                        logs={[]} 
-                        onLaunchLive={() => setIsLiveModalOpen(true)} 
-                        setActiveTab={setActiveTab} 
-                    />
-                )}
+    <CommandCenter 
+        classes={userData?.classes || []}
+        selectedClassId={dashCohortId}
+        setSelectedClassId={setDashCohortId}
+        logs={activityLogs} // Passed from App.tsx/Hook
+        onLaunchLive={() => setIsLiveModalOpen(true)} 
+        setActiveTab={setActiveTab} 
+    />
+)}
                 
                 {activeTab === 'analytics' && <AnalyticsDashboard classes={userData?.classes} />}
                 {activeTab === 'inbox' && <InstructorInbox />}
