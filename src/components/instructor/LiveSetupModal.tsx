@@ -1,9 +1,10 @@
 // src/components/instructor/LiveSetupModal.tsx
 import React, { useState } from 'react';
-import { X, Zap, LayoutGrid, Play, Users, BookOpen, Shield } from 'lucide-react';
+import { X, Zap, LayoutGrid, Play, Users, BookOpen, Shield, Gauge } from 'lucide-react'; // 🔥 Added Gauge for Slipstream
 
 export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = [], onDeploy }: any) {
-    const [selectedMode, setSelectedMode] = useState<'trivia' | 'connect_four' | null>(null);
+    // 🔥 Added 'slipstream' to the allowed modes
+    const [selectedMode, setSelectedMode] = useState<'trivia' | 'connect_four' | 'slipstream' | null>(null);
     const [selectedContent, setSelectedContent] = useState<string>('');
     const [selectedClass, setSelectedClass] = useState<string>('');
 
@@ -33,7 +34,7 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
             />
 
             {/* Modal Container */}
-            <div className="relative w-full max-w-2xl bg-white dark:bg-slate-950 rounded-[3rem] shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300">
+            <div className="relative w-full max-w-4xl bg-white dark:bg-slate-950 rounded-[3rem] shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300">
                 
                 {/* Header */}
                 <div className="shrink-0 p-6 md:p-8 border-b border-slate-100 dark:border-slate-800/60 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
@@ -60,7 +61,8 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
                             <span className="w-5 h-5 rounded-full bg-slate-800 dark:bg-slate-700 text-white flex items-center justify-center text-[10px]">1</span> 
                             Select Protocol
                         </h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* 🔥 Grid updated to 3 columns to fit the new mode */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <button 
                                 onClick={() => setSelectedMode('trivia')}
                                 className={`p-6 rounded-[2rem] border-4 text-left transition-all active:scale-[0.98] ${selectedMode === 'trivia' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 shadow-lg shadow-emerald-500/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-emerald-200 dark:hover:border-emerald-500/50'}`}
@@ -77,6 +79,16 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
                                 <LayoutGrid size={32} className={`mb-4 ${selectedMode === 'connect_four' ? 'text-indigo-500' : 'text-slate-300 dark:text-slate-600'}`} />
                                 <h4 className={`text-xl font-black mb-1 ${selectedMode === 'connect_four' ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-800 dark:text-white'}`}>Squad Strike</h4>
                                 <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Team-based tactical Connect Four. Answer correctly to unlock tactical drops.</p>
+                            </button>
+
+                            {/* 🔥 NEW SLIPSTREAM BUTTON */}
+                            <button 
+                                onClick={() => setSelectedMode('slipstream')}
+                                className={`p-6 rounded-[2rem] border-4 text-left transition-all active:scale-[0.98] ${selectedMode === 'slipstream' ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-500/10 shadow-lg shadow-cyan-500/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-cyan-200 dark:hover:border-cyan-500/50'}`}
+                            >
+                                <Gauge size={32} className={`mb-4 ${selectedMode === 'slipstream' ? 'text-cyan-500' : 'text-slate-300 dark:text-slate-600'}`} />
+                                <h4 className={`text-xl font-black mb-1 ${selectedMode === 'slipstream' ? 'text-cyan-700 dark:text-cyan-400' : 'text-slate-800 dark:text-white'}`}>Slipstream</h4>
+                                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Self-paced cyber race. Students pull the deck locally and race to the finish line.</p>
                             </button>
                         </div>
                     </section>
