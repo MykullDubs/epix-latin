@@ -2,9 +2,11 @@
 import React, { useMemo } from 'react';
 import { 
     Users, Zap, TrendingUp, AlertTriangle, Play, FileText, 
-    Activity, ChevronRight, Shield, Target, Flame, Calendar,
-    CheckCircle2 // 🔥 ADDED MISSING IMPORT
+    Activity, ChevronRight, Shield, Target, Calendar,
+    CheckCircle2 
 } from 'lucide-react';
+// 🔥 IMPORT THE NEW FEED COMPONENT
+import LiveActivityFeed from './LiveActivityFeed';
 
 export default function CommandCenter({ 
     classes = [], 
@@ -67,7 +69,6 @@ export default function CommandCenter({
         const classLogs = logs.filter((l: any) => l.classId === activeClass?.id);
         
         return days.map((day, index) => {
-            // 🔥 FIXED: Added explicit types to '_' and 'i' to satisfy TS7006
             const dayXp = classLogs.filter((_: any, i: number) => i % 5 === index)
                                   .reduce((acc: number, l: any) => acc + l.xp, 0);
             const height = Math.min(100, (dayXp / 2000) * 100);
@@ -78,6 +79,7 @@ export default function CommandCenter({
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-y-auto custom-scrollbar px-4 md:px-8 pt-6 pb-32 transition-colors duration-300">
             
+            {/* COHORT SELECTOR HEADER */}
             <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div>
                     <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter mb-2">
@@ -104,6 +106,7 @@ export default function CommandCenter({
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
+                {/* 1. TOP ROW: KPI TILES */}
                 <div className="lg:col-span-3 grid grid-cols-3 gap-4">
                     <div className="bg-white dark:bg-slate-900 p-5 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center md:items-start transition-all">
                         <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 rounded-xl flex items-center justify-center mb-3"><Users size={20} /></div>
@@ -124,6 +127,7 @@ export default function CommandCenter({
                     </div>
                 </div>
 
+                {/* 2. MIDDLE LEFT: TRIAGE PANEL */}
                 <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-all">
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2">
@@ -148,6 +152,7 @@ export default function CommandCenter({
                     </div>
                 </div>
 
+                {/* 3. MIDDLE RIGHT: RAPID OPS */}
                 <div className="lg:col-span-1 bg-slate-900 dark:bg-black p-6 md:p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden flex flex-col justify-between border border-slate-800">
                     <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-[60px] pointer-events-none" />
                     <div className="relative z-10 mb-8">
@@ -174,6 +179,7 @@ export default function CommandCenter({
                     </div>
                 </div>
 
+                {/* 4. BOTTOM LEFT: VELOCITY CHART */}
                 <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-all">
                     <h2 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2 mb-8">
                         <Activity size={16} className="text-emerald-500" /> Fleet Velocity
@@ -191,25 +197,19 @@ export default function CommandCenter({
                     </div>
                 </div>
 
-                <div className="lg:col-span-1 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col transition-all">
-                    <h2 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2 mb-6">
-                        <Flame size={16} className="text-orange-500 animate-pulse" /> Live Pulse
-                    </h2>
-                    <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-                        {logs.slice(0, 8).map((log: any, i: number) => (
-                            <div key={i} className="flex items-center gap-3 animate-in slide-in-from-right-4 duration-500" style={{ animationDelay: `${i * 100}ms` }}>
-                                <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 text-[10px] font-black text-indigo-500">
-                                    {log.studentEmail?.charAt(0).toUpperCase()}
-                                </div>
-                                <div className="min-w-0">
-                                    <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300 leading-tight truncate">
-                                        <span className="font-black text-slate-900 dark:text-white">{log.studentName || log.studentEmail.split('@')[0]}</span> mastered <span className="text-indigo-600 dark:text-indigo-400">{log.itemTitle}</span>
-                                    </p>
-                                    <span className="text-[9px] font-black text-emerald-500 uppercase">+{log.xp} XP</span>
-                                </div>
-                            </div>
-                        ))}
+                {/* 5. BOTTOM RIGHT: LIVE ACTIVITY FEED */}
+                <div className="lg:col-span-1 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col transition-all min-h-[400px]">
+                    {/* 🔥 THE INTEGRATED FEED COMPONENT */}
+                    <div className="flex-1 overflow-hidden">
+                        <LiveActivityFeed />
                     </div>
+                    
+                    <button 
+                        onClick={() => setActiveTab('logs')} 
+                        className="mt-6 w-full py-3 bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border border-slate-100 dark:border-slate-700/50 active:scale-95 shrink-0"
+                    >
+                        View Full Mission Logs
+                    </button>
                 </div>
 
             </div>
