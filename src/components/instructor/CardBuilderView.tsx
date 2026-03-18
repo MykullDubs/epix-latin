@@ -234,36 +234,79 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
         } 
     };
 
-    // (Bulk Import logic kept exactly as you had it)
-    const handleBulkImport = async () => {
-        try {
-            const cards = JSON.parse(jsonInput);
-            if (!Array.isArray(cards)) throw new Error("JSON must be an array");
-            let finalDeckId = bulkExistingId;
-            let finalDeckTitle = validDecks[bulkExistingId]?.title || 'Custom Deck';
-            if (bulkDestination === 'new') {
-                if (!bulkNewTitle.trim()) return alert("Please name your new deck.");
-                finalDeckId = `deck_${Date.now()}`;
-                finalDeckTitle = bulkNewTitle.trim();
-                await registerNewDeck(finalDeckId, finalDeckTitle);
-            }
-            setLocalOptimisticDecks((prev: any) => ({ ...prev, [finalDeckId]: prev[finalDeckId] || validDecks[finalDeckId] || { title: finalDeckTitle, cards: [] } }));
-            setIsImporting(true);
-            setImportProgress({ current: 0, total: cards.length });
-            let successCount = 0;
-            for (let i = 0; i < cards.length; i++) {
-                const card = cards[i];
-                if (!card.front || !card.back) continue; 
-                const cardData = { front: card.front, back: card.back, type: card.type || 'noun', deckId: finalDeckId, deckTitle: finalDeckTitle, ipa: card.ipa || "/.../", mastery: 0, morphology: card.morphology || [{ part: card.front, meaning: "Root", type: "root" }], usage: { sentence: card.sentence || "-", translation: card.translation || "-" }, grammar_tags: card.grammarTags || ["Imported"] };
-                try { await onSaveCard(cardData); successCount++; setImportProgress({ current: successCount, total: cards.length });
-                    setLocalOptimisticDecks((prev: any) => { const existingDeck = prev[finalDeckId]; return { ...prev, [finalDeckId]: { ...existingDeck, cards: [...existingDeck.cards, { id: `temp_${Date.now()}_${i}`, ...cardData }] } }; });
-                    await new Promise(resolve => setTimeout(resolve, 250));
-                } catch (err) { console.error(`Failed to save: ${card.front}`, err); }
-            }
-            setToastMsg(`Successfully forged ${successCount} targets!`); setJsonInput('');
-            if (bulkDestination === 'new') { setBulkNewTitle(''); setBulkDestination('existing'); setBulkExistingId(finalDeckId); setFormData(prev => ({ ...prev, deckId: finalDeckId })); }
-        } catch (e: any) { alert("Invalid JSON format."); } finally { setIsImporting(false); setImportProgress(null); }
-    };
+   const handleBulkImport = async () => {
+    try {
+        const importedCards = JSON.parse(jsonInput);
+        if (!Array.isArray(importedCards)) throw new Error("JSON must be an array");
+
+        let finalDeckId = bulkExistingId;
+        let finalDeckTitle = validDecks[bulkExistingId]?.title || 'Custom Deck';
+        
+        if (bulkDestination === 'new') {
+            if (!bulkNewTitle.trim()) return alert("Please name your new deck.");
+            finalDeckId = `deck_${Date.now()}`;
+            finalDeckTitle = bulkNewTitle.trim();
+            await registerNewDeck(finalDeckId, finalDeckTitle);
+        }
+
+        setIsImporting(true);
+        setImportProgress({ current: 0, total: importedCards.length });
+
+        let successCount = 0;
+        
+        for (let i = 0; i < importedCards.length; i++) {
+            const card = importedCards[i];
+            if (!card.front || !card.back) continue; 
+            
+            const cardData = {
+                front: card.front,
+                back: card.back,
+                type: card.type || 'noun',
+                deckId: finalDeckId,
+                deckTitle: finalDeckTitle,
+                ipa: card.ipa || "/.../",
+                mastery: 0,
+                morphology: card.morphology || [{ part: card.front, meaning: "Root", type: "root" }],
+                // 🔥 THE FIX: Tell the importer to look for conjugations in the JSON!
+                conjugations: card.conjugations || null, 
+                usage: { 
+                    sentence: card.usage?.sentence || card.sentence || "-", 
+                    translation: card.usage?.translation || card.translation || "-" 
+                },
+                grammar_tags: card.grammarTags || ["Imported"]
+            };
+            
+            try {
+                await onSaveCard(cardData); 
+                successCount++;
+                setImportProgress({ current: successCount, total: importedCards.length });
+                
+                // Keep UI updated optimistically
+                setLocalOptimisticDecks((prev: any) => {
+                    const existingDeck = prev[finalDeckId] || validDecks[finalDeckId] || { title: finalDeckTitle, cards: [] };
+                    return { ...prev, [finalDeckId]: { ...existingDeck, cards: [...existingDeck.cards, { id: `temp_${Date.now()}_${i}`, ...cardData }] } };
+                });
+
+                // Small delay to prevent Firebase rate limiting on bulk
+                await new Promise(resolve => setTimeout(resolve, 150));
+            } catch (err) { console.error(`Failed to save: ${card.front}`, err); }
+        }
+
+        setToastMsg(`Successfully forged ${successCount} targets!`);
+        setJsonInput('');
+        if (bulkDestination === 'new') {
+            setBulkNewTitle('');
+            setBulkDestination('existing');
+            setBulkExistingId(finalDeckId);
+            setFormData(prev => ({ ...prev, deckId: finalDeckId }));
+        }
+    } catch (e: any) {
+        alert("Invalid JSON format. Check for missing commas or brackets.");
+    } finally {
+        setIsImporting(false);
+        setImportProgress(null);
+    }
+  };
     
     useEffect(() => { if (editingId && !currentDeckCards.some((c: any) => c.id === editingId)) { handleClear(); } }, [currentDeckCards, editingId]);
 
