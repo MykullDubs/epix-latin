@@ -6,6 +6,26 @@
     
 <meta id="theme-color-meta" name="theme-color" content="#f8fafc" />
     <meta name="color-scheme" content="light dark" />
+    <script>
+      (function() {
+        try {
+          var theme = localStorage.getItem('magister-theme') || 'system';
+          var isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+            document.body.style.backgroundColor = '#020617'; 
+            var meta = document.getElementById('theme-color-meta');
+            if (meta) meta.setAttribute('content', '#020617');
+          } else {
+            document.documentElement.classList.remove('dark');
+            document.body.style.backgroundColor = '#f8fafc';
+            var meta = document.getElementById('theme-color-meta');
+            if (meta) meta.setAttribute('content', '#f8fafc');
+          }
+        } catch (e) {}
+      })();
+    </script>
     <meta name="description" content="Master your curriculum with Magister OS" />
     
     <link rel="icon" href="/favicon.ico" />
