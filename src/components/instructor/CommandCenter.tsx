@@ -2,7 +2,8 @@
 import React, { useMemo } from 'react';
 import { 
     Users, Zap, TrendingUp, AlertTriangle, Play, FileText, 
-    Activity, ChevronRight, Shield, Target, Flame, Calendar
+    Activity, ChevronRight, Shield, Target, Flame, Calendar,
+    CheckCircle2 // 🔥 ADDED MISSING IMPORT
 } from 'lucide-react';
 
 export default function CommandCenter({ 
@@ -26,7 +27,7 @@ export default function CommandCenter({
         return {
             activeStudents: activeClass?.studentEmails?.length || 0,
             weeklyXp: weeklyXp,
-            avgLevel: Math.floor(weeklyXp / 5000) + 1 // Dynamic level abstraction
+            avgLevel: Math.floor(weeklyXp / 5000) + 1 
         };
     }, [activeClass, logs]);
 
@@ -36,21 +37,19 @@ export default function CommandCenter({
         const now = Date.now();
         const classLogs = logs.filter((l: any) => l.classId === activeClass?.id);
 
-        // Alert: Low Performance
         const lowScores = classLogs.filter((l: any) => l.scorePct !== undefined && l.scorePct < 70);
         if (lowScores.length > 0) {
             alerts.push({ 
                 id: 'perf', type: 'warning', 
-                text: `${lowScores.length} recent scores below 70% threshold`, 
+                text: `${lowScores.length} recent scores below 70%`, 
                 time: 'Recent' 
             });
         }
 
-        // Alert: Inactivity
         activeClass?.studentEmails?.forEach((email: string) => {
             const studentLogs = classLogs.filter((l: any) => l.studentEmail === email);
             const lastLog = studentLogs[0]?.timestamp || 0;
-            if (now - lastLog > 3 * 24 * 60 * 60 * 1000) { // 3 days
+            if (now - lastLog > 3 * 24 * 60 * 60 * 1000) { 
                 alerts.push({ 
                     id: `inactive-${email}`, type: 'quest', 
                     text: `${email.split('@')[0]} inactive for 3+ days`, 
@@ -59,7 +58,7 @@ export default function CommandCenter({
             }
         });
 
-        return alerts.slice(0, 3); // Keep Bento clean
+        return alerts.slice(0, 3);
     }, [activeClass, logs]);
 
     // 4. Calculate Fleet Velocity (Last 5 Days)
@@ -68,8 +67,8 @@ export default function CommandCenter({
         const classLogs = logs.filter((l: any) => l.classId === activeClass?.id);
         
         return days.map((day, index) => {
-            // Very basic day mapping logic for demo
-            const dayXp = classLogs.filter((_, i) => i % 5 === index)
+            // 🔥 FIXED: Added explicit types to '_' and 'i' to satisfy TS7006
+            const dayXp = classLogs.filter((_: any, i: number) => i % 5 === index)
                                   .reduce((acc: number, l: any) => acc + l.xp, 0);
             const height = Math.min(100, (dayXp / 2000) * 100);
             return { day, xp: dayXp, height: `${height}%` };
@@ -79,7 +78,6 @@ export default function CommandCenter({
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-y-auto custom-scrollbar px-4 md:px-8 pt-6 pb-32 transition-colors duration-300">
             
-            {/* HERO HEADER WITH COHORT SELECTOR */}
             <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div>
                     <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter mb-2">
@@ -104,10 +102,8 @@ export default function CommandCenter({
                 </div>
             </div>
 
-            {/* BENTO GRID */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
-                {/* QUICK STATS */}
                 <div className="lg:col-span-3 grid grid-cols-3 gap-4">
                     <div className="bg-white dark:bg-slate-900 p-5 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center md:items-start transition-all">
                         <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 rounded-xl flex items-center justify-center mb-3"><Users size={20} /></div>
@@ -128,7 +124,6 @@ export default function CommandCenter({
                     </div>
                 </div>
 
-                {/* TRIAGE */}
                 <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-all">
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2">
@@ -153,7 +148,6 @@ export default function CommandCenter({
                     </div>
                 </div>
 
-                {/* OPERATIONS TILE */}
                 <div className="lg:col-span-1 bg-slate-900 dark:bg-black p-6 md:p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden flex flex-col justify-between border border-slate-800">
                     <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-[60px] pointer-events-none" />
                     <div className="relative z-10 mb-8">
@@ -180,7 +174,6 @@ export default function CommandCenter({
                     </div>
                 </div>
 
-                {/* VELOCITY CHART */}
                 <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-all">
                     <h2 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2 mb-8">
                         <Activity size={16} className="text-emerald-500" /> Fleet Velocity
@@ -198,7 +191,6 @@ export default function CommandCenter({
                     </div>
                 </div>
 
-                {/* LIVE PULSE (Vertical ticker) */}
                 <div className="lg:col-span-1 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col transition-all">
                     <h2 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2 mb-6">
                         <Flame size={16} className="text-orange-500 animate-pulse" /> Live Pulse
