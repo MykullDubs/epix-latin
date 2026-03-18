@@ -36,6 +36,7 @@ export default function InstructorDashboard({
   onRenameClass,
   onUpdateClassDescription,
   onAddStudent,
+  onRemoveStudent,   // 🔥 1. PROP CAUGHT FROM APP.TSX
   onStartPresentation, 
   onStartVocabGame,
   onStartConnectFour, 
@@ -217,6 +218,7 @@ export default function InstructorDashboard({
                   onRenameClass={onRenameClass} 
                   onUpdateClassDescription={onUpdateClassDescription} 
                   onAddStudent={onAddStudent} 
+                  onRemoveStudent={onRemoveStudent} // 🔥 2. SUCCESSFULLY PASSED DOWN
                   onStartPresentation={onStartPresentation} 
                   onStartVocabGame={onStartVocabGame}
                   onStartConnectFour={onStartConnectFour} 
@@ -304,19 +306,19 @@ export default function InstructorDashboard({
            ) : (
              <div className="h-full overflow-y-auto custom-scrollbar animate-in fade-in duration-700">
                 {activeTab === 'dashboard' && (
-    <CommandCenter 
-        classes={userData?.classes || []}
-        selectedClassId={dashCohortId}
-        setSelectedClassId={setDashCohortId}
-        logs={activityLogs} // Passed from App.tsx/Hook
-        lessons={lessons} 
-        allDecks={allDecks} 
-        curriculums={curriculums}
-        onAssign={onAssign}
-        onLaunchLive={() => setIsLiveModalOpen(true)} 
-        setActiveTab={setActiveTab} 
-    />
-)}
+                  <CommandCenter 
+                      classes={userData?.classes || []}
+                      selectedClassId={dashCohortId}
+                      setSelectedClassId={setDashCohortId}
+                      logs={activityLogs} // Passed from App.tsx/Hook
+                      lessons={lessons} 
+                      allDecks={allDecks} 
+                      curriculums={curriculums}
+                      onAssign={onAssign}
+                      onLaunchLive={() => setIsLiveModalOpen(true)} 
+                      setActiveTab={setActiveTab} 
+                  />
+                )}
                 
                 {activeTab === 'analytics' && <AnalyticsDashboard classes={userData?.classes} />}
                 {activeTab === 'inbox' && <InstructorInbox />}
@@ -331,11 +333,11 @@ export default function InstructorDashboard({
                decks={allDecks}
                onDeploy={(config: any) => {
                    setIsLiveModalOpen(false);
-                   // Route to the appropriate game presentation
+                   // Parameter order correctly matched to App.tsx signatures: (deckId, classId)
                    if (config.mode === 'connect_four') {
-                       if (onStartConnectFour) onStartConnectFour(config.classId, config.contentId);
+                       if (onStartConnectFour) onStartConnectFour(config.contentId, config.classId);
                    } else if (config.mode === 'trivia') {
-                       if (onStartVocabGame) onStartVocabGame(config.classId, config.contentId);
+                       if (onStartVocabGame) onStartVocabGame(config.contentId, config.classId);
                    }
                }}
            />
