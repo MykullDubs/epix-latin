@@ -14,7 +14,7 @@ export default defineConfig({
         short_name: 'Magister',
         description: 'Master your curriculum with Magister OS',
         theme_color: '#0f172a',
-        background_color: '#f8fafc',
+        background_color: '#020617',
         display: "standalone",
         scope: "/",
         start_url: "/",
