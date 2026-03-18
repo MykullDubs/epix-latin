@@ -141,7 +141,6 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
         setCurrentIndex(0);
         const qPayload = { ...quizQuestions[0], startTime: Date.now(), timeLimit: gameSettings.qTime * 1000 };
         
-        // 🔥 FORCE UPDATE TO FIREBASE TO TRIGGER STUDENT DEVICES
         const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
         await updateDoc(sessionRef, { 
             quizState: 'active',
@@ -157,16 +156,24 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
         scoresRef.current = {};
     };
 
-    const roundScores = useMemo(() => {
-        const rp = liveState?.roundPoints || {};
-        return Object.entries(rp)
-            .filter(([_, pts]: any) => pts > 0)
-            .map(([email, pts]: any) => {
-                const s = activeClass?.students?.find((st: any) => st.email.replace(/\./g, ',') === email || st.email === email);
-                return { name: s?.name || email.split('@')[0], points: pts };
-            })
-            .sort((a, b) => b.points - a.points);
-    }, [liveState?.roundPoints, activeClass?.students]);
+    // 🔥 THE NEW LIVE LEADERBOARD LOGIC
+    // Sorts students by total score dynamically and calculates round gains
+    const liveLeaderboard = useMemo(() => {
+        const scores = liveState?.finalScores || scoresRef.current || {};
+        const roundPts = liveState?.roundPoints || {};
+        const joinedEmails = Object.keys(liveState?.joined || {});
+        
+        return joinedEmails.map(email => {
+            const s = activeClass?.students?.find((st: any) => st.email.replace(/\./g, ',') === email || st.email === email);
+            return {
+                id: email,
+                name: s?.name || email.split('@')[0],
+                score: scores[email] || 0,
+                roundPoints: roundPts[email] || 0,
+                initial: (s?.name?.[0] || email[0]).toUpperCase()
+            };
+        }).sort((a, b) => b.score - a.score);
+    }, [liveState?.finalScores, liveState?.roundPoints, liveState?.joined, activeClass?.students]);
 
     if (isBooting) {
         return (
@@ -196,9 +203,9 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                 <Trophy size={100} className="text-yellow-400 mx-auto mb-8 animate-bounce-slow drop-shadow-[0_0_50px_rgba(250,204,21,0.5)]" />
                 <h1 className="text-8xl font-black uppercase tracking-tighter italic mb-20">Protocol Over</h1>
                 <div className="flex justify-center items-end gap-6 mb-20 h-72 border-b-2 border-slate-900 w-full max-w-4xl">
-                    {sortedScores[1] && <div className="flex flex-col items-center w-1/3"><div className="text-xl font-black mb-4 text-slate-400">{sortedScores[1].name}</div><div className="w-full h-32 bg-slate-900 rounded-t-3xl pt-8 text-center"><span className="text-3xl font-black">{sortedScores[1].score}</span></div></div>}
-                    {sortedScores[0] && <div className="flex flex-col items-center w-1/3"><Crown className="text-yellow-400 mb-2"/><div className="text-3xl font-black mb-4 text-yellow-400">{sortedScores[0].name}</div><div className="w-full h-48 bg-slate-900 rounded-t-[3rem] pt-12 text-center border-t-4 border-yellow-400"><span className="text-5xl font-black">{sortedScores[0].score}</span></div></div>}
-                    {sortedScores[2] && <div className="flex flex-col items-center w-1/3"><div className="text-xl font-black mb-4 text-amber-700">{sortedScores[2].name}</div><div className="w-full h-24 bg-slate-900 rounded-t-3xl pt-6 text-center"><span className="text-3xl font-black">{sortedScores[2].score}</span></div></div>}
+                    {sortedScores[1] && <div className="flex flex-col items-center w-1/3 animate-in slide-in-from-bottom-8 duration-700 delay-100"><div className="text-xl font-black mb-4 text-slate-400">{sortedScores[1].name}</div><div className="w-full h-32 bg-slate-900 rounded-t-3xl pt-8 text-center border-t-4 border-slate-500"><span className="text-3xl font-black">{sortedScores[1].score}</span></div></div>}
+                    {sortedScores[0] && <div className="flex flex-col items-center w-1/3 animate-in slide-in-from-bottom-12 duration-700 delay-300 relative z-10"><Crown className="text-yellow-400 mb-2"/><div className="text-3xl font-black mb-4 text-yellow-400">{sortedScores[0].name}</div><div className="w-full h-48 bg-slate-900 rounded-t-[3rem] pt-12 text-center border-t-4 border-yellow-400 shadow-[0_-20px_50px_rgba(250,204,21,0.1)]"><span className="text-5xl font-black">{sortedScores[0].score}</span></div></div>}
+                    {sortedScores[2] && <div className="flex flex-col items-center w-1/3 animate-in slide-in-from-bottom-4 duration-700"><div className="text-xl font-black mb-4 text-amber-700">{sortedScores[2].name}</div><div className="w-full h-24 bg-slate-900 rounded-t-3xl pt-6 text-center border-t-4 border-amber-700"><span className="text-3xl font-black">{sortedScores[2].score}</span></div></div>}
                 </div>
                 <button onClick={onExit} className="bg-white text-black px-12 py-5 rounded-full font-black text-xl hover:scale-105 active:scale-95 transition-all">Close Session</button>
             </div>
@@ -206,7 +213,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
     }
 
     // ========================================================================
-    //  RENDER: LOBBY (REPAIRED CLICK LOGIC)
+    //  RENDER: LOBBY
     // ========================================================================
     if (!liveState?.quizState || liveState?.quizState === 'waiting') {
         const joinedStudents = liveState?.joined || {};
@@ -214,10 +221,8 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
 
         return (
             <div className="h-full bg-black text-white flex flex-col relative overflow-hidden font-sans">
-                {/* Background Decor */}
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/30 via-black to-black pointer-events-none z-0" />
                 
-                {/* Header */}
                 <header className="flex items-center justify-between z-20 p-10 shrink-0">
                     <div className="flex items-center gap-6">
                         <div className="w-16 h-16 bg-indigo-600 rounded-[1.5rem] flex items-center justify-center shadow-2xl animate-pulse"><Zap size={32} fill="white" /></div>
@@ -228,10 +233,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                     </div>
                 </header>
 
-                {/* Main Lobby Layout */}
                 <main className="flex-1 grid grid-cols-12 gap-8 px-10 pb-10 z-10 overflow-hidden">
-                    
-                    {/* LEFT: Fleet Radar */}
                     <div className="col-span-8 bg-slate-900/30 border-2 border-slate-800/50 rounded-[3.5rem] flex flex-col backdrop-blur-xl relative overflow-hidden">
                         <div className="p-10 flex items-center justify-between border-b border-slate-800/50 shrink-0">
                             <h1 className="text-5xl font-black uppercase tracking-tighter italic">Arena Lobby</h1>
@@ -255,7 +257,6 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                         </div>
                     </div>
 
-                    {/* RIGHT: High-Response Launch Pad */}
                     <div className="col-span-4 flex flex-col">
                         <div className="flex-1 bg-slate-900/40 border-2 border-slate-800 rounded-[3.5rem] p-10 flex flex-col items-center justify-center text-center shadow-2xl relative z-30">
                             <Target size={60} className="text-indigo-500/30 mb-6" />
@@ -268,7 +269,6 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                                 >
                                     <Zap size={28} fill="black" /> Auto-Pilot
                                 </button>
-
                                 <button 
                                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); startRun(false); }}
                                     className="w-full py-6 bg-slate-800 text-white rounded-[2rem] font-black text-xl uppercase tracking-widest hover:bg-slate-700 active:scale-95 transition-all border-2 border-slate-700 cursor-pointer relative z-50 flex items-center justify-center gap-3"
@@ -276,10 +276,6 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                                     <Hand size={24} /> Manual Mode
                                 </button>
                             </div>
-
-                            {joinedCount === 0 && (
-                                <p className="mt-8 text-xs font-bold text-rose-500 uppercase tracking-widest animate-pulse">Awaiting first signal...</p>
-                            )}
                         </div>
                     </div>
                 </main>
@@ -309,23 +305,25 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
             </div>
 
             <main className="flex-1 grid grid-cols-12 gap-6 p-8 relative z-10 overflow-hidden">
+                {/* 1. LEFT RAIL: Fleet Manifest */}
                 <div className="col-span-3 bg-slate-900/40 border-2 border-slate-800/60 rounded-[3rem] p-8 flex flex-col backdrop-blur-md">
                     <h2 className="text-[10px] font-black uppercase tracking-[0.4em] mb-8 opacity-50 flex items-center gap-2"><Activity size={16}/> Fleet Manifest</h2>
-                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
                         {activeClass?.students?.map((s: any, i: number) => {
                             const safeEmail = s.email.replace(/\./g, ',');
                             if (!joinedStudents[safeEmail]) return null;
                             const hasAnswered = !!answers[safeEmail];
                             return (
-                                <div key={i} className={`flex items-center gap-4 p-3 rounded-2xl border transition-all ${hasAnswered ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-slate-800/30 border-slate-800'}`}>
-                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm ${hasAnswered ? 'bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.5)] animate-pulse' : 'bg-slate-800 text-slate-500'}`}>{(s.name?.[0] || s.email[0]).toUpperCase()}</div>
-                                    <div className="flex-1 min-w-0"><p className={`text-[11px] font-black uppercase truncate ${hasAnswered ? 'text-emerald-400' : 'text-slate-400'}`}>{s.name || s.email.split('@')[0]}</p></div>
+                                <div key={i} className={`flex items-center gap-4 p-3 rounded-2xl border transition-all duration-300 ${hasAnswered ? 'bg-emerald-500/10 border-emerald-500/30 shadow-[inset_0_0_20px_rgba(16,185,129,0.1)]' : 'bg-slate-800/30 border-slate-800'}`}>
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm transition-all duration-300 ${hasAnswered ? 'bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.5)] scale-110' : 'bg-slate-800 text-slate-500'}`}>{(s.name?.[0] || s.email[0]).toUpperCase()}</div>
+                                    <div className="flex-1 min-w-0"><p className={`text-[11px] font-black uppercase truncate transition-colors duration-300 ${hasAnswered ? 'text-emerald-400' : 'text-slate-400'}`}>{s.name || s.email.split('@')[0]}</p></div>
                                 </div>
                             );
                         })}
                     </div>
                 </div>
 
+                {/* 2. CENTER STAGE: The Target */}
                 <div className="col-span-6 flex flex-col items-center justify-center text-center px-12 relative">
                     <span className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.4em] bg-indigo-500/10 px-4 py-2 rounded-full border border-indigo-500/20 mb-12">Target {currentIndex + 1} / {quizQuestions.length}</span>
                     <h2 className="text-8xl md:text-9xl font-black tracking-tighter uppercase italic drop-shadow-[0_0_30px_rgba(255,255,255,0.1)] mb-4">{currentQ.question}</h2>
@@ -334,7 +332,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                     {liveState?.quizState === 'active' && (
                         <div className="mt-16 w-full max-w-md">
                             <div className="h-4 w-full bg-slate-800 rounded-full overflow-hidden border border-slate-700 shadow-inner">
-                                <div className="h-full bg-indigo-500 transition-all duration-500" style={{ width: `${progressPct}%` }} />
+                                <div className="h-full bg-indigo-500 transition-all duration-500 shadow-[0_0_15px_rgba(99,102,241,0.6)]" style={{ width: `${progressPct}%` }} />
                             </div>
                             <div className="flex justify-between mt-4">
                                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{answerCount} Responses</span>
@@ -354,18 +352,48 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                     )}
                 </div>
 
-                <div className="col-span-3 bg-slate-900/40 border-2 border-slate-800/60 rounded-[3rem] p-8 flex flex-col backdrop-blur-md">
-                    <h2 className="text-[10px] font-black uppercase tracking-[0.4em] mb-8 opacity-50 flex items-center gap-2"><Flame size={16} className="text-orange-500"/> Live XP Pulse</h2>
-                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4">
-                        {roundScores.map((log: any, i: number) => (
-                            <div key={i} className="flex items-center justify-between p-4 bg-slate-800/20 border border-slate-800 rounded-2xl animate-in slide-in-from-right-4">
-                                <span className="text-[11px] font-black uppercase text-slate-300">{log.name}</span>
-                                <span className="text-[10px] font-black text-emerald-400">+{log.points} XP</span>
+                {/* 3. RIGHT RAIL: Live Standings */}
+                <div className="col-span-3 bg-slate-900/40 border-2 border-slate-800/60 rounded-[3rem] p-8 flex flex-col backdrop-blur-md relative overflow-hidden">
+                    <h2 className="text-[10px] font-black uppercase tracking-[0.4em] mb-6 opacity-50 flex items-center gap-2">
+                        <Trophy size={16} className="text-yellow-500" /> Live Standings
+                    </h2>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2">
+                        {liveLeaderboard.length > 0 ? liveLeaderboard.map((player: any, i: number) => (
+                            <div 
+                                key={player.id} 
+                                className="flex items-center justify-between p-3 bg-slate-800/40 border border-slate-700/50 rounded-2xl relative overflow-hidden group transition-all duration-500"
+                            >
+                                <div className="flex items-center gap-3">
+                                    {/* Gold, Silver, Bronze badges */}
+                                    <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-[11px] font-black shrink-0 ${
+                                        i === 0 ? 'bg-yellow-500 text-yellow-900 shadow-[0_0_15px_rgba(234,179,8,0.4)] border-2 border-yellow-300' : 
+                                        i === 1 ? 'bg-slate-300 text-slate-800 border-2 border-white' : 
+                                        i === 2 ? 'bg-amber-700 text-amber-100 border-2 border-amber-500' : 
+                                        'bg-slate-800 text-slate-500'
+                                    }`}>
+                                        {i + 1}
+                                    </div>
+                                    <span className="text-[11px] font-black uppercase text-slate-200 truncate max-w-[100px]">{player.name}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-right">
+                                    {/* Round points slide up and fade out only during the reveal phase */}
+                                    {player.roundPoints > 0 && liveState?.quizState === 'revealed' && (
+                                        <span className="text-[9px] font-black text-emerald-400 animate-in slide-in-from-bottom-2 fade-in duration-500">
+                                            +{player.roundPoints}
+                                        </span>
+                                    )}
+                                    <span className="text-xs font-black text-indigo-400 tabular-nums">{player.score}</span>
+                                </div>
                             </div>
-                        ))}
+                        )) : (
+                            <div className="h-full flex flex-col items-center justify-center opacity-30">
+                                <Activity size={24} className="mb-2 text-slate-400" />
+                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Awaiting Scores</p>
+                            </div>
+                        )}
                     </div>
                     {isAutoPilot && (
-                        <div className="mt-8 pt-8 border-t border-slate-800 text-center">
+                        <div className="mt-8 pt-8 border-t border-slate-800 text-center shrink-0">
                             <div className={`text-6xl font-black tabular-nums transition-all ${timeLeft <= 5 && liveState?.quizState !== 'revealed' ? 'text-rose-500 animate-pulse scale-110' : 'text-slate-700'}`}>{timeLeft}s</div>
                             <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">{liveState?.quizState === 'revealed' ? 'Next Round' : 'Remaining'}</span>
                         </div>
