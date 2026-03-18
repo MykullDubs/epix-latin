@@ -3,7 +3,7 @@ import React from 'react';
 import { Home, Compass, Layers, User } from 'lucide-react';
 
 // ============================================================================
-//  STUDENT NAVIGATION BAR (Floating Pill Edition)
+//  STUDENT NAVIGATION BAR (Frosted Pill Edition)
 // ============================================================================
 export default function StudentNavBar({ activeTab, setActiveTab, activeOrg }: any) {
   const tabs = [
@@ -17,7 +17,7 @@ export default function StudentNavBar({ activeTab, setActiveTab, activeOrg }: an
   const themeColor = activeOrg?.themeColor || '#4f46e5'; 
 
   return (
-    <div className="absolute bottom-0 left-0 w-full bg-white border-t border-slate-200 px-6 py-4 pb-8 z-40 rounded-t-[2rem] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+    <div className="absolute bottom-0 left-0 w-full bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800/60 px-6 py-4 pb-8 z-40 rounded-t-[2rem] shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.4)] transition-colors duration-300">
       <div className="flex justify-between items-center max-w-sm mx-auto">
         {tabs.map(tab => {
           const isActive = activeTab === tab.id;
@@ -25,8 +25,10 @@ export default function StudentNavBar({ activeTab, setActiveTab, activeOrg }: an
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className="flex flex-col items-center gap-1 transition-all duration-300 relative"
-              style={{ color: isActive ? themeColor : '#94a3b8' }} 
+              className={`flex flex-col items-center gap-1 transition-all duration-300 relative ${
+                isActive ? '' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
+              }`}
+              style={isActive ? { color: themeColor } : {}} 
             >
               <div className={`transition-transform duration-300 ${isActive ? '-translate-y-2 scale-110' : 'hover:scale-110'}`}>
                 {tab.icon}
