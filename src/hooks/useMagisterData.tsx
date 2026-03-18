@@ -4,7 +4,8 @@ import { auth, db, appId } from '../config/firebase';
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { 
   doc, onSnapshot, collection, addDoc, setDoc, updateDoc, 
-  deleteDoc, query, where, collectionGroup, increment, arrayUnion, arrayRemove 
+  deleteDoc, query, where, collectionGroup, increment, arrayUnion, arrayRemove,
+  orderBy, limit // 🔥 Added for Live Pulse
 } from "firebase/firestore";
 
 export function useMagisterData() {
@@ -17,12 +18,15 @@ export function useMagisterData() {
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [instructorClasses, setInstructorClasses] = useState<any[]>([]); 
   
-  // 🔥 NEW: Custom Curriculums State
+  // Custom Curriculums State
   const [customCurriculums, setCustomCurriculums] = useState<any[]>([]);
   
   // Split the streams to prevent data collisions
   const [privateDecks, setPrivateDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
   const [publishedDecks, setPublishedDecks] = useState<any[]>([]);
+
+  // 🔥 NEW: State for the Bento Box Live Pulse
+  const [activityLogs, setActivityLogs] = useState<any[]>([]);
 
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
@@ -77,15 +81,22 @@ export function useMagisterData() {
         setPublishedDecks(snap.docs.map(d => d.data()));
       });
 
-      // 🔥 7. THE PATHWAY STREAM: Listen for custom curriculums
+      // 7. THE PATHWAY STREAM: Listen for custom curriculums
       const unsubCurriculums = onSnapshot(collectionGroup(db, 'custom_curriculums'), (snap) => {
         const fetchedCurriculums = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         setCustomCurriculums(fetchedCurriculums);
       });
 
+      // 🔥 8. THE ACTIVITY STREAM: Listen for the Live Pulse (Bento Box Feed)
+      const qLogs = query(collection(db, 'artifacts', appId, 'activity_logs'), orderBy('timestamp', 'desc'), limit(20));
+      const unsubLogs = onSnapshot(qLogs, (snap) => {
+          setActivityLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+
       return () => { 
           unsubAuth(); unsubProfile(); unsubLessons(); unsubCards(); 
-          unsubClasses(); unsubInstructorClasses(); unsubPublished(); unsubCurriculums();
+          unsubClasses(); unsubInstructorClasses(); unsubPublished(); 
+          unsubCurriculums(); unsubLogs();
       };
     }
     return () => unsubAuth();
@@ -195,6 +206,13 @@ export function useMagisterData() {
       });
     },
 
+    // 🔥 THE FIX: Integrated the updateCard action
+    updateCard: async (cardId: string, cardData: any) => {
+      if (!user) return;
+      const cardRef = doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId);
+      await updateDoc(cardRef, cardData);
+    },
+
     publishDeck: async (deckId: string, deckTitle: string, cards: any[], visibility: 'private' | 'restricted' | 'public', allowedClasses: string[] = []) => {
       if (!user) return;
       const deckRef = doc(db, 'artifacts', appId, 'published_decks', deckId);
@@ -210,7 +228,6 @@ export function useMagisterData() {
       }
     },
 
-    // 🔥 NEW: SAVE THE CURRICULUM TO FIRESTORE
     saveCurriculum: async (curriculumData: any) => {
       if (!user) return;
       const currId = curriculumData.id || `curriculum_${Date.now()}`;
@@ -267,6 +284,10 @@ export function useMagisterData() {
 
   const allLessons = useMemo(() => allAppLessons, [allAppLessons]);
 
-  // 🔥 IMPORTANT: Added customCurriculums to the return object!
-  return { user, userData, authChecked, activeOrg, allLessons, enrolledClasses, instructorClasses, allDecks, customCurriculums, actions };
+  // Added activityLogs to the return object!
+  return { 
+    user, userData, authChecked, activeOrg, allLessons, 
+    enrolledClasses, instructorClasses, allDecks, 
+    customCurriculums, activityLogs, actions 
+  };
 }
