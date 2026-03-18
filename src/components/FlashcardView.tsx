@@ -1,6 +1,10 @@
 // src/components/FlashcardView.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, X, Library, Layers, Play, Zap, HelpCircle, Puzzle, Flame, CheckCircle2, XCircle, Globe, Users, Filter, ChevronLeft, ChevronRight, RotateCw, ArrowUp } from 'lucide-react';
+import { 
+    ArrowLeft, X, Library, Layers, Play, Zap, HelpCircle, Puzzle, Flame, 
+    CheckCircle2, XCircle, Globe, Users, Filter, ChevronLeft, ChevronRight, 
+    RotateCw, ArrowUp, Paperclip // 🔥 Added Paperclip
+} from 'lucide-react';
 import { Toast } from './Toast'; 
 
 // ============================================================================
@@ -9,6 +13,7 @@ import { Toast } from './Toast';
 function StudyModePlayer({ deckCards }: any) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
+    const [showConjugations, setShowConjugations] = useState(false); // 🔥 New State
     
     // Swipe Physics & Animation State
     const [startX, setStartX] = useState<number | null>(null);
@@ -18,6 +23,11 @@ function StudyModePlayer({ deckCards }: any) {
     const [slideDirection, setSlideDirection] = useState<'right' | 'left' | 'up'>('right');
 
     const currentCard = deckCards[currentIndex];
+
+    // 🔥 Reset state when card changes
+    useEffect(() => {
+        setShowConjugations(false);
+    }, [currentIndex]);
 
     // --- Handlers ---
     const handleNext = (e?: any) => {
@@ -40,6 +50,7 @@ function StudyModePlayer({ deckCards }: any) {
 
     // --- Touch/Mouse Physics ---
     const handlePointerDown = (e: React.TouchEvent | React.MouseEvent) => {
+        if (showConjugations) return; // Disable swipe while viewing table
         const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
         const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
         setStartX(clientX);
@@ -49,7 +60,7 @@ function StudyModePlayer({ deckCards }: any) {
     };
 
     const handlePointerMove = (e: React.TouchEvent | React.MouseEvent) => {
-        if (startX === null || startY === null) return;
+        if (startX === null || startY === null || showConjugations) return;
         const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
         const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
         
@@ -153,6 +164,17 @@ function StudyModePlayer({ deckCards }: any) {
                             className="absolute inset-0 w-full h-full bg-indigo-50 dark:bg-indigo-900/20 rounded-[3rem] border-2 border-b-[8px] border-indigo-200 dark:border-indigo-500/30 shadow-xl flex flex-col items-center justify-center p-8 text-center transition-colors duration-300"
                             style={{ backfaceVisibility: 'hidden', transform: 'rotateX(180deg)' }}
                         >
+                            {/* 🔥 THE PAPERCLIP BUTTON */}
+                            {currentCard.conjugations && (
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); setShowConjugations(true); }}
+                                    className="absolute top-6 right-8 p-3 bg-white dark:bg-slate-800 text-indigo-500 dark:text-indigo-400 rounded-2xl shadow-lg border border-indigo-100 dark:border-slate-700 hover:scale-110 active:scale-95 transition-all z-30"
+                                >
+                                    <Paperclip size={20} strokeWidth={3} />
+                                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-rose-500 rounded-full border-2 border-white dark:border-slate-900" />
+                                </button>
+                            )}
+
                             <span className="text-[10px] font-black text-indigo-400 dark:text-indigo-300 uppercase tracking-widest absolute top-6 bg-white dark:bg-indigo-950 px-3 py-1 rounded-full shadow-sm transition-colors duration-300">Back</span>
                             
                             <h2 className="text-3xl md:text-4xl font-black text-indigo-900 dark:text-indigo-100 leading-tight transition-colors duration-300">{currentCard.back}</h2>
@@ -174,6 +196,37 @@ function StudyModePlayer({ deckCards }: any) {
                             </div>
                         </div>
                     </div>
+
+                    {/* 🔥 CONJUGATION OVERLAY PANEL */}
+                    {showConjugations && currentCard.conjugations && (
+                        <div className="absolute inset-0 z-40 bg-white/95 dark:bg-slate-900/95 rounded-[3rem] p-8 flex flex-col animate-in slide-in-from-bottom-12 duration-300 backdrop-blur-md border-2 border-indigo-500/30">
+                            <div className="flex justify-between items-center mb-6">
+                                <div className="flex items-center gap-2">
+                                    <Paperclip size={16} className="text-indigo-500" />
+                                    <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest">Conjugation Table</span>
+                                </div>
+                                <button onClick={() => setShowConjugations(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
+                                    <X size={20} className="text-slate-400" />
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4">
+                                {Object.entries(currentCard.conjugations).map(([tense, forms]: any) => (
+                                    <div key={tense} className="space-y-2">
+                                        <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-tighter bg-indigo-50 dark:bg-indigo-500/10 px-2 py-1 rounded w-fit">{tense}</h4>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {Object.entries(forms).map(([person, verb]: any) => (
+                                                <div key={person} className="flex flex-col p-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50">
+                                                    <span className="text-[8px] font-black text-slate-400 uppercase">{person}</span>
+                                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{verb}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
