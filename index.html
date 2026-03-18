@@ -4,24 +4,27 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     
-<meta id="theme-color-meta" name="theme-color" content="#f8fafc" />
-    <meta name="color-scheme" content="light dark" />
+<meta name="color-scheme" content="light dark" />
+
     <script>
       (function() {
         try {
           var theme = localStorage.getItem('magister-theme') || 'system';
           var isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
           
+          // Determine the correct color FIRST
+          var bgColor = isDark ? '#020617' : '#f8fafc';
+          
+          // 1. Synchronously inject the meta tag so the OS never sees white
+          document.write('<meta id="theme-color-meta" name="theme-color" content="' + bgColor + '" />');
+          
+          // 2. Paint the DOM
           if (isDark) {
             document.documentElement.classList.add('dark');
             document.body.style.backgroundColor = '#020617'; 
-            var meta = document.getElementById('theme-color-meta');
-            if (meta) meta.setAttribute('content', '#020617');
           } else {
             document.documentElement.classList.remove('dark');
             document.body.style.backgroundColor = '#f8fafc';
-            var meta = document.getElementById('theme-color-meta');
-            if (meta) meta.setAttribute('content', '#f8fafc');
           }
         } catch (e) {}
       })();
