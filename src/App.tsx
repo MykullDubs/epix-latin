@@ -1,7 +1,7 @@
 // src/App.tsx
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { doc, setDoc } from 'firebase/firestore'; // 🔥 IMPORTED FIREBASE FUNCTIONS
-import { db, appId } from './config/firebase';   // 🔥 IMPORTED DB CONFIG
+import { doc, setDoc } from 'firebase/firestore'; 
+import { db, appId } from './config/firebase';   
 import { useMagisterData } from './hooks/useMagisterData';
 import { GLOBAL_CURRICULUMS } from './constants/curriculums';
 
@@ -24,7 +24,11 @@ import LiveConnectFourProjector from './components/LiveConnectFourProjector';
 import CelebrationScreen from './components/CelebrationScreen';
 
 export default function App() {
-  const { user, userData, authChecked, activeOrg, allLessons, enrolledClasses, instructorClasses, allDecks, customCurriculums, actions } = useMagisterData();
+  const { 
+    user, userData, authChecked, activeOrg, allLessons, 
+    enrolledClasses, instructorClasses, allDecks, 
+    customCurriculums, activityLogs, actions 
+  } = useMagisterData();
   
   // Navigation State
   const [currentView, setCurrentView] = useState<'student' | 'instructor' | 'admin'>('student');
@@ -47,47 +51,41 @@ export default function App() {
   }, [customCurriculums]);
 
   // ==========================================================================
-  //  🔥 THE FIX: FIREBASE LIVE ARENA LAUNCHERS
+  //  LIVE ARENA LAUNCHERS
   // ==========================================================================
-  const handleStartVocabGame = async (classId: string, deckId: string) => {
+  const handleStartVocabGame = async (deckId: string, classId: string) => {
       try {
-          // 1. LIGHT THE SIGNAL FLARE FOR STUDENTS (Creates the Firebase Doc)
           const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
           await setDoc(sessionRef, {
               type: 'trivia',
               lessonId: deckId, 
-              quizState: 'waiting', // Puts students in the "Awaiting Protocol" lobby
+              quizState: 'waiting',
               currentBlockIndex: 0,
               joined: {},
               answers: {},
               scores: {},
               timestamp: Date.now()
           });
-
-          // 2. ROUTE THE INSTRUCTOR TO THE PROJECTOR VIEW
           setActiveVocabGame({ deckId, classId });
       } catch (error) {
           console.error("Failed to launch Live Arena:", error);
       }
   };
 
-  const handleStartConnectFour = async (classId: string, deckId: string) => {
+  const handleStartConnectFour = async (deckId: string, classId: string) => {
       try {
-          // 1. LIGHT THE SIGNAL FLARE FOR STUDENTS
           const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
           await setDoc(sessionRef, {
               type: 'connect_four',
               lessonId: deckId,
               quizState: 'waiting',
-              currentTurn: 1, // Team 1 starts
-              grid: Array(7).fill([]), // Empty Connect 4 board
-              teams: {}, // We assign students to teams as they join
+              currentTurn: 1, 
+              grid: Array(7).fill([]),
+              teams: {},
               joined: {},
               answers: {},
               timestamp: Date.now()
           });
-
-          // 2. ROUTE THE INSTRUCTOR TO THE PROJECTOR VIEW
           setActiveConnectFour({ deckId, classId });
       } catch (error) {
           console.error("Failed to launch Squad Strike:", error);
@@ -95,7 +93,7 @@ export default function App() {
   };
 
   // ==========================================================================
-  //  THE URL ROUTING ENGINE
+  //  URL ROUTING ENGINE
   // ==========================================================================
   const isHydrated = useRef(false);
 
@@ -150,7 +148,7 @@ export default function App() {
 
   useEffect(() => {
     const handlePopState = () => {
-      const params = new URLSearchParams(window.location.search);
+      const params = newSearchParams(window.location.search);
       
       setCurrentView((params.get('view') as any) || 'student');
       setActiveTab(params.get('tab') || 'home');
@@ -267,6 +265,7 @@ export default function App() {
         allDecks={allDecks} 
         lessons={allLessons} 
         curriculums={allCurriculums}
+        activityLogs={activityLogs}
         onAssignCurriculum={actions.assignCurriculum} 
         onSaveLesson={actions.saveLesson} 
         onSaveCurriculum={actions.saveCurriculum}
@@ -279,9 +278,10 @@ export default function App() {
         onRenameClass={actions.renameClass}
         onUpdateClassDescription={actions.updateClassDescription}
         onAddStudent={actions.addStudent}
+        onRemoveStudent={actions.removeStudent} // 🔥 PROP SUCCESSFULLY WIRED
         onStartPresentation={(lessonId: string, classId: string) => setActivePresentation({ lessonId, classId })}
-        onStartVocabGame={handleStartVocabGame}      // 🔥 WIRED UP
-        onStartConnectFour={handleStartConnectFour}  // 🔥 WIRED UP
+        onStartVocabGame={handleStartVocabGame}      
+        onStartConnectFour={handleStartConnectFour}  
         onPublishDeck={actions.publishDeck}
         onSwitchView={() => setCurrentView('student')}
         onLogout={actions.logout} 
