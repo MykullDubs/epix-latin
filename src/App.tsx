@@ -148,7 +148,8 @@ export default function App() {
 
   useEffect(() => {
     const handlePopState = () => {
-      const params = newSearchParams(window.location.search);
+      // 🔥 FIXED: new URLSearchParams instead of newSearchParams
+      const params = new URLSearchParams(window.location.search);
       
       setCurrentView((params.get('view') as any) || 'student');
       setActiveTab(params.get('tab') || 'home');
@@ -278,7 +279,7 @@ export default function App() {
         onRenameClass={actions.renameClass}
         onUpdateClassDescription={actions.updateClassDescription}
         onAddStudent={actions.addStudent}
-        onRemoveStudent={actions.removeStudent} // 🔥 PROP SUCCESSFULLY WIRED
+        onRemoveStudent={actions.removeStudent} 
         onStartPresentation={(lessonId: string, classId: string) => setActivePresentation({ lessonId, classId })}
         onStartVocabGame={handleStartVocabGame}      
         onStartConnectFour={handleStartConnectFour}  
