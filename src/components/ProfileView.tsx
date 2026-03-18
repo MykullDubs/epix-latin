@@ -17,8 +17,9 @@ import {
 import { 
   Globe, Flame, Trophy, BarChart3, CheckCircle2, Zap, 
   Settings, ChevronRight, UploadCloud, LogOut, Shield, Crown,
-  Camera, Loader2, Heart, Activity, AlertCircle, History, Target
+  Camera, Loader2, Heart, Activity, AlertCircle, History, Target, Moon
 } from 'lucide-react';
+import ThemeToggle from './ThemeToggle'; // 🔥 IMPORTED THE TOGGLE
 
 // --- SUB-COMPONENT: REUSABLE AVATAR ---
 const UserAvatar = ({ user, size = "md", border = false }: any) => {
@@ -36,8 +37,8 @@ const UserAvatar = ({ user, size = "md", border = false }: any) => {
     return (
         <div className={`relative shrink-0 ${sizeClasses[size]}`}>
             <div className={`w-full h-full rounded-[35%] overflow-hidden flex items-center justify-center font-black transition-all ${
-                avatarUrl ? 'bg-slate-100' : 'bg-gradient-to-br from-indigo-500 to-cyan-400 text-white'
-            } ${border ? 'ring-4 ring-white shadow-xl' : ''}`}>
+                avatarUrl ? 'bg-slate-100 dark:bg-slate-800' : 'bg-gradient-to-br from-indigo-500 to-cyan-400 text-white'
+            } ${border ? 'ring-4 ring-white dark:ring-slate-900 shadow-xl' : ''}`}>
                 {avatarUrl ? (
                     <img 
                         key={avatarUrl} 
@@ -49,7 +50,7 @@ const UserAvatar = ({ user, size = "md", border = false }: any) => {
                     <span>{initials}</span>
                 )}
             </div>
-            <div className="absolute -bottom-1 -right-1 w-1/4 h-1/4 bg-emerald-500 rounded-full border-2 border-white shadow-sm" />
+            <div className="absolute -bottom-1 -right-1 w-1/4 h-1/4 bg-emerald-500 rounded-full border-2 border-white dark:border-slate-900 shadow-sm" />
         </div>
     );
 };
@@ -83,7 +84,6 @@ export default function ProfileView({ user, userData: propUserData }: any) {
       return onSnapshot(q, (snapshot) => {
           const data = snapshot.docs.map(d => d.data());
           setLogs(data);
-          // Only calculate stats if the helper exists
           if (calculateUserStats) {
               setStats(calculateUserStats(data));
           }
@@ -135,7 +135,6 @@ export default function ProfileView({ user, userData: propUserData }: any) {
       setDeploying(false); 
   };
 
-  // 🔥 THE FIX: Bulletproof Agile Math checking both root and nested fields
   const xp = activeData?.profile?.main?.xp || activeData?.xp || 0;
   const streak = activeData?.profile?.main?.streak || activeData?.streak || 0;
   const totalLikes = activeData?.profile?.main?.totalLikesReceived || activeData?.totalLikesReceived || 0;
@@ -144,11 +143,11 @@ export default function ProfileView({ user, userData: propUserData }: any) {
   const league = getLeagueTier ? getLeagueTier(level) : { name: 'Bronze' };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 overflow-y-auto custom-scrollbar pt-2 pb-40">
+    <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-y-auto custom-scrollbar pt-2 pb-40 transition-colors duration-300">
         
         {/* 1. HERO CARD */}
         <div className="px-6 mb-8">
-            <div className="bg-slate-900 rounded-[3rem] p-8 relative overflow-hidden shadow-2xl border border-white/5">
+            <div className="bg-slate-900 rounded-[3rem] p-8 relative overflow-hidden shadow-2xl border border-white/5 dark:border-white/10">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[80px] -mr-32 -mt-32" />
                 <div className="relative z-10 flex flex-col items-center">
                     
@@ -184,15 +183,15 @@ export default function ProfileView({ user, userData: propUserData }: any) {
                             )}
                         </div>
 
-                        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-white text-slate-900 text-[10px] font-black px-4 py-1 rounded-full shadow-xl border border-slate-100 flex items-center gap-1.5 whitespace-nowrap z-30">
-                            <Crown size={10} className="text-indigo-600" /> LVL {level}
+                        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-[10px] font-black px-4 py-1 rounded-full shadow-xl border border-slate-100 dark:border-slate-700 flex items-center gap-1.5 whitespace-nowrap z-30 transition-colors duration-300">
+                            <Crown size={10} className="text-indigo-600 dark:text-indigo-400" /> LVL {level}
                         </div>
                     </div>
 
                     <h2 className="text-2xl font-black text-white mb-1 tracking-tight">{activeData?.name || "User"}</h2>
                     <div className="flex gap-2 mb-8">
                         <span className="px-3 py-1 bg-white/10 text-white/60 text-[9px] font-black rounded-lg uppercase tracking-widest border border-white/5">{activeData?.role}</span>
-                        <span className="px-3 py-1 bg-white text-indigo-600 text-[9px] font-black rounded-lg uppercase tracking-widest shadow-lg flex items-center gap-1.5"><Shield size={10}/> {league.name} League</span>
+                        <span className="px-3 py-1 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 text-[9px] font-black rounded-lg uppercase tracking-widest shadow-lg flex items-center gap-1.5 transition-colors duration-300"><Shield size={10}/> {league.name} League</span>
                     </div>
 
                     <div className="grid grid-cols-3 w-full bg-white/5 backdrop-blur-xl rounded-3xl border border-white/10 divide-x divide-white/5">
@@ -216,44 +215,45 @@ export default function ProfileView({ user, userData: propUserData }: any) {
         {/* 2. BODY CONTENT */}
         <div className="px-6 space-y-6">
             
-            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+            {/* JOURNEY PROGRESS */}
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-colors duration-300">
                 <div className="flex justify-between items-center mb-5">
-                    <h3 className="font-black text-slate-800 uppercase tracking-widest text-[10px] flex items-center gap-2"><Trophy size={14} className="text-amber-500"/> Journey Progress</h3>
-                    <div className="flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full uppercase">Next: {xpToNext} XP</div>
+                    <h3 className="font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest text-[10px] flex items-center gap-2"><Trophy size={14} className="text-amber-500"/> Journey Progress</h3>
+                    <div className="flex items-center gap-1 text-[9px] font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2.5 py-1 rounded-full uppercase transition-colors duration-300">Next: {xpToNext} XP</div>
                 </div>
-                <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden mb-3 p-1">
+                <div className="h-4 w-full bg-slate-100 dark:bg-slate-800/50 rounded-full overflow-hidden mb-3 p-1 transition-colors duration-300">
                     <div className="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(99,102,241,0.3)]" style={{ width: `${progressPct}%` }} />
                 </div>
-                <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">
+                <div className="flex justify-between text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest px-1">
                     <span>{currentLevelXp} Current</span>
                     <span>{xpToNext - currentLevelXp} remaining</span>
                 </div>
             </div>
 
-            {/* 🔥 NEW: RECENT ACTIVITY TIMELINE */}
+            {/* RECENT ACTIVITY TIMELINE */}
             {logs.length > 0 && (
-                <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-colors duration-300">
                     <div className="flex justify-between items-center mb-6">
-                        <h3 className="font-black text-slate-800 uppercase tracking-widest text-[10px] flex items-center gap-2"><History size={14} className="text-indigo-600"/> Recent Protocols</h3>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{logs.length} Total</span>
+                        <h3 className="font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest text-[10px] flex items-center gap-2"><History size={14} className="text-indigo-600 dark:text-indigo-400"/> Recent Protocols</h3>
+                        <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{logs.length} Total</span>
                     </div>
                     <div className="space-y-3">
                         {logs.slice(0, 4).map((log, i) => (
-                            <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100/50">
+                            <div key={i} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100/50 dark:border-slate-700/50 transition-colors duration-300">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-white rounded-[10px] shadow-sm flex items-center justify-center text-indigo-500 border border-slate-100">
+                                    <div className="w-10 h-10 bg-white dark:bg-slate-800 rounded-[10px] shadow-sm flex items-center justify-center text-indigo-500 dark:text-indigo-400 border border-slate-100 dark:border-slate-700 transition-colors duration-300">
                                         <Target size={16} />
                                     </div>
                                     <div>
-                                        <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">
+                                        <span className="block text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-0.5">
                                             {new Date(log.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                         </span>
-                                        <span className="block text-xs font-black text-slate-700 truncate max-w-[150px]">
+                                        <span className="block text-xs font-black text-slate-700 dark:text-slate-200 truncate max-w-[150px]">
                                             {log.itemTitle || 'Arena Match'}
                                         </span>
                                     </div>
                                 </div>
-                                <div className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-100/50">
+                                <div className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-100/50 dark:border-emerald-500/20 transition-colors duration-300">
                                     +{log.score || log.xp || 0} XP
                                 </div>
                             </div>
@@ -262,68 +262,86 @@ export default function ProfileView({ user, userData: propUserData }: any) {
                 </div>
             )}
 
+            {/* LEARNING VELOCITY */}
             {stats?.graphData?.length > 0 && (
-                <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-colors duration-300">
                     <div className="flex justify-between items-center mb-8">
-                        <h3 className="font-black text-slate-800 uppercase tracking-widest text-[10px] flex items-center gap-2"><Activity size={14} className="text-indigo-600"/> Learning Velocity</h3>
-                        <span className="text-[9px] font-black text-slate-400 uppercase">{stats.totalHours} Active Hours</span>
+                        <h3 className="font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest text-[10px] flex items-center gap-2"><Activity size={14} className="text-indigo-600 dark:text-indigo-400"/> Learning Velocity</h3>
+                        <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase">{stats.totalHours} Active Hours</span>
                     </div>
                     
                     <div className="flex items-end justify-between h-24 gap-2 px-1">
                         {stats.graphData.map((d: any, i: number) => (
                             <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group cursor-pointer relative">
-                                <div className="absolute -top-8 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg whitespace-nowrap z-10">
+                                <div className="absolute -top-8 bg-slate-800 dark:bg-white text-white dark:text-slate-900 text-[10px] font-black px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg whitespace-nowrap z-10">
                                     {d.minutes} mins
                                 </div>
                                 
-                                <div className="w-full bg-slate-50 rounded-lg relative flex items-end h-full mb-3 border border-slate-100 overflow-hidden">
+                                <div className="w-full bg-slate-50 dark:bg-slate-800/50 rounded-lg relative flex items-end h-full mb-3 border border-slate-100 dark:border-slate-700/50 overflow-hidden transition-colors duration-300">
                                     <div 
-                                        className={`w-full transition-all duration-1000 rounded-t-sm ${d.minutes > 0 ? 'bg-indigo-500 group-hover:bg-cyan-400' : 'bg-transparent'}`} 
+                                        className={`w-full transition-all duration-1000 rounded-t-sm ${d.minutes > 0 ? 'bg-indigo-500 group-hover:bg-cyan-400 dark:bg-indigo-600 dark:group-hover:bg-cyan-500' : 'bg-transparent'}`} 
                                         style={{ height: `${d.height}%` }} 
                                     />
                                 </div>
-                                <span className={`text-[8px] font-black uppercase transition-colors ${d.minutes > 0 ? 'text-slate-900 group-hover:text-indigo-600' : 'text-slate-300'}`}>{d.day}</span>
+                                <span className={`text-[8px] font-black uppercase transition-colors ${d.minutes > 0 ? 'text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400' : 'text-slate-300 dark:text-slate-600'}`}>{d.day}</span>
                             </div>
                         ))}
                     </div>
                 </div>
             )}
 
-            <div className="bg-white rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-sm">
-                <div className="p-2 space-y-1">
-                    <button onClick={toggleRole} className="w-full p-5 hover:bg-slate-50 rounded-[2rem] transition-all flex items-center justify-between group">
+            {/* SETTINGS BENTO BLOCK */}
+            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] overflow-hidden border border-slate-100 dark:border-slate-800 shadow-sm transition-colors duration-300">
+                <div className="flex flex-col">
+                    
+                    {/* 🔥 NEW: APPEARANCE TOGGLE ROW */}
+                    <div className="w-full p-5 flex items-center justify-between border-b border-slate-50 dark:border-slate-800/50">
                         <div className="flex items-center gap-4">
-                            <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 group-hover:scale-110 transition-transform"><Settings size={20}/></div>
+                            <div className="p-3 bg-cyan-50 dark:bg-cyan-500/10 rounded-2xl text-cyan-600 dark:text-cyan-400 transition-colors duration-300"><Moon size={20}/></div>
                             <div className="text-left">
-                                <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">System Context</span>
-                                <span className="text-sm font-black text-slate-800 capitalize">{activeData?.role} Mode</span>
+                                <span className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mb-1.5">Appearance</span>
+                                <span className="text-sm font-black text-slate-800 dark:text-slate-100">Interface Theme</span>
                             </div>
                         </div>
-                        <ChevronRight size={18} className="text-slate-300"/>
+                        <ThemeToggle />
+                    </div>
+
+                    {/* ROLE TOGGLE */}
+                    <button onClick={toggleRole} className="w-full p-5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-center justify-between group border-b border-slate-50 dark:border-slate-800/50">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-all"><Settings size={20}/></div>
+                            <div className="text-left">
+                                <span className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mb-1.5">System Context</span>
+                                <span className="text-sm font-black text-slate-800 dark:text-slate-100 capitalize">{activeData?.role} Mode</span>
+                            </div>
+                        </div>
+                        <ChevronRight size={18} className="text-slate-300 dark:text-slate-600"/>
                     </button>
 
+                    {/* SYSTEM SYNC (INSTRUCTOR ONLY) */}
                     {activeData?.role === 'instructor' && (
-                        <button onClick={deploySystemContent} disabled={deploying} className="w-full p-5 hover:bg-emerald-50 rounded-[2rem] transition-all flex items-center justify-between group">
+                        <button onClick={deploySystemContent} disabled={deploying} className="w-full p-5 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors flex items-center justify-between group border-b border-slate-50 dark:border-slate-800/50">
                             <div className="flex items-center gap-4">
-                                <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600 group-hover:scale-110 transition-transform"><UploadCloud size={20}/></div>
+                                <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-all"><UploadCloud size={20}/></div>
                                 <div className="text-left">
-                                    <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Infrastructure</span>
-                                    <span className="text-sm font-black text-slate-800">{deploying ? 'Rebuilding...' : 'Synchronize Core'}</span>
+                                    <span className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mb-1.5">Infrastructure</span>
+                                    <span className="text-sm font-black text-slate-800 dark:text-slate-100">{deploying ? 'Rebuilding...' : 'Synchronize Core'}</span>
                                 </div>
                             </div>
-                            <ChevronRight size={18} className="text-slate-300"/>
+                            <ChevronRight size={18} className="text-slate-300 dark:text-slate-600"/>
                         </button>
                     )}
 
-                    <button onClick={handleLogout} className="w-full p-5 hover:bg-rose-50 rounded-[2rem] transition-all flex items-center justify-between group mt-2">
+                    {/* LOGOUT */}
+                    <button onClick={handleLogout} className="w-full p-5 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors flex items-center justify-between group">
                         <div className="flex items-center gap-4">
-                            <div className="p-3 bg-rose-50 rounded-2xl text-rose-600 group-hover:scale-110 transition-transform"><LogOut size={20}/></div>
+                            <div className="p-3 bg-rose-50 dark:bg-rose-500/10 rounded-2xl text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-all"><LogOut size={20}/></div>
                             <div className="text-left">
-                                <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Session</span>
-                                <span className="text-sm font-black text-rose-600">Terminate Connection</span>
+                                <span className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mb-1.5">Session</span>
+                                <span className="text-sm font-black text-rose-600 dark:text-rose-400">Terminate Connection</span>
                             </div>
                         </div>
-                        <div className="bg-rose-100/50 p-2 rounded-full"><LogOut size={14} className="text-rose-500"/></div>
+                        <div className="bg-rose-100/50 dark:bg-rose-500/20 p-2 rounded-full transition-colors"><LogOut size={14} className="text-rose-500 dark:text-rose-400"/></div>
                     </button>
                 </div>
             </div>
