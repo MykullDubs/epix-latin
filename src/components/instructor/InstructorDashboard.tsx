@@ -11,7 +11,8 @@ import BuilderHub from './BuilderHub';
 import ClassManagerView from './ClassManagerView';
 import InstructorInbox from './InstructorInbox';
 import { AnalyticsDashboard } from './InstructorTools';
-import CommandCenter from './CommandCenter'; // 🔥 IMPORT OUR NEW BENTO COMPONENT
+import CommandCenter from './CommandCenter';
+import LiveSetupModal from './LiveSetupModal'; // 🔥 IMPORTED LIVE SETUP MODAL
 
 // ============================================================================
 //  INSTRUCTOR DASHBOARD (Main Navigation & Hub)
@@ -44,6 +45,9 @@ export default function InstructorDashboard({
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isRailExpanded, setIsRailExpanded] = useState(false);
   const [selectedClassId, setSelectedClassId] = useState<string>(''); 
+  
+  // 🔥 STATE FOR LIVE ARENA MODAL
+  const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
 
   const NavItem = ({ id, icon, label, badge }: { id: string; icon: React.ReactNode; label: string; badge?: boolean }) => {
     const isActive = activeTab === id;
@@ -300,7 +304,7 @@ export default function InstructorDashboard({
                     <CommandCenter 
                         classData={userData?.classes?.[0]} 
                         logs={[]} 
-                        onLaunchLive={() => alert("Configure Live Setup UI goes here!")} 
+                        onLaunchLive={() => setIsLiveModalOpen(true)} 
                         setActiveTab={setActiveTab} 
                     />
                 )}
@@ -309,6 +313,24 @@ export default function InstructorDashboard({
                 {activeTab === 'inbox' && <InstructorInbox />}
              </div>
            )}
+
+           {/* 🔥 LIVE ARENA MODAL */}
+           <LiveSetupModal 
+               isOpen={isLiveModalOpen}
+               onClose={() => setIsLiveModalOpen(false)}
+               classes={userData?.classes || []}
+               decks={allDecks}
+               onDeploy={(config: any) => {
+                   setIsLiveModalOpen(false);
+                   // Route to the appropriate game presentation
+                   if (config.mode === 'connect_four') {
+                       if (onStartConnectFour) onStartConnectFour(config.classId, config.contentId);
+                   } else if (config.mode === 'trivia') {
+                       if (onStartVocabGame) onStartVocabGame(config.classId, config.contentId);
+                   }
+               }}
+           />
+
         </div>
       </main>
     </div>
