@@ -197,38 +197,42 @@ function StudyModePlayer({ deckCards }: any) {
                         </div>
                     </div>
 
-                    {/* 🔥 CONJUGATION OVERLAY PANEL */}
-                    {showConjugations && currentCard.conjugations && (
-                        <div className="absolute inset-0 z-40 bg-white/95 dark:bg-slate-900/95 rounded-[3rem] p-8 flex flex-col animate-in slide-in-from-bottom-12 duration-300 backdrop-blur-md border-2 border-indigo-500/30">
-                            <div className="flex justify-between items-center mb-6">
-                                <div className="flex items-center gap-2">
-                                    <Paperclip size={16} className="text-indigo-500" />
-                                    <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest">Conjugation Table</span>
-                                </div>
-                                <button onClick={() => setShowConjugations(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
-                                    <X size={20} className="text-slate-400" />
-                                </button>
-                            </div>
-
-                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4">
-                                {Object.entries(currentCard.conjugations).map(([tense, forms]: any) => (
-                                    <div key={tense} className="space-y-2">
-                                        <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-tighter bg-indigo-50 dark:bg-indigo-500/10 px-2 py-1 rounded w-fit">{tense}</h4>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {Object.entries(forms).map(([person, verb]: any) => (
-                                                <div key={person} className="flex flex-col p-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50">
-                                                    <span className="text-[8px] font-black text-slate-400 uppercase">{person}</span>
-                                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{verb}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
+                 {/* 🔥 CONJUGATION OVERLAY PANEL */}
+{showConjugations && currentCard.conjugations && (
+    <div className="absolute inset-0 z-40 bg-white/95 dark:bg-slate-900/95 rounded-[3rem] p-8 flex flex-col animate-in slide-in-from-bottom-12 duration-300 backdrop-blur-md border-2 border-indigo-500/30">
+        <div className="flex justify-between items-center mb-6">
+            <div className="flex items-center gap-2">
+                <Paperclip size={16} className="text-indigo-500" />
+                <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest">Conjugation Table</span>
             </div>
+            <button onClick={() => setShowConjugations(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
+                <X size={20} className="text-slate-400" />
+            </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4">
+            {Object.entries(currentCard.conjugations).map(([tense, forms]: any) => (
+                <div key={tense} className="space-y-2">
+                    <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-tighter bg-indigo-50 dark:bg-indigo-500/10 px-2 py-1 rounded w-fit">{tense}</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                        {/* 🔥 THE FIX: We map over a fixed array instead of the object entries */}
+                        {['1s', '2s', '3s', '1p', '2p', '3p'].map((person) => {
+                            const verb = forms[person];
+                            if (!verb) return null; // Gracefully skip if a form is missing
+
+                            return (
+                                <div key={person} className="flex flex-col p-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50">
+                                    <span className="text-[8px] font-black text-slate-400 uppercase">{person}</span>
+                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{verb}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            ))}
+        </div>
+    </div>
+)}
 
             {/* Desktop / Manual Navigation Buttons */}
             <div className="flex items-center justify-between px-4 pb-8 shrink-0 z-10">
