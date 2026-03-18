@@ -17,14 +17,14 @@ import {
 import StudentGradebook from './StudentGradebook';
 import LeaderboardView from './LeaderboardView';
 
-// --- THEME HELPER ---
+// --- THEME HELPER (Dark Mode Upgraded) ---
 const getSubjectTheme = (subject: string) => {
     const sub = subject?.toLowerCase() || '';
-    if (sub.includes('math')) return { color: 'text-rose-500', bg: 'bg-rose-500', light: 'bg-rose-100', border: 'border-rose-200' };
-    if (sub.includes('science') || sub.includes('bio')) return { color: 'text-emerald-500', bg: 'bg-emerald-500', light: 'bg-emerald-100', border: 'border-emerald-200' };
-    if (sub.includes('social') || sub.includes('history')) return { color: 'text-amber-500', bg: 'bg-amber-500', light: 'bg-amber-100', border: 'border-amber-200' };
-    if (sub.includes('read') || sub.includes('english')) return { color: 'text-cyan-500', bg: 'bg-cyan-500', light: 'bg-cyan-100', border: 'border-cyan-200' };
-    return { color: 'text-indigo-500', bg: 'bg-indigo-500', light: 'bg-indigo-100', border: 'border-indigo-200' };
+    if (sub.includes('math')) return { color: 'text-rose-500 dark:text-rose-400', bg: 'bg-rose-500 dark:bg-rose-600', light: 'bg-rose-100 dark:bg-rose-500/10', border: 'border-rose-200 dark:border-rose-500/20' };
+    if (sub.includes('science') || sub.includes('bio')) return { color: 'text-emerald-500 dark:text-emerald-400', bg: 'bg-emerald-500 dark:bg-emerald-600', light: 'bg-emerald-100 dark:bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-500/20' };
+    if (sub.includes('social') || sub.includes('history')) return { color: 'text-amber-500 dark:text-amber-400', bg: 'bg-amber-500 dark:bg-amber-600', light: 'bg-amber-100 dark:bg-amber-500/10', border: 'border-amber-200 dark:border-amber-500/20' };
+    if (sub.includes('read') || sub.includes('english')) return { color: 'text-cyan-500 dark:text-cyan-400', bg: 'bg-cyan-500 dark:bg-cyan-600', light: 'bg-cyan-100 dark:bg-cyan-500/10', border: 'border-cyan-200 dark:border-cyan-500/20' };
+    return { color: 'text-indigo-500 dark:text-indigo-400', bg: 'bg-indigo-500 dark:bg-indigo-600', light: 'bg-indigo-100 dark:bg-indigo-500/10', border: 'border-indigo-200 dark:border-indigo-500/20' };
 };
 
 // ============================================================================
@@ -35,11 +35,11 @@ const ForumAvatar = ({ url, name, role, size = "md" }: any) => {
     const sizeClasses: any = { xs: "w-6 h-6 text-[10px]", sm: "w-8 h-8 text-xs", md: "w-10 h-10 text-sm", lg: "w-12 h-12 text-base" };
     return (
         <div className={`relative shrink-0 ${sizeClasses[size]}`}>
-            <div className={`w-full h-full rounded-[35%] overflow-hidden flex items-center justify-center font-black transition-all shadow-sm ${url ? 'bg-white' : 'bg-gradient-to-br from-indigo-500 to-cyan-400 text-white'}`}>
+            <div className={`w-full h-full rounded-[35%] overflow-hidden flex items-center justify-center font-black transition-all shadow-sm ${url ? 'bg-white dark:bg-slate-800' : 'bg-gradient-to-br from-indigo-500 to-cyan-400 text-white'}`}>
                 {url ? <img src={url} alt={`${name}'s avatar`} className="w-full h-full object-cover" /> : <span aria-hidden="true">{initials}</span>}
             </div>
             {role === 'instructor' && (
-                <div className="absolute -top-1 -right-1 bg-indigo-600 rounded-full border-2 border-white p-0.5 shadow-sm">
+                <div className="absolute -top-1 -right-1 bg-indigo-600 rounded-full border-2 border-white dark:border-slate-900 p-0.5 shadow-sm">
                     <Shield size={size === 'xs' ? 8 : 10} className="text-white" />
                 </div>
             )}
@@ -73,19 +73,19 @@ const VoiceRecorder = ({ onRecordingComplete, onCancel }: any) => {
   };
   const stopRecording = () => { mediaRecorderRef.current?.stop(); setIsRecording(false); };
   return (
-    <div className="bg-indigo-50/50 p-4 rounded-2xl border-2 border-indigo-100 flex items-center justify-between">
+    <div className="bg-indigo-50/50 dark:bg-indigo-500/10 p-4 rounded-2xl border-2 border-indigo-100 dark:border-indigo-500/20 flex items-center justify-between transition-colors duration-300">
       {!audioUrl ? (
         <div className="flex items-center gap-4 w-full">
           <div className={`w-3 h-3 rounded-full bg-rose-500 ${isRecording ? 'animate-pulse' : 'opacity-30'}`} />
-          <span className="text-xs font-black text-indigo-900 uppercase tracking-widest flex-1">{isRecording ? "Recording..." : "Voice Response"}</span>
-          <button type="button" onClick={isRecording ? stopRecording : startRecording} className={`p-3 rounded-full ${isRecording ? 'bg-rose-500 text-white animate-pulse' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
+          <span className="text-xs font-black text-indigo-900 dark:text-indigo-300 uppercase tracking-widest flex-1">{isRecording ? "Recording..." : "Voice Response"}</span>
+          <button type="button" onClick={isRecording ? stopRecording : startRecording} className={`p-3 rounded-full ${isRecording ? 'bg-rose-500 text-white animate-pulse' : 'bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400'}`}>
             {isRecording ? <Square size={18} fill="white" /> : <Mic size={18} />}
           </button>
         </div>
       ) : (
         <div className="flex items-center gap-3 w-full animate-in fade-in">
           <audio src={audioUrl} controls className="h-8 flex-1" />
-          <button type="button" onClick={() => { setAudioUrl(null); onCancel(); }} className="text-rose-500 text-xs font-black uppercase px-2 hover:bg-rose-50 rounded-lg py-2">Discard</button>
+          <button type="button" onClick={() => { setAudioUrl(null); onCancel(); }} className="text-rose-500 dark:text-rose-400 text-xs font-black uppercase px-2 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg py-2">Discard</button>
         </div>
       )}
     </div>
@@ -173,28 +173,28 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
 
   if (view === 'list') {
     return (
-      <div className="flex flex-col h-full bg-slate-50 rounded-[2.5rem] border-2 border-slate-100 shadow-inner p-6 overflow-hidden animate-in fade-in duration-500 font-sans">
+      <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 shadow-inner p-6 overflow-hidden animate-in fade-in duration-500 font-sans transition-colors duration-300">
         <header className="flex justify-between items-center mb-6 px-2">
-            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Discussions</h3>
+            <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tighter">Discussions</h3>
             {isInstructor && (
-                <button onClick={() => setIsCreating(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-black text-xs uppercase flex items-center gap-2 shadow-lg transition-colors">
+                <button onClick={() => setIsCreating(true)} className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400 text-white px-4 py-2 rounded-xl font-black text-xs uppercase flex items-center gap-2 shadow-lg transition-colors">
                   <Plus size={16} /> New Topic
                 </button>
             )}
         </header>
         <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
             {isCreating && (
-                <form onSubmit={handleCreateTopic} className="bg-white p-6 rounded-[2rem] border-2 border-indigo-100 shadow-xl mb-6">
-                    <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Topic Title..." className="w-full text-lg font-black text-slate-800 outline-none mb-2" />
-                    <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Prompt..." className="w-full text-sm text-slate-500 outline-none min-h-[100px] resize-none" />
-                    <div className="flex gap-2 justify-end mt-4"><button type="submit" className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase">Post</button></div>
+                <form onSubmit={handleCreateTopic} className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border-2 border-indigo-100 dark:border-indigo-500/20 shadow-xl mb-6 transition-colors duration-300">
+                    <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Topic Title..." className="w-full bg-transparent text-lg font-black text-slate-800 dark:text-slate-100 outline-none mb-2" />
+                    <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Prompt..." className="w-full bg-transparent text-sm text-slate-500 dark:text-slate-400 outline-none min-h-[100px] resize-none" />
+                    <div className="flex gap-2 justify-end mt-4"><button type="submit" className="px-6 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-xl font-black text-xs uppercase">Post</button></div>
                 </form>
             )}
             {topics.map(t => (
-                <button key={t.id} onClick={() => { setActiveTopic(t); setView('thread'); }} className="w-full bg-white p-6 rounded-[2.5rem] border-2 border-slate-100 shadow-sm hover:border-indigo-300 transition-all text-left">
-                    <h4 className="text-lg font-black text-slate-800 mb-1">{t.title}</h4>
-                    <p className="text-sm text-slate-400 line-clamp-1 mb-4 font-medium">{t.content}</p>
-                    <div className="flex items-center gap-3 text-xs font-black uppercase text-slate-400 tracking-widest"><ForumAvatar url={t.authorAvatarUrl} name={t.authorName} role={t.role} size="xs" /><span>{t.authorName}</span></div>
+                <button key={t.id} onClick={() => { setActiveTopic(t); setView('thread'); }} className="w-full bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 shadow-sm hover:border-indigo-300 dark:hover:border-indigo-500/40 transition-all text-left">
+                    <h4 className="text-lg font-black text-slate-800 dark:text-slate-100 mb-1">{t.title}</h4>
+                    <p className="text-sm text-slate-400 dark:text-slate-500 line-clamp-1 mb-4 font-medium">{t.content}</p>
+                    <div className="flex items-center gap-3 text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest"><ForumAvatar url={t.authorAvatarUrl} name={t.authorName} role={t.role} size="xs" /><span>{t.authorName}</span></div>
                 </button>
             ))}
         </div>
@@ -203,10 +203,10 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
   }
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 rounded-[2.5rem] border-2 border-slate-100 shadow-inner overflow-hidden animate-in slide-in-from-right-8 duration-500 font-sans">
-        <header className="bg-white p-6 border-b border-slate-100 flex items-center justify-between shadow-sm z-20">
-            <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-400 font-black text-xs uppercase hover:text-indigo-600 transition-colors"><ArrowLeft size={16} /> Back</button>
-            <span className="text-xs font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-3 py-1.5 rounded-lg">Response Gallery</span>
+    <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 shadow-inner overflow-hidden animate-in slide-in-from-right-8 duration-500 font-sans transition-colors duration-300">
+        <header className="bg-white dark:bg-slate-900 p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shadow-sm z-20 transition-colors duration-300">
+            <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-400 dark:text-slate-500 font-black text-xs uppercase hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"><ArrowLeft size={16} /> Back</button>
+            <span className="text-xs font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-widest bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1.5 rounded-lg">Response Gallery</span>
         </header>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
@@ -216,17 +216,17 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                     <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.3em] mb-4 block">Discussion Prompt</span>
                     <h2 className="text-3xl font-black mb-4 leading-tight">{activeTopic.title}</h2>
                     <p className="text-slate-300 font-medium leading-relaxed mb-6">{activeTopic.content}</p>
-                    <button onClick={() => setIsCreating(true)} className="px-6 py-3 bg-white text-slate-900 rounded-xl font-black text-xs uppercase shadow-xl">Respond</button>
+                    <button onClick={() => setIsCreating(true)} className="px-6 py-3 bg-white text-slate-900 rounded-xl font-black text-xs uppercase shadow-xl hover:bg-slate-100 transition-colors">Respond</button>
                 </div>
             </section>
 
             {isCreating && (
-                <form onSubmit={handlePostResponse} className="bg-white p-8 rounded-[2.5rem] border-2 border-indigo-100 shadow-xl space-y-4">
-                    <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Response title..." className="w-full text-xl font-black text-slate-800 outline-none" />
-                    <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Write thoughts..." className="w-full text-sm text-slate-500 outline-none min-h-[100px] resize-none" />
+                <form onSubmit={handlePostResponse} className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border-2 border-indigo-100 dark:border-indigo-500/20 shadow-xl space-y-4 transition-colors duration-300">
+                    <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Response title..." className="w-full bg-transparent text-xl font-black text-slate-800 dark:text-slate-100 outline-none" />
+                    <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Write thoughts..." className="w-full bg-transparent text-sm text-slate-500 dark:text-slate-400 outline-none min-h-[100px] resize-none" />
                     <VoiceRecorder onRecordingComplete={setPendingAudio} onCancel={() => setPendingAudio(null)} />
-                    <div className="flex gap-2 justify-end pt-4 border-t border-slate-50">
-                        <button type="submit" disabled={isUploading} className="px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-xl flex items-center gap-3 bg-indigo-600 text-white disabled:opacity-50">
+                    <div className="flex gap-2 justify-end pt-4 border-t border-slate-50 dark:border-slate-800">
+                        <button type="submit" disabled={isUploading} className="px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-xl flex items-center gap-3 bg-indigo-600 dark:bg-indigo-500 text-white disabled:opacity-50">
                             {isUploading ? <Loader2 size={16} className="animate-spin" /> : 'Submit Response'}
                         </button>
                     </div>
@@ -236,24 +236,24 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
             <div className="space-y-10">
                 {responses.map((res) => (
                     <article key={res.id} className="space-y-4">
-                        <div className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm relative group">
+                        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 shadow-sm relative group transition-colors duration-300">
                             <div className="flex items-center gap-4 mb-6">
                                 <ForumAvatar url={res.authorAvatarUrl} name={res.authorName} role={res.role} size="lg" />
-                                <div><span className="block text-sm font-black text-slate-800 leading-none mb-1">{res.authorName}</span><span className="text-xs font-bold text-slate-400 uppercase">{new Date(res.timestamp).toLocaleDateString()}</span></div>
+                                <div><span className="block text-sm font-black text-slate-800 dark:text-slate-100 leading-none mb-1">{res.authorName}</span><span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">{new Date(res.timestamp).toLocaleDateString()}</span></div>
                             </div>
-                            <h4 className="text-2xl font-black text-slate-900 mb-3 tracking-tight">{res.title}</h4>
-                            <p className="text-sm text-slate-600 leading-relaxed font-medium mb-6">{res.content}</p>
+                            <h4 className="text-2xl font-black text-slate-900 dark:text-white mb-3 tracking-tight">{res.title}</h4>
+                            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium mb-6">{res.content}</p>
                             {res.audioUrl && (
-                                <div className="mb-6 p-4 bg-indigo-50/50 rounded-2xl flex items-center gap-4 border border-indigo-100">
-                                    <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white"><Volume2 size={20} /></div>
+                                <div className="mb-6 p-4 bg-indigo-50/50 dark:bg-indigo-500/10 rounded-2xl flex items-center gap-4 border border-indigo-100 dark:border-indigo-500/20 transition-colors duration-300">
+                                    <div className="w-10 h-10 bg-indigo-600 dark:bg-indigo-500 rounded-full flex items-center justify-center text-white"><Volume2 size={20} /></div>
                                     <audio src={res.audioUrl} controls className="h-8 flex-1 opacity-90" />
                                 </div>
                             )}
-                            <div className="flex items-center gap-6 pt-6 border-t border-slate-50">
-                                <button onClick={() => handleToggleLike(res.id, res.likes || [], res.authorId)} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${res.likes?.includes(auth.currentUser?.uid) ? 'bg-rose-50 text-rose-500' : 'text-slate-400 hover:text-rose-400'}`}>
-                                    <Heart size={16} className={res.likes?.includes(auth.currentUser?.uid) ? 'fill-rose-500' : ''} /> <span className="text-xs font-black uppercase tracking-widest">{res.likes?.length || 0} Appreciations</span>
+                            <div className="flex items-center gap-6 pt-6 border-t border-slate-50 dark:border-slate-800">
+                                <button onClick={() => handleToggleLike(res.id, res.likes || [], res.authorId)} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${res.likes?.includes(auth.currentUser?.uid) ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400' : 'text-slate-400 hover:text-rose-400 dark:text-slate-500 dark:hover:text-rose-400'}`}>
+                                    <Heart size={16} className={res.likes?.includes(auth.currentUser?.uid) ? 'fill-rose-500 dark:fill-rose-400' : ''} /> <span className="text-xs font-black uppercase tracking-widest">{res.likes?.length || 0} Appreciations</span>
                                 </button>
-                                <button onClick={() => setReplyingToId(replyingToId === res.id ? null : res.id)} className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase hover:text-indigo-600 px-2 py-1">
+                                <button onClick={() => setReplyingToId(replyingToId === res.id ? null : res.id)} className="flex items-center gap-2 text-xs font-black text-slate-400 dark:text-slate-500 uppercase hover:text-indigo-600 dark:hover:text-indigo-400 px-2 py-1">
                                   <MessageSquare size={16} /> Reply
                                 </button>
                             </div>
@@ -261,15 +261,15 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
 
                         <div className="ml-10 space-y-4">
                             {res.comments?.map((comment: any, idx: number) => (
-                                <div key={idx} className="bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100">
-                                    <div className="flex items-center gap-3 mb-2"><ForumAvatar url={comment.authorAvatarUrl} name={comment.authorName} role={comment.role} size="xs" /><span className="text-xs font-black text-slate-700 uppercase tracking-widest">{comment.authorName}</span></div>
-                                    <p className="text-sm text-slate-600 font-bold leading-relaxed">{comment.text}</p>
+                                <div key={idx} className="bg-slate-50 dark:bg-slate-800/50 p-5 rounded-[1.5rem] border border-slate-100 dark:border-slate-700/50 transition-colors duration-300">
+                                    <div className="flex items-center gap-3 mb-2"><ForumAvatar url={comment.authorAvatarUrl} name={comment.authorName} role={comment.role} size="xs" /><span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest">{comment.authorName}</span></div>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400 font-bold leading-relaxed">{comment.text}</p>
                                 </div>
                             ))}
                             {replyingToId === res.id && (
                                 <div className="flex gap-2 animate-in slide-in-from-top-2">
-                                    <input autoFocus value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Reply..." className="flex-1 bg-white border-2 border-indigo-100 rounded-2xl px-5 py-3 text-sm font-medium outline-none focus:border-indigo-500" onKeyDown={(e) => e.key === 'Enter' && handlePostComment(res.id)} />
-                                    <button onClick={() => handlePostComment(res.id)} className="p-4 bg-indigo-600 text-white rounded-2xl shadow-xl"><Send size={18} /></button>
+                                    <input autoFocus value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Reply..." className="flex-1 bg-white dark:bg-slate-900 border-2 border-indigo-100 dark:border-indigo-500/30 text-slate-800 dark:text-slate-100 rounded-2xl px-5 py-3 text-sm font-medium outline-none focus:border-indigo-500 dark:focus:border-indigo-400 transition-colors duration-300" onKeyDown={(e) => e.key === 'Enter' && handlePostComment(res.id)} />
+                                    <button onClick={() => handlePostComment(res.id)} className="p-4 bg-indigo-600 dark:bg-indigo-500 text-white rounded-2xl shadow-xl"><Send size={18} /></button>
                                 </div>
                             )}
                         </div>
@@ -321,7 +321,6 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogAc
     const quizOptions = currentBlock?.options || currentBlock?.content?.options || [];
     const quizCorrectId = currentBlock?.correctId || currentBlock?.content?.correctId;
 
-    // 🔥 SPEED ALGO: Pull the massive aggregated XP from the projector's math
     const xpEarned = liveSession?.finalScores?.[safeEmail] || 0;
     const pointsThisRound = liveSession?.roundPoints?.[safeEmail] || 0;
     const [xpLogged, setXpLogged] = useState(false);
@@ -334,7 +333,6 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogAc
         }
     }, [classId, studentEmail, liveSession?.quizState, liveSession?.joined, safeEmail]);
 
-    // 🔥 TRIGGER GLOBAL XP LOGGING ON FINISH
     useEffect(() => {
         if (isFinished && !xpLogged && xpEarned > 0) {
             const syncArenaXP = async () => {
@@ -351,14 +349,13 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogAc
         }
     }, [isFinished, xpLogged, xpEarned, classId, onLogActivity]);
 
-    // 🔥 SPEED ALGO: Timestamp their answer!
     const submitAnswer = async (optionId: string) => {
         if (liveSession?.quizState !== 'active' || myAnswer) return;
         const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
         
         await updateDoc(sessionRef, { 
             [`answers.${safeEmail}`]: optionId,
-            [`answerTimes.${safeEmail}`]: Date.now() // Log exact millisecond for speed math!
+            [`answerTimes.${safeEmail}`]: Date.now()
         });
     };
 
@@ -386,7 +383,6 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogAc
                     <div className="bg-slate-900/80 backdrop-blur-xl border-2 border-slate-800 rounded-3xl p-6 w-full mb-8 shadow-2xl">
                         <div className="flex justify-between items-center">
                             <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Total XP Earned</span>
-                            {/* Massive numbers for the final score */}
                             <span className="text-4xl font-black text-indigo-400">+{xpEarned.toLocaleString()}</span> 
                         </div>
                     </div>
@@ -398,7 +394,6 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogAc
         );
     }
 
-    // ROUND REVEAL: Show exactly how much Speed Bonus they got!
     if (isRevealed) {
         const isCorrect = myAnswer === quizCorrectId;
         return (
@@ -418,7 +413,6 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogAc
         );
     }
 
-    // ACTIVE QUESTION (Buttons)
     return (
         <div className="h-full bg-slate-950 rounded-[2.5rem] p-4 flex flex-col border-[4px] border-slate-800 shadow-[inset_0_0_50px_rgba(0,0,0,0.8)]">
             <div className="bg-slate-900 p-6 rounded-[2rem] shadow-sm border border-slate-800 mb-4 text-center shrink-0">
@@ -456,21 +450,16 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity }
 
     const currentQ = liveSession?.currentQuestion;
     const myAnswer = liveSession?.answers?.[safeEmail];
-
-    // FIX: Check current student's specific correct status to unlock drop
     const iHaveUnlockedDrop = myAnswer === currentQ?.correctId;
-
-    // 🔥 THE FIX: Add the Victory XP trigger state
     const [xpLogged, setXpLogged] = useState(false);
 
-    // 🔥 THE FIX: Award XP automatically if their team wins
     useEffect(() => {
         if (isFinished && liveSession?.winningTeam === myTeam && !xpLogged) {
             const handleVictory = async () => {
                 if (onLogActivity) {
                     await onLogActivity(
                         `c4_victory_${classId}_${Date.now()}`, 
-                        100, // 100 XP for the win!
+                        100, 
                         'Connect Four: Squad Victory'
                     );
                 }
@@ -489,7 +478,6 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity }
     const handleDrop = async (colIndex: number) => {
         if (!isMyTurn || !iHaveUnlockedDrop) return;
         
-        // SYNC FIX: Ensure we check the correct grid property name
         const currentGrid = liveSession.grid || Array(7).fill([]);
         const currentColumn = currentGrid[colIndex] || [];
         if (currentColumn.length >= 6) return;
@@ -512,8 +500,6 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity }
                 {iWon ? <Trophy size={120} className="text-emerald-400 mb-6 animate-bounce" /> : <XCircle size={120} className="text-rose-900 mb-6" />}
                 <h2 className="text-5xl font-black text-white mb-4 tracking-tighter">{iWon ? 'VICTORY' : 'DEFEATED'}</h2>
                 <p className="text-white/60 font-black uppercase tracking-widest">{iWon ? 'Squad Superiority Established' : 'Tactical Withdrawal Required'}</p>
-                
-                {/* Optional: Show them that XP was logged */}
                 {iWon && (
                     <div className="mt-8 text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
                         {xpLogged ? <><CheckCircle2 size={14} /> 100 XP Synced to Profile</> : <><Loader2 size={14} className="animate-spin" /> Syncing XP...</>}
@@ -582,7 +568,8 @@ export default function StudentClassView({
   const [expandedRoadmaps, setExpandedRoadmaps] = useState<Record<string, boolean>>({ 
       [classData?.assignedCurriculums?.[0]]: true 
   });
-const [isScrolled, setIsScrolled] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
       setIsScrolled(e.currentTarget.scrollTop > 40);
   };
@@ -629,26 +616,27 @@ const [isScrolled, setIsScrolled] = useState(false);
               <div className="flex-1 w-full h-full p-4 md:p-8 pt-20">
                   {liveSession.type === 'connect_four' ? (
                     <ConnectFourRemote 
-    liveSession={liveSession} 
-    classId={classData.id} 
-    studentEmail={userData?.email || auth?.currentUser?.email} 
-    onLogActivity={onLogActivity} // <--- This must be here!
-/>
+                        liveSession={liveSession} 
+                        classId={classData.id} 
+                        studentEmail={userData?.email || auth?.currentUser?.email} 
+                        onLogActivity={onLogActivity}
+                    />
                   ) : (
-<LiveTriviaRemote 
-    liveSession={liveSession} 
-    lessons={lessons} 
-    classId={classData.id} 
-    studentEmail={userData?.email || auth?.currentUser?.email} 
-    onLogActivity={onLogActivity} // 🔥 ADD THIS LINE!
-/>                  )}
+                    <LiveTriviaRemote 
+                        liveSession={liveSession} 
+                        lessons={lessons} 
+                        classId={classData.id} 
+                        studentEmail={userData?.email || auth?.currentUser?.email} 
+                        onLogActivity={onLogActivity}
+                    />                  
+                  )}
               </div>
           </div>
       );
   }
 
 return (
-    <div className="h-full flex flex-col bg-slate-50 overflow-hidden animate-in fade-in duration-500 font-sans relative">
+    <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden animate-in fade-in duration-500 font-sans relative transition-colors duration-300">
       
       {/* 🔥 UPGRADED DYNAMIC HEADER */}
       <header className={`shrink-0 z-10 relative shadow-xl transition-all duration-500 ease-in-out overflow-hidden ${theme.bg} ${isScrolled ? 'rounded-b-3xl p-5 md:p-6' : 'rounded-b-[3rem] p-6 md:p-10 pt-10 md:pt-16'}`}>
@@ -686,7 +674,6 @@ return (
       {/* 🔥 ATTACH THE SCROLL LISTENER HERE */}
       <main className="flex-1 overflow-y-auto custom-scrollbar relative px-2 md:px-6 pb-48 pt-6" onScroll={handleScroll}>
 
-  
         {liveSession && activeSubTab !== 'live' && (
             <div className="px-4 mb-6 animate-in slide-in-from-top-4 fade-in duration-500">
                 <button onClick={() => setActiveSubTab('live')} className="w-full bg-black rounded-[2rem] p-1 shadow-2xl relative overflow-hidden group">
@@ -711,11 +698,15 @@ return (
                      ))}
                  </section>
              ) : (
-                <div className="text-center p-12 bg-white rounded-[3rem] border-2 border-dashed border-slate-200 m-4"><Map size={48} className="mx-auto text-slate-300 mb-4" /><h3 className="text-2xl font-black text-slate-800 mb-2">Map Loading...</h3><p className="text-slate-500 font-bold">Your instructor hasn't drawn the path yet.</p></div>
+                <div className="text-center p-12 bg-white dark:bg-slate-900 rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-slate-800 m-4 transition-colors duration-300">
+                    <Map size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+                    <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 mb-2">Map Loading...</h3>
+                    <p className="text-slate-500 dark:text-slate-400 font-bold">Your instructor hasn't drawn the path yet.</p>
+                </div>
              )}
              {standaloneLessons.length > 0 && (
                  <section className="space-y-4 mb-10 px-4 max-w-lg mx-auto">
-                     <div className="flex items-center gap-3 ml-2 mb-6"><div className="h-1 flex-1 bg-slate-200 rounded-full" /><h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Bonus Quests</h3><div className="h-1 flex-1 bg-slate-200 rounded-full" /></div>
+                     <div className="flex items-center gap-3 ml-2 mb-6"><div className="h-1 flex-1 bg-slate-200 dark:bg-slate-800 rounded-full" /><h3 className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Bonus Quests</h3><div className="h-1 flex-1 bg-slate-200 dark:bg-slate-800 rounded-full" /></div>
                      {standaloneLessons.map((item: any) => (<StandaloneAssignmentCard key={item.id} item={item} isCompleted={completedItems.includes(item.id)} onSelectLesson={onSelectLesson} theme={theme} />))}
                  </section>
              )}
@@ -725,7 +716,7 @@ return (
         {activeSubTab === 'leaderboard' && <LeaderboardView studentEmails={classData.studentEmails} currentUserEmail={userData.email} />}
         {activeSubTab === 'exams' && (
           <section className="space-y-4 px-4 max-w-lg mx-auto">
-            {examList.length === 0 ? <div className="text-center py-20 opacity-40"><FileText size={48} className="mx-auto mb-4" /><p className="font-black text-xs uppercase tracking-widest leading-loose">No active exams assigned.</p></div> : examList.map((item: any) => <ExamCard key={item.id} item={item} onSelectLesson={onSelectLesson} />)}
+            {examList.length === 0 ? <div className="text-center py-20 opacity-40"><FileText size={48} className="mx-auto mb-4 text-slate-800 dark:text-slate-100" /><p className="font-black text-xs uppercase tracking-widest leading-loose text-slate-800 dark:text-slate-100">No active exams assigned.</p></div> : examList.map((item: any) => <ExamCard key={item.id} item={item} onSelectLesson={onSelectLesson} />)}
           </section>
         )}
         {activeSubTab === 'forum' && <div className="h-[70vh]"><ClassForum classId={classData.id} userData={userData} /></div>}
@@ -733,7 +724,7 @@ return (
       </main>
 
       <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-[550px] z-[100] px-2">
-          <div className="bg-slate-900/95 backdrop-blur-2xl p-2 rounded-full shadow-2xl border border-white/10 flex items-center justify-between gap-1">
+          <div className="bg-slate-900/95 dark:bg-slate-900/95 backdrop-blur-2xl p-2 rounded-full shadow-2xl border border-white/10 flex items-center justify-between gap-1 transition-colors duration-300">
             {[
               { id: 'lessons', label: 'Roadmap', icon: <BookOpen size={18} /> },
               { id: 'leaderboard', label: 'Rankings', icon: <Trophy size={18} /> },
@@ -764,19 +755,27 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
     const headerAccent = curr.themeColor || '#6366f1';
     return (
         <article className="bg-transparent relative pb-8">
-            <button className="w-full text-left bg-white p-6 md:p-8 rounded-[3rem] border-2 border-slate-100 shadow-xl relative overflow-hidden group" onClick={onToggle}>
+            <button className="w-full text-left bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[3rem] border-2 border-slate-100 dark:border-slate-800 shadow-xl relative overflow-hidden group transition-colors duration-300" onClick={onToggle}>
                 <div className="absolute inset-0 opacity-10 transition-opacity group-hover:opacity-20" style={{ backgroundColor: headerAccent }} />
                 <div className="relative z-10 flex items-center justify-between mb-6">
-                    <div><span className="px-3 py-1.5 bg-slate-100 text-slate-500 rounded-xl text-[10px] font-black uppercase mb-3 inline-block">{curr.grade || 'Pathway'}</span><h3 className="text-2xl md:text-3xl font-black text-slate-800 pr-4 leading-tight">{curr.title}</h3></div>
-                    <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-slate-200"><ChevronUp size={24} className={isExpanded ? '' : 'rotate-180 transition-transform'} /></div>
+                    <div>
+                        <span className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-xl text-[10px] font-black uppercase mb-3 inline-block transition-colors duration-300">{curr.grade || 'Pathway'}</span>
+                        <h3 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-slate-100 pr-4 leading-tight">{curr.title}</h3>
+                    </div>
+                    <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center text-slate-400 dark:text-slate-500 group-hover:bg-slate-200 dark:group-hover:bg-slate-700 transition-colors duration-300"><ChevronUp size={24} className={isExpanded ? '' : 'rotate-180 transition-transform'} /></div>
                 </div>
-                <div className="flex items-center gap-4"><div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden relative shadow-inner flex-1"><div className="h-full transition-all duration-1000" style={{ width: `${progressPercent}%`, backgroundColor: headerAccent }} /></div><span className="text-sm font-black text-slate-400 shrink-0">{progressPercent}%</span></div>
+                <div className="flex items-center gap-4">
+                    <div className="h-3 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden relative shadow-inner dark:shadow-none flex-1 transition-colors duration-300">
+                        <div className="h-full transition-all duration-1000" style={{ width: `${progressPercent}%`, backgroundColor: headerAccent }} />
+                    </div>
+                    <span className="text-sm font-black text-slate-400 dark:text-slate-500 shrink-0">{progressPercent}%</span>
+                </div>
             </button>
             <div className={`overflow-hidden transition-all duration-700 ${isExpanded ? 'max-h-[5000px] opacity-100 mt-[-2rem]' : 'max-h-0 opacity-0 pointer-events-none'}`}>
-                <div className="pt-16 pb-12 px-1 sm:px-4 bg-slate-100/50 rounded-b-[3rem] border-2 border-t-0 border-slate-100 relative">
+                <div className="pt-16 pb-12 px-1 sm:px-4 bg-slate-100/50 dark:bg-slate-900/50 rounded-b-[3rem] border-2 border-t-0 border-slate-100 dark:border-slate-800 relative transition-colors duration-300">
                     <div className="relative max-w-sm mx-auto w-full">
-                        <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-6 sm:w-8 bg-slate-200/60 rounded-full z-0" />
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-6 sm:w-8 rounded-full transition-all duration-1000 z-0 shadow-inner" style={{ height: `${currLessons.length > 1 ? (normalizedActiveIndex / (currLessons.length - 1)) * 100 : 100}%`, backgroundColor: headerAccent }} />
+                        <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-6 sm:w-8 bg-slate-200/60 dark:bg-slate-800/60 rounded-full z-0 transition-colors duration-300" />
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-6 sm:w-8 rounded-full transition-all duration-1000 z-0 shadow-inner dark:shadow-none" style={{ height: `${currLessons.length > 1 ? (normalizedActiveIndex / (currLessons.length - 1)) * 100 : 100}%`, backgroundColor: headerAccent }} />
                         <div className="relative z-10 flex flex-col gap-8 sm:gap-12 py-8">
                             {currLessons.map((item: any, index: number) => {
                                 const isCompleted = completedItems.includes(item.id);
@@ -786,14 +785,24 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
                                 const isLeft = index % 2 === 0;
                                 return (
                                     <div key={item.id} className={`relative flex w-full items-center min-h-[90px] ${isLocked ? 'opacity-60' : ''}`}>
-                                        <div className={`w-1/2 flex justify-end pr-10 sm:pr-14 z-10 ${!isLeft ? 'invisible' : ''}`}><div className={`bg-white p-3 rounded-2xl shadow-sm border-2 ${isCurrent ? 'border-indigo-300 scale-105' : 'border-slate-100'} w-full max-w-[150px] text-right`}><span className={`text-[9px] font-black uppercase mb-1 ${isCurrent ? 'text-indigo-500' : 'text-slate-400'}`}>{isExam ? 'Checkpoint' : `Module ${index + 1}`}</span><h4 className="font-black text-[11px] sm:text-sm text-slate-800 leading-tight">{item.title}</h4></div></div>
+                                        <div className={`w-1/2 flex justify-end pr-10 sm:pr-14 z-10 ${!isLeft ? 'invisible' : ''}`}>
+                                            <div className={`bg-white dark:bg-slate-900 p-3 rounded-2xl shadow-sm border-2 ${isCurrent ? 'border-indigo-300 dark:border-indigo-500/50 scale-105' : 'border-slate-100 dark:border-slate-800'} w-full max-w-[150px] text-right transition-colors duration-300`}>
+                                                <span className={`text-[9px] font-black uppercase mb-1 ${isCurrent ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>{isExam ? 'Checkpoint' : `Module ${index + 1}`}</span>
+                                                <h4 className="font-black text-[11px] sm:text-sm text-slate-800 dark:text-slate-100 leading-tight">{item.title}</h4>
+                                            </div>
+                                        </div>
                                         <div className={`absolute left-1/2 top-1/2 -translate-y-1/2 z-20 ${isLeft ? '-translate-x-[30%]' : '-translate-x-[70%]'}`}>
-                                            <button disabled={isLocked} onClick={() => onSelectLesson(item)} className={`relative w-16 h-16 sm:w-20 rounded-full flex items-center justify-center border-[6px] transition-all shadow-xl ${isCompleted ? 'bg-emerald-500 border-white text-white' : isCurrent ? `bg-white border-[${headerAccent}] text-slate-800 scale-110 animate-bounce-slow shadow-2xl` : 'bg-slate-100 border-white text-slate-400 cursor-not-allowed'}`} style={{ ...(isCurrent && !isExam ? { borderColor: headerAccent, color: headerAccent } : {}) }}>
+                                            <button disabled={isLocked} onClick={() => onSelectLesson(item)} className={`relative w-16 h-16 sm:w-20 rounded-full flex items-center justify-center border-[6px] transition-all shadow-xl ${isCompleted ? 'bg-emerald-500 border-white dark:border-slate-900 text-white' : isCurrent ? `bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 scale-110 animate-bounce-slow shadow-2xl` : 'bg-slate-100 dark:bg-slate-800 border-white dark:border-slate-900 text-slate-400 dark:text-slate-500 cursor-not-allowed'}`} style={{ ...(isCurrent && !isExam ? { borderColor: headerAccent, color: headerAccent } : {}) }}>
                                                 {isCompleted ? <CheckCircle2 size={24} strokeWidth={3} /> : isLocked ? <Lock size={20} /> : isExam ? <Trophy size={24} fill={isCurrent ? "currentColor" : "none"} /> : <Play size={24} className="ml-1" fill={isCurrent ? "currentColor" : "none"} />}
                                                 {isCurrent && <div className="absolute inset-0 -m-3 border-4 rounded-full animate-ping opacity-40" style={{ borderColor: isExam ? '#f43f5e' : headerAccent }} />}
                                             </button>
                                         </div>
-                                        <div className={`w-1/2 flex justify-start pl-10 sm:pl-14 z-10 ${isLeft ? 'invisible' : ''}`}><div className={`bg-white p-3 rounded-2xl shadow-sm border-2 ${isCurrent ? 'border-indigo-300 scale-105' : 'border-slate-100'} w-full max-w-[150px] text-left`}><span className={`text-[9px] font-black uppercase mb-1 ${isCurrent ? 'text-indigo-500' : 'text-slate-400'}`}>{isExam ? 'Checkpoint' : `Module ${index + 1}`}</span><h4 className="font-black text-[11px] sm:text-sm text-slate-800 leading-tight">{item.title}</h4></div></div>
+                                        <div className={`w-1/2 flex justify-start pl-10 sm:pl-14 z-10 ${isLeft ? 'invisible' : ''}`}>
+                                            <div className={`bg-white dark:bg-slate-900 p-3 rounded-2xl shadow-sm border-2 ${isCurrent ? 'border-indigo-300 dark:border-indigo-500/50 scale-105' : 'border-slate-100 dark:border-slate-800'} w-full max-w-[150px] text-left transition-colors duration-300`}>
+                                                <span className={`text-[9px] font-black uppercase mb-1 ${isCurrent ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>{isExam ? 'Checkpoint' : `Module ${index + 1}`}</span>
+                                                <h4 className="font-black text-[11px] sm:text-sm text-slate-800 dark:text-slate-100 leading-tight">{item.title}</h4>
+                                            </div>
+                                        </div>
                                     </div>
                                 );
                             })}
@@ -806,15 +815,15 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
 };
 
 const StandaloneAssignmentCard = ({ item, isCompleted, onSelectLesson, theme }: any) => (
-    <button className={`w-full text-left p-5 border-4 bg-white rounded-[2.5rem] flex items-center gap-4 transition-all group ${isCompleted ? 'border-emerald-100' : 'border-slate-100 shadow-md hover:border-indigo-100'}`} onClick={() => onSelectLesson(item)}>
-        <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center border-4 border-white shadow-inner transition-colors shrink-0 ${isCompleted ? 'bg-emerald-500 text-white' : `${theme.bg} text-white`}`}>{isCompleted ? <CheckCircle2 size={28} strokeWidth={3} /> : item.type === 'arcade_game' ? <Gamepad2 size={28} /> : <Play size={28} className="ml-1" fill="currentColor" />}</div>
-        <div className="flex-1 pr-2"><span className={`text-[10px] font-black uppercase mb-1 block ${isCompleted ? 'text-emerald-500' : 'text-slate-400'}`}>{isCompleted ? 'Completed' : 'Special Assignment'}</span><h4 className="font-black text-slate-800 text-xl leading-tight transition-colors">{item.title}</h4></div>
+    <button className={`w-full text-left p-5 border-4 bg-white dark:bg-slate-900 rounded-[2.5rem] flex items-center gap-4 transition-all group ${isCompleted ? 'border-emerald-100 dark:border-emerald-500/20' : 'border-slate-100 dark:border-slate-800 shadow-md hover:border-indigo-100 dark:hover:border-indigo-500/30'}`} onClick={() => onSelectLesson(item)}>
+        <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center border-4 border-white dark:border-slate-900 shadow-inner dark:shadow-none transition-colors shrink-0 ${isCompleted ? 'bg-emerald-500 text-white' : `${theme.bg} text-white`}`}>{isCompleted ? <CheckCircle2 size={28} strokeWidth={3} /> : item.type === 'arcade_game' ? <Gamepad2 size={28} /> : <Play size={28} className="ml-1" fill="currentColor" />}</div>
+        <div className="flex-1 pr-2"><span className={`text-[10px] font-black uppercase mb-1 block ${isCompleted ? 'text-emerald-500 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>{isCompleted ? 'Completed' : 'Special Assignment'}</span><h4 className="font-black text-slate-800 dark:text-slate-100 text-xl leading-tight transition-colors">{item.title}</h4></div>
     </button>
 );
 
 const ExamCard = ({ item, onSelectLesson }: any) => (
-    <button className="w-full text-left p-6 border-4 border-rose-100 bg-rose-50/50 rounded-[3rem] flex items-center gap-5 transition-all group" onClick={() => onSelectLesson(item)}>
-      <div className="w-20 h-20 rounded-[2rem] flex items-center justify-center bg-white text-rose-500 shadow-lg border-4 border-rose-100 shrink-0"><Trophy size={36} fill="currentColor" /></div>
-      <div><span className="text-[10px] font-black uppercase text-rose-500 tracking-widest bg-rose-100 px-3 py-1 rounded-lg mb-2 inline-block">High-Stakes Assessment</span><h4 className="font-black text-slate-900 text-2xl leading-tight transition-colors">{item.title}</h4></div>
+    <button className="w-full text-left p-6 border-4 border-rose-100 dark:border-rose-500/20 bg-rose-50/50 dark:bg-rose-500/10 rounded-[3rem] flex items-center gap-5 transition-all group duration-300" onClick={() => onSelectLesson(item)}>
+      <div className="w-20 h-20 rounded-[2rem] flex items-center justify-center bg-white dark:bg-slate-900 text-rose-500 dark:text-rose-400 shadow-lg border-4 border-rose-100 dark:border-rose-500/20 shrink-0 transition-colors duration-300"><Trophy size={36} fill="currentColor" /></div>
+      <div><span className="text-[10px] font-black uppercase text-rose-500 dark:text-rose-400 tracking-widest bg-rose-100 dark:bg-rose-500/20 px-3 py-1 rounded-lg mb-2 inline-block transition-colors duration-300">High-Stakes Assessment</span><h4 className="font-black text-slate-900 dark:text-white text-2xl leading-tight transition-colors">{item.title}</h4></div>
     </button>
 );
