@@ -1,10 +1,11 @@
 // src/components/instructor/CommandCenter.tsx
-import React, { useState, useMemo } from 'react'; // 🔥 Added useState
+import React, { useState, useMemo } from 'react';
 import { 
     Users, Zap, TrendingUp, AlertTriangle, Play, FileText, 
     Activity, ChevronRight, Shield, Target, Calendar,
     CheckCircle2 
 } from 'lucide-react';
+// 🔥 IMPORT THE NEW FEED COMPONENT
 import LiveActivityFeed from './LiveActivityFeed';
 import DeploymentModal from './DeploymentModal'; 
 
@@ -15,10 +16,11 @@ export default function CommandCenter({
     logs = [], 
     onLaunchLive, 
     setActiveTab,
-    lessons = [],    // 🔥 Ensure these are passed from InstructorDashboard
+    lessons = [],    
     allDecks = {}, 
     curriculums = [],
-    onAssign 
+    onAssign,
+    onRemoveStudent // Added for future-proofing triage actions
 }: any) {
     const [isDeployModalOpen, setIsDeployModalOpen] = useState(false); 
 
@@ -68,7 +70,7 @@ export default function CommandCenter({
         return alerts.slice(0, 3);
     }, [activeClass, logs]);
 
-    // 4. Calculate Fleet Velocity
+    // 4. Calculate Fleet Velocity (Last 5 Days)
     const weeklyActivity = useMemo(() => {
         const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
         const classLogs = logs.filter((l: any) => l.classId === activeClass?.id);
@@ -187,7 +189,6 @@ export default function CommandCenter({
                             </div>
                         </button>
                         
-                        {/* DEPLOY MISSION BUTTON */}
                         <button 
                             onClick={() => setIsDeployModalOpen(true)}
                             className="w-full p-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl flex items-center justify-between group transition-all active:scale-95"
@@ -224,6 +225,7 @@ export default function CommandCenter({
                     <div className="flex-1 overflow-hidden">
                         <LiveActivityFeed />
                     </div>
+                    
                     <button 
                         onClick={() => setActiveTab('logs')} 
                         className="mt-6 w-full py-3 bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border border-slate-100 dark:border-slate-700/50 active:scale-95 shrink-0"
