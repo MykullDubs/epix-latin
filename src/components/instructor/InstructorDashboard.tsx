@@ -309,6 +309,10 @@ export default function InstructorDashboard({
         selectedClassId={dashCohortId}
         setSelectedClassId={setDashCohortId}
         logs={activityLogs} // Passed from App.tsx/Hook
+        lessons={lessons} 
+        allDecks={allDecks} 
+        curriculums={curriculums}
+        onAssign={onAssign}
         onLaunchLive={() => setIsLiveModalOpen(true)} 
         setActiveTab={setActiveTab} 
     />
