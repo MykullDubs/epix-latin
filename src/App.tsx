@@ -21,6 +21,7 @@ import LessonView from './components/LessonView';
 import ClassView from './components/ClassView'; 
 import LiveVocabProjector from './components/LiveVocabProjector'; 
 import LiveConnectFourProjector from './components/LiveConnectFourProjector';
+import LiveSlipstreamProjector from './components/LiveSlipstreamProjector'; // 🔥 IMPORTED SLIPSTREAM
 import CelebrationScreen from './components/CelebrationScreen';
 
 export default function App() {
@@ -45,6 +46,7 @@ export default function App() {
   const [activePresentation, setActivePresentation] = useState<{lessonId: string, classId: string} | null>(null);
   const [activeVocabGame, setActiveVocabGame] = useState<{deckId: string, classId: string} | null>(null);
   const [activeConnectFour, setActiveConnectFour] = useState<{deckId: string, classId: string} | null>(null);
+  const [activeSlipstream, setActiveSlipstream] = useState<{deckId: string, classId: string} | null>(null); // 🔥 NEW STATE
 
   const allCurriculums = useMemo(() => {
       return [...GLOBAL_CURRICULUMS, ...(customCurriculums || [])];
@@ -89,6 +91,24 @@ export default function App() {
           setActiveConnectFour({ deckId, classId });
       } catch (error) {
           console.error("Failed to launch Squad Strike:", error);
+      }
+  };
+
+  // 🔥 NEW SLIPSTREAM LAUNCHER
+  const handleStartSlipstream = async (deckId: string, classId: string) => {
+      try {
+          const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
+          await setDoc(sessionRef, {
+              type: 'slipstream',
+              lessonId: deckId,
+              quizState: 'waiting',
+              joined: {},
+              progress: {},
+              timestamp: Date.now()
+          });
+          setActiveSlipstream({ deckId, classId });
+      } catch (error) {
+          console.error("Failed to launch Slipstream Run:", error);
       }
   };
 
@@ -148,7 +168,6 @@ export default function App() {
 
   useEffect(() => {
     const handlePopState = () => {
-      // 🔥 FIXED: new URLSearchParams instead of newSearchParams
       const params = new URLSearchParams(window.location.search);
       
       setCurrentView((params.get('view') as any) || 'student');
@@ -241,7 +260,24 @@ export default function App() {
     );
   }
 
-  // 5. ADMIN VIEW
+  // 🔥 5. PROJECTOR MODE (Slipstream Run)
+  if (activeSlipstream) {
+    const deck = allDecks[activeSlipstream.deckId] || allDecks.custom;
+    const activeClassForSlipstream = instructorClasses.find(c => c.id === activeSlipstream.classId) || enrolledClasses.find(c => c.id === activeSlipstream.classId);
+
+    return (
+      <div className="fixed inset-0 z-[5000] bg-black flex flex-col">
+        <LiveSlipstreamProjector 
+             deck={deck} 
+             classId={activeSlipstream.classId} 
+             activeClass={activeClassForSlipstream} 
+             onExit={() => setActiveSlipstream(null)} 
+          />
+      </div>
+    );
+  }
+
+  // 6. ADMIN VIEW
   if (currentView === 'admin' && (userData?.role === 'admin' || userData?.role === 'org_admin')) {
     return (
         <div className="h-screen w-full relative">
@@ -257,7 +293,7 @@ export default function App() {
     );
   }
 
-  // 6. INSTRUCTOR VIEW
+  // 7. INSTRUCTOR VIEW
   if (currentView === 'instructor' && userData?.role !== 'student') {
     return (
       <InstructorDashboard 
@@ -282,7 +318,8 @@ export default function App() {
         onRemoveStudent={actions.removeStudent} 
         onStartPresentation={(lessonId: string, classId: string) => setActivePresentation({ lessonId, classId })}
         onStartVocabGame={handleStartVocabGame}      
-        onStartConnectFour={handleStartConnectFour}  
+        onStartConnectFour={handleStartConnectFour} 
+        onStartSlipstream={handleStartSlipstream} // 🔥 WIRED SLIPSTREAM UP TO DASHBOARD
         onPublishDeck={actions.publishDeck}
         onSwitchView={() => setCurrentView('student')}
         onLogout={actions.logout} 
@@ -291,7 +328,7 @@ export default function App() {
     );
   }
 
-  // 7. STUDENT MOBILE APP
+  // 8. STUDENT MOBILE APP
   return (
     <div className="bg-slate-50 dark:bg-slate-950 min-h-screen w-full flex flex-col items-center relative overflow-hidden transition-colors duration-300">
       {userData?.role !== 'student' && (
