@@ -5,7 +5,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { 
   doc, onSnapshot, collection, addDoc, setDoc, updateDoc, 
   deleteDoc, query, where, collectionGroup, increment, arrayUnion, arrayRemove,
-  orderBy, limit // 🔥 Added for Live Pulse
+  orderBy, limit, getDoc // 🔥 Added getDoc for the Removal Protocol
 } from "firebase/firestore";
 
 export function useMagisterData() {
@@ -18,14 +18,11 @@ export function useMagisterData() {
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [instructorClasses, setInstructorClasses] = useState<any[]>([]); 
   
-  // Custom Curriculums State
   const [customCurriculums, setCustomCurriculums] = useState<any[]>([]);
   
-  // Split the streams to prevent data collisions
   const [privateDecks, setPrivateDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
   const [publishedDecks, setPublishedDecks] = useState<any[]>([]);
 
-  // 🔥 NEW: State for the Bento Box Live Pulse
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
 
   useEffect(() => {
@@ -38,19 +35,16 @@ export function useMagisterData() {
     });
 
     if (user?.uid) {
-      // 1. Monitor User Profile (XP, Streaks, Roles)
       const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
         if (snap.exists()) setUserData(snap.data());
         setAuthChecked(true);
       });
 
-      // 2. Magic Vacuum: Pull all lessons available in this appId
       const unsubLessons = onSnapshot(collectionGroup(db, 'custom_lessons'), (snap) => {
         const fetchedLessons = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         setAllAppLessons(fetchedLessons);
       });
 
-      // 3. Card & Deck Logic (Private / Local Cards)
       const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => {
         const cards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         const decks: any = { custom: { title: 'Scriptorium', cards: [] } };
@@ -65,29 +59,24 @@ export function useMagisterData() {
         setPrivateDecks(decks); 
       });
 
-      // 4. Classes (Student View)
       const qClasses = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', user.email));
       const unsubClasses = onSnapshot(qClasses, (snap) => {
         setEnrolledClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
-      // 5. Classes (Instructor View)
       const unsubInstructorClasses = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), (snap) => {
         setInstructorClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
-      // 6. THE NETWORK STREAM: Listen for global/restricted published decks
       const unsubPublished = onSnapshot(collection(db, 'artifacts', appId, 'published_decks'), (snap) => {
         setPublishedDecks(snap.docs.map(d => d.data()));
       });
 
-      // 7. THE PATHWAY STREAM: Listen for custom curriculums
       const unsubCurriculums = onSnapshot(collectionGroup(db, 'custom_curriculums'), (snap) => {
         const fetchedCurriculums = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         setCustomCurriculums(fetchedCurriculums);
       });
 
-      // 🔥 8. THE ACTIVITY STREAM: Listen for the Live Pulse (Bento Box Feed)
       const qLogs = query(collection(db, 'artifacts', appId, 'activity_logs'), orderBy('timestamp', 'desc'), limit(20));
       const unsubLogs = onSnapshot(qLogs, (snap) => {
           setActivityLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -169,6 +158,24 @@ export function useMagisterData() {
       });
     },
 
+    // 🔥 NEW: Removal action to fix your roster bug
+    removeStudent: async (classId: string, studentEmail: string) => {
+      if (!user) return;
+      const classRef = doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId);
+      
+      const classSnap = await getDoc(classRef);
+      if (!classSnap.exists()) return;
+      
+      const classData = classSnap.data();
+      // Find the exact object in the array to ensure arrayRemove works
+      const studentObject = classData.students?.find((s: any) => s.email === studentEmail);
+
+      await updateDoc(classRef, {
+        studentEmails: arrayRemove(studentEmail),
+        ...(studentObject ? { students: arrayRemove(studentObject) } : {})
+      });
+    },
+
     assignContent: async (classId: string, assignmentId: any) => {
       if (!user) return;
       await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId), {
@@ -206,7 +213,6 @@ export function useMagisterData() {
       });
     },
 
-    // 🔥 THE FIX: Integrated the updateCard action
     updateCard: async (cardId: string, cardData: any) => {
       if (!user) return;
       const cardRef = doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId);
@@ -284,7 +290,6 @@ export function useMagisterData() {
 
   const allLessons = useMemo(() => allAppLessons, [allAppLessons]);
 
-  // Added activityLogs to the return object!
   return { 
     user, userData, authChecked, activeOrg, allLessons, 
     enrolledClasses, instructorClasses, allDecks, 
