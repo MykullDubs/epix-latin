@@ -1,7 +1,8 @@
-// src/components/student/StudentSlipstreamView.tsx
+// src/components/StudentSlipstreamView.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db, appId } from '../../config/firebase';
+// 🔥 FIXED THE IMPORT PATH HERE: Just one level up!
+import { db, appId } from '../config/firebase';
 import { Zap, AlertTriangle, Gauge, CheckCircle2, ShieldAlert } from 'lucide-react';
 
 export default function StudentSlipstreamView({ user, classId, deck, liveState, onExit }: any) {
