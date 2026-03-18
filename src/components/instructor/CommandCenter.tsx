@@ -1,12 +1,12 @@
 // src/components/instructor/CommandCenter.tsx
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react'; // 🔥 Added useState
 import { 
     Users, Zap, TrendingUp, AlertTriangle, Play, FileText, 
     Activity, ChevronRight, Shield, Target, Calendar,
     CheckCircle2 
 } from 'lucide-react';
-// 🔥 IMPORT THE NEW FEED COMPONENT
 import LiveActivityFeed from './LiveActivityFeed';
+import DeploymentModal from './DeploymentModal'; 
 
 export default function CommandCenter({ 
     classes = [], 
@@ -14,9 +14,14 @@ export default function CommandCenter({
     setSelectedClassId, 
     logs = [], 
     onLaunchLive, 
-    setActiveTab 
+    setActiveTab,
+    lessons = [],    // 🔥 Ensure these are passed from InstructorDashboard
+    allDecks = {}, 
+    curriculums = [],
+    onAssign 
 }: any) {
-    
+    const [isDeployModalOpen, setIsDeployModalOpen] = useState(false); 
+
     // 1. Resolve Active Class
     const activeClass = useMemo(() => 
         classes.find((c: any) => c.id === selectedClassId) || classes[0], 
@@ -63,7 +68,7 @@ export default function CommandCenter({
         return alerts.slice(0, 3);
     }, [activeClass, logs]);
 
-    // 4. Calculate Fleet Velocity (Last 5 Days)
+    // 4. Calculate Fleet Velocity
     const weeklyActivity = useMemo(() => {
         const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
         const classLogs = logs.filter((l: any) => l.classId === activeClass?.id);
@@ -79,14 +84,25 @@ export default function CommandCenter({
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-y-auto custom-scrollbar px-4 md:px-8 pt-6 pb-32 transition-colors duration-300">
             
+            {/* THE DEPLOYMENT MODAL */}
+            <DeploymentModal 
+                isOpen={isDeployModalOpen}
+                onClose={() => setIsDeployModalOpen(false)}
+                onDeploy={onAssign}
+                activeClass={activeClass}
+                lessons={lessons}
+                allDecks={allDecks}
+                curriculums={curriculums}
+            />
+
             {/* COHORT SELECTOR HEADER */}
             <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div>
-                    <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter mb-2">
+                    <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter mb-2 uppercase italic">
                         Command Center
                     </h1>
-                    <p className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                        <Shield size={14} className="text-indigo-500" /> System Overview
+                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">
+                        <Shield size={14} className="text-indigo-500" /> Tactical HUD
                     </p>
                 </div>
 
@@ -170,11 +186,17 @@ export default function CommandCenter({
                                 <span className="font-black text-sm uppercase tracking-widest">Launch Live Arena</span>
                             </div>
                         </button>
-                        <button className="w-full p-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl flex items-center justify-between group transition-all active:scale-95">
+                        
+                        {/* DEPLOY MISSION BUTTON */}
+                        <button 
+                            onClick={() => setIsDeployModalOpen(true)}
+                            className="w-full p-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl flex items-center justify-between group transition-all active:scale-95"
+                        >
                             <div className="flex items-center gap-3">
                                 <FileText size={20} className="text-emerald-400" />
-                                <span className="font-black text-sm uppercase tracking-widest">Deploy Exam</span>
+                                <span className="font-black text-sm uppercase tracking-widest">Deploy Mission</span>
                             </div>
+                            <ChevronRight size={16} className="text-slate-500 group-hover:translate-x-1 transition-transform" />
                         </button>
                     </div>
                 </div>
@@ -199,11 +221,9 @@ export default function CommandCenter({
 
                 {/* 5. BOTTOM RIGHT: LIVE ACTIVITY FEED */}
                 <div className="lg:col-span-1 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col transition-all min-h-[400px]">
-                    {/* 🔥 THE INTEGRATED FEED COMPONENT */}
                     <div className="flex-1 overflow-hidden">
                         <LiveActivityFeed />
                     </div>
-                    
                     <button 
                         onClick={() => setActiveTab('logs')} 
                         className="mt-6 w-full py-3 bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border border-slate-100 dark:border-slate-700/50 active:scale-95 shrink-0"
