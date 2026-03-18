@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { 
     Users, Plus, X, Flame, BookOpen, Edit3, Trash2, Mail, 
     Activity, Search, Gamepad2, CheckCircle2, Monitor, Filter, 
-    Library, Package, Puzzle, Play, Zap, Swords 
+    Library, Package, Puzzle, Play, Zap, Swords, AlertTriangle // 🔥 Added AlertTriangle
 } from 'lucide-react';
 
 export default function ClassManagerView({ 
@@ -20,7 +20,7 @@ export default function ClassManagerView({
     onRenameClass, 
     onUpdateClassDescription,
     onAddStudent,
-    onRemoveStudent, // 🔥 Added Prop
+    onRemoveStudent, 
     onStartPresentation,
     onStartVocabGame,
     onStartConnectFour 
@@ -31,9 +31,13 @@ export default function ClassManagerView({
     
     const [newStudentEmail, setNewStudentEmail] = useState('');
     const [isCreatingCohort, setIsCreatingCohort] = useState(false);
+    const [newCohortName, setNewCohortName] = useState('');
     const [searchQuery, setSearchQuery] = useState(''); 
     const [lessonSearch, setLessonSearch] = useState(''); 
     const [activeSubjectFilter, setActiveSubjectFilter] = useState('All'); 
+
+    // 🔥 NEW STATE: Tactical Confirmation Overlay
+    const [confirmDelete, setConfirmDelete] = useState<{cid: string, email: string} | null>(null);
 
     const activeClass = classes.find((c: any) => c.id === selectedClassId);
 
@@ -67,8 +71,6 @@ export default function ClassManagerView({
         setIsCreatingCohort(false);
     };
 
-    const [newCohortName, setNewCohortName] = useState('');
-
     const handleAddStudent = (e: React.FormEvent) => {
         e.preventDefault();
         if (!newStudentEmail.trim() || !activeClass) return;
@@ -87,6 +89,39 @@ export default function ClassManagerView({
     return (
         <div className="h-full max-w-7xl mx-auto flex flex-col md:flex-row gap-6 pb-24 animate-in fade-in duration-500 font-sans min-h-0 transition-colors">
             
+            {/* 🔥 THE TACTICAL CONFIRMATION OVERLAY */}
+            {confirmDelete && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 animate-in fade-in duration-200">
+                    <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-md" onClick={() => setConfirmDelete(null)} />
+                    <div className="relative bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 p-10 rounded-[3rem] shadow-2xl max-w-sm w-full text-center animate-in zoom-in-95 duration-300">
+                        <div className="w-20 h-20 bg-rose-50 dark:bg-rose-500/10 text-rose-500 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                            <AlertTriangle size={40} />
+                        </div>
+                        <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 uppercase tracking-tighter">Decommission Scholar?</h3>
+                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-8">
+                            This will remove <span className="font-black text-indigo-500">{confirmDelete.email}</span> from the fleet permanently.
+                        </p>
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={() => setConfirmDelete(null)}
+                                className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                            >
+                                Abort
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    onRemoveStudent(confirmDelete.cid, confirmDelete.email);
+                                    setConfirmDelete(null);
+                                }}
+                                className="flex-1 py-4 bg-rose-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-rose-500/30 hover:bg-rose-600 active:scale-95 transition-all"
+                            >
+                                Confirm
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* LEFT PANE: THE COHORT LIST */}
             <div className="w-full md:w-[340px] flex flex-col gap-6 shrink-0 min-h-0">
                 <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group shrink-0 transition-colors">
@@ -188,12 +223,11 @@ export default function ClassManagerView({
                                                             </div>
                                                         </td>
                                                         <td className="px-8 py-5 text-right">
-                                                            {/* 🔥 FIXED: WIRE UP THE REMOVE STUDENT ACTION */}
                                                             <button 
-                                                                onClick={() => { if(window.confirm(`Remove ${s.email} from cohort?`)) onRemoveStudent(activeClass.id, s.email); }}
+                                                                onClick={() => setConfirmDelete({ cid: activeClass.id, email: s.email })}
                                                                 className="p-2.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl transition-all opacity-0 group-hover:opacity-100"
                                                             >
-                                                                <X size={18} strokeWidth={3} />
+                                                                <Trash2 size={18} />
                                                             </button>
                                                         </td>
                                                     </tr>
@@ -222,7 +256,6 @@ export default function ClassManagerView({
                                         ))}
                                     </div>
 
-                                    {/* MAPPING REMAINS LARGELY SAME BUT WITH DARK MODE CLASSES */}
                                     {assignMode === 'packages' && (
                                         <div className="space-y-8">
                                             <div className="flex flex-col md:flex-row gap-4">
