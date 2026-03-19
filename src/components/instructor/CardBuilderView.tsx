@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
     Layers, Plus, X, Save, Edit3, Trash2, FileJson, Database, 
     Loader2, FolderPlus, FolderOpen, Share2, Lock, Users, 
-    Globe, CheckCircle2, Paperclip, ChevronRight, Wand2
+    Globe, CheckCircle2, Paperclip, ChevronRight, Wand2, BookOpen
 } from 'lucide-react';
 import { INITIAL_SYSTEM_DECKS } from '../../constants/defaults';
 import { Toast } from '../Toast';
@@ -106,8 +106,10 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
     const [conjugations, setConjugations] = useState<Record<string, Record<string, string>>>({});
     const [tempConj, setTempConj] = useState({ tense: 'Present', person: '1s', verb: '' });
 
-    // 🔥 STATE FOR THE MAGIC WAND
+    // 🔥 STATE FOR MAGIC AUTO-FILL & DISAMBIGUATION MODAL
     const [isAutoFilling, setIsAutoFilling] = useState(false);
+    const [showDefSelector, setShowDefSelector] = useState(false);
+    const [fetchedOptions, setFetchedOptions] = useState<any[]>([]);
 
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -142,7 +144,7 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
         } 
     };
 
-    // 🔥 UPGRADED: MAGIC AUTO-FILL LOGIC
+    // 🔥 HIGH-TACTICAL MAGIC AUTO-FILL (Handles Multiple Definitions)
     const handleMagicAutoFill = async (e: React.MouseEvent) => {
         e.preventDefault();
         const queryWord = formData.front.trim();
@@ -151,32 +153,39 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
         setIsAutoFilling(true);
         try {
             const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${queryWord}`);
-            
             if (!response.ok) throw new Error("Word not found in global dictionary");
             
             const data = await response.json();
             
-            // 1. Harvest the IPA
+            // Extract the IPA (usually shared across meanings)
             const textEntry = data[0]?.phonetics?.find((p: any) => p.text);
             const fetchedIpa = textEntry?.text || data[0]?.phonetic || '';
 
-            // 2. Harvest the Meaning & Part of Speech
-            const firstMeaning = data[0]?.meanings?.[0];
-            const fetchedType = firstMeaning?.partOfSpeech || 'noun';
-            const fetchedDefinition = firstMeaning?.definitions?.[0]?.definition || '';
-
-            // Validate Word Type (Dropdown safety check)
+            // Extract ALL definitions across ALL parts of speech
+            const options: any[] = [];
             const validTypes = ['noun', 'verb', 'adjective', 'adverb'];
-            const safeType = validTypes.includes(fetchedType.toLowerCase()) ? fetchedType.toLowerCase() : 'noun';
 
-            if (fetchedIpa || fetchedDefinition) {
-                setFormData(prev => ({ 
-                    ...prev, 
-                    ipa: fetchedIpa || prev.ipa,
-                    back: fetchedDefinition || prev.back,
-                    type: safeType
-                }));
+            data[0]?.meanings?.forEach((meaning: any) => {
+                const rawPos = meaning.partOfSpeech || 'noun';
+                const safeType = validTypes.includes(rawPos.toLowerCase()) ? rawPos.toLowerCase() : 'noun';
+                
+                meaning.definitions?.forEach((def: any) => {
+                    options.push({
+                        type: safeType,
+                        definition: def.definition,
+                        ipa: fetchedIpa
+                    });
+                });
+            });
+
+            if (options.length === 1) {
+                // If there's only one possible meaning, just auto-fill it instantly
+                setFormData(prev => ({ ...prev, ipa: options[0].ipa, back: options[0].definition, type: options[0].type }));
                 setToastMsg("Target data auto-filled! ✨");
+            } else if (options.length > 1) {
+                // If there are multiple meanings, open the disambiguation selector
+                setFetchedOptions(options);
+                setShowDefSelector(true);
             } else {
                 setToastMsg("No extended data found for this exact word.");
             }
@@ -367,6 +376,45 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                     onPublish={onPublishDeck}
                 />
             )}
+
+            {/* 🔥 NEW DISAMBIGUATION MODAL */}
+            {showDefSelector && (
+                <div className="fixed inset-0 z-[9999] bg-slate-900/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-950 w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 duration-300 max-h-[80vh] flex flex-col">
+                        
+                        <div className="px-6 py-5 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
+                            <div>
+                                <h2 className="text-xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-2">
+                                    <BookOpen size={20} className="text-indigo-500" /> Disambiguation Required
+                                </h2>
+                                <p className="text-xs font-bold text-slate-400 mt-1">Select the correct definition for <span className="text-indigo-500 uppercase tracking-widest ml-1">"{formData.front}"</span></p>
+                            </div>
+                            <button onClick={() => setShowDefSelector(false)} className="p-2 bg-white dark:bg-slate-800 rounded-full hover:bg-rose-50 dark:hover:bg-rose-900/30 text-slate-400 dark:text-slate-500 hover:text-rose-500 transition-colors shadow-sm"><X size={20} strokeWidth={3}/></button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-3 bg-slate-50 dark:bg-slate-950">
+                            {fetchedOptions.map((opt, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => {
+                                        setFormData(prev => ({ ...prev, ipa: opt.ipa, back: opt.definition, type: opt.type }));
+                                        setShowDefSelector(false);
+                                        setToastMsg("Target data auto-filled! ✨");
+                                    }}
+                                    className="w-full text-left p-5 rounded-[1.5rem] border-2 border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all group active:scale-[0.98] shadow-sm hover:shadow-md"
+                                >
+                                    <span className="inline-block px-3 py-1 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-lg text-[10px] font-black uppercase tracking-widest mb-3 border border-indigo-100 dark:border-indigo-500/20">
+                                        {opt.type}
+                                    </span>
+                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300 group-hover:text-indigo-900 dark:group-hover:text-indigo-100 transition-colors leading-relaxed">
+                                        {opt.definition}
+                                    </p>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
             
             <div className="bg-indigo-50 dark:bg-indigo-950 p-4 rounded-xl border border-indigo-100 dark:border-indigo-500/20 mb-4 text-sm text-indigo-800 dark:text-indigo-300 flex justify-between items-center transition-colors">
                 <div><p className="font-bold flex items-center gap-2"><Layers size={16}/> Deck Builder</p></div>
@@ -398,7 +446,6 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                         )}
                     </section>
 
-                    {/* 🔥 THE MAGIC AUTO-FILL CORE DATA SECTION */}
                     <section className="space-y-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
                         <div className="flex items-center justify-between mb-2">
                             <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest">Core Data</h3>
@@ -413,9 +460,8 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                                         value={formData.front} 
                                         onChange={handleChange} 
                                         className="w-full p-4 pl-4 pr-16 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-bold focus:border-indigo-500 outline-none transition-colors" 
-                                        placeholder="e.g. Ubiquitous" 
+                                        placeholder="e.g. Incorporate" 
                                     />
-                                    {/* 🔥 MOVED WAND HERE FOR FULL AUTO-FILL */}
                                     <button 
                                         type="button"
                                         onClick={handleMagicAutoFill}
@@ -429,11 +475,10 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                             </div>
                             <div className="flex flex-col gap-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Meaning (Back)</label>
-                                <input name="back" value={formData.back} onChange={handleChange} className="w-full p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-bold focus:border-indigo-500 outline-none transition-colors" placeholder="e.g. Present everywhere" />
+                                <input name="back" value={formData.back} onChange={handleChange} className="w-full p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-bold focus:border-indigo-500 outline-none transition-colors" placeholder="e.g. To include as part of a whole" />
                             </div>
                         </div>
 
-                        {/* Phonetics & Type Row */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="flex flex-col gap-2 md:col-span-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Phonetics (IPA)</label>
@@ -442,7 +487,7 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                                     value={formData.ipa} 
                                     onChange={handleChange} 
                                     className="w-full p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 font-mono text-slate-800 dark:text-white focus:border-indigo-500 outline-none transition-colors" 
-                                    placeholder="e.g. /juːˈbɪkwɪtəs/" 
+                                    placeholder="e.g. /ɪnˈkɔːpəɹeɪt/" 
                                 />
                             </div>
 
