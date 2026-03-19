@@ -36,10 +36,11 @@ export default function InstructorDashboard({
   onRenameClass,
   onUpdateClassDescription,
   onAddStudent,
-  onRemoveStudent,   // 🔥 1. PROP CAUGHT FROM APP.TSX
+  onRemoveStudent,   
   onStartPresentation, 
   onStartVocabGame,
-  onStartConnectFour, 
+  onStartConnectFour,
+  onStartSlipstream, // 🔥 1. SUCCESSFULLY CAUGHT FROM APP.TSX
   onPublishDeck, 
   onSwitchView, 
   onLogout,
@@ -186,11 +187,13 @@ export default function InstructorDashboard({
       <main className="flex-1 overflow-hidden relative bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
         <div className="h-full w-full">
             
-           {activeTab === 'admin' && AdminDashboardView ? (
+           {activeTab === 'admin' && AdminDashboardView && (
              <div className="h-full animate-in zoom-in-95 duration-500">
                <AdminDashboardView user={userData} />
              </div>
-           ) : activeTab === 'studio' ? (
+           )}
+
+           {activeTab === 'studio' && (
              <div className="h-full animate-in zoom-in-95 duration-500">
                <BuilderHub 
                  onSaveLesson={onSaveLesson} 
@@ -202,7 +205,9 @@ export default function InstructorDashboard({
                  instructorClasses={userData?.classes || []}
                />
              </div>
-           ) : activeTab === 'classes' ? (
+           )}
+
+           {activeTab === 'classes' && (
              <div className="h-full p-6 md:p-12 overflow-y-auto custom-scrollbar animate-in slide-in-from-right-6 duration-500">
                <ClassManagerView 
                   user={user} 
@@ -218,13 +223,15 @@ export default function InstructorDashboard({
                   onRenameClass={onRenameClass} 
                   onUpdateClassDescription={onUpdateClassDescription} 
                   onAddStudent={onAddStudent} 
-                  onRemoveStudent={onRemoveStudent} // 🔥 2. SUCCESSFULLY PASSED DOWN
+                  onRemoveStudent={onRemoveStudent} 
                   onStartPresentation={onStartPresentation} 
                   onStartVocabGame={onStartVocabGame}
                   onStartConnectFour={onStartConnectFour} 
                />
              </div>
-           ) : activeTab === 'vault' ? (
+           )}
+
+           {activeTab === 'vault' && (
              <div className="h-full overflow-y-auto p-6 md:p-12 custom-scrollbar animate-in slide-in-from-bottom-6 duration-500">
                 <div className="max-w-6xl mx-auto space-y-8">
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 border-b border-slate-200 dark:border-slate-800 pb-8 transition-colors">
@@ -303,14 +310,17 @@ export default function InstructorDashboard({
                     </div>
                 </div>
              </div>
-           ) : (
+           )}
+
+           {/* This block handles the dashboard, analytics, and inbox depending on the tab */}
+           {['dashboard', 'analytics', 'inbox'].includes(activeTab) && (
              <div className="h-full overflow-y-auto custom-scrollbar animate-in fade-in duration-700">
                 {activeTab === 'dashboard' && (
                   <CommandCenter 
                       classes={userData?.classes || []}
                       selectedClassId={dashCohortId}
                       setSelectedClassId={setDashCohortId}
-                      logs={activityLogs} // Passed from App.tsx/Hook
+                      logs={activityLogs} 
                       lessons={lessons} 
                       allDecks={allDecks} 
                       curriculums={curriculums}
@@ -333,12 +343,18 @@ export default function InstructorDashboard({
                decks={allDecks}
                onDeploy={(config: any) => {
                    setIsLiveModalOpen(false);
-                   // Parameter order correctly matched to App.tsx signatures: (deckId, classId)
-                   if (config.mode === 'connect_four') {
-                       if (onStartConnectFour) onStartConnectFour(config.contentId, config.classId);
-                   } else if (config.mode === 'trivia') {
-                       if (onStartVocabGame) onStartVocabGame(config.contentId, config.classId);
-                   }
+                   
+                   // Delay the launch by a fraction of a second to allow the modal to animate out smoothly
+                   setTimeout(() => {
+                       if (config.mode === 'connect_four') {
+                           if (onStartConnectFour) onStartConnectFour(config.contentId, config.classId);
+                       } else if (config.mode === 'trivia') {
+                           if (onStartVocabGame) onStartVocabGame(config.contentId, config.classId);
+                       } else if (config.mode === 'slipstream') {
+                           // 🔥 2. SUCCESSFULLY WIRED
+                           if (onStartSlipstream) onStartSlipstream(config.contentId, config.classId);
+                       }
+                   }, 300);
                }}
            />
 
