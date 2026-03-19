@@ -105,8 +105,8 @@ export default function InstructorDashboard({
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 overflow-hidden font-sans select-none transition-colors duration-300">
       
-      <aside 
-        className={`bg-slate-950 dark:bg-black flex flex-col transition-all duration-500 ease-in-out z-50 shadow-[20px_0_40px_rgba(0,0,0,0.1)] dark:shadow-[20px_0_40px_rgba(0,0,0,0.4)] ${
+    <aside 
+        className={`bg-slate-950 dark:bg-black flex flex-col overflow-x-hidden transition-all duration-500 ease-in-out z-50 shadow-[20px_0_40px_rgba(0,0,0,0.1)] dark:shadow-[20px_0_40px_rgba(0,0,0,0.4)] ${
           isRailExpanded ? 'w-72' : 'w-20'
         }`}
       >
@@ -137,8 +137,8 @@ export default function InstructorDashboard({
           )}
         </div>
 
-        <nav className="flex-1 px-3 py-8 space-y-2 overflow-y-auto custom-scrollbar">
-          <nav className="flex-1 px-3 py-8 space-y-2 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        {/* 🔥 UPGRADED: Invisible scrollbar applied here */}
+        <nav className="flex-1 px-3 py-8 space-y-2 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <NavItem id="dashboard" icon={<Activity />} label="Live Feed" />
           <NavItem id="studio" icon={<PenTool />} label="Studio Hub" />
           <NavItem id="classes" icon={<School />} label="Cohort Manager" />
@@ -183,7 +183,6 @@ export default function InstructorDashboard({
           </button>
         </div>
       </aside>
-
       {/* --- MAIN STAGE --- */}
       <main className="flex-1 overflow-hidden relative bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
         <div className="h-full w-full">
