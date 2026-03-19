@@ -16,8 +16,6 @@ import {
 
 import StudentGradebook from './StudentGradebook';
 import LeaderboardView from './LeaderboardView';
-
-// 🔥 IMPORT THE NEW SLIPSTREAM VIEW
 import StudentSlipstreamView from './StudentSlipstreamView';
 
 // --- THEME HELPER (Dark Mode Upgraded) ---
@@ -42,8 +40,8 @@ const ForumAvatar = ({ url, name, role, size = "md" }: any) => {
                 {url ? <img src={url} alt={`${name}'s avatar`} className="w-full h-full object-cover" /> : <span aria-hidden="true">{initials}</span>}
             </div>
             {role === 'instructor' && (
-                <div className="absolute -top-1 -right-1 bg-indigo-600 rounded-full border-2 border-white dark:border-slate-900 p-0.5 shadow-sm">
-                    <Shield size={size === 'xs' ? 8 : 10} className="text-white" />
+                <div className="absolute -top-1.5 -right-1.5 bg-indigo-600 rounded-full border-2 border-white dark:border-slate-900 p-0.5 shadow-md">
+                    <Shield size={size === 'xs' ? 8 : 10} className="text-white" fill="currentColor" />
                 </div>
             )}
         </div>
@@ -75,20 +73,26 @@ const VoiceRecorder = ({ onRecordingComplete, onCancel }: any) => {
     } catch (err) { alert("Microphone access denied."); }
   };
   const stopRecording = () => { mediaRecorderRef.current?.stop(); setIsRecording(false); };
+  
   return (
-    <div className="bg-indigo-50/50 dark:bg-indigo-500/10 p-4 rounded-2xl border-2 border-indigo-100 dark:border-indigo-500/20 flex items-center justify-between transition-colors duration-300">
+    <div className="bg-slate-50 dark:bg-slate-950/50 p-2 pl-4 rounded-full border border-slate-200 dark:border-slate-800 flex items-center justify-between transition-colors duration-300">
       {!audioUrl ? (
         <div className="flex items-center gap-4 w-full">
-          <div className={`w-3 h-3 rounded-full bg-rose-500 ${isRecording ? 'animate-pulse' : 'opacity-30'}`} />
-          <span className="text-xs font-black text-indigo-900 dark:text-indigo-300 uppercase tracking-widest flex-1">{isRecording ? "Recording..." : "Voice Response"}</span>
-          <button type="button" onClick={isRecording ? stopRecording : startRecording} className={`p-3 rounded-full ${isRecording ? 'bg-rose-500 text-white animate-pulse' : 'bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400'}`}>
-            {isRecording ? <Square size={18} fill="white" /> : <Mic size={18} />}
+          <div className={`w-2.5 h-2.5 rounded-full ${isRecording ? 'bg-rose-500 animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.6)]' : 'bg-slate-300 dark:bg-slate-700'}`} />
+          <span className={`text-[10px] font-black uppercase tracking-widest flex-1 ${isRecording ? 'text-rose-500' : 'text-slate-400'}`}>
+              {isRecording ? "Recording Transmission..." : "Attach Voice Memo"}
+          </span>
+          <button type="button" onClick={isRecording ? stopRecording : startRecording} className={`w-10 h-10 flex items-center justify-center rounded-full transition-all active:scale-95 ${isRecording ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md'}`}>
+            {isRecording ? <Square size={14} fill="currentColor" /> : <Mic size={16} />}
           </button>
         </div>
       ) : (
         <div className="flex items-center gap-3 w-full animate-in fade-in">
-          <audio src={audioUrl} controls className="h-8 flex-1" />
-          <button type="button" onClick={() => { setAudioUrl(null); onCancel(); }} className="text-rose-500 dark:text-rose-400 text-xs font-black uppercase px-2 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg py-2">Discard</button>
+          <div className="w-8 h-8 bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center shrink-0">
+              <Mic size={14} />
+          </div>
+          <audio src={audioUrl} controls className="h-8 flex-1 opacity-90 grayscale" />
+          <button type="button" onClick={() => { setAudioUrl(null); onCancel(); }} className="text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 w-8 h-8 flex items-center justify-center rounded-full transition-colors"><X size={16} strokeWidth={3} /></button>
         </div>
       )}
     </div>
@@ -96,7 +100,7 @@ const VoiceRecorder = ({ onRecordingComplete, onCancel }: any) => {
 };
 
 // ============================================================================
-//  INTERNAL FORUM COMPONENT
+//  INTERNAL FORUM COMPONENT (🔥 UPGRADED TACTICAL UI)
 // ============================================================================
 const ClassForum = ({ classId, userData }: { classId: string, userData: any }) => {
   const [view, setView] = useState<'list' | 'thread'>('list');
@@ -174,30 +178,67 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
     setCommentText(""); setReplyingToId(null);
   };
 
+  const formatDate = (ts: number) => {
+      return new Date(ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
   if (view === 'list') {
     return (
-      <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 shadow-inner p-6 overflow-hidden animate-in fade-in duration-500 font-sans transition-colors duration-300">
+      <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 shadow-inner p-4 md:p-6 overflow-hidden animate-in fade-in duration-500 font-sans transition-colors duration-300">
         <header className="flex justify-between items-center mb-6 px-2">
-            <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tighter">Discussions</h3>
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-500/10 text-indigo-500 rounded-2xl flex items-center justify-center">
+                    <MessageSquare size={20} />
+                </div>
+                <div>
+                    <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tighter leading-none">Comms Link</h3>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Active Discussions</p>
+                </div>
+            </div>
             {isInstructor && (
-                <button onClick={() => setIsCreating(true)} className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400 text-white px-4 py-2 rounded-xl font-black text-xs uppercase flex items-center gap-2 shadow-lg transition-colors">
-                  <Plus size={16} /> New Topic
+                <button onClick={() => setIsCreating(true)} className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-3 rounded-2xl font-black text-[10px] uppercase flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all active:scale-95">
+                  <Plus size={16} /> <span className="hidden sm:inline">New Directive</span>
                 </button>
             )}
         </header>
-        <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
+
+        <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2 pb-20">
             {isCreating && (
-                <form onSubmit={handleCreateTopic} className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border-2 border-indigo-100 dark:border-indigo-500/20 shadow-xl mb-6 transition-colors duration-300">
-                    <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Topic Title..." className="w-full bg-transparent text-lg font-black text-slate-800 dark:text-slate-100 outline-none mb-2" />
-                    <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Prompt..." className="w-full bg-transparent text-sm text-slate-500 dark:text-slate-400 outline-none min-h-[100px] resize-none" />
-                    <div className="flex gap-2 justify-end mt-4"><button type="submit" className="px-6 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-xl font-black text-xs uppercase">Post</button></div>
+                <form onSubmit={handleCreateTopic} className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-indigo-200 dark:border-indigo-500/30 shadow-xl mb-8 relative overflow-hidden group">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500" />
+                    <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Directive Title..." className="w-full bg-transparent text-xl font-black text-slate-800 dark:text-slate-100 outline-none mb-3 placeholder:text-slate-300 dark:placeholder:text-slate-700" />
+                    <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Enter details..." className="w-full bg-transparent text-sm text-slate-600 dark:text-slate-400 outline-none min-h-[100px] resize-none placeholder:text-slate-300 dark:placeholder:text-slate-700" />
+                    <div className="flex gap-3 justify-end mt-4 pt-4 border-t border-slate-100 dark:border-slate-800/50">
+                        <button type="button" onClick={() => setIsCreating(false)} className="px-6 py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-black text-[10px] uppercase tracking-widest transition-colors">Cancel</button>
+                        <button type="submit" className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md transition-colors flex items-center gap-2">Broadcast <Send size={14}/></button>
+                    </div>
                 </form>
             )}
+
+            {topics.length === 0 && !isCreating && (
+                <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-center opacity-40">
+                    <MessageSquare size={64} className="mb-4 text-slate-400" strokeWidth={1.5} />
+                    <p className="font-black uppercase tracking-[0.2em] text-slate-500 text-sm">No Comms Active</p>
+                    <p className="text-xs font-bold text-slate-400 mt-2 max-w-xs">Waiting for instructor directives to initiate communication.</p>
+                </div>
+            )}
+
             {topics.map(t => (
-                <button key={t.id} onClick={() => { setActiveTopic(t); setView('thread'); }} className="w-full bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 shadow-sm hover:border-indigo-300 dark:hover:border-indigo-500/40 transition-all text-left">
-                    <h4 className="text-lg font-black text-slate-800 dark:text-slate-100 mb-1">{t.title}</h4>
-                    <p className="text-sm text-slate-400 dark:text-slate-500 line-clamp-1 mb-4 font-medium">{t.content}</p>
-                    <div className="flex items-center gap-3 text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest"><ForumAvatar url={t.authorAvatarUrl} name={t.authorName} role={t.role} size="xs" /><span>{t.authorName}</span></div>
+                <button key={t.id} onClick={() => { setActiveTopic(t); setView('thread'); }} className="w-full bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-500/40 transition-all text-left relative overflow-hidden group">
+                    <div className="absolute left-0 top-0 w-1.5 h-full bg-slate-200 dark:bg-slate-800 group-hover:bg-indigo-500 transition-colors" />
+                    <div className="flex justify-between items-start gap-4 mb-3">
+                        <h4 className="text-lg font-black text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors leading-tight">{t.title}</h4>
+                        <span className="shrink-0 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-1"><ChevronRight size={12} /> Enter</span>
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-5 font-medium leading-relaxed">{t.content}</p>
+                    
+                    <div className="flex items-center justify-between pt-4 border-t border-slate-50 dark:border-slate-800/50">
+                        <div className="flex items-center gap-3 text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">
+                            <ForumAvatar url={t.authorAvatarUrl} name={t.authorName} role={t.role} size="xs" />
+                            <span className="truncate max-w-[120px]">{t.authorName}</span>
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-400">{formatDate(t.timestamp)}</span>
+                    </div>
                 </button>
             ))}
         </div>
@@ -205,79 +246,146 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
     );
   }
 
+  // --- THREAD VIEW ---
   return (
-    <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 shadow-inner overflow-hidden animate-in slide-in-from-right-8 duration-500 font-sans transition-colors duration-300">
-        <header className="bg-white dark:bg-slate-900 p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shadow-sm z-20 transition-colors duration-300">
-            <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-400 dark:text-slate-500 font-black text-xs uppercase hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"><ArrowLeft size={16} /> Back</button>
-            <span className="text-xs font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-widest bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1.5 rounded-lg">Response Gallery</span>
+    <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-inner overflow-hidden animate-in slide-in-from-right-8 duration-500 font-sans transition-colors duration-300">
+        <header className="bg-white dark:bg-slate-900/80 backdrop-blur-md p-4 md:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-sm z-30 transition-colors duration-300 shrink-0">
+            <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-400 dark:text-slate-500 font-black text-xs uppercase hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors active:scale-95"><ArrowLeft size={16} /> Retreat</button>
+            <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.2em] bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1.5 rounded-full border border-indigo-100 dark:border-indigo-500/20 flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" /> Live Thread
+            </span>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
-            <section className="bg-slate-900 text-white p-8 rounded-[3rem] shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-8 opacity-10"><Zap size={80} /></div>
-                <div className="relative z-10">
-                    <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.3em] mb-4 block">Discussion Prompt</span>
-                    <h2 className="text-3xl font-black mb-4 leading-tight">{activeTopic.title}</h2>
-                    <p className="text-slate-300 font-medium leading-relaxed mb-6">{activeTopic.content}</p>
-                    <button onClick={() => setIsCreating(true)} className="px-6 py-3 bg-white text-slate-900 rounded-xl font-black text-xs uppercase shadow-xl hover:bg-slate-100 transition-colors">Respond</button>
-                </div>
-            </section>
-
-            {isCreating && (
-                <form onSubmit={handlePostResponse} className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border-2 border-indigo-100 dark:border-indigo-500/20 shadow-xl space-y-4 transition-colors duration-300">
-                    <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Response title..." className="w-full bg-transparent text-xl font-black text-slate-800 dark:text-slate-100 outline-none" />
-                    <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Write thoughts..." className="w-full bg-transparent text-sm text-slate-500 dark:text-slate-400 outline-none min-h-[100px] resize-none" />
-                    <VoiceRecorder onRecordingComplete={setPendingAudio} onCancel={() => setPendingAudio(null)} />
-                    <div className="flex gap-2 justify-end pt-4 border-t border-slate-50 dark:border-slate-800">
-                        <button type="submit" disabled={isUploading} className="px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-xl flex items-center gap-3 bg-indigo-600 dark:bg-indigo-500 text-white disabled:opacity-50">
-                            {isUploading ? <Loader2 size={16} className="animate-spin" /> : 'Submit Response'}
-                        </button>
+        <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+            {/* HERO PROMPT CARD */}
+            <div className="bg-gradient-to-br from-indigo-900 to-slate-900 dark:from-indigo-950 dark:to-black text-white px-6 py-10 md:p-12 relative overflow-hidden shrink-0 border-b-4 border-indigo-500">
+                <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none"><Zap size={120} /></div>
+                <div className="max-w-3xl mx-auto relative z-10">
+                    <div className="flex items-center gap-3 mb-6">
+                        <ForumAvatar url={activeTopic.authorAvatarUrl} name={activeTopic.authorName} role={activeTopic.role} size="md" />
+                        <div>
+                            <span className="block text-sm font-black tracking-widest uppercase text-indigo-300">{activeTopic.authorName}</span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">{formatDate(activeTopic.timestamp)}</span>
+                        </div>
                     </div>
-                </form>
-            )}
+                    <h2 className="text-3xl md:text-4xl font-black mb-4 leading-tight tracking-tight drop-shadow-md">{activeTopic.title}</h2>
+                    <p className="text-slate-300 font-medium leading-relaxed text-lg mb-8 max-w-2xl">{activeTopic.content}</p>
+                    
+                    {!isCreating && (
+                        <button onClick={() => setIsCreating(true)} className="px-8 py-4 bg-white text-indigo-900 rounded-2xl font-black text-xs uppercase tracking-widest shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:bg-slate-100 hover:scale-105 active:scale-95 transition-all flex items-center gap-2">
+                            <Send size={16} /> Transmit Reply
+                        </button>
+                    )}
+                </div>
+            </div>
 
-            <div className="space-y-10">
-                {responses.map((res) => (
-                    <article key={res.id} className="space-y-4">
-                        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 shadow-sm relative group transition-colors duration-300">
-                            <div className="flex items-center gap-4 mb-6">
-                                <ForumAvatar url={res.authorAvatarUrl} name={res.authorName} role={res.role} size="lg" />
-                                <div><span className="block text-sm font-black text-slate-800 dark:text-slate-100 leading-none mb-1">{res.authorName}</span><span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase">{new Date(res.timestamp).toLocaleDateString()}</span></div>
-                            </div>
-                            <h4 className="text-2xl font-black text-slate-900 dark:text-white mb-3 tracking-tight">{res.title}</h4>
-                            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium mb-6">{res.content}</p>
-                            {res.audioUrl && (
-                                <div className="mb-6 p-4 bg-indigo-50/50 dark:bg-indigo-500/10 rounded-2xl flex items-center gap-4 border border-indigo-100 dark:border-indigo-500/20 transition-colors duration-300">
-                                    <div className="w-10 h-10 bg-indigo-600 dark:bg-indigo-500 rounded-full flex items-center justify-center text-white"><Volume2 size={20} /></div>
-                                    <audio src={res.audioUrl} controls className="h-8 flex-1 opacity-90" />
-                                </div>
-                            )}
-                            <div className="flex items-center gap-6 pt-6 border-t border-slate-50 dark:border-slate-800">
-                                <button onClick={() => handleToggleLike(res.id, res.likes || [], res.authorId)} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${res.likes?.includes(auth.currentUser?.uid) ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400' : 'text-slate-400 hover:text-rose-400 dark:text-slate-500 dark:hover:text-rose-400'}`}>
-                                    <Heart size={16} className={res.likes?.includes(auth.currentUser?.uid) ? 'fill-rose-500 dark:fill-rose-400' : ''} /> <span className="text-xs font-black uppercase tracking-widest">{res.likes?.length || 0} Appreciations</span>
-                                </button>
-                                <button onClick={() => setReplyingToId(replyingToId === res.id ? null : res.id)} className="flex items-center gap-2 text-xs font-black text-slate-400 dark:text-slate-500 uppercase hover:text-indigo-600 dark:hover:text-indigo-400 px-2 py-1">
-                                  <MessageSquare size={16} /> Reply
-                                </button>
-                            </div>
+            {/* MAIN CONTENT AREA */}
+            <div className="max-w-3xl mx-auto p-4 md:p-8 pb-32">
+                
+                {/* NEW RESPONSE FORM */}
+                {isCreating && (
+                    <form onSubmit={handlePostResponse} className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border-2 border-indigo-200 dark:border-indigo-500/30 shadow-xl mb-10 animate-in slide-in-from-top-4 duration-300 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-cyan-400" />
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">New Transmission</h4>
+                        
+                        <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Transmission Header..." className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm font-black text-slate-800 dark:text-slate-100 outline-none focus:border-indigo-500 mb-3" />
+                        <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Write data..." className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-600 dark:text-slate-400 outline-none focus:border-indigo-500 min-h-[100px] resize-none mb-4" />
+                        
+                        <VoiceRecorder onRecordingComplete={setPendingAudio} onCancel={() => setPendingAudio(null)} />
+                        
+                        <div className="flex gap-3 justify-end mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
+                            <button type="button" onClick={() => setIsCreating(false)} className="px-6 py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-black text-[10px] uppercase tracking-widest transition-colors">Cancel</button>
+                            <button type="submit" disabled={isUploading} className="px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 transition-colors">
+                                {isUploading ? <Loader2 size={14} className="animate-spin" /> : <><Send size={14}/> Send</>}
+                            </button>
                         </div>
+                    </form>
+                )}
 
-                        <div className="ml-10 space-y-4">
-                            {res.comments?.map((comment: any, idx: number) => (
-                                <div key={idx} className="bg-slate-50 dark:bg-slate-800/50 p-5 rounded-[1.5rem] border border-slate-100 dark:border-slate-700/50 transition-colors duration-300">
-                                    <div className="flex items-center gap-3 mb-2"><ForumAvatar url={comment.authorAvatarUrl} name={comment.authorName} role={comment.role} size="xs" /><span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest">{comment.authorName}</span></div>
-                                    <p className="text-sm text-slate-600 dark:text-slate-400 font-bold leading-relaxed">{comment.text}</p>
-                                </div>
-                            ))}
-                            {replyingToId === res.id && (
-                                <div className="flex gap-2 animate-in slide-in-from-top-2">
-                                    <input autoFocus value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Reply..." className="flex-1 bg-white dark:bg-slate-900 border-2 border-indigo-100 dark:border-indigo-500/30 text-slate-800 dark:text-slate-100 rounded-2xl px-5 py-3 text-sm font-medium outline-none focus:border-indigo-500 dark:focus:border-indigo-400 transition-colors duration-300" onKeyDown={(e) => e.key === 'Enter' && handlePostComment(res.id)} />
-                                    <button onClick={() => handlePostComment(res.id)} className="p-4 bg-indigo-600 dark:bg-indigo-500 text-white rounded-2xl shadow-xl"><Send size={18} /></button>
-                                </div>
-                            )}
+                {/* RESPONSES FEED */}
+                <div className="space-y-8">
+                    {responses.length === 0 && !isCreating ? (
+                        <div className="text-center py-12 opacity-40">
+                            <Zap size={48} className="mx-auto mb-4 text-slate-400" />
+                            <p className="font-black uppercase tracking-[0.2em] text-slate-500 text-xs">No Transmissions Received</p>
                         </div>
-                    </article>
-                ))}
+                    ) : (
+                        responses.map((res) => (
+                            <article key={res.id} className="relative">
+                                {/* The Response Card */}
+                                <div className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm relative z-10 transition-colors duration-300">
+                                    <div className="flex items-start justify-between gap-4 mb-4">
+                                        <div className="flex items-center gap-4">
+                                            <ForumAvatar url={res.authorAvatarUrl} name={res.authorName} role={res.role} size="md" />
+                                            <div>
+                                                <span className="block text-sm font-black text-slate-800 dark:text-slate-100 leading-none mb-1">{res.authorName}</span>
+                                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{formatDate(res.timestamp)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <h4 className="text-xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">{res.title}</h4>
+                                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium mb-6 whitespace-pre-wrap">{res.content}</p>
+                                    
+                                    {res.audioUrl && (
+                                        <div className="mb-6 p-2 pl-4 pr-2 bg-slate-50 dark:bg-slate-950 rounded-full flex items-center gap-3 border border-slate-200 dark:border-slate-800">
+                                            <div className="w-6 h-6 bg-indigo-500/20 text-indigo-500 rounded-full flex items-center justify-center shrink-0"><Volume2 size={12} /></div>
+                                            <audio src={res.audioUrl} controls className="h-8 flex-1 opacity-80 scale-95 origin-left grayscale" />
+                                        </div>
+                                    )}
+                                    
+                                    <div className="flex items-center gap-4 pt-4 border-t border-slate-100 dark:border-slate-800/60">
+                                        <button onClick={() => handleToggleLike(res.id, res.likes || [], res.authorId)} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all border ${res.likes?.includes(auth.currentUser?.uid) ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-900/50 text-rose-500 dark:text-rose-400 shadow-sm' : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-rose-400'}`}>
+                                            <Heart size={14} className={res.likes?.includes(auth.currentUser?.uid) ? 'fill-rose-500 dark:fill-rose-400' : ''} /> 
+                                            <span className="text-[10px] font-black uppercase tracking-widest">{res.likes?.length || 0}</span>
+                                        </button>
+                                        <button onClick={() => setReplyingToId(replyingToId === res.id ? null : res.id)} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all border text-[10px] font-black uppercase tracking-widest ${replyingToId === res.id ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-900/50 text-indigo-600 dark:text-indigo-400' : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-indigo-400'}`}>
+                                            <MessageSquare size={14} /> Reply
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Threaded Comments Section */}
+                                {(res.comments?.length > 0 || replyingToId === res.id) && (
+                                    <div className="ml-8 md:ml-12 mt-4 space-y-3 relative before:absolute before:-left-6 before:top-0 before:bottom-6 before:w-px before:bg-slate-200 dark:before:bg-slate-800">
+                                        {res.comments?.map((comment: any, idx: number) => (
+                                            <div key={idx} className="bg-slate-100/50 dark:bg-slate-900/50 p-4 rounded-[1.5rem] border border-slate-200 dark:border-slate-800/80 transition-colors relative before:absolute before:-left-6 before:top-6 before:w-6 before:h-px before:bg-slate-200 dark:before:bg-slate-800">
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <ForumAvatar url={comment.authorAvatarUrl} name={comment.authorName} role={comment.role} size="xs" />
+                                                    <span className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">{comment.authorName}</span>
+                                                    <span className="text-[8px] font-bold text-slate-400 dark:text-slate-600 uppercase ml-auto">{formatDate(comment.timestamp)}</span>
+                                                </div>
+                                                <p className="text-xs text-slate-700 dark:text-slate-300 font-medium leading-relaxed pl-9">{comment.text}</p>
+                                            </div>
+                                        ))}
+                                        
+                                        {/* Active Reply Terminal */}
+                                        {replyingToId === res.id && (
+                                            <div className="relative flex items-center animate-in slide-in-from-top-2 before:absolute before:-left-6 before:top-1/2 before:w-6 before:h-px before:bg-indigo-300 dark:before:bg-indigo-500/50">
+                                                <div className="absolute left-4 text-indigo-400 font-mono font-black text-xs">&gt;</div>
+                                                <input 
+                                                    autoFocus 
+                                                    value={commentText} 
+                                                    onChange={e => setCommentText(e.target.value)} 
+                                                    placeholder="Enter command to reply..." 
+                                                    className="w-full bg-white dark:bg-slate-900 border-2 border-indigo-200 dark:border-indigo-500/50 text-slate-800 dark:text-slate-100 rounded-2xl pl-10 pr-14 py-4 text-xs font-mono font-bold outline-none focus:border-indigo-500 dark:focus:border-indigo-400 transition-colors shadow-sm" 
+                                                    onKeyDown={(e) => e.key === 'Enter' && handlePostComment(res.id)} 
+                                                />
+                                                <button 
+                                                    onClick={() => handlePostComment(res.id)} 
+                                                    disabled={!commentText.trim()}
+                                                    className="absolute right-2 p-2 bg-indigo-600 text-white rounded-xl shadow-md disabled:opacity-50 active:scale-95 transition-all"
+                                                >
+                                                    <Send size={14} />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </article>
+                        ))
+                    )}
+                </div>
             </div>
         </div>
     </div>
@@ -570,7 +678,6 @@ export default function StudentClassView({
   const [liveSession, setLiveSession] = useState<any>(null);
   
   // 🔥 FETCH DECK DATA FOR SLIPSTREAM
-  // We need to pull the specific deck referenced in the live session so the student device can render it
   const [activeDeck, setActiveDeck] = useState<any>(null);
 
   const [expandedRoadmaps, setExpandedRoadmaps] = useState<Record<string, boolean>>({ 
@@ -601,12 +708,7 @@ export default function StudentClassView({
             const sessionData = docSnap.data();
             setLiveSession(sessionData);
             
-            // 🔥 If it's slipstream, pre-load the deck content for local rendering
             if (sessionData.type === 'slipstream' && sessionData.lessonId) {
-                // If it's a published deck, it might be in 'published_decks'
-                // Otherwise we look in the instructor's 'custom_cards'
-                // For simplicity here, we assume `StudentClassView` receives `allDecks` from `App.tsx` 
-                // OR we can fetch it dynamically. Since it's not passed, let's just listen to it.
                 const deckQuery = query(collection(db, 'artifacts', appId, 'published_decks'), where('id', '==', sessionData.lessonId));
                 onSnapshot(deckQuery, (snap) => {
                    if (!snap.empty) {
