@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
     Layers, Plus, X, Save, Edit3, Trash2, FileJson, Database, 
     Loader2, FolderPlus, FolderOpen, Share2, Lock, Users, 
-    Globe, CheckCircle2, Paperclip, ChevronRight, Wand2 // 🔥 Imported Wand2
+    Globe, CheckCircle2, Paperclip, ChevronRight, Wand2
 } from 'lucide-react';
 import { INITIAL_SYSTEM_DECKS } from '../../constants/defaults';
 import { Toast } from '../Toast';
@@ -103,12 +103,11 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
     const [morphology, setMorphology] = useState<any[]>([]);
     const [newMorphPart, setNewMorphPart] = useState({ part: '', meaning: '', type: 'root' });
     
-    // 🔥 CONJUGATION FORGE STATE
     const [conjugations, setConjugations] = useState<Record<string, Record<string, string>>>({});
     const [tempConj, setTempConj] = useState({ tense: 'Present', person: '1s', verb: '' });
 
-    // 🔥 NEW: IPA GENERATOR STATE
-    const [isGeneratingIpa, setIsGeneratingIpa] = useState(false);
+    // 🔥 STATE FOR THE MAGIC WAND
+    const [isAutoFilling, setIsAutoFilling] = useState(false);
 
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -143,37 +142,54 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
         } 
     };
 
-    // 🔥 NEW: IPA AUTO-FILL FUNCTION
-    const handleAutoGenerateIPA = async (e: React.MouseEvent) => {
+    // 🔥 UPGRADED: MAGIC AUTO-FILL LOGIC
+    const handleMagicAutoFill = async (e: React.MouseEvent) => {
         e.preventDefault();
-        if (!formData.front.trim()) return;
+        const queryWord = formData.front.trim();
+        if (!queryWord) return;
 
-        setIsGeneratingIpa(true);
+        setIsAutoFilling(true);
         try {
-            const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${formData.front.trim()}`);
+            const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${queryWord}`);
             
-            if (!response.ok) throw new Error("Word not found");
+            if (!response.ok) throw new Error("Word not found in global dictionary");
             
             const data = await response.json();
+            
+            // 1. Harvest the IPA
             const textEntry = data[0]?.phonetics?.find((p: any) => p.text);
-            const finalIpa = textEntry?.text || data[0]?.phonetic;
+            const fetchedIpa = textEntry?.text || data[0]?.phonetic || '';
 
-            if (finalIpa) {
-                setFormData(prev => ({ ...prev, ipa: finalIpa }));
+            // 2. Harvest the Meaning & Part of Speech
+            const firstMeaning = data[0]?.meanings?.[0];
+            const fetchedType = firstMeaning?.partOfSpeech || 'noun';
+            const fetchedDefinition = firstMeaning?.definitions?.[0]?.definition || '';
+
+            // Validate Word Type (Dropdown safety check)
+            const validTypes = ['noun', 'verb', 'adjective', 'adverb'];
+            const safeType = validTypes.includes(fetchedType.toLowerCase()) ? fetchedType.toLowerCase() : 'noun';
+
+            if (fetchedIpa || fetchedDefinition) {
+                setFormData(prev => ({ 
+                    ...prev, 
+                    ipa: fetchedIpa || prev.ipa,
+                    back: fetchedDefinition || prev.back,
+                    type: safeType
+                }));
+                setToastMsg("Target data auto-filled! ✨");
             } else {
-                setToastMsg("No phonetic data found for this word.");
+                setToastMsg("No extended data found for this exact word.");
             }
         } catch (err) {
-            setToastMsg("Could not connect to phonetics database.");
+            setToastMsg("Could not connect to dictionary engine.");
         } finally {
-            setIsGeneratingIpa(false);
+            setIsAutoFilling(false);
         }
     };
 
     const addMorphology = () => { if (newMorphPart.part && newMorphPart.meaning) { setMorphology([...morphology, newMorphPart]); setNewMorphPart({ part: '', meaning: '', type: 'root' }); } };
     const removeMorphology = (index: number) => { setMorphology(morphology.filter((_, i) => i !== index)); };
 
-    // 🔥 CONJUGATION LOGIC
     const addConjugation = () => {
         if (!tempConj.verb.trim() || !tempConj.tense.trim()) return;
         setConjugations(prev => ({
@@ -200,7 +216,7 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
         setEditingId(card.id); 
         setFormData({ front: card.front, back: card.back, type: card.type || 'noun', ipa: card.ipa || '', sentence: card.usage?.sentence || '', sentenceTrans: card.usage?.translation || '', grammarTags: card.grammar_tags?.join(', ') || '', deckId: card.deckId || formData.deckId }); 
         setMorphology(card.morphology || []); 
-        setConjugations(card.conjugations || {}); // 🔥 Load Conjugations
+        setConjugations(card.conjugations || {});
         window.scrollTo({ top: 0, behavior: 'smooth' }); 
     };
 
@@ -208,7 +224,7 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
         setEditingId(null); 
         setFormData(prev => ({ ...prev, front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' })); 
         setMorphology([]); 
-        setConjugations({}); // 🔥 Clear Conjugations
+        setConjugations({});
     };
 
     const registerNewDeck = async (deckId: string, deckTitle: string) => {
@@ -236,7 +252,7 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
             front: formData.front, back: formData.back, type: formData.type, 
             deckId: finalDeckId, deckTitle: finalDeckTitle, ipa: formData.ipa || "/.../", 
             mastery: 0, morphology: morphology.length > 0 ? morphology : [{ part: formData.front, meaning: "Root", type: "root" }], 
-            conjugations: Object.keys(conjugations).length > 0 ? conjugations : null, // 🔥 Include Conjugations
+            conjugations: Object.keys(conjugations).length > 0 ? conjugations : null,
             usage: { sentence: formData.sentence || "-", translation: formData.sentenceTrans || "-" }, 
             grammar_tags: formData.grammarTags ? formData.grammarTags.split(',').map(t => t.trim()) : ["Custom"] 
         }; 
@@ -310,13 +326,11 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                 successCount++;
                 setImportProgress({ current: successCount, total: importedCards.length });
                 
-                // Keep UI updated optimistically
                 setLocalOptimisticDecks((prev: any) => {
                     const existingDeck = prev[finalDeckId] || validDecks[finalDeckId] || { title: finalDeckTitle, cards: [] };
                     return { ...prev, [finalDeckId]: { ...existingDeck, cards: [...existingDeck.cards, { id: `temp_${Date.now()}_${i}`, ...cardData }] } };
                 });
 
-                // Small delay to prevent Firebase rate limiting on bulk
                 await new Promise(resolve => setTimeout(resolve, 150));
             } catch (err) { console.error(`Failed to save: ${card.front}`, err); }
         }
@@ -384,17 +398,38 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                         )}
                     </section>
 
-                    {/* 🔥 CORE DATA UPGRADED WITH MAGIC WAND */}
+                    {/* 🔥 THE MAGIC AUTO-FILL CORE DATA SECTION */}
                     <section className="space-y-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
-                        <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest">Core Data</h3>
+                        <div className="flex items-center justify-between mb-2">
+                            <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest">Core Data</h3>
+                        </div>
+                        
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                             <div className="flex flex-col gap-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Target Word (Front)</label>
-                                <input name="front" value={formData.front} onChange={handleChange} className="w-full p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-bold focus:border-indigo-500 outline-none" placeholder="e.g. Ubiquitous" />
+                                <div className="relative flex items-center">
+                                    <input 
+                                        name="front" 
+                                        value={formData.front} 
+                                        onChange={handleChange} 
+                                        className="w-full p-4 pl-4 pr-16 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-bold focus:border-indigo-500 outline-none transition-colors" 
+                                        placeholder="e.g. Ubiquitous" 
+                                    />
+                                    {/* 🔥 MOVED WAND HERE FOR FULL AUTO-FILL */}
+                                    <button 
+                                        type="button"
+                                        onClick={handleMagicAutoFill}
+                                        disabled={isAutoFilling || !formData.front.trim()}
+                                        title="Magic Auto-Fill (Dictionary)"
+                                        className="absolute right-2 p-2 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-500/40 rounded-xl transition-all disabled:opacity-30 disabled:hover:bg-indigo-100 active:scale-95 shadow-sm"
+                                    >
+                                        {isAutoFilling ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
+                                    </button>
+                                </div>
                             </div>
                             <div className="flex flex-col gap-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Meaning (Back)</label>
-                                <input name="back" value={formData.back} onChange={handleChange} className="w-full p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-bold focus:border-indigo-500 outline-none" placeholder="e.g. Present everywhere" />
+                                <input name="back" value={formData.back} onChange={handleChange} className="w-full p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-bold focus:border-indigo-500 outline-none transition-colors" placeholder="e.g. Present everywhere" />
                             </div>
                         </div>
 
@@ -402,24 +437,13 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="flex flex-col gap-2 md:col-span-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Phonetics (IPA)</label>
-                                <div className="relative flex items-center">
-                                    <input 
-                                        name="ipa" 
-                                        value={formData.ipa} 
-                                        onChange={handleChange} 
-                                        className="w-full p-4 pl-4 pr-14 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 font-mono text-slate-800 dark:text-white focus:border-indigo-500 outline-none" 
-                                        placeholder="e.g. /juːˈbɪkwɪtəs/" 
-                                    />
-                                    <button 
-                                        type="button"
-                                        onClick={handleAutoGenerateIPA}
-                                        disabled={isGeneratingIpa || !formData.front.trim()}
-                                        title="Auto-generate IPA"
-                                        className="absolute right-2 p-2 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-500/40 rounded-xl transition-all disabled:opacity-30 disabled:hover:bg-indigo-100 active:scale-95"
-                                    >
-                                        {isGeneratingIpa ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
-                                    </button>
-                                </div>
+                                <input 
+                                    name="ipa" 
+                                    value={formData.ipa} 
+                                    onChange={handleChange} 
+                                    className="w-full p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 font-mono text-slate-800 dark:text-white focus:border-indigo-500 outline-none transition-colors" 
+                                    placeholder="e.g. /juːˈbɪkwɪtəs/" 
+                                />
                             </div>
 
                             <div className="flex flex-col gap-2">
@@ -428,7 +452,7 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                                     name="type" 
                                     value={formData.type} 
                                     onChange={handleChange} 
-                                    className="w-full p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 font-bold dark:text-white focus:border-indigo-500 outline-none cursor-pointer"
+                                    className="w-full p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 font-bold dark:text-white focus:border-indigo-500 outline-none cursor-pointer transition-colors"
                                 >
                                     <option value="noun">Noun</option>
                                     <option value="verb">Verb</option>
@@ -439,7 +463,6 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                         </div>
                     </section>
 
-                    {/* 🔥 CONJUGATION FORGE SECTION */}
                     <section className="space-y-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest flex items-center gap-2">
