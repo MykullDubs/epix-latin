@@ -244,8 +244,9 @@ export default function BuilderHub({
       {/* WORKSPACE */}
       <div className="flex-1 flex overflow-hidden relative">
         
-        {/* LEFT PANE: EDITOR */}
-        <div className={`h-full overflow-y-auto custom-scrollbar transition-all duration-500 ease-in-out ${
+{/* LEFT PANE: EDITOR */}
+        {/* 🔥 UPGRADED: Swapped custom-scrollbar for native hidden scroll utilities */}
+        <div className={`h-full overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] transition-all duration-500 ease-in-out ${
           viewMode === 'edit' ? 'w-full md:w-1/2 opacity-100' : 'hidden md:block md:w-1/2 opacity-50 grayscale-[50%]'
         }`}>
           <div className="p-6 md:p-12 max-w-2xl mx-auto pb-40">
