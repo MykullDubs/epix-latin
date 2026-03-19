@@ -145,6 +145,7 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
     };
 
     // 🔥 HIGH-TACTICAL MAGIC AUTO-FILL (Handles Multiple Definitions)
+  // 🔥 UPGRADED: MAGIC AUTO-FILL WITH PHONETIC STITCHING
     const handleMagicAutoFill = async (e: React.MouseEvent) => {
         e.preventDefault();
         const queryWord = formData.front.trim();
@@ -152,18 +153,49 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
 
         setIsAutoFilling(true);
         try {
-            const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${queryWord}`);
-            if (!response.ok) throw new Error("Word not found in global dictionary");
+            // 1. Try the exact phrase first (URL encoded to handle spaces safely)
+            const safeQuery = encodeURIComponent(queryWord);
+            const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${safeQuery}`);
             
+            if (!response.ok) {
+                // 2. FALLBACK: If it's a multi-word phrase and the exact match fails
+                if (queryWord.includes(' ')) {
+                    const words = queryWord.split(' ');
+                    let combinedIpa = '';
+                    
+                    // Fetch each word individually
+                    for (const w of words) {
+                        try {
+                            const wordRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(w)}`);
+                            if (wordRes.ok) {
+                                const wordData = await wordRes.json();
+                                const txtEntry = wordData[0]?.phonetics?.find((p: any) => p.text);
+                                const ipaTxt = txtEntry?.text || wordData[0]?.phonetic || '';
+                                // Clean out the slashes so we can stitch them together cleanly
+                                combinedIpa += ipaTxt.replace(/\//g, '') + ' ';
+                            }
+                        } catch (err) {
+                            // Silently ignore individual word failures to keep stitching what we can
+                        }
+                    }
+                    
+                    if (combinedIpa.trim()) {
+                        setFormData(prev => ({ ...prev, ipa: `/${combinedIpa.trim()}/` }));
+                        setToastMsg("Phrase stitched! ✨ (Definition requires manual entry)");
+                        return;
+                    }
+                }
+                throw new Error("Word not found in global dictionary");
+            }
+            
+            // 3. EXACT MATCH FOUND: Harvest Data
             const data = await response.json();
             
-            // Extract the IPA (usually shared across meanings)
             const textEntry = data[0]?.phonetics?.find((p: any) => p.text);
             const fetchedIpa = textEntry?.text || data[0]?.phonetic || '';
 
-            // Extract ALL definitions across ALL parts of speech
             const options: any[] = [];
-            const validTypes = ['noun', 'verb', 'adjective', 'adverb'];
+            const validTypes = ['noun', 'verb', 'adjective', 'adverb', 'phrase'];
 
             data[0]?.meanings?.forEach((meaning: any) => {
                 const rawPos = meaning.partOfSpeech || 'noun';
@@ -179,13 +211,15 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
             });
 
             if (options.length === 1) {
-                // If there's only one possible meaning, just auto-fill it instantly
                 setFormData(prev => ({ ...prev, ipa: options[0].ipa, back: options[0].definition, type: options[0].type }));
                 setToastMsg("Target data auto-filled! ✨");
             } else if (options.length > 1) {
-                // If there are multiple meanings, open the disambiguation selector
                 setFetchedOptions(options);
                 setShowDefSelector(true);
+            } else if (fetchedIpa) {
+                // Failsafe: If we got IPA but no definition
+                setFormData(prev => ({ ...prev, ipa: fetchedIpa }));
+                setToastMsg("Phonetics found! ✨ (Definition missing)");
             } else {
                 setToastMsg("No extended data found for this exact word.");
             }
