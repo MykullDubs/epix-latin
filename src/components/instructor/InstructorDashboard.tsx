@@ -138,6 +138,7 @@ export default function InstructorDashboard({
         </div>
 
         <nav className="flex-1 px-3 py-8 space-y-2 overflow-y-auto custom-scrollbar">
+          <nav className="flex-1 px-3 py-8 space-y-2 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <NavItem id="dashboard" icon={<Activity />} label="Live Feed" />
           <NavItem id="studio" icon={<PenTool />} label="Studio Hub" />
           <NavItem id="classes" icon={<School />} label="Cohort Manager" />
