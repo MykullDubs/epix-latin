@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
     ArrowLeft, X, Library, Layers, Play, Zap, HelpCircle, Puzzle, Flame, 
     CheckCircle2, XCircle, Globe, Users, Filter, ChevronLeft, ChevronRight, 
-    RotateCw, ArrowUp, Paperclip, Music // 🔥 Imported Music icon
+    RotateCw, ArrowUp, Paperclip, Music, Star, Archive, Plus // 🔥 Imported New Icons
 } from 'lucide-react';
 import { Toast } from './Toast'; 
 
@@ -11,9 +11,9 @@ import { Toast } from './Toast';
 const SUBJECT_ORDER = ['1s', '2s', '3s', '1p', '2p', '3p'];
 
 // ============================================================================
-//  1. STUDY MODE (Swipe Physics, Flipping, & Conjugations)
+//  1. STUDY MODE (Swipe Physics, Flipping, Conjugations, & Stars)
 // ============================================================================
-function StudyModePlayer({ deckCards }: any) {
+function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     const [showConjugations, setShowConjugations] = useState(false); 
@@ -26,6 +26,9 @@ function StudyModePlayer({ deckCards }: any) {
     const [slideDirection, setSlideDirection] = useState<'right' | 'left' | 'up'>('right');
 
     const currentCard = deckCards[currentIndex];
+
+    // 🔥 Check if the current card is starred in the student's preferences
+    const isStarred = userData?.cardPrefs?.[currentCard?.id]?.starred || false;
 
     // Reset UI state when switching cards
     useEffect(() => {
@@ -132,9 +135,19 @@ function StudyModePlayer({ deckCards }: any) {
                         
                         {/* FRONT FACE */}
                         <div className="absolute inset-0 w-full h-full bg-slate-900 rounded-[3rem] border-2 border-b-[8px] border-slate-800 shadow-2xl flex flex-col items-center justify-center p-8 text-center overflow-hidden transition-colors" style={{ backfaceVisibility: 'hidden' }}>
-                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest absolute top-6 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20 shadow-sm z-20">Front</span>
                             
-                            {/* 🔥 MEDIA UPGRADE: Display Image implicitly on the front if available */}
+                            {/* 🔥 STAR BUTTON (LEECH MANAGEMENT) */}
+                            {onToggleStar && (
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); onToggleStar(currentCard.id, isStarred); }} 
+                                    className="absolute top-6 right-6 p-2 rounded-full hover:bg-white/10 transition-colors z-30"
+                                >
+                                    <Star size={24} className={isStarred ? "text-yellow-400 fill-yellow-400 drop-shadow-md" : "text-slate-600"} />
+                                </button>
+                            )}
+
+                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest absolute top-6 left-6 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20 shadow-sm z-20">Front</span>
+                            
                             {currentCard.imageUrl && (
                                 <div className="absolute inset-0 w-full h-full opacity-20 pointer-events-none z-0">
                                     <img src={currentCard.imageUrl} className="w-full h-full object-cover blur-xl" alt="" />
@@ -143,7 +156,6 @@ function StudyModePlayer({ deckCards }: any) {
 
                             <h2 className="text-4xl md:text-5xl font-black text-white leading-tight relative z-10">{currentCard.front}</h2>
                             
-                            {/* 🔥 IPA FIX: Render LTR safely */}
                             {currentCard.ipa && (
                                 <p className="text-sm font-bold text-indigo-400 mt-4 px-3 py-1 rounded-lg relative z-10" style={{ direction: 'ltr', fontFamily: 'Arial, sans-serif' }}>
                                     {currentCard.ipa}
@@ -157,7 +169,6 @@ function StudyModePlayer({ deckCards }: any) {
 
                         {/* BACK FACE */}
                         <div className="absolute inset-0 w-full h-full bg-white rounded-[3rem] border-2 border-b-[8px] border-slate-200 shadow-2xl flex flex-col overflow-hidden transition-colors" style={{ backfaceVisibility: 'hidden', transform: 'rotateX(180deg)' }}>
-                            {/* Paperclip Trigger */}
                             {currentCard.conjugations && (
                                 <button onClick={(e) => { e.stopPropagation(); setShowConjugations(true); }} className="absolute top-6 right-8 p-3 bg-white dark:bg-slate-800 text-indigo-500 dark:text-indigo-400 rounded-2xl shadow-lg border border-indigo-100 dark:border-slate-700 hover:scale-110 active:scale-95 transition-all z-30">
                                     <Paperclip size={20} strokeWidth={3} />
@@ -166,13 +177,12 @@ function StudyModePlayer({ deckCards }: any) {
                             )}
                             
                             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center overflow-y-auto custom-scrollbar relative z-10">
-                                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest absolute top-6 bg-slate-50 px-3 py-1 rounded-full shadow-sm border border-slate-100">Back</span>
+                                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest absolute top-6 left-6 bg-slate-50 px-3 py-1 rounded-full shadow-sm border border-slate-100">Back</span>
                                 
                                 <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[9px] font-black uppercase tracking-widest mb-4 mt-4">{currentCard.type}</span>
                                 
                                 <h2 className="text-3xl md:text-4xl font-black text-slate-900 leading-tight mb-4">{currentCard.back}</h2>
                                 
-                                {/* 🔥 MEDIA UPGRADE: Render image and audio on the back */}
                                 {currentCard.imageUrl && (
                                     <div className="w-full aspect-video rounded-2xl overflow-hidden mb-4 border-2 border-slate-50 shadow-inner shrink-0">
                                         <img src={currentCard.imageUrl} className="w-full h-full object-cover" alt="Context" />
@@ -260,7 +270,7 @@ function StudyModePlayer({ deckCards }: any) {
 }
 
 // ============================================================================
-//  2. MATCHING GAME
+//  2. MATCHING GAME (Unchanged)
 // ============================================================================
 function MatchingGame({ deckCards, onGameEnd }: any) {
     const [cards, setCards] = useState<any[]>([]);
@@ -327,7 +337,7 @@ function MatchingGame({ deckCards, onGameEnd }: any) {
 }
 
 // ============================================================================
-//  3. QUIZ SESSION 
+//  3. QUIZ SESSION (Unchanged)
 // ============================================================================
 function QuizSessionView({ deckCards, onGameEnd }: any) {
     const [index, setIndex] = useState(0);
@@ -385,7 +395,6 @@ function QuizSessionView({ deckCards, onGameEnd }: any) {
                     </div>
                 )}
                 
-                {/* 🔥 MEDIA UPGRADE: Display image in Quiz Mode */}
                 {currentCard.imageUrl && (
                     <div className="w-full h-24 rounded-xl overflow-hidden mb-4 opacity-80 border-2 border-slate-100 dark:border-slate-800">
                         <img src={currentCard.imageUrl} className="w-full h-full object-cover" alt="" />
@@ -418,10 +427,12 @@ function QuizSessionView({ deckCards, onGameEnd }: any) {
 // ============================================================================
 //  4. MAIN FLASHCARD VIEW (HUB)
 // ============================================================================
-export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity }: any) {
+export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity, userData, onToggleStar, onToggleArchive }: any) {
     const [internalMode, setInternalMode] = useState<'library' | 'menu' | 'playing'>('library');
     const [activeGame, setActiveGame] = useState<'standard' | 'quiz' | 'match' | 'tower'>('standard');
-    const [deckFilter, setDeckFilter] = useState<'all' | 'personal' | 'network'>('all');
+    
+    // 🔥 Added 'archived' and 'starred' to the filter
+    const [deckFilter, setDeckFilter] = useState<'all' | 'personal' | 'network' | 'archived' | 'starred'>('all');
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     
     const resolvedDeck = allDecks[selectedDeckKey] || Object.values(allDecks)[0];
@@ -447,7 +458,13 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     };
 
     if (internalMode === 'library') {
-        const filteredDecks = Object.entries(allDecks).filter(([_, deck]: any) => {
+        // 🔥 Filter logic upgraded to respect archives
+        const filteredDecks = Object.entries(allDecks).filter(([key, deck]: any) => {
+            const isArchived = userData?.deckPrefs?.[key]?.archived || false;
+            
+            if (deckFilter === 'archived') return isArchived;
+            if (isArchived) return false; // Hide archived decks from all other views
+
             if (deckFilter === 'all') return true;
             if (deckFilter === 'personal') return !deck.isPublished;
             if (deckFilter === 'network') return deck.isPublished;
@@ -462,11 +479,15 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         <div className="bg-gradient-to-br from-orange-400 to-rose-500 text-white p-2 rounded-xl"><Library size={20} strokeWidth={3}/></div>
                         <span className="font-black text-slate-800 dark:text-white text-xl uppercase tracking-tighter">Study Hub</span>
                     </div>
+                    {/* 🔥 PERSONAL SCRIPTORIUM ENTRY POINT */}
+                    <button className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-md active:scale-95 transition-all">
+                        <Plus size={14} /> Forge Deck
+                    </button>
                 </div>
 
                 <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-6 py-3 flex items-center gap-2 overflow-x-auto custom-scrollbar sticky top-[76px] z-30">
                     <Filter size={14} className="text-slate-400 mr-2 shrink-0" />
-                    {['all', 'personal', 'network'].map((f: any) => (
+                    {['all', 'personal', 'network', 'archived'].map((f: any) => (
                         <button key={f} onClick={() => setDeckFilter(f)} className={`shrink-0 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${deckFilter === f ? 'bg-slate-800 dark:bg-slate-700 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200'}`}>
                             {f} Decks
                         </button>
@@ -476,12 +497,21 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 <div className="flex-1 overflow-y-auto p-6 space-y-5 pb-32">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         {filteredDecks.map(([key, deck]: any) => (
-                            <button key={key} onClick={() => { onSelectDeck(key); setInternalMode('menu'); }} className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 border-[3px] border-slate-100 dark:border-slate-800 hover:border-orange-300 dark:hover:border-orange-500/50 hover:-translate-y-1 transition-all text-left">
+                            <button key={key} onClick={() => { onSelectDeck(key); setInternalMode('menu'); }} className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 border-[3px] border-slate-100 dark:border-slate-800 hover:border-orange-300 dark:hover:border-orange-500/50 hover:-translate-y-1 transition-all text-left relative group">
+                                {/* 🔥 ARCHIVE BADGE / BUTTON */}
+                                {onToggleArchive && (
+                                    <div 
+                                        onClick={(e) => { e.stopPropagation(); onToggleArchive(key, userData?.deckPrefs?.[key]?.archived); }}
+                                        className="absolute top-4 right-4 p-2 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors z-20"
+                                    >
+                                        <Archive size={16} />
+                                    </div>
+                                )}
+
                                 <div className="flex justify-between items-start mb-6">
                                     <div className="w-16 h-16 bg-orange-50 dark:bg-orange-500/10 text-orange-500 rounded-2xl flex items-center justify-center text-2xl border border-orange-100 dark:border-orange-500/20">{deck.icon || <Layers size={28}/>}</div>
-                                    <div className="bg-orange-50 dark:bg-orange-500/10 w-10 h-10 rounded-full flex items-center justify-center text-orange-500 shadow-inner"><Play size={18} fill="currentColor" className="ml-1"/></div>
                                 </div>
-                                <h3 className="font-black text-slate-800 dark:text-white text-xl leading-tight line-clamp-1">{deck.title === "✍️ Scriptorium" ? "My Collection" : deck.title}</h3>
+                                <h3 className="font-black text-slate-800 dark:text-white text-xl leading-tight line-clamp-1 pr-8">{deck.title === "✍️ Scriptorium" ? "My Collection" : deck.title}</h3>
                                 <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest mt-2 block">{deck.cards?.length || 0} Targets</span>
                             </button>
                         ))}
@@ -543,7 +573,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 <div className="w-11"></div>
             </div>
             <div className="flex-1 overflow-hidden relative">
-                {activeGame === 'standard' && <StudyModePlayer deckCards={cards} />}
+                {activeGame === 'standard' && <StudyModePlayer deckCards={cards} userData={userData} onToggleStar={onToggleStar} />}
                 {activeGame === 'quiz' && <div className="h-full overflow-y-auto"><QuizSessionView deckCards={cards} onGameEnd={(res: any) => handleGameFinish(res.score ? (res.score/res.total)*100 : 0)} /></div>}
                 {activeGame === 'match' && <div className="h-full overflow-y-auto pt-6"><MatchingGame deckCards={cards} onGameEnd={(scorePct: number) => handleGameFinish(scorePct)} /></div>}
             </div>
