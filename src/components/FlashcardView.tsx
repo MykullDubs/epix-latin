@@ -3,7 +3,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
     ArrowLeft, X, Library, Layers, Play, Zap, HelpCircle, Puzzle, Flame, 
     CheckCircle2, XCircle, Globe, Users, Filter, ChevronLeft, ChevronRight, 
-    RotateCw, ArrowUp, Paperclip, Music, Star, Archive, Plus, Save, Loader2 
+    RotateCw, ArrowUp, Paperclip, Music, Star, Archive, Plus, Save, Loader2,
+    MoreVertical, FolderPlus, Trash2 // 🔥 Added Context Menu Icons
 } from 'lucide-react';
 import { Toast } from './Toast'; 
 
@@ -335,7 +336,7 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
 }
 
 // ============================================================================
-//  2. MATCHING GAME & 3. QUIZ SESSION (Unchanged, Omitted for brevity below, keep your existing ones)
+//  2. MATCHING GAME & 3. QUIZ SESSION 
 // ============================================================================
 function MatchingGame({ deckCards, onGameEnd }: any) {
     const [cards, setCards] = useState<any[]>([]);
@@ -490,16 +491,17 @@ function QuizSessionView({ deckCards, onGameEnd }: any) {
 //  4. MAIN FLASHCARD VIEW (HUB)
 // ============================================================================
 export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity, userData, onSaveCard, onToggleStar, onToggleArchive }: any) {
-    // 🔥 Added 'create' to internal modes
     const [internalMode, setInternalMode] = useState<'library' | 'menu' | 'playing' | 'create'>('library');
     const [activeGame, setActiveGame] = useState<'standard' | 'quiz' | 'match' | 'tower'>('standard');
     const [deckFilter, setDeckFilter] = useState<'all' | 'personal' | 'network' | 'archived' | 'starred'>('all');
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     
+    // 🔥 NEW: State to track which deck's context menu is open
+    const [activeMenu, setActiveMenu] = useState<string | null>(null);
+    
     const resolvedDeck = allDecks[selectedDeckKey] || Object.values(allDecks)[0];
     const cards = resolvedDeck?.cards || [];
     
-    // 🔥 Dynamic Naming Update
     const deckTitle = resolvedDeck?.id === 'custom' ? "My Study Cards" : resolvedDeck?.title;
 
     const launchGame = (mode: 'standard' | 'quiz' | 'match' | 'tower') => {
@@ -554,7 +556,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         <div className="bg-gradient-to-br from-orange-400 to-rose-500 text-white p-2 rounded-xl"><Library size={20} strokeWidth={3}/></div>
                         <span className="font-black text-slate-800 dark:text-white text-xl uppercase tracking-tighter">Study Hub</span>
                     </div>
-                    {/* 🔥 STUDENT CARD FORGE TRIGGER */}
                     <button onClick={() => setInternalMode('create')} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-md active:scale-95 transition-all">
                         <Plus size={14} /> New Card
                     </button>
@@ -569,27 +570,78 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     ))}
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-5 pb-32">
+                <div className="flex-1 overflow-y-auto p-6 space-y-5 pb-32 relative z-10">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        {filteredDecks.map(([key, deck]: any) => (
-                            <button key={key} onClick={() => { onSelectDeck(key); setInternalMode('menu'); }} className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 border-[3px] border-slate-100 dark:border-slate-800 hover:border-orange-300 dark:hover:border-orange-500/50 hover:-translate-y-1 transition-all text-left relative group">
-                                
-                                {onToggleArchive && (
-                                    <div 
-                                        onClick={(e) => { e.stopPropagation(); onToggleArchive(key, userData?.deckPrefs?.[key]?.archived); }}
-                                        className="absolute top-4 right-4 p-2 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors z-20"
-                                    >
-                                        <Archive size={16} />
-                                    </div>
-                                )}
+                        {filteredDecks.map(([key, deck]: any) => {
+                            const isArchived = userData?.deckPrefs?.[key]?.archived || false;
+                            
+                            return (
+                                <button key={key} onClick={() => { onSelectDeck(key); setInternalMode('menu'); }} className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 border-[3px] border-slate-100 dark:border-slate-800 hover:border-orange-300 dark:hover:border-orange-500/50 hover:-translate-y-1 transition-all text-left relative group">
+                                    
+                                    {/* 🔥 THE NEW CONTEXT MENU */}
+                                    <div className="absolute top-4 right-4 z-20">
+                                        <div 
+                                            onClick={(e) => { 
+                                                e.stopPropagation(); 
+                                                setActiveMenu(activeMenu === key ? null : key); 
+                                            }}
+                                            className="p-2 rounded-full bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/20 transition-colors"
+                                        >
+                                            <MoreVertical size={18} />
+                                        </div>
 
-                                <div className="flex justify-between items-start mb-6">
-                                    <div className="w-16 h-16 bg-orange-50 dark:bg-orange-500/10 text-orange-500 rounded-2xl flex items-center justify-center text-2xl border border-orange-100 dark:border-orange-500/20">{deck.icon || <Layers size={28}/>}</div>
-                                </div>
-                                <h3 className="font-black text-slate-800 dark:text-white text-xl leading-tight line-clamp-1 pr-8">{deck.id === 'custom' ? "My Study Cards" : deck.title}</h3>
-                                <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest mt-2 block">{deck.cards?.length || 0} Targets</span>
-                            </button>
-                        ))}
+                                        {/* Dropdown Panel */}
+                                        {activeMenu === key && (
+                                            <>
+                                                {/* Invisible overlay to catch clicks outside the menu */}
+                                                <div 
+                                                    className="fixed inset-0 z-30 cursor-default" 
+                                                    onClick={(e) => { e.stopPropagation(); setActiveMenu(null); }} 
+                                                />
+                                                
+                                                <div className="absolute top-12 right-0 w-48 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-700 py-2 z-40 animate-in zoom-in-95 duration-200 overflow-hidden">
+                                                    
+                                                    <div 
+                                                        onClick={(e) => { e.stopPropagation(); setToastMsg("Folder system coming soon!"); setActiveMenu(null); }} 
+                                                        className="w-full text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors cursor-pointer"
+                                                    >
+                                                        <FolderPlus size={16} className="text-indigo-500" /> Move to Folder
+                                                    </div>
+                                                    
+                                                    {onToggleArchive && (
+                                                        <div 
+                                                            onClick={(e) => { 
+                                                                e.stopPropagation(); 
+                                                                onToggleArchive(key, isArchived); 
+                                                                setActiveMenu(null); 
+                                                            }} 
+                                                            className="w-full text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors cursor-pointer"
+                                                        >
+                                                            <Archive size={16} className="text-amber-500" /> {isArchived ? 'Unarchive Deck' : 'Archive Deck'}
+                                                        </div>
+                                                    )}
+                                                    
+                                                    <div className="h-px w-full bg-slate-100 dark:bg-slate-700 my-1" />
+                                                    
+                                                    <div 
+                                                        onClick={(e) => { e.stopPropagation(); setToastMsg("Deck removed from Library."); setActiveMenu(null); }} 
+                                                        className="w-full text-left px-4 py-3 text-xs font-bold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 flex items-center gap-3 transition-colors cursor-pointer"
+                                                    >
+                                                        <Trash2 size={16} /> Remove Deck
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div className="w-16 h-16 bg-orange-50 dark:bg-orange-500/10 text-orange-500 rounded-2xl flex items-center justify-center text-2xl border border-orange-100 dark:border-orange-500/20">{deck.icon || <Layers size={28}/>}</div>
+                                    </div>
+                                    <h3 className="font-black text-slate-800 dark:text-white text-xl leading-tight line-clamp-1 pr-10">{deck.id === 'custom' ? "My Study Cards" : deck.title}</h3>
+                                    <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest mt-2 block">{deck.cards?.length || 0} Targets</span>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
             </div>
