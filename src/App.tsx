@@ -382,7 +382,18 @@ export default function App() {
           ) : activeTab === 'discovery' ? (
             <DiscoveryView allDecks={allDecks} lessons={allLessons} onSelectDeck={(d:any) => { setActiveDeckKey(d.id); setActiveTab('flashcards'); }} onSelectLesson={setActiveLesson} onLogActivity={actions.logActivity} userData={userData} />
           ) : activeTab === 'flashcards' ? (
-            <FlashcardView allDecks={allDecks} selectedDeckKey={activeDeckKey} onSelectDeck={(key:any) => { setActiveDeckKey(key); if(!key) setActiveTab('home'); }} onLogActivity={actions.logActivity} onSaveCard={actions.saveCard} userData={userData} user={user} />
+            // 🔥 FULLY WIRED FLASHCARD VIEW
+            <FlashcardView 
+                allDecks={allDecks} 
+                selectedDeckKey={activeDeckKey} 
+                onSelectDeck={(key:any) => { setActiveDeckKey(key); if(!key) setActiveTab('home'); }} 
+                onLogActivity={actions.logActivity} 
+                onSaveCard={actions.saveCard} 
+                userData={userData} 
+                user={user} 
+                onToggleStar={actions.toggleCardStar} 
+                onToggleArchive={actions.toggleDeckArchive} 
+            />
           ) : activeTab === 'profile' ? (
             <ProfileView user={user} userData={userData} />
           ) : (
@@ -394,7 +405,7 @@ export default function App() {
                 user={user}
                 activeOrg={activeOrg} 
                 setActiveTab={setActiveTab} 
-                allDecks={allDecks} // 🔥 FIX: Passed the missing prop
+                allDecks={allDecks} 
             />
           )}
         </div>
