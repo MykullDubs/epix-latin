@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { db, appId } from '../config/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { calculateNextReview, SRSData } from '../utils/srsEngine';
-import { RotateCcw, Check, Zap, ArrowLeft, Loader2, Trophy, Music, ChevronUp } from 'lucide-react';
+import { RotateCcw, Check, Zap, ArrowLeft, Loader2, Trophy, ChevronUp } from 'lucide-react';
 
 export default function SpacedRepetitionView({ deck, userId, onExit }: any) {
     const [dueCards, setDueCards] = useState<any[]>([]);
@@ -41,15 +41,15 @@ export default function SpacedRepetitionView({ deck, userId, onExit }: any) {
         loadReviewQueue();
     }, [deck, userId]);
 
-    // 🔥 SWIPE LOGIC
+    // 🔥 BULLETPROOF SWIPE LOGIC
     const handleTouchStart = (e: React.TouchEvent) => setTouchStart(e.targetTouches[0].clientY);
     const handleTouchEnd = (e: React.TouchEvent) => {
         if (!touchStart) return;
         const touchEnd = e.changedTouches[0].clientY;
         const distance = touchStart - touchEnd;
 
-        // If swipe up is more than 50px
-        if (distance > 50 && !isFlipped) {
+        // If swipe up is more than 40px
+        if (distance > 40 && !isFlipped) {
             setIsFlipped(true);
         }
         setTouchStart(null);
@@ -64,7 +64,7 @@ export default function SpacedRepetitionView({ deck, userId, onExit }: any) {
         await setDoc(srsRef, nextSrsData, { merge: true });
 
         setIsFlipped(false);
-        setTimeout(() => setCurrentIndex(prev => prev + 1), 300);
+        setTimeout(() => setCurrentIndex(prev => prev + 1), 400); // Wait for flip animation to finish
     };
 
     if (isLoading) return (
@@ -78,69 +78,78 @@ export default function SpacedRepetitionView({ deck, userId, onExit }: any) {
         <div className="h-full flex flex-col items-center justify-center bg-slate-950 p-8 text-center animate-in zoom-in-95">
             <Trophy size={80} className="text-yellow-400 mb-6" />
             <h2 className="text-3xl font-black text-white mb-2 uppercase">Neural Queue Empty</h2>
-            <button onClick={onExit} className="mt-8 px-10 py-4 bg-indigo-600 text-white rounded-full font-black text-xs uppercase tracking-widest">Return to Hub</button>
+            <button onClick={onExit} className="mt-8 px-10 py-4 bg-indigo-600 text-white rounded-full font-black text-xs uppercase tracking-widest active:scale-95 transition-transform">Return to Hub</button>
         </div>
     );
 
     const activeCard = dueCards[currentIndex];
 
     return (
-        <div className="h-full flex flex-col bg-slate-950 font-sans touch-none overflow-hidden">
+        <div className="h-full flex flex-col bg-slate-950 font-sans touch-none overflow-hidden select-none">
             <header className="flex items-center justify-between p-6 shrink-0 z-50">
-                <button onClick={onExit} className="flex items-center gap-2 text-slate-500 font-black text-[10px] uppercase tracking-widest"><ArrowLeft size={14} /> Exit</button>
+                <button onClick={onExit} className="flex items-center gap-2 text-slate-500 font-black text-[10px] uppercase tracking-widest hover:text-white transition-colors"><ArrowLeft size={14} /> Exit</button>
                 <div className="text-indigo-400 text-[10px] font-black tracking-widest uppercase">{dueCards.length - currentIndex} Remaining</div>
             </header>
 
-            <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
-                <div className="relative w-full max-w-sm aspect-[3/4] perspective-2000">
+            <div className="flex-1 flex flex-col items-center justify-center p-6 relative w-full">
+                {/* 3D SCENE CONTAINER */}
+                <div className="relative w-full max-w-sm aspect-[3/4] perspective-[2000px]">
+                    
+                    {/* 3D OBJECT (THE CARD) */}
                     <div 
-                        className={`relative w-full h-full transition-all duration-700 preserve-3d ${isFlipped ? 'rotate-x-180' : ''}`}
+                        className={`relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] cursor-pointer ${isFlipped ? '[transform:rotateX(180deg)]' : ''}`}
                         onTouchStart={handleTouchStart}
                         onTouchEnd={handleTouchEnd}
                         onClick={() => !isFlipped && setIsFlipped(true)}
                     >
-                        {/* FRONT */}
-                        <div className="absolute inset-0 backface-hidden bg-slate-900 border-2 border-slate-800 rounded-[3rem] flex flex-col items-center justify-center p-8 text-center shadow-2xl">
-                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-500 mb-8">Target Word</span>
-                            <h2 className="text-5xl font-black text-white tracking-tighter mb-4">{activeCard.front}</h2>
+                        
+                        {/* FRONT FACE: WORD + IPA */}
+                        <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] bg-slate-900 border-2 border-slate-800 rounded-[3rem] flex flex-col items-center justify-center p-8 text-center shadow-2xl">
+                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-500 mb-6">Target Word</span>
+                            
+                            <h2 className="text-5xl font-black text-white tracking-tighter mb-2 leading-none">{activeCard.front}</h2>
+                            
+                            {/* 🔥 IPA cleanly rendered on the front */}
+                            {activeCard.ipa && (
+                                <p className="text-indigo-400 font-bold text-xl tracking-normal mt-2" style={{ direction: 'ltr', fontFamily: 'Arial, sans-serif' }}>
+                                    {activeCard.ipa}
+                                </p>
+                            )}
+
                             <div className="mt-12 flex flex-col items-center gap-2 animate-bounce opacity-40">
                                 <ChevronUp size={24} className="text-indigo-400" />
-                                <span className="text-[9px] font-black text-white uppercase tracking-[0.2em]">Swipe up</span>
+                                <span className="text-[9px] font-black text-white uppercase tracking-[0.2em]">Swipe up or tap</span>
                             </div>
                         </div>
 
-                        {/* BACK */}
-                        <div className="absolute inset-0 backface-hidden rotate-x-180 bg-white rounded-[3rem] flex flex-col overflow-hidden shadow-2xl">
+                        {/* BACK FACE: DEFINITION & RATINGS */}
+                        <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] [transform:rotateX(180deg)] bg-white rounded-[3rem] flex flex-col overflow-hidden shadow-2xl">
+                            
                             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
                                 <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[9px] font-black uppercase mb-4">{activeCard.type}</span>
                                 <h3 className="text-3xl font-black text-slate-900 leading-tight mb-4">{activeCard.back}</h3>
                                 
-                                {/* 🔥 IPA FIX: Force LTR and standard font stack */}
-                                {activeCard.ipa && (
-                                    <p className="text-indigo-600 font-bold mb-6 text-xl tracking-normal" style={{ direction: 'ltr', fontFamily: 'Arial, sans-serif' }}>
-                                        {activeCard.ipa}
-                                    </p>
-                                )}
-                                
                                 {activeCard.imageUrl && (
-                                    <div className="w-full h-32 rounded-2xl overflow-hidden border-2 border-slate-50">
+                                    <div className="w-full h-32 rounded-2xl overflow-hidden border-2 border-slate-50 shadow-sm mt-4">
                                         <img src={activeCard.imageUrl} className="w-full h-full object-cover" alt="" />
                                     </div>
                                 )}
                             </div>
 
+                            {/* SRS ACTION BAR */}
                             <div className="p-4 bg-slate-50 flex gap-2">
-                                <button onClick={(e) => { e.stopPropagation(); handleRating(1); }} className="flex-1 bg-white border-2 border-rose-100 text-rose-500 py-4 rounded-2xl flex flex-col items-center justify-center transition-all active:scale-90">
+                                <button onClick={(e) => { e.stopPropagation(); handleRating(1); }} className="flex-1 bg-white border-2 border-rose-100 hover:border-rose-500 text-rose-500 py-4 rounded-2xl flex flex-col items-center justify-center transition-all active:scale-90 shadow-sm">
                                     <RotateCcw size={18} /><span className="text-[9px] font-black uppercase mt-1">Again</span>
                                 </button>
-                                <button onClick={(e) => { e.stopPropagation(); handleRating(4); }} className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl flex flex-col items-center justify-center active:scale-90 shadow-lg">
+                                <button onClick={(e) => { e.stopPropagation(); handleRating(4); }} className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl flex flex-col items-center justify-center active:scale-90 shadow-lg shadow-indigo-500/30">
                                     <Check size={18} /><span className="text-[9px] font-black uppercase mt-1">Good</span>
                                 </button>
-                                <button onClick={(e) => { e.stopPropagation(); handleRating(5); }} className="flex-1 bg-white border-2 border-emerald-100 text-emerald-500 py-4 rounded-2xl flex flex-col items-center justify-center transition-all active:scale-90">
+                                <button onClick={(e) => { e.stopPropagation(); handleRating(5); }} className="flex-1 bg-white border-2 border-emerald-100 hover:border-emerald-500 text-emerald-500 py-4 rounded-2xl flex flex-col items-center justify-center transition-all active:scale-90 shadow-sm">
                                     <Zap size={18} /><span className="text-[9px] font-black uppercase mt-1">Easy</span>
                                 </button>
                             </div>
                         </div>
+
                     </div>
                 </div>
             </div>
