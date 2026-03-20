@@ -4,12 +4,12 @@ import {
     GraduationCap, Globe, Flame, Zap, Trophy, 
     School, Layers, Feather, Target, BookOpen, 
     Microscope, Terminal, Calculator, Palette, BookText,
-    Check, Brain, Play // 🔥 Imported Daily Review Icons
+    Check, Brain, Play
 } from 'lucide-react';
 import { calculateLevel } from '../utils/profileHelpers';
 import InstallPWA from './InstallPWA';
-import SpacedRepetitionView from './SpacedRepetitionView'; // 🔥 IMPORTED SRS ENGINE
-import { auth } from '../config/firebase'; // Needed for User ID
+import SpacedRepetitionView from './SpacedRepetitionView'; 
+import { auth } from '../config/firebase'; 
 
 // --- UPGRADED THEME HELPER (Now with Dark Mode variants) ---
 const getSubjectTheme = (subject: string) => {
@@ -24,11 +24,9 @@ const getSubjectTheme = (subject: string) => {
     return { icon: Globe, color: 'text-indigo-500 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-500/10', border: 'border-indigo-100 dark:border-indigo-500/20', hover: 'hover:border-indigo-300 dark:hover:border-indigo-500/40 hover:shadow-indigo-100 dark:hover:shadow-indigo-900/20' };
 };
 
-// Notice we added `allDecks` to the props so we can aggregate the cards!
 export default function HomeView({ setActiveTab, classes, curriculums = [], onSelectClass, userData, user, activeOrg, allDecks }: any) {
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
-  // 🔥 STATE FOR THE GLOBAL SRS ENGINE
   const [launchDailyReview, setLaunchDailyReview] = useState(false);
 
   const xp = userData?.xp || 0;
@@ -77,11 +75,17 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
 
   // 🔥 GLOBAL REVIEW: IF ACTIVATED, TAKEOVER THE SCREEN
   if (launchDailyReview) {
-      // Flattens all cards from all decks into a single massive study array
+      // 🔥 Filter out archived decks before compiling the queue
+      const activeDecks = Object.entries(allDecks || {}).filter(([key, deck]) => {
+          const isArchived = userData?.deckPrefs?.[key]?.archived || false;
+          return !isArchived;
+      }).map(([_, deck]) => deck);
+
+      // Flattens all cards from NON-ARCHIVED decks into a single massive study array
       const masterDeck = {
           id: 'global_review',
           title: 'Daily Review',
-          cards: Object.values(allDecks || {}).flatMap((deck: any) => deck.cards || [])
+          cards: activeDecks.flatMap((deck: any) => deck.cards || [])
       };
 
       return (
