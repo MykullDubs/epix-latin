@@ -4,10 +4,12 @@ import {
     GraduationCap, Globe, Flame, Zap, Trophy, 
     School, Layers, Feather, Target, BookOpen, 
     Microscope, Terminal, Calculator, Palette, BookText,
-    Check
+    Check, Brain, Play // 🔥 Imported Daily Review Icons
 } from 'lucide-react';
 import { calculateLevel } from '../utils/profileHelpers';
 import InstallPWA from './InstallPWA';
+import SpacedRepetitionView from './SpacedRepetitionView'; // 🔥 IMPORTED SRS ENGINE
+import { auth } from '../config/firebase'; // Needed for User ID
 
 // --- UPGRADED THEME HELPER (Now with Dark Mode variants) ---
 const getSubjectTheme = (subject: string) => {
@@ -22,9 +24,13 @@ const getSubjectTheme = (subject: string) => {
     return { icon: Globe, color: 'text-indigo-500 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-500/10', border: 'border-indigo-100 dark:border-indigo-500/20', hover: 'hover:border-indigo-300 dark:hover:border-indigo-500/40 hover:shadow-indigo-100 dark:hover:shadow-indigo-900/20' };
 };
 
-export default function HomeView({ setActiveTab, classes, curriculums = [], onSelectClass, userData, user, activeOrg }: any) {
+// Notice we added `allDecks` to the props so we can aggregate the cards!
+export default function HomeView({ setActiveTab, classes, curriculums = [], onSelectClass, userData, user, activeOrg, allDecks }: any) {
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
+  // 🔥 STATE FOR THE GLOBAL SRS ENGINE
+  const [launchDailyReview, setLaunchDailyReview] = useState(false);
+
   const xp = userData?.xp || 0;
   const streak = userData?.streak || 0;
   const targetLang = userData?.targetLanguage || "English";
@@ -68,6 +74,26 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
   const now = new Date();
   const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const hoursRemaining = Math.max(1, Math.floor((tomorrow.getTime() - now.getTime()) / (1000 * 60 * 60)));
+
+  // 🔥 GLOBAL REVIEW: IF ACTIVATED, TAKEOVER THE SCREEN
+  if (launchDailyReview) {
+      // Flattens all cards from all decks into a single massive study array
+      const masterDeck = {
+          id: 'global_review',
+          title: 'Daily Review',
+          cards: Object.values(allDecks || {}).flatMap((deck: any) => deck.cards || [])
+      };
+
+      return (
+          <div className="fixed inset-0 z-[9999] bg-slate-950 p-4 md:p-8 animate-in slide-in-from-bottom-8 duration-500">
+              <SpacedRepetitionView 
+                  deck={masterDeck} 
+                  userId={auth.currentUser?.uid} 
+                  onExit={() => setLaunchDailyReview(false)} 
+              />
+          </div>
+      );
+  }
 
   return (
     <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 font-sans transition-colors duration-300">
@@ -183,6 +209,43 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                               );
                           })}
                       </div>
+                  </section>
+              )}
+
+              {/* 🔥 3.5. GLOBAL DAILY REVIEW BANNER (SRS) */}
+              {allDecks && Object.keys(allDecks).length > 0 && (
+                  <section className="animate-in slide-in-from-bottom-4 duration-500 delay-75">
+                      <div className="flex items-center gap-3 mb-4 ml-1">
+                          <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                              <Brain size={18} className="text-indigo-500" /> Daily Habits
+                          </h3>
+                      </div>
+
+                      <button 
+                          onClick={() => setLaunchDailyReview(true)}
+                          className="w-full relative bg-gradient-to-br from-indigo-900 to-slate-900 dark:from-indigo-950 dark:to-black rounded-[2.5rem] p-6 md:p-8 border-4 border-indigo-500/30 shadow-2xl overflow-hidden group text-left transition-all active:scale-[0.98]"
+                      >
+                          <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
+                              <Brain size={100} />
+                          </div>
+                          <div className="absolute -inset-24 bg-gradient-to-r from-indigo-500/20 to-cyan-500/20 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+
+                          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                              <div>
+                                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-500/20 text-indigo-300 rounded-lg text-[10px] font-black uppercase tracking-widest mb-3 border border-indigo-400/20 backdrop-blur-md">
+                                      <Zap size={12} className="text-yellow-400" fill="currentColor" /> Optimized Review
+                                  </span>
+                                  <h2 className="text-3xl font-black text-white tracking-tight mb-2">Global Queue</h2>
+                                  <p className="text-indigo-200/80 text-sm font-bold max-w-xs leading-relaxed">
+                                      The algorithm has compiled the exact targets you are about to forget.
+                                  </p>
+                              </div>
+
+                              <div className="shrink-0 flex items-center justify-center w-14 h-14 bg-white text-indigo-900 rounded-[1.2rem] shadow-[0_0_30px_rgba(255,255,255,0.2)] group-hover:scale-110 transition-transform">
+                                  <Play size={20} className="ml-1" fill="currentColor" />
+                              </div>
+                          </div>
+                      </button>
                   </section>
               )}
               
