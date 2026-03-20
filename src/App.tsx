@@ -21,7 +21,7 @@ import LessonView from './components/LessonView';
 import ClassView from './components/ClassView'; 
 import LiveVocabProjector from './components/LiveVocabProjector'; 
 import LiveConnectFourProjector from './components/LiveConnectFourProjector';
-import LiveSlipstreamProjector from './components/LiveSlipstreamProjector'; // 🔥 IMPORTED SLIPSTREAM
+import LiveSlipstreamProjector from './components/LiveSlipstreamProjector';
 import CelebrationScreen from './components/CelebrationScreen';
 
 export default function App() {
@@ -46,7 +46,7 @@ export default function App() {
   const [activePresentation, setActivePresentation] = useState<{lessonId: string, classId: string} | null>(null);
   const [activeVocabGame, setActiveVocabGame] = useState<{deckId: string, classId: string} | null>(null);
   const [activeConnectFour, setActiveConnectFour] = useState<{deckId: string, classId: string} | null>(null);
-  const [activeSlipstream, setActiveSlipstream] = useState<{deckId: string, classId: string} | null>(null); // 🔥 NEW STATE
+  const [activeSlipstream, setActiveSlipstream] = useState<{deckId: string, classId: string} | null>(null);
 
   const allCurriculums = useMemo(() => {
       return [...GLOBAL_CURRICULUMS, ...(customCurriculums || [])];
@@ -79,7 +79,7 @@ export default function App() {
           const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
           await setDoc(sessionRef, {
               type: 'connect_four',
-              lessonId: deckId,
+              lessonId: deckId, 
               quizState: 'waiting',
               currentTurn: 1, 
               grid: Array(7).fill([]),
@@ -94,13 +94,12 @@ export default function App() {
       }
   };
 
-  // 🔥 NEW SLIPSTREAM LAUNCHER
   const handleStartSlipstream = async (deckId: string, classId: string) => {
       try {
           const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
           await setDoc(sessionRef, {
               type: 'slipstream',
-              lessonId: deckId,
+              lessonId: deckId, 
               quizState: 'waiting',
               joined: {},
               progress: {},
@@ -191,7 +190,7 @@ export default function App() {
   if (!user) {
     return showAuth ? (
       <div className="relative min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
-         <button onClick={() => setShowAuth(false)} className="absolute top-6 left-6 z-50 text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold text-sm transition-colors">← Regresar</button>
+         <button onClick={() => setShowAuth(false)} className="absolute top-6 left-6 z-50 text-slate-400 hover:text-slate-900 dark:hover:white font-bold text-sm transition-colors">← Regresar</button>
          <AuthView />
       </div>
     ) : <MarketingSite onLoginClick={() => setShowAuth(true)} />;
@@ -260,7 +259,7 @@ export default function App() {
     );
   }
 
-  // 🔥 5. PROJECTOR MODE (Slipstream Run)
+  // 5. PROJECTOR MODE (Slipstream Run)
   if (activeSlipstream) {
     const deck = allDecks[activeSlipstream.deckId] || allDecks.custom;
     const activeClassForSlipstream = instructorClasses.find(c => c.id === activeSlipstream.classId) || enrolledClasses.find(c => c.id === activeSlipstream.classId);
@@ -319,7 +318,7 @@ export default function App() {
         onStartPresentation={(lessonId: string, classId: string) => setActivePresentation({ lessonId, classId })}
         onStartVocabGame={handleStartVocabGame}      
         onStartConnectFour={handleStartConnectFour} 
-        onStartSlipstream={handleStartSlipstream} // 🔥 WIRED SLIPSTREAM UP TO DASHBOARD
+        onStartSlipstream={handleStartSlipstream}
         onPublishDeck={actions.publishDeck}
         onSwitchView={() => setCurrentView('student')}
         onLogout={actions.logout} 
@@ -340,7 +339,6 @@ export default function App() {
       <div className="w-full bg-white dark:bg-slate-950 max-w-md h-[100dvh] shadow-2xl relative flex flex-col overflow-hidden transition-colors duration-300">
         <div className="flex-1 overflow-hidden relative bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
           
-          {/* CELEBRATION INTERCEPTOR */}
           {celebrationData ? (
              <CelebrationScreen 
                 data={celebrationData} 
@@ -370,16 +368,16 @@ export default function App() {
             )
           ) : activeStudentClass ? (
             <StudentClassView 
-               classData={activeStudentClass} 
-               lessons={allLessons} 
-               curriculums={allCurriculums}
-               onBack={() => setActiveStudentClass(null)} 
-               onSelectLesson={setActiveLesson} 
-               setActiveTab={setActiveTab} 
-               setSelectedLessonId={(lessonId: string) => setActivePresentation({ lessonId, classId: activeStudentClass.id })} 
-               userData={userData} 
-               ExamPlayerView={ExamPlayerView} 
-               onLogActivity={actions.logActivity}
+                classData={activeStudentClass} 
+                lessons={allLessons} 
+                curriculums={allCurriculums}
+                onBack={() => setActiveStudentClass(null)} 
+                onSelectLesson={setActiveLesson} 
+                setActiveTab={setActiveTab} 
+                setSelectedLessonId={(lessonId: string) => setActivePresentation({ lessonId, classId: activeStudentClass.id })} 
+                userData={userData} 
+                ExamPlayerView={ExamPlayerView} 
+                onLogActivity={actions.logActivity}
             />
           ) : activeTab === 'discovery' ? (
             <DiscoveryView allDecks={allDecks} lessons={allLessons} onSelectDeck={(d:any) => { setActiveDeckKey(d.id); setActiveTab('flashcards'); }} onSelectLesson={setActiveLesson} onLogActivity={actions.logActivity} userData={userData} />
@@ -389,12 +387,14 @@ export default function App() {
             <ProfileView user={user} userData={userData} />
           ) : (
             <HomeView 
-               classes={enrolledClasses} 
-               curriculums={allCurriculums} 
-               onSelectClass={setActiveStudentClass} 
-               userData={userData} 
-               activeOrg={activeOrg} 
-               setActiveTab={setActiveTab} 
+                classes={enrolledClasses} 
+                curriculums={allCurriculums} 
+                onSelectClass={setActiveStudentClass} 
+                userData={userData} 
+                user={user}
+                activeOrg={activeOrg} 
+                setActiveTab={setActiveTab} 
+                allDecks={allDecks} // 🔥 FIX: Passed the missing prop
             />
           )}
         </div>
