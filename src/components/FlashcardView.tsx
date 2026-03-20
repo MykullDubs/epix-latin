@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
     ArrowLeft, X, Library, Layers, Play, Zap, HelpCircle, Puzzle, Flame, 
     CheckCircle2, XCircle, Globe, Users, Filter, ChevronLeft, ChevronRight, 
-    RotateCw, ArrowUp, Paperclip 
+    RotateCw, ArrowUp, Paperclip, Music // 🔥 Imported Music icon
 } from 'lucide-react';
 import { Toast } from './Toast'; 
 
@@ -118,30 +118,45 @@ function StudyModePlayer({ deckCards }: any) {
             </div>
 
             {/* The Draggable Card Container */}
-            <div key={currentIndex} className={`flex-1 relative flex items-center justify-center perspective-[1000px] mb-8 ${animationClass}`}>
+            <div key={currentIndex} className={`flex-1 relative flex items-center justify-center perspective-[2000px] mb-8 ${animationClass}`}>
                 <div 
                     onTouchStart={handlePointerDown} onTouchMove={handlePointerMove} onTouchEnd={handlePointerUp}
                     onMouseDown={handlePointerDown} onMouseMove={handlePointerMove} onMouseUp={handlePointerUp} onMouseLeave={handlePointerUp}
-                    className={`relative w-full aspect-square max-h-[400px] cursor-grab active:cursor-grabbing ${startX === null ? 'transition-all duration-300' : ''}`}
+                    className={`relative w-full aspect-[3/4] max-h-[450px] cursor-grab active:cursor-grabbing ${startX === null ? 'transition-transform duration-500' : ''}`}
                     style={{ 
                         transform: `translateX(${dragX}px) translateY(${dragY * 0.4}px) rotate(${dragX * 0.05}deg)`,
                         transformStyle: 'preserve-3d'
                     }}
                 >
-                    <div className="absolute inset-0 w-full h-full transition-transform duration-500 ease-out" style={{ transform: isFlipped ? 'rotateX(180deg)' : 'rotateX(0deg)', transformStyle: 'preserve-3d' }}>
+                    <div className="absolute inset-0 w-full h-full transition-transform duration-700 ease-out" style={{ transform: isFlipped ? 'rotateX(180deg)' : 'rotateX(0deg)', transformStyle: 'preserve-3d' }}>
                         
                         {/* FRONT FACE */}
-                        <div className="absolute inset-0 w-full h-full bg-white dark:bg-slate-900 rounded-[3rem] border-2 border-b-[8px] border-slate-200 dark:border-slate-800 shadow-xl flex flex-col items-center justify-center p-8 text-center transition-colors" style={{ backfaceVisibility: 'hidden' }}>
-                            <span className="text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-widest absolute top-6 bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1 rounded-full">Front</span>
-                            <h2 className="text-4xl md:text-5xl font-black text-slate-800 dark:text-white leading-tight">{currentCard.front}</h2>
-                            {currentCard.ipa && <p className="text-sm font-bold text-slate-400 dark:text-slate-500 mt-4 bg-slate-50 dark:bg-slate-800/50 px-3 py-1 rounded-lg">{currentCard.ipa}</p>}
-                            <div className="absolute bottom-8 flex flex-col items-center gap-1 text-[10px] font-black text-indigo-400 dark:text-indigo-500 uppercase tracking-widest opacity-60">
+                        <div className="absolute inset-0 w-full h-full bg-slate-900 rounded-[3rem] border-2 border-b-[8px] border-slate-800 shadow-2xl flex flex-col items-center justify-center p-8 text-center overflow-hidden transition-colors" style={{ backfaceVisibility: 'hidden' }}>
+                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest absolute top-6 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20 shadow-sm z-20">Front</span>
+                            
+                            {/* 🔥 MEDIA UPGRADE: Display Image implicitly on the front if available */}
+                            {currentCard.imageUrl && (
+                                <div className="absolute inset-0 w-full h-full opacity-20 pointer-events-none z-0">
+                                    <img src={currentCard.imageUrl} className="w-full h-full object-cover blur-xl" alt="" />
+                                </div>
+                            )}
+
+                            <h2 className="text-4xl md:text-5xl font-black text-white leading-tight relative z-10">{currentCard.front}</h2>
+                            
+                            {/* 🔥 IPA FIX: Render LTR safely */}
+                            {currentCard.ipa && (
+                                <p className="text-sm font-bold text-indigo-400 mt-4 px-3 py-1 rounded-lg relative z-10" style={{ direction: 'ltr', fontFamily: 'Arial, sans-serif' }}>
+                                    {currentCard.ipa}
+                                </p>
+                            )}
+
+                            <div className="absolute bottom-8 flex flex-col items-center gap-1 text-[10px] font-black text-indigo-500 uppercase tracking-widest opacity-80 z-10">
                                 <ArrowUp size={16} strokeWidth={3} className="animate-bounce" /> Slide up to flip
                             </div>
                         </div>
 
                         {/* BACK FACE */}
-                        <div className="absolute inset-0 w-full h-full bg-indigo-50 dark:bg-indigo-900/20 rounded-[3rem] border-2 border-b-[8px] border-indigo-200 dark:border-indigo-500/30 shadow-xl flex flex-col items-center justify-center p-8 text-center transition-colors" style={{ backfaceVisibility: 'hidden', transform: 'rotateX(180deg)' }}>
+                        <div className="absolute inset-0 w-full h-full bg-white rounded-[3rem] border-2 border-b-[8px] border-slate-200 shadow-2xl flex flex-col overflow-hidden transition-colors" style={{ backfaceVisibility: 'hidden', transform: 'rotateX(180deg)' }}>
                             {/* Paperclip Trigger */}
                             {currentCard.conjugations && (
                                 <button onClick={(e) => { e.stopPropagation(); setShowConjugations(true); }} className="absolute top-6 right-8 p-3 bg-white dark:bg-slate-800 text-indigo-500 dark:text-indigo-400 rounded-2xl shadow-lg border border-indigo-100 dark:border-slate-700 hover:scale-110 active:scale-95 transition-all z-30">
@@ -149,20 +164,41 @@ function StudyModePlayer({ deckCards }: any) {
                                     <div className="absolute -top-1 -right-1 w-3 h-3 bg-rose-500 rounded-full border-2 border-white dark:border-slate-900" />
                                 </button>
                             )}
-                            <span className="text-[10px] font-black text-indigo-400 dark:text-indigo-300 uppercase tracking-widest absolute top-6 bg-white dark:bg-indigo-950 px-3 py-1 rounded-full shadow-sm">Back</span>
-                            <h2 className="text-3xl md:text-4xl font-black text-indigo-900 dark:text-indigo-100 leading-tight">{currentCard.back}</h2>
                             
-                            {currentCard.morphology && (
-                                <div className="flex flex-wrap justify-center gap-2 mt-6">
-                                    {currentCard.morphology.map((m: any, i: number) => (
-                                        <div key={i} className="bg-white dark:bg-slate-800 border border-indigo-100 dark:border-indigo-500/20 px-3 py-1.5 rounded-xl shadow-sm text-[10px] uppercase tracking-wider transition-colors">
-                                            <span className="font-black text-indigo-600 dark:text-indigo-400 mr-1">{m.part}</span>
-                                            <span className="font-bold text-slate-400 dark:text-slate-500">{m.meaning}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                            <div className="absolute bottom-8 flex flex-col items-center gap-1 text-[10px] font-black text-indigo-400/60 dark:text-indigo-500/60 uppercase tracking-widest">
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center overflow-y-auto custom-scrollbar relative z-10">
+                                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest absolute top-6 bg-slate-50 px-3 py-1 rounded-full shadow-sm border border-slate-100">Back</span>
+                                
+                                <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[9px] font-black uppercase tracking-widest mb-4 mt-4">{currentCard.type}</span>
+                                
+                                <h2 className="text-3xl md:text-4xl font-black text-slate-900 leading-tight mb-4">{currentCard.back}</h2>
+                                
+                                {/* 🔥 MEDIA UPGRADE: Render image and audio on the back */}
+                                {currentCard.imageUrl && (
+                                    <div className="w-full aspect-video rounded-2xl overflow-hidden mb-4 border-2 border-slate-50 shadow-inner shrink-0">
+                                        <img src={currentCard.imageUrl} className="w-full h-full object-cover" alt="Context" />
+                                    </div>
+                                )}
+
+                                {currentCard.audioUrl && (
+                                    <div className="w-full bg-slate-50 p-2 rounded-xl flex items-center gap-3 border border-slate-200 shrink-0 mb-4">
+                                        <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white shrink-0"><Music size={14} /></div>
+                                        <audio src={currentCard.audioUrl} controls className="h-8 w-full opacity-80" />
+                                    </div>
+                                )}
+
+                                {currentCard.morphology && (
+                                    <div className="flex flex-wrap justify-center gap-2 mt-2 pb-8">
+                                        {currentCard.morphology.map((m: any, i: number) => (
+                                            <div key={i} className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl shadow-sm text-[10px] uppercase tracking-wider transition-colors">
+                                                <span className="font-black text-indigo-600 mr-1">{m.part}</span>
+                                                <span className="font-bold text-slate-500">{m.meaning}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="absolute bottom-6 left-0 right-0 flex flex-col items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest z-10 pointer-events-none bg-gradient-to-t from-white via-white/80 to-transparent pt-6 pb-2">
                                 <ArrowUp size={16} strokeWidth={3} className="animate-bounce" /> Slide up to return
                             </div>
                         </div>
@@ -348,7 +384,15 @@ function QuizSessionView({ deckCards, onGameEnd }: any) {
                         }
                     </div>
                 )}
-                <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-4 bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1 rounded-full">Translate</span>
+                
+                {/* 🔥 MEDIA UPGRADE: Display image in Quiz Mode */}
+                {currentCard.imageUrl && (
+                    <div className="w-full h-24 rounded-xl overflow-hidden mb-4 opacity-80 border-2 border-slate-100 dark:border-slate-800">
+                        <img src={currentCard.imageUrl} className="w-full h-full object-cover" alt="" />
+                    </div>
+                )}
+
+                <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1 rounded-full">Translate</span>
                 <h2 className="text-3xl md:text-4xl font-black text-slate-800 dark:text-white leading-tight">{currentCard.front}</h2>
             </div>
 
@@ -459,7 +503,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     <span className="text-indigo-500 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1 rounded-lg">{cards.length} Configured Targets</span>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-24">
                     <div className="grid grid-cols-2 gap-4">
                         <button onClick={() => launchGame('standard')} className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-100 dark:border-slate-800 shadow-sm hover:border-blue-300 dark:hover:border-blue-500/50 hover:-translate-y-1 transition-all group text-left">
                             <div className="w-14 h-14 bg-blue-50 dark:bg-blue-500/10 text-blue-500 rounded-2xl flex items-center justify-center mb-4 group-hover:rotate-6 transition-transform"><Layers size={28}/></div>
