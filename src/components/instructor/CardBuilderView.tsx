@@ -3,12 +3,14 @@ import React, { useState, useEffect } from 'react';
 import { 
     Layers, Plus, X, Save, Edit3, Trash2, FileJson, Database, 
     Loader2, FolderPlus, FolderOpen, Share2, Lock, Users, 
-    Globe, CheckCircle2, Paperclip, ChevronRight, Wand2, BookOpen
+    Globe, CheckCircle2, Paperclip, ChevronRight, Wand2, BookOpen,
+    Image as ImageIcon, Music, UploadCloud // 🔥 Imported Media Icons
 } from 'lucide-react';
 import { INITIAL_SYSTEM_DECKS } from '../../constants/defaults';
 import { Toast } from '../Toast';
 import { doc, setDoc } from 'firebase/firestore';
-import { db, appId } from '../../config/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'; // 🔥 Imported Storage tools
+import { db, storage, auth, appId } from '../../config/firebase';
 
 // ============================================================================
 //  NETWORK PUBLISHING MODAL (INLINE COMPONENT)
@@ -97,7 +99,11 @@ const DeckShareModal = ({ deck, instructorClasses, onClose, onPublish }: any) =>
 //  MAIN CARD BUILDER VIEW
 // ============================================================================
 export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard, availableDecks, initialDeckId, onPublishDeck, instructorClasses }: any) {
-    const [formData, setFormData] = useState({ front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '', deckId: initialDeckId || 'custom' });
+    // 🔥 ADDED MEDIA URLS TO FORM STATE
+    const [formData, setFormData] = useState({ 
+        front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', 
+        grammarTags: '', deckId: initialDeckId || 'custom', imageUrl: '', audioUrl: '' 
+    });
     const [isCreatingDeck, setIsCreatingDeck] = useState(false);
     const [newDeckTitle, setNewDeckTitle] = useState('');
     const [morphology, setMorphology] = useState<any[]>([]);
@@ -106,10 +112,13 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
     const [conjugations, setConjugations] = useState<Record<string, Record<string, string>>>({});
     const [tempConj, setTempConj] = useState({ tense: 'Present', person: '1s', verb: '' });
 
-    // 🔥 STATE FOR MAGIC AUTO-FILL & DISAMBIGUATION MODAL
     const [isAutoFilling, setIsAutoFilling] = useState(false);
     const [showDefSelector, setShowDefSelector] = useState(false);
     const [fetchedOptions, setFetchedOptions] = useState<any[]>([]);
+
+    // 🔥 MEDIA UPLOAD STATE
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
+    const [isUploadingAudio, setIsUploadingAudio] = useState(false);
 
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -144,8 +153,40 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
         } 
     };
 
-    // 🔥 HIGH-TACTICAL MAGIC AUTO-FILL (Handles Multiple Definitions)
-  // 🔥 UPGRADED: MAGIC AUTO-FILL WITH PHONETIC STITCHING
+    // 🔥 FIREBASE STORAGE: SECURE MEDIA UPLOAD HANDLER
+    const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'audio') => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const isImage = type === 'image';
+        const setter = isImage ? setIsUploadingImage : setIsUploadingAudio;
+        const field = isImage ? 'imageUrl' : 'audioUrl';
+
+        // Size guard: 5MB for images, 10MB for audio
+        const maxSize = isImage ? 5 * 1024 * 1024 : 10 * 1024 * 1024;
+        if (file.size > maxSize) {
+            setToastMsg(`File too large. Limit is ${isImage ? '5MB' : '10MB'}.`);
+            return;
+        }
+
+        setter(true);
+        try {
+            // Routing to the user's specific path to bypass the firewall
+            const safeName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+            const fileRef = ref(storage, `artifacts/${appId}/users/${auth.currentUser?.uid}/media/${Date.now()}_${safeName}`);
+            const uploadResult = await uploadBytes(fileRef, file);
+            const url = await getDownloadURL(uploadResult.ref);
+            
+            setFormData(prev => ({ ...prev, [field]: url }));
+            setToastMsg(`${isImage ? 'Image' : 'Audio'} payload secured! ✨`);
+        } catch (err) {
+            console.error("Media upload error:", err);
+            setToastMsg(`Upload failed. Check your connection.`);
+        } finally {
+            setter(false);
+        }
+    };
+
     const handleMagicAutoFill = async (e: React.MouseEvent) => {
         e.preventDefault();
         const queryWord = formData.front.trim();
@@ -153,17 +194,14 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
 
         setIsAutoFilling(true);
         try {
-            // 1. Try the exact phrase first (URL encoded to handle spaces safely)
             const safeQuery = encodeURIComponent(queryWord);
             const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${safeQuery}`);
             
             if (!response.ok) {
-                // 2. FALLBACK: If it's a multi-word phrase and the exact match fails
                 if (queryWord.includes(' ')) {
                     const words = queryWord.split(' ');
                     let combinedIpa = '';
                     
-                    // Fetch each word individually
                     for (const w of words) {
                         try {
                             const wordRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(w)}`);
@@ -171,12 +209,9 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                                 const wordData = await wordRes.json();
                                 const txtEntry = wordData[0]?.phonetics?.find((p: any) => p.text);
                                 const ipaTxt = txtEntry?.text || wordData[0]?.phonetic || '';
-                                // Clean out the slashes so we can stitch them together cleanly
                                 combinedIpa += ipaTxt.replace(/\//g, '') + ' ';
                             }
-                        } catch (err) {
-                            // Silently ignore individual word failures to keep stitching what we can
-                        }
+                        } catch (err) {}
                     }
                     
                     if (combinedIpa.trim()) {
@@ -188,7 +223,6 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                 throw new Error("Word not found in global dictionary");
             }
             
-            // 3. EXACT MATCH FOUND: Harvest Data
             const data = await response.json();
             
             const textEntry = data[0]?.phonetics?.find((p: any) => p.text);
@@ -217,7 +251,6 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                 setFetchedOptions(options);
                 setShowDefSelector(true);
             } else if (fetchedIpa) {
-                // Failsafe: If we got IPA but no definition
                 setFormData(prev => ({ ...prev, ipa: fetchedIpa }));
                 setToastMsg("Phonetics found! ✨ (Definition missing)");
             } else {
@@ -257,7 +290,13 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
     const handleSelectCard = (card: any) => { 
         setImportMode(false); 
         setEditingId(card.id); 
-        setFormData({ front: card.front, back: card.back, type: card.type || 'noun', ipa: card.ipa || '', sentence: card.usage?.sentence || '', sentenceTrans: card.usage?.translation || '', grammarTags: card.grammar_tags?.join(', ') || '', deckId: card.deckId || formData.deckId }); 
+        // Load the media URLs into state if they exist
+        setFormData({ 
+            front: card.front, back: card.back, type: card.type || 'noun', ipa: card.ipa || '', 
+            sentence: card.usage?.sentence || '', sentenceTrans: card.usage?.translation || '', 
+            grammarTags: card.grammar_tags?.join(', ') || '', deckId: card.deckId || formData.deckId,
+            imageUrl: card.imageUrl || '', audioUrl: card.audioUrl || '' 
+        }); 
         setMorphology(card.morphology || []); 
         setConjugations(card.conjugations || {});
         window.scrollTo({ top: 0, behavior: 'smooth' }); 
@@ -265,7 +304,10 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
 
     const handleClear = () => { 
         setEditingId(null); 
-        setFormData(prev => ({ ...prev, front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', grammarTags: '' })); 
+        setFormData(prev => ({ 
+            ...prev, front: '', back: '', type: 'noun', ipa: '', 
+            sentence: '', sentenceTrans: '', grammarTags: '', imageUrl: '', audioUrl: '' 
+        })); 
         setMorphology([]); 
         setConjugations({});
     };
@@ -291,9 +333,11 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
             await registerNewDeck(finalDeckId, finalDeckTitle);
         } 
 
+        // 🔥 INJECT MEDIA URLS INTO PAYLOAD
         const cardData = { 
             front: formData.front, back: formData.back, type: formData.type, 
             deckId: finalDeckId, deckTitle: finalDeckTitle, ipa: formData.ipa || "/.../", 
+            imageUrl: formData.imageUrl || null, audioUrl: formData.audioUrl || null,
             mastery: 0, morphology: morphology.length > 0 ? morphology : [{ part: formData.front, meaning: "Root", type: "root" }], 
             conjugations: Object.keys(conjugations).length > 0 ? conjugations : null,
             usage: { sentence: formData.sentence || "-", translation: formData.sentenceTrans || "-" }, 
@@ -348,19 +392,12 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
             if (!card.front || !card.back) continue; 
             
             const cardData = {
-                front: card.front,
-                back: card.back,
-                type: card.type || 'noun',
-                deckId: finalDeckId,
-                deckTitle: finalDeckTitle,
-                ipa: card.ipa || "/.../",
-                mastery: 0,
-                morphology: card.morphology || [{ part: card.front, meaning: "Root", type: "root" }],
+                front: card.front, back: card.back, type: card.type || 'noun',
+                deckId: finalDeckId, deckTitle: finalDeckTitle, ipa: card.ipa || "/.../",
+                imageUrl: card.imageUrl || null, audioUrl: card.audioUrl || null,
+                mastery: 0, morphology: card.morphology || [{ part: card.front, meaning: "Root", type: "root" }],
                 conjugations: card.conjugations || null, 
-                usage: { 
-                    sentence: card.usage?.sentence || card.sentence || "-", 
-                    translation: card.usage?.translation || card.translation || "-" 
-                },
+                usage: { sentence: card.usage?.sentence || card.sentence || "-", translation: card.usage?.translation || card.translation || "-" },
                 grammar_tags: card.grammarTags || ["Imported"]
             };
             
@@ -396,7 +433,7 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
     
     useEffect(() => { if (editingId && !currentDeckCards.some((c: any) => c.id === editingId)) { handleClear(); } }, [currentDeckCards, editingId]);
 
-    const jsonTemplate = `[\n  { "front": "canis", "back": "dog", "type": "noun" },\n  { "front": "videre", "back": "to see", "type": "verb" }\n]`;
+    const jsonTemplate = `[\n  { "front": "canis", "back": "dog", "type": "noun", "imageUrl": "https://..." }\n]`;
 
     return (
         <div className="space-y-6 relative pb-12 font-sans transition-colors duration-300">
@@ -411,7 +448,6 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                 />
             )}
 
-            {/* 🔥 NEW DISAMBIGUATION MODAL */}
             {showDefSelector && (
                 <div className="fixed inset-0 z-[9999] bg-slate-900/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
                     <div className="bg-white dark:bg-slate-950 w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 duration-300 max-h-[80vh] flex flex-col">
@@ -542,6 +578,52 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                         </div>
                     </section>
 
+                    {/* 🔥 NEW MEDIA PAYLOAD SECTION */}
+                    <section className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-inner transition-colors">
+                        <div className="flex items-center gap-2 mb-4">
+                            <UploadCloud size={16} className="text-indigo-500" />
+                            <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest">Media Payload</h3>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            
+                            {/* Image Dropzone */}
+                            <div className="bg-white dark:bg-slate-900 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col items-center justify-center text-center relative hover:border-indigo-400 transition-colors group">
+                                {formData.imageUrl ? (
+                                    <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800">
+                                        <img src={formData.imageUrl} alt="Card preview" className="w-full h-full object-cover" />
+                                        <button type="button" onClick={() => setFormData(prev => ({...prev, imageUrl: ''}))} className="absolute top-2 right-2 bg-rose-500 text-white p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14}/></button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {isUploadingImage ? <Loader2 size={32} className="animate-spin text-indigo-500 mb-2" /> : <ImageIcon size={32} className="text-slate-300 dark:text-slate-600 mb-2 group-hover:text-indigo-400 transition-colors" />}
+                                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Attach Reference Image</span>
+                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mt-1">PNG, JPG (Max 5MB)</span>
+                                        <input type="file" accept="image/*" onChange={(e) => handleMediaUpload(e, 'image')} disabled={isUploadingImage} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed" />
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Audio Dropzone */}
+                            <div className="bg-white dark:bg-slate-900 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col items-center justify-center text-center relative hover:border-indigo-400 transition-colors group">
+                                {formData.audioUrl ? (
+                                    <div className="w-full flex flex-col items-center gap-3">
+                                        <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center"><Music size={20} /></div>
+                                        <audio src={formData.audioUrl} controls className="w-full h-8 opacity-80" />
+                                        <button type="button" onClick={() => setFormData(prev => ({...prev, audioUrl: ''}))} className="text-[10px] font-black uppercase text-rose-500 hover:text-rose-600 tracking-widest flex items-center gap-1"><Trash2 size={12}/> Remove Audio</button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {isUploadingAudio ? <Loader2 size={32} className="animate-spin text-indigo-500 mb-2" /> : <Music size={32} className="text-slate-300 dark:text-slate-600 mb-2 group-hover:text-indigo-400 transition-colors" />}
+                                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Attach Native Pronunciation</span>
+                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mt-1">MP3, WAV (Max 10MB)</span>
+                                        <input type="file" accept="audio/*" onChange={(e) => handleMediaUpload(e, 'audio')} disabled={isUploadingAudio} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed" />
+                                    </>
+                                )}
+                            </div>
+
+                        </div>
+                    </section>
+
                     <section className="space-y-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest flex items-center gap-2">
@@ -655,7 +737,13 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                                 <div className="flex flex-col">
                                     <span className="font-black text-slate-800 dark:text-white transition-colors">{card.front}</span>
                                     <span className="text-xs font-bold text-slate-400 mt-0.5">{card.back}</span>
-                                    {card.conjugations && <div className="flex items-center gap-1 mt-1 text-indigo-500 dark:text-indigo-400"><Paperclip size={10} strokeWidth={3}/><span className="text-[8px] font-black uppercase tracking-tighter">Conjugations Added</span></div>}
+                                    
+                                    {/* MEDIA BADGES */}
+                                    <div className="flex items-center gap-2 mt-2">
+                                        {card.imageUrl && <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-indigo-500"><ImageIcon size={10} /> Image</span>}
+                                        {card.audioUrl && <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-indigo-500"><Music size={10} /> Audio</span>}
+                                        {card.conjugations && <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-indigo-500"><Paperclip size={10}/> Conjs</span>}
+                                    </div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900 transition-colors"><Edit3 size={14} /></div>
