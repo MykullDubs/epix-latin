@@ -5,7 +5,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { 
   doc, onSnapshot, collection, addDoc, setDoc, updateDoc, 
   deleteDoc, query, where, collectionGroup, increment, arrayUnion, arrayRemove,
-  orderBy, limit, getDoc // 🔥 Added getDoc for the Removal Protocol
+  orderBy, limit, getDoc
 } from "firebase/firestore";
 
 export function useMagisterData() {
@@ -25,11 +25,17 @@ export function useMagisterData() {
 
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
 
+  // 🔥 NEW: State for Student Preferences
+  const [cardPrefs, setCardPrefs] = useState<Record<string, any>>({});
+  const [deckPrefs, setDeckPrefs] = useState<Record<string, any>>({});
+
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
       if (!u) {
         setUserData(null);
+        setCardPrefs({});
+        setDeckPrefs({});
         setAuthChecked(true);
       }
     });
@@ -82,10 +88,23 @@ export function useMagisterData() {
           setActivityLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
+      // 🔥 NEW: Listeners for Student Deck/Card Preferences
+      const unsubCardPrefs = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'card_prefs'), (snap) => {
+          const prefs: Record<string, any> = {};
+          snap.docs.forEach(d => { prefs[d.id] = d.data(); });
+          setCardPrefs(prefs);
+      });
+
+      const unsubDeckPrefs = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'deck_prefs'), (snap) => {
+          const prefs: Record<string, any> = {};
+          snap.docs.forEach(d => { prefs[d.id] = d.data(); });
+          setDeckPrefs(prefs);
+      });
+
       return () => { 
           unsubAuth(); unsubProfile(); unsubLessons(); unsubCards(); 
           unsubClasses(); unsubInstructorClasses(); unsubPublished(); 
-          unsubCurriculums(); unsubLogs();
+          unsubCurriculums(); unsubLogs(); unsubCardPrefs(); unsubDeckPrefs();
       };
     }
     return () => unsubAuth();
@@ -120,9 +139,22 @@ export function useMagisterData() {
       return merged;
   }, [privateDecks, publishedDecks, enrolledClasses, user?.uid]);
 
-
   const actions = {
     logout: () => signOut(auth),
+    
+    // 🔥 NEW: Leech Management (Toggle Star)
+    toggleCardStar: async (cardId: string, currentStatus: boolean) => {
+        if (!user) return;
+        const prefRef = doc(db, 'artifacts', appId, 'users', user.uid, 'card_prefs', cardId);
+        await setDoc(prefRef, { starred: !currentStatus }, { merge: true });
+    },
+
+    // 🔥 NEW: Archive Deck
+    toggleDeckArchive: async (deckId: string, currentStatus: boolean) => {
+        if (!user) return;
+        const prefRef = doc(db, 'artifacts', appId, 'users', user.uid, 'deck_prefs', deckId);
+        await setDoc(prefRef, { archived: !currentStatus }, { merge: true });
+    },
     
     createClass: async (className: string) => {
       if (!user) return;
@@ -158,28 +190,25 @@ export function useMagisterData() {
       });
     },
 
-    // 🔥 NEW: Removal action to fix your roster bug
-removeStudent: async (classId: string, studentEmail: string) => {
-  if (!user) return;
-  try {
-    const classRef = doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId);
-    const classSnap = await getDoc(classRef);
-    
-    if (classSnap.exists()) {
-      const data = classSnap.data();
-      // Find the EXACT student object in the array to satisfy Firestore's pickiness
-      const studentToRemove = data.students?.find((s: any) => s.email === studentEmail);
-      
-      await updateDoc(classRef, {
-        studentEmails: arrayRemove(studentEmail),
-        // If we found the object, remove it. If not, just remove the string.
-        ...(studentToRemove ? { students: arrayRemove(studentToRemove) } : {})
-      });
-    }
-  } catch (err) {
-    console.error("Decommission protocol failed:", err);
-  }
-},
+    removeStudent: async (classId: string, studentEmail: string) => {
+      if (!user) return;
+      try {
+        const classRef = doc(db, 'artifacts', appId, 'users', user.uid, 'classes', classId);
+        const classSnap = await getDoc(classRef);
+        
+        if (classSnap.exists()) {
+          const data = classSnap.data();
+          const studentToRemove = data.students?.find((s: any) => s.email === studentEmail);
+          
+          await updateDoc(classRef, {
+            studentEmails: arrayRemove(studentEmail),
+            ...(studentToRemove ? { students: arrayRemove(studentToRemove) } : {})
+          });
+        }
+      } catch (err) {
+        console.error("Decommission protocol failed:", err);
+      }
+    },
 
     assignContent: async (classId: string, assignmentId: any) => {
       if (!user) return;
@@ -294,10 +323,28 @@ removeStudent: async (classId: string, studentEmail: string) => {
   };
 
   const allLessons = useMemo(() => allAppLessons, [allAppLessons]);
+  
+  // 🔥 DYNAMIC USER DATA ENRICHMENT: Bundles prefs into the userData object!
+  const enrichedUserData = useMemo(() => {
+    if (!userData) return null;
+    return {
+        ...userData,
+        cardPrefs,
+        deckPrefs
+    };
+  }, [userData, cardPrefs, deckPrefs]);
 
   return { 
-    user, userData, authChecked, activeOrg, allLessons, 
-    enrolledClasses, instructorClasses, allDecks, 
-    customCurriculums, activityLogs, actions 
+    user, 
+    userData: enrichedUserData, 
+    authChecked, 
+    activeOrg, 
+    allLessons, 
+    enrolledClasses, 
+    instructorClasses, 
+    allDecks, 
+    customCurriculums, 
+    activityLogs, 
+    actions 
   };
 }
