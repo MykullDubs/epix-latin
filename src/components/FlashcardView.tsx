@@ -3,12 +3,84 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
     ArrowLeft, X, Library, Layers, Play, Zap, HelpCircle, Puzzle, Flame, 
     CheckCircle2, XCircle, Globe, Users, Filter, ChevronLeft, ChevronRight, 
-    RotateCw, ArrowUp, Paperclip, Music, Star, Archive, Plus // 🔥 Imported New Icons
+    RotateCw, ArrowUp, Paperclip, Music, Star, Archive, Plus, Save, Loader2 
 } from 'lucide-react';
 import { Toast } from './Toast'; 
 
-// 🔥 THE GOLDEN ORDER FOR LINGUISTICS
 const SUBJECT_ORDER = ['1s', '2s', '3s', '1p', '2p', '3p'];
+
+// ============================================================================
+//  0. STUDENT CARD BUILDER (The New "Study Cards" Forge)
+// ============================================================================
+function StudentCardBuilder({ onSave, onCancel }: any) {
+    const [front, setFront] = useState('');
+    const [back, setBack] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleSubmit = async () => {
+        if (!front.trim() || !back.trim()) return;
+        setIsSaving(true);
+        await onSave({ 
+            front: front.trim(), 
+            back: back.trim(), 
+            deckId: 'custom', 
+            deckTitle: 'My Study Cards',
+            type: 'note',
+            ipa: '', // Students don't need to worry about IPA by default
+            morphology: [{ part: front.trim(), meaning: 'Root', type: 'root' }],
+            grammar_tags: ['Student Note']
+        });
+        setIsSaving(false);
+        onCancel(true); // true indicates a successful save for the toast message
+    };
+
+    return (
+        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 absolute inset-0 z-[200] animate-in slide-in-from-bottom-8 duration-300">
+            <div className="px-6 pt-8 pb-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                <button onClick={() => onCancel(false)} className="flex items-center text-slate-400 hover:text-rose-500 mb-6 text-xs font-black uppercase tracking-widest transition-colors bg-slate-50 dark:bg-slate-800 px-4 py-2 rounded-full w-fit active:scale-95">
+                    <ArrowLeft size={16} className="mr-2"/> Cancel
+                </button>
+                <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">New Study Card</h1>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border-2 border-slate-100 dark:border-slate-800 shadow-sm space-y-6">
+                    
+                    <div className="flex flex-col gap-2">
+                        <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest pl-1">Front (Target Concept)</label>
+                        <input 
+                            value={front} 
+                            onChange={(e) => setFront(e.target.value)} 
+                            placeholder="e.g., Mitosis" 
+                            className="w-full p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-bold focus:border-indigo-500 outline-none transition-colors"
+                            autoFocus
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                        <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest pl-1">Back (Definition / Note)</label>
+                        <textarea 
+                            value={back} 
+                            onChange={(e) => setBack(e.target.value)} 
+                            placeholder="e.g., Cellular division resulting in two identical cells." 
+                            className="w-full p-4 h-32 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-bold focus:border-indigo-500 outline-none transition-colors resize-none custom-scrollbar"
+                        />
+                    </div>
+
+                </div>
+
+                <button 
+                    onClick={handleSubmit} 
+                    disabled={!front.trim() || !back.trim() || isSaving}
+                    className="w-full bg-indigo-600 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white p-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-indigo-500/30 active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                    {isSaving ? <Loader2 size={20} className="animate-spin"/> : <Save size={20}/>}
+                    {isSaving ? 'Forging...' : 'Save Card to Deck'}
+                </button>
+            </div>
+        </div>
+    );
+}
 
 // ============================================================================
 //  1. STUDY MODE (Swipe Physics, Flipping, Conjugations, & Stars)
@@ -30,7 +102,6 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
     // 🔥 Check if the current card is starred in the student's preferences
     const isStarred = userData?.cardPrefs?.[currentCard?.id]?.starred || false;
 
-    // Reset UI state when switching cards
     useEffect(() => {
         setShowConjugations(false);
         setIsFlipped(false);
@@ -52,7 +123,6 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
         }
     };
 
-    // --- Interaction Physics ---
     const handlePointerDown = (e: React.TouchEvent | React.MouseEvent) => {
         if (showConjugations) return; 
         const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
@@ -71,7 +141,6 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
         const currentDragX = clientX - startX;
         const currentDragY = clientY - startY;
         
-        // Elasticity for first/last cards
         if ((currentIndex === 0 && currentDragX > 0) || (currentIndex === deckCards.length - 1 && currentDragX < 0)) {
             setDragX(currentDragX * 0.2); 
         } else {
@@ -109,7 +178,6 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
 
     return (
         <div className="flex flex-col h-full max-w-md mx-auto p-6 w-full overflow-hidden transition-colors duration-300">
-            {/* Header & Progress */}
             <div className="mb-8 shrink-0">
                 <div className="flex justify-between text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 transition-colors">
                     <span>Target {currentIndex + 1}</span>
@@ -120,7 +188,6 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
                 </div>
             </div>
 
-            {/* The Draggable Card Container */}
             <div key={currentIndex} className={`flex-1 relative flex items-center justify-center perspective-[2000px] mb-8 ${animationClass}`}>
                 <div 
                     onTouchStart={handlePointerDown} onTouchMove={handlePointerMove} onTouchEnd={handlePointerUp}
@@ -136,7 +203,6 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
                         {/* FRONT FACE */}
                         <div className="absolute inset-0 w-full h-full bg-slate-900 rounded-[3rem] border-2 border-b-[8px] border-slate-800 shadow-2xl flex flex-col items-center justify-center p-8 text-center overflow-hidden transition-colors" style={{ backfaceVisibility: 'hidden' }}>
                             
-                            {/* 🔥 STAR BUTTON (LEECH MANAGEMENT) */}
                             {onToggleStar && (
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); onToggleStar(currentCard.id, isStarred); }} 
@@ -214,7 +280,7 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
                         </div>
                     </div>
 
-                    {/* 🔥 CONJUGATION OVERLAY (STRICT ORDER) */}
+                    {/* CONJUGATION OVERLAY */}
                     {showConjugations && currentCard.conjugations && (
                         <div className="absolute inset-0 z-40 bg-white/95 dark:bg-slate-900/95 rounded-[3rem] p-8 flex flex-col animate-in slide-in-from-bottom-12 duration-300 backdrop-blur-md border-2 border-indigo-500/30">
                             <div className="flex justify-between items-center mb-6">
@@ -251,7 +317,6 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
                 </div>
             </div>
 
-            {/* Navigation Controls */}
             <div className="flex items-center justify-between px-4 pb-8 shrink-0 z-10">
                 <button onClick={handlePrev} disabled={currentIndex === 0} className="w-14 h-14 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-md border border-slate-100 dark:border-slate-700 disabled:opacity-30 transition-all active:scale-95">
                     <ChevronLeft size={24} strokeWidth={3} />
@@ -270,7 +335,7 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
 }
 
 // ============================================================================
-//  2. MATCHING GAME (Unchanged)
+//  2. MATCHING GAME & 3. QUIZ SESSION (Unchanged, Omitted for brevity below, keep your existing ones)
 // ============================================================================
 function MatchingGame({ deckCards, onGameEnd }: any) {
     const [cards, setCards] = useState<any[]>([]);
@@ -336,9 +401,6 @@ function MatchingGame({ deckCards, onGameEnd }: any) {
     );
 }
 
-// ============================================================================
-//  3. QUIZ SESSION (Unchanged)
-// ============================================================================
 function QuizSessionView({ deckCards, onGameEnd }: any) {
     const [index, setIndex] = useState(0);
     const [score, setScore] = useState(0);
@@ -427,17 +489,18 @@ function QuizSessionView({ deckCards, onGameEnd }: any) {
 // ============================================================================
 //  4. MAIN FLASHCARD VIEW (HUB)
 // ============================================================================
-export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity, userData, onToggleStar, onToggleArchive }: any) {
-    const [internalMode, setInternalMode] = useState<'library' | 'menu' | 'playing'>('library');
+export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity, userData, onSaveCard, onToggleStar, onToggleArchive }: any) {
+    // 🔥 Added 'create' to internal modes
+    const [internalMode, setInternalMode] = useState<'library' | 'menu' | 'playing' | 'create'>('library');
     const [activeGame, setActiveGame] = useState<'standard' | 'quiz' | 'match' | 'tower'>('standard');
-    
-    // 🔥 Added 'archived' and 'starred' to the filter
     const [deckFilter, setDeckFilter] = useState<'all' | 'personal' | 'network' | 'archived' | 'starred'>('all');
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     
     const resolvedDeck = allDecks[selectedDeckKey] || Object.values(allDecks)[0];
     const cards = resolvedDeck?.cards || [];
-    const deckTitle = resolvedDeck?.title === "✍️ Scriptorium" ? "My Collection" : resolvedDeck?.title;
+    
+    // 🔥 Dynamic Naming Update
+    const deckTitle = resolvedDeck?.id === 'custom' ? "My Study Cards" : resolvedDeck?.title;
 
     const launchGame = (mode: 'standard' | 'quiz' | 'match' | 'tower') => {
         setActiveGame(mode);
@@ -457,13 +520,25 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         setToastMsg(`Protocol Complete! +${earnedXP} XP Earned!`);
     };
 
+    // --- STUDENT BUILDER OVERLAY ---
+    if (internalMode === 'create') {
+        return (
+            <StudentCardBuilder 
+                onSave={onSaveCard} 
+                onCancel={(success?: boolean) => {
+                    setInternalMode('library');
+                    if (success) setToastMsg("Study Card secured. Good job.");
+                }} 
+            />
+        );
+    }
+
     if (internalMode === 'library') {
-        // 🔥 Filter logic upgraded to respect archives
         const filteredDecks = Object.entries(allDecks).filter(([key, deck]: any) => {
             const isArchived = userData?.deckPrefs?.[key]?.archived || false;
             
             if (deckFilter === 'archived') return isArchived;
-            if (isArchived) return false; // Hide archived decks from all other views
+            if (isArchived) return false; 
 
             if (deckFilter === 'all') return true;
             if (deckFilter === 'personal') return !deck.isPublished;
@@ -479,9 +554,9 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         <div className="bg-gradient-to-br from-orange-400 to-rose-500 text-white p-2 rounded-xl"><Library size={20} strokeWidth={3}/></div>
                         <span className="font-black text-slate-800 dark:text-white text-xl uppercase tracking-tighter">Study Hub</span>
                     </div>
-                    {/* 🔥 PERSONAL SCRIPTORIUM ENTRY POINT */}
-                    <button className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-md active:scale-95 transition-all">
-                        <Plus size={14} /> Forge Deck
+                    {/* 🔥 STUDENT CARD FORGE TRIGGER */}
+                    <button onClick={() => setInternalMode('create')} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-md active:scale-95 transition-all">
+                        <Plus size={14} /> New Card
                     </button>
                 </div>
 
@@ -498,7 +573,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         {filteredDecks.map(([key, deck]: any) => (
                             <button key={key} onClick={() => { onSelectDeck(key); setInternalMode('menu'); }} className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 border-[3px] border-slate-100 dark:border-slate-800 hover:border-orange-300 dark:hover:border-orange-500/50 hover:-translate-y-1 transition-all text-left relative group">
-                                {/* 🔥 ARCHIVE BADGE / BUTTON */}
+                                
                                 {onToggleArchive && (
                                     <div 
                                         onClick={(e) => { e.stopPropagation(); onToggleArchive(key, userData?.deckPrefs?.[key]?.archived); }}
@@ -511,7 +586,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                 <div className="flex justify-between items-start mb-6">
                                     <div className="w-16 h-16 bg-orange-50 dark:bg-orange-500/10 text-orange-500 rounded-2xl flex items-center justify-center text-2xl border border-orange-100 dark:border-orange-500/20">{deck.icon || <Layers size={28}/>}</div>
                                 </div>
-                                <h3 className="font-black text-slate-800 dark:text-white text-xl leading-tight line-clamp-1 pr-8">{deck.title === "✍️ Scriptorium" ? "My Collection" : deck.title}</h3>
+                                <h3 className="font-black text-slate-800 dark:text-white text-xl leading-tight line-clamp-1 pr-8">{deck.id === 'custom' ? "My Study Cards" : deck.title}</h3>
                                 <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest mt-2 block">{deck.cards?.length || 0} Targets</span>
                             </button>
                         ))}
