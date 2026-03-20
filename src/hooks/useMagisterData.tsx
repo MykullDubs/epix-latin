@@ -20,7 +20,7 @@ export function useMagisterData() {
   
   const [customCurriculums, setCustomCurriculums] = useState<any[]>([]);
   
-  const [privateDecks, setPrivateDecks] = useState<any>({ custom: { title: 'Scriptorium', cards: [] } });
+  const [privateDecks, setPrivateDecks] = useState<any>({ custom: { title: 'My Study Cards', cards: [] } });
   const [publishedDecks, setPublishedDecks] = useState<any[]>([]);
 
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
@@ -53,7 +53,7 @@ export function useMagisterData() {
 
       const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => {
         const cards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        const decks: any = { custom: { title: 'Scriptorium', cards: [] } };
+        const decks: any = { custom: { title: 'My Study Cards', cards: [] } };
         
         cards.forEach((card: any) => {
           const dId = card.deckId || 'custom';
