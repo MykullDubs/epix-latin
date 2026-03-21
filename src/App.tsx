@@ -382,7 +382,7 @@ export default function App() {
           ) : activeTab === 'discovery' ? (
             <DiscoveryView allDecks={allDecks} lessons={allLessons} onSelectDeck={(d:any) => { setActiveDeckKey(d.id); setActiveTab('flashcards'); }} onSelectLesson={setActiveLesson} onLogActivity={actions.logActivity} userData={userData} onPurchaseItem={actions.purchaseUnlock} />
           ) : activeTab === 'flashcards' ? (
-            // 🔥 FULLY WIRED FLASHCARD VIEW
+            // 🔥 FULLY WIRED FLASHCARD VIEW WITH NEW POWER ACTIONS
             <FlashcardView 
                 allDecks={allDecks} 
                 selectedDeckKey={activeDeckKey} 
@@ -395,6 +395,9 @@ export default function App() {
                 onToggleArchive={actions.toggleDeckArchive} 
                 onCreateFolder={actions.createStudyFolder}
                 onAssignToFolder={actions.assignDeckToFolder}
+                onHideDeck={actions.hideDeck}
+                onUpdateFolder={actions.updateStudyFolder}
+                onDeleteFolder={actions.deleteStudyFolder}
             />
           ) : activeTab === 'profile' ? (
             <ProfileView user={user} userData={userData} />
