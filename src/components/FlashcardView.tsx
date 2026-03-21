@@ -4,13 +4,22 @@ import {
     ArrowLeft, X, Library, Layers, Play, Zap, HelpCircle, Puzzle, Flame, 
     CheckCircle2, XCircle, Globe, Users, Filter, ChevronLeft, ChevronRight, 
     RotateCw, ArrowUp, Paperclip, Music, Star, Archive, Plus, Save, Loader2,
-    MoreVertical, FolderPlus, Trash2, Folder, FolderOpen,
-    // 🔥 NEW ICONS FOR DYNAMIC THEMES
+    MoreVertical, FolderPlus, Trash2, Folder, FolderOpen, Edit3, Infinity,
     Calculator, FlaskConical, Palette, Utensils, Plane, HeartPulse, Activity, BookText, Code
 } from 'lucide-react';
 import { Toast } from './Toast'; 
 
 const SUBJECT_ORDER = ['1s', '2s', '3s', '1p', '2p', '3p'];
+
+// 🔥 FOLDER COLOR ENGINE
+const FOLDER_COLORS: Record<string, any> = {
+    indigo: { bg: 'bg-indigo-50 dark:bg-indigo-900/20', border: 'border-indigo-100 dark:border-indigo-500/30', text: 'text-indigo-900 dark:text-indigo-100', iconBg: 'bg-white dark:bg-indigo-500/30', iconColor: 'text-indigo-600 dark:text-indigo-400', badge: 'bg-white/60 dark:bg-black/20 text-indigo-600 dark:text-indigo-300', hex: 'bg-indigo-500' },
+    rose: { bg: 'bg-rose-50 dark:bg-rose-900/20', border: 'border-rose-100 dark:border-rose-500/30', text: 'text-rose-900 dark:text-rose-100', iconBg: 'bg-white dark:bg-rose-500/30', iconColor: 'text-rose-600 dark:text-rose-400', badge: 'bg-white/60 dark:bg-black/20 text-rose-600 dark:text-rose-300', hex: 'bg-rose-500' },
+    emerald: { bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-100 dark:border-emerald-500/30', text: 'text-emerald-900 dark:text-emerald-100', iconBg: 'bg-white dark:bg-emerald-500/30', iconColor: 'text-emerald-600 dark:text-emerald-400', badge: 'bg-white/60 dark:bg-black/20 text-emerald-600 dark:text-emerald-300', hex: 'bg-emerald-500' },
+    amber: { bg: 'bg-amber-50 dark:bg-amber-900/20', border: 'border-amber-100 dark:border-amber-500/30', text: 'text-amber-900 dark:text-amber-100', iconBg: 'bg-white dark:bg-amber-500/30', iconColor: 'text-amber-600 dark:text-amber-400', badge: 'bg-white/60 dark:bg-black/20 text-amber-600 dark:text-amber-300', hex: 'bg-amber-500' },
+    sky: { bg: 'bg-sky-50 dark:bg-sky-900/20', border: 'border-sky-100 dark:border-sky-500/30', text: 'text-sky-900 dark:text-sky-100', iconBg: 'bg-white dark:bg-sky-500/30', iconColor: 'text-sky-600 dark:text-sky-400', badge: 'bg-white/60 dark:bg-black/20 text-sky-600 dark:text-sky-300', hex: 'bg-sky-500' },
+    fuchsia: { bg: 'bg-fuchsia-50 dark:bg-fuchsia-900/20', border: 'border-fuchsia-100 dark:border-fuchsia-500/30', text: 'text-fuchsia-900 dark:text-fuchsia-100', iconBg: 'bg-white dark:bg-fuchsia-500/30', iconColor: 'text-fuchsia-600 dark:text-fuchsia-400', badge: 'bg-white/60 dark:bg-black/20 text-fuchsia-600 dark:text-fuchsia-300', hex: 'bg-fuchsia-500' }
+};
 
 // 🔥 DYNAMIC THEME ENGINE
 const getDeckTheme = (title: string = '') => {
@@ -499,7 +508,7 @@ function QuizSessionView({ deckCards, onGameEnd }: any) {
 // ============================================================================
 //  4. MAIN FLASHCARD VIEW (HUB)
 // ============================================================================
-export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity, userData, onSaveCard, onToggleStar, onToggleArchive, onCreateFolder, onAssignToFolder, onHideDeck }: any) {
+export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity, userData, onSaveCard, onToggleStar, onToggleArchive, onCreateFolder, onAssignToFolder, onHideDeck, onUpdateFolder, onDeleteFolder }: any) {
     const [internalMode, setInternalMode] = useState<'library' | 'menu' | 'playing' | 'create'>('library');
     const [activeGame, setActiveGame] = useState<'standard' | 'quiz' | 'match' | 'tower'>('standard');
     
@@ -507,23 +516,26 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     
     const [activeOptionsDeck, setActiveOptionsDeck] = useState<any>(null);
+    const [activeOptionsFolder, setActiveOptionsFolder] = useState<string | null>(null);
     const [menuView, setMenuView] = useState<'main' | 'folders'>('main'); 
     
-    const [showFolderModal, setShowFolderModal] = useState(false);
+    const [showFolderModal, setShowFolderModal] = useState<{isOpen: boolean, editMode: boolean, oldName: string}>({isOpen: false, editMode: false, oldName: ''});
     const [newFolderName, setNewFolderName] = useState('');
+    const [selectedColor, setSelectedColor] = useState('indigo');
     
+    const [omniDeck, setOmniDeck] = useState<any>(null);
+
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-    const resolvedDeck = allDecks[selectedDeckKey] || Object.values(allDecks)[0];
+    const resolvedDeck = omniDeck || allDecks[selectedDeckKey] || Object.values(allDecks)[0];
     const cards = resolvedDeck?.cards || [];
     const deckTitle = resolvedDeck?.id === 'custom' ? "My Study Cards" : resolvedDeck?.title;
 
     const customFolders: string[] = userData?.studyFolders || [];
+    const folderColors: Record<string, string> = userData?.folderColors || {};
 
     useEffect(() => {
-        if (scrollContainerRef.current) {
-            scrollContainerRef.current.scrollTop = 0;
-        }
+        if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
     }, [deckFilter, internalMode]);
 
     const launchGame = (mode: 'standard' | 'quiz' | 'match' | 'tower') => {
@@ -533,7 +545,11 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
     const handleBack = () => {
         if (internalMode === 'playing') setInternalMode('menu');
-        else if (internalMode === 'menu') { setInternalMode('library'); onSelectDeck(null); }
+        else if (internalMode === 'menu') { 
+            setInternalMode('library'); 
+            onSelectDeck(null); 
+            setOmniDeck(null); 
+        }
     };
 
     const handleGameFinish = (scorePct: number) => {
@@ -544,23 +560,41 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         setToastMsg(`Protocol Complete! +${earnedXP} XP Earned!`);
     };
 
-    const handleCreateFolder = async () => {
-        if (!newFolderName.trim() || !onCreateFolder) return;
-        await onCreateFolder(newFolderName.trim());
-        setToastMsg(`Folder "${newFolderName.trim()}" created.`);
+    const launchOmniMode = (folderName: string) => {
+        const folderDecks = Object.values(allDecks).filter((d: any) => userData?.deckPrefs?.[d.id]?.folder === folderName && !userData?.deckPrefs?.[d.id]?.archived);
+        const allCards = folderDecks.flatMap((d: any) => d.cards || []);
+        
+        if (allCards.length === 0) {
+            setToastMsg("Folder has no cards to study.");
+            return;
+        }
+
+        setOmniDeck({
+            id: `omni_${folderName}`,
+            title: `${folderName} (Omni-Mode)`,
+            cards: allCards.sort(() => Math.random() - 0.5) 
+        });
+        setInternalMode('menu');
+    };
+
+    const handleSaveFolder = async () => {
+        if (!newFolderName.trim()) return;
+        if (showFolderModal.editMode && onUpdateFolder) {
+            await onUpdateFolder(showFolderModal.oldName, newFolderName.trim(), selectedColor);
+            setToastMsg("Folder updated.");
+            if (deckFilter === showFolderModal.oldName) setDeckFilter(newFolderName.trim()); 
+        } else if (onCreateFolder) {
+            await onCreateFolder(newFolderName.trim(), selectedColor);
+            setToastMsg(`Folder "${newFolderName.trim()}" created.`);
+        }
+        setShowFolderModal({isOpen: false, editMode: false, oldName: ''});
         setNewFolderName('');
-        setShowFolderModal(false);
+        setSelectedColor('indigo');
     };
 
     if (internalMode === 'create') {
         return (
-            <StudentCardBuilder 
-                onSave={onSaveCard} 
-                onCancel={(success?: boolean) => {
-                    setInternalMode('library');
-                    if (success) setToastMsg("Study Card secured. Good job.");
-                }} 
-            />
+            <StudentCardBuilder onSave={onSaveCard} onCancel={(success?: boolean) => { setInternalMode('library'); if (success) setToastMsg("Study Card secured."); }} />
         );
     }
 
@@ -576,10 +610,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             if (deckFilter === 'personal') return !deck.isPublished;
             if (deckFilter === 'network') return deck.isPublished;
             
-            if (customFolders.includes(deckFilter)) {
-                return currentFolder === deckFilter;
-            }
-
+            if (customFolders.includes(deckFilter)) return currentFolder === deckFilter;
             return true;
         });
 
@@ -587,10 +618,13 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors relative">
                 {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
                 
-                {showFolderModal && (
+                {showFolderModal.isOpen && (
                     <div className="fixed inset-0 z-[600] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
                         <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl border border-slate-100 dark:border-slate-800 animate-in zoom-in-95">
-                            <h3 className="font-black text-2xl text-slate-800 dark:text-white mb-6 text-center">New Folder</h3>
+                            <h3 className="font-black text-2xl text-slate-800 dark:text-white mb-6 text-center">
+                                {showFolderModal.editMode ? 'Edit Folder' : 'New Folder'}
+                            </h3>
+                            
                             <input 
                                 value={newFolderName}
                                 onChange={(e) => setNewFolderName(e.target.value)}
@@ -598,9 +632,23 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                 className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 font-bold text-slate-800 dark:text-white focus:border-indigo-500 outline-none mb-6 text-lg text-center"
                                 autoFocus
                             />
+
+                            <div className="mb-8">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-3 text-center">Select Theme Color</span>
+                                <div className="flex justify-center gap-3">
+                                    {Object.keys(FOLDER_COLORS).map(color => (
+                                        <button 
+                                            key={color} 
+                                            onClick={() => setSelectedColor(color)}
+                                            className={`w-8 h-8 rounded-full shadow-sm transition-all active:scale-90 ${FOLDER_COLORS[color].hex} ${selectedColor === color ? 'ring-4 ring-indigo-500/30 scale-110' : 'ring-2 ring-transparent opacity-70 hover:opacity-100'}`} 
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+
                             <div className="flex gap-3">
-                                <button onClick={() => setShowFolderModal(false)} className="flex-1 px-4 py-4 rounded-2xl font-black text-slate-500 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors active:scale-95">Cancel</button>
-                                <button onClick={handleCreateFolder} disabled={!newFolderName.trim()} className="flex-1 px-4 py-4 rounded-2xl font-black text-white bg-indigo-600 disabled:bg-indigo-400 active:scale-95 transition-all">Create</button>
+                                <button onClick={() => setShowFolderModal({isOpen: false, editMode: false, oldName: ''})} className="flex-1 px-4 py-4 rounded-2xl font-black text-slate-500 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors active:scale-95">Cancel</button>
+                                <button onClick={handleSaveFolder} disabled={!newFolderName.trim()} className="flex-1 px-4 py-4 rounded-2xl font-black text-white bg-indigo-600 disabled:bg-indigo-400 active:scale-95 transition-all">Save</button>
                             </div>
                         </div>
                     </div>
@@ -627,86 +675,102 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         ))}
                         
                         {customFolders.length > 0 && <div className="w-px h-5 bg-slate-300 dark:bg-slate-700 mx-2 shrink-0" />}
-                        {customFolders.map((folderName: string) => (
-                            <button key={folderName} onClick={() => setDeckFilter(folderName)} className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 active:scale-95 ${deckFilter === folderName ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100'}`}>
-                                <Folder size={12} fill="currentColor" /> {folderName}
-                            </button>
-                        ))}
+                        {customFolders.map((folderName: string) => {
+                            const cTheme = FOLDER_COLORS[folderColors[folderName] || 'indigo'];
+                            return (
+                                <button key={folderName} onClick={() => setDeckFilter(folderName)} className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 active:scale-95 ${deckFilter === folderName ? `${cTheme.hex} text-white shadow-md` : `${cTheme.bg} ${cTheme.iconColor}`}`}>
+                                    <Folder size={12} fill="currentColor" /> {folderName}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 
-                <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 space-y-5 pb-28 relative z-10 custom-scrollbar overscroll-y-contain">
+                <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 space-y-5 pb-28 relative z-10 custom-scrollbar overscroll-y-contain h-full">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         
-                        {/* BREADCRUMB HEADER */}
                         {customFolders.includes(deckFilter) && (
                             <div className="col-span-full animate-in fade-in duration-300 mb-2 mt-2">
                                 <button onClick={() => setDeckFilter('all')} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-500 transition-colors w-fit bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 active:scale-95">
                                     <ArrowLeft size={14} /> Back to Library
                                 </button>
-                                <div className="flex items-center gap-3 mt-6 mb-2">
-                                    <FolderOpen size={28} className="text-indigo-500" />
-                                    <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">{deckFilter}</h2>
+                                
+                                <div className="flex items-center justify-between mt-6 mb-2">
+                                    <div className="flex items-center gap-3">
+                                        <FolderOpen size={28} className={FOLDER_COLORS[folderColors[deckFilter] || 'indigo'].iconColor} />
+                                        <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">{deckFilter}</h2>
+                                    </div>
+                                    
+                                    <button 
+                                        onClick={() => launchOmniMode(deckFilter)}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest text-white shadow-md active:scale-95 transition-transform ${FOLDER_COLORS[folderColors[deckFilter] || 'indigo'].hex}`}
+                                    >
+                                        <Infinity size={16} /> Study All
+                                    </button>
                                 </div>
                             </div>
                         )}
 
-                        {/* RENDER FOLDERS */}
                         {deckFilter === 'all' && customFolders.map((folderName: string) => {
                             const itemCount = Object.keys(allDecks).filter(key => userData?.deckPrefs?.[key]?.folder === folderName && !userData?.deckPrefs?.[key]?.archived).length;
+                            const theme = FOLDER_COLORS[folderColors[folderName] || 'indigo'];
                             
                             return (
-                                <button 
-                                    key={`folder-${folderName}`} 
-                                    onClick={() => setDeckFilter(folderName)} 
-                                    className="relative group w-full bg-indigo-50 dark:bg-indigo-900/20 rounded-[2rem] p-5 border-4 border-indigo-100 dark:border-indigo-500/30 hover:border-indigo-300 dark:hover:border-indigo-500/60 hover:-translate-y-1 transition-all text-left shadow-sm hover:shadow-xl flex flex-col h-full animate-in fade-in duration-300"
-                                >
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="w-12 h-12 bg-white dark:bg-indigo-500/30 text-indigo-600 dark:text-indigo-400 rounded-[1rem] flex items-center justify-center text-xl border border-indigo-100 dark:border-indigo-500/40 shadow-inner group-hover:scale-110 transition-transform">
-                                            <Folder size={24} fill="currentColor" />
+                                <div key={`folder-${folderName}`} className="relative group h-full">
+                                    <button 
+                                        onClick={() => setDeckFilter(folderName)} 
+                                        className={`w-full ${theme.bg} rounded-[2.5rem] p-5 border-4 ${theme.border} hover:-translate-y-1 transition-all text-left shadow-sm hover:shadow-xl flex flex-col h-full animate-in fade-in duration-300 relative z-10`}
+                                    >
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className={`w-12 h-12 ${theme.iconBg} ${theme.iconColor} rounded-[1rem] flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform`}>
+                                                <Folder size={24} fill="currentColor" />
+                                            </div>
                                         </div>
-                                    </div>
-                                    <h3 className="font-black text-indigo-900 dark:text-indigo-100 text-lg leading-tight line-clamp-2 pr-2 mb-auto">{folderName}</h3>
-                                    <div className="mt-3">
-                                        <span className="text-[9px] text-indigo-600 dark:text-indigo-300 uppercase font-black tracking-widest bg-white/60 dark:bg-black/20 px-2.5 py-1 rounded-md shadow-sm border border-indigo-100/50 dark:border-indigo-500/20">
-                                            {itemCount} Decks
-                                        </span>
-                                    </div>
-                                </button>
+                                        <h3 className={`font-black ${theme.text} text-lg leading-tight line-clamp-2 pr-6 mb-auto`}>{folderName}</h3>
+                                        <div className="mt-3">
+                                            <span className={`text-[9px] uppercase font-black tracking-widest ${theme.badge} px-2.5 py-1 rounded-md shadow-sm`}>
+                                                {itemCount} Decks
+                                            </span>
+                                        </div>
+                                    </button>
+
+                                    <button 
+                                        onClick={(e) => { 
+                                            e.preventDefault(); e.stopPropagation(); 
+                                            setActiveOptionsFolder(folderName);
+                                        }}
+                                        className={`absolute top-3 right-3 p-2 rounded-full ${theme.iconColor} hover:bg-white/50 transition-colors active:bg-white/80 z-20`}
+                                        aria-label="Folder Options"
+                                    >
+                                        <MoreVertical size={20} />
+                                    </button>
+                                </div>
                             );
                         })}
 
-                        {/* EMPTY FOLDER STATE */}
                         {filteredDecks.length === 0 && deckFilter !== 'all' && customFolders.includes(deckFilter) && (
                              <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[2.5rem] mt-4 text-slate-400 font-bold text-sm uppercase tracking-widest">
                                  Folder is empty
                              </div>
                         )}
 
-                        {/* RENDER DECKS WITH 3D STACK MAGIC */}
                         {filteredDecks.map(([key, deck]: any) => {
-                            const isArchived = userData?.deckPrefs?.[key]?.archived || false;
-                            
-                            // 🔥 1. Run the NLP Engine
                             const displayTitle = deck.id === 'custom' ? "My Study Cards" : deck.title;
                             const theme = getDeckTheme(displayTitle);
                             const DeckIcon = deck.icon || theme.icon;
 
-                            // 🔥 2. Auto-Extract Tags
                             const rawTags = deck.tags || deck.cards?.[0]?.grammar_tags || [];
-                            const displayTags = Array.isArray(rawTags) ? rawTags.slice(0, 2) : []; // Show max 2 tags
+                            const displayTags = Array.isArray(rawTags) ? rawTags.slice(0, 2) : []; 
                             
                             return (
                                 <div key={key} className="relative group animate-in fade-in duration-300 h-full pt-2">
                                     
-                                    {/* 🔥 THE 3D STACK ILLUSION */}
-                                    <div className="absolute inset-x-4 -bottom-1 h-10 bg-slate-200 dark:bg-slate-800 rounded-[2rem] transition-transform duration-300 group-hover:translate-y-1.5" />
-                                    <div className="absolute inset-x-2 -bottom-0 h-10 bg-slate-100 dark:bg-slate-800/80 rounded-[2rem] transition-transform duration-300 group-hover:translate-y-1" />
+                                    <div className="absolute inset-x-4 -bottom-1 h-10 bg-slate-200 dark:bg-slate-800 rounded-[2.5rem] transition-transform duration-300 group-hover:translate-y-1.5" />
+                                    <div className="absolute inset-x-2 -bottom-0 h-10 bg-slate-100 dark:bg-slate-800/80 rounded-[2.5rem] transition-transform duration-300 group-hover:translate-y-1" />
 
-                                    {/* MAIN DECK BUTTON */}
                                     <button 
                                         onClick={() => { onSelectDeck(key); setInternalMode('menu'); }} 
-                                        className="w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] p-5 border-2 border-slate-50 dark:border-slate-800 hover:border-slate-100 dark:hover:border-slate-700 transition-all text-left shadow-sm group-hover:-translate-y-1 relative z-10 flex flex-col"
+                                        className="w-full h-full bg-white dark:bg-slate-900 rounded-[2.5rem] p-5 border-2 border-slate-50 dark:border-slate-800 hover:border-slate-100 dark:hover:border-slate-700 transition-all text-left shadow-sm group-hover:-translate-y-1 relative z-10 flex flex-col"
                                     >
                                         <div className="flex justify-between items-start mb-4">
                                             <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center text-xl border shadow-inner group-hover:scale-110 transition-transform ${theme.bg} ${theme.color} ${theme.border}`}>
@@ -717,7 +781,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                         <h3 className="font-black text-slate-800 dark:text-white text-lg leading-tight line-clamp-2 pr-8 mb-3">{displayTitle}</h3>
                                         
                                         <div className="mt-auto pt-1 flex flex-col gap-2">
-                                            {/* 🔥 THE TAG DISPLAY */}
                                             {displayTags.length > 0 && (
                                                 <div className="flex flex-wrap gap-1.5">
                                                     {displayTags.map((tag: string, i: number) => (
@@ -728,7 +791,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                                 </div>
                                             )}
 
-                                            {/* Bottom Metadata Bar */}
                                             <div className="flex items-center gap-2">
                                                 <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest flex items-center gap-1">
                                                     <Layers size={10} /> {deck.cards?.length || 0}
@@ -737,7 +799,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                         </div>
                                     </button>
 
-                                    {/* ELEVATED TOUCH TARGET (Context Menu) */}
                                     <button 
                                         onClick={(e) => { 
                                             e.preventDefault();
@@ -745,7 +806,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                             setActiveOptionsDeck(deck);
                                             setMenuView('main'); 
                                         }}
-                                        className="absolute top-5 right-2 p-2 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors z-20"
+                                        className="absolute top-4 right-3 p-2 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors z-20"
                                         aria-label="Deck Options"
                                     >
                                         <MoreVertical size={20} />
@@ -756,7 +817,62 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     </div>
                 </div>
 
-                {/* BOTTOM SHEET DRAWER MODAL */}
+                {activeOptionsFolder && (
+                    <div className="fixed inset-0 z-[500] flex flex-col justify-end">
+                        <div className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setActiveOptionsFolder(null)} />
+                        <div className="bg-white dark:bg-slate-900 w-full rounded-t-[2.5rem] p-6 relative z-10 animate-in slide-in-from-bottom-full duration-300 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] pb-safe-6">
+                            <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto mb-6" />
+                            
+                            <div className="flex items-center gap-4 mb-6 px-2">
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm ${FOLDER_COLORS[folderColors[activeOptionsFolder] || 'indigo'].bg} ${FOLDER_COLORS[folderColors[activeOptionsFolder] || 'indigo'].iconColor}`}>
+                                    <Folder size={24} fill="currentColor" />
+                                </div>
+                                <div>
+                                    <h3 className="font-black text-xl text-slate-800 dark:text-white leading-tight line-clamp-1">{activeOptionsFolder}</h3>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Folder Settings</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <button 
+                                    onClick={() => { 
+                                        setNewFolderName(activeOptionsFolder); 
+                                        setSelectedColor(folderColors[activeOptionsFolder] || 'indigo');
+                                        setActiveOptionsFolder(null); 
+                                        setShowFolderModal({isOpen: true, editMode: true, oldName: activeOptionsFolder}); 
+                                    }} 
+                                    className="w-full text-left px-5 py-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3 transition-colors active:scale-[0.98]"
+                                >
+                                    <Edit3 size={20} className="text-indigo-500" /> Edit Folder
+                                </button>
+                                
+                                <button 
+                                    onClick={() => { 
+                                        launchOmniMode(activeOptionsFolder); 
+                                        setActiveOptionsFolder(null); 
+                                    }} 
+                                    className="w-full text-left px-5 py-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3 transition-colors active:scale-[0.98]"
+                                >
+                                    <Infinity size={20} className="text-emerald-500" /> Study Omni-Mode
+                                </button>
+
+                                <div className="h-4" />
+                                
+                                <button 
+                                    onClick={() => { 
+                                        if(onDeleteFolder) onDeleteFolder(activeOptionsFolder); 
+                                        setActiveOptionsFolder(null); 
+                                        setToastMsg("Folder deleted. Decks moved to Library."); 
+                                    }} 
+                                    className="w-full text-left px-5 py-4 bg-rose-50 dark:bg-rose-500/10 rounded-2xl text-sm font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 flex items-center gap-3 transition-colors active:scale-[0.98]"
+                                >
+                                    <Trash2 size={20} /> Delete Folder
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {activeOptionsDeck && (
                     <div className="fixed inset-0 z-[500] flex flex-col justify-end">
                         <div 
@@ -768,8 +884,8 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto mb-6" />
                             
                             <div className="flex items-center gap-4 mb-6 px-2">
-                                <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-xl shadow-sm border border-slate-100 dark:border-slate-700">
-                                    {activeOptionsDeck.icon || <Layers size={24} className="text-slate-400" />}
+                                <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center text-xl shadow-sm border border-slate-100 dark:border-slate-700 ${getDeckTheme(activeOptionsDeck.id === 'custom' ? "My Study Cards" : activeOptionsDeck.title).bg} ${getDeckTheme(activeOptionsDeck.id === 'custom' ? "My Study Cards" : activeOptionsDeck.title).color}`}>
+                                    {getDeckTheme(activeOptionsDeck.id === 'custom' ? "My Study Cards" : activeOptionsDeck.title).icon === Layers ? <Layers size={24} /> : React.createElement(getDeckTheme(activeOptionsDeck.id === 'custom' ? "My Study Cards" : activeOptionsDeck.title).icon, { size: 24 })}
                                 </div>
                                 <div>
                                     <h3 className="font-black text-xl text-slate-800 dark:text-white leading-tight line-clamp-1">
@@ -846,7 +962,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                     <div className="h-4" />
                                     
                                     <button 
-                                        onClick={() => { setActiveOptionsDeck(null); setShowFolderModal(true); }}
+                                        onClick={() => { setActiveOptionsDeck(null); setShowFolderModal({isOpen: true, editMode: false, oldName: ''}); }}
                                         className="w-full text-left px-5 py-4 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl text-sm font-black text-indigo-600 dark:text-indigo-400 flex items-center gap-3 transition-colors active:scale-[0.98]"
                                     >
                                         <Plus size={20} strokeWidth={3} /> Create New Folder
@@ -902,7 +1018,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
     // --- PLAYING VIEW ---
     return (
-        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 animate-in slide-in-from-bottom-8 duration-500 relative z-[100] transition-colors pb-safe">
+        <div className="h-[100dvh] flex flex-col bg-slate-50 dark:bg-slate-950 animate-in slide-in-from-bottom-8 duration-500 relative z-[100] transition-colors pb-safe">
             <div className="px-4 py-4 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center shrink-0">
                 <button onClick={handleBack} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition-colors"><X size={20} strokeWidth={3}/></button>
                 <div className="flex flex-col items-center">
