@@ -393,6 +393,8 @@ export default function App() {
                 user={user} 
                 onToggleStar={actions.toggleCardStar} 
                 onToggleArchive={actions.toggleDeckArchive} 
+                onCreateFolder={actions.createStudyFolder}
+                onAssignToFolder={actions.assignDeckToFolder}
             />
           ) : activeTab === 'profile' ? (
             <ProfileView user={user} userData={userData} />
