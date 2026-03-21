@@ -91,10 +91,9 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   if (!lesson || !pages[activePageIdx]) return null;
 
   return (
-    // 🔥 FIX 1: Changed to h-full w-full (removes fixed inset-0) so it fits into App.tsx's flex container
-    <div className="h-full w-full bg-slate-900 text-white flex flex-col overflow-hidden font-sans selection:bg-indigo-500 relative">
+    <div className="h-full w-full flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500">
       
-      <main className="flex-1 flex overflow-hidden relative group/canvas bg-white text-slate-900 h-full w-full">
+      <main className="flex-1 flex overflow-hidden relative group/canvas bg-white text-slate-900">
         
         {/* MOUSE NAVIGATION CONTROLS */}
         {activePageIdx > 0 && (
@@ -117,83 +116,86 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
             </button>
         )}
 
-        {/* 🔥 FIX 2: Changed justify-center to justify-start */}
-        <div ref={stageRef} className={`flex-1 overflow-y-auto px-16 py-12 flex flex-col items-center justify-start transition-all duration-500 ${showForum ? 'mr-[450px]' : ''}`}>
+        {/* 🔥 THE UNBREAKABLE CENTERING SCROLL CONTAINER */}
+        <div ref={stageRef} className={`flex-1 overflow-y-auto w-full relative transition-all duration-500 ${showForum ? 'mr-[450px]' : ''}`}>
           
-          {/* 🔥 FIX 3: Added my-auto so short content centers, but tall content pushes down naturally */}
-          <div className="w-full max-w-7xl space-y-20 my-auto">
-            {pages[activePageIdx].blocks.map((block: any, i: number) => {
-              const isQuiz = block.type === 'quiz';
-              const answerCount = Object.keys(liveState?.answers || {}).length;
+          {/* This inner wrapper guarantees short content is centered, and tall content naturally drops down without clipping the top */}
+          <div className="min-h-full w-full flex flex-col items-center justify-center px-16 py-12">
+            
+            <div className="w-full max-w-7xl space-y-20">
+              {pages[activePageIdx].blocks.map((block: any, i: number) => {
+                const isQuiz = block.type === 'quiz';
+                const answerCount = Object.keys(liveState?.answers || {}).length;
 
-              return (
-                <div key={i} className="animate-in fade-in zoom-in-95 duration-700 w-full">
-                  
-                  {/* MULTIPLAYER QUIZ BLOCK INTERCEPTOR */}
-                  {isQuiz ? (
-                    <div className="bg-slate-900 text-white border-4 border-slate-800 rounded-[4rem] p-16 shadow-2xl text-center animate-in slide-in-from-bottom-12 duration-500 mx-auto max-w-5xl mt-12 mb-12">
-                        <span className="text-[2vh] font-black text-indigo-400 uppercase tracking-widest block mb-6">Class Question</span>
-                        <h2 className="text-[5vh] md:text-[6vh] font-black mb-12 leading-tight">{block.content?.question || block.question}</h2>
-                        
-                        {/* State 1: Waiting to Start */}
-                        {liveState?.quizState === 'waiting' && (
-                            <button 
-                                onClick={() => triggerQuiz('active')}
-                                className="bg-rose-500 hover:bg-rose-600 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest shadow-[0_0_40px_rgba(244,63,94,0.5)] transition-transform active:scale-95 flex items-center gap-4 mx-auto focus:outline-none focus:ring-4 focus:ring-rose-400"
-                            >
-                                <Zap size={40} fill="currentColor" /> Launch Trivia Protocol
-                            </button>
-                        )}
+                return (
+                  <div key={i} className="animate-in fade-in zoom-in-95 duration-700 w-full">
+                    
+                    {/* MULTIPLAYER QUIZ BLOCK INTERCEPTOR */}
+                    {isQuiz ? (
+                      <div className="bg-slate-900 text-white border-4 border-slate-800 rounded-[4rem] p-16 shadow-2xl text-center animate-in slide-in-from-bottom-12 duration-500 mx-auto max-w-5xl mt-12 mb-12">
+                          <span className="text-[2vh] font-black text-indigo-400 uppercase tracking-widest block mb-6">Class Question</span>
+                          <h2 className="text-[5vh] md:text-[6vh] font-black mb-12 leading-tight">{block.content?.question || block.question}</h2>
+                          
+                          {/* State 1: Waiting to Start */}
+                          {liveState?.quizState === 'waiting' && (
+                              <button 
+                                  onClick={() => triggerQuiz('active')}
+                                  className="bg-rose-500 hover:bg-rose-600 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest shadow-[0_0_40px_rgba(244,63,94,0.5)] transition-transform active:scale-95 flex items-center gap-4 mx-auto focus:outline-none focus:ring-4 focus:ring-rose-400"
+                              >
+                                  <Zap size={40} fill="currentColor" /> Launch Trivia Protocol
+                              </button>
+                          )}
 
-                        {/* State 2: Active Game (Waiting for answers) */}
-                        {liveState?.quizState === 'active' && (
-                            <div className="space-y-12 animate-in fade-in duration-500">
-                                <div className="flex flex-col items-center justify-center gap-4 text-[6vh] font-black text-indigo-400">
-                                    <div className="flex items-center gap-6 bg-slate-800 px-10 py-6 rounded-[2rem] shadow-inner border border-slate-700">
-                                        <Users size={64} className="animate-pulse" /> 
-                                        <span>{answerCount} Students Locked In</span>
-                                    </div>
-                                </div>
-                                <button 
-                                    onClick={() => triggerQuiz('revealed')}
-                                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest transition-transform active:scale-95 shadow-xl mx-auto focus:outline-none focus:ring-4 focus:ring-indigo-400"
-                                >
-                                    Reveal Correct Answer
-                                </button>
-                            </div>
-                        )}
+                          {/* State 2: Active Game (Waiting for answers) */}
+                          {liveState?.quizState === 'active' && (
+                              <div className="space-y-12 animate-in fade-in duration-500">
+                                  <div className="flex flex-col items-center justify-center gap-4 text-[6vh] font-black text-indigo-400">
+                                      <div className="flex items-center gap-6 bg-slate-800 px-10 py-6 rounded-[2rem] shadow-inner border border-slate-700">
+                                          <Users size={64} className="animate-pulse" /> 
+                                          <span>{answerCount} Students Locked In</span>
+                                      </div>
+                                  </div>
+                                  <button 
+                                      onClick={() => triggerQuiz('revealed')}
+                                      className="bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest transition-transform active:scale-95 shadow-xl mx-auto focus:outline-none focus:ring-4 focus:ring-indigo-400"
+                                  >
+                                      Reveal Correct Answer
+                                  </button>
+                              </div>
+                          )}
 
-                        {/* State 3: The Reveal (Shows Correct Answer) */}
-                        {liveState?.quizState === 'revealed' && (
-                            <div className="animate-in zoom-in duration-500 flex flex-col items-center">
-                                <div className="inline-flex items-center gap-4 bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/50 px-10 py-5 rounded-[2rem] text-[4vh] font-black mb-12 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
-                                    <CheckCircle2 size={48} /> Correct Answer Displayed!
-                                </div>
-                                
-                                {/* Show the correct answer prominently */}
-                                <div className="bg-emerald-500 text-white p-8 rounded-[2rem] shadow-xl text-[4vh] font-bold border-4 border-emerald-400 min-w-[50%]">
-                                    {block.content?.options?.find((o:any) => o.id === block.content.correctId)?.text || "Answer Revealed on Devices"}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                  ) : (
-                    /* STANDARD BLOCKS */
-                    <>
-                        {block.type === 'text' && <TextBlock block={block} />}
-                        {block.type === 'essay' && <EssayBlock block={block} />}
-                        {block.type === 'image' && <ImageBlock block={block} />}
-                        {block.type === 'dialogue' && <DialogueBlock block={block} />}
-                        {block.type === 'vocab-list' && <VocabListBlock block={block} />}
-                        {block.type === 'discussion' && <DiscussionBlock block={block} />}
-                        {block.type === 'game' && block.gameType === 'connect-three' && <GameBlock block={block} lessonVocab={lessonVocab} />}
-                        {block.type === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
-                        {block.type === 'fill-blank' && <FillBlankBlock block={block} liveState={liveState} />}
-                    </>
-                  )}
-                </div>
-              );
-            })}
+                          {/* State 3: The Reveal (Shows Correct Answer) */}
+                          {liveState?.quizState === 'revealed' && (
+                              <div className="animate-in zoom-in duration-500 flex flex-col items-center">
+                                  <div className="inline-flex items-center gap-4 bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/50 px-10 py-5 rounded-[2rem] text-[4vh] font-black mb-12 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
+                                      <CheckCircle2 size={48} /> Correct Answer Displayed!
+                                  </div>
+                                  
+                                  {/* Show the correct answer prominently */}
+                                  <div className="bg-emerald-500 text-white p-8 rounded-[2rem] shadow-xl text-[4vh] font-bold border-4 border-emerald-400 min-w-[50%]">
+                                      {block.content?.options?.find((o:any) => o.id === block.content.correctId)?.text || "Answer Revealed on Devices"}
+                                  </div>
+                              </div>
+                          )}
+                      </div>
+                    ) : (
+                      /* STANDARD BLOCKS */
+                      <>
+                          {block.type === 'text' && <TextBlock block={block} />}
+                          {block.type === 'essay' && <EssayBlock block={block} />}
+                          {block.type === 'image' && <ImageBlock block={block} />}
+                          {block.type === 'dialogue' && <DialogueBlock block={block} />}
+                          {block.type === 'vocab-list' && <VocabListBlock block={block} />}
+                          {block.type === 'discussion' && <DiscussionBlock block={block} />}
+                          {block.type === 'game' && block.gameType === 'connect-three' && <GameBlock block={block} lessonVocab={lessonVocab} />}
+                          {block.type === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
+                          {block.type === 'fill-blank' && <FillBlankBlock block={block} liveState={liveState} />}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 
