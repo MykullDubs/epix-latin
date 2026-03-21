@@ -88,7 +88,7 @@ export function useMagisterData() {
           setActivityLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
-      // 🔥 NEW: Listeners for Student Deck/Card Preferences
+      // 🔥 Listeners for Student Deck/Card Preferences
       const unsubCardPrefs = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'card_prefs'), (snap) => {
           const prefs: Record<string, any> = {};
           snap.docs.forEach(d => { prefs[d.id] = d.data(); });
@@ -152,7 +152,7 @@ export function useMagisterData() {
     logout: () => signOut(auth),
     
     // 🔥 FOLDER MANAGEMENT
-  createStudyFolder: async (folderName: string, color: string = 'indigo') => {
+    createStudyFolder: async (folderName: string, color: string = 'indigo') => {
         if (!user) return;
         const cleanName = folderName.trim();
         if (!cleanName) return;
@@ -206,6 +206,12 @@ export function useMagisterData() {
             const prefRef = doc(db, 'artifacts', appId, 'users', user.uid, 'deck_prefs', dId);
             await setDoc(prefRef, { folder: null }, { merge: true });
         }
+    },
+
+    assignDeckToFolder: async (deckId: string, folderName: string | null) => {
+        if (!user) return;
+        const prefRef = doc(db, 'artifacts', appId, 'users', user.uid, 'deck_prefs', deckId);
+        await setDoc(prefRef, { folder: folderName }, { merge: true });
     },
 
     // 🔥 DECK PREFERENCES
@@ -440,7 +446,9 @@ export function useMagisterData() {
         cardPrefs,
         deckPrefs,
         // Ensure studyFolders safely defaults to an array even if missing in DB
-        studyFolders: userData.studyFolders || userData?.profile?.main?.studyFolders || [] 
+        studyFolders: userData.studyFolders || userData?.profile?.main?.studyFolders || [],
+        // Supply folder colors to the frontend
+        folderColors: userData.folderColors || userData?.profile?.main?.folderColors || {}
     };
   }, [userData, cardPrefs, deckPrefs]);
 
