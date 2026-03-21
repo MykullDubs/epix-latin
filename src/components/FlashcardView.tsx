@@ -1,5 +1,5 @@
 // src/components/FlashcardView.tsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
     ArrowLeft, X, Library, Layers, Play, Zap, HelpCircle, Puzzle, Flame, 
     CheckCircle2, XCircle, Globe, Users, Filter, ChevronLeft, ChevronRight, 
@@ -36,7 +36,7 @@ function StudentCardBuilder({ onSave, onCancel }: any) {
     };
 
     return (
-        <div className="h-[100dvh] flex flex-col bg-slate-50 dark:bg-slate-950 absolute inset-0 z-[200] animate-in slide-in-from-bottom-8 duration-300">
+        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 absolute inset-0 z-[200] animate-in slide-in-from-bottom-8 duration-300">
             <div className="px-6 pt-safe-8 pb-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
                 <button onClick={() => onCancel(false)} className="flex items-center text-slate-400 hover:text-rose-500 mb-4 text-xs font-black uppercase tracking-widest transition-colors bg-slate-50 dark:bg-slate-800 px-5 py-2.5 rounded-full w-fit active:scale-95">
                     <ArrowLeft size={16} className="mr-2"/> Cancel
@@ -44,7 +44,7 @@ function StudentCardBuilder({ onSave, onCancel }: any) {
                 <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">New Study Card</h1>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-32 custom-scrollbar">
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border-2 border-slate-100 dark:border-slate-800 shadow-sm space-y-6">
                     <div className="flex flex-col gap-2">
                         <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest pl-1">Front (Target Concept)</label>
@@ -325,7 +325,7 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
 }
 
 // ============================================================================
-//  2. MATCHING GAME & 3. QUIZ SESSION 
+//  2. MATCHING GAME 
 // ============================================================================
 function MatchingGame({ deckCards, onGameEnd }: any) {
     const [cards, setCards] = useState<any[]>([]);
@@ -492,11 +492,21 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const [showFolderModal, setShowFolderModal] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
     
+    // 🔥 The Ref to control scroll position
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+
     const resolvedDeck = allDecks[selectedDeckKey] || Object.values(allDecks)[0];
     const cards = resolvedDeck?.cards || [];
     const deckTitle = resolvedDeck?.id === 'custom' ? "My Study Cards" : resolvedDeck?.title;
 
     const customFolders: string[] = userData?.studyFolders || [];
+
+    // 🔥 Auto-scroll to top when folder or view changes
+    useEffect(() => {
+        if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTop = 0;
+        }
+    }, [deckFilter, internalMode]);
 
     const launchGame = (mode: 'standard' | 'quiz' | 'match' | 'tower') => {
         setActiveGame(mode);
@@ -544,14 +554,10 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             if (deckFilter === 'archived') return isArchived;
             if (isArchived) return false; 
 
-            // 🔥 Root Library view logic: only show decks that ARE NOT in a folder
             if (deckFilter === 'all') return currentFolder === null;
-
-            // Optional filters
             if (deckFilter === 'personal') return !deck.isPublished;
             if (deckFilter === 'network') return deck.isPublished;
             
-            // Inside a specific folder
             if (customFolders.includes(deckFilter)) {
                 return currentFolder === deckFilter;
             }
@@ -560,7 +566,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         });
 
         return (
-            <div className="h-[100dvh] flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors relative">
+            <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors relative">
                 {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
                 
                 {showFolderModal && (
@@ -609,12 +615,13 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     ))}
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-5 pb-12 relative z-10 custom-scrollbar overscroll-y-contain">
+                {/* 🔥 H-FULL Reinstated & Ref Added for Auto-scroll */}
+                <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 space-y-5 pb-28 relative z-10 custom-scrollbar overscroll-y-contain">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         
-                        {/* 🔥 BREADCRUMB HEADER FOR INSIDE A FOLDER */}
+                        {/* BREADCRUMB HEADER */}
                         {customFolders.includes(deckFilter) && (
-                            <div className="col-span-full animate-in fade-in duration-300 mb-2">
+                            <div className="col-span-full animate-in fade-in duration-300 mb-2 mt-2">
                                 <button onClick={() => setDeckFilter('all')} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-500 transition-colors w-fit bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 active:scale-95">
                                     <ArrowLeft size={14} /> Back to Library
                                 </button>
@@ -625,7 +632,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             </div>
                         )}
 
-                        {/* 🔥 RENDER FOLDERS AS CLICKABLE GRID CARDS IN THE ROOT 'ALL' VIEW */}
+                        {/* RENDER FOLDERS */}
                         {deckFilter === 'all' && customFolders.map((folderName: string) => {
                             const itemCount = Object.keys(allDecks).filter(key => userData?.deckPrefs?.[key]?.folder === folderName && !userData?.deckPrefs?.[key]?.archived).length;
                             
@@ -650,13 +657,14 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             );
                         })}
 
-                        {/* RENDER DECKS */}
+                        {/* EMPTY FOLDER STATE */}
                         {filteredDecks.length === 0 && deckFilter !== 'all' && customFolders.includes(deckFilter) && (
                              <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[2.5rem] mt-4 text-slate-400 font-bold text-sm uppercase tracking-widest">
                                  Folder is empty
                              </div>
                         )}
 
+                        {/* RENDER DECKS */}
                         {filteredDecks.map(([key, deck]: any) => {
                             const isArchived = userData?.deckPrefs?.[key]?.archived || false;
                             const currentFolder = userData?.deckPrefs?.[key]?.folder || null;
@@ -694,7 +702,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     </div>
                 </div>
 
-                {/* 🔥 THE BOTTOM SHEET DRAWER MODAL */}
+                {/* BOTTOM SHEET DRAWER MODAL */}
                 {activeOptionsDeck && (
                     <div className="fixed inset-0 z-[500] flex flex-col justify-end">
                         <div 
@@ -840,7 +848,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
     // --- PLAYING VIEW ---
     return (
-        <div className="h-[100dvh] flex flex-col bg-slate-50 dark:bg-slate-950 animate-in slide-in-from-bottom-8 duration-500 relative z-[100] transition-colors pb-safe">
+        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 animate-in slide-in-from-bottom-8 duration-500 relative z-[100] transition-colors pb-safe">
             <div className="px-4 py-4 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center shrink-0">
                 <button onClick={handleBack} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition-colors"><X size={20} strokeWidth={3}/></button>
                 <div className="flex flex-col items-center">
