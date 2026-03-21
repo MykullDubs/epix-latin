@@ -91,8 +91,11 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   if (!lesson || !pages[activePageIdx]) return null;
 
   return (
-    <div className="h-full w-full flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500">
-      
+    // 🔥 THE FIX: A hard clamp calculating exactly 100vh minus the 4rem App header
+    <div 
+        className="w-full flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500 relative"
+        style={{ height: 'calc(100dvh - 4rem)' }}
+    >
       <main className="flex-1 flex overflow-hidden relative group/canvas bg-white text-slate-900">
         
         {/* MOUSE NAVIGATION CONTROLS */}
@@ -116,13 +119,13 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
             </button>
         )}
 
-        {/* 🔥 THE UNBREAKABLE CENTERING SCROLL CONTAINER */}
+        {/* SECURE SCROLL CONTAINER */}
         <div ref={stageRef} className={`flex-1 overflow-y-auto w-full relative transition-all duration-500 ${showForum ? 'mr-[450px]' : ''}`}>
           
-          {/* This inner wrapper guarantees short content is centered, and tall content naturally drops down without clipping the top */}
-          <div className="min-h-full w-full flex flex-col items-center justify-center px-16 py-12">
+          {/* FLEX-CENTERING WRAPPER: Centers short content, expands down for tall content without clipping */}
+          <div className="flex flex-col min-h-full w-full items-center px-16 py-12">
             
-            <div className="w-full max-w-7xl space-y-20">
+            <div className="w-full max-w-7xl space-y-20 my-auto">
               {pages[activePageIdx].blocks.map((block: any, i: number) => {
                 const isQuiz = block.type === 'quiz';
                 const answerCount = Object.keys(liveState?.answers || {}).length;
