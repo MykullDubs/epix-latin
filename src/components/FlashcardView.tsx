@@ -4,11 +4,31 @@ import {
     ArrowLeft, X, Library, Layers, Play, Zap, HelpCircle, Puzzle, Flame, 
     CheckCircle2, XCircle, Globe, Users, Filter, ChevronLeft, ChevronRight, 
     RotateCw, ArrowUp, Paperclip, Music, Star, Archive, Plus, Save, Loader2,
-    MoreVertical, FolderPlus, Trash2, Folder, FolderOpen 
+    MoreVertical, FolderPlus, Trash2, Folder, FolderOpen,
+    // 🔥 NEW ICONS FOR DYNAMIC THEMES
+    Calculator, FlaskConical, Palette, Utensils, Plane, HeartPulse, Activity, BookText, Code
 } from 'lucide-react';
 import { Toast } from './Toast'; 
 
 const SUBJECT_ORDER = ['1s', '2s', '3s', '1p', '2p', '3p'];
+
+// 🔥 DYNAMIC THEME ENGINE
+const getDeckTheme = (title: string = '') => {
+    const str = title.toLowerCase();
+    if (str.match(/math|calc|num|algebra|geometry/)) return { icon: Calculator, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'border-blue-100 dark:border-blue-500/20' };
+    if (str.match(/sci|bio|chem|phys|cell/)) return { icon: FlaskConical, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-100 dark:border-emerald-500/20' };
+    if (str.match(/art|color|draw|paint/)) return { icon: Palette, color: 'text-fuchsia-500', bg: 'bg-fuchsia-50 dark:bg-fuchsia-500/10', border: 'border-fuchsia-100 dark:border-fuchsia-500/20' };
+    if (str.match(/food|eat|cook|kitchen/)) return { icon: Utensils, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-500/10', border: 'border-orange-100 dark:border-orange-500/20' };
+    if (str.match(/music|song|audio|sound/)) return { icon: Music, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-500/10', border: 'border-rose-100 dark:border-rose-500/20' };
+    if (str.match(/travel|place|city|country/)) return { icon: Plane, color: 'text-sky-500', bg: 'bg-sky-50 dark:bg-sky-500/10', border: 'border-sky-100 dark:border-sky-500/20' };
+    if (str.match(/verb|action|do/)) return { icon: Activity, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-500/10', border: 'border-red-100 dark:border-red-500/20' };
+    if (str.match(/body|health|med|doctor/)) return { icon: HeartPulse, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-500/10', border: 'border-rose-100 dark:border-rose-500/20' };
+    if (str.match(/read|lit|book|vocab|word/)) return { icon: BookText, color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-500/10', border: 'border-indigo-100 dark:border-indigo-500/20' };
+    if (str.match(/code|tech|comp|program/)) return { icon: Code, color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-200 dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-700' };
+    
+    // Default fallback
+    return { icon: Layers, color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-500/10', border: 'border-indigo-100 dark:border-indigo-500/20' };
+};
 
 // ============================================================================
 //  0. STUDENT CARD BUILDER
@@ -544,7 +564,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         );
     }
 
-if (internalMode === 'library') {
+    if (internalMode === 'library') {
         const filteredDecks = Object.entries(allDecks).filter(([key, deck]: any) => {
             const isArchived = userData?.deckPrefs?.[key]?.archived || false;
             const currentFolder = userData?.deckPrefs?.[key]?.folder || null;
@@ -586,10 +606,7 @@ if (internalMode === 'library') {
                     </div>
                 )}
 
-                {/* 🔥 THE FIX: Single Sticky Wrapper for BOTH bars */}
                 <div className="sticky top-0 z-30 w-full flex flex-col shrink-0">
-                    
-                    {/* Header Bar */}
                     <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl px-6 py-5 flex justify-between items-center pt-safe">
                         <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-orange-400 to-rose-500 text-white p-2.5 rounded-xl shadow-md shadow-orange-500/20"><Library size={22} strokeWidth={3}/></div>
@@ -600,7 +617,6 @@ if (internalMode === 'library') {
                         </button>
                     </div>
 
-                    {/* Filter Bar (Border applied here now to seal the bottom) */}
                     <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center gap-2 overflow-x-auto custom-scrollbar overscroll-x-contain">
                         <Filter size={16} className="text-slate-400 mr-2 shrink-0" />
                         
@@ -667,26 +683,61 @@ if (internalMode === 'library') {
                              </div>
                         )}
 
-                        {/* RENDER DECKS */}
+                        {/* RENDER DECKS WITH 3D STACK MAGIC */}
                         {filteredDecks.map(([key, deck]: any) => {
                             const isArchived = userData?.deckPrefs?.[key]?.archived || false;
                             
+                            // 🔥 1. Run the NLP Engine
+                            const displayTitle = deck.id === 'custom' ? "My Study Cards" : deck.title;
+                            const theme = getDeckTheme(displayTitle);
+                            const DeckIcon = deck.icon || theme.icon;
+
+                            // 🔥 2. Auto-Extract Tags
+                            const rawTags = deck.tags || deck.cards?.[0]?.grammar_tags || [];
+                            const displayTags = Array.isArray(rawTags) ? rawTags.slice(0, 2) : []; // Show max 2 tags
+                            
                             return (
-                                <div key={key} className="relative group animate-in fade-in duration-300 h-full">
-                                    <button onClick={() => { onSelectDeck(key); setInternalMode('menu'); }} className="w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] p-5 border-4 border-slate-50 dark:border-slate-800 hover:border-orange-100 dark:hover:border-orange-500/30 hover:-translate-y-1 transition-all text-left shadow-sm hover:shadow-xl flex flex-col">
+                                <div key={key} className="relative group animate-in fade-in duration-300 h-full pt-2">
+                                    
+                                    {/* 🔥 THE 3D STACK ILLUSION */}
+                                    <div className="absolute inset-x-4 -bottom-1 h-10 bg-slate-200 dark:bg-slate-800 rounded-[2rem] transition-transform duration-300 group-hover:translate-y-1.5" />
+                                    <div className="absolute inset-x-2 -bottom-0 h-10 bg-slate-100 dark:bg-slate-800/80 rounded-[2rem] transition-transform duration-300 group-hover:translate-y-1" />
+
+                                    {/* MAIN DECK BUTTON */}
+                                    <button 
+                                        onClick={() => { onSelectDeck(key); setInternalMode('menu'); }} 
+                                        className="w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] p-5 border-2 border-slate-50 dark:border-slate-800 hover:border-slate-100 dark:hover:border-slate-700 transition-all text-left shadow-sm group-hover:-translate-y-1 relative z-10 flex flex-col"
+                                    >
                                         <div className="flex justify-between items-start mb-4">
-                                            <div className="w-12 h-12 bg-orange-50 dark:bg-orange-500/10 text-orange-500 rounded-[1rem] flex items-center justify-center text-xl border border-orange-100 dark:border-orange-500/20 shadow-inner group-hover:scale-110 transition-transform">
-                                                {deck.icon || <Layers size={24}/>}
+                                            <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center text-xl border shadow-inner group-hover:scale-110 transition-transform ${theme.bg} ${theme.color} ${theme.border}`}>
+                                                {typeof DeckIcon === 'string' ? DeckIcon : <DeckIcon size={24}/>}
                                             </div>
                                         </div>
-                                        <h3 className="font-black text-slate-800 dark:text-white text-lg leading-tight line-clamp-2 pr-8 mb-auto">{deck.id === 'custom' ? "My Study Cards" : deck.title}</h3>
                                         
-                                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                                            <span className="text-[9px] text-slate-400 uppercase font-black tracking-widest bg-slate-50 dark:bg-slate-800 px-2.5 py-1 rounded-md">{deck.cards?.length || 0} Targets</span>
+                                        <h3 className="font-black text-slate-800 dark:text-white text-lg leading-tight line-clamp-2 pr-8 mb-3">{displayTitle}</h3>
+                                        
+                                        <div className="mt-auto pt-1 flex flex-col gap-2">
+                                            {/* 🔥 THE TAG DISPLAY */}
+                                            {displayTags.length > 0 && (
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {displayTags.map((tag: string, i: number) => (
+                                                        <span key={i} className="text-[8px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                                                            {tag}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* Bottom Metadata Bar */}
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest flex items-center gap-1">
+                                                    <Layers size={10} /> {deck.cards?.length || 0}
+                                                </span>
+                                            </div>
                                         </div>
                                     </button>
 
-                                    {/* ELEVATED TOUCH TARGET */}
+                                    {/* ELEVATED TOUCH TARGET (Context Menu) */}
                                     <button 
                                         onClick={(e) => { 
                                             e.preventDefault();
@@ -694,7 +745,7 @@ if (internalMode === 'library') {
                                             setActiveOptionsDeck(deck);
                                             setMenuView('main'); 
                                         }}
-                                        className="absolute top-3 right-3 p-2 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/20 transition-colors active:bg-slate-100 z-20"
+                                        className="absolute top-5 right-2 p-2 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors z-20"
                                         aria-label="Deck Options"
                                     >
                                         <MoreVertical size={20} />
