@@ -4,7 +4,7 @@ import {
     ArrowLeft, X, Library, Layers, Play, Zap, HelpCircle, Puzzle, Flame, 
     CheckCircle2, XCircle, Globe, Users, Filter, ChevronLeft, ChevronRight, 
     RotateCw, ArrowUp, Paperclip, Music, Star, Archive, Plus, Save, Loader2,
-    MoreVertical, FolderPlus, Trash2, FolderOpen // 🔥 Added Context Menu Icons
+    MoreVertical, FolderPlus, Trash2, FolderOpen, Folder // 🔥 Added Context Menu Icons
 } from 'lucide-react';
 import { Toast } from './Toast'; 
 
