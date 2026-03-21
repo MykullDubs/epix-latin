@@ -36,7 +36,7 @@ function StudentCardBuilder({ onSave, onCancel }: any) {
     };
 
     return (
-        <div className="h-[100dvh] flex flex-col bg-slate-50 dark:bg-slate-950 absolute inset-0 z-[200] animate-in slide-in-from-bottom-8 duration-300">
+        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 absolute inset-0 z-[200] animate-in slide-in-from-bottom-8 duration-300">
             <div className="px-6 pt-safe-8 pb-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
                 <button onClick={() => onCancel(false)} className="flex items-center text-slate-400 hover:text-rose-500 mb-4 text-xs font-black uppercase tracking-widest transition-colors bg-slate-50 dark:bg-slate-800 px-5 py-2.5 rounded-full w-fit active:scale-95">
                     <ArrowLeft size={16} className="mr-2"/> Cancel
@@ -167,7 +167,7 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
         : 'animate-in fade-in slide-in-from-left-12 duration-300';
 
     return (
-        <div className="flex flex-col h-[100dvh] max-w-md mx-auto p-6 w-full overflow-hidden transition-colors duration-300 pb-safe-8">
+        <div className="flex flex-col h-full max-w-md mx-auto p-6 w-full overflow-hidden transition-colors duration-300 pb-safe-8">
             <div className="mb-6 shrink-0 pt-safe-4">
                 <div className="flex justify-between text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 transition-colors">
                     <span>Target {currentIndex + 1}</span>
@@ -307,6 +307,7 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
                 </div>
             </div>
 
+            {/* Mobile Optimized Bottom Controls */}
             <div className="flex items-center justify-between px-2 shrink-0 z-10 w-full mb-safe-4">
                 <button onClick={handlePrev} disabled={currentIndex === 0} className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-md border border-slate-100 dark:border-slate-700 disabled:opacity-30 transition-all active:scale-95 touch-manipulation">
                     <ChevronLeft size={28} strokeWidth={3} className="-ml-1" />
@@ -325,7 +326,7 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
 }
 
 // ============================================================================
-//  2. MATCHING GAME (Unchanged)
+//  2. MATCHING GAME 
 // ============================================================================
 function MatchingGame({ deckCards, onGameEnd }: any) {
     const [cards, setCards] = useState<any[]>([]);
@@ -392,7 +393,7 @@ function MatchingGame({ deckCards, onGameEnd }: any) {
 }
 
 // ============================================================================
-//  3. QUIZ SESSION (Unchanged)
+//  3. QUIZ SESSION 
 // ============================================================================
 function QuizSessionView({ deckCards, onGameEnd }: any) {
     const [index, setIndex] = useState(0);
@@ -489,7 +490,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const [deckFilter, setDeckFilter] = useState<string>('all');
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     
-    // 🔥 Elevated State: Store the actual deck object for the Drawer, not just the ID
     const [activeOptionsDeck, setActiveOptionsDeck] = useState<any>(null);
     const [menuView, setMenuView] = useState<'main' | 'folders'>('main'); 
     
@@ -560,7 +560,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         });
 
         return (
-            <div className="h-[100dvh] flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors relative">
+            <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors relative">
                 {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
                 
                 {showFolderModal && (
@@ -609,9 +609,11 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     ))}
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-5 pb-safe-32 relative z-10 custom-scrollbar overscroll-y-contain">
+                {/* 🔥 Swapped back to h-full so the scroll sits neatly above the Nav Bar */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-5 pb-12 relative z-10 custom-scrollbar overscroll-y-contain">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         {filteredDecks.map(([key, deck]: any) => {
+                            const isArchived = userData?.deckPrefs?.[key]?.archived || false;
                             const currentFolder = userData?.deckPrefs?.[key]?.folder || null;
                             
                             return (
@@ -713,7 +715,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                     </button>
                                 </div>
                             ) : (
-                                // 🔥 FOLDERS VIEW IN DRAWER
                                 <div className="space-y-2">
                                     <button onClick={() => setMenuView('main')} className="px-3 py-3 w-full flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors mb-2">
                                         <ArrowLeft size={14} /> Back
@@ -757,6 +758,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             </div>
         );
     }
+
     // --- MENU VIEW ---
     if (internalMode === 'menu') {
         return (
@@ -769,7 +771,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     <span className="text-indigo-500 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1 rounded-lg">{cards.length} Configured Targets</span>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-24">
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-12">
                     <div className="grid grid-cols-2 gap-4">
                         <button onClick={() => launchGame('standard')} className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-100 dark:border-slate-800 shadow-sm hover:border-blue-300 dark:hover:border-blue-500/50 hover:-translate-y-1 transition-all group text-left">
                             <div className="w-14 h-14 bg-blue-50 dark:bg-blue-500/10 text-blue-500 rounded-2xl flex items-center justify-center mb-4 group-hover:rotate-6 transition-transform"><Layers size={28}/></div>
@@ -799,7 +801,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
     // --- PLAYING VIEW ---
     return (
-        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 animate-in slide-in-from-bottom-8 duration-500 relative z-[100] transition-colors">
+        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 animate-in slide-in-from-bottom-8 duration-500 relative z-[100] transition-colors pb-safe">
             <div className="px-4 py-4 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center shrink-0">
                 <button onClick={handleBack} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition-colors"><X size={20} strokeWidth={3}/></button>
                 <div className="flex flex-col items-center">
