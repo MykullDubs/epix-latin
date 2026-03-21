@@ -380,7 +380,7 @@ export default function App() {
                 onLogActivity={actions.logActivity}
             />
           ) : activeTab === 'discovery' ? (
-            <DiscoveryView allDecks={allDecks} lessons={allLessons} onSelectDeck={(d:any) => { setActiveDeckKey(d.id); setActiveTab('flashcards'); }} onSelectLesson={setActiveLesson} onLogActivity={actions.logActivity} userData={userData} />
+            <DiscoveryView allDecks={allDecks} lessons={allLessons} onSelectDeck={(d:any) => { setActiveDeckKey(d.id); setActiveTab('flashcards'); }} onSelectLesson={setActiveLesson} onLogActivity={actions.logActivity} userData={userData} onPurchaseItem={actions.purchaseUnlock} />
           ) : activeTab === 'flashcards' ? (
             // 🔥 FULLY WIRED FLASHCARD VIEW
             <FlashcardView 
