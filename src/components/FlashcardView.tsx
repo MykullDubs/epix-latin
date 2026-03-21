@@ -325,7 +325,7 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
 }
 
 // ============================================================================
-//  2. MATCHING GAME 
+//  2. MATCHING GAME & 3. QUIZ SESSION
 // ============================================================================
 function MatchingGame({ deckCards, onGameEnd }: any) {
     const [cards, setCards] = useState<any[]>([]);
@@ -492,7 +492,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const [showFolderModal, setShowFolderModal] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
     
-    // 🔥 The Ref to control scroll position
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     const resolvedDeck = allDecks[selectedDeckKey] || Object.values(allDecks)[0];
@@ -501,7 +500,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
     const customFolders: string[] = userData?.studyFolders || [];
 
-    // 🔥 Auto-scroll to top when folder or view changes
     useEffect(() => {
         if (scrollContainerRef.current) {
             scrollContainerRef.current.scrollTop = 0;
@@ -615,22 +613,24 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     ))}
                 </div>
 
-                {/* 🔥 H-FULL Reinstated & Ref Added for Auto-scroll */}
+                {/* 🔥 H-FULL Reinstated & Grid updated to 2-columns (grid-cols-2) */}
                 <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 space-y-5 pb-28 relative z-10 custom-scrollbar overscroll-y-contain">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        
-                        {/* BREADCRUMB HEADER */}
-                        {customFolders.includes(deckFilter) && (
-                            <div className="col-span-full animate-in fade-in duration-300 mb-2 mt-2">
-                                <button onClick={() => setDeckFilter('all')} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-500 transition-colors w-fit bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 active:scale-95">
-                                    <ArrowLeft size={14} /> Back to Library
-                                </button>
-                                <div className="flex items-center gap-3 mt-6 mb-2">
-                                    <FolderOpen size={28} className="text-indigo-500" />
-                                    <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">{deckFilter}</h2>
-                                </div>
+                    
+                    {/* BREADCRUMB HEADER */}
+                    {customFolders.includes(deckFilter) && (
+                        <div className="animate-in fade-in duration-300 mb-2 mt-2">
+                            <button onClick={() => setDeckFilter('all')} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-500 transition-colors w-fit bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 active:scale-95">
+                                <ArrowLeft size={14} /> Back to Library
+                            </button>
+                            <div className="flex items-center gap-3 mt-6 mb-2">
+                                <FolderOpen size={28} className="text-indigo-500" />
+                                <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">{deckFilter}</h2>
                             </div>
-                        )}
+                        </div>
+                    )}
+
+                    {/* 🔥 2-COLUMN GRID INJECTED HERE */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
 
                         {/* RENDER FOLDERS */}
                         {deckFilter === 'all' && customFolders.map((folderName: string) => {
@@ -640,16 +640,16 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                 <button 
                                     key={`folder-${folderName}`} 
                                     onClick={() => setDeckFilter(folderName)} 
-                                    className="relative group w-full bg-indigo-50 dark:bg-indigo-900/20 rounded-[2.5rem] p-7 border-4 border-indigo-100 dark:border-indigo-500/30 hover:border-indigo-300 dark:hover:border-indigo-500/60 hover:-translate-y-1 transition-all text-left shadow-sm hover:shadow-xl block animate-in fade-in duration-300"
+                                    className="relative group w-full bg-indigo-50 dark:bg-indigo-900/20 rounded-[2rem] p-5 border-4 border-indigo-100 dark:border-indigo-500/30 hover:border-indigo-300 dark:hover:border-indigo-500/60 hover:-translate-y-1 transition-all text-left shadow-sm hover:shadow-xl flex flex-col h-full animate-in fade-in duration-300"
                                 >
-                                    <div className="flex justify-between items-start mb-6">
-                                        <div className="w-16 h-16 bg-white dark:bg-indigo-500/30 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center text-2xl border border-indigo-100 dark:border-indigo-500/40 shadow-inner group-hover:scale-110 transition-transform">
-                                            <Folder size={32} fill="currentColor" />
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className="w-12 h-12 bg-white dark:bg-indigo-500/30 text-indigo-600 dark:text-indigo-400 rounded-[1rem] flex items-center justify-center text-xl border border-indigo-100 dark:border-indigo-500/40 shadow-inner group-hover:scale-110 transition-transform">
+                                            <Folder size={24} fill="currentColor" />
                                         </div>
                                     </div>
-                                    <h3 className="font-black text-indigo-900 dark:text-indigo-100 text-2xl leading-tight line-clamp-1 pr-4 mb-1">{folderName}</h3>
-                                    <div className="flex items-center gap-3 mt-3">
-                                        <span className="text-[10px] text-indigo-600 dark:text-indigo-300 uppercase font-black tracking-widest bg-white/60 dark:bg-black/20 px-3 py-1 rounded-md shadow-sm border border-indigo-100/50 dark:border-indigo-500/20">
+                                    <h3 className="font-black text-indigo-900 dark:text-indigo-100 text-lg leading-tight line-clamp-2 pr-2 mb-auto">{folderName}</h3>
+                                    <div className="mt-3">
+                                        <span className="text-[9px] text-indigo-600 dark:text-indigo-300 uppercase font-black tracking-widest bg-white/60 dark:bg-black/20 px-2.5 py-1 rounded-md shadow-sm border border-indigo-100/50 dark:border-indigo-500/20">
                                             {itemCount} Decks
                                         </span>
                                     </div>
@@ -667,23 +667,24 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         {/* RENDER DECKS */}
                         {filteredDecks.map(([key, deck]: any) => {
                             const isArchived = userData?.deckPrefs?.[key]?.archived || false;
-                            const currentFolder = userData?.deckPrefs?.[key]?.folder || null;
                             
                             return (
-                                <div key={key} className="relative group animate-in fade-in duration-300">
-                                    <button onClick={() => { onSelectDeck(key); setInternalMode('menu'); }} className="w-full bg-white dark:bg-slate-900 rounded-[2.5rem] p-7 border-4 border-slate-50 dark:border-slate-800 hover:border-orange-100 dark:hover:border-orange-500/30 hover:-translate-y-1 transition-all text-left shadow-sm hover:shadow-xl relative block">
-                                        <div className="flex justify-between items-start mb-6">
-                                            <div className="w-16 h-16 bg-orange-50 dark:bg-orange-500/10 text-orange-500 rounded-2xl flex items-center justify-center text-2xl border border-orange-100 dark:border-orange-500/20 shadow-inner group-hover:scale-110 transition-transform">
-                                                {deck.icon || <Layers size={28}/>}
+                                <div key={key} className="relative group animate-in fade-in duration-300 h-full">
+                                    <button onClick={() => { onSelectDeck(key); setInternalMode('menu'); }} className="w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] p-5 border-4 border-slate-50 dark:border-slate-800 hover:border-orange-100 dark:hover:border-orange-500/30 hover:-translate-y-1 transition-all text-left shadow-sm hover:shadow-xl flex flex-col">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className="w-12 h-12 bg-orange-50 dark:bg-orange-500/10 text-orange-500 rounded-[1rem] flex items-center justify-center text-xl border border-orange-100 dark:border-orange-500/20 shadow-inner group-hover:scale-110 transition-transform">
+                                                {deck.icon || <Layers size={24}/>}
                                             </div>
                                         </div>
-                                        <h3 className="font-black text-slate-800 dark:text-white text-2xl leading-tight line-clamp-1 pr-12 mb-1">{deck.id === 'custom' ? "My Study Cards" : deck.title}</h3>
+                                        {/* Adjusted padding right so the 3 dots don't cover the text */}
+                                        <h3 className="font-black text-slate-800 dark:text-white text-lg leading-tight line-clamp-2 pr-8 mb-auto">{deck.id === 'custom' ? "My Study Cards" : deck.title}</h3>
                                         
-                                        <div className="flex items-center gap-3 mt-3">
-                                            <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest bg-slate-50 dark:bg-slate-800 px-3 py-1 rounded-md">{deck.cards?.length || 0} Targets</span>
+                                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                                            <span className="text-[9px] text-slate-400 uppercase font-black tracking-widest bg-slate-50 dark:bg-slate-800 px-2.5 py-1 rounded-md">{deck.cards?.length || 0} Targets</span>
                                         </div>
                                     </button>
 
+                                    {/* 🔥 ELEVATED TOUCH TARGET */}
                                     <button 
                                         onClick={(e) => { 
                                             e.preventDefault();
@@ -691,10 +692,10 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                             setActiveOptionsDeck(deck);
                                             setMenuView('main'); 
                                         }}
-                                        className="absolute top-4 right-4 p-3 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/20 transition-colors active:bg-slate-100 z-20"
+                                        className="absolute top-3 right-3 p-2 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/20 transition-colors active:bg-slate-100 z-20"
                                         aria-label="Deck Options"
                                     >
-                                        <MoreVertical size={24} />
+                                        <MoreVertical size={20} />
                                     </button>
                                 </div>
                             );
