@@ -91,20 +91,10 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   if (!lesson || !pages[activePageIdx]) return null;
 
   return (
-    <div className="h-screen w-screen bg-slate-900 text-white fixed inset-0 z-[5000] flex flex-col overflow-hidden font-sans selection:bg-indigo-500">
+    // 🔥 FIX 1: Changed to h-full w-full (removes fixed inset-0) so it fits into App.tsx's flex container
+    <div className="h-full w-full bg-slate-900 text-white flex flex-col overflow-hidden font-sans selection:bg-indigo-500 relative">
       
-      {/* HEADER CONTROLS (Replacing default app header) */}
-      <header className="h-16 px-6 flex justify-between items-center border-b border-white/10 shrink-0" style={{ backgroundColor: activeOrg?.themeColor || '#4f46e5' }}>
-        <span className="font-black text-white uppercase tracking-widest flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.8)]" />
-            {activeOrg?.name || 'Magister'} | CLASE EN VIVO
-        </span>
-        <button onClick={onExit} className="bg-black/20 hover:bg-rose-600 text-white px-6 py-2 rounded-full font-black text-xs uppercase tracking-widest transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-white">
-            Terminar Clase
-        </button>
-      </header>
-
-      <main className="flex-1 flex overflow-hidden relative group/canvas bg-white text-slate-900">
+      <main className="flex-1 flex overflow-hidden relative group/canvas bg-white text-slate-900 h-full w-full">
         
         {/* MOUSE NAVIGATION CONTROLS */}
         {activePageIdx > 0 && (
@@ -127,8 +117,11 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
             </button>
         )}
 
-        <div ref={stageRef} className={`flex-1 overflow-y-auto px-16 py-12 flex flex-col items-center justify-center transition-all duration-500 ${showForum ? 'mr-[450px]' : ''}`}>
-          <div className="w-full max-w-7xl space-y-20">
+        {/* 🔥 FIX 2: Changed justify-center to justify-start */}
+        <div ref={stageRef} className={`flex-1 overflow-y-auto px-16 py-12 flex flex-col items-center justify-start transition-all duration-500 ${showForum ? 'mr-[450px]' : ''}`}>
+          
+          {/* 🔥 FIX 3: Added my-auto so short content centers, but tall content pushes down naturally */}
+          <div className="w-full max-w-7xl space-y-20 my-auto">
             {pages[activePageIdx].blocks.map((block: any, i: number) => {
               const isQuiz = block.type === 'quiz';
               const answerCount = Object.keys(liveState?.answers || {}).length;
@@ -138,7 +131,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                   
                   {/* MULTIPLAYER QUIZ BLOCK INTERCEPTOR */}
                   {isQuiz ? (
-                    <div className="bg-slate-900 text-white border-4 border-slate-800 rounded-[4rem] p-16 shadow-2xl text-center animate-in slide-in-from-bottom-12 duration-500 mx-auto max-w-5xl">
+                    <div className="bg-slate-900 text-white border-4 border-slate-800 rounded-[4rem] p-16 shadow-2xl text-center animate-in slide-in-from-bottom-12 duration-500 mx-auto max-w-5xl mt-12 mb-12">
                         <span className="text-[2vh] font-black text-indigo-400 uppercase tracking-widest block mb-6">Class Question</span>
                         <h2 className="text-[5vh] md:text-[6vh] font-black mb-12 leading-tight">{block.content?.question || block.question}</h2>
                         
@@ -214,7 +207,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       </main>
 
       {/* FOOTER PROGRESS INDICATOR */}
-      <footer className="h-20 bg-slate-900 border-t border-slate-800 flex items-center justify-between px-12 shrink-0">
+      <footer className="h-20 bg-slate-900 border-t border-slate-800 flex items-center justify-between px-12 shrink-0 relative z-20">
           <div className="flex items-center gap-6">
               <h2 className="text-xl font-black text-slate-500 uppercase tracking-widest">{lesson.title}</h2>
           </div>
@@ -236,14 +229,14 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 // ============================================================================
 
 const TextBlock = ({ block }: { block: any }) => (
-  <div className="text-center">
+  <div className="text-center py-12">
     {block.title && <h3 className="text-[3vh] font-black text-indigo-500 uppercase tracking-widest mb-6">{block.title}</h3>}
     <p className="text-[6vh] font-bold text-slate-800 leading-tight">{block.content}</p>
   </div>
 );
 
 const EssayBlock = ({ block }: { block: any }) => (
-  <div className="w-full max-w-5xl mx-auto space-y-[4vh]">
+  <div className="w-full max-w-5xl mx-auto space-y-[4vh] py-12">
     <h1 className="text-[8vh] font-black text-slate-900 leading-none mb-12 text-center">{block.title}</h1>
     {block.content?.split('\n\n').map((para: string, pIdx: number) => (
       <p key={pIdx} className="text-[4vh] leading-[1.6] text-slate-700 font-serif text-justify first-letter:text-[6vh] first-letter:font-black first-letter:text-indigo-600 first-letter:mr-3">{para.trim()}</p>
@@ -252,14 +245,14 @@ const EssayBlock = ({ block }: { block: any }) => (
 );
 
 const ImageBlock = ({ block }: { block: any }) => (
-  <figure className="w-full flex flex-col items-center">
+  <figure className="w-full flex flex-col items-center py-12">
     <img src={block.url} alt="presentation slide" className="max-h-[60vh] rounded-[3rem] shadow-2xl object-cover border-8 border-slate-50" />
     {block.caption && <figcaption className="text-[3vh] text-slate-500 font-bold mt-8 text-center max-w-4xl">{block.caption}</figcaption>}
   </figure>
 );
 
 const DialogueBlock = ({ block }: { block: any }) => (
-  <div className="w-full max-w-5xl mx-auto space-y-12">
+  <div className="w-full max-w-5xl mx-auto space-y-12 py-12">
     {block.lines?.map((line: any, j: number) => (
       <div key={j} className={`flex items-end gap-6 ${line.side === 'right' ? 'flex-row-reverse' : ''}`}>
         <div className={`w-20 h-20 rounded-full flex items-center justify-center text-[3vh] font-black text-white shrink-0 shadow-2xl ${line.side === 'right' ? 'bg-indigo-600' : 'bg-slate-800'}`}>
@@ -277,7 +270,7 @@ const DialogueBlock = ({ block }: { block: any }) => (
 );
 
 const VocabListBlock = ({ block }: { block: any }) => (
-  <div className="grid grid-cols-2 gap-8">
+  <div className="grid grid-cols-2 gap-8 py-12">
     {block.items.map((item: any, j: number) => (
       <div key={j} className="bg-slate-50 p-12 rounded-[3rem] border-4 border-slate-100 text-center shadow-xl">
         <p className="text-[5vh] font-black text-indigo-600 mb-2">{item.term}</p>
@@ -288,7 +281,7 @@ const VocabListBlock = ({ block }: { block: any }) => (
 );
 
 const DiscussionBlock = ({ block }: { block: any }) => (
-  <div className="w-full max-w-5xl mx-auto bg-indigo-50 rounded-[4rem] p-16 border-8 border-indigo-100 shadow-2xl">
+  <div className="w-full max-w-5xl mx-auto bg-indigo-50 rounded-[4rem] p-16 border-8 border-indigo-100 shadow-2xl my-12">
     <div className="flex items-center gap-6 mb-12 justify-center">
       <div className="p-6 bg-indigo-600 text-white rounded-3xl shadow-xl" aria-hidden="true"><MessageCircle size={48} /></div>
       <h3 className="text-[5vh] font-black text-indigo-900">{block.title || "Let's Discuss"}</h3>
@@ -305,7 +298,7 @@ const DiscussionBlock = ({ block }: { block: any }) => (
 );
 
 const GameBlock = ({ block, lessonVocab }: { block: any, lessonVocab: any }) => (
-  <div className="w-full max-w-6xl mx-auto flex flex-col items-center">
+  <div className="w-full max-w-6xl mx-auto flex flex-col items-center py-12">
     <div className="text-center mb-12">
       <div className="inline-flex items-center justify-center p-6 bg-indigo-50 text-indigo-600 rounded-3xl mb-8 shadow-inner" aria-hidden="true">
         <Gamepad2 size={64} />
@@ -326,7 +319,7 @@ const ScenarioBlock = ({ block, liveState }: { block: any, liveState: any }) => 
   const style = bgColors[currentNode?.color || 'neutral'];
 
   return (
-    <div className={`w-full max-w-5xl mx-auto rounded-[4rem] p-16 text-white shadow-2xl border-8 text-center transition-colors duration-500 ${style}`}>
+    <div className={`w-full max-w-5xl mx-auto rounded-[4rem] p-16 text-white shadow-2xl border-8 text-center transition-colors duration-500 my-12 ${style}`}>
       <span className="text-[2vh] font-black uppercase tracking-widest block mb-8 opacity-70">Interactive Scenario • {currentNode?.speaker || 'Character'}</span>
       <h3 className="text-[5vh] font-serif italic mb-12 leading-tight">"{currentNode?.text}"</h3>
       <div className="inline-block px-8 py-4 bg-black/20 rounded-full border-2 border-white/20 backdrop-blur-md">
@@ -344,7 +337,7 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
   }, [block]);
 
   return (
-    <div className="w-full max-w-6xl mx-auto bg-white p-16 rounded-[4rem] border-4 border-slate-100 shadow-2xl">
+    <div className="w-full max-w-6xl mx-auto bg-white p-16 rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12">
       <h3 className="text-[4vh] font-bold text-slate-800 mb-12 flex items-center gap-4">
         <span className="bg-indigo-100 text-indigo-600 p-4 rounded-2xl" aria-hidden="true"><Puzzle size={40}/></span>
         {block.question}
