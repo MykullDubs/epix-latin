@@ -132,30 +132,91 @@ export function useMagisterData() {
                                      pubDeck.allowedClasses?.some((id: string) => myClassIds.includes(id));
 
           if (isPublic || isInstructor || isRestrictedAccess) {
-              merged[pubDeck.id] = { ...pubDeck, isPublished: true };
+              // Only inject if it hasn't been soft-deleted by the student
+              const isHidden = deckPrefs[pubDeck.id]?.hidden;
+              if (!isHidden) {
+                  merged[pubDeck.id] = { ...pubDeck, isPublished: true };
+              }
           }
       });
 
+      // Filter out hidden private decks too
+      Object.keys(merged).forEach(key => {
+          if (deckPrefs[key]?.hidden) delete merged[key];
+      });
+
       return merged;
-  }, [privateDecks, publishedDecks, enrolledClasses, user?.uid]);
+  }, [privateDecks, publishedDecks, enrolledClasses, user?.uid, deckPrefs]);
 
   const actions = {
     logout: () => signOut(auth),
     
-    // 🔥 NEW: Leech Management (Toggle Star)
+    // 🔥 FOLDER MANAGEMENT
+    createStudyFolder: async (folderName: string) => {
+        if (!user) return;
+        const cleanName = folderName.trim();
+        if (!cleanName) return;
+
+        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
+            studyFolders: arrayUnion(cleanName)
+        }).catch(e => console.log("Subcollection update skipped", e));
+
+        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid), {
+            'profile.main.studyFolders': arrayUnion(cleanName)
+        }).catch(e => console.log("Parent doc update skipped", e));
+    },
+
+    assignDeckToFolder: async (deckId: string, folderName: string | null) => {
+        if (!user) return;
+        const prefRef = doc(db, 'artifacts', appId, 'users', user.uid, 'deck_prefs', deckId);
+        await setDoc(prefRef, { folder: folderName }, { merge: true });
+    },
+
+    // 🔥 DECK PREFERENCES
     toggleCardStar: async (cardId: string, currentStatus: boolean) => {
         if (!user) return;
         const prefRef = doc(db, 'artifacts', appId, 'users', user.uid, 'card_prefs', cardId);
         await setDoc(prefRef, { starred: !currentStatus }, { merge: true });
     },
 
-    // 🔥 NEW: Archive Deck
     toggleDeckArchive: async (deckId: string, currentStatus: boolean) => {
         if (!user) return;
         const prefRef = doc(db, 'artifacts', appId, 'users', user.uid, 'deck_prefs', deckId);
         await setDoc(prefRef, { archived: !currentStatus }, { merge: true });
     },
+
+    hideDeck: async (deckId: string) => {
+        if (!user) return;
+        const prefRef = doc(db, 'artifacts', appId, 'users', user.uid, 'deck_prefs', deckId);
+        await setDoc(prefRef, { hidden: true }, { merge: true });
+    },
+
+    // 🔥 ECONOMY VAULT
+    purchaseUnlock: async (itemId: string, price: number) => {
+        if (!user || !user.uid) return false;
+        const currentCoins = userData?.profile?.main?.coins || userData?.coins || 0;
+        
+        if (currentCoins < price) return false;
+
+        try {
+            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
+                coins: increment(-price)
+            });
+            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid), {
+                'profile.main.coins': increment(-price)
+            });
+
+            const prefRef = doc(db, 'artifacts', appId, 'users', user.uid, 'unlocks', itemId);
+            await setDoc(prefRef, { unlockedAt: Date.now(), pricePaid: price });
+
+            return true;
+        } catch (err) {
+            console.error("Transaction failed:", err);
+            return false;
+        }
+    },
     
+    // STANDARD CLASS/CONTENT MANAGEMENT
     createClass: async (className: string) => {
       if (!user) return;
       await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), {
@@ -308,12 +369,23 @@ export function useMagisterData() {
                 newStreak = 1; newDailyXp = xp; newDailyLessons = isLesson ? 1 : 0;
             }
 
+            // 🔥 ECONOMY ENGINE: Earn 1 Flux for every 5 XP (Minting)
+            const earnedFlux = Math.floor(xp / 5);
+
             await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
-              xp: increment(xp), streak: newStreak, dailyXp: newDailyXp, dailyLessons: newDailyLessons, lastActivityDate: todayStr
+              xp: increment(xp), 
+              coins: increment(earnedFlux), 
+              streak: newStreak, 
+              dailyXp: newDailyXp, 
+              dailyLessons: newDailyLessons, 
+              lastActivityDate: todayStr
             }).catch(e => console.log("Subcollection update skipped", e));
 
             await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid), {
-              'profile.main.xp': increment(xp), 'profile.main.streak': newStreak, 'xp': increment(xp)
+              'profile.main.xp': increment(xp), 
+              'profile.main.coins': increment(earnedFlux), 
+              'profile.main.streak': newStreak, 
+              'xp': increment(xp)
             }).catch(e => console.log("Parent doc update skipped", e));
           }
       } catch (err) {
@@ -324,13 +396,15 @@ export function useMagisterData() {
 
   const allLessons = useMemo(() => allAppLessons, [allAppLessons]);
   
-  // 🔥 DYNAMIC USER DATA ENRICHMENT: Bundles prefs into the userData object!
+  // 🔥 DYNAMIC USER DATA ENRICHMENT
   const enrichedUserData = useMemo(() => {
     if (!userData) return null;
     return {
         ...userData,
         cardPrefs,
-        deckPrefs
+        deckPrefs,
+        // Ensure studyFolders safely defaults to an array even if missing in DB
+        studyFolders: userData.studyFolders || userData?.profile?.main?.studyFolders || [] 
     };
   }, [userData, cardPrefs, deckPrefs]);
 
