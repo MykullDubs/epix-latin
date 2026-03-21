@@ -21,7 +21,6 @@ const FOLDER_COLORS: Record<string, any> = {
     fuchsia: { bg: 'bg-fuchsia-50 dark:bg-fuchsia-900/20', border: 'border-fuchsia-100 dark:border-fuchsia-500/30', text: 'text-fuchsia-900 dark:text-fuchsia-100', iconBg: 'bg-white dark:bg-fuchsia-500/30', iconColor: 'text-fuchsia-600 dark:text-fuchsia-400', badge: 'bg-white/60 dark:bg-black/20 text-fuchsia-600 dark:text-fuchsia-300', hex: 'bg-fuchsia-500' }
 };
 
-// 🔥 DYNAMIC THEME ENGINE
 const getDeckTheme = (title: string = '') => {
     const str = title.toLowerCase();
     if (str.match(/math|calc|num|algebra|geometry/)) return { icon: Calculator, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'border-blue-100 dark:border-blue-500/20' };
@@ -34,47 +33,81 @@ const getDeckTheme = (title: string = '') => {
     if (str.match(/body|health|med|doctor/)) return { icon: HeartPulse, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-500/10', border: 'border-rose-100 dark:border-rose-500/20' };
     if (str.match(/read|lit|book|vocab|word/)) return { icon: BookText, color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-500/10', border: 'border-indigo-100 dark:border-indigo-500/20' };
     if (str.match(/code|tech|comp|program/)) return { icon: Code, color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-200 dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-700' };
-    
-    // Default fallback
     return { icon: Layers, color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-500/10', border: 'border-indigo-100 dark:border-indigo-500/20' };
 };
 
 // ============================================================================
-//  0. STUDENT CARD BUILDER
+//  0. CONTEXTUAL CONTENT FORGE
 // ============================================================================
-function StudentCardBuilder({ onSave, onCancel }: any) {
+function ContextualCardBuilder({ config, onSave, onCancel }: any) {
+    const isNewDeck = config.type === 'new_deck';
+    const [deckTitle, setDeckTitle] = useState('');
     const [front, setFront] = useState('');
     const [back, setBack] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
     const handleSubmit = async () => {
-        if (!front.trim() || !back.trim()) return;
+        if (!front.trim() || !back.trim() || (isNewDeck && !deckTitle.trim())) return;
         setIsSaving(true);
+        
+        const finalDeckId = isNewDeck ? `custom_${Date.now()}` : config.deck.id;
+        const finalTitle = isNewDeck ? deckTitle.trim() : config.deck.title;
+
         await onSave({ 
             front: front.trim(), 
             back: back.trim(), 
-            deckId: 'custom', 
-            deckTitle: 'My Study Cards',
+            deckId: finalDeckId, 
+            deckTitle: finalTitle,
             type: 'note',
             ipa: '', 
             morphology: [{ part: front.trim(), meaning: 'Root', type: 'root' }],
             grammar_tags: ['Student Note']
-        });
+        }, config.folder); // Pass folder context back up!
+        
         setIsSaving(false);
         onCancel(true); 
     };
 
     return (
-        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 absolute inset-0 z-[200] animate-in slide-in-from-bottom-8 duration-300">
-            <div className="px-6 pt-safe-8 pb-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+        <div className="h-[100dvh] flex flex-col bg-slate-50 dark:bg-slate-950 absolute inset-0 z-[200] animate-in slide-in-from-bottom-8 duration-300">
+            <div className="px-6 pt-safe-8 pb-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0 shadow-sm z-10">
                 <button onClick={() => onCancel(false)} className="flex items-center text-slate-400 hover:text-rose-500 mb-4 text-xs font-black uppercase tracking-widest transition-colors bg-slate-50 dark:bg-slate-800 px-5 py-2.5 rounded-full w-fit active:scale-95">
                     <ArrowLeft size={16} className="mr-2"/> Cancel
                 </button>
-                <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">New Study Card</h1>
+                <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">
+                    {isNewDeck ? 'Forge New Deck' : 'Add Target Card'}
+                </h1>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-32 custom-scrollbar">
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border-2 border-slate-100 dark:border-slate-800 shadow-sm space-y-6">
+                    
+                    {/* Contextual Deck Input */}
+                    {isNewDeck ? (
+                        <div className="flex flex-col gap-2 pb-6 border-b border-slate-100 dark:border-slate-800">
+                            <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest pl-1 flex justify-between">
+                                <span>Deck Title</span>
+                                {config.folder && <span className="text-slate-400 flex items-center gap-1"><FolderOpen size={12}/> {config.folder}</span>}
+                            </label>
+                            <input 
+                                value={deckTitle} 
+                                onChange={(e) => setDeckTitle(e.target.value)} 
+                                placeholder="e.g., Biology Chapter 4" 
+                                className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 dark:text-white font-bold focus:border-indigo-500 outline-none transition-colors text-lg"
+                                autoFocus
+                            />
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-3 pb-6 border-b border-slate-100 dark:border-slate-800">
+                            <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 flex items-center justify-center border border-indigo-100 dark:border-indigo-500/20"><Layers size={18}/></div>
+                            <div>
+                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Appending to</p>
+                                <p className="text-sm font-bold text-slate-800 dark:text-white line-clamp-1">{config.deck.title}</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Card Content Inputs */}
                     <div className="flex flex-col gap-2">
                         <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest pl-1">Front (Target Concept)</label>
                         <input 
@@ -82,7 +115,7 @@ function StudentCardBuilder({ onSave, onCancel }: any) {
                             onChange={(e) => setFront(e.target.value)} 
                             placeholder="e.g., Mitosis" 
                             className="w-full p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-bold focus:border-indigo-500 outline-none transition-colors"
-                            autoFocus
+                            autoFocus={!isNewDeck}
                         />
                     </div>
                     <div className="flex flex-col gap-2">
@@ -95,13 +128,14 @@ function StudentCardBuilder({ onSave, onCancel }: any) {
                         />
                     </div>
                 </div>
+
                 <button 
                     onClick={handleSubmit} 
-                    disabled={!front.trim() || !back.trim() || isSaving}
+                    disabled={!front.trim() || !back.trim() || (isNewDeck && !deckTitle.trim()) || isSaving}
                     className="w-full bg-indigo-600 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white p-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-indigo-500/30 active:scale-95 transition-all flex items-center justify-center gap-2 mb-safe-8"
                 >
                     {isSaving ? <Loader2 size={20} className="animate-spin"/> : <Save size={20}/>}
-                    {isSaving ? 'Forging...' : 'Save Card to Deck'}
+                    {isSaving ? 'Processing...' : isNewDeck ? 'Forge Deck & Save Card' : 'Save Card to Deck'}
                 </button>
             </div>
         </div>
@@ -354,7 +388,7 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
 }
 
 // ============================================================================
-//  2. MATCHING GAME & 3. QUIZ SESSION
+//  2. MATCHING GAME & 3. QUIZ SESSION 
 // ============================================================================
 function MatchingGame({ deckCards, onGameEnd }: any) {
     const [cards, setCards] = useState<any[]>([]);
@@ -520,11 +554,11 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const [menuView, setMenuView] = useState<'main' | 'folders'>('main'); 
     
     const [showFolderModal, setShowFolderModal] = useState<{isOpen: boolean, editMode: boolean, oldName: string}>({isOpen: false, editMode: false, oldName: ''});
-    const [newFolderName, setNewFolderName] = useState('');
-    const [selectedColor, setSelectedColor] = useState('indigo');
     
-    const [omniDeck, setOmniDeck] = useState<any>(null);
+    // 🔥 THE BUILDER CONFIG ENGINE
+    const [builderConfig, setBuilderConfig] = useState<{type: 'new_deck', folder: string | null} | {type: 'add_card', deck: any} | null>(null);
 
+    const [omniDeck, setOmniDeck] = useState<any>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     const resolvedDeck = omniDeck || allDecks[selectedDeckKey] || Object.values(allDecks)[0];
@@ -577,24 +611,25 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         setInternalMode('menu');
     };
 
-    const handleSaveFolder = async () => {
-        if (!newFolderName.trim()) return;
-        if (showFolderModal.editMode && onUpdateFolder) {
-            await onUpdateFolder(showFolderModal.oldName, newFolderName.trim(), selectedColor);
-            setToastMsg("Folder updated.");
-            if (deckFilter === showFolderModal.oldName) setDeckFilter(newFolderName.trim()); 
-        } else if (onCreateFolder) {
-            await onCreateFolder(newFolderName.trim(), selectedColor);
-            setToastMsg(`Folder "${newFolderName.trim()}" created.`);
+    // 🔥 THE NEW SAVE HANDLER
+    const handleSaveFromBuilder = async (cardData: any, folderToAssign: string | null) => {
+        await onSaveCard(cardData);
+        if (folderToAssign && onAssignToFolder) {
+            await onAssignToFolder(cardData.deckId, folderToAssign);
         }
-        setShowFolderModal({isOpen: false, editMode: false, oldName: ''});
-        setNewFolderName('');
-        setSelectedColor('indigo');
     };
 
-    if (internalMode === 'create') {
+    if (internalMode === 'create' && builderConfig) {
         return (
-            <StudentCardBuilder onSave={onSaveCard} onCancel={(success?: boolean) => { setInternalMode('library'); if (success) setToastMsg("Study Card secured."); }} />
+            <ContextualCardBuilder 
+                config={builderConfig}
+                onSave={handleSaveFromBuilder} 
+                onCancel={(success?: boolean) => {
+                    setInternalMode(builderConfig.type === 'add_card' ? 'menu' : 'library');
+                    if (success) setToastMsg(builderConfig.type === 'new_deck' ? "Deck Forged." : "Card Appended.");
+                    setBuilderConfig(null);
+                }} 
+            />
         );
     }
 
@@ -614,44 +649,33 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             return true;
         });
 
+        // Extracted generic Folder Creation Modal logic to keep it clean
+        const handleSaveNewFolder = async (folderName: string, color: string) => {
+            if (!folderName.trim()) return;
+            if (showFolderModal.editMode && onUpdateFolder) {
+                await onUpdateFolder(showFolderModal.oldName, folderName.trim(), color);
+                setToastMsg("Folder updated.");
+                if (deckFilter === showFolderModal.oldName) setDeckFilter(folderName.trim()); 
+            } else if (onCreateFolder) {
+                await onCreateFolder(folderName.trim(), color);
+                setToastMsg(`Folder "${folderName.trim()}" created.`);
+            }
+            setShowFolderModal({isOpen: false, editMode: false, oldName: ''});
+        };
+
         return (
             <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors relative">
                 {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
                 
+                {/* UPGRADED FOLDER CREATION / EDIT MODAL */}
                 {showFolderModal.isOpen && (
-                    <div className="fixed inset-0 z-[600] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
-                        <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl border border-slate-100 dark:border-slate-800 animate-in zoom-in-95">
-                            <h3 className="font-black text-2xl text-slate-800 dark:text-white mb-6 text-center">
-                                {showFolderModal.editMode ? 'Edit Folder' : 'New Folder'}
-                            </h3>
-                            
-                            <input 
-                                value={newFolderName}
-                                onChange={(e) => setNewFolderName(e.target.value)}
-                                placeholder="e.g., Midterm Prep"
-                                className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 font-bold text-slate-800 dark:text-white focus:border-indigo-500 outline-none mb-6 text-lg text-center"
-                                autoFocus
-                            />
-
-                            <div className="mb-8">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-3 text-center">Select Theme Color</span>
-                                <div className="flex justify-center gap-3">
-                                    {Object.keys(FOLDER_COLORS).map(color => (
-                                        <button 
-                                            key={color} 
-                                            onClick={() => setSelectedColor(color)}
-                                            className={`w-8 h-8 rounded-full shadow-sm transition-all active:scale-90 ${FOLDER_COLORS[color].hex} ${selectedColor === color ? 'ring-4 ring-indigo-500/30 scale-110' : 'ring-2 ring-transparent opacity-70 hover:opacity-100'}`} 
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="flex gap-3">
-                                <button onClick={() => setShowFolderModal({isOpen: false, editMode: false, oldName: ''})} className="flex-1 px-4 py-4 rounded-2xl font-black text-slate-500 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors active:scale-95">Cancel</button>
-                                <button onClick={handleSaveFolder} disabled={!newFolderName.trim()} className="flex-1 px-4 py-4 rounded-2xl font-black text-white bg-indigo-600 disabled:bg-indigo-400 active:scale-95 transition-all">Save</button>
-                            </div>
-                        </div>
-                    </div>
+                    <FolderModal 
+                        initialName={showFolderModal.editMode ? showFolderModal.oldName : ''}
+                        initialColor={showFolderModal.editMode ? folderColors[showFolderModal.oldName] : 'indigo'}
+                        isEdit={showFolderModal.editMode}
+                        onSave={handleSaveNewFolder}
+                        onClose={() => setShowFolderModal({isOpen: false, editMode: false, oldName: ''})}
+                    />
                 )}
 
                 <div className="sticky top-0 z-30 w-full flex flex-col shrink-0">
@@ -660,8 +684,15 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             <div className="bg-gradient-to-br from-orange-400 to-rose-500 text-white p-2.5 rounded-xl shadow-md shadow-orange-500/20"><Library size={22} strokeWidth={3}/></div>
                             <span className="font-black text-slate-800 dark:text-white text-2xl uppercase tracking-tighter">Study Hub</span>
                         </div>
-                        <button onClick={() => setInternalMode('create')} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-indigo-500/30 active:scale-95 transition-all">
-                            <Plus size={16} strokeWidth={3} /> New Card
+                        {/* 🔥 HEADER BUTTON: New Deck in Library */}
+                        <button 
+                            onClick={() => {
+                                setBuilderConfig({ type: 'new_deck', folder: null });
+                                setInternalMode('create');
+                            }} 
+                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-indigo-500/30 active:scale-95 transition-all"
+                        >
+                            <Plus size={16} strokeWidth={3} /> New Deck
                         </button>
                     </div>
 
@@ -689,28 +720,39 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 space-y-5 pb-28 relative z-10 custom-scrollbar overscroll-y-contain h-full">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         
+                        {/* BREADCRUMB HEADER WITH OMNI-STUDY & NEW DECK BUTTONS */}
                         {customFolders.includes(deckFilter) && (
                             <div className="col-span-full animate-in fade-in duration-300 mb-2 mt-2">
                                 <button onClick={() => setDeckFilter('all')} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-500 transition-colors w-fit bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 active:scale-95">
                                     <ArrowLeft size={14} /> Back to Library
                                 </button>
                                 
-                                <div className="flex items-center justify-between mt-6 mb-2">
-                                    <div className="flex items-center gap-3">
-                                        <FolderOpen size={28} className={FOLDER_COLORS[folderColors[deckFilter] || 'indigo'].iconColor} />
-                                        <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">{deckFilter}</h2>
-                                    </div>
-                                    
+                                <div className="flex items-center gap-3 mt-6 mb-4">
+                                    <FolderOpen size={28} className={FOLDER_COLORS[folderColors[deckFilter] || 'indigo'].iconColor} />
+                                    <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">{deckFilter}</h2>
+                                </div>
+                                
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => {
+                                            setBuilderConfig({ type: 'new_deck', folder: deckFilter });
+                                            setInternalMode('create');
+                                        }}
+                                        className="flex-1 flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 shadow-sm active:scale-95 transition-all hover:border-indigo-200"
+                                    >
+                                        <Plus size={16} /> New Deck
+                                    </button>
                                     <button 
                                         onClick={() => launchOmniMode(deckFilter)}
-                                        className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest text-white shadow-md active:scale-95 transition-transform ${FOLDER_COLORS[folderColors[deckFilter] || 'indigo'].hex}`}
+                                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white shadow-md active:scale-95 transition-all ${FOLDER_COLORS[folderColors[deckFilter] || 'indigo'].hex}`}
                                     >
-                                        <Infinity size={16} /> Study All
+                                        <Infinity size={16} /> Omni-Study
                                     </button>
                                 </div>
                             </div>
                         )}
 
+                        {/* RENDER FOLDERS WITH DYNAMIC COLORS */}
                         {deckFilter === 'all' && customFolders.map((folderName: string) => {
                             const itemCount = Object.keys(allDecks).filter(key => userData?.deckPrefs?.[key]?.folder === folderName && !userData?.deckPrefs?.[key]?.archived).length;
                             const theme = FOLDER_COLORS[folderColors[folderName] || 'indigo'];
@@ -719,7 +761,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                 <div key={`folder-${folderName}`} className="relative group h-full">
                                     <button 
                                         onClick={() => setDeckFilter(folderName)} 
-                                        className={`w-full ${theme.bg} rounded-[2.5rem] p-5 border-4 ${theme.border} hover:-translate-y-1 transition-all text-left shadow-sm hover:shadow-xl flex flex-col h-full animate-in fade-in duration-300 relative z-10`}
+                                        className={`w-full ${theme.bg} rounded-[2rem] p-5 border-4 ${theme.border} hover:-translate-y-1 transition-all text-left shadow-sm hover:shadow-xl flex flex-col h-full animate-in fade-in duration-300 relative z-10`}
                                     >
                                         <div className="flex justify-between items-start mb-4">
                                             <div className={`w-12 h-12 ${theme.iconBg} ${theme.iconColor} rounded-[1rem] flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform`}>
@@ -734,6 +776,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                         </div>
                                     </button>
 
+                                    {/* Folder Context Menu Target */}
                                     <button 
                                         onClick={(e) => { 
                                             e.preventDefault(); e.stopPropagation(); 
@@ -748,12 +791,15 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             );
                         })}
 
+                        {/* EMPTY FOLDER STATE */}
                         {filteredDecks.length === 0 && deckFilter !== 'all' && customFolders.includes(deckFilter) && (
-                             <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[2.5rem] mt-4 text-slate-400 font-bold text-sm uppercase tracking-widest">
+                             <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[2.5rem] mt-4 text-slate-400 font-bold text-sm uppercase tracking-widest flex flex-col items-center gap-3">
+                                 <FolderPlus size={32} className="opacity-20" />
                                  Folder is empty
                              </div>
                         )}
 
+                        {/* RENDER DECKS */}
                         {filteredDecks.map(([key, deck]: any) => {
                             const displayTitle = deck.id === 'custom' ? "My Study Cards" : deck.title;
                             const theme = getDeckTheme(displayTitle);
@@ -765,12 +811,12 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             return (
                                 <div key={key} className="relative group animate-in fade-in duration-300 h-full pt-2">
                                     
-                                    <div className="absolute inset-x-4 -bottom-1 h-10 bg-slate-200 dark:bg-slate-800 rounded-[2.5rem] transition-transform duration-300 group-hover:translate-y-1.5" />
-                                    <div className="absolute inset-x-2 -bottom-0 h-10 bg-slate-100 dark:bg-slate-800/80 rounded-[2.5rem] transition-transform duration-300 group-hover:translate-y-1" />
+                                    <div className="absolute inset-x-4 -bottom-1 h-10 bg-slate-200 dark:bg-slate-800 rounded-[2rem] transition-transform duration-300 group-hover:translate-y-1.5" />
+                                    <div className="absolute inset-x-2 -bottom-0 h-10 bg-slate-100 dark:bg-slate-800/80 rounded-[2rem] transition-transform duration-300 group-hover:translate-y-1" />
 
                                     <button 
                                         onClick={() => { onSelectDeck(key); setInternalMode('menu'); }} 
-                                        className="w-full h-full bg-white dark:bg-slate-900 rounded-[2.5rem] p-5 border-2 border-slate-50 dark:border-slate-800 hover:border-slate-100 dark:hover:border-slate-700 transition-all text-left shadow-sm group-hover:-translate-y-1 relative z-10 flex flex-col"
+                                        className="w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] p-5 border-2 border-slate-50 dark:border-slate-800 hover:border-slate-100 dark:hover:border-slate-700 transition-all text-left shadow-sm group-hover:-translate-y-1 relative z-10 flex flex-col"
                                     >
                                         <div className="flex justify-between items-start mb-4">
                                             <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center text-xl border shadow-inner group-hover:scale-110 transition-transform ${theme.bg} ${theme.color} ${theme.border}`}>
@@ -817,6 +863,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     </div>
                 </div>
 
+                {/* BOTTOM SHEET: FOLDER SETTINGS */}
                 {activeOptionsFolder && (
                     <div className="fixed inset-0 z-[500] flex flex-col justify-end">
                         <div className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setActiveOptionsFolder(null)} />
@@ -836,8 +883,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             <div className="space-y-2">
                                 <button 
                                     onClick={() => { 
-                                        setNewFolderName(activeOptionsFolder); 
-                                        setSelectedColor(folderColors[activeOptionsFolder] || 'indigo');
                                         setActiveOptionsFolder(null); 
                                         setShowFolderModal({isOpen: true, editMode: true, oldName: activeOptionsFolder}); 
                                     }} 
@@ -873,6 +918,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     </div>
                 )}
 
+                {/* BOTTOM SHEET: DECK OPTIONS */}
                 {activeOptionsDeck && (
                     <div className="fixed inset-0 z-[500] flex flex-col justify-end">
                         <div 
@@ -884,8 +930,8 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto mb-6" />
                             
                             <div className="flex items-center gap-4 mb-6 px-2">
-                                <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center text-xl shadow-sm border border-slate-100 dark:border-slate-700 ${getDeckTheme(activeOptionsDeck.id === 'custom' ? "My Study Cards" : activeOptionsDeck.title).bg} ${getDeckTheme(activeOptionsDeck.id === 'custom' ? "My Study Cards" : activeOptionsDeck.title).color}`}>
-                                    {getDeckTheme(activeOptionsDeck.id === 'custom' ? "My Study Cards" : activeOptionsDeck.title).icon === Layers ? <Layers size={24} /> : React.createElement(getDeckTheme(activeOptionsDeck.id === 'custom' ? "My Study Cards" : activeOptionsDeck.title).icon, { size: 24 })}
+                                <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-xl shadow-sm border border-slate-100 dark:border-slate-700">
+                                    {activeOptionsDeck.icon || <Layers size={24} className="text-slate-400" />}
                                 </div>
                                 <div>
                                     <h3 className="font-black text-xl text-slate-800 dark:text-white leading-tight line-clamp-1">
@@ -978,14 +1024,36 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
     // --- MENU VIEW ---
     if (internalMode === 'menu') {
+        // 🔥 Hide "Omni-Mode" marker in menu if active
+        const displayMenuTitle = deckTitle.includes('(Omni-Mode)') ? deckTitle.replace(' (Omni-Mode)', '') : deckTitle;
+        
         return (
             <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 relative overflow-hidden transition-colors">
                 <div className="px-6 pt-8 pb-4">
                     <button onClick={handleBack} className="flex items-center text-slate-400 dark:text-slate-500 hover:text-indigo-600 mb-6 text-xs font-black uppercase tracking-widest transition-colors bg-white dark:bg-slate-800 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm w-fit active:scale-95">
                         <ArrowLeft size={16} className="mr-2"/> Back
                     </button>
-                    <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter mb-2">{deckTitle}</h1>
-                    <span className="text-indigo-500 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1 rounded-lg">{cards.length} Configured Targets</span>
+                    
+                    <div className="flex justify-between items-start mb-2">
+                        <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter">{displayMenuTitle}</h1>
+                        
+                        {/* 🔥 HEADER BUTTON: Add Card Inside Deck */}
+                        {!omniDeck && (
+                            <button 
+                                onClick={() => {
+                                    setBuilderConfig({ type: 'add_card', deck: resolvedDeck });
+                                    setInternalMode('create');
+                                }} 
+                                className="bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 p-3 rounded-2xl shadow-sm border border-indigo-100 dark:border-indigo-500/30 active:scale-95 transition-all"
+                                aria-label="Add Card"
+                            >
+                                <Plus size={20} strokeWidth={3} />
+                            </button>
+                        )}
+                    </div>
+                    <span className="text-indigo-500 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1 rounded-lg">
+                        {cards.length} Configured Targets {omniDeck ? '(Omni)' : ''}
+                    </span>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-24">
@@ -1031,6 +1099,46 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 {activeGame === 'standard' && <StudyModePlayer deckCards={cards} userData={userData} onToggleStar={onToggleStar} />}
                 {activeGame === 'quiz' && <div className="h-full overflow-y-auto"><QuizSessionView deckCards={cards} onGameEnd={(res: any) => handleGameFinish(res.score ? (res.score/res.total)*100 : 0)} /></div>}
                 {activeGame === 'match' && <div className="h-full overflow-y-auto pt-6"><MatchingGame deckCards={cards} onGameEnd={(scorePct: number) => handleGameFinish(scorePct)} /></div>}
+            </div>
+        </div>
+    );
+}
+
+// Extracted reusable Folder Modal component to keep the main render cleaner
+function FolderModal({ initialName, initialColor, isEdit, onSave, onClose }: any) {
+    const [name, setName] = useState(initialName || '');
+    const [color, setColor] = useState(initialColor || 'indigo');
+
+    return (
+        <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl border border-slate-100 dark:border-slate-800 animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-black text-2xl text-slate-800 dark:text-white mb-6 text-center">
+                {isEdit ? 'Edit Folder' : 'New Folder'}
+            </h3>
+            
+            <input 
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g., Midterm Prep"
+                className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 font-bold text-slate-800 dark:text-white focus:border-indigo-500 outline-none mb-6 text-lg text-center"
+                autoFocus
+            />
+
+            <div className="mb-8">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-3 text-center">Select Theme Color</span>
+                <div className="flex justify-center gap-3">
+                    {Object.keys(FOLDER_COLORS).map(c => (
+                        <button 
+                            key={c} 
+                            onClick={(e) => { e.preventDefault(); setColor(c); }}
+                            className={`w-8 h-8 rounded-full shadow-sm transition-all active:scale-90 ${FOLDER_COLORS[c].hex} ${color === c ? 'ring-4 ring-indigo-500/30 scale-110' : 'ring-2 ring-transparent opacity-70 hover:opacity-100'}`} 
+                        />
+                    ))}
+                </div>
+            </div>
+
+            <div className="flex gap-3">
+                <button onClick={(e) => { e.preventDefault(); onClose(); }} className="flex-1 px-4 py-4 rounded-2xl font-black text-slate-500 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors active:scale-95">Cancel</button>
+                <button onClick={(e) => { e.preventDefault(); onSave(name, color); }} disabled={!name.trim()} className="flex-1 px-4 py-4 rounded-2xl font-black text-white bg-indigo-600 disabled:bg-indigo-400 active:scale-95 transition-all">Save</button>
             </div>
         </div>
     );
