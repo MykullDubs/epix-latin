@@ -4,14 +4,14 @@ import {
     ArrowLeft, X, Library, Layers, Play, Zap, HelpCircle, Puzzle, Flame, 
     CheckCircle2, XCircle, Globe, Users, Filter, ChevronLeft, ChevronRight, 
     RotateCw, ArrowUp, Paperclip, Music, Star, Archive, Plus, Save, Loader2,
-    MoreVertical, FolderPlus, Trash2, FolderOpen, Folder // 🔥 Added Context Menu Icons
+    MoreVertical, FolderPlus, Trash2, Folder, FolderOpen 
 } from 'lucide-react';
 import { Toast } from './Toast'; 
 
 const SUBJECT_ORDER = ['1s', '2s', '3s', '1p', '2p', '3p'];
 
 // ============================================================================
-//  0. STUDENT CARD BUILDER (The New "Study Cards" Forge)
+//  0. STUDENT CARD BUILDER
 // ============================================================================
 function StudentCardBuilder({ onSave, onCancel }: any) {
     const [front, setFront] = useState('');
@@ -27,18 +27,18 @@ function StudentCardBuilder({ onSave, onCancel }: any) {
             deckId: 'custom', 
             deckTitle: 'My Study Cards',
             type: 'note',
-            ipa: '', // Students don't need to worry about IPA by default
+            ipa: '', 
             morphology: [{ part: front.trim(), meaning: 'Root', type: 'root' }],
             grammar_tags: ['Student Note']
         });
         setIsSaving(false);
-        onCancel(true); // true indicates a successful save for the toast message
+        onCancel(true); 
     };
 
     return (
-        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 absolute inset-0 z-[200] animate-in slide-in-from-bottom-8 duration-300">
-            <div className="px-6 pt-8 pb-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-                <button onClick={() => onCancel(false)} className="flex items-center text-slate-400 hover:text-rose-500 mb-6 text-xs font-black uppercase tracking-widest transition-colors bg-slate-50 dark:bg-slate-800 px-4 py-2 rounded-full w-fit active:scale-95">
+        <div className="h-[100dvh] flex flex-col bg-slate-50 dark:bg-slate-950 absolute inset-0 z-[200] animate-in slide-in-from-bottom-8 duration-300">
+            <div className="px-6 pt-safe-8 pb-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+                <button onClick={() => onCancel(false)} className="flex items-center text-slate-400 hover:text-rose-500 mb-4 text-xs font-black uppercase tracking-widest transition-colors bg-slate-50 dark:bg-slate-800 px-5 py-2.5 rounded-full w-fit active:scale-95">
                     <ArrowLeft size={16} className="mr-2"/> Cancel
                 </button>
                 <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">New Study Card</h1>
@@ -46,7 +46,6 @@ function StudentCardBuilder({ onSave, onCancel }: any) {
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border-2 border-slate-100 dark:border-slate-800 shadow-sm space-y-6">
-                    
                     <div className="flex flex-col gap-2">
                         <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest pl-1">Front (Target Concept)</label>
                         <input 
@@ -57,7 +56,6 @@ function StudentCardBuilder({ onSave, onCancel }: any) {
                             autoFocus
                         />
                     </div>
-
                     <div className="flex flex-col gap-2">
                         <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest pl-1">Back (Definition / Note)</label>
                         <textarea 
@@ -67,13 +65,11 @@ function StudentCardBuilder({ onSave, onCancel }: any) {
                             className="w-full p-4 h-32 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-bold focus:border-indigo-500 outline-none transition-colors resize-none custom-scrollbar"
                         />
                     </div>
-
                 </div>
-
                 <button 
                     onClick={handleSubmit} 
                     disabled={!front.trim() || !back.trim() || isSaving}
-                    className="w-full bg-indigo-600 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white p-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-indigo-500/30 active:scale-95 transition-all flex items-center justify-center gap-2"
+                    className="w-full bg-indigo-600 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white p-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-indigo-500/30 active:scale-95 transition-all flex items-center justify-center gap-2 mb-safe-8"
                 >
                     {isSaving ? <Loader2 size={20} className="animate-spin"/> : <Save size={20}/>}
                     {isSaving ? 'Forging...' : 'Save Card to Deck'}
@@ -84,14 +80,13 @@ function StudentCardBuilder({ onSave, onCancel }: any) {
 }
 
 // ============================================================================
-//  1. STUDY MODE (Swipe Physics, Flipping, Conjugations, & Stars)
+//  1. STUDY MODE
 // ============================================================================
 function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     const [showConjugations, setShowConjugations] = useState(false); 
     
-    // Swipe Physics State
     const [startX, setStartX] = useState<number | null>(null);
     const [startY, setStartY] = useState<number | null>(null);
     const [dragX, setDragX] = useState(0);
@@ -99,8 +94,6 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
     const [slideDirection, setSlideDirection] = useState<'right' | 'left' | 'up'>('right');
 
     const currentCard = deckCards[currentIndex];
-
-    // 🔥 Check if the current card is starred in the student's preferences
     const isStarred = userData?.cardPrefs?.[currentCard?.id]?.starred || false;
 
     useEffect(() => {
@@ -156,13 +149,9 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
         const SWIPE_THRESHOLD_X = 75; 
         const SWIPE_THRESHOLD_Y = -60; 
         
-        if (dragX > SWIPE_THRESHOLD_X && currentIndex > 0) {
-            handlePrev();
-        } else if (dragX < -SWIPE_THRESHOLD_X && currentIndex < deckCards.length - 1) {
-            handleNext();
-        } else if (dragY < SWIPE_THRESHOLD_Y || (Math.abs(dragX) < 10 && Math.abs(dragY) < 10)) {
-            setIsFlipped(!isFlipped);
-        }
+        if (dragX > SWIPE_THRESHOLD_X && currentIndex > 0) handlePrev();
+        else if (dragX < -SWIPE_THRESHOLD_X && currentIndex < deckCards.length - 1) handleNext();
+        else if (dragY < SWIPE_THRESHOLD_Y || (Math.abs(dragX) < 10 && Math.abs(dragY) < 10)) setIsFlipped(!isFlipped);
         
         setStartX(null);
         setStartY(null);
@@ -178,22 +167,23 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
         : 'animate-in fade-in slide-in-from-left-12 duration-300';
 
     return (
-        <div className="flex flex-col h-full max-w-md mx-auto p-6 w-full overflow-hidden transition-colors duration-300">
-            <div className="mb-8 shrink-0">
-                <div className="flex justify-between text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 transition-colors">
+        <div className="flex flex-col h-[100dvh] max-w-md mx-auto p-6 w-full overflow-hidden transition-colors duration-300 pb-safe-8">
+            <div className="mb-6 shrink-0 pt-safe-4">
+                <div className="flex justify-between text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 transition-colors">
                     <span>Target {currentIndex + 1}</span>
                     <span>{deckCards.length} Total</span>
                 </div>
-                <div className="h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner transition-colors">
+                <div className="h-2.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner transition-colors">
                     <div className="h-full bg-indigo-500 transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
                 </div>
             </div>
 
-            <div key={currentIndex} className={`flex-1 relative flex items-center justify-center perspective-[2000px] mb-8 ${animationClass}`}>
+            {/* 🔥 touch-none explicitly added here to prevent page scrolling while swiping */}
+            <div key={currentIndex} className={`flex-1 relative flex items-center justify-center perspective-[2000px] mb-6 ${animationClass}`}>
                 <div 
                     onTouchStart={handlePointerDown} onTouchMove={handlePointerMove} onTouchEnd={handlePointerUp}
                     onMouseDown={handlePointerDown} onMouseMove={handlePointerMove} onMouseUp={handlePointerUp} onMouseLeave={handlePointerUp}
-                    className={`relative w-full aspect-[3/4] max-h-[450px] cursor-grab active:cursor-grabbing ${startX === null ? 'transition-transform duration-500' : ''}`}
+                    className={`relative w-full aspect-[3/4] max-h-[480px] cursor-grab active:cursor-grabbing touch-none ${startX === null ? 'transition-transform duration-500' : ''}`}
                     style={{ 
                         transform: `translateX(${dragX}px) translateY(${dragY * 0.4}px) rotate(${dragX * 0.05}deg)`,
                         transformStyle: 'preserve-3d'
@@ -202,18 +192,18 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
                     <div className="absolute inset-0 w-full h-full transition-transform duration-700 ease-out" style={{ transform: isFlipped ? 'rotateX(180deg)' : 'rotateX(0deg)', transformStyle: 'preserve-3d' }}>
                         
                         {/* FRONT FACE */}
-                        <div className="absolute inset-0 w-full h-full bg-slate-900 rounded-[3rem] border-2 border-b-[8px] border-slate-800 shadow-2xl flex flex-col items-center justify-center p-8 text-center overflow-hidden transition-colors" style={{ backfaceVisibility: 'hidden' }}>
+                        <div className="absolute inset-0 w-full h-full bg-slate-900 rounded-[2.5rem] border-2 border-b-[8px] border-slate-800 shadow-2xl flex flex-col items-center justify-center p-8 text-center overflow-hidden transition-colors" style={{ backfaceVisibility: 'hidden' }}>
                             
                             {onToggleStar && (
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); onToggleStar(currentCard.id, isStarred); }} 
-                                    className="absolute top-6 right-6 p-2 rounded-full hover:bg-white/10 transition-colors z-30"
+                                    className="absolute top-6 right-6 p-3 rounded-full hover:bg-white/10 transition-colors z-30"
                                 >
                                     <Star size={24} className={isStarred ? "text-yellow-400 fill-yellow-400 drop-shadow-md" : "text-slate-600"} />
                                 </button>
                             )}
 
-                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest absolute top-6 left-6 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20 shadow-sm z-20">Front</span>
+                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest absolute top-6 left-6 bg-indigo-500/10 px-4 py-1.5 rounded-full border border-indigo-500/20 shadow-sm z-20">Front</span>
                             
                             {currentCard.imageUrl && (
                                 <div className="absolute inset-0 w-full h-full opacity-20 pointer-events-none z-0">
@@ -221,10 +211,10 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
                                 </div>
                             )}
 
-                            <h2 className="text-4xl md:text-5xl font-black text-white leading-tight relative z-10">{currentCard.front}</h2>
+                            <h2 className="text-4xl md:text-5xl font-black text-white leading-tight relative z-10 w-full px-4">{currentCard.front}</h2>
                             
                             {currentCard.ipa && (
-                                <p className="text-sm font-bold text-indigo-400 mt-4 px-3 py-1 rounded-lg relative z-10" style={{ direction: 'ltr', fontFamily: 'Arial, sans-serif' }}>
+                                <p className="text-base font-bold text-indigo-400 mt-4 px-3 py-1 rounded-lg relative z-10" style={{ direction: 'ltr', fontFamily: 'Arial, sans-serif' }}>
                                     {currentCard.ipa}
                                 </p>
                             )}
@@ -235,18 +225,18 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
                         </div>
 
                         {/* BACK FACE */}
-                        <div className="absolute inset-0 w-full h-full bg-white rounded-[3rem] border-2 border-b-[8px] border-slate-200 shadow-2xl flex flex-col overflow-hidden transition-colors" style={{ backfaceVisibility: 'hidden', transform: 'rotateX(180deg)' }}>
+                        <div className="absolute inset-0 w-full h-full bg-white rounded-[2.5rem] border-2 border-b-[8px] border-slate-200 shadow-2xl flex flex-col overflow-hidden transition-colors" style={{ backfaceVisibility: 'hidden', transform: 'rotateX(180deg)' }}>
                             {currentCard.conjugations && (
-                                <button onClick={(e) => { e.stopPropagation(); setShowConjugations(true); }} className="absolute top-6 right-8 p-3 bg-white dark:bg-slate-800 text-indigo-500 dark:text-indigo-400 rounded-2xl shadow-lg border border-indigo-100 dark:border-slate-700 hover:scale-110 active:scale-95 transition-all z-30">
+                                <button onClick={(e) => { e.stopPropagation(); setShowConjugations(true); }} className="absolute top-6 right-6 p-3 bg-white dark:bg-slate-800 text-indigo-500 dark:text-indigo-400 rounded-2xl shadow-lg border border-indigo-100 dark:border-slate-700 hover:scale-110 active:scale-95 transition-all z-30">
                                     <Paperclip size={20} strokeWidth={3} />
                                     <div className="absolute -top-1 -right-1 w-3 h-3 bg-rose-500 rounded-full border-2 border-white dark:border-slate-900" />
                                 </button>
                             )}
                             
-                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center overflow-y-auto custom-scrollbar relative z-10">
-                                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest absolute top-6 left-6 bg-slate-50 px-3 py-1 rounded-full shadow-sm border border-slate-100">Back</span>
+                            <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-8 text-center overflow-y-auto custom-scrollbar relative z-10 pb-16">
+                                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest absolute top-6 left-6 bg-slate-50 px-4 py-1.5 rounded-full shadow-sm border border-slate-100">Back</span>
                                 
-                                <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[9px] font-black uppercase tracking-widest mb-4 mt-4">{currentCard.type}</span>
+                                <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[9px] font-black uppercase tracking-widest mb-4 mt-8">{currentCard.type}</span>
                                 
                                 <h2 className="text-3xl md:text-4xl font-black text-slate-900 leading-tight mb-4">{currentCard.back}</h2>
                                 
@@ -258,8 +248,8 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
 
                                 {currentCard.audioUrl && (
                                     <div className="w-full bg-slate-50 p-2 rounded-xl flex items-center gap-3 border border-slate-200 shrink-0 mb-4">
-                                        <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white shrink-0"><Music size={14} /></div>
-                                        <audio src={currentCard.audioUrl} controls className="h-8 w-full opacity-80" />
+                                        <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white shrink-0 shadow-md"><Music size={16} /></div>
+                                        <audio src={currentCard.audioUrl} controls className="h-10 w-full opacity-80" />
                                     </div>
                                 )}
 
@@ -275,7 +265,7 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
                                 )}
                             </div>
 
-                            <div className="absolute bottom-6 left-0 right-0 flex flex-col items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest z-10 pointer-events-none bg-gradient-to-t from-white via-white/80 to-transparent pt-6 pb-2">
+                            <div className="absolute bottom-4 left-0 right-0 flex flex-col items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest z-10 pointer-events-none bg-gradient-to-t from-white via-white/80 to-transparent pt-6 pb-2">
                                 <ArrowUp size={16} strokeWidth={3} className="animate-bounce" /> Slide up to return
                             </div>
                         </div>
@@ -283,29 +273,29 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
 
                     {/* CONJUGATION OVERLAY */}
                     {showConjugations && currentCard.conjugations && (
-                        <div className="absolute inset-0 z-40 bg-white/95 dark:bg-slate-900/95 rounded-[3rem] p-8 flex flex-col animate-in slide-in-from-bottom-12 duration-300 backdrop-blur-md border-2 border-indigo-500/30">
+                        <div className="absolute inset-0 z-40 bg-white/95 dark:bg-slate-900/95 rounded-[3rem] p-6 flex flex-col animate-in slide-in-from-bottom-12 duration-300 backdrop-blur-md border-2 border-indigo-500/30">
                             <div className="flex justify-between items-center mb-6">
                                 <div className="flex items-center gap-2">
-                                    <Paperclip size={16} className="text-indigo-500" />
-                                    <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest">Conjugation Table</span>
+                                    <Paperclip size={18} className="text-indigo-500" />
+                                    <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest">Conjugation</span>
                                 </div>
-                                <button onClick={() => setShowConjugations(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
+                                <button onClick={() => setShowConjugations(false)} className="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors active:scale-95">
                                     <X size={20} className="text-slate-400" />
                                 </button>
                             </div>
 
-                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4">
+                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pb-8">
                                 {Object.entries(currentCard.conjugations).map(([tense, forms]: any) => (
                                     <div key={tense} className="space-y-2">
-                                        <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-tighter bg-indigo-50 dark:bg-indigo-500/10 px-2 py-1 rounded w-fit">{tense}</h4>
+                                        <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-tighter bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1.5 rounded-md w-fit">{tense}</h4>
                                         <div className="grid grid-cols-2 gap-2">
                                             {SUBJECT_ORDER.map((person) => {
                                                 const verb = forms[person];
                                                 if (!verb) return null;
                                                 return (
-                                                    <div key={person} className="flex flex-col p-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50">
-                                                        <span className="text-[8px] font-black text-slate-400 uppercase">{person}</span>
-                                                        <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{verb}</span>
+                                                    <div key={person} className="flex flex-col p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50 shadow-sm">
+                                                        <span className="text-[9px] font-black text-slate-400 uppercase mb-0.5">{person}</span>
+                                                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{verb}</span>
                                                     </div>
                                                 );
                                             })}
@@ -318,23 +308,23 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
                 </div>
             </div>
 
-            <div className="flex items-center justify-between px-4 pb-8 shrink-0 z-10">
-                <button onClick={handlePrev} disabled={currentIndex === 0} className="w-14 h-14 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-md border border-slate-100 dark:border-slate-700 disabled:opacity-30 transition-all active:scale-95">
-                    <ChevronLeft size={24} strokeWidth={3} />
+            {/* Mobile Optimized Bottom Controls */}
+            <div className="flex items-center justify-between px-2 shrink-0 z-10 w-full mb-safe-4">
+                <button onClick={handlePrev} disabled={currentIndex === 0} className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-md border border-slate-100 dark:border-slate-700 disabled:opacity-30 transition-all active:scale-95 touch-manipulation">
+                    <ChevronLeft size={28} strokeWidth={3} className="-ml-1" />
                 </button>
-                <div className="flex gap-1.5">
+                <div className="flex gap-2">
                     {[...Array(Math.min(5, deckCards.length))].map((_, idx) => (
-                        <div key={idx} className={`h-1.5 rounded-full transition-all duration-300 ${idx === Math.floor((currentIndex / deckCards.length) * 5) ? 'w-4 bg-indigo-500' : 'w-1.5 bg-slate-200 dark:bg-slate-700'}`} />
+                        <div key={idx} className={`h-2 rounded-full transition-all duration-300 ${idx === Math.floor((currentIndex / deckCards.length) * 5) ? 'w-5 bg-indigo-500' : 'w-2 bg-slate-200 dark:bg-slate-700'}`} />
                     ))}
                 </div>
-                <button onClick={handleNext} disabled={currentIndex === deckCards.length - 1} className="w-14 h-14 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-md border border-slate-100 dark:border-slate-700 disabled:opacity-30 transition-all active:scale-95">
-                    <ChevronRight size={24} strokeWidth={3} />
+                <button onClick={handleNext} disabled={currentIndex === deckCards.length - 1} className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-md border border-slate-100 dark:border-slate-700 disabled:opacity-30 transition-all active:scale-95 touch-manipulation">
+                    <ChevronRight size={28} strokeWidth={3} className="ml-1" />
                 </button>
             </div>
         </div>
     );
 }
-
 // ============================================================================
 //  2. MATCHING GAME & 3. QUIZ SESSION 
 // ============================================================================
@@ -490,19 +480,16 @@ function QuizSessionView({ deckCards, onGameEnd }: any) {
 // ============================================================================
 //  4. MAIN FLASHCARD VIEW (HUB)
 // ============================================================================
-export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity, userData, onSaveCard, onToggleStar, onToggleArchive, onCreateFolder, onAssignToFolder }: any) {
+export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity, userData, onSaveCard, onToggleStar, onToggleArchive, onCreateFolder, onAssignToFolder, onHideDeck }: any) {
     const [internalMode, setInternalMode] = useState<'library' | 'menu' | 'playing' | 'create'>('library');
     const [activeGame, setActiveGame] = useState<'standard' | 'quiz' | 'match' | 'tower'>('standard');
     
-    // 🔥 Deck filter is now a dynamic string to allow custom folder names
     const [deckFilter, setDeckFilter] = useState<string>('all');
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     
-    // Context Menu State
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
-    const [menuView, setMenuView] = useState<'main' | 'folders'>('main'); // Tracks nested menu state
+    const [menuView, setMenuView] = useState<'main' | 'folders'>('main'); 
     
-    // Folder Creation Modal State
     const [showFolderModal, setShowFolderModal] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
     
@@ -510,7 +497,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const cards = resolvedDeck?.cards || [];
     const deckTitle = resolvedDeck?.id === 'custom' ? "My Study Cards" : resolvedDeck?.title;
 
-    // 🔥 Grab custom folders from user profile
     const customFolders: string[] = userData?.studyFolders || [];
 
     const launchGame = (mode: 'standard' | 'quiz' | 'match' | 'tower') => {
@@ -539,7 +525,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         setShowFolderModal(false);
     };
 
-    // --- STUDENT BUILDER OVERLAY ---
     if (internalMode === 'create') {
         return (
             <StudentCardBuilder 
@@ -558,13 +543,12 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             const currentFolder = userData?.deckPrefs?.[key]?.folder || null;
             
             if (deckFilter === 'archived') return isArchived;
-            if (isArchived) return false; // Hide archived decks from all other views
+            if (isArchived) return false; 
 
             if (deckFilter === 'all') return true;
             if (deckFilter === 'personal') return !deck.isPublished;
             if (deckFilter === 'network') return deck.isPublished;
             
-            // 🔥 Custom Folder Routing
             if (customFolders.includes(deckFilter)) {
                 return currentFolder === deckFilter;
             }
@@ -573,128 +557,129 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         });
 
         return (
-            <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors relative">
+            <div className="h-[100dvh] flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors relative">
                 {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
                 
-                {/* 🔥 FOLDER CREATION MODAL */}
                 {showFolderModal && (
-                    <div className="fixed inset-0 z-[500] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
-                        <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2rem] p-6 shadow-2xl border border-slate-100 dark:border-slate-800 animate-in zoom-in-95">
-                            <h3 className="font-black text-xl text-slate-800 dark:text-white mb-4">New Folder</h3>
+                    <div className="fixed inset-0 z-[500] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
+                        <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl border border-slate-100 dark:border-slate-800 animate-in zoom-in-95">
+                            <h3 className="font-black text-2xl text-slate-800 dark:text-white mb-6 text-center">New Folder</h3>
                             <input 
                                 value={newFolderName}
                                 onChange={(e) => setNewFolderName(e.target.value)}
                                 placeholder="e.g., Midterm Prep"
-                                className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-bold text-slate-800 dark:text-white focus:border-indigo-500 outline-none mb-6"
+                                className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 font-bold text-slate-800 dark:text-white focus:border-indigo-500 outline-none mb-6 text-lg text-center"
                                 autoFocus
                             />
                             <div className="flex gap-3">
-                                <button onClick={() => setShowFolderModal(false)} className="flex-1 px-4 py-3 rounded-xl font-black text-slate-500 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">Cancel</button>
-                                <button onClick={handleCreateFolder} disabled={!newFolderName.trim()} className="flex-1 px-4 py-3 rounded-xl font-black text-white bg-indigo-600 disabled:bg-indigo-400 active:scale-95 transition-all">Create</button>
+                                <button onClick={() => setShowFolderModal(false)} className="flex-1 px-4 py-4 rounded-2xl font-black text-slate-500 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors active:scale-95">Cancel</button>
+                                <button onClick={handleCreateFolder} disabled={!newFolderName.trim()} className="flex-1 px-4 py-4 rounded-2xl font-black text-white bg-indigo-600 disabled:bg-indigo-400 active:scale-95 transition-all">Create</button>
                             </div>
                         </div>
                     </div>
                 )}
 
-                <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800 px-6 py-5 flex justify-between items-center sticky top-0 z-30">
+                <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800 px-6 py-safe-5 flex justify-between items-center sticky top-0 z-30 pt-safe shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="bg-gradient-to-br from-orange-400 to-rose-500 text-white p-2 rounded-xl"><Library size={20} strokeWidth={3}/></div>
-                        <span className="font-black text-slate-800 dark:text-white text-xl uppercase tracking-tighter">Study Hub</span>
+                        <div className="bg-gradient-to-br from-orange-400 to-rose-500 text-white p-2.5 rounded-xl shadow-md shadow-orange-500/20"><Library size={22} strokeWidth={3}/></div>
+                        <span className="font-black text-slate-800 dark:text-white text-2xl uppercase tracking-tighter">Study Hub</span>
                     </div>
-                    <button onClick={() => setInternalMode('create')} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-md active:scale-95 transition-all">
-                        <Plus size={14} /> New Card
+                    <button onClick={() => setInternalMode('create')} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-indigo-500/30 active:scale-95 transition-all">
+                        <Plus size={16} strokeWidth={3} /> New Card
                     </button>
                 </div>
 
-                <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-6 py-3 flex items-center gap-2 overflow-x-auto custom-scrollbar sticky top-[76px] z-20">
-                    <Filter size={14} className="text-slate-400 mr-2 shrink-0" />
+                {/* 🔥 Mobile Polish: overscroll-x-contain keeps the swipe from bouncing the whole PWA page */}
+                <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center gap-2 overflow-x-auto custom-scrollbar sticky top-[80px] z-20 overscroll-x-contain shrink-0">
+                    <Filter size={16} className="text-slate-400 mr-2 shrink-0" />
                     
-                    {/* Standard Filters */}
                     {['all', 'personal', 'network', 'archived'].map((f: any) => (
-                        <button key={f} onClick={() => setDeckFilter(f)} className={`shrink-0 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${deckFilter === f ? 'bg-slate-800 dark:bg-slate-700 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200'}`}>
+                        <button key={f} onClick={() => setDeckFilter(f)} className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${deckFilter === f ? 'bg-slate-800 dark:bg-slate-700 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200'}`}>
                             {f}
                         </button>
                     ))}
                     
-                    {/* Custom Folders in Filter Bar */}
-                    {customFolders.length > 0 && <div className="w-px h-4 bg-slate-300 dark:bg-slate-700 mx-1 shrink-0" />}
+                    {customFolders.length > 0 && <div className="w-px h-5 bg-slate-300 dark:bg-slate-700 mx-2 shrink-0" />}
                     {customFolders.map((folderName: string) => (
-                        <button key={folderName} onClick={() => setDeckFilter(folderName)} className={`shrink-0 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${deckFilter === folderName ? 'bg-indigo-600 text-white shadow-md' : 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100'}`}>
-                            <Folder size={10} fill="currentColor" /> {folderName}
+                        <button key={folderName} onClick={() => setDeckFilter(folderName)} className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 active:scale-95 ${deckFilter === folderName ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100'}`}>
+                            <Folder size={12} fill="currentColor" /> {folderName}
                         </button>
                     ))}
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-5 pb-32 relative z-10">
+                <div className="flex-1 overflow-y-auto p-6 space-y-5 pb-safe-32 relative z-10 custom-scrollbar overscroll-y-contain">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         {filteredDecks.map(([key, deck]: any) => {
                             const isArchived = userData?.deckPrefs?.[key]?.archived || false;
                             const currentFolder = userData?.deckPrefs?.[key]?.folder || null;
                             
                             return (
-                                <button key={key} onClick={() => { onSelectDeck(key); setInternalMode('menu'); }} className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 border-[3px] border-slate-100 dark:border-slate-800 hover:border-orange-300 dark:hover:border-orange-500/50 hover:-translate-y-1 transition-all text-left relative group">
+                                <button key={key} onClick={() => { onSelectDeck(key); setInternalMode('menu'); }} className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-7 border-4 border-slate-50 dark:border-slate-800 hover:border-orange-100 dark:hover:border-orange-500/30 hover:-translate-y-1 transition-all text-left relative group shadow-sm hover:shadow-xl">
                                     
-                                    {/* 🔥 THE CONTEXT MENU ENGINE */}
+                                    {/* 🔥 FAT FINGER TOUCH TARGET FOR CONTEXT MENU */}
                                     <div className="absolute top-4 right-4 z-20">
                                         <div 
                                             onClick={(e) => { 
                                                 e.stopPropagation(); 
                                                 setActiveMenu(activeMenu === key ? null : key);
-                                                setMenuView('main'); // Reset to main view on open
+                                                setMenuView('main'); 
                                             }}
-                                            className="p-2 rounded-full bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/20 transition-colors"
+                                            className="p-3 -mr-1 -mt-1 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/20 transition-colors active:bg-slate-100"
                                         >
-                                            <MoreVertical size={18} />
+                                            <MoreVertical size={22} />
                                         </div>
 
-                                        {/* Dropdown Panel */}
                                         {activeMenu === key && (
                                             <>
-                                                {/* Invisible overlay to catch clicks outside */}
                                                 <div className="fixed inset-0 z-30 cursor-default" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); }} />
                                                 
-                                                <div className="absolute top-12 right-0 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-700 py-2 z-40 animate-in zoom-in-95 duration-200 overflow-hidden">
+                                                {/* Menu Position logic prevents horizontal overflow on small phones */}
+                                                <div className="absolute top-14 right-0 w-64 bg-white dark:bg-slate-800 rounded-[1.5rem] shadow-2xl border-2 border-slate-100 dark:border-slate-700 py-3 z-40 animate-in zoom-in-95 duration-200 overflow-hidden origin-top-right">
                                                     
                                                     {menuView === 'main' ? (
                                                         <>
                                                             <div 
                                                                 onClick={(e) => { e.stopPropagation(); setMenuView('folders'); }} 
-                                                                className="w-full text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex justify-between items-center transition-colors cursor-pointer group/folder"
+                                                                className="w-full text-left px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex justify-between items-center transition-colors cursor-pointer group/folder active:bg-slate-100"
                                                             >
-                                                                <span className="flex items-center gap-3"><FolderPlus size={16} className="text-indigo-500" /> Move to Folder</span>
-                                                                <ChevronRight size={14} className="text-slate-300 group-hover/folder:text-indigo-500 transition-colors" />
+                                                                <span className="flex items-center gap-3"><FolderPlus size={18} className="text-indigo-500" /> Move to Folder</span>
+                                                                <ChevronRight size={16} className="text-slate-300 group-hover/folder:text-indigo-500 transition-colors" />
                                                             </div>
                                                             
                                                             {onToggleArchive && (
                                                                 <div 
                                                                     onClick={(e) => { e.stopPropagation(); onToggleArchive(key, isArchived); setActiveMenu(null); }} 
-                                                                    className="w-full text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors cursor-pointer"
+                                                                    className="w-full text-left px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors cursor-pointer active:bg-slate-100"
                                                                 >
-                                                                    <Archive size={16} className="text-amber-500" /> {isArchived ? 'Unarchive Deck' : 'Archive Deck'}
+                                                                    <Archive size={18} className="text-amber-500" /> {isArchived ? 'Unarchive Deck' : 'Archive Deck'}
                                                                 </div>
                                                             )}
                                                             
-                                                            <div className="h-px w-full bg-slate-100 dark:bg-slate-700 my-1" />
+                                                            <div className="h-px w-full bg-slate-100 dark:bg-slate-700 my-2" />
                                                             
                                                             <div 
-                                                                onClick={(e) => { e.stopPropagation(); setToastMsg("Network decks cannot be deleted."); setActiveMenu(null); }} 
-                                                                className="w-full text-left px-4 py-3 text-xs font-bold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 flex items-center gap-3 transition-colors cursor-pointer"
+                                                                onClick={(e) => { 
+                                                                    e.stopPropagation(); 
+                                                                    if (onHideDeck) onHideDeck(key);
+                                                                    setActiveMenu(null);
+                                                                    setToastMsg("Deck banished."); 
+                                                                }} 
+                                                                className="w-full text-left px-5 py-4 text-sm font-bold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 flex items-center gap-3 transition-colors cursor-pointer active:bg-rose-100"
                                                             >
-                                                                <Trash2 size={16} /> Remove Deck
+                                                                <Trash2 size={18} /> Remove Deck
                                                             </div>
                                                         </>
                                                     ) : (
-                                                        // 🔥 NESTED FOLDER SELECTION VIEW
-                                                        <div className="max-h-60 overflow-y-auto custom-scrollbar">
-                                                            <div onClick={(e) => { e.stopPropagation(); setMenuView('main'); }} className="px-4 py-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 cursor-pointer border-b border-slate-100 dark:border-slate-700 mb-1 bg-slate-50 dark:bg-slate-900/50">
-                                                                <ArrowLeft size={12} /> Back
+                                                        <div className="max-h-72 overflow-y-auto custom-scrollbar">
+                                                            <div onClick={(e) => { e.stopPropagation(); setMenuView('main'); }} className="px-5 py-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 cursor-pointer border-b border-slate-100 dark:border-slate-700 mb-1 bg-slate-50 dark:bg-slate-900/50 active:bg-slate-100">
+                                                                <ArrowLeft size={14} /> Back
                                                             </div>
                                                             
                                                             <div 
                                                                 onClick={(e) => { e.stopPropagation(); onAssignToFolder(key, null); setActiveMenu(null); setToastMsg("Removed from folder."); }}
-                                                                className={`px-4 py-2.5 text-xs font-bold flex items-center gap-3 cursor-pointer transition-colors ${currentFolder === null ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}
+                                                                className={`px-5 py-4 text-sm font-bold flex items-center gap-3 cursor-pointer transition-colors active:bg-slate-100 ${currentFolder === null ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                                                             >
-                                                                <div className={`w-2 h-2 rounded-full ${currentFolder === null ? 'bg-indigo-500' : 'border-2 border-slate-300'}`} />
+                                                                <div className={`w-2.5 h-2.5 rounded-full ${currentFolder === null ? 'bg-indigo-500 shadow-sm' : 'border-2 border-slate-300'}`} />
                                                                 None (Library)
                                                             </div>
 
@@ -702,21 +687,21 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                                                 <div 
                                                                     key={folderName}
                                                                     onClick={(e) => { e.stopPropagation(); onAssignToFolder(key, folderName); setActiveMenu(null); setToastMsg(`Moved to ${folderName}`); }}
-                                                                    className={`px-4 py-2.5 text-xs font-bold flex items-center gap-3 cursor-pointer transition-colors ${currentFolder === folderName ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 hover:bg-slate-50'}`}
+                                                                    className={`px-5 py-4 text-sm font-bold flex items-center gap-3 cursor-pointer transition-colors active:bg-slate-100 ${currentFolder === folderName ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                                                                 >
-                                                                    <div className={`w-2 h-2 rounded-full ${currentFolder === folderName ? 'bg-indigo-500' : 'border-2 border-slate-300'}`} />
-                                                                    <FolderOpen size={14} className={currentFolder === folderName ? 'text-indigo-500' : 'text-slate-400'} />
+                                                                    <div className={`w-2.5 h-2.5 rounded-full ${currentFolder === folderName ? 'bg-indigo-500 shadow-sm' : 'border-2 border-slate-300'}`} />
+                                                                    <FolderOpen size={16} className={currentFolder === folderName ? 'text-indigo-500' : 'text-slate-400'} />
                                                                     {folderName}
                                                                 </div>
                                                             ))}
                                                             
-                                                            <div className="h-px w-full bg-slate-100 dark:bg-slate-700 my-1" />
+                                                            <div className="h-px w-full bg-slate-100 dark:bg-slate-700 my-2" />
                                                             
                                                             <div 
                                                                 onClick={(e) => { e.stopPropagation(); setActiveMenu(null); setShowFolderModal(true); }}
-                                                                className="px-4 py-3 text-xs font-black text-indigo-600 flex items-center gap-2 hover:bg-indigo-50 cursor-pointer"
+                                                                className="px-5 py-4 text-sm font-black text-indigo-600 flex items-center gap-3 hover:bg-indigo-50 cursor-pointer active:bg-indigo-100"
                                                             >
-                                                                <Plus size={14} /> Create New Folder
+                                                                <Plus size={18} strokeWidth={3} /> Create New Folder
                                                             </div>
                                                         </div>
                                                     )}
@@ -725,19 +710,18 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                         )}
                                     </div>
 
-                                    {/* Deck Card Content */}
                                     <div className="flex justify-between items-start mb-6">
-                                        <div className="w-16 h-16 bg-orange-50 dark:bg-orange-500/10 text-orange-500 rounded-2xl flex items-center justify-center text-2xl border border-orange-100 dark:border-orange-500/20 shadow-inner">
+                                        <div className="w-16 h-16 bg-orange-50 dark:bg-orange-500/10 text-orange-500 rounded-2xl flex items-center justify-center text-2xl border border-orange-100 dark:border-orange-500/20 shadow-inner group-hover:scale-110 transition-transform">
                                             {deck.icon || <Layers size={28}/>}
                                         </div>
                                     </div>
-                                    <h3 className="font-black text-slate-800 dark:text-white text-xl leading-tight line-clamp-1 pr-10">{deck.id === 'custom' ? "My Study Cards" : deck.title}</h3>
+                                    <h3 className="font-black text-slate-800 dark:text-white text-2xl leading-tight line-clamp-1 pr-10 mb-1">{deck.id === 'custom' ? "My Study Cards" : deck.title}</h3>
                                     
-                                    <div className="flex items-center gap-2 mt-2">
-                                        <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest">{deck.cards?.length || 0} Targets</span>
+                                    <div className="flex items-center gap-3 mt-3">
+                                        <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest bg-slate-50 dark:bg-slate-800 px-3 py-1 rounded-md">{deck.cards?.length || 0} Targets</span>
                                         {currentFolder && (
-                                            <span className="text-[9px] bg-indigo-50 text-indigo-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1">
-                                                <Folder size={8} /> {currentFolder}
+                                            <span className="text-[9px] bg-indigo-50 text-indigo-500 px-3 py-1 rounded-md font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm border border-indigo-100">
+                                                <Folder size={10} fill="currentColor"/> {currentFolder}
                                             </span>
                                         )}
                                     </div>
