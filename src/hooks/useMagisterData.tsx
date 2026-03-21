@@ -152,13 +152,16 @@ export function useMagisterData() {
     logout: () => signOut(auth),
     
     // 🔥 FOLDER MANAGEMENT
-    createStudyFolder: async (folderName: string) => {
+  createStudyFolder: async (folderName: string, color: string = 'indigo') => {
         if (!user) return;
         const cleanName = folderName.trim();
         if (!cleanName) return;
 
-        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
-            studyFolders: arrayUnion(cleanName)
+        const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main');
+        
+        await updateDoc(profileRef, {
+            studyFolders: arrayUnion(cleanName),
+            [`folderColors.${cleanName}`]: color
         }).catch(e => console.log("Subcollection update skipped", e));
 
         await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid), {
@@ -166,10 +169,43 @@ export function useMagisterData() {
         }).catch(e => console.log("Parent doc update skipped", e));
     },
 
-    assignDeckToFolder: async (deckId: string, folderName: string | null) => {
+    updateStudyFolder: async (oldName: string, newName: string, color: string) => {
         if (!user) return;
-        const prefRef = doc(db, 'artifacts', appId, 'users', user.uid, 'deck_prefs', deckId);
-        await setDoc(prefRef, { folder: folderName }, { merge: true });
+        const cleanOld = oldName.trim();
+        const cleanNew = newName.trim();
+        const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main');
+
+        // 1. Update the color
+        await setDoc(profileRef, { folderColors: { [cleanNew || cleanOld]: color } }, { merge: true });
+
+        // 2. If renamed, swap the array items and update all decks inside it
+        if (cleanNew && cleanNew !== cleanOld) {
+            await updateDoc(profileRef, { studyFolders: arrayRemove(cleanOld) });
+            await updateDoc(profileRef, { studyFolders: arrayUnion(cleanNew) });
+            
+            // Re-route decks locally
+            const decksToUpdate = Object.keys(deckPrefs).filter(k => deckPrefs[k].folder === cleanOld);
+            for (const dId of decksToUpdate) {
+                const prefRef = doc(db, 'artifacts', appId, 'users', user.uid, 'deck_prefs', dId);
+                await setDoc(prefRef, { folder: cleanNew }, { merge: true });
+            }
+        }
+    },
+
+    deleteStudyFolder: async (folderName: string) => {
+        if (!user) return;
+        const cleanName = folderName.trim();
+        
+        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
+            studyFolders: arrayRemove(cleanName)
+        });
+
+        // Evict decks back to main library
+        const decksInFolder = Object.keys(deckPrefs).filter(k => deckPrefs[k].folder === cleanName);
+        for (const dId of decksInFolder) {
+            const prefRef = doc(db, 'artifacts', appId, 'users', user.uid, 'deck_prefs', dId);
+            await setDoc(prefRef, { folder: null }, { merge: true });
+        }
     },
 
     // 🔥 DECK PREFERENCES
