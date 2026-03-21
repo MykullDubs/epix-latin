@@ -80,7 +80,7 @@ function StudentCardBuilder({ onSave, onCancel }: any) {
 }
 
 // ============================================================================
-//  1. STUDY MODE
+//  1. STUDY MODE 
 // ============================================================================
 function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -178,7 +178,6 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
                 </div>
             </div>
 
-            {/* 🔥 touch-none explicitly added here to prevent page scrolling while swiping */}
             <div key={currentIndex} className={`flex-1 relative flex items-center justify-center perspective-[2000px] mb-6 ${animationClass}`}>
                 <div 
                     onTouchStart={handlePointerDown} onTouchMove={handlePointerMove} onTouchEnd={handlePointerUp}
@@ -308,7 +307,6 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
                 </div>
             </div>
 
-            {/* Mobile Optimized Bottom Controls */}
             <div className="flex items-center justify-between px-2 shrink-0 z-10 w-full mb-safe-4">
                 <button onClick={handlePrev} disabled={currentIndex === 0} className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-md border border-slate-100 dark:border-slate-700 disabled:opacity-30 transition-all active:scale-95 touch-manipulation">
                     <ChevronLeft size={28} strokeWidth={3} className="-ml-1" />
@@ -325,8 +323,9 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
         </div>
     );
 }
+
 // ============================================================================
-//  2. MATCHING GAME & 3. QUIZ SESSION 
+//  2. MATCHING GAME (Unchanged)
 // ============================================================================
 function MatchingGame({ deckCards, onGameEnd }: any) {
     const [cards, setCards] = useState<any[]>([]);
@@ -392,6 +391,9 @@ function MatchingGame({ deckCards, onGameEnd }: any) {
     );
 }
 
+// ============================================================================
+//  3. QUIZ SESSION (Unchanged)
+// ============================================================================
 function QuizSessionView({ deckCards, onGameEnd }: any) {
     const [index, setIndex] = useState(0);
     const [score, setScore] = useState(0);
@@ -487,7 +489,8 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const [deckFilter, setDeckFilter] = useState<string>('all');
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     
-    const [activeMenu, setActiveMenu] = useState<string | null>(null);
+    // 🔥 Elevated State: Store the actual deck object for the Drawer, not just the ID
+    const [activeOptionsDeck, setActiveOptionsDeck] = useState<any>(null);
     const [menuView, setMenuView] = useState<'main' | 'folders'>('main'); 
     
     const [showFolderModal, setShowFolderModal] = useState(false);
@@ -561,7 +564,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
                 
                 {showFolderModal && (
-                    <div className="fixed inset-0 z-[500] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
+                    <div className="fixed inset-0 z-[600] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
                         <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl border border-slate-100 dark:border-slate-800 animate-in zoom-in-95">
                             <h3 className="font-black text-2xl text-slate-800 dark:text-white mb-6 text-center">New Folder</h3>
                             <input 
@@ -589,7 +592,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     </button>
                 </div>
 
-                {/* 🔥 Mobile Polish: overscroll-x-contain keeps the swipe from bouncing the whole PWA page */}
                 <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center gap-2 overflow-x-auto custom-scrollbar sticky top-[80px] z-20 overscroll-x-contain shrink-0">
                     <Filter size={16} className="text-slate-400 mr-2 shrink-0" />
                     
@@ -610,126 +612,148 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 <div className="flex-1 overflow-y-auto p-6 space-y-5 pb-safe-32 relative z-10 custom-scrollbar overscroll-y-contain">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         {filteredDecks.map(([key, deck]: any) => {
-                            const isArchived = userData?.deckPrefs?.[key]?.archived || false;
                             const currentFolder = userData?.deckPrefs?.[key]?.folder || null;
                             
                             return (
-                                <button key={key} onClick={() => { onSelectDeck(key); setInternalMode('menu'); }} className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-7 border-4 border-slate-50 dark:border-slate-800 hover:border-orange-100 dark:hover:border-orange-500/30 hover:-translate-y-1 transition-all text-left relative group shadow-sm hover:shadow-xl">
-                                    
-                                    {/* 🔥 FAT FINGER TOUCH TARGET FOR CONTEXT MENU */}
-                                    <div className="absolute top-4 right-4 z-20">
-                                        <div 
-                                            onClick={(e) => { 
-                                                e.stopPropagation(); 
-                                                setActiveMenu(activeMenu === key ? null : key);
-                                                setMenuView('main'); 
-                                            }}
-                                            className="p-3 -mr-1 -mt-1 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/20 transition-colors active:bg-slate-100"
-                                        >
-                                            <MoreVertical size={22} />
+                                <div key={key} className="relative group">
+                                    <button onClick={() => { onSelectDeck(key); setInternalMode('menu'); }} className="w-full bg-white dark:bg-slate-900 rounded-[2.5rem] p-7 border-4 border-slate-50 dark:border-slate-800 hover:border-orange-100 dark:hover:border-orange-500/30 hover:-translate-y-1 transition-all text-left shadow-sm hover:shadow-xl relative block">
+                                        <div className="flex justify-between items-start mb-6">
+                                            <div className="w-16 h-16 bg-orange-50 dark:bg-orange-500/10 text-orange-500 rounded-2xl flex items-center justify-center text-2xl border border-orange-100 dark:border-orange-500/20 shadow-inner group-hover:scale-110 transition-transform">
+                                                {deck.icon || <Layers size={28}/>}
+                                            </div>
                                         </div>
-
-                                        {activeMenu === key && (
-                                            <>
-                                                <div className="fixed inset-0 z-30 cursor-default" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); }} />
-                                                
-                                                {/* Menu Position logic prevents horizontal overflow on small phones */}
-                                                <div className="absolute top-14 right-0 w-64 bg-white dark:bg-slate-800 rounded-[1.5rem] shadow-2xl border-2 border-slate-100 dark:border-slate-700 py-3 z-40 animate-in zoom-in-95 duration-200 overflow-hidden origin-top-right">
-                                                    
-                                                    {menuView === 'main' ? (
-                                                        <>
-                                                            <div 
-                                                                onClick={(e) => { e.stopPropagation(); setMenuView('folders'); }} 
-                                                                className="w-full text-left px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex justify-between items-center transition-colors cursor-pointer group/folder active:bg-slate-100"
-                                                            >
-                                                                <span className="flex items-center gap-3"><FolderPlus size={18} className="text-indigo-500" /> Move to Folder</span>
-                                                                <ChevronRight size={16} className="text-slate-300 group-hover/folder:text-indigo-500 transition-colors" />
-                                                            </div>
-                                                            
-                                                            {onToggleArchive && (
-                                                                <div 
-                                                                    onClick={(e) => { e.stopPropagation(); onToggleArchive(key, isArchived); setActiveMenu(null); }} 
-                                                                    className="w-full text-left px-5 py-4 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors cursor-pointer active:bg-slate-100"
-                                                                >
-                                                                    <Archive size={18} className="text-amber-500" /> {isArchived ? 'Unarchive Deck' : 'Archive Deck'}
-                                                                </div>
-                                                            )}
-                                                            
-                                                            <div className="h-px w-full bg-slate-100 dark:bg-slate-700 my-2" />
-                                                            
-                                                            <div 
-                                                                onClick={(e) => { 
-                                                                    e.stopPropagation(); 
-                                                                    if (onHideDeck) onHideDeck(key);
-                                                                    setActiveMenu(null);
-                                                                    setToastMsg("Deck banished."); 
-                                                                }} 
-                                                                className="w-full text-left px-5 py-4 text-sm font-bold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 flex items-center gap-3 transition-colors cursor-pointer active:bg-rose-100"
-                                                            >
-                                                                <Trash2 size={18} /> Remove Deck
-                                                            </div>
-                                                        </>
-                                                    ) : (
-                                                        <div className="max-h-72 overflow-y-auto custom-scrollbar">
-                                                            <div onClick={(e) => { e.stopPropagation(); setMenuView('main'); }} className="px-5 py-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 cursor-pointer border-b border-slate-100 dark:border-slate-700 mb-1 bg-slate-50 dark:bg-slate-900/50 active:bg-slate-100">
-                                                                <ArrowLeft size={14} /> Back
-                                                            </div>
-                                                            
-                                                            <div 
-                                                                onClick={(e) => { e.stopPropagation(); onAssignToFolder(key, null); setActiveMenu(null); setToastMsg("Removed from folder."); }}
-                                                                className={`px-5 py-4 text-sm font-bold flex items-center gap-3 cursor-pointer transition-colors active:bg-slate-100 ${currentFolder === null ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                                                            >
-                                                                <div className={`w-2.5 h-2.5 rounded-full ${currentFolder === null ? 'bg-indigo-500 shadow-sm' : 'border-2 border-slate-300'}`} />
-                                                                None (Library)
-                                                            </div>
-
-                                                            {customFolders.map(folderName => (
-                                                                <div 
-                                                                    key={folderName}
-                                                                    onClick={(e) => { e.stopPropagation(); onAssignToFolder(key, folderName); setActiveMenu(null); setToastMsg(`Moved to ${folderName}`); }}
-                                                                    className={`px-5 py-4 text-sm font-bold flex items-center gap-3 cursor-pointer transition-colors active:bg-slate-100 ${currentFolder === folderName ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                                                                >
-                                                                    <div className={`w-2.5 h-2.5 rounded-full ${currentFolder === folderName ? 'bg-indigo-500 shadow-sm' : 'border-2 border-slate-300'}`} />
-                                                                    <FolderOpen size={16} className={currentFolder === folderName ? 'text-indigo-500' : 'text-slate-400'} />
-                                                                    {folderName}
-                                                                </div>
-                                                            ))}
-                                                            
-                                                            <div className="h-px w-full bg-slate-100 dark:bg-slate-700 my-2" />
-                                                            
-                                                            <div 
-                                                                onClick={(e) => { e.stopPropagation(); setActiveMenu(null); setShowFolderModal(true); }}
-                                                                className="px-5 py-4 text-sm font-black text-indigo-600 flex items-center gap-3 hover:bg-indigo-50 cursor-pointer active:bg-indigo-100"
-                                                            >
-                                                                <Plus size={18} strokeWidth={3} /> Create New Folder
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
-
-                                    <div className="flex justify-between items-start mb-6">
-                                        <div className="w-16 h-16 bg-orange-50 dark:bg-orange-500/10 text-orange-500 rounded-2xl flex items-center justify-center text-2xl border border-orange-100 dark:border-orange-500/20 shadow-inner group-hover:scale-110 transition-transform">
-                                            {deck.icon || <Layers size={28}/>}
+                                        <h3 className="font-black text-slate-800 dark:text-white text-2xl leading-tight line-clamp-1 pr-12 mb-1">{deck.id === 'custom' ? "My Study Cards" : deck.title}</h3>
+                                        
+                                        <div className="flex items-center gap-3 mt-3">
+                                            <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest bg-slate-50 dark:bg-slate-800 px-3 py-1 rounded-md">{deck.cards?.length || 0} Targets</span>
+                                            {currentFolder && (
+                                                <span className="text-[9px] bg-indigo-50 text-indigo-500 px-3 py-1 rounded-md font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm border border-indigo-100">
+                                                    <Folder size={10} fill="currentColor"/> {currentFolder}
+                                                </span>
+                                            )}
                                         </div>
-                                    </div>
-                                    <h3 className="font-black text-slate-800 dark:text-white text-2xl leading-tight line-clamp-1 pr-10 mb-1">{deck.id === 'custom' ? "My Study Cards" : deck.title}</h3>
-                                    
-                                    <div className="flex items-center gap-3 mt-3">
-                                        <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest bg-slate-50 dark:bg-slate-800 px-3 py-1 rounded-md">{deck.cards?.length || 0} Targets</span>
-                                        {currentFolder && (
-                                            <span className="text-[9px] bg-indigo-50 text-indigo-500 px-3 py-1 rounded-md font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm border border-indigo-100">
-                                                <Folder size={10} fill="currentColor"/> {currentFolder}
-                                            </span>
-                                        )}
-                                    </div>
-                                </button>
+                                    </button>
+
+                                    {/* 🔥 ELEVATED TOUCH TARGET (Outside the button to prevent click conflicts) */}
+                                    <button 
+                                        onClick={(e) => { 
+                                            e.preventDefault();
+                                            e.stopPropagation(); 
+                                            setActiveOptionsDeck(deck);
+                                            setMenuView('main'); 
+                                        }}
+                                        className="absolute top-4 right-4 p-3 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/20 transition-colors active:bg-slate-100 z-20"
+                                        aria-label="Deck Options"
+                                    >
+                                        <MoreVertical size={24} />
+                                    </button>
+                                </div>
                             );
                         })}
                     </div>
                 </div>
+
+                {/* 🔥 THE BOTTOM SHEET DRAWER MODAL */}
+                {activeOptionsDeck && (
+                    <div className="fixed inset-0 z-[500] flex flex-col justify-end">
+                        <div 
+                            className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm transition-opacity" 
+                            onClick={() => setActiveOptionsDeck(null)} 
+                        />
+                        <div className="bg-white dark:bg-slate-900 w-full rounded-t-[2.5rem] p-6 relative z-10 animate-in slide-in-from-bottom-full duration-300 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] pb-safe-6">
+                            
+                            <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto mb-6" />
+                            
+                            <div className="flex items-center gap-4 mb-6 px-2">
+                                <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-xl shadow-sm border border-slate-100 dark:border-slate-700">
+                                    {activeOptionsDeck.icon || <Layers size={24} className="text-slate-400" />}
+                                </div>
+                                <div>
+                                    <h3 className="font-black text-xl text-slate-800 dark:text-white leading-tight line-clamp-1">
+                                        {activeOptionsDeck.id === 'custom' ? "My Study Cards" : activeOptionsDeck.title}
+                                    </h3>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Deck Options</p>
+                                </div>
+                            </div>
+
+                            {menuView === 'main' ? (
+                                <div className="space-y-2">
+                                    <button 
+                                        onClick={() => setMenuView('folders')} 
+                                        className="w-full text-left px-5 py-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex justify-between items-center transition-colors active:scale-[0.98]"
+                                    >
+                                        <span className="flex items-center gap-3"><FolderPlus size={20} className="text-indigo-500" /> Move to Folder</span>
+                                        <ChevronRight size={18} className="text-slate-400" />
+                                    </button>
+                                    
+                                    {onToggleArchive && (
+                                        <button 
+                                            onClick={() => { 
+                                                onToggleArchive(activeOptionsDeck.id, userData?.deckPrefs?.[activeOptionsDeck.id]?.archived || false); 
+                                                setActiveOptionsDeck(null); 
+                                            }} 
+                                            className="w-full text-left px-5 py-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3 transition-colors active:scale-[0.98]"
+                                        >
+                                            <Archive size={20} className="text-amber-500" /> 
+                                            {userData?.deckPrefs?.[activeOptionsDeck.id]?.archived ? 'Unarchive Deck' : 'Archive Deck'}
+                                        </button>
+                                    )}
+                                    
+                                    <div className="h-4" />
+                                    
+                                    <button 
+                                        onClick={() => { 
+                                            if (onHideDeck) onHideDeck(activeOptionsDeck.id);
+                                            setActiveOptionsDeck(null);
+                                            setToastMsg("Deck banished."); 
+                                        }} 
+                                        className="w-full text-left px-5 py-4 bg-rose-50 dark:bg-rose-500/10 rounded-2xl text-sm font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 flex items-center gap-3 transition-colors active:scale-[0.98]"
+                                    >
+                                        <Trash2 size={20} /> Remove Deck
+                                    </button>
+                                </div>
+                            ) : (
+                                // 🔥 FOLDERS VIEW IN DRAWER
+                                <div className="space-y-2">
+                                    <button onClick={() => setMenuView('main')} className="px-3 py-3 w-full flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors mb-2">
+                                        <ArrowLeft size={14} /> Back
+                                    </button>
+                                    
+                                    <div className="max-h-60 overflow-y-auto custom-scrollbar space-y-2 pr-2">
+                                        <button 
+                                            onClick={() => { onAssignToFolder(activeOptionsDeck.id, null); setActiveOptionsDeck(null); setToastMsg("Removed from folder."); }}
+                                            className={`w-full text-left px-5 py-4 rounded-2xl text-sm font-bold flex items-center gap-3 transition-all active:scale-[0.98] ${userData?.deckPrefs?.[activeOptionsDeck.id]?.folder === null ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20' : 'bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300'}`}
+                                        >
+                                            <div className={`w-3 h-3 rounded-full ${userData?.deckPrefs?.[activeOptionsDeck.id]?.folder === null ? 'bg-indigo-500 shadow-sm' : 'border-2 border-slate-300 dark:border-slate-600'}`} />
+                                            None (Main Library)
+                                        </button>
+
+                                        {customFolders.map(folderName => (
+                                            <button 
+                                                key={folderName}
+                                                onClick={() => { onAssignToFolder(activeOptionsDeck.id, folderName); setActiveOptionsDeck(null); setToastMsg(`Moved to ${folderName}`); }}
+                                                className={`w-full text-left px-5 py-4 rounded-2xl text-sm font-bold flex items-center gap-3 transition-all active:scale-[0.98] ${userData?.deckPrefs?.[activeOptionsDeck.id]?.folder === folderName ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20' : 'bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300'}`}
+                                            >
+                                                <div className={`w-3 h-3 rounded-full ${userData?.deckPrefs?.[activeOptionsDeck.id]?.folder === folderName ? 'bg-indigo-500 shadow-sm' : 'border-2 border-slate-300 dark:border-slate-600'}`} />
+                                                <FolderOpen size={18} className={userData?.deckPrefs?.[activeOptionsDeck.id]?.folder === folderName ? 'text-indigo-500' : 'text-slate-400'} />
+                                                {folderName}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    
+                                    <div className="h-4" />
+                                    
+                                    <button 
+                                        onClick={() => { setActiveOptionsDeck(null); setShowFolderModal(true); }}
+                                        className="w-full text-left px-5 py-4 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl text-sm font-black text-indigo-600 dark:text-indigo-400 flex items-center gap-3 transition-colors active:scale-[0.98]"
+                                    >
+                                        <Plus size={20} strokeWidth={3} /> Create New Folder
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
