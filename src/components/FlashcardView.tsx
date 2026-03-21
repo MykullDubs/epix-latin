@@ -544,7 +544,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         );
     }
 
-    if (internalMode === 'library') {
+if (internalMode === 'library') {
         const filteredDecks = Object.entries(allDecks).filter(([key, deck]: any) => {
             const isArchived = userData?.deckPrefs?.[key]?.archived || false;
             const currentFolder = userData?.deckPrefs?.[key]?.folder || null;
@@ -586,51 +586,54 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     </div>
                 )}
 
-                <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800 px-6 py-safe-5 flex justify-between items-center sticky top-0 z-30 pt-safe shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-gradient-to-br from-orange-400 to-rose-500 text-white p-2.5 rounded-xl shadow-md shadow-orange-500/20"><Library size={22} strokeWidth={3}/></div>
-                        <span className="font-black text-slate-800 dark:text-white text-2xl uppercase tracking-tighter">Study Hub</span>
-                    </div>
-                    <button onClick={() => setInternalMode('create')} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-indigo-500/30 active:scale-95 transition-all">
-                        <Plus size={16} strokeWidth={3} /> New Card
-                    </button>
-                </div>
-
-                <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center gap-2 overflow-x-auto custom-scrollbar sticky top-[80px] z-20 overscroll-x-contain shrink-0">
-                    <Filter size={16} className="text-slate-400 mr-2 shrink-0" />
+                {/* 🔥 THE FIX: Single Sticky Wrapper for BOTH bars */}
+                <div className="sticky top-0 z-30 w-full flex flex-col shrink-0">
                     
-                    {['all', 'personal', 'network', 'archived'].map((f: any) => (
-                        <button key={f} onClick={() => setDeckFilter(f)} className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${deckFilter === f ? 'bg-slate-800 dark:bg-slate-700 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200'}`}>
-                            {f}
-                        </button>
-                    ))}
-                    
-                    {customFolders.length > 0 && <div className="w-px h-5 bg-slate-300 dark:bg-slate-700 mx-2 shrink-0" />}
-                    {customFolders.map((folderName: string) => (
-                        <button key={folderName} onClick={() => setDeckFilter(folderName)} className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 active:scale-95 ${deckFilter === folderName ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100'}`}>
-                            <Folder size={12} fill="currentColor" /> {folderName}
-                        </button>
-                    ))}
-                </div>
-
-                {/* 🔥 H-FULL Reinstated & Grid updated to 2-columns (grid-cols-2) */}
-                <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 space-y-5 pb-28 relative z-10 custom-scrollbar overscroll-y-contain">
-                    
-                    {/* BREADCRUMB HEADER */}
-                    {customFolders.includes(deckFilter) && (
-                        <div className="animate-in fade-in duration-300 mb-2 mt-2">
-                            <button onClick={() => setDeckFilter('all')} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-500 transition-colors w-fit bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 active:scale-95">
-                                <ArrowLeft size={14} /> Back to Library
-                            </button>
-                            <div className="flex items-center gap-3 mt-6 mb-2">
-                                <FolderOpen size={28} className="text-indigo-500" />
-                                <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">{deckFilter}</h2>
-                            </div>
+                    {/* Header Bar */}
+                    <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl px-6 py-5 flex justify-between items-center pt-safe">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-gradient-to-br from-orange-400 to-rose-500 text-white p-2.5 rounded-xl shadow-md shadow-orange-500/20"><Library size={22} strokeWidth={3}/></div>
+                            <span className="font-black text-slate-800 dark:text-white text-2xl uppercase tracking-tighter">Study Hub</span>
                         </div>
-                    )}
+                        <button onClick={() => setInternalMode('create')} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-indigo-500/30 active:scale-95 transition-all">
+                            <Plus size={16} strokeWidth={3} /> New Card
+                        </button>
+                    </div>
 
-                    {/* 🔥 2-COLUMN GRID INJECTED HERE */}
+                    {/* Filter Bar (Border applied here now to seal the bottom) */}
+                    <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center gap-2 overflow-x-auto custom-scrollbar overscroll-x-contain">
+                        <Filter size={16} className="text-slate-400 mr-2 shrink-0" />
+                        
+                        {['all', 'personal', 'network', 'archived'].map((f: any) => (
+                            <button key={f} onClick={() => setDeckFilter(f)} className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${deckFilter === f ? 'bg-slate-800 dark:bg-slate-700 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200'}`}>
+                                {f}
+                            </button>
+                        ))}
+                        
+                        {customFolders.length > 0 && <div className="w-px h-5 bg-slate-300 dark:bg-slate-700 mx-2 shrink-0" />}
+                        {customFolders.map((folderName: string) => (
+                            <button key={folderName} onClick={() => setDeckFilter(folderName)} className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 active:scale-95 ${deckFilter === folderName ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100'}`}>
+                                <Folder size={12} fill="currentColor" /> {folderName}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 space-y-5 pb-28 relative z-10 custom-scrollbar overscroll-y-contain">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        
+                        {/* BREADCRUMB HEADER */}
+                        {customFolders.includes(deckFilter) && (
+                            <div className="col-span-full animate-in fade-in duration-300 mb-2 mt-2">
+                                <button onClick={() => setDeckFilter('all')} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-500 transition-colors w-fit bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 active:scale-95">
+                                    <ArrowLeft size={14} /> Back to Library
+                                </button>
+                                <div className="flex items-center gap-3 mt-6 mb-2">
+                                    <FolderOpen size={28} className="text-indigo-500" />
+                                    <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">{deckFilter}</h2>
+                                </div>
+                            </div>
+                        )}
 
                         {/* RENDER FOLDERS */}
                         {deckFilter === 'all' && customFolders.map((folderName: string) => {
@@ -676,7 +679,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                                 {deck.icon || <Layers size={24}/>}
                                             </div>
                                         </div>
-                                        {/* Adjusted padding right so the 3 dots don't cover the text */}
                                         <h3 className="font-black text-slate-800 dark:text-white text-lg leading-tight line-clamp-2 pr-8 mb-auto">{deck.id === 'custom' ? "My Study Cards" : deck.title}</h3>
                                         
                                         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -684,7 +686,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                         </div>
                                     </button>
 
-                                    {/* 🔥 ELEVATED TOUCH TARGET */}
+                                    {/* ELEVATED TOUCH TARGET */}
                                     <button 
                                         onClick={(e) => { 
                                             e.preventDefault();
