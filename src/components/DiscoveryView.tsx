@@ -2,7 +2,8 @@
 import React, { useState, useMemo } from 'react';
 import { 
     Search, Sparkles, BarChart3, ArrowDown, Star, Gamepad2, 
-    BookOpen, Layers, Globe, Target, Check, Zap, Map, Trophy, ChevronRight, Play
+    BookOpen, Layers, Globe, Target, Check, Zap, Map, Trophy, 
+    ChevronRight, Play, Hexagon, Lock, Unlock, Loader2
 } from 'lucide-react';
 
 // ============================================================================
@@ -26,39 +27,53 @@ const getTypeStyles = (type: string) => {
     }
 };
 
-const DeckGroup = ({ title, items, onClick, icon }: any) => (
+const DeckGroup = ({ title, items, onClick, icon, userData }: any) => (
     <div className="animate-in slide-in-from-bottom-4 duration-500">
         <h4 className="text-sm font-black text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2 px-2 uppercase tracking-widest">{icon} {title}</h4>
         <div className="flex gap-4 overflow-x-auto pb-6 -mx-6 px-6 custom-scrollbar snap-x">
-            {items.map((item: any) => <DiscoveryCard key={item.id} item={item} onClick={() => onClick(item)} compact />)}
+            {items.map((item: any) => <DiscoveryCard key={item.id} item={item} onClick={() => onClick(item)} compact userData={userData} />)}
         </div>
     </div>
 );
 
-const DiscoveryCard = ({ item, onClick, compact = false }: any) => {
+const DiscoveryCard = ({ item, onClick, compact = false, userData }: any) => {
     const style = getTypeStyles(item.contentType);
     const Icon = style.icon;
     const displayTitle = item.title || item.name || "Untitled Resource";
 
+    // 🔥 ECONOMY CHECK
+    const price = item.price || 0;
+    const isUnlocked = price === 0 || userData?.unlocks?.[item.id];
+    const isLocked = !isUnlocked;
+
     return (
         <button 
             onClick={onClick} 
-            className={`snap-start bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-300 text-left group flex flex-col overflow-hidden ${compact ? 'min-w-[260px] max-w-[260px] h-[220px]' : 'h-64'} relative`}
+            className={`snap-start bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-300 text-left group flex flex-col overflow-hidden ${compact ? 'min-w-[260px] max-w-[260px] h-[220px]' : 'h-64'} relative ${isLocked ? 'opacity-90 grayscale-[0.2]' : ''}`}
         >
             <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent dark:from-white/5 opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none" />
             
+            {/* 🔥 PREMIUM LOCK BADGE */}
+            {isLocked && (
+                <div className="absolute top-5 right-5 bg-slate-900/90 dark:bg-black/90 backdrop-blur-md text-white text-[10px] font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 z-30 shadow-xl border border-white/10 transition-transform group-hover:scale-110">
+                    <Lock size={12} className="text-amber-400" />
+                    <span>{price}</span>
+                    <Hexagon size={10} className="text-amber-400 fill-amber-400/20" />
+                </div>
+            )}
+
             <div className="p-6 flex-1 w-full relative z-20">
                 <div className="flex justify-between items-start mb-4">
                     <div className={`w-14 h-14 rounded-[1.2rem] flex items-center justify-center transition-all duration-500 ${style.bg} ${style.text} ${style.hover} shadow-inner group-hover:rotate-6 group-hover:scale-110`}>
                         <Icon size={24} strokeWidth={2.5}/>
                     </div>
-                    {item.contentType === 'arcade' && (
+                    {item.contentType === 'arcade' && !isLocked && (
                         <span className="flex items-center gap-1 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg shadow-sm border border-amber-200 dark:border-amber-500/30">
                             <Zap size={10} className="fill-amber-500" /> Hot
                         </span>
                     )}
                 </div>
-                <h4 className="font-black text-slate-800 dark:text-white text-xl leading-tight mb-2 line-clamp-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{displayTitle}</h4>
+                <h4 className="font-black text-slate-800 dark:text-white text-xl leading-tight mb-2 line-clamp-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors pr-10">{displayTitle}</h4>
                 {item.description && !compact && (
                     <p className="text-xs font-bold text-slate-400 dark:text-slate-500 line-clamp-2">{item.description}</p>
                 )}
@@ -71,8 +86,8 @@ const DiscoveryCard = ({ item, onClick, compact = false }: any) => {
                 </div>
                 
                 <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-colors ${style.bg} ${style.text} shadow-sm border border-transparent group-hover:${style.border}`}>
-                    <span className="text-[10px] font-black uppercase tracking-widest">{style.label}</span>
-                    <ChevronRight size={12} strokeWidth={3} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">{isLocked ? 'Unlock' : style.label}</span>
+                    {isLocked ? <Lock size={12} strokeWidth={3} /> : <ChevronRight size={12} strokeWidth={3} />}
                 </div>
             </div>
         </button>
@@ -82,12 +97,18 @@ const DiscoveryCard = ({ item, onClick, compact = false }: any) => {
 // ============================================================================
 //  STUDENT DISCOVERY VIEW
 // ============================================================================
-export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, onSelectLesson, onLogActivity, userData }: any) {
+export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, onSelectLesson, onLogActivity, userData, onPurchaseItem }: any) {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState('All');
     const [sortMode, setSortMode] = useState<'relevance' | 'size' | 'alpha'>('relevance');
 
-    // --- 1. THE REBUILT FUZZY BRAIN ---
+    // Purchase Modal State
+    const [purchasePrompt, setPurchasePrompt] = useState<any>(null);
+    const [isPurchasing, setIsPurchasing] = useState(false);
+
+    const fluxBalance = userData?.profile?.main?.coins || userData?.coins || 0;
+
+    // --- THE REBUILT FUZZY BRAIN ---
     const { processedItems, categories, difficultyGroups } = useMemo(() => {
         
         const normalizeLanguage = (lang?: string) => {
@@ -168,7 +189,16 @@ export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, o
         return { processedItems: entries, categories: cats, difficultyGroups: groups };
     }, [allDecks, lessons, searchTerm, activeCategory, sortMode]);
 
+    // 🔥 SMART CLICK ROUTER (Handles Locks)
     const handleItemClick = (item: any) => {
+        const price = item.price || 0;
+        const isUnlocked = price === 0 || userData?.unlocks?.[item.id];
+
+        if (!isUnlocked) {
+            setPurchasePrompt(item); // Open Storefront Modal
+            return;
+        }
+
         if (onLogActivity) onLogActivity(`explore_${item.contentType}`, 0, "Exploration");
         if (item.contentType === 'lesson' || item.contentType === 'arcade') {
             onSelectLesson(item);
@@ -177,11 +207,90 @@ export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, o
         }
     };
 
+    // 🔥 CHECKOUT PROCESSOR
+    const handlePurchaseConfirm = async () => {
+        if (!purchasePrompt || !onPurchaseItem) return;
+        setIsPurchasing(true);
+        
+        const success = await onPurchaseItem(purchasePrompt.id, purchasePrompt.price);
+        
+        setIsPurchasing(false);
+        if (success) {
+            const itemToOpen = purchasePrompt;
+            setPurchasePrompt(null);
+            // Auto-open upon purchase
+            if (itemToOpen.contentType === 'lesson' || itemToOpen.contentType === 'arcade') {
+                onSelectLesson(itemToOpen);
+            } else {
+                onSelectDeck(itemToOpen);
+            }
+        } else {
+            alert("Insufficient Flux balance. Keep learning to earn more!");
+        }
+    };
+
     const isSearching = searchTerm.length > 0;
 
     return (
         <div className="h-full bg-slate-50 dark:bg-slate-950 flex flex-col overflow-hidden animate-in fade-in duration-500 relative transition-colors">
             
+            {/* 🔥 VAULT / PURCHASE MODAL */}
+            {purchasePrompt && (
+                <div className="fixed inset-0 z-[600] bg-slate-900/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl border-4 border-slate-100 dark:border-slate-800 animate-in zoom-in-95 relative overflow-hidden">
+                        
+                        {/* Decorative Background */}
+                        <div className="absolute -top-24 -right-24 text-indigo-50 dark:text-indigo-500/5">
+                            <Unlock size={200} />
+                        </div>
+
+                        <div className="relative z-10">
+                            <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl flex items-center justify-center mb-6 shadow-inner border border-indigo-100 dark:border-indigo-500/20">
+                                <Lock size={32} className="text-indigo-500" />
+                            </div>
+
+                            <h3 className="font-black text-2xl text-slate-800 dark:text-white mb-2 leading-tight">Unlock Content</h3>
+                            <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-6">
+                                You are about to unlock <span className="text-indigo-600 dark:text-indigo-400">{purchasePrompt.title || purchasePrompt.name}</span>.
+                            </p>
+
+                            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-5 mb-8 border-2 border-slate-100 dark:border-slate-700/50 flex justify-between items-center">
+                                <div>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">Cost</span>
+                                    <div className="flex items-center gap-1.5 font-black text-xl text-slate-800 dark:text-white">
+                                        {purchasePrompt.price} <Hexagon size={16} className="text-indigo-500 fill-indigo-500/20" />
+                                    </div>
+                                </div>
+                                <div className="h-8 w-px bg-slate-200 dark:bg-slate-700" />
+                                <div className="text-right">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">Your Balance</span>
+                                    <div className={`flex items-center gap-1.5 font-black text-xl justify-end ${fluxBalance >= purchasePrompt.price ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                        {fluxBalance} <Hexagon size={16} className="fill-current opacity-20" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button 
+                                    onClick={() => setPurchasePrompt(null)} 
+                                    className="flex-1 px-4 py-4 rounded-2xl font-black text-slate-500 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors active:scale-95"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={handlePurchaseConfirm} 
+                                    disabled={fluxBalance < purchasePrompt.price || isPurchasing}
+                                    className="flex-1 px-4 py-4 rounded-2xl font-black text-white bg-indigo-600 disabled:bg-slate-300 dark:disabled:bg-slate-800 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-xl shadow-indigo-500/20"
+                                >
+                                    {isPurchasing ? <Loader2 size={18} className="animate-spin" /> : <Unlock size={18} />}
+                                    {isPurchasing ? 'Processing' : 'Unlock Now'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* FLOATING HEADER AREA */}
             <div className="px-6 pt-12 pb-6 bg-slate-50/90 dark:bg-slate-950/90 backdrop-blur-3xl z-20 sticky top-0 transition-all border-b border-slate-100 dark:border-slate-800 shadow-sm">
                 <div className="flex justify-between items-end mb-6">
@@ -192,10 +301,18 @@ export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, o
                         <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mt-1">Explore.</h1>
                     </div>
                     
-                    <div className="flex gap-2 bg-white dark:bg-slate-900 p-1 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
-                        <button onClick={() => setSortMode('relevance')} className={`p-3 rounded-xl transition-all active:scale-95 ${sortMode === 'relevance' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`} title="Smart Sort"><Sparkles size={18}/></button>
-                        <button onClick={() => setSortMode('size')} className={`p-3 rounded-xl transition-all active:scale-95 ${sortMode === 'size' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`} title="Sort by Size"><BarChart3 size={18}/></button>
-                        <button onClick={() => setSortMode('alpha')} className={`p-3 rounded-xl transition-all active:scale-95 ${sortMode === 'alpha' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`} title="A-Z"><ArrowDown size={18}/></button>
+                    {/* 🔥 THE WALLET UI INJECTED */}
+                    <div className="flex flex-col items-end gap-3">
+                        <div className="flex items-center gap-2 bg-white dark:bg-slate-900 px-4 py-2 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+                            <Hexagon size={16} className="text-indigo-500 fill-indigo-500/20" />
+                            <span className="font-black text-slate-800 dark:text-white tracking-tight">{fluxBalance} <span className="text-[10px] uppercase text-slate-400">Flux</span></span>
+                        </div>
+
+                        <div className="flex gap-2 bg-white dark:bg-slate-900 p-1 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+                            <button onClick={() => setSortMode('relevance')} className={`p-2.5 rounded-xl transition-all active:scale-95 ${sortMode === 'relevance' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`} title="Smart Sort"><Sparkles size={16}/></button>
+                            <button onClick={() => setSortMode('size')} className={`p-2.5 rounded-xl transition-all active:scale-95 ${sortMode === 'size' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`} title="Sort by Size"><BarChart3 size={16}/></button>
+                            <button onClick={() => setSortMode('alpha')} className={`p-2.5 rounded-xl transition-all active:scale-95 ${sortMode === 'alpha' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`} title="A-Z"><ArrowDown size={16}/></button>
+                        </div>
                     </div>
                 </div>
                 
@@ -244,7 +361,7 @@ export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, o
                             <div className="px-6 mb-12">
                                 <button 
                                     onClick={() => handleItemClick(processedItems[0])} 
-                                    className="w-full relative h-[340px] rounded-[3rem] overflow-hidden shadow-2xl shadow-indigo-900/10 dark:shadow-black/50 group text-left transition-transform active:scale-[0.98] border-4 border-white/10"
+                                    className={`w-full relative h-[340px] rounded-[3rem] overflow-hidden shadow-2xl shadow-indigo-900/10 dark:shadow-black/50 group text-left transition-all duration-300 active:scale-[0.98] border-4 border-white/10 ${processedItems[0].price && !(processedItems[0].price === 0 || userData?.unlocks?.[processedItems[0].id]) ? 'grayscale-[0.2]' : ''}`}
                                 >
                                     <div className={`absolute inset-0 transition-transform duration-1000 group-hover:scale-105 ${
                                         processedItems[0].contentType === 'arcade' ? 'bg-gradient-to-br from-amber-500 via-orange-600 to-rose-500' :
@@ -256,8 +373,15 @@ export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, o
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
                                     
                                     <div className="absolute top-6 right-6 bg-white/20 backdrop-blur-xl border border-white/30 text-white text-[10px] font-black px-4 py-2 rounded-full uppercase tracking-widest shadow-lg flex items-center gap-1.5">
-                                        <Star size={12} className="fill-yellow-400 text-yellow-400" /> Featured Data
+                                        <Star size={12} className="fill-yellow-400 text-yellow-400" /> Featured
                                     </div>
+
+                                    {/* 🔥 HERO LOCK BADGE */}
+                                    {processedItems[0].price && !(processedItems[0].price === 0 || userData?.unlocks?.[processedItems[0].id]) && (
+                                        <div className="absolute top-6 left-6 bg-slate-900/90 backdrop-blur-md text-white text-xs font-black px-4 py-2 rounded-full shadow-lg flex items-center gap-2 border border-white/20">
+                                            <Lock size={14} className="text-amber-400" /> {processedItems[0].price} <Hexagon size={12} className="text-amber-400 fill-amber-400/20" />
+                                        </div>
+                                    )}
                                     
                                     <div className="relative z-10 p-8 h-full flex flex-col justify-end">
                                         <div className="flex items-center gap-3 mb-4">
@@ -291,14 +415,14 @@ export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, o
 
                     {sortMode === 'size' && !isSearching ? (
                         <div className="space-y-10">
-                            {difficultyGroups.master.length > 0 && <DeckGroup title="Master Class (Long)" items={difficultyGroups.master} onClick={handleItemClick} icon={<Trophy size={18} className="text-yellow-500"/>}/>}
-                            {difficultyGroups.standard.length > 0 && <DeckGroup title="Standard Units" items={difficultyGroups.standard} onClick={handleItemClick} icon={<Layers size={18} className="text-indigo-500"/>}/>}
-                            {difficultyGroups.quick.length > 0 && <DeckGroup title="Quick Bites" items={difficultyGroups.quick} onClick={handleItemClick} icon={<Zap size={18} className="text-orange-500"/>}/>}
+                            {difficultyGroups.master.length > 0 && <DeckGroup title="Master Class (Long)" items={difficultyGroups.master} onClick={handleItemClick} icon={<Trophy size={18} className="text-yellow-500"/>} userData={userData} />}
+                            {difficultyGroups.standard.length > 0 && <DeckGroup title="Standard Units" items={difficultyGroups.standard} onClick={handleItemClick} icon={<Layers size={18} className="text-indigo-500"/>} userData={userData} />}
+                            {difficultyGroups.quick.length > 0 && <DeckGroup title="Quick Bites" items={difficultyGroups.quick} onClick={handleItemClick} icon={<Zap size={18} className="text-orange-500"/>} userData={userData} />}
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                             {processedItems.map((item: any) => (
-                                <DiscoveryCard key={item.id} item={item} onClick={() => handleItemClick(item)} />
+                                <DiscoveryCard key={item.id} item={item} onClick={() => handleItemClick(item)} userData={userData} />
                             ))}
                         </div>
                     )}
