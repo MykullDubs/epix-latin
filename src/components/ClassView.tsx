@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { doc, onSnapshot, setDoc } from 'firebase/firestore'; 
 import { db } from '../config/firebase';
 import { useLiveClass } from '../hooks/useLiveClass';
-import { MessageSquare, MessageCircle, Gamepad2, CheckCircle2, X, Puzzle, ChevronLeft, ChevronRight, Zap, Users, Clock, EyeOff } from 'lucide-react';
+import { MessageSquare, MessageCircle, Gamepad2, CheckCircle2, X, Puzzle, ChevronLeft, ChevronRight, Zap, Users, Clock, EyeOff, HelpCircle, Layers } from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
 // import ClassForum from './ClassForum'; // Ensure this exists
 
