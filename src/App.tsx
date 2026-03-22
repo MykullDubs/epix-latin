@@ -1,6 +1,6 @@
 // src/App.tsx
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { doc, setDoc } from 'firebase/firestore'; 
+import { doc, setDoc, updateDoc } from 'firebase/firestore'; 
 import { db, appId } from './config/firebase';   
 import { useMagisterData } from './hooks/useMagisterData';
 import { GLOBAL_CURRICULUMS } from './constants/curriculums';
@@ -12,6 +12,7 @@ import HomeView from './components/HomeView';
 import DiscoveryView from './components/DiscoveryView';
 import FlashcardView from './components/FlashcardView';
 import ProfileView from './components/ProfileView';
+import StorefrontView from './components/StorefrontView'; // 🔥 Black Market Injected
 import InstructorDashboard from './components/instructor/InstructorDashboard';
 import AdminDashboardView from './components/admin/AdminDashboardView';
 import StudentClassView from './components/StudentClassView';
@@ -23,6 +24,13 @@ import LiveVocabProjector from './components/LiveVocabProjector';
 import LiveConnectFourProjector from './components/LiveConnectFourProjector';
 import LiveSlipstreamProjector from './components/LiveSlipstreamProjector';
 import CelebrationScreen from './components/CelebrationScreen';
+
+// 🔥 DYNAMIC OS THEME ENGINE
+const OS_THEMES: Record<string, string> = {
+    theme_hacker: 'bg-emerald-50 dark:bg-emerald-950',
+    theme_synth: 'bg-fuchsia-50 dark:bg-fuchsia-950',
+    default: 'bg-slate-50 dark:bg-slate-950'
+};
 
 export default function App() {
   const { 
@@ -51,6 +59,44 @@ export default function App() {
   const allCurriculums = useMemo(() => {
       return [...GLOBAL_CURRICULUMS, ...(customCurriculums || [])];
   }, [customCurriculums]);
+
+  // Determine active background theme based on equipped cosmetics
+  const activeOSTheme = OS_THEMES[userData?.equipped?.themes] || OS_THEMES.default;
+
+  // ==========================================================================
+  //  THE FLUX ECONOMY (Black Market Handlers)
+  // ==========================================================================
+  const handlePurchaseCosmetic = async (itemId: string, price: number, category: string) => {
+      if (!user || !userData) return;
+      
+      const newFlux = (userData.flux || 0) - price;
+      const newInventory = [...(userData.inventory || []), itemId];
+      
+      try {
+          const userRef = doc(db, 'users', user.uid);
+          await updateDoc(userRef, {
+              flux: newFlux,
+              inventory: newInventory
+          });
+      } catch (err) {
+          console.error("Transaction failed:", err);
+      }
+  };
+
+  const handleEquipCosmetic = async (itemId: string, category: string) => {
+      if (!user || !userData) return;
+      
+      const newEquipped = { ...(userData.equipped || {}), [category]: itemId };
+      
+      try {
+          const userRef = doc(db, 'users', user.uid);
+          await updateDoc(userRef, {
+              equipped: newEquipped
+          });
+      } catch (err) {
+          console.error("Equip protocol failed:", err);
+      }
+  };
 
   // ==========================================================================
   //  LIVE ARENA LAUNCHERS
@@ -121,6 +167,14 @@ export default function App() {
 
     const params = new URLSearchParams(window.location.search);
     
+    // Check if they scanned a quick-join or signup QR Code
+    if (params.get('action') === 'signup' && !user) {
+        setShowAuth(true);
+        params.delete('action');
+        const newUrl = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
+        window.history.replaceState({}, '', newUrl);
+    }
+
     if (params.get('view')) setCurrentView(params.get('view') as any);
     if (params.get('tab')) setActiveTab(params.get('tab')!);
     if (params.get('deckId')) setActiveDeckKey(params.get('deckId'));
@@ -140,7 +194,7 @@ export default function App() {
     if (enrolledClasses.length > 0 || allLessons.length > 0) {
         isHydrated.current = true;
     }
-  }, [authChecked, enrolledClasses, allLessons]);
+  }, [authChecked, enrolledClasses, allLessons, user]);
 
   useEffect(() => {
     if (!isHydrated.current) return;
@@ -184,13 +238,13 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [enrolledClasses, allLessons]);
 
-  if (!authChecked) return <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors duration-300"><div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>;
+  if (!authChecked) return <div className={`${activeOSTheme} h-screen flex items-center justify-center transition-colors duration-500`}><div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>;
 
   // 1. PUBLIC / AUTH GATES
   if (!user) {
     return showAuth ? (
-      <div className="relative min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
-         <button onClick={() => setShowAuth(false)} className="absolute top-6 left-6 z-50 text-slate-400 hover:text-slate-900 dark:hover:white font-bold text-sm transition-colors">← Regresar</button>
+      <div className={`relative min-h-screen ${activeOSTheme} transition-colors duration-500`}>
+         <button onClick={() => setShowAuth(false)} className="absolute top-6 left-6 z-50 text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold text-sm transition-colors">← Regresar</button>
          <AuthView />
       </div>
     ) : <MarketingSite onLoginClick={() => setShowAuth(true)} />;
@@ -279,7 +333,7 @@ export default function App() {
   // 6. ADMIN VIEW
   if (currentView === 'admin' && (userData?.role === 'admin' || userData?.role === 'org_admin')) {
     return (
-        <div className="h-screen w-full relative">
+        <div className={`h-screen w-full relative ${activeOSTheme} transition-colors duration-500`}>
             <AdminDashboardView user={{...user, ...userData}} activeOrg={activeOrg} onSwitchView={() => setCurrentView('student')} />
             <button 
                 onClick={() => setCurrentView('student')}
@@ -329,15 +383,15 @@ export default function App() {
 
   // 8. STUDENT MOBILE APP
   return (
-    <div className="bg-slate-50 dark:bg-slate-950 min-h-screen w-full flex flex-col items-center relative overflow-hidden transition-colors duration-300">
+    <div className={`${activeOSTheme} min-h-[100dvh] w-full flex flex-col items-center relative overflow-hidden transition-colors duration-500`}>
       {userData?.role !== 'student' && (
         <button onClick={() => setCurrentView(userData?.role === 'instructor' ? 'instructor' : 'admin')} className="fixed top-6 right-6 z-[1000] bg-slate-900 text-white px-8 py-3 rounded-full font-black text-xs uppercase shadow-2xl transition-all hover:scale-105 active:scale-95">
           {userData?.role === 'instructor' ? '🎓 Magister Command' : '🛡️ Command Center'}
         </button>
       )}
 
-      <div className="w-full bg-white dark:bg-slate-950 max-w-md h-[100dvh] shadow-2xl relative flex flex-col overflow-hidden transition-colors duration-300">
-        <div className="flex-1 overflow-hidden relative bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+      <div className={`w-full ${activeOSTheme} max-w-md h-[100dvh] shadow-2xl relative flex flex-col overflow-hidden transition-colors duration-500`}>
+        <div className={`flex-1 overflow-hidden relative ${activeOSTheme} transition-colors duration-500`}>
           
           {celebrationData ? (
              <CelebrationScreen 
@@ -381,8 +435,14 @@ export default function App() {
             />
           ) : activeTab === 'discovery' ? (
             <DiscoveryView allDecks={allDecks} lessons={allLessons} onSelectDeck={(d:any) => { setActiveDeckKey(d.id); setActiveTab('flashcards'); }} onSelectLesson={setActiveLesson} onLogActivity={actions.logActivity} userData={userData} onPurchaseItem={actions.purchaseUnlock} />
+          ) : activeTab === 'store' ? (
+            // 🔥 STOREFRONT VIEW INJECTED
+            <StorefrontView 
+                userData={userData} 
+                onPurchase={handlePurchaseCosmetic} 
+                onEquip={handleEquipCosmetic} 
+            />
           ) : activeTab === 'flashcards' ? (
-            // 🔥 FULLY WIRED FLASHCARD VIEW WITH NEW POWER ACTIONS
             <FlashcardView 
                 allDecks={allDecks} 
                 selectedDeckKey={activeDeckKey} 
