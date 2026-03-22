@@ -11,14 +11,14 @@ import {
     Lock, Play, ChevronRight, Monitor, FileText, ChevronDown, 
     ChevronUp, Trophy, Zap, Flame, Plus, User, Heart,
     Mic, Square, Volume2, Loader2, Shield, Map, Gamepad2,
-    Triangle, Circle, XCircle, X, ArrowDownCircle, Settings // 🔥 Added Settings
+    Triangle, Circle, XCircle, X, ArrowDownCircle, Settings
 } from 'lucide-react';
 
 import StudentGradebook from './StudentGradebook';
 import LeaderboardView from './LeaderboardView';
 import StudentSlipstreamView from './StudentSlipstreamView';
-import HoloAvatar from './HoloAvatar'; // 🔥 IMPORTED
-import AvatarForge from './AvatarForge'; // 🔥 IMPORTED
+import HoloAvatar from './HoloAvatar';
+import AvatarForge from './AvatarForge';
 
 // --- THEME HELPER (Dark Mode Upgraded) ---
 const getSubjectTheme = (subject: string) => {
@@ -248,6 +248,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
     );
   }
 
+  // --- THREAD VIEW ---
   return (
     <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-inner overflow-hidden animate-in slide-in-from-right-8 duration-500 font-sans transition-colors duration-300">
         <header className="bg-white dark:bg-slate-900/80 backdrop-blur-md p-4 md:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-sm z-30 transition-colors duration-300 shrink-0">
@@ -258,6 +259,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
         </header>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+            {/* HERO PROMPT CARD */}
             <div className="bg-gradient-to-br from-indigo-900 to-slate-900 dark:from-indigo-950 dark:to-black text-white px-6 py-10 md:p-12 relative overflow-hidden shrink-0 border-b-4 border-indigo-500">
                 <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none"><Zap size={120} /></div>
                 <div className="max-w-3xl mx-auto relative z-10">
@@ -279,7 +281,10 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                 </div>
             </div>
 
+            {/* MAIN CONTENT AREA */}
             <div className="max-w-3xl mx-auto p-4 md:p-8 pb-32">
+                
+                {/* NEW RESPONSE FORM */}
                 {isCreating && (
                     <form onSubmit={handlePostResponse} className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border-2 border-indigo-200 dark:border-indigo-500/30 shadow-xl mb-10 animate-in slide-in-from-top-4 duration-300 relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-cyan-400" />
@@ -299,6 +304,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                     </form>
                 )}
 
+                {/* RESPONSES FEED */}
                 <div className="space-y-8">
                     {responses.length === 0 && !isCreating ? (
                         <div className="text-center py-12 opacity-40">
@@ -308,6 +314,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                     ) : (
                         responses.map((res) => (
                             <article key={res.id} className="relative">
+                                {/* The Response Card */}
                                 <div className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm relative z-10 transition-colors duration-300">
                                     <div className="flex items-start justify-between gap-4 mb-4">
                                         <div className="flex items-center gap-4">
@@ -340,6 +347,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                                     </div>
                                 </div>
 
+                                {/* Threaded Comments Section */}
                                 {(res.comments?.length > 0 || replyingToId === res.id) && (
                                     <div className="ml-8 md:ml-12 mt-4 space-y-3 relative before:absolute before:-left-6 before:top-0 before:bottom-6 before:w-px before:bg-slate-200 dark:before:bg-slate-800">
                                         {res.comments?.map((comment: any, idx: number) => (
@@ -353,6 +361,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                                             </div>
                                         ))}
                                         
+                                        {/* Active Reply Terminal */}
                                         {replyingToId === res.id && (
                                             <div className="relative flex items-center animate-in slide-in-from-top-2 before:absolute before:-left-6 before:top-1/2 before:w-6 before:h-px before:bg-indigo-300 dark:before:bg-indigo-500/50">
                                                 <div className="absolute left-4 text-indigo-400 font-mono font-black text-xs">&gt;</div>
@@ -499,7 +508,12 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogAc
     };
 
     if (!isQuiz || liveSession?.quizState === 'waiting') {
-        const studentData = liveSession?.joined?.[safeEmail] || { name: userData?.name, equipped: userData?.equipped, avatarUrl: userData?.profile?.main?.avatarUrl };
+        // 🔥 THE FIX: Safe merge ensuring UI updates instantly from local data!
+        const studentData = {
+            name: userData?.name || studentEmail,
+            equipped: liveSession?.joined?.[safeEmail]?.equipped || userData?.equipped || {},
+            avatarUrl: liveSession?.joined?.[safeEmail]?.avatarUrl || userData?.profile?.main?.avatarUrl
+        };
 
         return (
             <div className="h-full bg-black rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500 border-4 border-slate-800 shadow-[inset_0_0_100px_rgba(255,255,255,0.05)] relative overflow-hidden">
@@ -698,7 +712,12 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, 
     };
 
     if (liveSession?.quizState === 'waiting') {
-        const studentData = liveSession?.joined?.[safeEmail] || { name: userData?.name, equipped: userData?.equipped, avatarUrl: userData?.profile?.main?.avatarUrl };
+        // 🔥 THE FIX: Safe merge ensuring UI updates instantly from local data!
+        const studentData = {
+            name: userData?.name || studentEmail,
+            equipped: liveSession?.joined?.[safeEmail]?.equipped || userData?.equipped || {},
+            avatarUrl: liveSession?.joined?.[safeEmail]?.avatarUrl || userData?.profile?.main?.avatarUrl
+        };
         
         return (
             <div className="h-full bg-black rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center border-4 border-slate-900 shadow-[inset_0_0_100px_rgba(255,255,255,0.05)] relative overflow-hidden">
