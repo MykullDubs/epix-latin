@@ -402,7 +402,7 @@ const SHAPE_THEMES = [
     { color: 'bg-slate-800 hover:bg-slate-900 active:bg-black', shadow: 'shadow-[0_8px_0_rgb(15,23,42)]', icon: X }
 ];
 
-const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogActivity }: any) => {
+const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogActivity, userData }: any) => {
     const activeLesson = lessons.find((l: any) => l.id === liveSession?.lessonId);
     const pages = useMemo(() => {
         if (!activeLesson?.blocks) return [];
@@ -436,13 +436,19 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogAc
     const pointsThisRound = liveSession?.roundPoints?.[safeEmail] || 0;
     const [xpLogged, setXpLogged] = useState(false);
 
+    // 🔥 THIS IS WHERE WE INJECT THE EQUIPPED DATA WHEN THEY JOIN
     useEffect(() => {
         if (!classId || !studentEmail || !liveSession) return;
         if (liveSession.quizState === 'waiting' && !liveSession.joined?.[safeEmail]) {
             const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
-            updateDoc(sessionRef, { [`joined.${safeEmail}`]: true }).catch(e => console.log("Could not ping lobby arrival:", e));
+            updateDoc(sessionRef, { 
+                [`joined.${safeEmail}`]: {
+                    name: userData?.name || studentEmail,
+                    equipped: userData?.equipped || {} // BROADCAST LOADOUT!
+                } 
+            }).catch(e => console.log("Could not ping lobby arrival:", e));
         }
-    }, [classId, studentEmail, liveSession?.quizState, liveSession?.joined, safeEmail]);
+    }, [classId, studentEmail, liveSession?.quizState, liveSession?.joined, safeEmail, userData]);
 
     useEffect(() => {
         if (isFinished && !xpLogged && xpEarned > 0) {
@@ -553,7 +559,7 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogAc
 // ============================================================================
 //  CONNECT FOUR: STUDENT REMOTE
 // ============================================================================
-const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity }: any) => {
+const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, userData }: any) => {
     const safeEmail = (studentEmail || 'scholar@magister').replace(/\./g, ',');
     const myTeam = liveSession?.teams?.[safeEmail]; 
     const isMyTurn = liveSession?.currentTurn === myTeam;
@@ -563,6 +569,20 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity }
     const myAnswer = liveSession?.answers?.[safeEmail];
     const iHaveUnlockedDrop = myAnswer === currentQ?.correctId;
     const [xpLogged, setXpLogged] = useState(false);
+
+    // 🔥 INJECT EQUIPPED DATA WHEN JOINING
+    useEffect(() => {
+        if (!classId || !studentEmail || !liveSession) return;
+        if (liveSession.quizState === 'waiting' && !liveSession.joined?.[safeEmail]) {
+            const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
+            updateDoc(sessionRef, { 
+                [`joined.${safeEmail}`]: {
+                    name: userData?.name || studentEmail,
+                    equipped: userData?.equipped || {} // BROADCAST LOADOUT
+                }
+            }).catch(e => console.log("Could not ping lobby arrival:", e));
+        }
+    }, [classId, studentEmail, liveSession?.quizState, liveSession?.joined, safeEmail, userData]);
 
     useEffect(() => {
         if (isFinished && liveSession?.winningTeam === myTeam && !xpLogged) {
@@ -598,7 +618,8 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity }
             lastMove: { 
                 col: colIndex, 
                 row: currentColumn.length, 
-                team: myTeam, 
+                team: myTeam,
+                player: safeEmail, // 🔥 Tells the projector WHO dropped the piece!
                 timestamp: Date.now() 
             } 
         });
@@ -756,6 +777,7 @@ export default function StudentClassView({
                         classId={classData.id} 
                         studentEmail={userData?.email || auth?.currentUser?.email} 
                         onLogActivity={onLogActivity}
+                        userData={userData} // Pass userData for payload injection
                     />
                   ) : (
                     <LiveTriviaRemote 
@@ -764,6 +786,7 @@ export default function StudentClassView({
                         classId={classData.id} 
                         studentEmail={userData?.email || auth?.currentUser?.email} 
                         onLogActivity={onLogActivity}
+                        userData={userData} // Pass userData for payload injection
                     />                  
                   )}
               </div>
