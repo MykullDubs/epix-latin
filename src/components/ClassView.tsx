@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { doc, onSnapshot, setDoc } from 'firebase/firestore'; 
 import { db } from '../config/firebase';
 import { useLiveClass } from '../hooks/useLiveClass';
-import { MessageSquare, MessageCircle, Gamepad2, CheckCircle2, X, Puzzle, ChevronLeft, ChevronRight, Zap, Users } from 'lucide-react';
+import { MessageSquare, MessageCircle, Gamepad2, CheckCircle2, X, Puzzle, ChevronLeft, ChevronRight, Zap, Users, Clock, EyeOff } from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
 // import ClassForum from './ClassForum'; // Ensure this exists
 
@@ -13,7 +13,13 @@ import ConnectThreeVocab from './ConnectThreeVocab';
 export default function ClassView({ lesson, classId, userData, activeOrg, onExit }: any) {
   const [activePageIdx, setActivePageIdx] = useState(0);
   const [showForum, setShowForum] = useState(false);
+  
+  // 🔥 OS FEATURE: Presentation Telemetry & Focus Mode
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [isBlanked, setIsBlanked] = useState(false);
+  
   const stageRef = useRef<HTMLDivElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
 
   // Initialize the Instructor Live Game Sync Engine
   const { liveState, startLiveClass, endLiveClass, changeSlide, triggerQuiz } = useLiveClass(classId, true);
@@ -24,11 +30,25 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       ?.flatMap((b: any) => b.items) || [];
   }, [lesson]);
 
-  // When the projector starts, broadcast to the room!
+  // When the projector starts, broadcast to the room & start the clock!
   useEffect(() => {
       startLiveClass(lesson.id);
-      return () => { endLiveClass(); }; // Kill the session when teacher closes it
+      
+      const timer = setInterval(() => {
+          setElapsedTime(prev => prev + 1);
+      }, 1000);
+
+      return () => { 
+          clearInterval(timer);
+          endLiveClass(); 
+      };
   }, [lesson.id]);
+
+  const formatTime = (seconds: number) => {
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
 
   const pages = useMemo(() => {
     if (!lesson?.blocks) return [];
@@ -46,41 +66,45 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
     return grouped;
   }, [lesson]);
 
-  // KEYBOARD NAVIGATION LISTENER
-  const handleNext = useCallback(() => {
-      if (activePageIdx < pages.length - 1) {
-          const nextIdx = activePageIdx + 1;
-          setActivePageIdx(nextIdx);
-          changeSlide(nextIdx); // Broadcast page change to student phones
+  const jumpToSlide = useCallback((index: number) => {
+      if (index >= 0 && index < pages.length) {
+          setActivePageIdx(index);
+          changeSlide(index);
           if (stageRef.current) stageRef.current.scrollTo({ top: 0, behavior: 'smooth' });
       }
-  }, [activePageIdx, pages.length, changeSlide]);
+  }, [pages.length, changeSlide]);
 
-  const handlePrev = useCallback(() => {
-      if (activePageIdx > 0) {
-          const prevIdx = activePageIdx - 1;
-          setActivePageIdx(prevIdx);
-          changeSlide(prevIdx); // Broadcast page change to student phones
-          if (stageRef.current) stageRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-  }, [activePageIdx, changeSlide]);
+  const handleNext = useCallback(() => jumpToSlide(activePageIdx + 1), [activePageIdx, jumpToSlide]);
+  const handlePrev = useCallback(() => jumpToSlide(activePageIdx - 1), [activePageIdx, jumpToSlide]);
+
+  // 🔥 OS FEATURE: Interactive Progress Bar Scrubber
+  const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!progressBarRef.current) return;
+      const rect = progressBarRef.current.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const percentage = clickX / rect.width;
+      const targetSlide = Math.floor(percentage * pages.length);
+      jumpToSlide(targetSlide);
+  };
 
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
           if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
           
           if (e.key === 'ArrowRight' || e.key === ' ') { 
-              e.preventDefault();
-              handleNext();
+              e.preventDefault(); handleNext();
           } else if (e.key === 'ArrowLeft') {
-              e.preventDefault();
-              handlePrev();
+              e.preventDefault(); handlePrev();
           } else if (e.key === 'ArrowDown') {
               e.preventDefault();
               if (stageRef.current) stageRef.current.scrollBy({ top: window.innerHeight * 0.4, behavior: 'smooth' });
           } else if (e.key === 'ArrowUp') {
               e.preventDefault();
               if (stageRef.current) stageRef.current.scrollBy({ top: -(window.innerHeight * 0.4), behavior: 'smooth' });
+          } else if (e.key.toLowerCase() === 'b') {
+              // 🔥 OS FEATURE: Press 'B' to blackout the screen
+              e.preventDefault();
+              setIsBlanked(prev => !prev);
           }
       };
       
@@ -91,11 +115,15 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   if (!lesson || !pages[activePageIdx]) return null;
 
   return (
-    // 🔥 THE FIX: A hard clamp calculating exactly 100vh minus the 4rem App header
     <div 
         className="w-full flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500 relative"
         style={{ height: 'calc(100dvh - 4rem)' }}
     >
+      {/* 🔥 OS FEATURE: The Blackout Overlay */}
+      <div className={`absolute inset-0 bg-black z-[9000] flex items-center justify-center transition-opacity duration-700 pointer-events-none ${isBlanked ? 'opacity-100' : 'opacity-0'}`}>
+          <EyeOff size={64} className="text-white/10" />
+      </div>
+
       <main className="flex-1 flex overflow-hidden relative group/canvas bg-white text-slate-900">
         
         {/* MOUSE NAVIGATION CONTROLS */}
@@ -103,7 +131,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
             <button 
                 onClick={handlePrev} 
                 aria-label="Previous Slide"
-                className="absolute left-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/10 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 focus:outline-none shadow-lg"
+                className="absolute left-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/5 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 focus:outline-none shadow-lg"
             >
                 <ChevronLeft size={48} aria-hidden="true" />
             </button>
@@ -113,19 +141,18 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
             <button 
                 onClick={handleNext} 
                 aria-label="Next Slide"
-                className="absolute right-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/10 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 focus:outline-none shadow-lg"
+                className="absolute right-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/5 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 focus:outline-none shadow-lg"
             >
                 <ChevronRight size={48} aria-hidden="true" />
             </button>
         )}
 
         {/* SECURE SCROLL CONTAINER */}
-        <div ref={stageRef} className={`flex-1 overflow-y-auto w-full relative transition-all duration-500 ${showForum ? 'mr-[450px]' : ''}`}>
+        <div ref={stageRef} className={`flex-1 overflow-y-auto w-full relative transition-all duration-500 ${showForum ? 'mr-[450px]' : ''} scroll-smooth`}>
           
-          {/* FLEX-CENTERING WRAPPER: Centers short content, expands down for tall content without clipping */}
-          <div className="flex flex-col min-h-full w-full items-center px-16 py-12">
+          <div className="flex flex-col min-h-full w-full items-center px-16 py-12 lg:px-32">
             
-            <div className="w-full max-w-7xl space-y-20 my-auto">
+            <div className="w-full max-w-7xl space-y-24 my-auto">
               {pages[activePageIdx].blocks.map((block: any, i: number) => {
                 const isQuiz = block.type === 'quiz';
                 const answerCount = Object.keys(liveState?.answers || {}).length;
@@ -133,53 +160,52 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                 return (
                   <div key={i} className="animate-in fade-in zoom-in-95 duration-700 w-full">
                     
-                    {/* MULTIPLAYER QUIZ BLOCK INTERCEPTOR */}
                     {isQuiz ? (
-                      <div className="bg-slate-900 text-white border-4 border-slate-800 rounded-[4rem] p-16 shadow-2xl text-center animate-in slide-in-from-bottom-12 duration-500 mx-auto max-w-5xl mt-12 mb-12">
-                          <span className="text-[2vh] font-black text-indigo-400 uppercase tracking-widest block mb-6">Class Question</span>
-                          <h2 className="text-[5vh] md:text-[6vh] font-black mb-12 leading-tight">{block.content?.question || block.question}</h2>
+                      <div className="bg-slate-900 text-white border-4 border-slate-800 rounded-[4rem] p-16 shadow-2xl text-center animate-in slide-in-from-bottom-12 duration-500 mx-auto max-w-5xl my-12 relative overflow-hidden">
+                          {/* Decorative Background Elements */}
+                          <div className="absolute top-0 right-0 -mr-16 -mt-16 text-slate-800 opacity-50 rotate-12"><HelpCircle size={250} /></div>
                           
-                          {/* State 1: Waiting to Start */}
-                          {liveState?.quizState === 'waiting' && (
-                              <button 
-                                  onClick={() => triggerQuiz('active')}
-                                  className="bg-rose-500 hover:bg-rose-600 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest shadow-[0_0_40px_rgba(244,63,94,0.5)] transition-transform active:scale-95 flex items-center gap-4 mx-auto focus:outline-none focus:ring-4 focus:ring-rose-400"
-                              >
-                                  <Zap size={40} fill="currentColor" /> Launch Trivia Protocol
-                              </button>
-                          )}
+                          <div className="relative z-10">
+                              <span className="text-[2vh] font-black text-indigo-400 uppercase tracking-widest block mb-6">Class Question</span>
+                              <h2 className="text-[5vh] md:text-[6vh] font-black mb-12 leading-tight">{block.content?.question || block.question}</h2>
+                              
+                              {liveState?.quizState === 'waiting' && (
+                                  <button 
+                                      onClick={() => triggerQuiz('active')}
+                                      className="bg-rose-500 hover:bg-rose-600 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest shadow-[0_0_40px_rgba(244,63,94,0.5)] transition-transform active:scale-95 flex items-center gap-4 mx-auto focus:outline-none focus:ring-4 focus:ring-rose-400"
+                                  >
+                                      <Zap size={40} fill="currentColor" /> Launch Trivia Protocol
+                                  </button>
+                              )}
 
-                          {/* State 2: Active Game (Waiting for answers) */}
-                          {liveState?.quizState === 'active' && (
-                              <div className="space-y-12 animate-in fade-in duration-500">
-                                  <div className="flex flex-col items-center justify-center gap-4 text-[6vh] font-black text-indigo-400">
-                                      <div className="flex items-center gap-6 bg-slate-800 px-10 py-6 rounded-[2rem] shadow-inner border border-slate-700">
-                                          <Users size={64} className="animate-pulse" /> 
-                                          <span>{answerCount} Students Locked In</span>
+                              {liveState?.quizState === 'active' && (
+                                  <div className="space-y-12 animate-in fade-in duration-500">
+                                      <div className="flex flex-col items-center justify-center gap-4 text-[6vh] font-black text-indigo-400">
+                                          <div className="flex items-center gap-6 bg-slate-800 px-10 py-6 rounded-[2rem] shadow-inner border border-slate-700">
+                                              <Users size={64} className="animate-pulse" /> 
+                                              <span>{answerCount} Students Locked In</span>
+                                          </div>
+                                      </div>
+                                      <button 
+                                          onClick={() => triggerQuiz('revealed')}
+                                          className="bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest transition-transform active:scale-95 shadow-xl mx-auto focus:outline-none focus:ring-4 focus:ring-indigo-400"
+                                      >
+                                          Reveal Correct Answer
+                                      </button>
+                                  </div>
+                              )}
+
+                              {liveState?.quizState === 'revealed' && (
+                                  <div className="animate-in zoom-in duration-500 flex flex-col items-center">
+                                      <div className="inline-flex items-center gap-4 bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/50 px-10 py-5 rounded-[2rem] text-[4vh] font-black mb-12 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
+                                          <CheckCircle2 size={48} /> Correct Answer Displayed!
+                                      </div>
+                                      <div className="bg-emerald-500 text-white p-8 rounded-[2rem] shadow-xl text-[4vh] font-bold border-4 border-emerald-400 min-w-[50%]">
+                                          {block.content?.options?.find((o:any) => o.id === block.content.correctId)?.text || "Answer Revealed on Devices"}
                                       </div>
                                   </div>
-                                  <button 
-                                      onClick={() => triggerQuiz('revealed')}
-                                      className="bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest transition-transform active:scale-95 shadow-xl mx-auto focus:outline-none focus:ring-4 focus:ring-indigo-400"
-                                  >
-                                      Reveal Correct Answer
-                                  </button>
-                              </div>
-                          )}
-
-                          {/* State 3: The Reveal (Shows Correct Answer) */}
-                          {liveState?.quizState === 'revealed' && (
-                              <div className="animate-in zoom-in duration-500 flex flex-col items-center">
-                                  <div className="inline-flex items-center gap-4 bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/50 px-10 py-5 rounded-[2rem] text-[4vh] font-black mb-12 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
-                                      <CheckCircle2 size={48} /> Correct Answer Displayed!
-                                  </div>
-                                  
-                                  {/* Show the correct answer prominently */}
-                                  <div className="bg-emerald-500 text-white p-8 rounded-[2rem] shadow-xl text-[4vh] font-bold border-4 border-emerald-400 min-w-[50%]">
-                                      {block.content?.options?.find((o:any) => o.id === block.content.correctId)?.text || "Answer Revealed on Devices"}
-                                  </div>
-                              </div>
-                          )}
+                              )}
+                          </div>
                       </div>
                     ) : (
                       /* STANDARD BLOCKS */
@@ -211,16 +237,30 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         )}
       </main>
 
-      {/* FOOTER PROGRESS INDICATOR */}
+      {/* FOOTER PROGRESS INDICATOR & HUD */}
       <footer className="h-20 bg-slate-900 border-t border-slate-800 flex items-center justify-between px-12 shrink-0 relative z-20">
-          <div className="flex items-center gap-6">
-              <h2 className="text-xl font-black text-slate-500 uppercase tracking-widest">{lesson.title}</h2>
+          <div className="flex items-center gap-8">
+              <h2 className="text-xl font-black text-slate-400 uppercase tracking-widest">{lesson.title}</h2>
+              <div className="h-6 w-px bg-slate-800" />
+              {/* 🔥 OS FEATURE: Telemetry Clock */}
+              <span className="flex items-center gap-2 font-mono text-lg font-bold text-slate-500">
+                  <Clock size={18} /> {formatTime(elapsedTime)}
+              </span>
           </div>
+          
           <div className="flex items-center gap-6">
-              <div className="w-48 h-2 bg-slate-800 rounded-full overflow-hidden">
-                  <div className="h-full bg-indigo-500 transition-all duration-500" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} />
+              {/* 🔥 OS FEATURE: Interactive Scrubber */}
+              <div 
+                  ref={progressBarRef}
+                  onClick={handleProgressBarClick}
+                  className="w-64 h-3 bg-slate-800 rounded-full overflow-hidden cursor-pointer group relative"
+                  title="Click to jump to slide"
+              >
+                  {/* Hover preview indicator */}
+                  <div className="absolute inset-0 bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="h-full bg-indigo-500 transition-all duration-300 relative z-10" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} />
               </div>
-              <span className="font-black text-slate-400 tracking-widest uppercase">
+              <span className="font-black text-slate-400 tracking-widest uppercase w-32 text-right">
                   Slide {activePageIdx + 1} of {pages.length}
               </span>
           </div>
@@ -230,28 +270,35 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 }
 
 // ============================================================================
-//  INTERNAL BLOCK RENDERERS (Keeps main component clean)
+//  INTERNAL BLOCK RENDERERS (Cinematic Upgrades)
 // ============================================================================
 
 const TextBlock = ({ block }: { block: any }) => (
-  <div className="text-center py-12">
-    {block.title && <h3 className="text-[3vh] font-black text-indigo-500 uppercase tracking-widest mb-6">{block.title}</h3>}
-    <p className="text-[6vh] font-bold text-slate-800 leading-tight">{block.content}</p>
+  <div className="text-center py-12 max-w-6xl mx-auto">
+    {block.title && <h3 className="text-[3vh] font-black text-indigo-500 uppercase tracking-widest mb-8">{block.title}</h3>}
+    {/* Cinematic Typography */}
+    <p className="text-[6vh] font-black text-slate-800 leading-[1.1] tracking-tight">{block.content}</p>
   </div>
 );
 
 const EssayBlock = ({ block }: { block: any }) => (
-  <div className="w-full max-w-5xl mx-auto space-y-[4vh] py-12">
-    <h1 className="text-[8vh] font-black text-slate-900 leading-none mb-12 text-center">{block.title}</h1>
-    {block.content?.split('\n\n').map((para: string, pIdx: number) => (
-      <p key={pIdx} className="text-[4vh] leading-[1.6] text-slate-700 font-serif text-justify first-letter:text-[6vh] first-letter:font-black first-letter:text-indigo-600 first-letter:mr-3">{para.trim()}</p>
-    ))}
+  <div className="w-full max-w-7xl mx-auto py-12">
+    <h1 className="text-[8vh] font-black text-slate-900 leading-none mb-16 text-center">{block.title}</h1>
+    {/* 🔥 OS FEATURE: Newspaper multi-column layout for easy projector reading */}
+    <div className="columns-1 xl:columns-2 gap-20 space-y-[4vh]">
+        {block.content?.split('\n\n').map((para: string, pIdx: number) => (
+          <p key={pIdx} className="text-[3.5vh] leading-[1.7] text-slate-700 font-serif text-justify first-letter:text-[7vh] first-letter:font-black first-letter:text-indigo-600 first-letter:float-left first-letter:mr-3 break-inside-avoid">{para.trim()}</p>
+        ))}
+    </div>
   </div>
 );
 
 const ImageBlock = ({ block }: { block: any }) => (
   <figure className="w-full flex flex-col items-center py-12">
-    <img src={block.url} alt="presentation slide" className="max-h-[60vh] rounded-[3rem] shadow-2xl object-cover border-8 border-slate-50" />
+    <div className="relative group overflow-hidden rounded-[3rem] shadow-2xl border-8 border-slate-50">
+        {/* Subtle cinematic zoom on load */}
+        <img src={block.url} alt="presentation slide" className="max-h-[65vh] object-cover animate-in zoom-in-105 duration-[20s]" />
+    </div>
     {block.caption && <figcaption className="text-[3vh] text-slate-500 font-bold mt-8 text-center max-w-4xl">{block.caption}</figcaption>}
   </figure>
 );
@@ -259,7 +306,12 @@ const ImageBlock = ({ block }: { block: any }) => (
 const DialogueBlock = ({ block }: { block: any }) => (
   <div className="w-full max-w-5xl mx-auto space-y-12 py-12">
     {block.lines?.map((line: any, j: number) => (
-      <div key={j} className={`flex items-end gap-6 ${line.side === 'right' ? 'flex-row-reverse' : ''}`}>
+      // 🔥 OS FEATURE: Staggered animation entrance like an actual chat loading
+      <div 
+        key={j} 
+        className={`flex items-end gap-6 animate-in slide-in-from-bottom-8 fade-in fill-mode-both ${line.side === 'right' ? 'flex-row-reverse' : ''}`}
+        style={{ animationDelay: `${j * 300}ms`, animationDuration: '600ms' }}
+      >
         <div className={`w-20 h-20 rounded-full flex items-center justify-center text-[3vh] font-black text-white shrink-0 shadow-2xl ${line.side === 'right' ? 'bg-indigo-600' : 'bg-slate-800'}`}>
           {line.speaker?.[0].toUpperCase()}
         </div>
@@ -275,26 +327,30 @@ const DialogueBlock = ({ block }: { block: any }) => (
 );
 
 const VocabListBlock = ({ block }: { block: any }) => (
-  <div className="grid grid-cols-2 gap-8 py-12">
+  <div className="grid grid-cols-2 gap-10 py-12">
     {block.items.map((item: any, j: number) => (
-      <div key={j} className="bg-slate-50 p-12 rounded-[3rem] border-4 border-slate-100 text-center shadow-xl">
-        <p className="text-[5vh] font-black text-indigo-600 mb-2">{item.term}</p>
-        <p className="text-[2.5vh] text-slate-500 font-bold">{item.definition}</p>
+      // 🔥 OS FEATURE: Glassmorphism layout
+      <div key={j} className="bg-gradient-to-br from-slate-50 to-slate-100 p-12 rounded-[3rem] border border-white shadow-xl text-left relative overflow-hidden group">
+        <div className="absolute -right-12 -top-12 opacity-5 text-indigo-900 rotate-12 group-hover:scale-110 transition-transform duration-700">
+            <Layers size={200} />
+        </div>
+        <p className="text-[5vh] font-black text-indigo-600 mb-4 relative z-10">{item.term}</p>
+        <p className="text-[3vh] text-slate-600 font-medium leading-relaxed relative z-10">{item.definition}</p>
       </div>
     ))}
   </div>
 );
 
 const DiscussionBlock = ({ block }: { block: any }) => (
-  <div className="w-full max-w-5xl mx-auto bg-indigo-50 rounded-[4rem] p-16 border-8 border-indigo-100 shadow-2xl my-12">
-    <div className="flex items-center gap-6 mb-12 justify-center">
-      <div className="p-6 bg-indigo-600 text-white rounded-3xl shadow-xl" aria-hidden="true"><MessageCircle size={48} /></div>
+  <div className="w-full max-w-6xl mx-auto bg-indigo-50 rounded-[4rem] p-16 border-8 border-indigo-100 shadow-2xl my-12">
+    <div className="flex items-center gap-6 mb-16 justify-center">
+      <div className="p-6 bg-indigo-600 text-white rounded-3xl shadow-xl animate-bounce" style={{ animationDuration: '3s' }} aria-hidden="true"><MessageCircle size={48} /></div>
       <h3 className="text-[5vh] font-black text-indigo-900">{block.title || "Let's Discuss"}</h3>
     </div>
     <div className="space-y-8">
       {(block.questions || []).map((q: string, j: number) => (
-        <div key={j} className="bg-white p-8 rounded-[2rem] shadow-md border-4 border-indigo-50 flex gap-6 items-start">
-          <span className="text-[4vh] font-black text-indigo-300">{j + 1}</span>
+        <div key={j} className="bg-white p-10 rounded-[2.5rem] shadow-md border-4 border-indigo-50 flex gap-8 items-start hover:-translate-y-2 transition-transform duration-300">
+          <span className="text-[5vh] font-black text-indigo-200 leading-none">{j + 1}</span>
           <p className="text-[4vh] font-bold text-slate-800 leading-tight">{q}</p>
         </div>
       ))}
@@ -327,7 +383,7 @@ const ScenarioBlock = ({ block, liveState }: { block: any, liveState: any }) => 
     <div className={`w-full max-w-5xl mx-auto rounded-[4rem] p-16 text-white shadow-2xl border-8 text-center transition-colors duration-500 my-12 ${style}`}>
       <span className="text-[2vh] font-black uppercase tracking-widest block mb-8 opacity-70">Interactive Scenario • {currentNode?.speaker || 'Character'}</span>
       <h3 className="text-[5vh] font-serif italic mb-12 leading-tight">"{currentNode?.text}"</h3>
-      <div className="inline-block px-8 py-4 bg-black/20 rounded-full border-2 border-white/20 backdrop-blur-md">
+      <div className="inline-block px-8 py-4 bg-black/20 rounded-full border-2 border-white/20 backdrop-blur-md animate-pulse">
         <p className="text-[3vh] font-bold text-white">Look at your device to make a choice!</p>
       </div>
     </div>
