@@ -17,7 +17,8 @@ import {
 import { 
   Globe, Flame, Trophy, BarChart3, CheckCircle2, Zap, 
   Settings, ChevronRight, UploadCloud, LogOut, Shield, Crown,
-  Camera, Loader2, Heart, Activity, AlertCircle, History, Target, Moon
+  Camera, Loader2, Heart, Activity, AlertCircle, History, Target, Moon,
+  X, Save, RefreshCw, Cpu, Eye, Smile, ArrowUpCircle, Layers
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 
@@ -33,6 +34,128 @@ const TITLE_MAP: Record<string, string> = {
     'title_glitch': '"System Glitch"',
     'title_architect': '"The Architect"',
 };
+
+// ============================================================================
+//  AVATAR FORGE (The Custom Character Builder)
+// ============================================================================
+const FORGE_PARTS = {
+    base: ['box', 'cylinder', 'shadow', 'skull', 'square'],
+    eyes: ['bulging', 'dizzy', 'eva', 'frame1', 'frame2', 'glow', 'happy', 'robocop', 'round', 'sensor', 'smile'],
+    mouth: ['bite', 'diagram', 'grill01', 'grill02', 'square01', 'square02'],
+    top: ['antenna', 'antennaCrooked', 'bulb01', 'horns', 'radar', 'lights', 'pyramid']
+};
+
+const FORGE_COLORS = ['4f46e5', '06b6d4', '10b981', 'f59e0b', 'f43f5e', '8b5cf6', '64748b'];
+
+function AvatarForge({ currentConfig, onSave, onClose }: any) {
+    const [config, setConfig] = useState(currentConfig || {
+        base: 'skull',
+        eyes: 'glow',
+        mouth: 'bite',
+        top: 'antenna',
+        baseColor: '4f46e5'
+    });
+
+    const [activeTab, setActiveTab] = useState<'base' | 'eyes' | 'mouth' | 'top'>('base');
+
+    const previewUrl = `https://api.dicebear.com/7.x/bottts/svg?base=${config.base}&eyes=${config.eyes}&mouth=${config.mouth}&top=${config.top}&baseColor=${config.baseColor}&backgroundColor=transparent`;
+
+    const handleRandomize = () => {
+        setConfig({
+            base: FORGE_PARTS.base[Math.floor(Math.random() * FORGE_PARTS.base.length)],
+            eyes: FORGE_PARTS.eyes[Math.floor(Math.random() * FORGE_PARTS.eyes.length)],
+            mouth: FORGE_PARTS.mouth[Math.floor(Math.random() * FORGE_PARTS.mouth.length)],
+            top: FORGE_PARTS.top[Math.floor(Math.random() * FORGE_PARTS.top.length)],
+            baseColor: FORGE_COLORS[Math.floor(Math.random() * FORGE_COLORS.length)]
+        });
+    };
+
+    const tabs = [
+        { id: 'base', icon: Cpu, label: 'Chassis' },
+        { id: 'eyes', icon: Eye, label: 'Optics' },
+        { id: 'mouth', icon: Smile, label: 'Vocoder' },
+        { id: 'top', icon: ArrowUpCircle, label: 'Hardware' }
+    ];
+
+    return (
+        <div className="fixed inset-0 z-[7000] flex items-center justify-center p-6">
+            <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md transition-opacity animate-in fade-in" onClick={onClose} />
+            
+            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] shadow-2xl border-4 border-slate-100 dark:border-slate-800 relative z-10 animate-in zoom-in-95 duration-300 overflow-hidden flex flex-col">
+                
+                <div className="bg-slate-100 dark:bg-slate-800 p-8 relative flex flex-col items-center border-b border-slate-200 dark:border-slate-700">
+                    <button onClick={onClose} className="absolute top-6 right-6 p-2 bg-white/50 dark:bg-black/20 hover:bg-white dark:hover:bg-black/40 rounded-full text-slate-500 transition-colors">
+                        <X size={20} strokeWidth={3} />
+                    </button>
+                    
+                    <button onClick={handleRandomize} className="absolute top-6 left-6 p-2 bg-white/50 dark:bg-black/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/30 rounded-full text-indigo-500 transition-colors" title="Randomize Protocol">
+                        <RefreshCw size={20} strokeWidth={3} />
+                    </button>
+
+                    <div className="w-40 h-40 bg-white dark:bg-slate-900 rounded-[2rem] shadow-inner border-4 border-slate-50 dark:border-slate-800 flex items-center justify-center p-4 relative mb-6">
+                        <img src={previewUrl} alt="Live Avatar Preview" className="w-full h-full object-contain drop-shadow-xl animate-in zoom-in" />
+                    </div>
+
+                    <div className="flex gap-2 justify-center bg-white dark:bg-slate-900 p-2 rounded-full shadow-sm border border-slate-200 dark:border-slate-700">
+                        {FORGE_COLORS.map(color => (
+                            <button 
+                                key={color}
+                                onClick={() => setConfig({ ...config, baseColor: color })}
+                                className={`w-6 h-6 rounded-full transition-transform ${config.baseColor === color ? 'scale-125 ring-2 ring-offset-2 ring-slate-400 dark:ring-slate-500 dark:ring-offset-slate-900' : 'hover:scale-110'}`}
+                                style={{ backgroundColor: `#${color}` }}
+                            />
+                        ))}
+                    </div>
+                </div>
+
+                <div className="flex flex-col p-6 h-72">
+                    <div className="flex gap-2 mb-6 overflow-x-auto custom-scrollbar pb-2">
+                        {tabs.map(tab => {
+                            const Icon = tab.icon;
+                            const isActive = activeTab === tab.id;
+                            return (
+                                <button 
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id as any)}
+                                    className={`flex-1 flex flex-col items-center justify-center py-2 px-4 rounded-xl transition-colors ${isActive ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30' : 'bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                                >
+                                    <Icon size={18} className="mb-1" />
+                                    <span className="text-[9px] font-black uppercase tracking-widest">{tab.label}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                        <div className="grid grid-cols-3 gap-3">
+                            {FORGE_PARTS[activeTab].map((part) => {
+                                const isSelected = config[activeTab] === part;
+                                return (
+                                    <button 
+                                        key={part}
+                                        onClick={() => setConfig({ ...config, [activeTab]: part })}
+                                        className={`py-4 rounded-xl text-xs font-bold capitalize transition-all active:scale-95 ${isSelected ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30 border-2 border-indigo-500' : 'bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-500/50'}`}
+                                    >
+                                        {part}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="p-6 pt-0">
+                    <button 
+                        onClick={() => onSave(previewUrl, config)}
+                        className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 p-4 rounded-2xl font-black text-sm uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2 shadow-xl"
+                    >
+                        <Save size={20} /> Save & Equip Avatar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 // --- SUB-COMPONENT: REUSABLE AVATAR ---
 const UserAvatar = ({ user, size = "md", border = false }: any) => {
@@ -55,11 +178,11 @@ const UserAvatar = ({ user, size = "md", border = false }: any) => {
     return (
         <div className={`relative shrink-0 ${sizeClasses[size]}`}>
             <div className={`w-full h-full rounded-[35%] overflow-hidden flex items-center justify-center font-black transition-all ${
-                equippedAvatar ? 'bg-slate-800' :
+                equippedAvatar || avatarUrl?.includes('dicebear') ? 'bg-slate-800' :
                 avatarUrl ? 'bg-slate-100 dark:bg-slate-800' : 'bg-gradient-to-br from-indigo-500 to-cyan-400 text-white'
             } ${border && !activeAuraCSS ? 'ring-4 ring-white dark:ring-slate-900 shadow-xl' : ''} ${activeAuraCSS}`}>
                 
-                {/* 1. Show Equipped Black Market Avatar */}
+                {/* 1. Show Equipped Black Market Avatar OR Forge Avatar */}
                 {equippedAvatar ? (
                     <img 
                         src={`https://api.dicebear.com/7.x/bottts/svg?seed=${equippedAvatar}&backgroundColor=transparent`} 
@@ -67,13 +190,13 @@ const UserAvatar = ({ user, size = "md", border = false }: any) => {
                         className="w-full h-full object-contain p-1 animate-in zoom-in duration-500" 
                     />
                 ) : 
-                /* 2. Fallback to Uploaded Photo */
+                /* 2. Fallback to Uploaded Photo / Forged Avatar */
                 avatarUrl ? (
                     <img 
                         key={avatarUrl} 
                         src={avatarUrl} 
                         alt={name} 
-                        className="w-full h-full object-cover animate-in fade-in duration-500" 
+                        className={`w-full h-full ${avatarUrl.includes('dicebear') ? 'object-contain p-1' : 'object-cover'} animate-in fade-in duration-500`} 
                     />
                 ) : 
                 /* 3. Fallback to Initials */
@@ -94,7 +217,9 @@ export default function ProfileView({ user, userData: propUserData }: any) {
   const [deploying, setDeploying] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [liveProfile, setLiveProfile] = useState<any>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // 🔥 Avatar Forge State
+  const [showForge, setShowForge] = useState(false);
 
   // 1. LIVE LISTENER
   useEffect(() => {
@@ -145,19 +270,6 @@ export default function ProfileView({ user, userData: propUserData }: any) {
       await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid), { role: newRole }); 
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file || !user?.uid) return;
-      setIsUploading(true);
-      try { 
-          if (uploadProfilePicture) await uploadProfilePicture(user.uid, file); 
-      } catch (err: any) { 
-          alert(`Upload failed: ${err.message}`); 
-      } finally { 
-          setIsUploading(false); 
-      }
-  };
-
   const deploySystemContent = async () => { 
       if (!window.confirm("Overwrite system content?")) return;
       setDeploying(true); 
@@ -168,6 +280,28 @@ export default function ProfileView({ user, userData: propUserData }: any) {
       setDeploying(false); 
   };
 
+  // 🔥 AVATAR FORGE SAVE HANDLER
+  const handleSaveCustomAvatar = async (finalUrl: string, config: any) => {
+      if (!user?.uid) return;
+      try {
+          const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
+          
+          // If they save a custom forge avatar, we automatically un-equip any Store avatar
+          // so the custom one shows up instead!
+          const newEquipped = { ...(activeData.equipped || {}) };
+          if (newEquipped.avatars) delete newEquipped.avatars;
+
+          await updateDoc(userRef, {
+              'profile.main.avatarUrl': finalUrl,
+              'customAvatarConfig': config,
+              'equipped': newEquipped
+          });
+          setShowForge(false);
+      } catch (err) {
+          console.error("Failed to forge avatar:", err);
+      }
+  };
+
   const xp = activeData?.profile?.main?.xp || activeData?.xp || 0;
   const streak = activeData?.profile?.main?.streak || activeData?.streak || 0;
   const totalLikes = activeData?.profile?.main?.totalLikesReceived || activeData?.totalLikesReceived || 0;
@@ -175,7 +309,6 @@ export default function ProfileView({ user, userData: propUserData }: any) {
   const { level, currentLevelXp, xpToNext, progressPct } = calculateLevel ? calculateLevel(xp, totalLikes) : { level: 1, currentLevelXp: xp, xpToNext: 100, progressPct: 0 };
   const league = getLeagueTier ? getLeagueTier(level) : { name: 'Bronze' };
 
-  // 🔥 Determine active title
   const activeTitle = activeData?.equipped?.titles ? TITLE_MAP[activeData.equipped.titles] : "Student";
 
   return (
@@ -206,17 +339,13 @@ export default function ProfileView({ user, userData: propUserData }: any) {
                             </svg>
                         </div>
                         
-                        <div onClick={() => fileInputRef.current?.click()} className="cursor-pointer group relative z-10">
+                        {/* 🔥 FORGE TRIGGER */}
+                        <div onClick={() => setShowForge(true)} className="cursor-pointer group relative z-10">
                             <UserAvatar user={activeData} size="xl" />
                             <div className="absolute inset-0 bg-black/40 rounded-[35%] opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center backdrop-blur-sm">
-                                <Camera className="text-white mb-1" size={24} />
-                                <span className="text-[8px] font-black text-white uppercase tracking-tighter">Edit</span>
+                                <Settings className="text-white mb-1" size={24} />
+                                <span className="text-[8px] font-black text-white uppercase tracking-tighter">Forge</span>
                             </div>
-                            {isUploading && (
-                                <div className="absolute inset-0 bg-slate-900/80 rounded-[35%] flex items-center justify-center z-20">
-                                    <Loader2 className="animate-spin text-cyan-400" size={32} />
-                                </div>
-                            )}
                         </div>
 
                         <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-[10px] font-black px-4 py-1 rounded-full shadow-xl border border-slate-100 dark:border-slate-700 flex items-center gap-1.5 whitespace-nowrap z-30 transition-colors duration-300">
@@ -383,9 +512,16 @@ export default function ProfileView({ user, userData: propUserData }: any) {
                     </button>
                 </div>
             </div>
-
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
         </div>
+
+        {/* 🔥 FORGE MODAL PORTAL */}
+        {showForge && (
+            <AvatarForge 
+                currentConfig={activeData?.customAvatarConfig} 
+                onSave={handleSaveCustomAvatar} 
+                onClose={() => setShowForge(false)} 
+            />
+        )}
     </div>
   );
 }
