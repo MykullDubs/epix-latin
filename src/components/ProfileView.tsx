@@ -19,7 +19,20 @@ import {
   Settings, ChevronRight, UploadCloud, LogOut, Shield, Crown,
   Camera, Loader2, Heart, Activity, AlertCircle, History, Target, Moon
 } from 'lucide-react';
-import ThemeToggle from './ThemeToggle'; // 🔥 IMPORTED THE TOGGLE
+import ThemeToggle from './ThemeToggle';
+
+// 🔥 BLACK MARKET COSMETIC DICTIONARIES
+const AURA_MAP: Record<string, string> = {
+    'aura_emerald': 'ring-4 ring-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.8)]',
+    'aura_void': 'ring-4 ring-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.8)]',
+    'aura_solar': 'ring-4 ring-amber-400 shadow-[0_0_30px_rgba(251,191,36,1)] animate-pulse',
+};
+
+const TITLE_MAP: Record<string, string> = {
+    'title_scholar': '"The Scholar"',
+    'title_glitch': '"System Glitch"',
+    'title_architect': '"The Architect"',
+};
 
 // --- SUB-COMPONENT: REUSABLE AVATAR ---
 const UserAvatar = ({ user, size = "md", border = false }: any) => {
@@ -34,23 +47,43 @@ const UserAvatar = ({ user, size = "md", border = false }: any) => {
     const name = user?.name || "Scholar";
     const initials = getInitials ? getInitials(name) : name[0].toUpperCase();
 
+    // 🔥 PULL COSMETICS FROM USER DATA
+    const equippedAvatar = user?.equipped?.avatars;
+    const equippedAura = user?.equipped?.auras;
+    const activeAuraCSS = equippedAura ? AURA_MAP[equippedAura] : '';
+
     return (
         <div className={`relative shrink-0 ${sizeClasses[size]}`}>
             <div className={`w-full h-full rounded-[35%] overflow-hidden flex items-center justify-center font-black transition-all ${
+                equippedAvatar ? 'bg-slate-800' :
                 avatarUrl ? 'bg-slate-100 dark:bg-slate-800' : 'bg-gradient-to-br from-indigo-500 to-cyan-400 text-white'
-            } ${border ? 'ring-4 ring-white dark:ring-slate-900 shadow-xl' : ''}`}>
-                {avatarUrl ? (
+            } ${border && !activeAuraCSS ? 'ring-4 ring-white dark:ring-slate-900 shadow-xl' : ''} ${activeAuraCSS}`}>
+                
+                {/* 1. Show Equipped Black Market Avatar */}
+                {equippedAvatar ? (
+                    <img 
+                        src={`https://api.dicebear.com/7.x/bottts/svg?seed=${equippedAvatar}&backgroundColor=transparent`} 
+                        alt="Cosmetic Avatar" 
+                        className="w-full h-full object-contain p-1 animate-in zoom-in duration-500" 
+                    />
+                ) : 
+                /* 2. Fallback to Uploaded Photo */
+                avatarUrl ? (
                     <img 
                         key={avatarUrl} 
                         src={avatarUrl} 
                         alt={name} 
                         className="w-full h-full object-cover animate-in fade-in duration-500" 
                     />
-                ) : (
+                ) : 
+                /* 3. Fallback to Initials */
+                (
                     <span>{initials}</span>
                 )}
             </div>
-            <div className="absolute -bottom-1 -right-1 w-1/4 h-1/4 bg-emerald-500 rounded-full border-2 border-white dark:border-slate-900 shadow-sm" />
+            
+            {/* Online/Status Indicator */}
+            <div className="absolute -bottom-1 -right-1 w-1/4 h-1/4 bg-emerald-500 rounded-full border-2 border-white dark:border-slate-900 shadow-sm z-10" />
         </div>
     );
 };
@@ -142,6 +175,9 @@ export default function ProfileView({ user, userData: propUserData }: any) {
   const { level, currentLevelXp, xpToNext, progressPct } = calculateLevel ? calculateLevel(xp, totalLikes) : { level: 1, currentLevelXp: xp, xpToNext: 100, progressPct: 0 };
   const league = getLeagueTier ? getLeagueTier(level) : { name: 'Bronze' };
 
+  // 🔥 Determine active title
+  const activeTitle = activeData?.equipped?.titles ? TITLE_MAP[activeData.equipped.titles] : "Student";
+
   return (
     <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-y-auto custom-scrollbar pt-2 pb-40 transition-colors duration-300">
         
@@ -153,7 +189,7 @@ export default function ProfileView({ user, userData: propUserData }: any) {
                     
                     {/* AVATAR & SQUIRCLE PROGRESS RING */}
                     <div className="relative mb-6">
-                        <div className="absolute inset-0 scale-125">
+                        <div className="absolute inset-0 scale-125 z-0">
                             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
                                 <rect x="4" y="4" width="92" height="92" rx="32" fill="none" stroke="white" opacity="0.05" strokeWidth="2" />
                                 <rect 
@@ -170,7 +206,7 @@ export default function ProfileView({ user, userData: propUserData }: any) {
                             </svg>
                         </div>
                         
-                        <div onClick={() => fileInputRef.current?.click()} className="cursor-pointer group relative">
+                        <div onClick={() => fileInputRef.current?.click()} className="cursor-pointer group relative z-10">
                             <UserAvatar user={activeData} size="xl" />
                             <div className="absolute inset-0 bg-black/40 rounded-[35%] opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center backdrop-blur-sm">
                                 <Camera className="text-white mb-1" size={24} />
@@ -189,6 +225,8 @@ export default function ProfileView({ user, userData: propUserData }: any) {
                     </div>
 
                     <h2 className="text-2xl font-black text-white mb-1 tracking-tight">{activeData?.name || "User"}</h2>
+                    <span className="text-xs font-black text-indigo-400 mb-4 tracking-widest">{activeTitle}</span>
+                    
                     <div className="flex gap-2 mb-8">
                         <span className="px-3 py-1 bg-white/10 text-white/60 text-[9px] font-black rounded-lg uppercase tracking-widest border border-white/5">{activeData?.role}</span>
                         <span className="px-3 py-1 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 text-[9px] font-black rounded-lg uppercase tracking-widest shadow-lg flex items-center gap-1.5 transition-colors duration-300"><Shield size={10}/> {league.name} League</span>
@@ -294,7 +332,7 @@ export default function ProfileView({ user, userData: propUserData }: any) {
             <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] overflow-hidden border border-slate-100 dark:border-slate-800 shadow-sm transition-colors duration-300">
                 <div className="flex flex-col">
                     
-                    {/* 🔥 NEW: APPEARANCE TOGGLE ROW */}
+                    {/* APPEARANCE TOGGLE ROW */}
                     <div className="w-full p-5 flex items-center justify-between border-b border-slate-50 dark:border-slate-800/50">
                         <div className="flex items-center gap-4">
                             <div className="p-3 bg-cyan-50 dark:bg-cyan-500/10 rounded-2xl text-cyan-600 dark:text-cyan-400 transition-colors duration-300"><Moon size={20}/></div>
