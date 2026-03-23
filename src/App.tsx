@@ -12,7 +12,7 @@ import HomeView from './components/HomeView';
 import DiscoveryView from './components/DiscoveryView';
 import FlashcardView from './components/FlashcardView';
 import ProfileView from './components/ProfileView';
-import StorefrontView from './components/StorefrontView'; // 🔥 Black Market Injected
+import StorefrontView from './components/StorefrontView'; 
 import InstructorDashboard from './components/instructor/InstructorDashboard';
 import AdminDashboardView from './components/admin/AdminDashboardView';
 import StudentClassView from './components/StudentClassView';
@@ -73,7 +73,7 @@ export default function App() {
       const newInventory = [...(userData.inventory || []), itemId];
       
       try {
-          const userRef = doc(db, 'users', user.uid);
+          const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
           await updateDoc(userRef, {
               flux: newFlux,
               inventory: newInventory
@@ -89,7 +89,7 @@ export default function App() {
       const newEquipped = { ...(userData.equipped || {}), [category]: itemId };
       
       try {
-          const userRef = doc(db, 'users', user.uid);
+          const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
           await updateDoc(userRef, {
               equipped: newEquipped
           });
@@ -167,7 +167,6 @@ export default function App() {
 
     const params = new URLSearchParams(window.location.search);
     
-    // Check if they scanned a quick-join or signup QR Code
     if (params.get('action') === 'signup' && !user) {
         setShowAuth(true);
         params.delete('action');
@@ -238,7 +237,18 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [enrolledClasses, allLessons]);
 
-  if (!authChecked) return <div className={`${activeOSTheme} h-screen flex items-center justify-center transition-colors duration-500`}><div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>;
+  // 🔥 JUICE: Custom Boot Sequence
+  if (!authChecked) {
+      return (
+          <div className={`${activeOSTheme} h-screen flex flex-col items-center justify-center transition-colors duration-700`}>
+              <div className="relative">
+                  <div className="absolute inset-0 bg-indigo-500 blur-xl opacity-40 animate-pulse" />
+                  <div className="w-16 h-16 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin relative z-10" />
+              </div>
+              <p className="mt-8 text-xs font-black uppercase tracking-[0.3em] text-indigo-500/80 animate-pulse">Initializing OS</p>
+          </div>
+      );
+  }
 
   // 1. PUBLIC / AUTH GATES
   if (!user) {
@@ -338,7 +348,7 @@ export default function App() {
             <button 
                 onClick={() => setCurrentView('student')}
                 style={{ backgroundColor: activeOrg?.themeColor || '#4f46e5' }}
-                className="fixed bottom-6 right-6 z-[9000] text-white px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest shadow-2xl transition-transform active:scale-95"
+                className="fixed bottom-6 right-6 z-[9000] text-white px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest shadow-2xl transition-transform active:scale-95 hover:scale-105"
             >
                 👁️ Preview App
             </button>
@@ -383,15 +393,27 @@ export default function App() {
 
   // 8. STUDENT MOBILE APP
   return (
-    <div className={`${activeOSTheme} min-h-[100dvh] w-full flex flex-col items-center relative overflow-hidden transition-colors duration-500`}>
+    <div className={`${activeOSTheme} min-h-[100dvh] w-full flex flex-col items-center relative overflow-hidden transition-colors duration-700`}>
+      
+      {/* 🔥 JUICE: Floating Command Center Button */}
       {userData?.role !== 'student' && (
-        <button onClick={() => setCurrentView(userData?.role === 'instructor' ? 'instructor' : 'admin')} className="fixed top-6 right-6 z-[1000] bg-slate-900 text-white px-8 py-3 rounded-full font-black text-xs uppercase shadow-2xl transition-all hover:scale-105 active:scale-95">
-          {userData?.role === 'instructor' ? '🎓 Magister Command' : '🛡️ Command Center'}
+        <button 
+            onClick={() => setCurrentView(userData?.role === 'instructor' ? 'instructor' : 'admin')} 
+            className="fixed top-6 right-6 z-[1000] bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-3 rounded-full font-black text-[10px] tracking-widest uppercase shadow-[0_10px_30px_rgba(0,0,0,0.3)] transition-all hover:scale-105 active:scale-95 group overflow-hidden border border-white/10 dark:border-slate-900/10"
+        >
+          {/* Sweeping Light Effect */}
+          <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-[150%] group-hover:animate-[shimmer_1.5s_infinite]" />
+          <span className="relative z-10 flex items-center gap-2">
+            {userData?.role === 'instructor' ? '🎓 Magister Command' : '🛡️ Command Center'}
+          </span>
         </button>
       )}
 
-      <div className={`w-full ${activeOSTheme} max-w-md h-[100dvh] shadow-2xl relative flex flex-col overflow-hidden transition-colors duration-500`}>
-        <div className={`flex-1 overflow-hidden relative ${activeOSTheme} transition-colors duration-500`}>
+      {/* 🔥 JUICE: The OS Device Wrapper */}
+      <div className={`w-full ${activeOSTheme} max-w-md h-[100dvh] shadow-[0_0_50px_rgba(0,0,0,0.15)] dark:shadow-[0_0_50px_rgba(0,0,0,0.4)] relative flex flex-col overflow-hidden transition-colors duration-700 ring-1 ring-slate-900/5 dark:ring-white/5`}>
+        
+        {/* 🔥 JUICE: Tab Transition Wrapper using Key triggers */}
+        <div key={activeTab + (activeLesson?.id || '')} className="flex-1 overflow-hidden relative animate-in fade-in zoom-in-[0.98] duration-300 ease-out">
           
           {celebrationData ? (
              <CelebrationScreen 
@@ -436,7 +458,6 @@ export default function App() {
           ) : activeTab === 'discovery' ? (
             <DiscoveryView allDecks={allDecks} lessons={allLessons} onSelectDeck={(d:any) => { setActiveDeckKey(d.id); setActiveTab('flashcards'); }} onSelectLesson={setActiveLesson} onLogActivity={actions.logActivity} userData={userData} onPurchaseItem={actions.purchaseUnlock} />
           ) : activeTab === 'store' ? (
-            // 🔥 STOREFRONT VIEW INJECTED
             <StorefrontView 
                 userData={userData} 
                 onPurchase={handlePurchaseCosmetic} 
