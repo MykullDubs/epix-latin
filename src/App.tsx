@@ -24,6 +24,7 @@ import LiveVocabProjector from './components/LiveVocabProjector';
 import LiveConnectFourProjector from './components/LiveConnectFourProjector';
 import LiveSlipstreamProjector from './components/LiveSlipstreamProjector';
 import CelebrationScreen from './components/CelebrationScreen';
+import HoloAvatar from './components/HoloAvatar'; // 🔥 OS-Level Avatar Injection
 
 // 🔥 DYNAMIC OS THEME ENGINE
 const OS_THEMES: Record<string, string> = {
@@ -73,6 +74,7 @@ export default function App() {
       const newInventory = [...(userData.inventory || []), itemId];
       
       try {
+          // 🔥 FIXED PATH: Now writes correctly to the multi-tenant architecture
           const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
           await updateDoc(userRef, {
               flux: newFlux,
@@ -89,6 +91,7 @@ export default function App() {
       const newEquipped = { ...(userData.equipped || {}), [category]: itemId };
       
       try {
+          // 🔥 FIXED PATH
           const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
           await updateDoc(userRef, {
               equipped: newEquipped
@@ -237,7 +240,6 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [enrolledClasses, allLessons]);
 
-  // 🔥 JUICE: Custom Boot Sequence
   if (!authChecked) {
       return (
           <div className={`${activeOSTheme} h-screen flex flex-col items-center justify-center transition-colors duration-700`}>
@@ -395,24 +397,24 @@ export default function App() {
   return (
     <div className={`${activeOSTheme} min-h-[100dvh] w-full flex flex-col items-center relative overflow-hidden transition-colors duration-700`}>
       
-      {/* 🔥 JUICE: Floating Command Center Button */}
+      {/* 🔥 JUICE: Floating Command Center Button features the user's avatar! */}
       {userData?.role !== 'student' && (
         <button 
             onClick={() => setCurrentView(userData?.role === 'instructor' ? 'instructor' : 'admin')} 
-            className="fixed top-6 right-6 z-[1000] bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-3 rounded-full font-black text-[10px] tracking-widest uppercase shadow-[0_10px_30px_rgba(0,0,0,0.3)] transition-all hover:scale-105 active:scale-95 group overflow-hidden border border-white/10 dark:border-slate-900/10"
+            className="fixed top-6 right-6 z-[1000] bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-3 rounded-full font-black text-[10px] tracking-widest uppercase shadow-[0_10px_30px_rgba(0,0,0,0.3)] transition-all hover:scale-105 active:scale-95 group overflow-hidden border border-white/10 dark:border-slate-900/10 flex items-center gap-3"
         >
-          {/* Sweeping Light Effect */}
           <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-[150%] group-hover:animate-[shimmer_1.5s_infinite]" />
-          <span className="relative z-10 flex items-center gap-2">
-            {userData?.role === 'instructor' ? '🎓 Magister Command' : '🛡️ Command Center'}
+          <HoloAvatar student={userData} size="sm" className="w-6 h-6 shadow-none ring-1 ring-white/20" />
+          <span className="relative z-10">
+            {userData?.role === 'instructor' ? 'Magister Command' : 'Command Center'}
           </span>
         </button>
       )}
 
-      {/* 🔥 JUICE: The OS Device Wrapper */}
+      {/* The OS Device Wrapper */}
       <div className={`w-full ${activeOSTheme} max-w-md h-[100dvh] shadow-[0_0_50px_rgba(0,0,0,0.15)] dark:shadow-[0_0_50px_rgba(0,0,0,0.4)] relative flex flex-col overflow-hidden transition-colors duration-700 ring-1 ring-slate-900/5 dark:ring-white/5`}>
         
-        {/* 🔥 JUICE: Tab Transition Wrapper using Key triggers */}
+        {/* Tab Transition Wrapper using Key triggers */}
         <div key={activeTab + (activeLesson?.id || '')} className="flex-1 overflow-hidden relative animate-in fade-in zoom-in-[0.98] duration-300 ease-out">
           
           {celebrationData ? (
@@ -497,7 +499,7 @@ export default function App() {
         </div>
         
         {!activeLesson && !activeStudentClass && !celebrationData && (
-          <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} activeOrg={activeOrg} />
+          <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} activeOrg={activeOrg} userData={userData} />
         )}
       </div>
     </div>
