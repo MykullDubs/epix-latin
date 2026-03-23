@@ -1,17 +1,27 @@
 // src/components/StudentNavBar.tsx
 import React from 'react';
 import { Home, Compass, Layers, User, ShoppingBag } from 'lucide-react';
+import HoloAvatar from './HoloAvatar'; // 🔥 IMPORTED
 
 // ============================================================================
 //  STUDENT NAVIGATION BAR (Frosted Pill Edition)
 // ============================================================================
-export default function StudentNavBar({ activeTab, setActiveTab, activeOrg }: any) {
+export default function StudentNavBar({ activeTab, setActiveTab, activeOrg, userData }: any) {
   const tabs = [
     { id: 'home', icon: <Home size={24} />, label: 'Home' },
     { id: 'discovery', icon: <Compass size={24} />, label: 'Explore' },
     { id: 'flashcards', icon: <Layers size={24} />, label: 'Decks' },
-    { id: 'store', icon: <ShoppingBag size={24} />, label: 'Market' }, // 🔥 THE BLACK MARKET DOOR
-    { id: 'profile', icon: <User size={24} />, label: 'Profile' }
+    { id: 'store', icon: <ShoppingBag size={24} />, label: 'Market' },
+    { 
+        id: 'profile', 
+        // 🔥 If they have an avatar, show it! Otherwise, fallback to generic User icon.
+        icon: userData ? (
+            <HoloAvatar student={userData} size="sm" className="w-[26px] h-[26px] border-none ring-0 shadow-none bg-transparent" />
+        ) : (
+            <User size={24} />
+        ), 
+        label: 'Profile' 
+    }
   ];
 
   // Fallback theme color (your app's default color, e.g., Indigo-600)
