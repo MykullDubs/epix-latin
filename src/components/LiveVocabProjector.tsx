@@ -5,9 +5,9 @@ import {
     Users, Timer, Zap, ArrowRight, X, Trophy, CheckCircle2, 
     Settings, Hand, Crown, Activity, Target, Shield, Flame, Loader2 
 } from 'lucide-react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, getDocs } from 'firebase/firestore'; // 🔥 ADDED COLLECTION & GETDOCS
 import { db, appId } from '../config/firebase';
-import HoloAvatar from './HoloAvatar'; // 🔥 IMPORT THE AVATAR ENGINE
+import HoloAvatar from './HoloAvatar';
 
 export default function LiveVocabProjector({ deck, classId, activeClass, onExit }: any) {
     const { liveState, startLiveClass, endLiveClass, changeSlide, triggerQuiz } = useLiveClass(classId, true);
@@ -15,7 +15,11 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isAutoPilot, setIsAutoPilot] = useState(false);
     const [isFinished, setIsFinished] = useState(false); 
-    const [isBooting, setIsBooting] = useState(true); 
+    
+    // 🔥 UPGRADED BOOT SEQUENCE STATES
+    const [minBootTimePassed, setMinBootTimePassed] = useState(false);
+    const [isFetchingCards, setIsFetchingCards] = useState(true);
+    const [fetchedCards, setFetchedCards] = useState<any[]>([]);
     
     const scoresRef = useRef<{ [email: string]: number }>({});
     const [gameSettings, setGameSettings] = useState({ qTime: 15, rTime: 6 });
@@ -30,25 +34,59 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
     useEffect(() => { liveStateRef.current = liveState; }, [liveState]);
     useEffect(() => { currentIndexRef.current = currentIndex; }, [currentIndex]);
 
-    // System Boot Sequence
+    // 🔥 1. Minimum Boot Timer (Juice)
     useEffect(() => {
-        const timer = setTimeout(() => setIsBooting(false), 2000);
+        const timer = setTimeout(() => setMinBootTimePassed(true), 2000);
         return () => clearTimeout(timer);
     }, []);
 
+    // 🔥 2. The Critical Fetch Engine
+    useEffect(() => {
+        const loadCards = async () => {
+            if (!deck) return;
+            
+            // If it's a legacy custom deck or has cards attached locally, use them
+            if (deck.id === 'custom' || deck.key === 'custom' || (deck.cards && deck.cards.length > 0 && !deck.stats)) {
+                setFetchedCards(deck.cards || []);
+                setIsFetchingCards(false);
+                return;
+            }
+
+            try {
+                const deckIdToFetch = deck.id || deck.key;
+                const cardsRef = collection(db, 'artifacts', appId, 'decks', deckIdToFetch, 'cards');
+                const snap = await getDocs(cardsRef);
+                setFetchedCards(snap.docs.map(d => d.data()));
+            } catch (err) {
+                console.error("Projector failed to decrypt targets:", err);
+            } finally {
+                setIsFetchingCards(false);
+            }
+        };
+
+        loadCards();
+    }, [deck]);
+
+    // System is booting if EITHER the timer isn't done OR the cards are still downloading
+    const isBooting = !minBootTimePassed || isFetchingCards;
+
+    // 🔥 3. Map the fetched cards into the quiz logic
     const quizQuestions = useMemo(() => {
-        if (!deck?.cards || deck.cards.length === 0) return [];
-        const shuffledDeck = [...deck.cards].sort(() => 0.5 - Math.random());
+        if (fetchedCards.length === 0) return [];
+        const shuffledDeck = [...fetchedCards].sort(() => 0.5 - Math.random());
+        
         return shuffledDeck.map((card) => {
-            const distractors = deck.cards
+            const distractors = fetchedCards
                 .filter((c: any) => (c.id || c.front) !== (card.id || card.front))
                 .sort(() => 0.5 - Math.random()).slice(0, 3);
+                
             const options = [card, ...distractors]
                 .map((c: any) => ({ id: c.id || c.front, text: c.back }))
                 .sort(() => 0.5 - Math.random());
+                
             return { question: card.front, ipa: card.ipa, options: options, correctId: card.id || card.front };
         });
-    }, [deck]);
+    }, [fetchedCards]);
 
     useEffect(() => {
         if (quizQuestions.length > 0 && classId) startLiveClass(safeDeckId, 'vocab', quizQuestions[0]);
@@ -157,7 +195,6 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
         scoresRef.current = {};
     };
 
-    // 🔥 UPGRADED LIVE LEADERBOARD (NOW INCLUDES EQUIPPED AVATAR DATA)
     const liveLeaderboard = useMemo(() => {
         const scores = liveState?.finalScores || scoresRef.current || {};
         const roundPts = liveState?.roundPoints || {};
@@ -165,11 +202,11 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
         
         return joinedEmails.map(email => {
             const s = activeClass?.students?.find((st: any) => st.email.replace(/\./g, ',') === email || st.email === email);
-            const joinedData = liveState?.joined?.[email] || {}; // Pull the payload they broadcasted
+            const joinedData = liveState?.joined?.[email] || {};
             return {
                 id: email,
                 name: joinedData.name || s?.name || email.split('@')[0],
-                equipped: joinedData.equipped, // Pass the cosmetics!
+                equipped: joinedData.equipped,
                 score: scores[email] || 0,
                 roundPoints: roundPts[email] || 0,
                 initial: (s?.name?.[0] || email[0]).toUpperCase()
@@ -192,7 +229,6 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
     }
 
     if (isFinished) {
-        // 🔥 UPGRADED PODIUM LOGIC
         const sortedScores = Object.entries(scoresRef.current)
             .map(([email, score]) => {
                 const scholar = activeClass?.students?.find((s:any) => s.email.replace(/\./g, ',') === email || s.email === email);
@@ -287,7 +323,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                             {activeClass?.students?.map((s: any, i: number) => {
                                 const safeEmail = s.email.replace(/\./g, ',');
                                 const isConnected = !!joinedStudents[safeEmail];
-                                const studentData = joinedStudents[safeEmail] || s; // 🔥 Use joined payload if available
+                                const studentData = joinedStudents[safeEmail] || s; 
                                 
                                 return (
                                     <div key={i} className={`flex flex-col items-center gap-3 transition-all duration-700 ${isConnected ? 'opacity-100 scale-110' : 'opacity-20 grayscale'}`}>
@@ -359,7 +395,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                             const safeEmail = s.email.replace(/\./g, ',');
                             if (!joinedStudents[safeEmail]) return null;
                             const hasAnswered = !!answers[safeEmail];
-                            const studentData = joinedStudents[safeEmail]; // Pull their payload
+                            const studentData = joinedStudents[safeEmail]; 
 
                             return (
                                 <div key={i} className={`flex items-center gap-4 p-3 rounded-2xl border transition-all duration-300 ${hasAnswered ? 'bg-emerald-500/10 border-emerald-500/30 shadow-[inset_0_0_20px_rgba(16,185,129,0.1)]' : 'bg-slate-800/30 border-slate-800'}`}>
@@ -376,8 +412,8 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                 {/* 2. CENTER STAGE: The Target */}
                 <div className="col-span-6 flex flex-col items-center justify-center text-center px-12 relative">
                     <span className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.4em] bg-indigo-500/10 px-4 py-2 rounded-full border border-indigo-500/20 mb-12">Target {currentIndex + 1} / {quizQuestions.length}</span>
-                    <h2 className="text-8xl md:text-9xl font-black tracking-tighter uppercase italic drop-shadow-[0_0_30px_rgba(255,255,255,0.1)] mb-4">{currentQ.question}</h2>
-                    {currentQ.ipa && <p className="text-2xl font-mono text-indigo-400 opacity-60 tracking-widest">{currentQ.ipa}</p>}
+                    <h2 className="text-8xl md:text-9xl font-black tracking-tighter uppercase italic drop-shadow-[0_0_30px_rgba(255,255,255,0.1)] mb-4">{currentQ?.question}</h2>
+                    {currentQ?.ipa && <p className="text-2xl font-mono text-indigo-400 opacity-60 tracking-widest">{currentQ.ipa}</p>}
 
                     {liveState?.quizState === 'active' && (
                         <div className="mt-16 w-full max-w-md">
@@ -395,7 +431,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                     {liveState?.quizState === 'revealed' && (
                         <div className="mt-16 animate-in zoom-in-95 duration-500">
                             <div className="bg-emerald-500 text-white px-16 py-8 rounded-[2.5rem] text-5xl font-black border-4 border-emerald-400 shadow-[0_0_60px_rgba(16,185,129,0.4)]">
-                                {currentQ.options.find((o:any) => o.id === currentQ.correctId)?.text}
+                                {currentQ?.options.find((o:any) => o.id === currentQ.correctId)?.text}
                             </div>
                             {!isAutoPilot && <button onClick={handleNext} className="mt-12 flex items-center gap-4 text-slate-500 hover:text-white font-black text-xl uppercase tracking-widest transition-all mx-auto">{currentIndex < quizQuestions.length - 1 ? 'Next Target' : 'Final Rankings'} <ArrowRight /></button>}
                         </div>
@@ -422,7 +458,6 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                                     }`}>
                                         {i + 1}
                                     </div>
-                                    {/* 🔥 AVATAR INSERTED INTO LEADERBOARD */}
                                     <HoloAvatar student={player} size="sm" />
                                     <span className="text-[11px] font-black uppercase text-slate-200 truncate max-w-[80px]">{player.name}</span>
                                 </div>
