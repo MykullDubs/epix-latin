@@ -452,8 +452,7 @@ export default function CardBuilderView({
         }
 
         // 🛡️ SECURITY UPGRADE: Pulling the key securely from your .env file
-        const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-        
+const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;        
         if (!apiKey) {
             setToastMsg("CRITICAL: Missing Gemini API Key in .env file.");
             return;
