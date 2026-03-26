@@ -444,14 +444,14 @@ export default function CardBuilderView({
         }
     };
 
-    // 🔥 THE NEURAL FORGE LOGIC (Upgraded Strict JSON Mode)
+// 🔥 THE NEURAL FORGE LOGIC (Beta Track + Double Protection)
     const handleNeuralForge = async () => {
         if (!aiPrompt.trim()) {
             setToastMsg("Provide a prompt for the AI to forge.");
             return;
         }
 
-        // ⚠️ HARDCODED FOR LOCAL TESTING ONLY (Delete this key in Google AI Studio later to prevent scraper abuse!)
+        // ⚠️ HARDCODED FOR LOCAL TESTING ONLY
         const apiKey = "AIzaSyBaBVxKwEFg-LENpEYjObl13spPy3gVY9k";
 
         setIsImporting(true); 
@@ -478,7 +478,8 @@ export default function CardBuilderView({
         USER PROMPT: "${aiPrompt}"`;
 
         try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+            // 🔥 Back to v1beta which fully supports the JSON MimeType
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -496,7 +497,11 @@ export default function CardBuilderView({
             }
 
             const data = await response.json();
-            const rawText = data.candidates[0].content.parts[0].text;
+            let rawText = data.candidates[0].content.parts[0].text;
+            
+            // 🔥 Double protection: Safely strip markdown blockquotes if the API still sneaks them in
+            rawText = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+            
             const aiCards = JSON.parse(rawText);
             
             if (!Array.isArray(aiCards)) throw new Error("AI did not return an array.");
