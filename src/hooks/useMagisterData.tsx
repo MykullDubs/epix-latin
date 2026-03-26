@@ -5,7 +5,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { 
   doc, onSnapshot, collection, addDoc, setDoc, updateDoc, 
   deleteDoc, query, where, collectionGroup, increment, arrayUnion, arrayRemove,
-  orderBy, limit, getDoc
+  orderBy, limit, getDoc, writeBatch // 🔥 INJECTED writeBatch
 } from "firebase/firestore";
 
 export function useMagisterData() {
@@ -25,7 +25,7 @@ export function useMagisterData() {
 
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
 
-  // 🔥 NEW: State for Student Preferences
+  // State for Student Preferences
   const [cardPrefs, setCardPrefs] = useState<Record<string, any>>({});
   const [deckPrefs, setDeckPrefs] = useState<Record<string, any>>({});
 
@@ -51,6 +51,7 @@ export function useMagisterData() {
         setAllAppLessons(fetchedLessons);
       });
 
+      // 🔥 Note: You will eventually update this listener to point to the new 'decks' collection!
       const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => {
         const cards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         const decks: any = { custom: { title: 'My Study Cards', cards: [] } };
@@ -88,7 +89,7 @@ export function useMagisterData() {
           setActivityLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
-      // 🔥 Listeners for Student Deck/Card Preferences
+      // Listeners for Student Deck/Card Preferences
       const unsubCardPrefs = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'card_prefs'), (snap) => {
           const prefs: Record<string, any> = {};
           snap.docs.forEach(d => { prefs[d.id] = d.data(); });
@@ -132,7 +133,6 @@ export function useMagisterData() {
                                      pubDeck.allowedClasses?.some((id: string) => myClassIds.includes(id));
 
           if (isPublic || isInstructor || isRestrictedAccess) {
-              // Only inject if it hasn't been soft-deleted by the student
               const isHidden = deckPrefs[pubDeck.id]?.hidden;
               if (!isHidden) {
                   merged[pubDeck.id] = { ...pubDeck, isPublished: true };
@@ -140,7 +140,6 @@ export function useMagisterData() {
           }
       });
 
-      // Filter out hidden private decks too
       Object.keys(merged).forEach(key => {
           if (deckPrefs[key]?.hidden) delete merged[key];
       });
@@ -175,15 +174,12 @@ export function useMagisterData() {
         const cleanNew = newName.trim();
         const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main');
 
-        // 1. Update the color
         await setDoc(profileRef, { folderColors: { [cleanNew || cleanOld]: color } }, { merge: true });
 
-        // 2. If renamed, swap the array items and update all decks inside it
         if (cleanNew && cleanNew !== cleanOld) {
             await updateDoc(profileRef, { studyFolders: arrayRemove(cleanOld) });
             await updateDoc(profileRef, { studyFolders: arrayUnion(cleanNew) });
             
-            // Re-route decks locally
             const decksToUpdate = Object.keys(deckPrefs).filter(k => deckPrefs[k].folder === cleanOld);
             for (const dId of decksToUpdate) {
                 const prefRef = doc(db, 'artifacts', appId, 'users', user.uid, 'deck_prefs', dId);
@@ -200,7 +196,6 @@ export function useMagisterData() {
             studyFolders: arrayRemove(cleanName)
         });
 
-        // Evict decks back to main library
         const decksInFolder = Object.keys(deckPrefs).filter(k => deckPrefs[k].folder === cleanName);
         for (const dId of decksInFolder) {
             const prefRef = doc(db, 'artifacts', appId, 'users', user.uid, 'deck_prefs', dId);
@@ -342,35 +337,6 @@ export function useMagisterData() {
       });
     },
 
-    saveCard: async (cardData: any) => {
-      if (!user) return;
-      const cardId = cardData.id || `card_${Date.now()}`;
-      await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId), { 
-        ...cardData, id: cardId, owner: user.uid 
-      });
-    },
-
-    updateCard: async (cardId: string, cardData: any) => {
-      if (!user) return;
-      const cardRef = doc(db, 'artifacts', appId, 'users', user.uid, 'custom_cards', cardId);
-      await updateDoc(cardRef, cardData);
-    },
-
-    publishDeck: async (deckId: string, deckTitle: string, cards: any[], visibility: 'private' | 'restricted' | 'public', allowedClasses: string[] = []) => {
-      if (!user) return;
-      const deckRef = doc(db, 'artifacts', appId, 'published_decks', deckId);
-      
-      if (visibility === 'private') {
-          await deleteDoc(deckRef).catch(e => console.log("Deck already private"));
-      } else {
-          await setDoc(deckRef, {
-              id: deckId, title: deckTitle, cards: cards,
-              instructorId: user.uid, instructorName: userData?.name || 'Instructor',
-              visibility: visibility, allowedClasses: allowedClasses, updatedAt: Date.now()
-          });
-      }
-    },
-
     saveCurriculum: async (curriculumData: any) => {
       if (!user) return;
       const currId = curriculumData.id || `curriculum_${Date.now()}`;
@@ -381,6 +347,137 @@ export function useMagisterData() {
         updatedAt: Date.now()
       });
     },
+
+    // ========================================================================
+    // 🔥 ENTERPRISE CONTENT MANAGEMENT (DECKS & CARDS)
+    // ========================================================================
+
+    createDeck: async (deckData: any) => {
+        if (!user) return;
+        const deckRef = doc(collection(db, 'artifacts', appId, 'decks'));
+        
+        const newDeck = {
+            id: deckRef.id,
+            title: deckData.title || "New Protocol",
+            description: deckData.description || "",
+            subject: deckData.subject || "General",
+            tags: deckData.tags || [],
+            authorId: user.uid,
+            authorName: userData?.name || "Magister",
+            isPublic: deckData.isPublic || false,
+            status: "draft", 
+            version: 1,
+            stats: {
+                cardCount: 0,
+                totalPlays: 0,
+                averageScore: 0
+            },
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+        };
+
+        try {
+            await setDoc(deckRef, newDeck);
+            return deckRef.id;
+        } catch (error) {
+            console.error("Failed to initialize deck payload:", error);
+            throw error;
+        }
+    },
+
+    saveCard: async (deckId: string, cardData: any, isNewCard: boolean = true) => {
+        if (!user || !deckId) return;
+
+        const batch = writeBatch(db);
+        
+        // 1. Point to the specific card inside the subcollection
+        const cardRef = isNewCard 
+            ? doc(collection(db, 'artifacts', appId, 'decks', deckId, 'cards')) 
+            : doc(db, 'artifacts', appId, 'decks', deckId, 'cards', cardData.id || `card_${Date.now()}`);
+
+        const payload = {
+            ...cardData,
+            id: cardRef.id,
+            updatedAt: Date.now()
+        };
+
+        // Add the card write to the batch
+        batch.set(cardRef, payload, { merge: true });
+
+        // 2. Point to the Parent Deck to update the metadata
+        const deckRef = doc(db, 'artifacts', appId, 'decks', deckId);
+        const deckUpdates: any = { updatedAt: Date.now() };
+
+        // Only increment the total card count if this is a brand NEW card
+        if (isNewCard) {
+            deckUpdates['stats.cardCount'] = increment(1);
+        }
+
+        batch.update(deckRef, deckUpdates);
+
+        try {
+            await batch.commit(); // FIRE THE BATCH!
+            return cardRef.id;
+        } catch (error) {
+            console.error("Batch write failed. Data integrity preserved.", error);
+            throw error;
+        }
+    },
+
+    updateCard: async (deckId: string, cardId: string, cardData: any) => {
+        // Reroute to the new batch logic
+        return actions.saveCard(deckId, { ...cardData, id: cardId }, false);
+    },
+
+    deleteCard: async (deckId: string, cardId: string) => {
+        if (!user || !deckId || !cardId) return;
+
+        const batch = writeBatch(db);
+        
+        // Queue the deletion
+        const cardRef = doc(db, 'artifacts', appId, 'decks', deckId, 'cards', cardId);
+        batch.delete(cardRef);
+
+        // Queue the parent count decrement
+        const deckRef = doc(db, 'artifacts', appId, 'decks', deckId);
+        batch.update(deckRef, {
+            'stats.cardCount': increment(-1),
+            updatedAt: Date.now()
+        });
+
+        try {
+            await batch.commit();
+        } catch (error) {
+            console.error("Failed to scrub data:", error);
+            throw error;
+        }
+    },
+
+    publishDeck: async (deckId: string, deckTitle: string, visibility: 'private' | 'restricted' | 'public', allowedClasses: string[] = []) => {
+        if (!user || !deckId) return;
+
+        // In the new architecture, the cards are already safely in the subcollection.
+        // We just update the parent document to switch its state!
+        const deckRef = doc(db, 'artifacts', appId, 'decks', deckId);
+        
+        try {
+            await updateDoc(deckRef, {
+                title: deckTitle,
+                visibility: visibility,
+                allowedClasses: allowedClasses,
+                status: "published",
+                version: increment(1),
+                updatedAt: Date.now()
+            });
+        } catch (error) {
+            console.error("Publishing sequence failed:", error);
+            throw error;
+        }
+    },
+
+    // ========================================================================
+    //  TELEMETRY & LOGGING
+    // ========================================================================
 
     logActivity: async (itemId: string, xp: number, title: string, details: any = {}) => {
       if (!user || !user.uid) return;
@@ -445,9 +542,7 @@ export function useMagisterData() {
         ...userData,
         cardPrefs,
         deckPrefs,
-        // Ensure studyFolders safely defaults to an array even if missing in DB
         studyFolders: userData.studyFolders || userData?.profile?.main?.studyFolders || [],
-        // Supply folder colors to the frontend
         folderColors: userData.folderColors || userData?.profile?.main?.folderColors || {}
     };
   }, [userData, cardPrefs, deckPrefs]);
