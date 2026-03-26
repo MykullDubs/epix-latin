@@ -444,15 +444,20 @@ export default function CardBuilderView({
         }
     };
 
-// 🔥 THE NEURAL FORGE LOGIC (Upgraded to Gemini 2.5 Flash)
+// 🔥 THE NEURAL FORGE LOGIC (Secure Environment Edition)
     const handleNeuralForge = async () => {
         if (!aiPrompt.trim()) {
             setToastMsg("Provide a prompt for the AI to forge.");
             return;
         }
 
-        // ⚠️ HARDCODED FOR LOCAL TESTING ONLY (Delete this key in Google AI Studio later!)
-        const apiKey = "AIzaSyBaBVxKwEFg-LENpEYjObl13spPy3gVY9k";
+        // 🛡️ SECURITY UPGRADE: Pulling the key securely from your .env file
+        const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+        
+        if (!apiKey) {
+            setToastMsg("CRITICAL: Missing Gemini API Key in .env file.");
+            return;
+        }
 
         setIsImporting(true); 
         setToastMsg("Initializing Neural Forge. Please wait...");
@@ -478,7 +483,6 @@ export default function CardBuilderView({
         USER PROMPT: "${aiPrompt}"`;
 
         try {
-            // 🔥 UPDATED: Pointing to the active gemini-2.5-flash model
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -499,9 +503,7 @@ export default function CardBuilderView({
             const data = await response.json();
             let rawText = data.candidates[0].content.parts[0].text;
             
-            // Double protection: Strip markdown blockquotes if the API sneaks them in
             rawText = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
-            
             const aiCards = JSON.parse(rawText);
             
             if (!Array.isArray(aiCards)) throw new Error("AI did not return an array.");
