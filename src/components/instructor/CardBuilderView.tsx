@@ -126,7 +126,7 @@ export default function CardBuilderView({
     const [localOptimisticDecks, setLocalOptimisticDecks] = useState<any>({});
     const [showShareModal, setShowShareModal] = useState(false);
     
-    // 🔥 NEW: 3-WAY BUILDER TAB STATE
+    // 🔥 3-WAY BUILDER TAB STATE
     const [builderTab, setBuilderTab] = useState<'single' | 'bulk' | 'ai'>('single');
     
     const [jsonInput, setJsonInput] = useState<string>('');
@@ -381,7 +381,6 @@ export default function CardBuilderView({
         } 
     };
 
-    // 🔥 CORE BULK IMPORT / AI INGESTION FUNCTION
     const executeBulkIngest = async (cardsArray: any[], successMessage: string) => {
         let finalDeckId = bulkExistingId;
         let finalDeckTitle = validDecks[bulkExistingId]?.title || 'Custom Deck';
@@ -418,8 +417,6 @@ export default function CardBuilderView({
                 setImportProgress({ current: successCount, total: cardsArray.length });
                 
                 setCurrentDeckCards(prev => [...prev, { ...cardData, id: newId }]);
-
-                // Artificial delay to prevent blowing up Firebase write limits
                 await new Promise(resolve => setTimeout(resolve, 150));
             } catch (err) { console.error(`Failed to save: ${card.front}`, err); }
         }
@@ -434,7 +431,7 @@ export default function CardBuilderView({
         }
         setIsImporting(false);
         setImportProgress(null);
-        setBuilderTab('single'); // Kick them back to the view to see their newly made cards
+        setBuilderTab('single'); 
     };
 
     const handleBulkImport = async () => {
@@ -447,14 +444,14 @@ export default function CardBuilderView({
         }
     };
 
-    // 🔥 THE NEURAL FORGE LOGIC
+    // 🔥 THE NEURAL FORGE LOGIC (Upgraded Strict JSON Mode)
     const handleNeuralForge = async () => {
         if (!aiPrompt.trim()) {
             setToastMsg("Provide a prompt for the AI to forge.");
             return;
         }
 
-        // ⚠️ HARDCODED FOR LOCAL TESTING ONLY
+        // ⚠️ HARDCODED FOR LOCAL TESTING ONLY (Delete this key in Google AI Studio later to prevent scraper abuse!)
         const apiKey = "AIzaSyBaBVxKwEFg-LENpEYjObl13spPy3gVY9k";
 
         setIsImporting(true); 
@@ -465,14 +462,12 @@ export default function CardBuilderView({
         You MUST generate EXACTLY ${aiCardCount} cards.
         The target language is ${aiTargetLanguage}.
         
-        You MUST return ONLY a raw, perfectly formatted JSON array. Do not wrap it in markdown blockquotes or text.
-        
         JSON SCHEMA:
         [
           {
             "front": "Target word/concept in ${aiTargetLanguage}",
             "back": "Definition/translation in English",
-            "type": "noun", // noun, verb, adjective, adverb, phrase
+            "type": "noun", 
             "ipa": "/phonetics in IPA format/",
             "morphology": [{"part": "The word itself or a root", "meaning": "Root meaning", "type": "root"}],
             "usage": {"sentence": "A simple example sentence in ${aiTargetLanguage}", "translation": "The English translation of the sentence"},
@@ -483,30 +478,34 @@ export default function CardBuilderView({
         USER PROMPT: "${aiPrompt}"`;
 
         try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: systemPrompt }] }]
+                    contents: [{ role: "user", parts: [{ text: systemPrompt }] }],
+                    generationConfig: {
+                        responseMimeType: "application/json" 
+                    }
                 })
             });
 
-            if (!response.ok) throw new Error("API call failed.");
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error("Gemini API Error Details:", errorData);
+                throw new Error(`API call failed: ${errorData.error?.message || response.statusText}`);
+            }
 
             const data = await response.json();
             const rawText = data.candidates[0].content.parts[0].text;
+            const aiCards = JSON.parse(rawText);
             
-            // Clean the output in case Gemini included markdown code blocks
-            const jsonStr = rawText.replace(/```json\n/g, '').replace(/```/g, '').trim();
-            
-            const aiCards = JSON.parse(jsonStr);
             if (!Array.isArray(aiCards)) throw new Error("AI did not return an array.");
 
             await executeBulkIngest(aiCards, "Neural Forge Complete!");
 
         } catch (err) {
             console.error("Neural Forge Error:", err);
-            setToastMsg("Neural Forge failed. The AI's JSON output may have been corrupted.");
+            setToastMsg("Neural Forge failed. Check the console for details.");
             setIsImporting(false);
         }
     };
