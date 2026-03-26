@@ -12,7 +12,7 @@ import ClassManagerView from './ClassManagerView';
 import InstructorInbox from './InstructorInbox';
 import { AnalyticsDashboard } from './InstructorTools';
 import CommandCenter from './CommandCenter';
-import LiveSetupModal from './LiveSetupModal'; // 🔥 IMPORTED LIVE SETUP MODAL
+import LiveSetupModal from './LiveSetupModal'; 
 
 // ============================================================================
 //  INSTRUCTOR DASHBOARD (Main Navigation & Hub)
@@ -29,6 +29,7 @@ export default function InstructorDashboard({
   onSaveLesson, 
   onSaveCard,
   onUpdateCard,
+  onDeleteCard, // 🔥 NEW: ADDED DELETE WIRE
   onAssign,            
   onRevoke,            
   onCreateClass,  
@@ -40,7 +41,7 @@ export default function InstructorDashboard({
   onStartPresentation, 
   onStartVocabGame,
   onStartConnectFour,
-  onStartSlipstream, // 🔥 1. SUCCESSFULLY CAUGHT FROM APP.TSX
+  onStartSlipstream, 
   onPublishDeck, 
   onSwitchView, 
   onLogout,
@@ -51,7 +52,7 @@ export default function InstructorDashboard({
   const [selectedClassId, setSelectedClassId] = useState<string>(''); 
   const [dashCohortId, setDashCohortId] = useState<string>(userData?.classes?.[0]?.id || '');
   
-  // 🔥 STATE FOR LIVE ARENA MODAL
+  // STATE FOR LIVE ARENA MODAL
   const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
 
   const NavItem = ({ id, icon, label, badge }: { id: string; icon: React.ReactNode; label: string; badge?: boolean }) => {
@@ -137,7 +138,6 @@ export default function InstructorDashboard({
           )}
         </div>
 
-        {/* 🔥 UPGRADED: Invisible scrollbar applied here */}
         <nav className="flex-1 px-3 py-8 space-y-2 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <NavItem id="dashboard" icon={<Activity />} label="Live Feed" />
           <NavItem id="studio" icon={<PenTool />} label="Studio Hub" />
@@ -198,6 +198,8 @@ export default function InstructorDashboard({
                <BuilderHub 
                  onSaveLesson={onSaveLesson} 
                  onSaveCard={onSaveCard} 
+                 onUpdateCard={onUpdateCard} // 🔥 WIRED UP
+                 onDeleteCard={onDeleteCard} // 🔥 WIRED UP
                  onSaveCurriculum={onSaveCurriculum} 
                  lessons={lessons} 
                  allDecks={allDecks} 
@@ -351,7 +353,6 @@ export default function InstructorDashboard({
                        } else if (config.mode === 'trivia') {
                            if (onStartVocabGame) onStartVocabGame(config.contentId, config.classId);
                        } else if (config.mode === 'slipstream') {
-                           // 🔥 2. SUCCESSFULLY WIRED
                            if (onStartSlipstream) onStartSlipstream(config.contentId, config.classId);
                        }
                    }, 300);
