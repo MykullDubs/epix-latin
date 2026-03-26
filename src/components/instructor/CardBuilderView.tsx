@@ -4,12 +4,12 @@ import {
     Layers, Plus, X, Save, Edit3, Trash2, FileJson, Database, 
     Loader2, FolderPlus, FolderOpen, Share2, Lock, Users, 
     Globe, CheckCircle2, Paperclip, ChevronRight, Wand2, BookOpen,
-    Image as ImageIcon, Music, UploadCloud // 🔥 Imported Media Icons
+    Image as ImageIcon, Music, UploadCloud
 } from 'lucide-react';
 import { INITIAL_SYSTEM_DECKS } from '../../constants/defaults';
 import { Toast } from '../Toast';
-import { doc, setDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'; // 🔥 Imported Storage tools
+import { doc, setDoc, collection, getDocs } from 'firebase/firestore'; // 🔥 Added getDocs & collection
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage, auth, appId } from '../../config/firebase';
 
 // ============================================================================
@@ -28,7 +28,7 @@ const DeckShareModal = ({ deck, instructorClasses, onClose, onPublish }: any) =>
 
     const handleSave = async () => {
         setIsSaving(true);
-        await onPublish(deck.id || 'custom', deck.title, deck.cards || [], visibility, selectedClasses);
+        await onPublish(deck.id || 'custom', deck.title, visibility, selectedClasses); // 🔥 Removed cards payload, as it's not needed in new schema
         setIsSaving(false);
         onClose();
     };
@@ -98,8 +98,10 @@ const DeckShareModal = ({ deck, instructorClasses, onClose, onPublish }: any) =>
 // ============================================================================
 //  MAIN CARD BUILDER VIEW
 // ============================================================================
-export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard, availableDecks, initialDeckId, onPublishDeck, instructorClasses }: any) {
-    // 🔥 ADDED MEDIA URLS TO FORM STATE
+export default function CardBuilderView({ 
+    onSaveCard, onUpdateCard, onDeleteCard, availableDecks, 
+    initialDeckId, onPublishDeck, instructorClasses 
+}: any) {
     const [formData, setFormData] = useState({ 
         front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', 
         grammarTags: '', deckId: initialDeckId || 'custom', imageUrl: '', audioUrl: '' 
@@ -116,7 +118,6 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
     const [showDefSelector, setShowDefSelector] = useState(false);
     const [fetchedOptions, setFetchedOptions] = useState<any[]>([]);
 
-    // 🔥 MEDIA UPLOAD STATE
     const [isUploadingImage, setIsUploadingImage] = useState(false);
     const [isUploadingAudio, setIsUploadingAudio] = useState(false);
 
@@ -133,11 +134,53 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
     const [bulkNewTitle, setBulkNewTitle] = useState('');
     const [bulkExistingId, setBulkExistingId] = useState('custom');
 
+    // 🔥 SUBCOLLECTION FETCH ENGINE
+    const [currentDeckCards, setCurrentDeckCards] = useState<any[]>([]);
+    const [isFetchingCards, setIsFetchingCards] = useState(false);
+
     const validDecks = { ...availableDecks, ...localOptimisticDecks };
     const deckOptions = Object.entries(validDecks).map(([key, deck]: any) => ({ id: key, title: deck.title })); 
-    const currentDeckCards = validDecks[formData.deckId] ? validDecks[formData.deckId].cards || [] : [];
 
     useEffect(() => { if (initialDeckId) setFormData(prev => ({...prev, deckId: initialDeckId})); }, [initialDeckId]);
+    
+    // 🔥 FETCH CARDS WHEN DECK SELECTION CHANGES
+    useEffect(() => {
+        const fetchDeckCards = async () => {
+            if (formData.deckId === 'new') {
+                setCurrentDeckCards([]);
+                return;
+            }
+
+            if (formData.deckId === 'custom') {
+                setCurrentDeckCards(validDecks['custom']?.cards || []);
+                return;
+            }
+
+            setIsFetchingCards(true);
+            try {
+                // Check if we have optimistic cards first
+                const optimisticCards = localOptimisticDecks[formData.deckId]?.cards || [];
+                
+                const cardsRef = collection(db, 'artifacts', appId, 'decks', formData.deckId, 'cards');
+                const snap = await getDocs(cardsRef);
+                const loadedCards = snap.docs.map(doc => doc.data());
+                
+                // Merge optimistic cards with DB cards (in case they just created one)
+                const mergedCards = [...loadedCards];
+                optimisticCards.forEach((optCard: any) => {
+                    if (!mergedCards.some(c => c.id === optCard.id)) mergedCards.push(optCard);
+                });
+
+                setCurrentDeckCards(mergedCards);
+            } catch (err) {
+                console.error("Failed to fetch cards:", err);
+            } finally {
+                setIsFetchingCards(false);
+            }
+        };
+
+        fetchDeckCards();
+    }, [formData.deckId, validDecks]);
     
     const handleChange = (e: any) => { 
         if (e.target.name === 'deckId') { 
@@ -153,7 +196,6 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
         } 
     };
 
-    // 🔥 FIREBASE STORAGE: SECURE MEDIA UPLOAD HANDLER
     const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'audio') => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -162,7 +204,6 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
         const setter = isImage ? setIsUploadingImage : setIsUploadingAudio;
         const field = isImage ? 'imageUrl' : 'audioUrl';
 
-        // Size guard: 5MB for images, 10MB for audio
         const maxSize = isImage ? 5 * 1024 * 1024 : 10 * 1024 * 1024;
         if (file.size > maxSize) {
             setToastMsg(`File too large. Limit is ${isImage ? '5MB' : '10MB'}.`);
@@ -171,7 +212,6 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
 
         setter(true);
         try {
-            // Routing to the user's specific path to bypass the firewall
             const safeName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
             const fileRef = ref(storage, `artifacts/${appId}/users/${auth.currentUser?.uid}/media/${Date.now()}_${safeName}`);
             const uploadResult = await uploadBytes(fileRef, file);
@@ -290,7 +330,6 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
     const handleSelectCard = (card: any) => { 
         setImportMode(false); 
         setEditingId(card.id); 
-        // Load the media URLs into state if they exist
         setFormData({ 
             front: card.front, back: card.back, type: card.type || 'noun', ipa: card.ipa || '', 
             sentence: card.usage?.sentence || '', sentenceTrans: card.usage?.translation || '', 
@@ -315,8 +354,23 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
     const registerNewDeck = async (deckId: string, deckTitle: string) => {
         try {
             const deckRef = doc(db, 'artifacts', appId, 'decks', deckId);
+            // Notice we omit the cards array here. Cards live in subcollection now.
             await setDoc(deckRef, { id: deckId, key: deckId, title: deckTitle, type: 'vocabulary', createdAt: new Date().toISOString() }, { merge: true });
         } catch (err) { console.error("Failed to register deck:", err); }
+    };
+
+    const handleDeleteCard = async (cardId: string) => {
+        if (!window.confirm("Delete this card permanently?")) return;
+        
+        try {
+            await onDeleteCard(formData.deckId, cardId); // 🔥 Uses new backend action
+            setCurrentDeckCards(prev => prev.filter(c => c.id !== cardId));
+            if (editingId === cardId) handleClear();
+            setToastMsg("Target eliminated.");
+        } catch (err) {
+            console.error("Failed to delete card:", err);
+            setToastMsg("Error: Deletion failed.");
+        }
     };
 
     const handleSubmit = async (e: any) => { 
@@ -333,7 +387,6 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
             await registerNewDeck(finalDeckId, finalDeckTitle);
         } 
 
-        // 🔥 INJECT MEDIA URLS INTO PAYLOAD
         const cardData = { 
             front: formData.front, back: formData.back, type: formData.type, 
             deckId: finalDeckId, deckTitle: finalDeckTitle, ipa: formData.ipa || "/.../", 
@@ -344,18 +397,13 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
             grammar_tags: formData.grammarTags ? formData.grammarTags.split(',').map(t => t.trim()) : ["Custom"] 
         }; 
 
-        if (!editingId) {
-            setLocalOptimisticDecks((prev: any) => {
-                const existingDeck = prev[finalDeckId] || validDecks[finalDeckId] || { title: finalDeckTitle || 'Custom Deck', cards: [] };
-                return { ...prev, [finalDeckId]: { ...existingDeck, title: finalDeckTitle || existingDeck.title, cards: [...existingDeck.cards, { id: `temp_${Date.now()}`, ...cardData }] } };
-            });
-        }
-
         if (editingId) { 
-            await onUpdateCard(editingId, cardData); 
+            await onUpdateCard(finalDeckId, editingId, cardData); // 🔥 Fixed argument order
+            setCurrentDeckCards(prev => prev.map(c => c.id === editingId ? { ...cardData, id: editingId } : c));
             setToastMsg("Target Updated Successfully"); 
         } else { 
-            await onSaveCard(cardData); 
+            const newCardId = await onSaveCard(finalDeckId, cardData, true); // 🔥 Fixed argument order
+            setCurrentDeckCards(prev => [...prev, { ...cardData, id: newCardId }]);
             setToastMsg("Target Forged Successfully"); 
         } 
 
@@ -402,15 +450,9 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
             };
             
             try {
-                await onSaveCard(cardData); 
+                await onSaveCard(finalDeckId, cardData, true); // 🔥 FIXED ARGUMENT ORDER
                 successCount++;
                 setImportProgress({ current: successCount, total: importedCards.length });
-                
-                setLocalOptimisticDecks((prev: any) => {
-                    const existingDeck = prev[finalDeckId] || validDecks[finalDeckId] || { title: finalDeckTitle, cards: [] };
-                    return { ...prev, [finalDeckId]: { ...existingDeck, cards: [...existingDeck.cards, { id: `temp_${Date.now()}_${i}`, ...cardData }] } };
-                });
-
                 await new Promise(resolve => setTimeout(resolve, 150));
             } catch (err) { console.error(`Failed to save: ${card.front}`, err); }
         }
@@ -578,7 +620,6 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                         </div>
                     </section>
 
-                    {/* 🔥 NEW MEDIA PAYLOAD SECTION */}
                     <section className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-inner transition-colors">
                         <div className="flex items-center gap-2 mb-4">
                             <UploadCloud size={16} className="text-indigo-500" />
@@ -683,7 +724,7 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                     </button>
                 </div>
             ) : (
-                /* Bulk Import logic - themed for dark mode */
+                /* Bulk Import logic */
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                     <section className="bg-slate-50 dark:bg-slate-900 p-6 rounded-3xl border-2 border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
                         <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest mb-4">Destination Deck</h3>
@@ -719,7 +760,8 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                 </div>
             )}
 
-            {currentDeckCards.length > 0 && (
+            {/* DECK INVENTORY (Now dynamically fetches subcollection cards) */}
+            {formData.deckId && (
                 <div className="pt-10 mt-10 border-t-2 border-slate-100 dark:border-slate-800 transition-colors">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                         <h3 className="font-black text-slate-400 uppercase tracking-widest text-xs">Deck Inventory</h3>
@@ -727,35 +769,42 @@ export default function CardBuilderView({ onSaveCard, onUpdateCard, onDeleteCard
                             <button onClick={() => setShowShareModal(true)} className="bg-indigo-100 dark:bg-indigo-900/40 hover:bg-indigo-600 dark:hover:bg-indigo-600 text-indigo-600 dark:text-indigo-400 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-sm">
                                 <Share2 size={14} /> Network Access
                             </button>
-                            <span className="bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-3 py-2 rounded-xl text-[10px] font-black tracking-widest transition-colors">{currentDeckCards.length} Targets</span>
+                            <span className="bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-3 py-2 rounded-xl text-[10px] font-black tracking-widest transition-colors flex items-center gap-2">
+                                {isFetchingCards ? <Loader2 size={12} className="animate-spin" /> : currentDeckCards.length} Targets
+                            </span>
                         </div>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {currentDeckCards.map((card: any) => (
-                            <div key={card.id} onClick={() => !isImporting && handleSelectCard(card)} className={`p-4 rounded-2xl border-2 flex justify-between items-center cursor-pointer transition-all group ${editingId === card.id ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-500 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-500/50'}`}>
-                                <div className="flex flex-col">
-                                    <span className="font-black text-slate-800 dark:text-white transition-colors">{card.front}</span>
-                                    <span className="text-xs font-bold text-slate-400 mt-0.5">{card.back}</span>
-                                    
-                                    {/* MEDIA BADGES */}
-                                    <div className="flex items-center gap-2 mt-2">
-                                        {card.imageUrl && <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-indigo-500"><ImageIcon size={10} /> Image</span>}
-                                        {card.audioUrl && <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-indigo-500"><Music size={10} /> Audio</span>}
-                                        {card.conjugations && <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-indigo-500"><Paperclip size={10}/> Conjs</span>}
+                    {isFetchingCards ? (
+                        <div className="py-12 flex justify-center opacity-50">
+                            <Loader2 size={32} className="animate-spin text-indigo-500" />
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {currentDeckCards.map((card: any) => (
+                                <div key={card.id} onClick={() => !isImporting && handleSelectCard(card)} className={`p-4 rounded-2xl border-2 flex justify-between items-center cursor-pointer transition-all group ${editingId === card.id ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-500 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-500/50'}`}>
+                                    <div className="flex flex-col">
+                                        <span className="font-black text-slate-800 dark:text-white transition-colors">{card.front}</span>
+                                        <span className="text-xs font-bold text-slate-400 mt-0.5">{card.back}</span>
+                                        
+                                        <div className="flex items-center gap-2 mt-2">
+                                            {card.imageUrl && <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-indigo-500"><ImageIcon size={10} /> Image</span>}
+                                            {card.audioUrl && <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-indigo-500"><Music size={10} /> Audio</span>}
+                                            {card.conjugations && <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-indigo-500"><Paperclip size={10}/> Conjs</span>}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900 transition-colors"><Edit3 size={14} /></div>
+                                        {!(INITIAL_SYSTEM_DECKS as any)[formData.deckId] && (
+                                            <button onClick={(e) => { e.stopPropagation(); !isImporting && handleDeleteCard(card.id); }} className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-300 hover:bg-rose-500 hover:text-white transition-all">
+                                                <Trash2 size={14}/>
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900 transition-colors"><Edit3 size={14} /></div>
-                                    {!(INITIAL_SYSTEM_DECKS as any)[card.deckId] && (
-                                        <button onClick={(e) => { e.stopPropagation(); !isImporting && onDeleteCard(card.id); }} className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-300 hover:bg-rose-500 hover:text-white transition-all">
-                                            <Trash2 size={14}/>
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
         </div>
