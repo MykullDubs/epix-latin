@@ -444,14 +444,14 @@ export default function CardBuilderView({
         }
     };
 
-// 🔥 THE NEURAL FORGE LOGIC (Beta Track + Double Protection)
+// 🔥 THE NEURAL FORGE LOGIC (Upgraded to Gemini 2.5 Flash)
     const handleNeuralForge = async () => {
         if (!aiPrompt.trim()) {
             setToastMsg("Provide a prompt for the AI to forge.");
             return;
         }
 
-        // ⚠️ HARDCODED FOR LOCAL TESTING ONLY
+        // ⚠️ HARDCODED FOR LOCAL TESTING ONLY (Delete this key in Google AI Studio later!)
         const apiKey = "AIzaSyBaBVxKwEFg-LENpEYjObl13spPy3gVY9k";
 
         setIsImporting(true); 
@@ -478,8 +478,8 @@ export default function CardBuilderView({
         USER PROMPT: "${aiPrompt}"`;
 
         try {
-            // 🔥 Back to v1beta which fully supports the JSON MimeType
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+            // 🔥 UPDATED: Pointing to the active gemini-2.5-flash model
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -499,7 +499,7 @@ export default function CardBuilderView({
             const data = await response.json();
             let rawText = data.candidates[0].content.parts[0].text;
             
-            // 🔥 Double protection: Safely strip markdown blockquotes if the API still sneaks them in
+            // Double protection: Strip markdown blockquotes if the API sneaks them in
             rawText = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
             
             const aiCards = JSON.parse(rawText);
