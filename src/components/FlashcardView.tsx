@@ -5,10 +5,9 @@ import {
     CheckCircle2, XCircle, Globe, Users, Filter, ChevronLeft, ChevronRight, 
     RotateCw, ArrowUp, Paperclip, Music, Star, Archive, Plus, Save, Loader2,
     MoreVertical, FolderPlus, Trash2, Folder, FolderOpen, Edit3, Infinity,
-    Calculator, FlaskConical, Palette, Utensils, Plane, HeartPulse, Activity, BookText, Code
+    Calculator, FlaskConical, Palette, Utensils, Plane, HeartPulse, Activity, BookText, Code, BrainCircuit
 } from 'lucide-react';
 import { Toast } from './Toast'; 
-// 🔥 IMPORT FIREBASE SO WE CAN FETCH SUBCOLLECTIONS
 import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 import { db, appId } from '../config/firebase';
 import { saveDeckToCache, getDeckFromCache } from '../utils/localCache';
@@ -66,7 +65,7 @@ function ContextualCardBuilder({ config, onSave, onCancel }: any) {
             ipa: '', 
             morphology: [{ part: front.trim(), meaning: 'Root', type: 'root' }],
             grammar_tags: ['Student Note']
-        }, config.folder); // Pass folder context back up!
+        }, config.folder); 
         
         setIsSaving(false);
         onCancel(true); 
@@ -86,7 +85,6 @@ function ContextualCardBuilder({ config, onSave, onCancel }: any) {
             <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-32 custom-scrollbar">
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border-2 border-slate-100 dark:border-slate-800 shadow-sm space-y-6">
                     
-                    {/* Contextual Deck Input */}
                     {isNewDeck ? (
                         <div className="flex flex-col gap-2 pb-6 border-b border-slate-100 dark:border-slate-800">
                             <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest pl-1 flex justify-between">
@@ -111,7 +109,6 @@ function ContextualCardBuilder({ config, onSave, onCancel }: any) {
                         </div>
                     )}
 
-                    {/* Card Content Inputs */}
                     <div className="flex flex-col gap-2">
                         <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest pl-1">Front (Target Concept)</label>
                         <input 
@@ -149,14 +146,13 @@ function ContextualCardBuilder({ config, onSave, onCancel }: any) {
 // ============================================================================
 //  1. SRB-POWERED STUDY MODE (SPACED REPETITION BRAIN)
 // ============================================================================
-function StudyModePlayer({ deckCards, userData, onToggleStar, deckId }: any) {
+function StudyModePlayer({ deckCards, userData, onToggleStar, deckId, initialSrbData }: any) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     const [showConjugations, setShowConjugations] = useState(false); 
     
-    // 🔥 SRB State: Hold the student's historical data for this specific deck
-    const [srbData, setSrbData] = useState<Record<string, any>>({});
-    const [isFetchingSrb, setIsFetchingSrb] = useState(true);
+    // SRB Engine
+    const [srbData, setSrbData] = useState<Record<string, any>>(initialSrbData || {});
 
     const [startX, setStartX] = useState<number | null>(null);
     const [startY, setStartY] = useState<number | null>(null);
@@ -166,25 +162,6 @@ function StudyModePlayer({ deckCards, userData, onToggleStar, deckId }: any) {
 
     const currentCard = deckCards[currentIndex];
     const isStarred = userData?.cardPrefs?.[currentCard?.id]?.starred || false;
-
-    // 🔥 FETCH SRB DATA ON MOUNT
-    useEffect(() => {
-        const fetchSrbStats = async () => {
-            if (!userData?.uid || !deckId) return;
-            try {
-                const statsRef = collection(db, 'artifacts', appId, 'users', userData.uid, 'deck_progress', deckId, 'card_stats');
-                const snap = await getDocs(statsRef);
-                const statsMap: Record<string, any> = {};
-                snap.docs.forEach(doc => { statsMap[doc.id] = doc.data(); });
-                setSrbData(statsMap);
-            } catch (err) {
-                console.error("Failed to load SRB data:", err);
-            } finally {
-                setIsFetchingSrb(false);
-            }
-        };
-        fetchSrbStats();
-    }, [deckId, userData?.uid]);
 
     useEffect(() => {
         setShowConjugations(false);
@@ -218,28 +195,26 @@ function StudyModePlayer({ deckCards, userData, onToggleStar, deckId }: any) {
     const handleRateCard = async (rating: 'again' | 'good' | 'easy') => {
         if (!userData?.uid || !deckId || !currentCard) return;
 
-        // 1. Calculate the new brain data
+        // Omni-Mode fallback: We check if the card has a deckId directly
+        const targetDeckId = currentCard.deckId || deckId;
+
         const currentStats = srbData[currentCard.id] || {};
         const newStats = calculateNextReview(rating, currentStats);
 
-        // 2. Optimistically update local UI memory
         setSrbData(prev => ({ ...prev, [currentCard.id]: newStats }));
 
-        // 3. Fire to Firebase in the background
-        const progressRef = doc(db, 'artifacts', appId, 'users', userData.uid, 'deck_progress', deckId, 'card_stats', currentCard.id);
+        // Fire to Firebase in the background (No awaiting to keep UI lightning fast)
+        const progressRef = doc(db, 'artifacts', appId, 'users', userData.uid, 'deck_progress', targetDeckId, 'card_stats', currentCard.id);
         setDoc(progressRef, newStats, { merge: true }).catch(console.error);
 
-        // 4. Advance to the next card
         if (currentIndex < deckCards.length - 1) {
             setSlideDirection('right');
             setCurrentIndex(i => i + 1);
         } else {
-            // Reached the end! (You could trigger a completion screen here)
             setIsFlipped(false);
         }
     };
 
-    // Helper to turn the interval into a human-readable label
     const getIntervalLabel = (rating: 'again' | 'good' | 'easy') => {
         const stats = calculateNextReview(rating, srbData[currentCard?.id] || {});
         if (stats.interval === 0) return '< 10m';
@@ -280,13 +255,12 @@ function StudyModePlayer({ deckCards, userData, onToggleStar, deckId }: any) {
         const SWIPE_THRESHOLD_X = 75; 
         const SWIPE_THRESHOLD_Y = -60; 
         
-        // If flipped, swiping shouldn't advance, they MUST rate the card!
         if (!isFlipped) {
             if (dragX > SWIPE_THRESHOLD_X && currentIndex > 0) {
                 setSlideDirection('left');
                 setCurrentIndex(i => i - 1);
             } else if (dragX < -SWIPE_THRESHOLD_X && currentIndex < deckCards.length - 1) {
-                // If they swipe right without flipping, we count it as a "Good" rating automatically for velocity
+                // Swipe left translates to "Good" score if they don't flip
                 handleRateCard('good');
             } else if (dragY < SWIPE_THRESHOLD_Y || (Math.abs(dragX) < 10 && Math.abs(dragY) < 10)) {
                 setIsFlipped(true);
@@ -298,10 +272,6 @@ function StudyModePlayer({ deckCards, userData, onToggleStar, deckId }: any) {
         setDragX(0);
         setDragY(0);
     };
-
-    if (isFetchingSrb) {
-        return <div className="h-full flex flex-col items-center justify-center opacity-50"><Loader2 size={40} className="animate-spin text-indigo-500 mb-4" /><span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Loading SRB Matrix...</span></div>;
-    }
 
     if (!currentCard) return null;
 
@@ -407,8 +377,47 @@ function StudyModePlayer({ deckCards, userData, onToggleStar, deckId }: any) {
                                     </div>
                                 )}
                             </div>
+
+                            <div className="absolute bottom-4 left-0 right-0 flex flex-col items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest z-10 pointer-events-none bg-gradient-to-t from-white via-white/80 to-transparent pt-6 pb-2">
+                                <ArrowUp size={16} strokeWidth={3} className="animate-bounce" /> Rate Target
+                            </div>
                         </div>
                     </div>
+
+                    {/* CONJUGATION OVERLAY */}
+                    {showConjugations && currentCard.conjugations && (
+                        <div className="absolute inset-0 z-40 bg-white/95 dark:bg-slate-900/95 rounded-[3rem] p-6 flex flex-col animate-in slide-in-from-bottom-12 duration-300 backdrop-blur-md border-2 border-indigo-500/30">
+                            <div className="flex justify-between items-center mb-6">
+                                <div className="flex items-center gap-2">
+                                    <Paperclip size={18} className="text-indigo-500" />
+                                    <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest">Conjugation</span>
+                                </div>
+                                <button onClick={() => setShowConjugations(false)} className="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors active:scale-95">
+                                    <X size={20} className="text-slate-400" />
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pb-8">
+                                {Object.entries(currentCard.conjugations).map(([tense, forms]: any) => (
+                                    <div key={tense} className="space-y-2">
+                                        <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-tighter bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1.5 rounded-md w-fit">{tense}</h4>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {SUBJECT_ORDER.map((person) => {
+                                                const verb = forms[person];
+                                                if (!verb) return null;
+                                                return (
+                                                    <div key={person} className="flex flex-col p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50 shadow-sm">
+                                                        <span className="text-[9px] font-black text-slate-400 uppercase mb-0.5">{person}</span>
+                                                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{verb}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -600,7 +609,7 @@ function QuizSessionView({ deckCards, onGameEnd }: any) {
 // ============================================================================
 //  4. MAIN FLASHCARD VIEW (HUB)
 // ============================================================================
-export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity, userData, onSaveCard, onToggleStar, onToggleArchive, onCreateFolder, onAssignToFolder, onHideDeck, onUpdateFolder, onDeleteFolder }: any) {
+export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity, userData, onSaveCard, onToggleStar, onToggleArchive, onCreateFolder, onAssignToFolder, onHideDeck, onUpdateFolder, onDeleteFolder, user }: any) {
     const [internalMode, setInternalMode] = useState<'library' | 'menu' | 'playing' | 'create'>('library');
     const [activeGame, setActiveGame] = useState<'standard' | 'quiz' | 'match' | 'tower'>('standard');
     
@@ -613,7 +622,9 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     
     const [showFolderModal, setShowFolderModal] = useState<{isOpen: boolean, editMode: boolean, oldName: string}>({isOpen: false, editMode: false, oldName: ''});
     
+    // 🔥 NEW: State for tracking SRB stats and Filtering due cards
     const [fetchedCards, setFetchedCards] = useState<any[]>([]);
+    const [cardStats, setCardStats] = useState<Record<string, any>>({});
     const [isFetchingCards, setIsFetchingCards] = useState(false);
     
     const [builderConfig, setBuilderConfig] = useState<{type: 'new_deck', folder: string | null} | {type: 'add_card', deck: any} | null>(null);
@@ -632,7 +643,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
     }, [deckFilter, internalMode]);
 
-    // 🔥 THE UPGRADED CACHE-FIRST FETCH ENGINE
+    // 🔥 CACHE-FIRST FETCH ENGINE (Now fetches SRB stats too!)
     useEffect(() => {
         const fetchDeckCards = async () => {
             if (!selectedDeckKey || omniDeck) return;
@@ -644,30 +655,30 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
             setIsFetchingCards(true);
             try {
-                // 1. Get the master timestamp from our lightweight metadata
+                // 1. Fetch Cards
                 const masterDeck = allDecks[selectedDeckKey];
                 const masterUpdatedAt = masterDeck?.updatedAt || 0;
-
-                // 2. Check the device's hard drive
                 const cachedData = await getDeckFromCache(selectedDeckKey);
 
-                // 3. If local data is perfectly in sync with Firebase, load it instantly!
+                let finalCards = [];
                 if (cachedData && cachedData.updatedAt >= masterUpdatedAt) {
-                    console.log("⚡ Magister OS: Loaded deck from Local Cache!");
-                    setFetchedCards(cachedData.cards);
-                    setIsFetchingCards(false);
-                    return; // EXIT EARLY! You just saved money.
+                    finalCards = cachedData.cards;
+                } else {
+                    const cardsRef = collection(db, 'artifacts', appId, 'decks', selectedDeckKey, 'cards');
+                    const snap = await getDocs(cardsRef);
+                    finalCards = snap.docs.map(doc => doc.data());
+                    await saveDeckToCache(selectedDeckKey, finalCards, masterUpdatedAt);
                 }
+                setFetchedCards(finalCards);
 
-                // 4. Otherwise, we reach out to Firebase to download the updates
-                console.log("☁️ Magister OS: Downloading fresh deck from Firebase...");
-                const cardsRef = collection(db, 'artifacts', appId, 'decks', selectedDeckKey, 'cards');
-                const snap = await getDocs(cardsRef);
-                const loadedCards = snap.docs.map(doc => doc.data());
-                
-                // 5. Update UI and save silently to the hard drive for next time
-                setFetchedCards(loadedCards);
-                await saveDeckToCache(selectedDeckKey, loadedCards, masterUpdatedAt);
+                // 2. Fetch SRB Stats for these cards
+                if (user?.uid) {
+                    const statsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'deck_progress', selectedDeckKey, 'card_stats');
+                    const statsSnap = await getDocs(statsRef);
+                    const statsMap: Record<string, any> = {};
+                    statsSnap.docs.forEach(d => { statsMap[d.id] = d.data(); });
+                    setCardStats(statsMap);
+                }
 
             } catch (err) {
                 console.error("Failed to load cards:", err);
@@ -678,7 +689,16 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         };
 
         fetchDeckCards();
-    }, [selectedDeckKey, omniDeck, allDecks]);
+    }, [selectedDeckKey, omniDeck, allDecks, user?.uid]);
+
+    // 🔥 THE FILTER: Which cards are due today?
+    const dueCards = useMemo(() => {
+        return cards.filter((c: any) => {
+            const stat = cardStats[c.id];
+            // If they've never seen it, or the review date is in the past, it's due!
+            return !stat?.nextReviewDate || stat.nextReviewDate <= Date.now();
+        });
+    }, [cards, cardStats]);
 
     const launchGame = (mode: 'standard' | 'quiz' | 'match' | 'tower') => {
         if (cards.length === 0) {
@@ -696,6 +716,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             onSelectDeck(null); 
             setOmniDeck(null); 
             setFetchedCards([]); 
+            setCardStats({});
         }
     };
 
@@ -707,7 +728,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         setToastMsg(`Protocol Complete! +${earnedXP} XP Earned!`);
     };
 
-    // 🔥 THE UPGRADED CACHE-FIRST OMNI-MODE ENGINE
     const launchOmniMode = async (folderName: string) => {
         const folderDecks = Object.values(allDecks).filter((d: any) => userData?.deckPrefs?.[d.id]?.folder === folderName && !userData?.deckPrefs?.[d.id]?.archived);
         
@@ -720,28 +740,38 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         setToastMsg("Compiling Omni-Deck...");
         
         try {
-            // We run a massive parallel check on the local cache for all decks
             const allPromises = folderDecks.map(async (deck: any) => {
                 if (deck.id === 'custom') return deck.cards || [];
                 
-                // Check Cache First
                 const cachedData = await getDeckFromCache(deck.id);
                 if (cachedData && cachedData.updatedAt >= (deck.updatedAt || 0)) {
                     return cachedData.cards;
                 }
 
-                // Fallback to Firebase
                 const cardsRef = collection(db, 'artifacts', appId, 'decks', deck.id, 'cards');
                 const snap = await getDocs(cardsRef);
                 const loadedCards = snap.docs.map(doc => doc.data());
                 
-                // Save locally
                 await saveDeckToCache(deck.id, loadedCards, deck.updatedAt || 0);
                 return loadedCards;
             });
 
-            const allResults = await Promise.all(allPromises);
+            // For Omni-Mode, we also need to gather the SRB stats for all decks
+            const statsPromises = folderDecks.map(async (deck: any) => {
+                if (deck.id === 'custom') return [];
+                const statsRef = collection(db, 'artifacts', appId, 'users', user?.uid, 'deck_progress', deck.id, 'card_stats');
+                const snap = await getDocs(statsRef);
+                return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            });
+
+            const [allResults, allStats] = await Promise.all([Promise.all(allPromises), Promise.all(statsPromises)]);
+            
             const allCards = allResults.flat();
+            
+            // Build the master stats map
+            const statsMap: Record<string, any> = {};
+            allStats.flat().forEach((stat: any) => { statsMap[stat.id] = stat; });
+            setCardStats(statsMap);
 
             if (allCards.length === 0) {
                 setToastMsg("No cards found inside these decks.");
@@ -817,7 +847,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors relative">
                 {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
                 
-                {/* UPGRADED FOLDER CREATION / EDIT MODAL */}
                 {showFolderModal.isOpen && (
                     <FolderModal 
                         initialName={showFolderModal.editMode ? showFolderModal.oldName : ''}
@@ -834,7 +863,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             <div className="bg-gradient-to-br from-orange-400 to-rose-500 text-white p-2.5 rounded-xl shadow-md shadow-orange-500/20"><Library size={22} strokeWidth={3}/></div>
                             <span className="font-black text-slate-800 dark:text-white text-2xl uppercase tracking-tighter">Study Hub</span>
                         </div>
-                        {/* 🔥 HEADER BUTTON: New Deck in Library */}
                         <button 
                             onClick={() => {
                                 setBuilderConfig({ type: 'new_deck', folder: null });
@@ -870,7 +898,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 space-y-5 pb-28 relative z-10 custom-scrollbar overscroll-y-contain h-full">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         
-                        {/* BREADCRUMB HEADER WITH OMNI-STUDY & NEW DECK BUTTONS */}
                         {customFolders.includes(deckFilter) && (
                             <div className="col-span-full animate-in fade-in duration-300 mb-2 mt-2">
                                 <button onClick={() => setDeckFilter('all')} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-500 transition-colors w-fit bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 active:scale-95">
@@ -904,7 +931,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             </div>
                         )}
 
-                        {/* RENDER FOLDERS WITH DYNAMIC COLORS */}
                         {deckFilter === 'all' && customFolders.map((folderName: string) => {
                             const itemCount = Object.keys(allDecks).filter(key => userData?.deckPrefs?.[key]?.folder === folderName && !userData?.deckPrefs?.[key]?.archived).length;
                             const theme = FOLDER_COLORS[folderColors[folderName] || 'indigo'];
@@ -928,7 +954,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                         </div>
                                     </button>
 
-                                    {/* Folder Context Menu Target */}
                                     <button 
                                         onClick={(e) => { 
                                             e.preventDefault(); e.stopPropagation(); 
@@ -943,7 +968,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             );
                         })}
 
-                        {/* EMPTY FOLDER STATE */}
                         {filteredDecks.length === 0 && deckFilter !== 'all' && customFolders.includes(deckFilter) && (
                              <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[2.5rem] mt-4 text-slate-400 font-bold text-sm uppercase tracking-widest flex flex-col items-center gap-3">
                                  <FolderPlus size={32} className="opacity-20" />
@@ -951,18 +975,14 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                              </div>
                         )}
 
-                        {/* RENDER DECKS */}
                         {filteredDecks.map(([key, deck]: any) => {
                             const displayTitle = deck.id === 'custom' ? "My Study Cards" : deck.title;
                             const theme = getDeckTheme(displayTitle);
                             const DeckIcon = deck.icon || theme.icon;
-
-                            // 🔥 UI UPDATE: Get count from metadata stats now!
                             const cardCount = deck.id === 'custom' ? (deck.cards?.length || 0) : (deck.stats?.cardCount || 0);
 
                             return (
                                 <div key={key} className="relative group animate-in fade-in duration-300 h-full pt-2">
-                                    
                                     <div className="absolute inset-x-4 -bottom-1 h-10 bg-slate-200 dark:bg-slate-800 rounded-[2rem] transition-transform duration-300 group-hover:translate-y-1.5" />
                                     <div className="absolute inset-x-2 -bottom-0 h-10 bg-slate-100 dark:bg-slate-800/80 rounded-[2rem] transition-transform duration-300 group-hover:translate-y-1" />
 
@@ -1005,7 +1025,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     </div>
                 </div>
 
-                {/* BOTTOM SHEET: FOLDER SETTINGS */}
                 {activeOptionsFolder && (
                     <div className="fixed inset-0 z-[500] flex flex-col justify-end">
                         <div className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setActiveOptionsFolder(null)} />
@@ -1060,7 +1079,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     </div>
                 )}
 
-                {/* BOTTOM SHEET: DECK OPTIONS */}
                 {activeOptionsDeck && (
                     <div className="fixed inset-0 z-[500] flex flex-col justify-end">
                         <div 
@@ -1178,7 +1196,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     <div className="flex justify-between items-start mb-2">
                         <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter">{displayMenuTitle}</h1>
                         
-                        {/* 🔥 HEADER BUTTON: Add Card Inside Deck */}
                         {!omniDeck && (
                             <button 
                                 onClick={() => {
@@ -1193,8 +1210,19 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         )}
                     </div>
                     
-                    <span className="text-indigo-500 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1 rounded-lg flex items-center gap-2 w-fit mt-3">
-                        {isFetchingCards ? <Loader2 size={12} className="animate-spin" /> : cards.length} Configured Targets {omniDeck ? '(Omni)' : ''}
+                    {/* 🔥 THE NEW SRB STATUS PILL */}
+                    <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-lg flex items-center gap-2 w-fit mt-3 transition-colors ${
+                        isFetchingCards ? 'bg-slate-100 dark:bg-slate-800 text-slate-400' :
+                        dueCards.length === 0 ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500' : 
+                        'bg-rose-50 dark:bg-rose-500/10 text-rose-500'
+                    }`}>
+                        {isFetchingCards ? (
+                            <><Loader2 size={12} className="animate-spin" /> Calculating Matrix...</>
+                        ) : dueCards.length === 0 ? (
+                            <><CheckCircle2 size={12} /> All Caught Up • {cards.length} Total</>
+                        ) : (
+                            <><BrainCircuit size={12} className="animate-pulse" /> {dueCards.length} Due for Review • {cards.length} Total</>
+                        )}
                     </span>
                 </div>
 
@@ -1206,21 +1234,39 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         </div>
                     ) : (
                         <div className="grid grid-cols-2 gap-4">
-                            <button onClick={() => launchGame('standard')} className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-100 dark:border-slate-800 shadow-sm hover:border-blue-300 dark:hover:border-blue-500/50 hover:-translate-y-1 transition-all group text-left">
-                                <div className="w-14 h-14 bg-blue-50 dark:bg-blue-500/10 text-blue-500 rounded-2xl flex items-center justify-center mb-4 group-hover:rotate-6 transition-transform"><Layers size={28}/></div>
-                                <h4 className="font-black text-slate-800 dark:text-white text-xl leading-none mb-2">Review</h4>
-                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Standard Mode</p>
+                            
+                            {/* 🔥 THE SRB REVIEW BUTTON */}
+                            <button 
+                                onClick={() => launchGame('standard')} 
+                                className={`p-6 rounded-[2.5rem] border-[3px] shadow-sm hover:-translate-y-1 transition-all group text-left ${
+                                    dueCards.length > 0 
+                                        ? 'bg-rose-50 dark:bg-rose-500/5 border-rose-200 dark:border-rose-500/30 hover:border-rose-300 dark:hover:border-rose-500/50' 
+                                        : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-500/50'
+                                }`}
+                            >
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 group-hover:rotate-6 transition-transform ${dueCards.length > 0 ? 'bg-rose-100 dark:bg-rose-500/20 text-rose-500' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-500'}`}>
+                                    {dueCards.length > 0 ? <BrainCircuit size={28}/> : <Layers size={28}/>}
+                                </div>
+                                <h4 className="font-black text-slate-800 dark:text-white text-xl leading-none mb-2">
+                                    {dueCards.length > 0 ? 'Review Due' : 'Browse Deck'}
+                                </h4>
+                                <p className={`text-[10px] font-black uppercase tracking-widest ${dueCards.length > 0 ? 'text-rose-400' : 'text-slate-400'}`}>
+                                    {dueCards.length > 0 ? 'Spaced Repetition' : 'Standard Mode'}
+                                </p>
                             </button>
+
                             <button onClick={() => launchGame('quiz')} className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-100 dark:border-slate-800 shadow-sm hover:border-emerald-300 dark:hover:border-emerald-500/50 hover:-translate-y-1 transition-all group text-left">
                                 <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 rounded-2xl flex items-center justify-center mb-4 group-hover:-rotate-6 transition-transform"><HelpCircle size={28}/></div>
                                 <h4 className="font-black text-slate-800 dark:text-white text-xl leading-none mb-2">Quiz</h4>
                                 <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Multiple Choice</p>
                             </button>
+
                             <button onClick={() => launchGame('match')} className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-100 dark:border-slate-800 shadow-sm hover:border-purple-300 dark:hover:border-purple-500/50 hover:-translate-y-1 transition-all group text-left">
                                 <div className="w-14 h-14 bg-purple-50 dark:bg-purple-500/10 text-purple-500 rounded-2xl flex items-center justify-center mb-4 group-hover:rotate-12 transition-transform"><Puzzle size={28}/></div>
                                 <h4 className="font-black text-slate-800 dark:text-white text-xl leading-none mb-2">Match</h4>
                                 <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Speed Pairs</p>
                             </button>
+
                             <button className="bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-800 shadow-xl opacity-50 cursor-not-allowed group text-left relative overflow-hidden">
                                 <div className="w-14 h-14 bg-orange-500/20 text-orange-400 rounded-2xl flex items-center justify-center mb-4"><Flame size={28} fill="currentColor"/></div>
                                 <h4 className="font-black text-white text-xl leading-none mb-2">Tower</h4>
@@ -1245,7 +1291,10 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 <div className="w-11"></div>
             </div>
             <div className="flex-1 overflow-hidden relative">
-                {activeGame === 'standard' && <StudyModePlayer deckCards={cards} userData={userData} onToggleStar={onToggleStar} deckId={resolvedDeck?.id} />}
+                {/* 🔥 SRB INJECTION: Pass the due cards and the raw stats map into the player */}
+                {activeGame === 'standard' && <StudyModePlayer deckCards={dueCards.length > 0 ? dueCards : cards} initialSrbData={cardStats} userData={userData} onToggleStar={onToggleStar} deckId={resolvedDeck?.id} />}
+                
+                {/* Quiz and Match still use the full deck for variety, but you could pass dueCards here too! */}
                 {activeGame === 'quiz' && <div className="h-full overflow-y-auto"><QuizSessionView deckCards={cards} onGameEnd={(res: any) => handleGameFinish(res.score ? (res.score/res.total)*100 : 0)} /></div>}
                 {activeGame === 'match' && <div className="h-full overflow-y-auto pt-6"><MatchingGame deckCards={cards} onGameEnd={(scorePct: number) => handleGameFinish(scorePct)} /></div>}
             </div>
