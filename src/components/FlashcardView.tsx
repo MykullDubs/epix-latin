@@ -11,6 +11,7 @@ import { Toast } from './Toast';
 // 🔥 IMPORT FIREBASE SO WE CAN FETCH SUBCOLLECTIONS
 import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 import { db, appId } from '../config/firebase';
+import { saveDeckToCache, getDeckFromCache } from '../utils/localCache';
 
 const SUBJECT_ORDER = ['1s', '2s', '3s', '1p', '2p', '3p'];
 
@@ -566,19 +567,15 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     
     const [showFolderModal, setShowFolderModal] = useState<{isOpen: boolean, editMode: boolean, oldName: string}>({isOpen: false, editMode: false, oldName: ''});
     
-    // 🔥 SUBCOLLECTION FETCH ENGINE
     const [fetchedCards, setFetchedCards] = useState<any[]>([]);
     const [isFetchingCards, setIsFetchingCards] = useState(false);
     
-    // 🔥 THE BUILDER CONFIG ENGINE
     const [builderConfig, setBuilderConfig] = useState<{type: 'new_deck', folder: string | null} | {type: 'add_card', deck: any} | null>(null);
 
     const [omniDeck, setOmniDeck] = useState<any>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     const resolvedDeck = omniDeck || allDecks[selectedDeckKey] || Object.values(allDecks)[0];
-    
-    // In Omni-Mode, the cards are already in memory. Otherwise, use fetched cards.
     const cards = omniDeck ? omniDeck.cards : fetchedCards;
     const deckTitle = resolvedDeck?.id === 'custom' ? "My Study Cards" : resolvedDeck?.title;
 
@@ -589,13 +586,11 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
     }, [deckFilter, internalMode]);
 
-    // 🔥 THE FETCH TRIGGER: Runs whenever a student selects a new deck
+    // 🔥 THE UPGRADED CACHE-FIRST FETCH ENGINE
     useEffect(() => {
         const fetchDeckCards = async () => {
             if (!selectedDeckKey || omniDeck) return;
             
-            // Personal custom cards are still in the old location right now, 
-            // so we skip the fetch if they click "My Study Cards"
             if (selectedDeckKey === 'custom') {
                 setFetchedCards(allDecks['custom']?.cards || []);
                 return;
@@ -603,13 +598,33 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
             setIsFetchingCards(true);
             try {
-                // Reach into the new multi-tenant subcollection architecture
+                // 1. Get the master timestamp from our lightweight metadata
+                const masterDeck = allDecks[selectedDeckKey];
+                const masterUpdatedAt = masterDeck?.updatedAt || 0;
+
+                // 2. Check the device's hard drive
+                const cachedData = await getDeckFromCache(selectedDeckKey);
+
+                // 3. If local data is perfectly in sync with Firebase, load it instantly!
+                if (cachedData && cachedData.updatedAt >= masterUpdatedAt) {
+                    console.log("⚡ Magister OS: Loaded deck from Local Cache!");
+                    setFetchedCards(cachedData.cards);
+                    setIsFetchingCards(false);
+                    return; // EXIT EARLY! You just saved money.
+                }
+
+                // 4. Otherwise, we reach out to Firebase to download the updates
+                console.log("☁️ Magister OS: Downloading fresh deck from Firebase...");
                 const cardsRef = collection(db, 'artifacts', appId, 'decks', selectedDeckKey, 'cards');
                 const snap = await getDocs(cardsRef);
                 const loadedCards = snap.docs.map(doc => doc.data());
+                
+                // 5. Update UI and save silently to the hard drive for next time
                 setFetchedCards(loadedCards);
+                await saveDeckToCache(selectedDeckKey, loadedCards, masterUpdatedAt);
+
             } catch (err) {
-                console.error("Failed to load cards from subcollection:", err);
+                console.error("Failed to load cards:", err);
                 setToastMsg("Failed to download deck. Check connection.");
             } finally {
                 setIsFetchingCards(false);
@@ -617,7 +632,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         };
 
         fetchDeckCards();
-    }, [selectedDeckKey, omniDeck]);
+    }, [selectedDeckKey, omniDeck, allDecks]);
 
     const launchGame = (mode: 'standard' | 'quiz' | 'match' | 'tower') => {
         if (cards.length === 0) {
@@ -634,7 +649,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             setInternalMode('library'); 
             onSelectDeck(null); 
             setOmniDeck(null); 
-            setFetchedCards([]); // Clear memory when leaving
+            setFetchedCards([]); 
         }
     };
 
@@ -646,6 +661,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         setToastMsg(`Protocol Complete! +${earnedXP} XP Earned!`);
     };
 
+    // 🔥 THE UPGRADED CACHE-FIRST OMNI-MODE ENGINE
     const launchOmniMode = async (folderName: string) => {
         const folderDecks = Object.values(allDecks).filter((d: any) => userData?.deckPrefs?.[d.id]?.folder === folderName && !userData?.deckPrefs?.[d.id]?.archived);
         
@@ -658,12 +674,24 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         setToastMsg("Compiling Omni-Deck...");
         
         try {
-            // 🔥 We must fetch ALL cards from ALL decks in the folder!
+            // We run a massive parallel check on the local cache for all decks
             const allPromises = folderDecks.map(async (deck: any) => {
                 if (deck.id === 'custom') return deck.cards || [];
+                
+                // Check Cache First
+                const cachedData = await getDeckFromCache(deck.id);
+                if (cachedData && cachedData.updatedAt >= (deck.updatedAt || 0)) {
+                    return cachedData.cards;
+                }
+
+                // Fallback to Firebase
                 const cardsRef = collection(db, 'artifacts', appId, 'decks', deck.id, 'cards');
                 const snap = await getDocs(cardsRef);
-                return snap.docs.map(doc => doc.data());
+                const loadedCards = snap.docs.map(doc => doc.data());
+                
+                // Save locally
+                await saveDeckToCache(deck.id, loadedCards, deck.updatedAt || 0);
+                return loadedCards;
             });
 
             const allResults = await Promise.all(allPromises);
@@ -690,9 +718,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     };
 
     const handleSaveFromBuilder = async (cardData: any, folderToAssign: string | null) => {
-        // 🔥 This passes the deckId up to your new saveCard function in useMagisterData
         await onSaveCard(cardData.deckId, cardData);
-        
         if (folderToAssign && onAssignToFolder) {
             await onAssignToFolder(cardData.deckId, folderToAssign);
         }
