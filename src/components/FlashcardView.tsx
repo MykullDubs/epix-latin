@@ -147,13 +147,17 @@ function ContextualCardBuilder({ config, onSave, onCancel }: any) {
 }
 
 // ============================================================================
-//  1. STUDY MODE 
+//  1. SRB-POWERED STUDY MODE (SPACED REPETITION BRAIN)
 // ============================================================================
 function StudyModePlayer({ deckCards, userData, onToggleStar, deckId }: any) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     const [showConjugations, setShowConjugations] = useState(false); 
     
+    // 🔥 SRB State: Hold the student's historical data for this specific deck
+    const [srbData, setSrbData] = useState<Record<string, any>>({});
+    const [isFetchingSrb, setIsFetchingSrb] = useState(true);
+
     const [startX, setStartX] = useState<number | null>(null);
     const [startY, setStartY] = useState<number | null>(null);
     const [dragX, setDragX] = useState(0);
@@ -163,33 +167,85 @@ function StudyModePlayer({ deckCards, userData, onToggleStar, deckId }: any) {
     const currentCard = deckCards[currentIndex];
     const isStarred = userData?.cardPrefs?.[currentCard?.id]?.starred || false;
 
+    // 🔥 FETCH SRB DATA ON MOUNT
+    useEffect(() => {
+        const fetchSrbStats = async () => {
+            if (!userData?.uid || !deckId) return;
+            try {
+                const statsRef = collection(db, 'artifacts', appId, 'users', userData.uid, 'deck_progress', deckId, 'card_stats');
+                const snap = await getDocs(statsRef);
+                const statsMap: Record<string, any> = {};
+                snap.docs.forEach(doc => { statsMap[doc.id] = doc.data(); });
+                setSrbData(statsMap);
+            } catch (err) {
+                console.error("Failed to load SRB data:", err);
+            } finally {
+                setIsFetchingSrb(false);
+            }
+        };
+        fetchSrbStats();
+    }, [deckId, userData?.uid]);
+
     useEffect(() => {
         setShowConjugations(false);
         setIsFlipped(false);
     }, [currentIndex]);
 
-    const handleNext = (e?: any) => {
-        e?.stopPropagation();
-        
-        // 🔥 MUTATION LAYER LOGIC: Student has seen the card. 
-        // Note: For a real app, you'd calculate actual SRS here based on if they got it right/wrong.
-        if (userData?.uid && deckId && currentCard) {
-            const progressRef = doc(db, 'artifacts', appId, 'users', userData.uid, 'deck_progress', deckId, 'card_stats', currentCard.id);
-            setDoc(progressRef, { lastSeen: Date.now() }, { merge: true }).catch(console.error);
+    // 🔥 THE SPACED REPETITION ALGORITHM (SM-2 Variant)
+    const calculateNextReview = (rating: 'again' | 'good' | 'easy', currentStats: any) => {
+        let { easeFactor = 2.5, interval = 0, repetitions = 0 } = currentStats || {};
+
+        if (rating === 'again') {
+            repetitions = 0;
+            interval = 1;
+            easeFactor = Math.max(1.3, easeFactor - 0.2);
+        } else if (rating === 'good') {
+            repetitions += 1;
+            if (repetitions === 1) interval = 1;
+            else if (repetitions === 2) interval = 6;
+            else interval = Math.round(interval * easeFactor);
+        } else if (rating === 'easy') {
+            repetitions += 1;
+            easeFactor += 0.15;
+            if (repetitions === 1) interval = 4;
+            else interval = Math.round(interval * easeFactor * 1.3);
         }
 
+        const nextReviewDate = Date.now() + (interval * 24 * 60 * 60 * 1000);
+        return { easeFactor, interval, repetitions, nextReviewDate, lastStudied: Date.now() };
+    };
+
+    const handleRateCard = async (rating: 'again' | 'good' | 'easy') => {
+        if (!userData?.uid || !deckId || !currentCard) return;
+
+        // 1. Calculate the new brain data
+        const currentStats = srbData[currentCard.id] || {};
+        const newStats = calculateNextReview(rating, currentStats);
+
+        // 2. Optimistically update local UI memory
+        setSrbData(prev => ({ ...prev, [currentCard.id]: newStats }));
+
+        // 3. Fire to Firebase in the background
+        const progressRef = doc(db, 'artifacts', appId, 'users', userData.uid, 'deck_progress', deckId, 'card_stats', currentCard.id);
+        setDoc(progressRef, newStats, { merge: true }).catch(console.error);
+
+        // 4. Advance to the next card
         if (currentIndex < deckCards.length - 1) {
             setSlideDirection('right');
             setCurrentIndex(i => i + 1);
+        } else {
+            // Reached the end! (You could trigger a completion screen here)
+            setIsFlipped(false);
         }
     };
 
-    const handlePrev = (e?: any) => {
-        e?.stopPropagation();
-        if (currentIndex > 0) {
-            setSlideDirection('left');
-            setCurrentIndex(i => i - 1);
-        }
+    // Helper to turn the interval into a human-readable label
+    const getIntervalLabel = (rating: 'again' | 'good' | 'easy') => {
+        const stats = calculateNextReview(rating, srbData[currentCard?.id] || {});
+        if (stats.interval === 0) return '< 10m';
+        if (stats.interval === 1) return '1 Day';
+        if (stats.interval < 30) return `${stats.interval} Days`;
+        return `${Math.round(stats.interval / 30 * 10) / 10} Mo`;
     };
 
     const handlePointerDown = (e: React.TouchEvent | React.MouseEvent) => {
@@ -224,15 +280,28 @@ function StudyModePlayer({ deckCards, userData, onToggleStar, deckId }: any) {
         const SWIPE_THRESHOLD_X = 75; 
         const SWIPE_THRESHOLD_Y = -60; 
         
-        if (dragX > SWIPE_THRESHOLD_X && currentIndex > 0) handlePrev();
-        else if (dragX < -SWIPE_THRESHOLD_X && currentIndex < deckCards.length - 1) handleNext();
-        else if (dragY < SWIPE_THRESHOLD_Y || (Math.abs(dragX) < 10 && Math.abs(dragY) < 10)) setIsFlipped(!isFlipped);
+        // If flipped, swiping shouldn't advance, they MUST rate the card!
+        if (!isFlipped) {
+            if (dragX > SWIPE_THRESHOLD_X && currentIndex > 0) {
+                setSlideDirection('left');
+                setCurrentIndex(i => i - 1);
+            } else if (dragX < -SWIPE_THRESHOLD_X && currentIndex < deckCards.length - 1) {
+                // If they swipe right without flipping, we count it as a "Good" rating automatically for velocity
+                handleRateCard('good');
+            } else if (dragY < SWIPE_THRESHOLD_Y || (Math.abs(dragX) < 10 && Math.abs(dragY) < 10)) {
+                setIsFlipped(true);
+            }
+        }
         
         setStartX(null);
         setStartY(null);
         setDragX(0);
         setDragY(0);
     };
+
+    if (isFetchingSrb) {
+        return <div className="h-full flex flex-col items-center justify-center opacity-50"><Loader2 size={40} className="animate-spin text-indigo-500 mb-4" /><span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Loading SRB Matrix...</span></div>;
+    }
 
     if (!currentCard) return null;
 
@@ -338,62 +407,39 @@ function StudyModePlayer({ deckCards, userData, onToggleStar, deckId }: any) {
                                     </div>
                                 )}
                             </div>
-
-                            <div className="absolute bottom-4 left-0 right-0 flex flex-col items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest z-10 pointer-events-none bg-gradient-to-t from-white via-white/80 to-transparent pt-6 pb-2">
-                                <ArrowUp size={16} strokeWidth={3} className="animate-bounce" /> Slide up to return
-                            </div>
                         </div>
                     </div>
-
-                    {/* CONJUGATION OVERLAY */}
-                    {showConjugations && currentCard.conjugations && (
-                        <div className="absolute inset-0 z-40 bg-white/95 dark:bg-slate-900/95 rounded-[3rem] p-6 flex flex-col animate-in slide-in-from-bottom-12 duration-300 backdrop-blur-md border-2 border-indigo-500/30">
-                            <div className="flex justify-between items-center mb-6">
-                                <div className="flex items-center gap-2">
-                                    <Paperclip size={18} className="text-indigo-500" />
-                                    <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest">Conjugation</span>
-                                </div>
-                                <button onClick={() => setShowConjugations(false)} className="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors active:scale-95">
-                                    <X size={20} className="text-slate-400" />
-                                </button>
-                            </div>
-
-                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pb-8">
-                                {Object.entries(currentCard.conjugations).map(([tense, forms]: any) => (
-                                    <div key={tense} className="space-y-2">
-                                        <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-tighter bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1.5 rounded-md w-fit">{tense}</h4>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {SUBJECT_ORDER.map((person) => {
-                                                const verb = forms[person];
-                                                if (!verb) return null;
-                                                return (
-                                                    <div key={person} className="flex flex-col p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50 shadow-sm">
-                                                        <span className="text-[9px] font-black text-slate-400 uppercase mb-0.5">{person}</span>
-                                                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{verb}</span>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
 
-            <div className="flex items-center justify-between px-2 shrink-0 z-10 w-full mb-safe-4">
-                <button onClick={handlePrev} disabled={currentIndex === 0} className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-md border border-slate-100 dark:border-slate-700 disabled:opacity-30 transition-all active:scale-95 touch-manipulation">
-                    <ChevronLeft size={28} strokeWidth={3} className="-ml-1" />
-                </button>
-                <div className="flex gap-2">
-                    {[...Array(Math.min(5, deckCards.length))].map((_, idx) => (
-                        <div key={idx} className={`h-2 rounded-full transition-all duration-300 ${idx === Math.floor((currentIndex / deckCards.length) * 5) ? 'w-5 bg-indigo-500' : 'w-2 bg-slate-200 dark:bg-slate-700'}`} />
-                    ))}
-                </div>
-                <button onClick={handleNext} disabled={currentIndex === deckCards.length - 1} className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-md border border-slate-100 dark:border-slate-700 disabled:opacity-30 transition-all active:scale-95 touch-manipulation">
-                    <ChevronRight size={28} strokeWidth={3} className="ml-1" />
-                </button>
+            {/* 🔥 SRB INTERFACE (REPLACES NEXT/PREV WHEN FLIPPED) */}
+            <div className="shrink-0 z-10 w-full mb-safe-4 min-h-[64px]">
+                {!isFlipped ? (
+                    <div className="flex items-center justify-between px-2 animate-in fade-in duration-300">
+                        <button onClick={(e) => { e.stopPropagation(); setSlideDirection('left'); setCurrentIndex(i => i - 1); }} disabled={currentIndex === 0} className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-md border border-slate-100 dark:border-slate-700 disabled:opacity-30 transition-all active:scale-95 touch-manipulation">
+                            <ChevronLeft size={28} strokeWidth={3} className="-ml-1" />
+                        </button>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tap card to review</span>
+                        <button onClick={(e) => { e.stopPropagation(); setSlideDirection('right'); setCurrentIndex(i => i + 1); }} disabled={currentIndex === deckCards.length - 1} className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-md border border-slate-100 dark:border-slate-700 disabled:opacity-30 transition-all active:scale-95 touch-manipulation">
+                            <ChevronRight size={28} strokeWidth={3} className="ml-1" />
+                        </button>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-3 gap-3 px-2 animate-in slide-in-from-bottom-4 fade-in duration-300">
+                        <button onClick={() => handleRateCard('again')} className="flex flex-col items-center justify-center p-4 rounded-2xl bg-rose-50 dark:bg-rose-500/10 border-2 border-rose-200 dark:border-rose-500/30 text-rose-600 dark:text-rose-400 shadow-sm active:scale-95 transition-all">
+                            <span className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">{getIntervalLabel('again')}</span>
+                            <span className="font-black text-sm uppercase tracking-widest">Again</span>
+                        </button>
+                        <button onClick={() => handleRateCard('good')} className="flex flex-col items-center justify-center p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border-2 border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400 shadow-sm active:scale-95 transition-all">
+                            <span className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">{getIntervalLabel('good')}</span>
+                            <span className="font-black text-sm uppercase tracking-widest">Good</span>
+                        </button>
+                        <button onClick={() => handleRateCard('easy')} className="flex flex-col items-center justify-center p-4 rounded-2xl bg-sky-50 dark:bg-sky-500/10 border-2 border-sky-200 dark:border-sky-500/30 text-sky-600 dark:text-sky-400 shadow-sm active:scale-95 transition-all">
+                            <span className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">{getIntervalLabel('easy')}</span>
+                            <span className="font-black text-sm uppercase tracking-widest">Easy</span>
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );
