@@ -8,6 +8,9 @@ import {
     Calculator, FlaskConical, Palette, Utensils, Plane, HeartPulse, Activity, BookText, Code
 } from 'lucide-react';
 import { Toast } from './Toast'; 
+// 🔥 IMPORT FIREBASE SO WE CAN FETCH SUBCOLLECTIONS
+import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { db, appId } from '../config/firebase';
 
 const SUBJECT_ORDER = ['1s', '2s', '3s', '1p', '2p', '3p'];
 
@@ -145,7 +148,7 @@ function ContextualCardBuilder({ config, onSave, onCancel }: any) {
 // ============================================================================
 //  1. STUDY MODE 
 // ============================================================================
-function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
+function StudyModePlayer({ deckCards, userData, onToggleStar, deckId }: any) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     const [showConjugations, setShowConjugations] = useState(false); 
@@ -166,6 +169,14 @@ function StudyModePlayer({ deckCards, userData, onToggleStar }: any) {
 
     const handleNext = (e?: any) => {
         e?.stopPropagation();
+        
+        // 🔥 MUTATION LAYER LOGIC: Student has seen the card. 
+        // Note: For a real app, you'd calculate actual SRS here based on if they got it right/wrong.
+        if (userData?.uid && deckId && currentCard) {
+            const progressRef = doc(db, 'artifacts', appId, 'users', userData.uid, 'deck_progress', deckId, 'card_stats', currentCard.id);
+            setDoc(progressRef, { lastSeen: Date.now() }, { merge: true }).catch(console.error);
+        }
+
         if (currentIndex < deckCards.length - 1) {
             setSlideDirection('right');
             setCurrentIndex(i => i + 1);
@@ -555,6 +566,10 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     
     const [showFolderModal, setShowFolderModal] = useState<{isOpen: boolean, editMode: boolean, oldName: string}>({isOpen: false, editMode: false, oldName: ''});
     
+    // 🔥 SUBCOLLECTION FETCH ENGINE
+    const [fetchedCards, setFetchedCards] = useState<any[]>([]);
+    const [isFetchingCards, setIsFetchingCards] = useState(false);
+    
     // 🔥 THE BUILDER CONFIG ENGINE
     const [builderConfig, setBuilderConfig] = useState<{type: 'new_deck', folder: string | null} | {type: 'add_card', deck: any} | null>(null);
 
@@ -562,7 +577,9 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     const resolvedDeck = omniDeck || allDecks[selectedDeckKey] || Object.values(allDecks)[0];
-    const cards = resolvedDeck?.cards || [];
+    
+    // In Omni-Mode, the cards are already in memory. Otherwise, use fetched cards.
+    const cards = omniDeck ? omniDeck.cards : fetchedCards;
     const deckTitle = resolvedDeck?.id === 'custom' ? "My Study Cards" : resolvedDeck?.title;
 
     const customFolders: string[] = userData?.studyFolders || [];
@@ -572,7 +589,41 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
     }, [deckFilter, internalMode]);
 
+    // 🔥 THE FETCH TRIGGER: Runs whenever a student selects a new deck
+    useEffect(() => {
+        const fetchDeckCards = async () => {
+            if (!selectedDeckKey || omniDeck) return;
+            
+            // Personal custom cards are still in the old location right now, 
+            // so we skip the fetch if they click "My Study Cards"
+            if (selectedDeckKey === 'custom') {
+                setFetchedCards(allDecks['custom']?.cards || []);
+                return;
+            }
+
+            setIsFetchingCards(true);
+            try {
+                // Reach into the new multi-tenant subcollection architecture
+                const cardsRef = collection(db, 'artifacts', appId, 'decks', selectedDeckKey, 'cards');
+                const snap = await getDocs(cardsRef);
+                const loadedCards = snap.docs.map(doc => doc.data());
+                setFetchedCards(loadedCards);
+            } catch (err) {
+                console.error("Failed to load cards from subcollection:", err);
+                setToastMsg("Failed to download deck. Check connection.");
+            } finally {
+                setIsFetchingCards(false);
+            }
+        };
+
+        fetchDeckCards();
+    }, [selectedDeckKey, omniDeck]);
+
     const launchGame = (mode: 'standard' | 'quiz' | 'match' | 'tower') => {
+        if (cards.length === 0) {
+            setToastMsg("This deck has no cards.");
+            return;
+        }
         setActiveGame(mode);
         setInternalMode('playing');
     };
@@ -583,6 +634,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             setInternalMode('library'); 
             onSelectDeck(null); 
             setOmniDeck(null); 
+            setFetchedCards([]); // Clear memory when leaving
         }
     };
 
@@ -594,26 +646,53 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         setToastMsg(`Protocol Complete! +${earnedXP} XP Earned!`);
     };
 
-    const launchOmniMode = (folderName: string) => {
+    const launchOmniMode = async (folderName: string) => {
         const folderDecks = Object.values(allDecks).filter((d: any) => userData?.deckPrefs?.[d.id]?.folder === folderName && !userData?.deckPrefs?.[d.id]?.archived);
-        const allCards = folderDecks.flatMap((d: any) => d.cards || []);
         
-        if (allCards.length === 0) {
-            setToastMsg("Folder has no cards to study.");
+        if (folderDecks.length === 0) {
+            setToastMsg("Folder has no decks to study.");
             return;
         }
 
-        setOmniDeck({
-            id: `omni_${folderName}`,
-            title: `${folderName} (Omni-Mode)`,
-            cards: allCards.sort(() => Math.random() - 0.5) 
-        });
-        setInternalMode('menu');
+        setIsFetchingCards(true);
+        setToastMsg("Compiling Omni-Deck...");
+        
+        try {
+            // 🔥 We must fetch ALL cards from ALL decks in the folder!
+            const allPromises = folderDecks.map(async (deck: any) => {
+                if (deck.id === 'custom') return deck.cards || [];
+                const cardsRef = collection(db, 'artifacts', appId, 'decks', deck.id, 'cards');
+                const snap = await getDocs(cardsRef);
+                return snap.docs.map(doc => doc.data());
+            });
+
+            const allResults = await Promise.all(allPromises);
+            const allCards = allResults.flat();
+
+            if (allCards.length === 0) {
+                setToastMsg("No cards found inside these decks.");
+                setIsFetchingCards(false);
+                return;
+            }
+
+            setOmniDeck({
+                id: `omni_${folderName}`,
+                title: `${folderName} (Omni-Mode)`,
+                cards: allCards.sort(() => Math.random() - 0.5) 
+            });
+            setInternalMode('menu');
+        } catch (err) {
+            console.error("Omni-Fetch failed:", err);
+            setToastMsg("Failed to compile Omni-Deck.");
+        } finally {
+            setIsFetchingCards(false);
+        }
     };
 
-    // 🔥 THE NEW SAVE HANDLER
     const handleSaveFromBuilder = async (cardData: any, folderToAssign: string | null) => {
-        await onSaveCard(cardData);
+        // 🔥 This passes the deckId up to your new saveCard function in useMagisterData
+        await onSaveCard(cardData.deckId, cardData);
+        
         if (folderToAssign && onAssignToFolder) {
             await onAssignToFolder(cardData.deckId, folderToAssign);
         }
@@ -649,7 +728,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             return true;
         });
 
-        // Extracted generic Folder Creation Modal logic to keep it clean
         const handleSaveNewFolder = async (folderName: string, color: string) => {
             if (!folderName.trim()) return;
             if (showFolderModal.editMode && onUpdateFolder) {
@@ -744,9 +822,11 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                     </button>
                                     <button 
                                         onClick={() => launchOmniMode(deckFilter)}
-                                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white shadow-md active:scale-95 transition-all ${FOLDER_COLORS[folderColors[deckFilter] || 'indigo'].hex}`}
+                                        disabled={isFetchingCards}
+                                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white shadow-md active:scale-95 transition-all disabled:opacity-50 ${FOLDER_COLORS[folderColors[deckFilter] || 'indigo'].hex}`}
                                     >
-                                        <Infinity size={16} /> Omni-Study
+                                        {isFetchingCards ? <Loader2 size={16} className="animate-spin" /> : <Infinity size={16} />} 
+                                        Omni-Study
                                     </button>
                                 </div>
                             </div>
@@ -805,9 +885,9 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             const theme = getDeckTheme(displayTitle);
                             const DeckIcon = deck.icon || theme.icon;
 
-                            const rawTags = deck.tags || deck.cards?.[0]?.grammar_tags || [];
-                            const displayTags = Array.isArray(rawTags) ? rawTags.slice(0, 2) : []; 
-                            
+                            // 🔥 UI UPDATE: Get count from metadata stats now!
+                            const cardCount = deck.id === 'custom' ? (deck.cards?.length || 0) : (deck.stats?.cardCount || 0);
+
                             return (
                                 <div key={key} className="relative group animate-in fade-in duration-300 h-full pt-2">
                                     
@@ -827,19 +907,9 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                         <h3 className="font-black text-slate-800 dark:text-white text-lg leading-tight line-clamp-2 pr-8 mb-3">{displayTitle}</h3>
                                         
                                         <div className="mt-auto pt-1 flex flex-col gap-2">
-                                            {displayTags.length > 0 && (
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {displayTags.map((tag: string, i: number) => (
-                                                        <span key={i} className="text-[8px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
-                                                            {tag}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            )}
-
                                             <div className="flex items-center gap-2">
                                                 <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest flex items-center gap-1">
-                                                    <Layers size={10} /> {deck.cards?.length || 0}
+                                                    <Layers size={10} /> {cardCount}
                                                 </span>
                                             </div>
                                         </div>
@@ -1024,7 +1094,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
     // --- MENU VIEW ---
     if (internalMode === 'menu') {
-        // 🔥 Hide "Omni-Mode" marker in menu if active
         const displayMenuTitle = deckTitle.includes('(Omni-Mode)') ? deckTitle.replace(' (Omni-Mode)', '') : deckTitle;
         
         return (
@@ -1051,34 +1120,42 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             </button>
                         )}
                     </div>
-                    <span className="text-indigo-500 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1 rounded-lg">
-                        {cards.length} Configured Targets {omniDeck ? '(Omni)' : ''}
+                    
+                    <span className="text-indigo-500 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1 rounded-lg flex items-center gap-2 w-fit mt-3">
+                        {isFetchingCards ? <Loader2 size={12} className="animate-spin" /> : cards.length} Configured Targets {omniDeck ? '(Omni)' : ''}
                     </span>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-24">
-                    <div className="grid grid-cols-2 gap-4">
-                        <button onClick={() => launchGame('standard')} className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-100 dark:border-slate-800 shadow-sm hover:border-blue-300 dark:hover:border-blue-500/50 hover:-translate-y-1 transition-all group text-left">
-                            <div className="w-14 h-14 bg-blue-50 dark:bg-blue-500/10 text-blue-500 rounded-2xl flex items-center justify-center mb-4 group-hover:rotate-6 transition-transform"><Layers size={28}/></div>
-                            <h4 className="font-black text-slate-800 dark:text-white text-xl leading-none mb-2">Review</h4>
-                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Standard Mode</p>
-                        </button>
-                        <button onClick={() => launchGame('quiz')} className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-100 dark:border-slate-800 shadow-sm hover:border-emerald-300 dark:hover:border-emerald-500/50 hover:-translate-y-1 transition-all group text-left">
-                            <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 rounded-2xl flex items-center justify-center mb-4 group-hover:-rotate-6 transition-transform"><HelpCircle size={28}/></div>
-                            <h4 className="font-black text-slate-800 dark:text-white text-xl leading-none mb-2">Quiz</h4>
-                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Multiple Choice</p>
-                        </button>
-                        <button onClick={() => launchGame('match')} className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-100 dark:border-slate-800 shadow-sm hover:border-purple-300 dark:hover:border-purple-500/50 hover:-translate-y-1 transition-all group text-left">
-                            <div className="w-14 h-14 bg-purple-50 dark:bg-purple-500/10 text-purple-500 rounded-2xl flex items-center justify-center mb-4 group-hover:rotate-12 transition-transform"><Puzzle size={28}/></div>
-                            <h4 className="font-black text-slate-800 dark:text-white text-xl leading-none mb-2">Match</h4>
-                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Speed Pairs</p>
-                        </button>
-                        <button className="bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-800 shadow-xl opacity-50 cursor-not-allowed group text-left relative overflow-hidden">
-                             <div className="w-14 h-14 bg-orange-500/20 text-orange-400 rounded-2xl flex items-center justify-center mb-4"><Flame size={28} fill="currentColor"/></div>
-                             <h4 className="font-black text-white text-xl leading-none mb-2">Tower</h4>
-                             <p className="text-[10px] text-orange-400 font-black uppercase tracking-widest">Survival</p>
-                        </button>
-                    </div>
+                    {isFetchingCards ? (
+                        <div className="h-full flex flex-col items-center justify-center opacity-40">
+                            <Loader2 size={48} className="animate-spin mb-4 text-indigo-500" />
+                            <p className="font-black uppercase tracking-widest text-slate-500 text-xs">Decrypting Cards...</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 gap-4">
+                            <button onClick={() => launchGame('standard')} className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-100 dark:border-slate-800 shadow-sm hover:border-blue-300 dark:hover:border-blue-500/50 hover:-translate-y-1 transition-all group text-left">
+                                <div className="w-14 h-14 bg-blue-50 dark:bg-blue-500/10 text-blue-500 rounded-2xl flex items-center justify-center mb-4 group-hover:rotate-6 transition-transform"><Layers size={28}/></div>
+                                <h4 className="font-black text-slate-800 dark:text-white text-xl leading-none mb-2">Review</h4>
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Standard Mode</p>
+                            </button>
+                            <button onClick={() => launchGame('quiz')} className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-100 dark:border-slate-800 shadow-sm hover:border-emerald-300 dark:hover:border-emerald-500/50 hover:-translate-y-1 transition-all group text-left">
+                                <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 rounded-2xl flex items-center justify-center mb-4 group-hover:-rotate-6 transition-transform"><HelpCircle size={28}/></div>
+                                <h4 className="font-black text-slate-800 dark:text-white text-xl leading-none mb-2">Quiz</h4>
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Multiple Choice</p>
+                            </button>
+                            <button onClick={() => launchGame('match')} className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-100 dark:border-slate-800 shadow-sm hover:border-purple-300 dark:hover:border-purple-500/50 hover:-translate-y-1 transition-all group text-left">
+                                <div className="w-14 h-14 bg-purple-50 dark:bg-purple-500/10 text-purple-500 rounded-2xl flex items-center justify-center mb-4 group-hover:rotate-12 transition-transform"><Puzzle size={28}/></div>
+                                <h4 className="font-black text-slate-800 dark:text-white text-xl leading-none mb-2">Match</h4>
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Speed Pairs</p>
+                            </button>
+                            <button className="bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-800 shadow-xl opacity-50 cursor-not-allowed group text-left relative overflow-hidden">
+                                <div className="w-14 h-14 bg-orange-500/20 text-orange-400 rounded-2xl flex items-center justify-center mb-4"><Flame size={28} fill="currentColor"/></div>
+                                <h4 className="font-black text-white text-xl leading-none mb-2">Tower</h4>
+                                <p className="text-[10px] text-orange-400 font-black uppercase tracking-widest">Survival</p>
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -1096,7 +1173,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 <div className="w-11"></div>
             </div>
             <div className="flex-1 overflow-hidden relative">
-                {activeGame === 'standard' && <StudyModePlayer deckCards={cards} userData={userData} onToggleStar={onToggleStar} />}
+                {activeGame === 'standard' && <StudyModePlayer deckCards={cards} userData={userData} onToggleStar={onToggleStar} deckId={resolvedDeck?.id} />}
                 {activeGame === 'quiz' && <div className="h-full overflow-y-auto"><QuizSessionView deckCards={cards} onGameEnd={(res: any) => handleGameFinish(res.score ? (res.score/res.total)*100 : 0)} /></div>}
                 {activeGame === 'match' && <div className="h-full overflow-y-auto pt-6"><MatchingGame deckCards={cards} onGameEnd={(scorePct: number) => handleGameFinish(scorePct)} /></div>}
             </div>
