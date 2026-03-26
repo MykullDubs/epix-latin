@@ -4,11 +4,11 @@ import {
     Layers, Plus, X, Save, Edit3, Trash2, FileJson, Database, 
     Loader2, FolderPlus, FolderOpen, Share2, Lock, Users, 
     Globe, CheckCircle2, Paperclip, ChevronRight, Wand2, BookOpen,
-    Image as ImageIcon, Music, UploadCloud
+    Image as ImageIcon, Music, UploadCloud, BrainCircuit, Sparkles
 } from 'lucide-react';
 import { INITIAL_SYSTEM_DECKS } from '../../constants/defaults';
 import { Toast } from '../Toast';
-import { doc, setDoc, collection, getDocs } from 'firebase/firestore'; // 🔥 Added getDocs & collection
+import { doc, setDoc, collection, getDocs } from 'firebase/firestore'; 
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage, auth, appId } from '../../config/firebase';
 
@@ -28,7 +28,7 @@ const DeckShareModal = ({ deck, instructorClasses, onClose, onPublish }: any) =>
 
     const handleSave = async () => {
         setIsSaving(true);
-        await onPublish(deck.id || 'custom', deck.title, visibility, selectedClasses); // 🔥 Removed cards payload, as it's not needed in new schema
+        await onPublish(deck.id || 'custom', deck.title, visibility, selectedClasses);
         setIsSaving(false);
         onClose();
     };
@@ -126,7 +126,9 @@ export default function CardBuilderView({
     const [localOptimisticDecks, setLocalOptimisticDecks] = useState<any>({});
     const [showShareModal, setShowShareModal] = useState(false);
     
-    const [importMode, setImportMode] = useState<boolean>(false);
+    // 🔥 NEW: 3-WAY BUILDER TAB STATE
+    const [builderTab, setBuilderTab] = useState<'single' | 'bulk' | 'ai'>('single');
+    
     const [jsonInput, setJsonInput] = useState<string>('');
     const [isImporting, setIsImporting] = useState<boolean>(false);
     const [importProgress, setImportProgress] = useState<{current: number, total: number} | null>(null);
@@ -134,7 +136,11 @@ export default function CardBuilderView({
     const [bulkNewTitle, setBulkNewTitle] = useState('');
     const [bulkExistingId, setBulkExistingId] = useState('custom');
 
-    // 🔥 SUBCOLLECTION FETCH ENGINE
+    // 🔥 AI AUTO-FORGE STATE
+    const [aiPrompt, setAiPrompt] = useState('');
+    const [aiTargetLanguage, setAiTargetLanguage] = useState('Spanish');
+    const [aiCardCount, setAiCardCount] = useState(10);
+
     const [currentDeckCards, setCurrentDeckCards] = useState<any[]>([]);
     const [isFetchingCards, setIsFetchingCards] = useState(false);
 
@@ -143,34 +149,22 @@ export default function CardBuilderView({
 
     useEffect(() => { if (initialDeckId) setFormData(prev => ({...prev, deckId: initialDeckId})); }, [initialDeckId]);
     
-    // 🔥 FETCH CARDS WHEN DECK SELECTION CHANGES
     useEffect(() => {
         const fetchDeckCards = async () => {
-            if (formData.deckId === 'new') {
-                setCurrentDeckCards([]);
-                return;
-            }
-
-            if (formData.deckId === 'custom') {
-                setCurrentDeckCards(validDecks['custom']?.cards || []);
-                return;
-            }
+            if (formData.deckId === 'new') { setCurrentDeckCards([]); return; }
+            if (formData.deckId === 'custom') { setCurrentDeckCards(validDecks['custom']?.cards || []); return; }
 
             setIsFetchingCards(true);
             try {
-                // Check if we have optimistic cards first
                 const optimisticCards = localOptimisticDecks[formData.deckId]?.cards || [];
-                
                 const cardsRef = collection(db, 'artifacts', appId, 'decks', formData.deckId, 'cards');
                 const snap = await getDocs(cardsRef);
                 const loadedCards = snap.docs.map(doc => doc.data());
                 
-                // Merge optimistic cards with DB cards (in case they just created one)
                 const mergedCards = [...loadedCards];
                 optimisticCards.forEach((optCard: any) => {
                     if (!mergedCards.some(c => c.id === optCard.id)) mergedCards.push(optCard);
                 });
-
                 setCurrentDeckCards(mergedCards);
             } catch (err) {
                 console.error("Failed to fetch cards:", err);
@@ -191,9 +185,7 @@ export default function CardBuilderView({
                 setIsCreatingDeck(false); 
                 setFormData({ ...formData, deckId: e.target.value }); 
             } 
-        } else { 
-            setFormData({ ...formData, [e.target.name]: e.target.value }); 
-        } 
+        } else { setFormData({ ...formData, [e.target.name]: e.target.value }); } 
     };
 
     const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'audio') => {
@@ -220,11 +212,8 @@ export default function CardBuilderView({
             setFormData(prev => ({ ...prev, [field]: url }));
             setToastMsg(`${isImage ? 'Image' : 'Audio'} payload secured! ✨`);
         } catch (err) {
-            console.error("Media upload error:", err);
             setToastMsg(`Upload failed. Check your connection.`);
-        } finally {
-            setter(false);
-        }
+        } finally { setter(false); }
     };
 
     const handleMagicAutoFill = async (e: React.MouseEvent) => {
@@ -241,7 +230,6 @@ export default function CardBuilderView({
                 if (queryWord.includes(' ')) {
                     const words = queryWord.split(' ');
                     let combinedIpa = '';
-                    
                     for (const w of words) {
                         try {
                             const wordRes = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(w)}`);
@@ -253,7 +241,6 @@ export default function CardBuilderView({
                             }
                         } catch (err) {}
                     }
-                    
                     if (combinedIpa.trim()) {
                         setFormData(prev => ({ ...prev, ipa: `/${combinedIpa.trim()}/` }));
                         setToastMsg("Phrase stitched! ✨ (Definition requires manual entry)");
@@ -264,7 +251,6 @@ export default function CardBuilderView({
             }
             
             const data = await response.json();
-            
             const textEntry = data[0]?.phonetics?.find((p: any) => p.text);
             const fetchedIpa = textEntry?.text || data[0]?.phonetic || '';
 
@@ -276,11 +262,7 @@ export default function CardBuilderView({
                 const safeType = validTypes.includes(rawPos.toLowerCase()) ? rawPos.toLowerCase() : 'noun';
                 
                 meaning.definitions?.forEach((def: any) => {
-                    options.push({
-                        type: safeType,
-                        definition: def.definition,
-                        ipa: fetchedIpa
-                    });
+                    options.push({ type: safeType, definition: def.definition, ipa: fetchedIpa });
                 });
             });
 
@@ -293,14 +275,8 @@ export default function CardBuilderView({
             } else if (fetchedIpa) {
                 setFormData(prev => ({ ...prev, ipa: fetchedIpa }));
                 setToastMsg("Phonetics found! ✨ (Definition missing)");
-            } else {
-                setToastMsg("No extended data found for this exact word.");
-            }
-        } catch (err) {
-            setToastMsg("Could not connect to dictionary engine.");
-        } finally {
-            setIsAutoFilling(false);
-        }
+            } else { setToastMsg("No extended data found for this exact word."); }
+        } catch (err) { setToastMsg("Could not connect to dictionary engine."); } finally { setIsAutoFilling(false); }
     };
 
     const addMorphology = () => { if (newMorphPart.part && newMorphPart.meaning) { setMorphology([...morphology, newMorphPart]); setNewMorphPart({ part: '', meaning: '', type: 'root' }); } };
@@ -309,26 +285,21 @@ export default function CardBuilderView({
     const addConjugation = () => {
         if (!tempConj.verb.trim() || !tempConj.tense.trim()) return;
         setConjugations(prev => ({
-            ...prev,
-            [tempConj.tense]: {
-                ...(prev[tempConj.tense] || {}),
-                [tempConj.person]: tempConj.verb.trim()
-            }
+            ...prev, [tempConj.tense]: { ...(prev[tempConj.tense] || {}), [tempConj.person]: tempConj.verb.trim() }
         }));
         setTempConj({ ...tempConj, verb: '' });
     };
 
     const removeConjugation = (tense: string, person: string) => {
         setConjugations(prev => {
-            const next = { ...prev };
-            delete next[tense][person];
+            const next = { ...prev }; delete next[tense][person];
             if (Object.keys(next[tense]).length === 0) delete next[tense];
             return next;
         });
     };
     
     const handleSelectCard = (card: any) => { 
-        setImportMode(false); 
+        setBuilderTab('single'); 
         setEditingId(card.id); 
         setFormData({ 
             front: card.front, back: card.back, type: card.type || 'noun', ipa: card.ipa || '', 
@@ -354,23 +325,18 @@ export default function CardBuilderView({
     const registerNewDeck = async (deckId: string, deckTitle: string) => {
         try {
             const deckRef = doc(db, 'artifacts', appId, 'decks', deckId);
-            // Notice we omit the cards array here. Cards live in subcollection now.
             await setDoc(deckRef, { id: deckId, key: deckId, title: deckTitle, type: 'vocabulary', createdAt: new Date().toISOString() }, { merge: true });
         } catch (err) { console.error("Failed to register deck:", err); }
     };
 
     const handleDeleteCard = async (cardId: string) => {
         if (!window.confirm("Delete this card permanently?")) return;
-        
         try {
-            await onDeleteCard(formData.deckId, cardId); // 🔥 Uses new backend action
+            await onDeleteCard(formData.deckId, cardId); 
             setCurrentDeckCards(prev => prev.filter(c => c.id !== cardId));
             if (editingId === cardId) handleClear();
             setToastMsg("Target eliminated.");
-        } catch (err) {
-            console.error("Failed to delete card:", err);
-            setToastMsg("Error: Deletion failed.");
-        }
+        } catch (err) { setToastMsg("Error: Deletion failed."); }
     };
 
     const handleSubmit = async (e: any) => { 
@@ -398,11 +364,11 @@ export default function CardBuilderView({
         }; 
 
         if (editingId) { 
-            await onUpdateCard(finalDeckId, editingId, cardData); // 🔥 Fixed argument order
+            await onUpdateCard(finalDeckId, editingId, cardData);
             setCurrentDeckCards(prev => prev.map(c => c.id === editingId ? { ...cardData, id: editingId } : c));
             setToastMsg("Target Updated Successfully"); 
         } else { 
-            const newCardId = await onSaveCard(finalDeckId, cardData, true); // 🔥 Fixed argument order
+            const newCardId = await onSaveCard(finalDeckId, cardData, true); 
             setCurrentDeckCards(prev => [...prev, { ...cardData, id: newCardId }]);
             setToastMsg("Target Forged Successfully"); 
         } 
@@ -415,11 +381,8 @@ export default function CardBuilderView({
         } 
     };
 
-   const handleBulkImport = async () => {
-    try {
-        const importedCards = JSON.parse(jsonInput);
-        if (!Array.isArray(importedCards)) throw new Error("JSON must be an array");
-
+    // 🔥 CORE BULK IMPORT / AI INGESTION FUNCTION
+    const executeBulkIngest = async (cardsArray: any[], successMessage: string) => {
         let finalDeckId = bulkExistingId;
         let finalDeckTitle = validDecks[bulkExistingId]?.title || 'Custom Deck';
         
@@ -431,12 +394,12 @@ export default function CardBuilderView({
         }
 
         setIsImporting(true);
-        setImportProgress({ current: 0, total: importedCards.length });
+        setImportProgress({ current: 0, total: cardsArray.length });
 
         let successCount = 0;
         
-        for (let i = 0; i < importedCards.length; i++) {
-            const card = importedCards[i];
+        for (let i = 0; i < cardsArray.length; i++) {
+            const card = cardsArray[i];
             if (!card.front || !card.back) continue; 
             
             const cardData = {
@@ -450,14 +413,18 @@ export default function CardBuilderView({
             };
             
             try {
-                await onSaveCard(finalDeckId, cardData, true); // 🔥 FIXED ARGUMENT ORDER
+                const newId = await onSaveCard(finalDeckId, cardData, true); 
                 successCount++;
-                setImportProgress({ current: successCount, total: importedCards.length });
+                setImportProgress({ current: successCount, total: cardsArray.length });
+                
+                setCurrentDeckCards(prev => [...prev, { ...cardData, id: newId }]);
+
+                // Artificial delay to prevent blowing up Firebase write limits
                 await new Promise(resolve => setTimeout(resolve, 150));
             } catch (err) { console.error(`Failed to save: ${card.front}`, err); }
         }
 
-        setToastMsg(`Successfully forged ${successCount} targets!`);
+        setToastMsg(`${successMessage} (${successCount} Targets)`);
         setJsonInput('');
         if (bulkDestination === 'new') {
             setBulkNewTitle('');
@@ -465,13 +432,84 @@ export default function CardBuilderView({
             setBulkExistingId(finalDeckId);
             setFormData(prev => ({ ...prev, deckId: finalDeckId }));
         }
-    } catch (e: any) {
-        alert("Invalid JSON format. Check for missing commas or brackets.");
-    } finally {
         setIsImporting(false);
         setImportProgress(null);
-    }
-  };
+        setBuilderTab('single'); // Kick them back to the view to see their newly made cards
+    };
+
+    const handleBulkImport = async () => {
+        try {
+            const importedCards = JSON.parse(jsonInput);
+            if (!Array.isArray(importedCards)) throw new Error("JSON must be an array");
+            await executeBulkIngest(importedCards, "Bulk import complete!");
+        } catch (e: any) {
+            alert("Invalid JSON format. Check for missing commas or brackets.");
+        }
+    };
+
+    // 🔥 THE NEURAL FORGE LOGIC
+    const handleNeuralForge = async () => {
+        if (!aiPrompt.trim()) {
+            setToastMsg("Provide a prompt for the AI to forge.");
+            return;
+        }
+
+        // ⚠️ HARDCODED FOR LOCAL TESTING ONLY
+        const apiKey = "AIzaSyBaBVxKwEFg-LENpEYjObl13spPy3gVY9k";
+
+        setIsImporting(true); 
+        setToastMsg("Initializing Neural Forge. Please wait...");
+
+        const systemPrompt = `You are a curriculum designer for an app called Magister OS. 
+        Your task is to generate a highly accurate, professional set of flashcards based on the user's prompt.
+        You MUST generate EXACTLY ${aiCardCount} cards.
+        The target language is ${aiTargetLanguage}.
+        
+        You MUST return ONLY a raw, perfectly formatted JSON array. Do not wrap it in markdown blockquotes or text.
+        
+        JSON SCHEMA:
+        [
+          {
+            "front": "Target word/concept in ${aiTargetLanguage}",
+            "back": "Definition/translation in English",
+            "type": "noun", // noun, verb, adjective, adverb, phrase
+            "ipa": "/phonetics in IPA format/",
+            "morphology": [{"part": "The word itself or a root", "meaning": "Root meaning", "type": "root"}],
+            "usage": {"sentence": "A simple example sentence in ${aiTargetLanguage}", "translation": "The English translation of the sentence"},
+            "grammarTags": ["AI_Generated", "${aiTargetLanguage}"]
+          }
+        ]
+        
+        USER PROMPT: "${aiPrompt}"`;
+
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: systemPrompt }] }]
+                })
+            });
+
+            if (!response.ok) throw new Error("API call failed.");
+
+            const data = await response.json();
+            const rawText = data.candidates[0].content.parts[0].text;
+            
+            // Clean the output in case Gemini included markdown code blocks
+            const jsonStr = rawText.replace(/```json\n/g, '').replace(/```/g, '').trim();
+            
+            const aiCards = JSON.parse(jsonStr);
+            if (!Array.isArray(aiCards)) throw new Error("AI did not return an array.");
+
+            await executeBulkIngest(aiCards, "Neural Forge Complete!");
+
+        } catch (err) {
+            console.error("Neural Forge Error:", err);
+            setToastMsg("Neural Forge failed. The AI's JSON output may have been corrupted.");
+            setIsImporting(false);
+        }
+    };
     
     useEffect(() => { if (editingId && !currentDeckCards.some((c: any) => c.id === editingId)) { handleClear(); } }, [currentDeckCards, editingId]);
 
@@ -533,16 +571,21 @@ export default function CardBuilderView({
                 {editingId && <button onClick={handleClear} className="text-xs font-bold bg-white dark:bg-slate-800 dark:text-white px-3 py-1 rounded-lg shadow-sm hover:text-indigo-600 dark:hover:text-indigo-400">Cancel Edit</button>}
             </div>
 
-            <div className="flex gap-6 border-b-2 border-slate-100 dark:border-slate-800 relative bottom-[-1px]">
-                <button disabled={isImporting} onClick={() => setImportMode(false)} className={`pb-4 text-sm font-black uppercase tracking-widest transition-colors border-b-4 flex items-center gap-2 ${!importMode ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-400 dark:text-slate-600 hover:text-slate-600'} disabled:opacity-50`}>
+            {/* 🔥 3-WAY TAB SELECTOR */}
+            <div className="flex gap-4 border-b-2 border-slate-100 dark:border-slate-800 relative bottom-[-1px] overflow-x-auto custom-scrollbar">
+                <button disabled={isImporting} onClick={() => setBuilderTab('single')} className={`pb-4 shrink-0 text-sm font-black uppercase tracking-widest transition-colors border-b-4 flex items-center gap-2 ${builderTab === 'single' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-400 dark:text-slate-600 hover:text-slate-600'} disabled:opacity-50`}>
                     <Edit3 size={16} /> Single Target
                 </button>
-                <button disabled={isImporting} onClick={() => { setImportMode(true); handleClear(); }} className={`pb-4 text-sm font-black uppercase tracking-widest transition-colors border-b-4 flex items-center gap-2 ${importMode ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-400 dark:text-slate-600 hover:text-slate-600'} disabled:opacity-50`}>
-                    <FileJson size={16} /> Bulk JSON Protocol
+                <button disabled={isImporting} onClick={() => { setBuilderTab('ai'); handleClear(); }} className={`pb-4 shrink-0 text-sm font-black uppercase tracking-widest transition-colors border-b-4 flex items-center gap-2 ${builderTab === 'ai' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-400 dark:text-slate-600 hover:text-slate-600'} disabled:opacity-50`}>
+                    <BrainCircuit size={16} /> Neural Auto-Forge
+                </button>
+                <button disabled={isImporting} onClick={() => { setBuilderTab('bulk'); handleClear(); }} className={`pb-4 shrink-0 text-sm font-black uppercase tracking-widest transition-colors border-b-4 flex items-center gap-2 ${builderTab === 'bulk' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-400 dark:text-slate-600 hover:text-slate-600'} disabled:opacity-50`}>
+                    <FileJson size={16} /> Bulk JSON
                 </button>
             </div>
 
-            {!importMode ? (
+            {/* 🔥 RENDER BASED ON TAB */}
+            {builderTab === 'single' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                     <section className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
                         <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -723,8 +766,82 @@ export default function CardBuilderView({
                         {editingId ? <><Save size={20}/> Update Vocabulary Target</> : <><Plus size={20}/> Forge Vocabulary Target</>}
                     </button>
                 </div>
-            ) : (
-                /* Bulk Import logic */
+            )}
+
+            {/* 🔥 THE NEURAL FORGE TAB */}
+            {builderTab === 'ai' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <section className="bg-gradient-to-br from-indigo-500 to-cyan-400 p-8 rounded-3xl shadow-xl transition-colors text-white relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none"><Sparkles size={120}/></div>
+                        <div className="relative z-10">
+                            <h2 className="font-black text-3xl tracking-tighter mb-2">Neural Auto-Forge</h2>
+                            <p className="text-sm font-bold opacity-90 max-w-sm mb-6">Describe the deck you want to build, and Magister OS will generate it instantly using AI.</p>
+                            
+                            <textarea 
+                                value={aiPrompt} 
+                                onChange={(e) => setAiPrompt(e.target.value)} 
+                                disabled={isImporting} 
+                                placeholder="e.g. '15 advanced medical terms in Spanish for emergency room nurses'" 
+                                className="w-full h-32 bg-white/10 backdrop-blur-md text-white placeholder-white/50 p-5 rounded-2xl font-bold text-lg border-2 border-white/20 focus:border-white outline-none resize-none custom-scrollbar mb-4" 
+                            />
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-black/20 p-4 rounded-xl border border-white/10">
+                                    <label className="text-[10px] font-black uppercase tracking-widest block mb-2 opacity-80">Target Language</label>
+                                    <input 
+                                        value={aiTargetLanguage} 
+                                        onChange={(e) => setAiTargetLanguage(e.target.value)} 
+                                        disabled={isImporting}
+                                        className="w-full bg-transparent text-white font-bold outline-none border-b border-white/30 focus:border-white pb-1"
+                                    />
+                                </div>
+                                <div className="bg-black/20 p-4 rounded-xl border border-white/10">
+                                    <label className="text-[10px] font-black uppercase tracking-widest block mb-2 opacity-80">Target Count</label>
+                                    <input 
+                                        type="number"
+                                        min="5" max="30"
+                                        value={aiCardCount} 
+                                        onChange={(e) => setAiCardCount(parseInt(e.target.value))} 
+                                        disabled={isImporting}
+                                        className="w-full bg-transparent text-white font-bold outline-none border-b border-white/30 focus:border-white pb-1"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section className="bg-slate-50 dark:bg-slate-900 p-6 rounded-3xl border-2 border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+                        <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest mb-4">Destination Deck</h3>
+                        <div className="flex flex-col md:flex-row gap-4 mb-4">
+                            <button onClick={() => setBulkDestination('new')} disabled={isImporting} className={`flex-1 p-4 rounded-xl border-2 flex items-center gap-3 transition-colors ${bulkDestination === 'new' ? 'border-indigo-600 dark:border-indigo-500 bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-transparent text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'} disabled:opacity-50`}>
+                                <FolderPlus size={20} /> <span className="font-black text-sm uppercase">Create New</span>
+                            </button>
+                            <button onClick={() => setBulkDestination('existing')} disabled={isImporting} className={`flex-1 p-4 rounded-xl border-2 flex items-center gap-3 transition-colors ${bulkDestination === 'existing' ? 'border-indigo-600 dark:border-indigo-500 bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-transparent text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'} disabled:opacity-50`}>
+                                <FolderOpen size={20} /> <span className="font-black text-sm uppercase">Add to Existing</span>
+                            </button>
+                        </div>
+                        {bulkDestination === 'new' ? (
+                            <input value={bulkNewTitle} onChange={(e) => setBulkNewTitle(e.target.value)} disabled={isImporting} placeholder="Name your new deck" className="w-full p-4 rounded-xl border-2 border-indigo-500 bg-white dark:bg-slate-800 dark:text-white font-black outline-none shadow-sm transition-colors" />
+                        ) : (
+                            <select value={bulkExistingId} onChange={(e) => setBulkExistingId(e.target.value)} disabled={isImporting} className="w-full p-4 rounded-xl border-2 border-indigo-500 bg-white dark:bg-slate-800 dark:text-indigo-400 font-black outline-none shadow-sm transition-colors cursor-pointer">
+                                <option value="custom">✍️ Scriptorium (My Deck)</option>
+                                {deckOptions.filter(d => d.id !== 'custom').map(d => (<option key={d.id} value={d.id}>{d.title}</option>))}
+                            </select>
+                        )}
+                    </section>
+
+                    <button onClick={handleNeuralForge} disabled={!aiPrompt.trim() || isImporting} className={`w-full text-white p-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-3 ${isImporting ? 'bg-amber-500' : 'bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-300 dark:disabled:bg-slate-800'}`}>
+                        {isImporting ? (
+                            <><Loader2 size={20} className="animate-spin" /> Forging Targets... ({importProgress?.current || 0}/{importProgress?.total || 0})</>
+                        ) : (
+                            <><BrainCircuit size={20}/> Generate & Import Deck</>
+                        )}
+                    </button>
+                </div>
+            )}
+
+            {/* THE BULK IMPORT TAB */}
+            {builderTab === 'bulk' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                     <section className="bg-slate-50 dark:bg-slate-900 p-6 rounded-3xl border-2 border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
                         <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest mb-4">Destination Deck</h3>
