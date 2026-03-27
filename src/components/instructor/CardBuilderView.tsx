@@ -150,6 +150,46 @@ export default function CardBuilderView({
     const validDecks = { ...availableDecks, ...localOptimisticDecks };
     const deckOptions = Object.entries(validDecks).map(([key, deck]: any) => ({ id: key, title: deck.title })); 
 
+    // 🔥 THE NETWORK INTERCEPTOR
+    // Guarantees Firebase gets the right data, and updates local memory instantly.
+    const handlePublishDeck = async (deckId: string, title: string, visibility: string, classes: string[]) => {
+        const isPublic = visibility === 'public';
+
+        try {
+            // 1. Force the exact fields Firebase needs for the Discovery Radar
+            const deckRef = doc(db, 'artifacts', appId, 'decks', deckId);
+            await setDoc(deckRef, {
+                visibility: visibility,
+                isPublished: isPublic, // 🔥 CRITICAL FOR DISCOVERY VIEW
+                allowedClasses: classes,
+                updatedAt: Date.now()
+            }, { merge: true });
+        } catch (e) {
+            console.error("Failed to update network access:", e);
+        }
+
+        // 2. Alert the parent router if it needs to know
+        if (onPublishDeck) {
+            try { await onPublishDeck(deckId, title, visibility, classes); } catch(e) {}
+        }
+
+        // 3. Update local optimistic state so the UI stops gaslighting you!
+        setLocalOptimisticDecks((prev: any) => {
+            if (!prev[deckId]) return prev;
+            return {
+                ...prev,
+                [deckId]: {
+                    ...prev[deckId],
+                    visibility: visibility,
+                    isPublished: isPublic,
+                    allowedClasses: classes
+                }
+            };
+        });
+
+        setToastMsg(`Access updated to: ${visibility.toUpperCase()}`);
+    };
+
     useEffect(() => { if (initialDeckId) setFormData(prev => ({...prev, deckId: initialDeckId})); }, [initialDeckId]);
     
     useEffect(() => {
@@ -336,7 +376,6 @@ export default function CardBuilderView({
         setDomainInput('');
     };
 
-    // 🔥 THE FIX: Now accepts and saves the `domainPath` array
     const registerNewDeck = async (deckId: string, deckTitle: string, path: string[] = []) => {
         try {
             console.log(`[Forge] Registering new deck: ${deckTitle} (${deckId})`);
@@ -647,7 +686,7 @@ export default function CardBuilderView({
                     deck={{ ...validDecks[formData.deckId], id: formData.deckId }} 
                     instructorClasses={instructorClasses || []} 
                     onClose={() => setShowShareModal(false)}
-                    onPublish={onPublishDeck}
+                    onPublish={handlePublishDeck}
                 />
             )}
 
