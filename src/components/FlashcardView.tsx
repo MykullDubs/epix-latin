@@ -146,7 +146,7 @@ function ContextualCardBuilder({ config, onSave, onCancel }: any) {
 // ============================================================================
 //  1. SRB-POWERED STUDY MODE (SPACED REPETITION BRAIN)
 // ============================================================================
-function StudyModePlayer({ user, deckCards, userData, onToggleStar, deckId, initialSrbData, onFinish }: any) {
+function StudyModePlayer({ setParentCardStats, user, deckCards, userData, onToggleStar, deckId, initialSrbData, onFinish }: any) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     const [showConjugations, setShowConjugations] = useState(false); 
@@ -209,7 +209,8 @@ const targetDeckId = currentCard.deckId || deckId || 'custom';
         const newStats = calculateNextReview(rating, currentStats);
 
         setSrbData(prev => ({ ...prev, [currentCard.id]: newStats }));
-
+        if (setParentCardStats) setParentCardStats((prev: any) => ({ ...prev, [currentCard.id]: newStats }));
+      
         // 🔥 FIX: Saving using user.uid!
         const progressRef = doc(db, 'artifacts', appId, 'users', user.uid, 'deck_progress', targetDeckId, 'card_stats', currentCard.id);
         setDoc(progressRef, newStats, { merge: true }).catch(console.error);
@@ -338,8 +339,7 @@ const targetDeckId = currentCard.deckId || deckId || 'custom';
                                 </div>
                             )}
 
-                            <h2 className="text-4xl md:text-5xl font-black text-white leading-tight relative z-10 w-full px-4">{currentCard.front}</h2>
-                            
+<h2 className="text-4xl md:text-5xl font-black text-white leading-tight relative z-10 w-full px-4 break-words overflow-hidden">{currentCard.front}</h2>                            
                             {currentCard.ipa && (
                                 <p className="text-base font-bold text-indigo-400 mt-4 px-3 py-1 rounded-lg relative z-10" style={{ direction: 'ltr', fontFamily: 'Arial, sans-serif' }}>
                                     {currentCard.ipa}
@@ -1321,8 +1321,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             </div>
             <div className="flex-1 overflow-hidden relative">
                 {/* 🔥 SRB INJECTION: Pass the sessionCards and the raw stats map into the player */}
-{activeGame === 'standard' && <StudyModePlayer deckCards={sessionCards} initialSrbData={cardStats} user={user} userData={userData} onToggleStar={onToggleStar} deckId={selectedDeckKey} onFinish={handleGameFinish} />}
-                {/* Quiz and Match still use the session cards */}
+{activeGame === 'standard' && <StudyModePlayer deckCards={sessionCards} initialSrbData={cardStats} setParentCardStats={setCardStats} user={user} userData={userData} onToggleStar={onToggleStar} deckId={selectedDeckKey} onFinish={handleGameFinish} />}                {/* Quiz and Match still use the session cards */}
                 {activeGame === 'quiz' && <div className="h-full overflow-y-auto"><QuizSessionView deckCards={sessionCards} onGameEnd={(res: any) => handleGameFinish(res.score ? (res.score/res.total)*100 : 0)} /></div>}
                 {activeGame === 'match' && <div className="h-full overflow-y-auto pt-6"><MatchingGame deckCards={sessionCards} onGameEnd={(scorePct: number) => handleGameFinish(scorePct)} /></div>}
             </div>
