@@ -689,29 +689,13 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const handleBackRef = useRef(handleBack);
     useEffect(() => {
         handleBackRef.current = handleBack;
-    }, [handleBack]);
+    }, [activeOptionsDeck, activeOptionsFolder, showFolderModal, internalMode, builderConfig, deckFilter, onSelectDeck]);
 
     useEffect(() => {
-        const handleNativeBack = () => handleBackRef.current();
+        const handleNativeBack = (e: PopStateEvent) => handleBackRef.current();
         window.addEventListener('popstate', handleNativeBack);
         return () => window.removeEventListener('popstate', handleNativeBack);
     }, []);
-
-    // 🔥 3. STRICT HISTORY STACK PUSHER (Only triggers when actually entering a new layer)
-    const prevModeRef = useRef(internalMode);
-    useEffect(() => {
-        const enteredNewLayer =
-            internalMode !== 'library' ||
-            deckFilter !== 'all' ||
-            !!activeOptionsDeck ||
-            !!activeOptionsFolder ||
-            showFolderModal.isOpen;
-
-        if (enteredNewLayer && prevModeRef.current !== internalMode) {
-            window.history.pushState({ modal: true }, '');
-        }
-        prevModeRef.current = internalMode;
-    }, [internalMode, deckFilter, activeOptionsDeck, activeOptionsFolder, showFolderModal.isOpen]);
 
     useEffect(() => {
         if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
@@ -784,6 +768,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             return;
         }
 
+        window.history.pushState({ view: 'playing' }, ''); 
         const studySnapshot = mode === 'standard' && dueCards.length > 0 ? [...dueCards] : [...cards];
         setSessionCards(studySnapshot);
         
@@ -796,7 +781,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         const earnedXP = Math.round((cards.length * baseMultiplier) * (scorePct / 100)); 
         onLogActivity(resolvedDeck?.id || 'custom', earnedXP, `${deckTitle} (${activeGame})`, { scorePct, mode: activeGame });
         
-        handleBack();
+        window.history.back(); 
         setTimeout(() => setToastMsg(`Protocol Complete! +${earnedXP} XP Earned!`), 100);
     };
 
@@ -812,7 +797,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
         // Swiped right across the screen
         if (deltaX < -70 && Math.abs(deltaX) > Math.abs(deltaY)) {
-            handleBack();
+            window.history.back(); 
         }
         setTouchStartCoords(null);
     };
@@ -893,6 +878,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 return;
             }
 
+            window.history.pushState({ view: 'menu' }, ''); 
             setOmniDeck({
                 id: `omni_${folderName}`,
                 title: `${folderName} (Omni-Mode)`,
@@ -920,10 +906,8 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 config={builderConfig}
                 onSave={handleSaveFromBuilder} 
                 onCancel={(success?: boolean) => {
-                    handleBack();
-                    if (success) {
-                        setTimeout(() => setToastMsg(builderConfig.type === 'new_deck' ? "Deck Forged." : "Card Appended."), 100);
-                    }
+                    window.history.back();
+                    if (success) setTimeout(() => setToastMsg(builderConfig.type === 'new_deck' ? "Deck Forged." : "Card Appended."), 100);
                 }} 
             />
         );
@@ -955,7 +939,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 await onCreateFolder(folderName.trim(), color);
                 setToastMsg(`Folder "${folderName.trim()}" created.`);
             }
-            handleBack();
+            window.history.back(); 
         };
 
         return (
@@ -968,7 +952,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         initialColor={showFolderModal.editMode ? folderColors[showFolderModal.oldName] : 'indigo'}
                         isEdit={showFolderModal.editMode}
                         onSave={handleSaveNewFolder}
-                        onClose={handleBack}
+                        onClose={() => window.history.back()}
                     />
                 )}
 
@@ -980,6 +964,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         </div>
                         <button 
                             onClick={() => {
+                                window.history.pushState({ view: 'create' }, ''); 
                                 setBuilderConfig({ type: 'new_deck', folder: null });
                                 setInternalMode('create');
                             }} 
@@ -995,7 +980,10 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         {['all', 'personal', 'network', 'archived'].map((f: any) => (
                             <button 
                                 key={f} 
-                                onClick={() => setDeckFilter(f)} 
+                                onClick={() => {
+                                    if (deckFilter === 'all') window.history.pushState({ view: 'folder' }, '');
+                                    setDeckFilter(f);
+                                }} 
                                 data-active={deckFilter === f} 
                                 className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${deckFilter === f ? 'bg-slate-800 dark:bg-slate-700 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200'}`}
                             >
@@ -1009,7 +997,10 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             return (
                                 <button 
                                     key={folderName} 
-                                    onClick={() => setDeckFilter(folderName)} 
+                                    onClick={() => {
+                                        if (deckFilter === 'all') window.history.pushState({ view: 'folder' }, '');
+                                        setDeckFilter(folderName);
+                                    }} 
                                     data-active={deckFilter === folderName} 
                                     className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 active:scale-95 ${deckFilter === folderName ? `${cTheme.hex} text-white shadow-md` : `${cTheme.bg} ${cTheme.iconColor}`}`}
                                 >
@@ -1030,7 +1021,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         
                         {customFolders.includes(deckFilter) && (
                             <div className="col-span-full animate-in fade-in duration-300 mb-2 mt-2">
-                                <button onClick={handleBack} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-500 transition-colors w-fit bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 active:scale-95">
+                                <button onClick={() => window.history.back()} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-500 transition-colors w-fit bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 active:scale-95">
                                     <ArrowLeft size={14} /> Back to Library
                                 </button>
                                 
@@ -1042,6 +1033,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                 <div className="flex gap-2">
                                     <button 
                                         onClick={() => {
+                                            window.history.pushState({ view: 'create' }, ''); 
                                             setBuilderConfig({ type: 'new_deck', folder: deckFilter });
                                             setInternalMode('create');
                                         }}
@@ -1068,7 +1060,10 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             return (
                                 <div key={`folder-${folderName}`} className="relative group h-full">
                                     <button 
-                                        onClick={() => setDeckFilter(folderName)} 
+                                        onClick={() => {
+                                            window.history.pushState({ view: 'folder' }, '');
+                                            setDeckFilter(folderName);
+                                        }} 
                                         className={`w-full ${theme.bg} rounded-[2rem] p-5 border-4 ${theme.border} hover:-translate-y-1 transition-all text-left shadow-sm hover:shadow-xl flex flex-col h-full animate-in fade-in duration-300 relative z-10`}
                                     >
                                         <div className="flex justify-between items-start mb-4">
@@ -1087,6 +1082,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                     <button 
                                         onClick={(e) => { 
                                             e.preventDefault(); e.stopPropagation(); 
+                                            window.history.pushState({ view: 'modal' }, '');
                                             setActiveOptionsFolder(folderName);
                                         }}
                                         className={`absolute top-3 right-3 p-2 rounded-full ${theme.iconColor} hover:bg-white/50 transition-colors active:bg-white/80 z-20`}
@@ -1118,6 +1114,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
                                     <button 
                                         onClick={() => { 
+                                            window.history.pushState({ view: 'menu' }, ''); 
                                             onSelectDeck(key); 
                                             setInternalMode('menu'); 
                                         }} 
@@ -1143,6 +1140,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                     <button 
                                         onClick={(e) => { 
                                             e.preventDefault(); e.stopPropagation(); 
+                                            window.history.pushState({ view: 'modal' }, '');
                                             setActiveOptionsDeck(deck);
                                             setMenuView('main'); 
                                         }}
@@ -1159,7 +1157,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
                 {activeOptionsFolder && (
                     <div className="fixed inset-0 z-[500] flex flex-col justify-end">
-                        <div className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm transition-opacity" onClick={handleBack} />
+                        <div className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => window.history.back()} />
                         <div className="bg-white dark:bg-slate-900 w-full rounded-t-[2.5rem] p-6 relative z-10 animate-in slide-in-from-bottom-full duration-300 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] pb-safe-6">
                             <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto mb-6" />
                             
@@ -1176,6 +1174,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             <div className="space-y-2">
                                 <button 
                                     onClick={() => { 
+                                        window.history.pushState({ view: 'modal' }, '');
                                         setActiveOptionsFolder(null); 
                                         setShowFolderModal({isOpen: true, editMode: true, oldName: activeOptionsFolder}); 
                                     }} 
@@ -1186,8 +1185,8 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                 
                                 <button 
                                     onClick={() => { 
-                                        launchOmniMode(activeOptionsFolder); 
-                                        setActiveOptionsFolder(null); 
+                                        window.history.back(); 
+                                        setTimeout(() => launchOmniMode(activeOptionsFolder), 50); 
                                     }} 
                                     className="w-full text-left px-5 py-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3 transition-colors active:scale-[0.98]"
                                 >
@@ -1198,9 +1197,11 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                 
                                 <button 
                                     onClick={() => { 
-                                        if(onDeleteFolder) onDeleteFolder(activeOptionsFolder); 
-                                        setActiveOptionsFolder(null); 
-                                        setToastMsg("Folder deleted. Decks moved to Library."); 
+                                        window.history.back(); 
+                                        setTimeout(() => {
+                                            if(onDeleteFolder) onDeleteFolder(activeOptionsFolder); 
+                                            setToastMsg("Folder deleted."); 
+                                        }, 50);
                                     }} 
                                     className="w-full text-left px-5 py-4 bg-rose-50 dark:bg-rose-500/10 rounded-2xl text-sm font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 flex items-center gap-3 transition-colors active:scale-[0.98]"
                                 >
@@ -1215,7 +1216,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     <div className="fixed inset-0 z-[500] flex flex-col justify-end">
                         <div 
                             className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm transition-opacity" 
-                            onClick={handleBack} 
+                            onClick={() => window.history.back()} 
                         />
                         <div className="bg-white dark:bg-slate-900 w-full rounded-t-[2.5rem] p-6 relative z-10 animate-in slide-in-from-bottom-full duration-300 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] pb-safe-6">
                             
@@ -1246,8 +1247,8 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                     {onToggleArchive && (
                                         <button 
                                             onClick={() => { 
-                                                onToggleArchive(activeOptionsDeck.id, userData?.deckPrefs?.[activeOptionsDeck.id]?.archived || false); 
-                                                setActiveOptionsDeck(null); 
+                                                window.history.back(); 
+                                                setTimeout(() => onToggleArchive(activeOptionsDeck.id, userData?.deckPrefs?.[activeOptionsDeck.id]?.archived || false), 50); 
                                             }} 
                                             className="w-full text-left px-5 py-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3 transition-colors active:scale-[0.98]"
                                         >
@@ -1260,9 +1261,11 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                     
                                     <button 
                                         onClick={() => { 
-                                            if (onHideDeck) onHideDeck(activeOptionsDeck.id);
-                                            setActiveOptionsDeck(null);
-                                            setToastMsg("Deck banished."); 
+                                            window.history.back(); 
+                                            setTimeout(() => {
+                                                if (onHideDeck) onHideDeck(activeOptionsDeck.id);
+                                                setToastMsg("Deck banished."); 
+                                            }, 50);
                                         }} 
                                         className="w-full text-left px-5 py-4 bg-rose-50 dark:bg-rose-500/10 rounded-2xl text-sm font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 flex items-center gap-3 transition-colors active:scale-[0.98]"
                                     >
@@ -1277,7 +1280,10 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                     
                                     <div className="max-h-60 overflow-y-auto custom-scrollbar space-y-2 pr-2">
                                         <button 
-                                            onClick={() => { onAssignToFolder(activeOptionsDeck.id, null); setActiveOptionsDeck(null); setToastMsg("Removed from folder."); }}
+                                            onClick={() => { 
+                                                window.history.back(); 
+                                                setTimeout(() => { onAssignToFolder(activeOptionsDeck.id, null); setToastMsg("Removed from folder."); }, 50);
+                                            }}
                                             className={`w-full text-left px-5 py-4 rounded-2xl text-sm font-bold flex items-center gap-3 transition-all active:scale-[0.98] ${userData?.deckPrefs?.[activeOptionsDeck.id]?.folder === null || !userData?.deckPrefs?.[activeOptionsDeck.id]?.folder ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20' : 'bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300'}`}
                                         >
                                             <div className={`w-3 h-3 rounded-full ${userData?.deckPrefs?.[activeOptionsDeck.id]?.folder === null || !userData?.deckPrefs?.[activeOptionsDeck.id]?.folder ? 'bg-indigo-500 shadow-sm' : 'border-2 border-slate-300 dark:border-slate-600'}`} />
@@ -1287,7 +1293,10 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                         {customFolders.map(folderName => (
                                             <button 
                                                 key={folderName}
-                                                onClick={() => { onAssignToFolder(activeOptionsDeck.id, folderName); setActiveOptionsDeck(null); setToastMsg(`Moved to ${folderName}`); }}
+                                                onClick={() => { 
+                                                    window.history.back(); 
+                                                    setTimeout(() => { onAssignToFolder(activeOptionsDeck.id, folderName); setToastMsg(`Moved to ${folderName}`); }, 50); 
+                                                }}
                                                 className={`w-full text-left px-5 py-4 rounded-2xl text-sm font-bold flex items-center gap-3 transition-all active:scale-[0.98] ${userData?.deckPrefs?.[activeOptionsDeck.id]?.folder === folderName ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20' : 'bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300'}`}
                                             >
                                                 <div className={`w-3 h-3 rounded-full ${userData?.deckPrefs?.[activeOptionsDeck.id]?.folder === folderName ? 'bg-indigo-500 shadow-sm' : 'border-2 border-slate-300 dark:border-slate-600'}`} />
@@ -1300,7 +1309,11 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                     <div className="h-4" />
                                     
                                     <button 
-                                        onClick={() => { setActiveOptionsDeck(null); setShowFolderModal({isOpen: true, editMode: false, oldName: ''}); }}
+                                        onClick={() => { 
+                                            window.history.pushState({ view: 'modal' }, '');
+                                            setActiveOptionsDeck(null); 
+                                            setShowFolderModal({isOpen: true, editMode: false, oldName: ''}); 
+                                        }}
                                         className="w-full text-left px-5 py-4 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl text-sm font-black text-indigo-600 dark:text-indigo-400 flex items-center gap-3 transition-colors active:scale-[0.98]"
                                     >
                                         <Plus size={20} strokeWidth={3} /> Create New Folder
@@ -1325,7 +1338,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 relative overflow-hidden transition-colors"
             >
                 <div className="px-6 pt-8 pb-4">
-                    <button onClick={handleBack} className="flex items-center text-slate-400 dark:text-slate-500 hover:text-indigo-600 mb-6 text-xs font-black uppercase tracking-widest transition-colors bg-white dark:bg-slate-800 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm w-fit active:scale-95">
+                    <button onClick={() => window.history.back()} className="flex items-center text-slate-400 dark:text-slate-500 hover:text-indigo-600 mb-6 text-xs font-black uppercase tracking-widest transition-colors bg-white dark:bg-slate-800 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm w-fit active:scale-95">
                         <ArrowLeft size={16} className="mr-2"/> Back
                     </button>
                     
@@ -1335,6 +1348,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         {!omniDeck && (
                             <button 
                                 onClick={() => {
+                                    window.history.pushState({ view: 'create' }, '');
                                     setBuilderConfig({ type: 'add_card', deck: resolvedDeck });
                                     setInternalMode('create');
                                 }} 
@@ -1423,7 +1437,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             className="h-[100dvh] flex flex-col bg-slate-50 dark:bg-slate-950 animate-in slide-in-from-bottom-8 duration-500 relative z-[100] transition-colors pb-safe"
         >
             <div className="px-4 py-4 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center shrink-0">
-                <button onClick={handleBack} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition-colors"><X size={20} strokeWidth={3}/></button>
+                <button onClick={() => window.history.back()} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition-colors"><X size={20} strokeWidth={3}/></button>
                 <div className="flex flex-col items-center">
                     <span className="text-[9px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-[0.2em] mb-0.5">{activeGame} Protocol</span>
                     <span className="text-sm font-black text-slate-900 dark:text-white line-clamp-1">{deckTitle}</span>
