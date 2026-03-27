@@ -1077,7 +1077,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                     <div className="absolute inset-x-4 -bottom-1 h-10 bg-slate-200 dark:bg-slate-800 rounded-[2rem] transition-transform duration-300 group-hover:translate-y-1.5" />
                                     <div className="absolute inset-x-2 -bottom-0 h-10 bg-slate-100 dark:bg-slate-800/80 rounded-[2rem] transition-transform duration-300 group-hover:translate-y-1" />
 
-                                    <button 
+                                    
                                     <button key={key} onClick={() => { window.history.pushState({ view: 'menu' }, ''); onSelectDeck(key); setInternalMode('menu'); }} className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border-2 border-b-8 border-slate-100 dark:border-slate-800 text-left active:translate-y-1 active:border-b-2 transition-all hover:border-indigo-500 shadow-sm"> 
                                       
                                         <div className="flex justify-between items-start mb-4">
