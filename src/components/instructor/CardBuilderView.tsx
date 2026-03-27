@@ -326,14 +326,28 @@ export default function CardBuilderView({
         setConjugations({});
     };
 
-    const registerNewDeck = async (deckId: string, deckTitle: string) => {
+const registerNewDeck = async (deckId: string, deckTitle: string) => {
         try {
-            // 🔥 OPTIMISTIC UPDATE: Tell the UI the deck exists so Network Access works!
+            // Tell the UI the deck exists so Network Access works
             setLocalOptimisticDecks((prev: any) => ({ ...prev, [deckId]: { id: deckId, title: deckTitle } }));
 
             const deckRef = doc(db, 'artifacts', appId, 'decks', deckId);
-            await setDoc(deckRef, { id: deckId, key: deckId, title: deckTitle, type: 'vocabulary', createdAt: new Date().toISOString() }, { merge: true });
-        } catch (err) { console.error("Failed to register deck:", err); }
+            await setDoc(deckRef, { 
+                id: deckId, 
+                key: deckId, 
+                title: deckTitle, 
+                type: 'vocabulary', 
+                createdAt: new Date().toISOString(),
+                updatedAt: Date.now(),
+                // 🔥 THE FIX: Stamp your ownership so the Library pulls it down!
+                authorId: auth.currentUser?.uid, 
+                authorEmail: auth.currentUser?.email,
+                visibility: 'private',
+                allowedClasses: []
+            }, { merge: true });
+        } catch (err) { 
+            console.error("Failed to register deck:", err); 
+        }
     };
 
     const handleDeleteCard = async (cardId: string) => {
