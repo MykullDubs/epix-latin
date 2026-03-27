@@ -144,9 +144,8 @@ export default function CardBuilderView({
     const [isFetchingCards, setIsFetchingCards] = useState(false);
 
     // We still use this to populate the dropdown select menus
-    const validDecks = { ...availableDecks };
-    const deckOptions = Object.entries(validDecks).map(([key, deck]: any) => ({ id: key, title: deck.title })); 
-
+    const validDecks = { ...availableDecks, ...localOptimisticDecks };
+    const deckOptions = Object.entries(validDecks).map(([key, deck]: any) => ({ id: key, title: deck.title }));
     useEffect(() => { if (initialDeckId) setFormData(prev => ({...prev, deckId: initialDeckId})); }, [initialDeckId]);
     
     // 🔥 THE FIX: A completely clean, loop-free fetcher
@@ -328,6 +327,9 @@ export default function CardBuilderView({
 
     const registerNewDeck = async (deckId: string, deckTitle: string) => {
         try {
+            // 🔥 FIX 2: Instantly teach the UI about the new deck so "Network Access" works!
+            setLocalOptimisticDecks((prev: any) => ({ ...prev, [deckId]: { id: deckId, title: deckTitle } }));
+            
             const deckRef = doc(db, 'artifacts', appId, 'decks', deckId);
             await setDoc(deckRef, { id: deckId, key: deckId, title: deckTitle, type: 'vocabulary', createdAt: new Date().toISOString() }, { merge: true });
         } catch (err) { console.error("Failed to register deck:", err); }
