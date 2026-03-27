@@ -654,7 +654,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const customFolders: string[] = userData?.studyFolders || [];
     const folderColors: Record<string, string> = userData?.folderColors || {};
 
-   // 🔥 1. BULLETPROOF STATE CONTROLLER
+    // 🔥 1. BULLETPROOF STATE CONTROLLER
     const handleBack = () => {
         // 1. Close modals first
         if (activeOptionsDeck) { setActiveOptionsDeck(null); return; }
@@ -674,7 +674,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         if (internalMode === 'menu') {
             setInternalMode('library');
             setOmniDeck(null);
-            // 🔥 REMOVED onSelectDeck(null) from here so it doesn't alert the parent router!
+            // Intentionally missing onSelectDeck(null) so we don't alert the parent router
             return;
         }
 
@@ -684,7 +684,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         // 6. Full exit (Let the main app Router handle the final exit back to dashboard)
         if (onSelectDeck) onSelectDeck(null);
     };
-    
+
     // 🔥 2. NATIVE DOM POPSTATE LISTENER (Always uses fresh state)
     const handleBackRef = useRef(handleBack);
     useEffect(() => {
@@ -815,7 +815,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         const deltaY = libTouchStart.y - touchEndY;
 
         if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
-            const allFilters = ['all', 'personal', 'network', 'archived', ...customFolders];
+            const allFilters = ['all', 'created', 'downloaded', 'archived', ...customFolders];
             const currentIndex = allFilters.indexOf(deckFilter);
 
             if (deltaX > 0 && currentIndex < allFilters.length - 1) {
@@ -913,7 +913,8 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         );
     }
 
-const filteredDecks = Object.entries(allDecks).filter(([key, deck]: any) => {
+    if (internalMode === 'library') {
+        const filteredDecks = Object.entries(allDecks).filter(([key, deck]: any) => {
             // 🔥 1. THE VAULT GATEKEEPER
             // Does the user actually own or have rights to this deck?
             const isCustom = key === 'custom';
@@ -940,6 +941,7 @@ const filteredDecks = Object.entries(allDecks).filter(([key, deck]: any) => {
             if (customFolders.includes(deckFilter)) return currentFolder === deckFilter;
             return true;
         });
+
         const handleSaveNewFolder = async (folderName: string, color: string) => {
             if (!folderName.trim()) return;
             if (showFolderModal.editMode && onUpdateFolder) {
@@ -985,10 +987,10 @@ const filteredDecks = Object.entries(allDecks).filter(([key, deck]: any) => {
                         </button>
                     </div>
 
-                <div ref={filterBarRef} className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center gap-2 overflow-x-auto custom-scrollbar overscroll-x-contain scroll-smooth">
+                    <div ref={filterBarRef} className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center gap-2 overflow-x-auto custom-scrollbar overscroll-x-contain scroll-smooth">
                         <Filter size={16} className="text-slate-400 mr-2 shrink-0" />
                         
-                        {/* 🔥 Changed to Created and Downloaded */}
+                        {/* 🔥 CHANGED TABS: Created and Downloaded */}
                         {['all', 'created', 'downloaded', 'archived'].map((f: any) => (
                             <button 
                                 key={f} 
