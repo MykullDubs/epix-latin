@@ -146,7 +146,7 @@ function ContextualCardBuilder({ config, onSave, onCancel }: any) {
 // ============================================================================
 //  1. SRB-POWERED STUDY MODE (SPACED REPETITION BRAIN)
 // ============================================================================
-function StudyModePlayer({ deckCards, userData, onToggleStar, deckId, initialSrbData, onFinish }: any) {
+function StudyModePlayer({ user, deckCards, userData, onToggleStar, deckId, initialSrbData, onFinish }: any) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     const [showConjugations, setShowConjugations] = useState(false); 
@@ -192,37 +192,40 @@ function StudyModePlayer({ deckCards, userData, onToggleStar, deckId, initialSrb
         return { easeFactor, interval, repetitions, nextReviewDate, lastStudied: Date.now() };
     };
 
-    const handleRateCard = async (rating: 'again' | 'good' | 'easy') => {
-        if (!userData?.uid || !deckId || !currentCard) return;
+  const handleRateCard = async (rating: 'again' | 'good' | 'easy') => {
+        // 🔥 FIX: We are now using user?.uid instead of userData, and removed the strict deckId check
+        if (!user?.uid || !currentCard) return; 
 
-        // 🔥 HAPTIC INJECTION
+        // 🔥 THE SENSORY ENGINE: Physical Haptic Feedback
         if ("vibrate" in navigator) {
-            rating === 'easy' ? navigator.vibrate([40, 30, 40]) : navigator.vibrate(60);
+            // Easy = Double Tap. Good = Solid Thud. Again = Long Buzz.
+            rating === 'easy' ? navigator.vibrate([40, 30, 40]) : 
+            rating === 'good' ? navigator.vibrate(50) : 
+            navigator.vibrate([100, 50, 100]);
         }
-
         // Omni-Mode fallback: We check if the card has a deckId directly
-        const targetDeckId = currentCard.deckId || deckId;
-
+const targetDeckId = currentCard.deckId || deckId || 'custom';
         const currentStats = srbData[currentCard.id] || {};
         const newStats = calculateNextReview(rating, currentStats);
 
         setSrbData(prev => ({ ...prev, [currentCard.id]: newStats }));
 
-        // Fire to Firebase in the background (No awaiting to keep UI lightning fast)
-        const progressRef = doc(db, 'artifacts', appId, 'users', userData.uid, 'deck_progress', targetDeckId, 'card_stats', currentCard.id);
+        // 🔥 FIX: Saving using user.uid!
+        const progressRef = doc(db, 'artifacts', appId, 'users', user.uid, 'deck_progress', targetDeckId, 'card_stats', currentCard.id);
         setDoc(progressRef, newStats, { merge: true }).catch(console.error);
 
-        // 🔥 FIX: Explicitly unflip the card and advance the index safely
+        // Snap the card back to the front
         setIsFlipped(false);
         
+        // Wait a split second for the flip animation, then advance the index
         setTimeout(() => {
             if (currentIndex < deckCards.length - 1) {
                 setSlideDirection('right');
                 setCurrentIndex(i => i + 1);
             } else {
-                if (onFinish) onFinish(100);
+                if (onFinish) onFinish(100); 
             }
-        }, 150); // Small wait to allow flip animation to start before content changes
+        }, 150); 
     };
 
     const getIntervalLabel = (rating: 'again' | 'good' | 'easy') => {
@@ -1318,8 +1321,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             </div>
             <div className="flex-1 overflow-hidden relative">
                 {/* 🔥 SRB INJECTION: Pass the sessionCards and the raw stats map into the player */}
-                {activeGame === 'standard' && <StudyModePlayer deckCards={sessionCards} initialSrbData={cardStats} userData={userData} onToggleStar={onToggleStar} deckId={resolvedDeck?.id} onFinish={(score: number) => handleGameFinish(score)} />}
-                
+{activeGame === 'standard' && <StudyModePlayer deckCards={sessionCards} initialSrbData={cardStats} user={user} userData={userData} onToggleStar={onToggleStar} deckId={selectedDeckKey} onFinish={handleFinish} />}
                 {/* Quiz and Match still use the session cards */}
                 {activeGame === 'quiz' && <div className="h-full overflow-y-auto"><QuizSessionView deckCards={sessionCards} onGameEnd={(res: any) => handleGameFinish(res.score ? (res.score/res.total)*100 : 0)} /></div>}
                 {activeGame === 'match' && <div className="h-full overflow-y-auto pt-6"><MatchingGame deckCards={sessionCards} onGameEnd={(scorePct: number) => handleGameFinish(scorePct)} /></div>}
