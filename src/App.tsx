@@ -475,8 +475,11 @@ export default function App() {
                 networkDecks={networkDecks} 
                 userData={userData} 
                 onDownloadDeck={(deck: any) => { 
-                    // 🔥 Removed the 3rd argument here so TypeScript is happy!
                     actions.purchaseUnlock(deck.id, deck.price || 0);
+                    // 🔥 EXPLICITLY add to user's library preferences so the Vault Gatekeeper sees it!
+                    if (actions.assignDeckToFolder) {
+                        actions.assignDeckToFolder(deck.id, null);
+                    }
                     setActiveDeckKey(deck.id);
                     setActiveTab('flashcards');
                 }} 
