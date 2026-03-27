@@ -4,7 +4,7 @@ import {
     Layers, Plus, X, Save, Edit3, Trash2, FileJson, Database, 
     Loader2, FolderPlus, FolderOpen, Share2, Lock, Users, 
     Globe, CheckCircle2, Paperclip, ChevronRight, Wand2, BookOpen,
-    Image as ImageIcon, Music, UploadCloud, BrainCircuit, Sparkles
+    Image as ImageIcon, Music, UploadCloud, BrainCircuit, Sparkles, Map
 } from 'lucide-react';
 import { INITIAL_SYSTEM_DECKS } from '../../constants/defaults';
 import { Toast } from '../Toast';
@@ -108,6 +108,11 @@ export default function CardBuilderView({
     });
     const [isCreatingDeck, setIsCreatingDeck] = useState(false);
     const [newDeckTitle, setNewDeckTitle] = useState('');
+    
+    // 🔥 THE LEXICON MAP STATE
+    const [domainPath, setDomainPath] = useState<string[]>([]);
+    const [domainInput, setDomainInput] = useState('');
+
     const [morphology, setMorphology] = useState<any[]>([]);
     const [newMorphPart, setNewMorphPart] = useState({ part: '', meaning: '', type: 'root' });
     
@@ -177,6 +182,21 @@ export default function CardBuilderView({
                 setFormData({ ...formData, deckId: e.target.value }); 
             } 
         } else { setFormData({ ...formData, [e.target.name]: e.target.value }); } 
+    };
+
+    // 🔥 LEXICON MAP HANDLERS
+    const handleAddDomain = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (domainInput.trim()) {
+                setDomainPath([...domainPath, domainInput.trim()]);
+                setDomainInput('');
+            }
+        }
+    };
+
+    const removeDomain = (indexToRemove: number) => {
+        setDomainPath(domainPath.filter((_, idx) => idx !== indexToRemove));
     };
 
     const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'audio') => {
@@ -311,20 +331,23 @@ export default function CardBuilderView({
         })); 
         setMorphology([]); 
         setConjugations({});
+        // Reset lexicon map when starting a fresh card/deck logic
+        setDomainPath([]);
+        setDomainInput('');
     };
 
-    // 🔥 THE FIX: Overloading the Deck object so no parent component filter rejects it!
-    const registerNewDeck = async (deckId: string, deckTitle: string) => {
+    // 🔥 THE FIX: Now accepts and saves the `domainPath` array
+    const registerNewDeck = async (deckId: string, deckTitle: string, path: string[] = []) => {
         try {
             console.log(`[Forge] Registering new deck: ${deckTitle} (${deckId})`);
             
             // 1. Give the UI immediate access
-            setLocalOptimisticDecks((prev: any) => ({ ...prev, [deckId]: { id: deckId, title: deckTitle, stats: { cardCount: 0 }, cards: [] } }));
+            setLocalOptimisticDecks((prev: any) => ({ ...prev, [deckId]: { id: deckId, title: deckTitle, stats: { cardCount: 0 }, cards: [], domainPath: path } }));
 
             const deckRef = doc(db, 'artifacts', appId, 'decks', deckId);
             const uid = auth.currentUser?.uid || 'unknown';
             
-            // 2. Blast the database with every possible legacy field
+            // 2. Blast the database with the path
             await setDoc(deckRef, { 
                 id: deckId, 
                 key: deckId, 
@@ -332,14 +355,15 @@ export default function CardBuilderView({
                 type: 'vocabulary', 
                 createdAt: new Date().toISOString(),
                 updatedAt: Date.now(),
-                authorId: uid,           // Legacy Auth
-                instructorId: uid,       // Legacy Auth
-                userId: uid,             // Legacy Auth
-                ownerId: uid,            // Legacy Auth
-                visibility: 'private',   // Ensures it isn't hidden
-                isPublished: false,      // Ensures it shows up in 'Personal'
+                authorId: uid,           
+                instructorId: uid,       
+                userId: uid,             
+                ownerId: uid,            
+                visibility: 'private',   
+                isPublished: false,      
+                domainPath: path,        // 🔥 SAVES THE LEXICON MAP TO FIREBASE
                 stats: { cardCount: 0 },
-                cards: []                // 🔥 LEGACY BYPASS: Tricks old .length > 0 filters!
+                cards: []                
             }, { merge: true });
             
             // 3. Link it explicitly to the user profile
@@ -382,7 +406,8 @@ export default function CardBuilderView({
             if (!newDeckTitle) return alert("Please name your new deck."); 
             finalDeckId = `deck_${Date.now()}`; 
             finalDeckTitle = newDeckTitle; 
-            await registerNewDeck(finalDeckId, finalDeckTitle);
+            // Send the domainPath into the registry
+            await registerNewDeck(finalDeckId, finalDeckTitle, domainPath);
         } 
 
         const cardData = { 
@@ -426,7 +451,8 @@ export default function CardBuilderView({
             if (!bulkNewTitle.trim()) return alert("Please name your new deck.");
             finalDeckId = `deck_${Date.now()}`;
             finalDeckTitle = bulkNewTitle.trim();
-            await registerNewDeck(finalDeckId, finalDeckTitle);
+            // Send the domainPath into the registry
+            await registerNewDeck(finalDeckId, finalDeckTitle, domainPath);
         }
 
         setIsImporting(true);
@@ -457,7 +483,6 @@ export default function CardBuilderView({
             } catch (err) { console.error(`Failed to save card: ${card.front}`, err); }
         }
 
-        // 🔥 THE FIX: Safely update stats with an object instead of dot-notation for setDoc
         try {
             console.log(`[Forge] Updating final stats for deck: ${finalDeckId}`);
             const deckRef = doc(db, 'artifacts', appId, 'decks', finalDeckId);
@@ -566,6 +591,53 @@ export default function CardBuilderView({
 
     const jsonTemplate = `[\n  { "front": "canis", "back": "dog", "type": "noun", "imageUrl": "https://..." }\n]`;
 
+    // 🔥 REUSABLE RENDERER FOR THE DOMAIN MAP
+    const renderDomainBuilder = () => (
+        <div className="flex flex-col gap-3 p-5 bg-indigo-50/50 dark:bg-indigo-500/5 rounded-2xl border border-indigo-100 dark:border-indigo-500/10 mt-4 animate-in slide-in-from-top-2">
+            <div>
+                <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest flex items-center gap-1.5 mb-1">
+                    <Map size={14}/> Lexicon Map (Optional)
+                </label>
+                <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                    Map this module's location in the global network (e.g., Entertainment &gt; Movies &gt; Story).
+                </p>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-2 min-h-[32px]">
+                {domainPath.length === 0 && (
+                    <span className="text-xs font-bold text-slate-400 italic">Root Level (Uncategorized)</span>
+                )}
+                {domainPath.map((domain, idx) => (
+                    <React.Fragment key={idx}>
+                        <div className="bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-2 shadow-sm border border-indigo-100 dark:border-slate-700 transition-all">
+                            {domain}
+                            <button 
+                                onClick={(e) => { e.preventDefault(); removeDomain(idx); }} 
+                                className="text-slate-300 hover:text-rose-500 transition-colors"
+                            >
+                                <X size={12} strokeWidth={3}/>
+                            </button>
+                        </div>
+                        {idx < domainPath.length - 1 && <ChevronRight size={14} className="text-indigo-300 dark:text-indigo-500/50" />}
+                    </React.Fragment>
+                ))}
+            </div>
+            
+            <div className="relative mt-1">
+                <input 
+                    value={domainInput} 
+                    onChange={(e) => setDomainInput(e.target.value)} 
+                    onKeyDown={handleAddDomain}
+                    placeholder={domainPath.length === 0 ? "Type Macro Domain & press Enter" : "Add next sub-level & press Enter"} 
+                    className="w-full p-3 rounded-xl bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 focus:border-indigo-500 dark:text-white font-bold outline-none transition-colors shadow-sm text-sm"
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black uppercase tracking-widest text-slate-400 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded-md bg-slate-50 dark:bg-slate-800 pointer-events-none">
+                    Enter ↵
+                </div>
+            </div>
+        </div>
+    );
+
     return (
         <div className="space-y-6 relative pb-12 font-sans transition-colors duration-300">
             {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
@@ -648,7 +720,10 @@ export default function CardBuilderView({
                             <option value="new">✨ + Create New Deck</option>
                         </select>
                         {isCreatingDeck && (
-                            <input value={newDeckTitle} onChange={(e) => setNewDeckTitle(e.target.value)} placeholder="Enter new deck name..." className="w-full p-4 rounded-xl border-2 border-indigo-500 bg-white dark:bg-slate-800 dark:text-white font-black outline-none shadow-sm animate-in slide-in-from-top-2" autoFocus />
+                            <div className="animate-in slide-in-from-top-2">
+                                <input value={newDeckTitle} onChange={(e) => setNewDeckTitle(e.target.value)} placeholder="Enter new deck name..." className="w-full p-4 rounded-xl border-2 border-indigo-500 bg-white dark:bg-slate-800 dark:text-white font-black outline-none shadow-sm transition-colors" autoFocus />
+                                {renderDomainBuilder()}
+                            </div>
                         )}
                     </section>
 
@@ -872,7 +947,10 @@ export default function CardBuilderView({
                             </button>
                         </div>
                         {bulkDestination === 'new' ? (
-                            <input value={bulkNewTitle} onChange={(e) => setBulkNewTitle(e.target.value)} disabled={isImporting} placeholder="Name your new deck" className="w-full p-4 rounded-xl border-2 border-indigo-500 bg-white dark:bg-slate-800 dark:text-white font-black outline-none shadow-sm transition-colors" />
+                            <div className="animate-in slide-in-from-top-2">
+                                <input value={bulkNewTitle} onChange={(e) => setBulkNewTitle(e.target.value)} disabled={isImporting} placeholder="Name your new deck" className="w-full p-4 rounded-xl border-2 border-indigo-500 bg-white dark:bg-slate-800 dark:text-white font-black outline-none shadow-sm transition-colors" />
+                                {renderDomainBuilder()}
+                            </div>
                         ) : (
                             <select value={bulkExistingId} onChange={(e) => setBulkExistingId(e.target.value)} disabled={isImporting} className="w-full p-4 rounded-xl border-2 border-indigo-500 bg-white dark:bg-slate-800 dark:text-indigo-400 font-black outline-none shadow-sm transition-colors cursor-pointer">
                                 <option value="custom">✍️ Scriptorium (My Deck)</option>
@@ -905,7 +983,10 @@ export default function CardBuilderView({
                             </button>
                         </div>
                         {bulkDestination === 'new' ? (
-                            <input value={bulkNewTitle} onChange={(e) => setBulkNewTitle(e.target.value)} disabled={isImporting} placeholder="Name your new deck" className="w-full p-4 rounded-xl border-2 border-indigo-500 bg-white dark:bg-slate-800 dark:text-white font-black outline-none shadow-sm transition-colors" />
+                            <div className="animate-in slide-in-from-top-2">
+                                <input value={bulkNewTitle} onChange={(e) => setBulkNewTitle(e.target.value)} disabled={isImporting} placeholder="Name your new deck" className="w-full p-4 rounded-xl border-2 border-indigo-500 bg-white dark:bg-slate-800 dark:text-white font-black outline-none shadow-sm transition-colors" />
+                                {renderDomainBuilder()}
+                            </div>
                         ) : (
                             <select value={bulkExistingId} onChange={(e) => setBulkExistingId(e.target.value)} disabled={isImporting} className="w-full p-4 rounded-xl border-2 border-indigo-500 bg-white dark:bg-slate-800 dark:text-indigo-400 font-black outline-none shadow-sm transition-colors cursor-pointer">
                                 <option value="custom">✍️ Scriptorium (My Deck)</option>
