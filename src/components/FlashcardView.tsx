@@ -268,11 +268,10 @@ function StudyModePlayer({ setParentCardStats, user, deckCards, userData, onTogg
                 setSlideDirection('left');
                 setCurrentIndex(i => i - 1);
             } else if (dragX < -SWIPE_THRESHOLD_X && currentIndex < deckCards.length - 1) {
-                // Swipe left translates to "Good" score if they don't flip
                 handleRateCard('good');
             } else if (dragY < SWIPE_THRESHOLD_Y || (Math.abs(dragX) < 10 && Math.abs(dragY) < 10)) {
                 setIsFlipped(true);
-                if ("vibrate" in navigator) navigator.vibrate(10); // Haptic click on flip
+                if ("vibrate" in navigator) navigator.vibrate(10); 
             }
         }
         
@@ -637,12 +636,10 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     
     const [showFolderModal, setShowFolderModal] = useState<{isOpen: boolean, editMode: boolean, oldName: string}>({isOpen: false, editMode: false, oldName: ''});
     
-    // State for tracking SRB stats and Filtering due cards
     const [fetchedCards, setFetchedCards] = useState<any[]>([]);
     const [cardStats, setCardStats] = useState<Record<string, any>>({});
     const [isFetchingCards, setIsFetchingCards] = useState(false);
     
-    // 1. SESSION LOCK STATE
     const [sessionCards, setSessionCards] = useState<any[]>([]);
     const [libTouchStart, setLibTouchStart] = useState<{x: number, y: number} | null>(null);
     const [builderConfig, setBuilderConfig] = useState<{type: 'new_deck', folder: string | null} | {type: 'add_card', deck: any} | null>(null);
@@ -650,6 +647,12 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const [omniDeck, setOmniDeck] = useState<any>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const filterBarRef = useRef<HTMLDivElement>(null);
+
+    // 🔥 THE BLACK BOX RECORDER: Prevents stale closure bugs on swipe back
+    const stateRef = useRef({ internalMode, deckFilter, activeOptionsDeck, activeOptionsFolder, showFolderModal, builderConfig });
+    useEffect(() => {
+        stateRef.current = { internalMode, deckFilter, activeOptionsDeck, activeOptionsFolder, showFolderModal, builderConfig };
+    });
 
     const resolvedDeck = omniDeck || allDecks[selectedDeckKey] || Object.values(allDecks)[0];
     const cards = omniDeck ? omniDeck.cards : fetchedCards;
@@ -671,7 +674,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         }
     }, [deckFilter]);
 
-    // CACHE-FIRST FETCH ENGINE 
     useEffect(() => {
         const fetchDeckCards = async () => {
             if (!selectedDeckKey || omniDeck) return;
@@ -717,7 +719,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         fetchDeckCards();
     }, [selectedDeckKey, omniDeck, allDecks, user?.uid]);
 
-    // THE FILTER: Which cards are due today?
     const dueCards = useMemo(() => {
         return cards.filter((c: any) => {
             const stat = cardStats[c.id];
@@ -725,28 +726,32 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         });
     }, [cards, cardStats]);
 
-    // 🔥 THE NATIVE DOM POPSTATE CONTROLLER
+    // 🔥 THE NATIVE DOM POPSTATE CONTROLLER (Now perfectly immune to stale data)
     useEffect(() => {
         const handleNativeSwipe = () => {
-            if (activeOptionsDeck) { 
+            const s = stateRef.current;
+            if (s.activeOptionsDeck) { 
                 setActiveOptionsDeck(null); 
-            } else if (activeOptionsFolder) { 
+            } else if (s.activeOptionsFolder) { 
                 setActiveOptionsFolder(null); 
-            } else if (showFolderModal.isOpen) { 
+            } else if (s.showFolderModal.isOpen) { 
                 setShowFolderModal({isOpen: false, editMode: false, oldName: ''}); 
-            } else if (internalMode === 'playing') { 
+            } else if (s.internalMode === 'playing') { 
                 setInternalMode('menu'); 
-            } else if (internalMode === 'create') { 
-                setInternalMode(builderConfig?.type === 'add_card' ? 'menu' : 'library'); 
-            } else if (internalMode === 'menu') {
+            } else if (s.internalMode === 'create') { 
+                setInternalMode(s.builderConfig?.type === 'add_card' ? 'menu' : 'library'); 
+            } else if (s.internalMode === 'menu') {
                 setInternalMode('library');
                 onSelectDeck(null);
                 setOmniDeck(null);
+            } else if (s.internalMode === 'library' && s.deckFilter !== 'all') {
+                // Automatically return to the root 'All' tab before exiting the app!
+                setDeckFilter('all');
             }
         };
         window.addEventListener('popstate', handleNativeSwipe);
         return () => window.removeEventListener('popstate', handleNativeSwipe);
-    }, [internalMode, activeOptionsDeck, activeOptionsFolder, showFolderModal, builderConfig, onSelectDeck]);
+    }, [onSelectDeck]);
 
     const launchGame = (mode: 'standard' | 'quiz' | 'match' | 'tower') => {
         if (cards.length === 0) {
@@ -787,7 +792,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         const deltaX = libTouchStart.x - touchEndX; 
         const deltaY = libTouchStart.y - touchEndY;
 
-        // Ensure it's a horizontal swipe, not a vertical scroll
         if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
             const allFilters = ['all', 'personal', 'network', 'archived', ...customFolders];
             const currentIndex = allFilters.indexOf(deckFilter);
@@ -954,7 +958,15 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         <Filter size={16} className="text-slate-400 mr-2 shrink-0" />
                         
                         {['all', 'personal', 'network', 'archived'].map((f: any) => (
-                            <button key={f} onClick={() => setDeckFilter(f)} data-active={deckFilter === f} className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${deckFilter === f ? 'bg-slate-800 dark:bg-slate-700 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200'}`}>
+                            <button 
+                                key={f} 
+                                onClick={() => {
+                                    if (deckFilter === 'all') window.history.pushState({ view: 'folder' }, '');
+                                    setDeckFilter(f);
+                                }} 
+                                data-active={deckFilter === f} 
+                                className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${deckFilter === f ? 'bg-slate-800 dark:bg-slate-700 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200'}`}
+                            >
                                 {f}
                             </button>
                         ))}
@@ -963,7 +975,15 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         {customFolders.map((folderName: string) => {
                             const cTheme = FOLDER_COLORS[folderColors[folderName] || 'indigo'];
                             return (
-                                <button key={folderName} onClick={() => setDeckFilter(folderName)} data-active={deckFilter === folderName} className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 active:scale-95 ${deckFilter === folderName ? `${cTheme.hex} text-white shadow-md` : `${cTheme.bg} ${cTheme.iconColor}`}`}>
+                                <button 
+                                    key={folderName} 
+                                    onClick={() => {
+                                        if (deckFilter === 'all') window.history.pushState({ view: 'folder' }, '');
+                                        setDeckFilter(folderName);
+                                    }} 
+                                    data-active={deckFilter === folderName} 
+                                    className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 active:scale-95 ${deckFilter === folderName ? `${cTheme.hex} text-white shadow-md` : `${cTheme.bg} ${cTheme.iconColor}`}`}
+                                >
                                     <Folder size={12} fill="currentColor" /> {folderName}
                                 </button>
                             );
@@ -981,7 +1001,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         
                         {customFolders.includes(deckFilter) && (
                             <div className="col-span-full animate-in fade-in duration-300 mb-2 mt-2">
-                                <button onClick={() => setDeckFilter('all')} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-500 transition-colors w-fit bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 active:scale-95">
+                                <button onClick={() => window.history.back()} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-500 transition-colors w-fit bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 active:scale-95">
                                     <ArrowLeft size={14} /> Back to Library
                                 </button>
                                 
@@ -1020,7 +1040,10 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             return (
                                 <div key={`folder-${folderName}`} className="relative group h-full">
                                     <button 
-                                        onClick={() => setDeckFilter(folderName)} 
+                                        onClick={() => {
+                                            window.history.pushState({ view: 'folder' }, '');
+                                            setDeckFilter(folderName);
+                                        }} 
                                         className={`w-full ${theme.bg} rounded-[2rem] p-5 border-4 ${theme.border} hover:-translate-y-1 transition-all text-left shadow-sm hover:shadow-xl flex flex-col h-full animate-in fade-in duration-300 relative z-10`}
                                     >
                                         <div className="flex justify-between items-start mb-4">
