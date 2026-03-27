@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { 
     Search, Sparkles, Lock, Unlock, Hexagon, Layers, 
     BookOpen, Gamepad2, Globe, Target, ArrowLeft, Download, 
-    Compass, Users, Zap, CheckCircle2, Loader2, BookText, Activity
+    Compass, Users, Zap, CheckCircle2, Loader2, BookText, Activity, ChevronRight
 } from 'lucide-react';
 import { Toast } from './Toast';
 
@@ -362,7 +362,7 @@ export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, o
                     </div>
                 ) : (
                     <div className="grid grid-cols-2 gap-4">
-                        {Object.entries(categorizedItems).map(([category, items]) => {
+                        {Object.entries(categorizedItems).map(([category, items]: [string, any]) => {
                             const theme = CATEGORY_COLORS[category] || CATEGORY_COLORS.Default;
                             const CatIcon = theme.icon;
 
