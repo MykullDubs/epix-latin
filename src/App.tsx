@@ -61,6 +61,19 @@ export default function App() {
       return [...GLOBAL_CURRICULUMS, ...(customCurriculums || [])];
   }, [customCurriculums]);
 
+  // 🔥 THE NETWORK FILTER: Only passes public decks to the Discovery Radar
+  const networkDecks = useMemo(() => {
+      const publicDecks: Record<string, any> = {};
+      if (allDecks) {
+          Object.entries(allDecks).forEach(([key, deck]: any) => {
+              if (deck.isPublished === true) {
+                  publicDecks[key] = deck;
+              }
+          });
+      }
+      return publicDecks;
+  }, [allDecks]);
+
   // Determine active background theme based on equipped cosmetics
   const activeOSTheme = OS_THEMES[userData?.equipped?.themes] || OS_THEMES.default;
 
@@ -458,7 +471,15 @@ export default function App() {
                 onLogActivity={actions.logActivity}
             />
           ) : activeTab === 'discovery' ? (
-            <DiscoveryView allDecks={allDecks} lessons={allLessons} onSelectDeck={(d:any) => { setActiveDeckKey(d.id); setActiveTab('flashcards'); }} onSelectLesson={setActiveLesson} onLogActivity={actions.logActivity} userData={userData} onPurchaseItem={actions.purchaseUnlock} />
+            <DiscoveryView 
+                networkDecks={networkDecks} 
+                userData={userData} 
+                onDownloadDeck={(deck: any) => { 
+                    actions.purchaseUnlock(deck.id, deck.price || 0, 'deck');
+                    setActiveDeckKey(deck.id);
+                    setActiveTab('flashcards');
+                }} 
+            />
           ) : activeTab === 'store' ? (
             <StorefrontView 
                 userData={userData} 
