@@ -146,7 +146,7 @@ function ContextualCardBuilder({ config, onSave, onCancel }: any) {
 // ============================================================================
 //  1. SRB-POWERED STUDY MODE (SPACED REPETITION BRAIN)
 // ============================================================================
-function StudyModePlayer({ deckCards, userData, onToggleStar, deckId, initialSrbData }: any) {
+function StudyModePlayer({ deckCards, userData, onToggleStar, deckId, initialSrbData, onFinish }: any) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     const [showConjugations, setShowConjugations] = useState(false); 
@@ -195,6 +195,11 @@ function StudyModePlayer({ deckCards, userData, onToggleStar, deckId, initialSrb
     const handleRateCard = async (rating: 'again' | 'good' | 'easy') => {
         if (!userData?.uid || !deckId || !currentCard) return;
 
+        // 🔥 HAPTIC INJECTION
+        if ("vibrate" in navigator) {
+            rating === 'easy' ? navigator.vibrate([40, 30, 40]) : navigator.vibrate(60);
+        }
+
         // Omni-Mode fallback: We check if the card has a deckId directly
         const targetDeckId = currentCard.deckId || deckId;
 
@@ -207,12 +212,17 @@ function StudyModePlayer({ deckCards, userData, onToggleStar, deckId, initialSrb
         const progressRef = doc(db, 'artifacts', appId, 'users', userData.uid, 'deck_progress', targetDeckId, 'card_stats', currentCard.id);
         setDoc(progressRef, newStats, { merge: true }).catch(console.error);
 
-        if (currentIndex < deckCards.length - 1) {
-            setSlideDirection('right');
-            setCurrentIndex(i => i + 1);
-        } else {
-            setIsFlipped(false);
-        }
+        // 🔥 FIX: Explicitly unflip the card and advance the index safely
+        setIsFlipped(false);
+        
+        setTimeout(() => {
+            if (currentIndex < deckCards.length - 1) {
+                setSlideDirection('right');
+                setCurrentIndex(i => i + 1);
+            } else {
+                if (onFinish) onFinish(100);
+            }
+        }, 150); // Small wait to allow flip animation to start before content changes
     };
 
     const getIntervalLabel = (rating: 'again' | 'good' | 'easy') => {
@@ -264,6 +274,7 @@ function StudyModePlayer({ deckCards, userData, onToggleStar, deckId, initialSrb
                 handleRateCard('good');
             } else if (dragY < SWIPE_THRESHOLD_Y || (Math.abs(dragX) < 10 && Math.abs(dragY) < 10)) {
                 setIsFlipped(true);
+                if ("vibrate" in navigator) navigator.vibrate(10); // Haptic click on flip
             }
         }
         
@@ -482,6 +493,7 @@ function MatchingGame({ deckCards, onGameEnd }: any) {
             setIsLocked(true);
             const [idx1, idx2] = newFlipped;
             if (cards[idx1].pairId === cards[idx2].pairId) {
+                if ("vibrate" in navigator) navigator.vibrate(40);
                 setTimeout(() => {
                     setSolved(prev => [...prev, idx1, idx2]);
                     setFlipped([]);
@@ -493,6 +505,7 @@ function MatchingGame({ deckCards, onGameEnd }: any) {
                     }
                 }, 600);
             } else {
+                if ("vibrate" in navigator) navigator.vibrate([100, 50, 100]);
                 setTimeout(() => { setFlipped([]); setIsLocked(false); }, 1000);
             }
         }
@@ -541,6 +554,11 @@ function QuizSessionView({ deckCards, onGameEnd }: any) {
         setIsProcessing(true);
         setSelectedOption(option);
         const isCorrect = option === currentCard.back;
+        
+        if ("vibrate" in navigator) {
+            isCorrect ? navigator.vibrate(50) : navigator.vibrate([100, 50, 100]);
+        }
+
         if (isCorrect) { setScore(s => s + 1); setStreak(s => s + 1); } else { setStreak(0); }
 
         setTimeout(() => {
@@ -627,6 +645,9 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const [cardStats, setCardStats] = useState<Record<string, any>>({});
     const [isFetchingCards, setIsFetchingCards] = useState(false);
     
+    // 🔥 1. SESSION LOCK STATE
+    const [sessionCards, setSessionCards] = useState<any[]>([]);
+
     const [builderConfig, setBuilderConfig] = useState<{type: 'new_deck', folder: string | null} | {type: 'add_card', deck: any} | null>(null);
 
     const [omniDeck, setOmniDeck] = useState<any>(null);
@@ -705,6 +726,11 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             setToastMsg("This deck has no cards.");
             return;
         }
+
+        // 🔥 2. LOCK THE SESSION SNAPSHOT
+        const studySnapshot = mode === 'standard' && dueCards.length > 0 ? [...dueCards] : [...cards];
+        setSessionCards(studySnapshot);
+
         setActiveGame(mode);
         setInternalMode('playing');
     };
@@ -1291,12 +1317,12 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 <div className="w-11"></div>
             </div>
             <div className="flex-1 overflow-hidden relative">
-                {/* 🔥 SRB INJECTION: Pass the due cards and the raw stats map into the player */}
-                {activeGame === 'standard' && <StudyModePlayer deckCards={dueCards.length > 0 ? dueCards : cards} initialSrbData={cardStats} userData={userData} onToggleStar={onToggleStar} deckId={resolvedDeck?.id} />}
+                {/* 🔥 SRB INJECTION: Pass the sessionCards and the raw stats map into the player */}
+                {activeGame === 'standard' && <StudyModePlayer deckCards={sessionCards} initialSrbData={cardStats} userData={userData} onToggleStar={onToggleStar} deckId={resolvedDeck?.id} onFinish={(score: number) => handleGameFinish(score)} />}
                 
-                {/* Quiz and Match still use the full deck for variety, but you could pass dueCards here too! */}
-                {activeGame === 'quiz' && <div className="h-full overflow-y-auto"><QuizSessionView deckCards={cards} onGameEnd={(res: any) => handleGameFinish(res.score ? (res.score/res.total)*100 : 0)} /></div>}
-                {activeGame === 'match' && <div className="h-full overflow-y-auto pt-6"><MatchingGame deckCards={cards} onGameEnd={(scorePct: number) => handleGameFinish(scorePct)} /></div>}
+                {/* Quiz and Match still use the session cards */}
+                {activeGame === 'quiz' && <div className="h-full overflow-y-auto"><QuizSessionView deckCards={sessionCards} onGameEnd={(res: any) => handleGameFinish(res.score ? (res.score/res.total)*100 : 0)} /></div>}
+                {activeGame === 'match' && <div className="h-full overflow-y-auto pt-6"><MatchingGame deckCards={sessionCards} onGameEnd={(scorePct: number) => handleGameFinish(scorePct)} /></div>}
             </div>
         </div>
     );
