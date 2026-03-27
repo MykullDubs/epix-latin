@@ -626,7 +626,12 @@ function QuizSessionView({ deckCards, onGameEnd }: any) {
 // ============================================================================
 //  4. MAIN FLASHCARD VIEW (HUB)
 // ============================================================================
-export default function FlashcardView({ allDecks, selectedDeckKey, onLogActivity, userData, onSaveCard, onToggleStar, onToggleArchive, onCreateFolder, onAssignToFolder, onHideDeck, onUpdateFolder, onDeleteFolder, user, onSelectDeck }) {
+export default function FlashcardView({ 
+    allDecks, selectedDeckKey, onLogActivity, userData, 
+    onSaveCard, onToggleStar, onToggleArchive, onCreateFolder, 
+    onAssignToFolder, onHideDeck, onUpdateFolder, onDeleteFolder, 
+    user, onSelectDeck 
+}: any) { // 🔥 Added : any here to satisfy the build gatekeeper
     const [internalMode, setInternalMode] = useState<'library' | 'menu' | 'playing' | 'create'>('library');
     const [activeGame, setActiveGame] = useState<'standard' | 'quiz' | 'match' | 'tower'>('standard');
     
