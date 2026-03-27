@@ -650,7 +650,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     
     // 🔥 1. SESSION LOCK STATE
     const [sessionCards, setSessionCards] = useState<any[]>([]);
-
+    const [libTouchStart, setLibTouchStart] = useState<{x: number, y: number} | null>(null);
     const [builderConfig, setBuilderConfig] = useState<{type: 'new_deck', folder: string | null} | {type: 'add_card', deck: any} | null>(null);
 
     const [omniDeck, setOmniDeck] = useState<any>(null);
@@ -755,6 +755,35 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         onLogActivity(resolvedDeck.id || 'custom', earnedXP, `${deckTitle} (${activeGame})`, { scorePct, mode: activeGame });
         setInternalMode('menu');
         setToastMsg(`Protocol Complete! +${earnedXP} XP Earned!`);
+    };
+    const handleLibrarySwipeStart = (e: React.TouchEvent) => {
+        setLibTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    };
+
+    const handleLibrarySwipeEnd = (e: React.TouchEvent) => {
+        if (!libTouchStart) return;
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+
+        const deltaX = libTouchStart.x - touchEndX; 
+        const deltaY = libTouchStart.y - touchEndY;
+
+        // Ensure it's a horizontal swipe, not a vertical scroll
+        if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+            const allFilters = ['all', 'personal', 'network', 'archived', ...customFolders];
+            const currentIndex = allFilters.indexOf(deckFilter);
+
+            if (deltaX > 0 && currentIndex < allFilters.length - 1) {
+                // Swiped Left -> Next Tab
+                setDeckFilter(allFilters[currentIndex + 1]);
+                if ("vibrate" in navigator) navigator.vibrate(15); 
+            } else if (deltaX < 0 && currentIndex > 0) {
+                // Swiped Right -> Prev Tab
+                setDeckFilter(allFilters[currentIndex - 1]);
+                if ("vibrate" in navigator) navigator.vibrate(15); 
+            }
+        }
+        setLibTouchStart(null);
     };
 
     const launchOmniMode = async (folderName: string) => {
@@ -924,7 +953,12 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     </div>
                 </div>
 
-                <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 space-y-5 pb-28 relative z-10 custom-scrollbar overscroll-y-contain h-full">
+               <div 
+                    ref={scrollContainerRef} 
+                    onTouchStart={handleLibrarySwipeStart}
+                    onTouchEnd={handleLibrarySwipeEnd}
+                    className="flex-1 overflow-y-auto p-6 space-y-5 pb-28 relative z-10 custom-scrollbar overscroll-y-contain h-full"
+                >
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         
                         {customFolders.includes(deckFilter) && (
