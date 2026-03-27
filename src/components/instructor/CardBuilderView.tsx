@@ -575,7 +575,7 @@ export default function CardBuilderView({
         } 
     };
 
-    const executeBulkIngest = async (cardsArray: any[], successMessage: string) => {
+    const executeBulkIngest = async (cardsArray: any[], successMessage: string, overridePath?: string[]) => {
         let finalDeckId = bulkExistingId;
         let finalDeckTitle = validDecks[bulkExistingId]?.title || 'Custom Deck';
         
@@ -584,7 +584,7 @@ export default function CardBuilderView({
             finalDeckId = `deck_${Date.now()}`;
             finalDeckTitle = bulkNewTitle.trim();
             // Send the domainPath into the registry
-            await registerNewDeck(finalDeckId, finalDeckTitle, domainPath);
+            await registerNewDeck(finalDeckId, finalDeckTitle, overridePath || domainPath);
         }
 
         setIsImporting(true);
@@ -653,11 +653,13 @@ export default function CardBuilderView({
             const rawData = JSON.parse(cleanInput);
             
             if (!Array.isArray(rawData) && rawData.cards && Array.isArray(rawData.cards)) {
+                let newPath = domainPath;
                 if (rawData.domainPath && Array.isArray(rawData.domainPath)) {
+                    newPath = rawData.domainPath;
                     setDomainPath(rawData.domainPath);
                     setToastMsg("Domain Map detected in JSON! ✨");
                 }
-                await executeBulkIngest(rawData.cards, "Master Payload imported!");
+                await executeBulkIngest(rawData.cards, "Master Payload imported!", newPath);
             } else if (Array.isArray(rawData)) {
                 await executeBulkIngest(rawData, "Bulk import complete!");
             } else {
@@ -741,12 +743,14 @@ export default function CardBuilderView({
                 throw new Error("AI did not return the correct schema format.");
             }
 
+            let newPath = domainPath;
             if (aiResponse.domainPath && Array.isArray(aiResponse.domainPath)) {
+                newPath = aiResponse.domainPath;
                 setDomainPath(aiResponse.domainPath);
                 setToastMsg(`Auto-Mapped to: ${aiResponse.domainPath.join(' > ')}`);
             }
 
-            await executeBulkIngest(aiResponse.cards, "Neural Forge & Mapping Complete!");
+            await executeBulkIngest(aiResponse.cards, "Neural Forge & Mapping Complete!", newPath);
 
         } catch (err) {
             console.error("Neural Forge Error:", err);
