@@ -1,45 +1,89 @@
 // src/components/DiscoveryView.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
-    Search, Sparkles, Lock, Unlock, Hexagon, Layers, 
-    BookOpen, Gamepad2, Globe, Target, ArrowLeft, Download, 
-    Compass, Users, Zap, CheckCircle2, Loader2, BookText, Activity, ChevronRight
+    Search, Globe, Layers, BookOpen, Gamepad2, 
+    Lock, Unlock, Hexagon, ChevronRight, Zap, 
+    Target, ArrowLeft, Download, Compass, Loader2 
 } from 'lucide-react';
 import { Toast } from './Toast';
 
 // ============================================================================
 //  UI THEME ENGINES
 // ============================================================================
-
-// 1. Vault-style Folder Colors for Categories
-const CATEGORY_COLORS: Record<string, any> = {
-    'Practice Decks': { bg: 'bg-indigo-50 dark:bg-indigo-900/20', border: 'border-indigo-100 dark:border-indigo-500/30', text: 'text-indigo-900 dark:text-indigo-100', iconBg: 'bg-white dark:bg-indigo-500/30', iconColor: 'text-indigo-600 dark:text-indigo-400', badge: 'bg-white/60 dark:bg-black/20 text-indigo-600 dark:text-indigo-300', hex: 'bg-indigo-500', icon: Layers },
-    'Core Lessons': { bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-100 dark:border-emerald-500/30', text: 'text-emerald-900 dark:text-emerald-100', iconBg: 'bg-white dark:bg-emerald-500/30', iconColor: 'text-emerald-600 dark:text-emerald-400', badge: 'bg-white/60 dark:bg-black/20 text-emerald-600 dark:text-emerald-300', hex: 'bg-emerald-500', icon: BookOpen },
-    'Arcade Games': { bg: 'bg-amber-50 dark:bg-amber-900/20', border: 'border-amber-100 dark:border-amber-500/30', text: 'text-amber-900 dark:text-amber-100', iconBg: 'bg-white dark:bg-amber-500/30', iconColor: 'text-amber-600 dark:text-amber-400', badge: 'bg-white/60 dark:bg-black/20 text-amber-600 dark:text-amber-300', hex: 'bg-amber-500', icon: Gamepad2 },
-    'Grammar': { bg: 'bg-rose-50 dark:bg-rose-900/20', border: 'border-rose-100 dark:border-rose-500/30', text: 'text-rose-900 dark:text-rose-100', iconBg: 'bg-white dark:bg-rose-500/30', iconColor: 'text-rose-600 dark:text-rose-400', badge: 'bg-white/60 dark:bg-black/20 text-rose-600 dark:text-rose-300', hex: 'bg-rose-500', icon: BookText },
-    'Vocabulary': { bg: 'bg-sky-50 dark:bg-sky-900/20', border: 'border-sky-100 dark:border-sky-500/30', text: 'text-sky-900 dark:text-sky-100', iconBg: 'bg-white dark:bg-sky-500/30', iconColor: 'text-sky-600 dark:text-sky-400', badge: 'bg-white/60 dark:bg-black/20 text-sky-600 dark:text-sky-300', hex: 'bg-sky-500', icon: Globe },
-    'Default': { bg: 'bg-slate-50 dark:bg-slate-900/20', border: 'border-slate-200 dark:border-slate-700/50', text: 'text-slate-800 dark:text-slate-200', iconBg: 'bg-white dark:bg-slate-800', iconColor: 'text-slate-500 dark:text-slate-400', badge: 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300', hex: 'bg-slate-500', icon: Compass }
-};
-
-// 2. Card Styles based on Type
 const getTypeStyles = (type: string) => {
     switch(type) {
-        case 'arcade': return { bg: 'bg-amber-50 dark:bg-amber-500/10', text: 'text-amber-600 dark:text-amber-400', icon: Gamepad2, label: 'Arcade Game' };
-        case 'deck': return { bg: 'bg-rose-50 dark:bg-rose-500/10', text: 'text-rose-600 dark:text-rose-400', icon: Layers, label: 'Practice Deck' };
-        default: return { bg: 'bg-indigo-50 dark:bg-indigo-500/10', text: 'text-indigo-600 dark:text-indigo-400', icon: BookOpen, label: 'Standard Unit' };
+        case 'arcade': return { bg: 'bg-amber-50 dark:bg-amber-500/10', text: 'text-amber-600 dark:text-amber-400', icon: Gamepad2, label: 'Arcade Game', border: 'border-amber-200 dark:border-amber-500/20' };
+        case 'deck': return { bg: 'bg-rose-50 dark:bg-rose-500/10', text: 'text-rose-600 dark:text-rose-400', icon: Layers, label: 'Practice Deck', border: 'border-rose-200 dark:border-rose-500/20' };
+        default: return { bg: 'bg-indigo-50 dark:bg-indigo-500/10', text: 'text-indigo-600 dark:text-indigo-400', icon: BookOpen, label: 'Core Lesson', border: 'border-indigo-200 dark:border-indigo-500/20' };
     }
 };
 
+const NAV_TABS = ['All', 'Practice Decks', 'Core Lessons', 'Arcade Games'];
+
 // ============================================================================
-//  STUDENT DISCOVERY VIEW
+//  SUB-COMPONENT: DISCOVERY CARD (The Grid Items)
 // ============================================================================
-export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, onSelectLesson, onLogActivity, userData, onPurchaseItem, onDownloadItem }: any) {
+const DiscoveryCard = ({ item, onClick, userData }: any) => {
+    const style = getTypeStyles(item.contentType);
+    const Icon = style.icon;
+    const displayTitle = item.title || item.name || "Untitled Resource";
+
+    const price = item.price || 0;
+    const isUnlocked = price === 0 || userData?.unlocks?.[item.id];
+    const isLocked = !isUnlocked;
+
+    return (
+        <button 
+            onClick={onClick} 
+            className={`bg-white dark:bg-slate-900 rounded-[2rem] border-2 border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 text-left group flex flex-col overflow-hidden relative active:scale-[0.98] ${isLocked ? 'opacity-90 grayscale-[0.2]' : ''}`}
+        >
+            {isLocked && (
+                <div className="absolute top-4 right-4 bg-slate-900/90 dark:bg-black/90 backdrop-blur-md text-white text-[10px] font-black px-3 py-1.5 rounded-full flex items-center gap-1.5 z-30 shadow-md border border-white/10 transition-transform group-hover:scale-105">
+                    <Lock size={12} className="text-amber-400" />
+                    <span>{price}</span>
+                    <Hexagon size={10} className="text-amber-400 fill-amber-400/20" />
+                </div>
+            )}
+
+            <div className="p-5 flex-1 w-full relative z-20">
+                <div className="flex justify-between items-start mb-4">
+                    <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center transition-transform duration-500 shadow-inner group-hover:rotate-6 group-hover:scale-110 ${style.bg} ${style.text}`}>
+                        <Icon size={20} strokeWidth={2.5}/>
+                    </div>
+                </div>
+                <h4 className="font-black text-slate-800 dark:text-white text-lg leading-tight mb-2 line-clamp-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors pr-4">{displayTitle}</h4>
+            </div>
+
+            <div className="px-5 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between w-full relative z-20 mt-auto">
+                <div className="flex items-center gap-1.5">
+                    <Globe size={12} className="text-slate-400 dark:text-slate-500"/>
+                    <p className="text-[9px] text-slate-500 dark:text-slate-400 font-black uppercase tracking-widest truncate max-w-[80px]">{item.normalizedLanguage}</p>
+                </div>
+                
+                <div className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition-colors ${style.bg} ${style.text} shadow-sm border border-transparent group-hover:${style.border}`}>
+                    <span className="text-[9px] font-black uppercase tracking-widest">{isLocked ? 'Unlock' : 'View'}</span>
+                    {isLocked ? <Lock size={10} strokeWidth={3} /> : <ChevronRight size={10} strokeWidth={3} />}
+                </div>
+            </div>
+        </button>
+    );
+};
+
+// ============================================================================
+//  MAIN COMPONENT: DISCOVERY VIEW
+// ============================================================================
+export default function DiscoveryView({ allDecks, lessons, userData, onPurchaseItem, onDownloadItem }: any) {
     const [searchTerm, setSearchTerm] = useState('');
-    const [viewMode, setViewMode] = useState<'categories' | 'category_detail' | 'preview'>('categories');
-    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+    const [viewMode, setViewMode] = useState<'explore' | 'preview'>('explore');
+    const [navFilter, setNavFilter] = useState('All');
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const [isDownloading, setIsDownloading] = useState(false);
     const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+    // Swipe & Scroll States
+    const [libTouchStart, setLibTouchStart] = useState<{x: number, y: number} | null>(null);
+    const filterBarRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     // Purchase Modal State
     const [purchasePrompt, setPurchasePrompt] = useState<any>(null);
@@ -48,12 +92,49 @@ export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, o
     const fluxBalance = userData?.profile?.main?.coins || userData?.coins || 0;
     const targetLanguages = userData?.learningLanguages || [];
 
-    // --- THE FILTER & CATEGORY ENGINE ---
-    const categorizedItems = useMemo(() => {
+    // --- AUTO-CENTER TABS ---
+    useEffect(() => {
+        if (filterBarRef.current) {
+            const activeTab = filterBarRef.current.querySelector('[data-active="true"]');
+            if (activeTab) {
+                activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            }
+        }
+    }, [navFilter]);
+
+    // --- SWIPE LOGIC ---
+    const handleSwipeStart = (e: React.TouchEvent) => {
+        setLibTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    };
+
+    const handleSwipeEnd = (e: React.TouchEvent) => {
+        if (!libTouchStart) return;
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+
+        const deltaX = libTouchStart.x - touchEndX; 
+        const deltaY = libTouchStart.y - touchEndY;
+
+        // Ensure it's a horizontal swipe, not a vertical scroll
+        if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+            const currentIndex = NAV_TABS.indexOf(navFilter);
+
+            if (deltaX > 0 && currentIndex < NAV_TABS.length - 1) {
+                setNavFilter(NAV_TABS[currentIndex + 1]);
+                if ("vibrate" in navigator) navigator.vibrate(15); 
+            } else if (deltaX < 0 && currentIndex > 0) {
+                setNavFilter(NAV_TABS[currentIndex - 1]);
+                if ("vibrate" in navigator) navigator.vibrate(15); 
+            }
+        }
+        setLibTouchStart(null);
+    };
+
+    // --- THE FILTER ENGINE ---
+    const processedItems = useMemo(() => {
         const normalizeLanguage = (lang?: string) => {
             if (!lang || lang.trim().length === 0) return 'General';
-            const cleanLang = lang.trim();
-            return cleanLang.charAt(0).toUpperCase() + cleanLang.slice(1).toLowerCase();
+            return lang.trim().charAt(0).toUpperCase() + lang.trim().slice(1).toLowerCase();
         };
 
         const rawDecks = Object.entries(allDecks || {}).map(([id, deck]: any) => ({
@@ -72,38 +153,30 @@ export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, o
 
         let allItems = [...rawDecks, ...rawLessons];
 
-        // 🔥 Strict Language Filter
+        // 1. Language Filter
         if (targetLanguages.length > 0) {
             allItems = allItems.filter(item => 
                 targetLanguages.includes(item.normalizedLanguage) || item.normalizedLanguage === 'General'
             );
         }
 
-        // Search Filter
+        // 2. Tab Filter
+        if (navFilter !== 'All') {
+            allItems = allItems.filter(item => {
+                if (navFilter === 'Practice Decks') return item.contentType === 'deck';
+                if (navFilter === 'Core Lessons') return item.contentType === 'lesson';
+                if (navFilter === 'Arcade Games') return item.contentType === 'arcade';
+                return true;
+            });
+        }
+
+        // 3. Search Filter
         if (searchTerm.trim()) {
             allItems = allItems.filter(item => item._searchStr.includes(searchTerm.toLowerCase()));
         }
 
-        // Group into Categories (Smart Fallback if undefined)
-        const groups: Record<string, any[]> = {};
-        allItems.forEach(item => {
-            let cat = item.category;
-            if (!cat) {
-                // Smart Fallback
-                if (item.contentType === 'arcade') cat = 'Arcade Games';
-                else if (item.contentType === 'lesson') cat = 'Core Lessons';
-                else cat = 'Practice Decks';
-            }
-            if (!groups[cat]) groups[cat] = [];
-            groups[cat].push(item);
-        });
-
-        // Sort categories alphabetically
-        return Object.keys(groups).sort().reduce((acc: any, key) => {
-            acc[key] = groups[key];
-            return acc;
-        }, {});
-    }, [allDecks, lessons, searchTerm, targetLanguages]);
+        return allItems;
+    }, [allDecks, lessons, searchTerm, targetLanguages, navFilter]);
 
     // --- INTERACTION ROUTERS ---
     const handleItemClick = (item: any) => {
@@ -140,98 +213,28 @@ export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, o
         const success = await onDownloadItem(selectedItem);
         setIsDownloading(false);
         
-        if (success) {
-            setToastMsg("Added to your Vault!");
-            // Auto-launch if you want, or just let them stay on preview
-        }
+        if (success) setToastMsg("Added to your Vault!");
     };
 
-    // --- VIEW RENDERS ---
-
-    // 1. CATEGORY DRILL-DOWN VIEW
-    if (viewMode === 'category_detail' && selectedCategory) {
-        const categoryItems = categorizedItems[selectedCategory] || [];
-        const theme = CATEGORY_COLORS[selectedCategory] || CATEGORY_COLORS.Default;
-        const CatIcon = theme.icon;
-
-        return (
-            <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors animate-in slide-in-from-right-8 duration-300 pb-safe">
-                {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
-                
-                <div className="px-6 pt-safe-8 pb-4 shrink-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20">
-                    <button onClick={() => { setViewMode('categories'); setSelectedCategory(null); }} className="flex items-center text-slate-400 hover:text-indigo-600 mb-6 text-xs font-black uppercase tracking-widest bg-white dark:bg-slate-800 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm active:scale-95 transition-all">
-                        <ArrowLeft size={14} className="mr-2"/> Back to Explore
-                    </button>
-                    <div className="flex items-center gap-4 mb-2">
-                        <div className={`w-14 h-14 rounded-[1.2rem] flex items-center justify-center shadow-inner border-2 ${theme.bg} ${theme.iconColor} ${theme.border}`}>
-                            <CatIcon size={28} />
-                        </div>
-                        <div>
-                            <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{selectedCategory}</h1>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{categoryItems.length} Public Modules</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar pb-32">
-                    {categoryItems.map((item: any) => {
-                        const style = getTypeStyles(item.contentType);
-                        const ItemIcon = style.icon;
-                        const isUnlocked = !item.price || item.price === 0 || userData?.unlocks?.[item.id];
-
-                        return (
-                            <button 
-                                key={item.id} 
-                                onClick={() => handleItemClick(item)}
-                                className={`w-full bg-white dark:bg-slate-900 p-5 rounded-[2rem] border-2 border-slate-100 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all text-left shadow-sm flex flex-col group active:scale-[0.98] ${!isUnlocked ? 'grayscale-[0.2]' : ''}`}
-                            >
-                                <div className="flex items-start justify-between w-full mb-4">
-                                    <div className="flex gap-4 items-center">
-                                        <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center shadow-inner transition-transform group-hover:scale-110 ${style.bg} ${style.text}`}>
-                                            <ItemIcon size={20} />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-black text-slate-800 dark:text-white text-lg leading-tight line-clamp-1 pr-4">{item.title || item.name}</h3>
-                                            <div className="flex items-center gap-3 mt-1 opacity-60">
-                                                <span className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1 text-slate-500"><Globe size={10}/> {item.normalizedLanguage}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    {!isUnlocked ? (
-                                        <div className="bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-1">
-                                            <Lock size={12} className="text-amber-500" />
-                                            <span className="text-[10px] font-black text-slate-600 dark:text-slate-300">{item.price}</span>
-                                        </div>
-                                    ) : (
-                                        <ChevronRight size={20} className="text-slate-300 group-hover:translate-x-1 transition-transform" />
-                                    )}
-                                </div>
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
-        );
-    }
-
-    // 2. ITEM PREVIEW (DOWNLOAD TO VAULT SCREEN)
+    // ============================================================================
+    //  RENDER: PREVIEW MODAL
+    // ============================================================================
     if (viewMode === 'preview' && selectedItem) {
         const style = getTypeStyles(selectedItem.contentType);
         const Icon = style.icon;
 
         return (
-            <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors animate-in slide-in-from-bottom-8 duration-300 relative z-50 pb-safe">
+            <div className="h-[100dvh] flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors animate-in slide-in-from-bottom-8 duration-300 relative z-50 pb-safe">
                 {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
                 
-                <div className="px-6 pt-safe-8 pb-4 shrink-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20">
-                    <button onClick={() => { setViewMode('category_detail'); setSelectedItem(null); }} className="flex items-center text-slate-400 hover:text-indigo-600 mb-6 text-xs font-black uppercase tracking-widest bg-white dark:bg-slate-800 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm active:scale-95 transition-all">
-                        <ArrowLeft size={14} className="mr-2"/> Back
+                <div className="px-6 pt-safe-8 pb-4 shrink-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20">
+                    <button onClick={() => { setViewMode('explore'); setSelectedItem(null); }} className="flex items-center text-slate-400 hover:text-indigo-600 mb-6 text-xs font-black uppercase tracking-widest bg-white dark:bg-slate-800 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm active:scale-95 transition-all">
+                        <ArrowLeft size={14} className="mr-2"/> Back to Explore
                     </button>
                     
                     <div className="flex items-center gap-4 mb-4">
                          <div className={`w-16 h-16 rounded-[1.2rem] flex items-center justify-center shadow-inner ${style.bg} ${style.text}`}>
-                            <Icon size={32} />
+                            <Icon size={32} strokeWidth={2.5}/>
                         </div>
                         <div>
                             <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-1 block">{style.label}</span>
@@ -270,9 +273,11 @@ export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, o
         );
     }
 
-    // 3. MAIN EXPLORE HUB (CATEGORIES)
+    // ============================================================================
+    //  RENDER: MAIN EXPLORE HUB
+    // ============================================================================
     return (
-        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors relative pb-safe">
+        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors relative">
             {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
             
             {/* 🔥 PURCHASE MODAL */}
@@ -313,22 +318,45 @@ export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, o
                 </div>
             )}
 
-            <div className="px-6 pt-safe-8 pb-4 shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl z-10 sticky top-0">
-                <div className="flex justify-between items-end mb-6">
-                    <div>
-                        <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter italic">EXPLORE</h1>
-                        <p className="text-[9px] font-black text-indigo-500 uppercase tracking-[0.4em] flex items-center gap-1 mt-1"><Globe size={12}/> Global Network</p>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                        <div className="flex items-center gap-2 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
-                            <Hexagon size={14} className="text-indigo-500 fill-indigo-500/20" />
-                            <span className="font-black text-slate-800 dark:text-white text-sm">{fluxBalance} <span className="text-[9px] uppercase text-slate-400">Flux</span></span>
+            {/* 🔥 VAULT-MATCHED HEADER & NAV BAR */}
+            <div className="sticky top-0 z-30 w-full flex flex-col shrink-0">
+                <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl px-6 py-5 flex justify-between items-center pt-safe">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white p-2.5 rounded-xl shadow-md shadow-indigo-500/20">
+                            <Globe size={22} strokeWidth={3}/>
                         </div>
+                        <span className="font-black text-slate-800 dark:text-white text-2xl uppercase tracking-tighter">Explore</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <Hexagon size={14} className="text-indigo-500 fill-indigo-500/20" />
+                        <span className="font-black text-slate-800 dark:text-white text-sm">{fluxBalance}</span>
                     </div>
                 </div>
 
-                <div className="relative group">
-                    <div className="absolute inset-0 bg-indigo-500/10 rounded-[2rem] blur-xl group-focus-within:bg-indigo-500/30 transition-all duration-500 pointer-events-none" />
+                <div ref={filterBarRef} className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center gap-2 overflow-x-auto custom-scrollbar overscroll-x-contain scroll-smooth">
+                    {NAV_TABS.map((tab) => (
+                        <button 
+                            key={tab} 
+                            onClick={() => setNavFilter(tab)} 
+                            data-active={navFilter === tab}
+                            className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${navFilter === tab ? 'bg-slate-800 dark:bg-slate-700 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                        >
+                            {tab}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* 🔥 SWIPEABLE CONTENT AREA */}
+            <div 
+                ref={scrollContainerRef}
+                onTouchStart={handleSwipeStart}
+                onTouchEnd={handleSwipeEnd}
+                className="flex-1 overflow-y-auto p-6 space-y-6 pb-28 relative z-10 custom-scrollbar overscroll-y-contain h-full"
+            >
+                {/* Search Bar */}
+                <div className="relative group mb-2">
+                    <div className="absolute inset-0 bg-indigo-500/10 rounded-[2rem] blur-xl group-focus-within:bg-indigo-500/20 transition-all duration-500 pointer-events-none" />
                     <div className="relative flex items-center">
                         <Search className="absolute left-6 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={20}/>
                         <input 
@@ -341,51 +369,17 @@ export default function DiscoveryView({ allDecks, lessons, user, onSelectDeck, o
                     </div>
                 </div>
                 
-                {/* Language Filter Badge */}
-                {targetLanguages.length > 0 && !searchTerm && (
-                    <div className="mt-4 flex items-center gap-2 overflow-x-auto custom-scrollbar pb-2">
-                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 shrink-0">Filtering by:</span>
-                        {targetLanguages.map((lang: string) => (
-                            <span key={lang} className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border border-indigo-100 dark:border-indigo-500/20 whitespace-nowrap">
-                                {lang}
-                            </span>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar pb-32">
-                {Object.keys(categorizedItems).length === 0 ? (
+                {/* Results Grid */}
+                {processedItems.length === 0 ? (
                     <div className="py-20 flex flex-col items-center justify-center text-slate-400 opacity-60">
                         <Compass size={48} className="mb-4" />
-                        <p className="font-black uppercase tracking-widest text-xs text-center max-w-[200px]">No modules match your language parameters.</p>
+                        <p className="font-black uppercase tracking-widest text-xs text-center max-w-[200px]">No modules found.</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-2 gap-4">
-                        {Object.entries(categorizedItems).map(([category, items]: [string, any]) => {
-                            const theme = CATEGORY_COLORS[category] || CATEGORY_COLORS.Default;
-                            const CatIcon = theme.icon;
-
-                            return (
-                                <button 
-                                    key={category} 
-                                    onClick={() => { setViewMode('category_detail'); setSelectedCategory(category); }}
-                                    className={`w-full ${theme.bg} rounded-[2rem] p-5 border-4 ${theme.border} hover:-translate-y-1 transition-all text-left shadow-sm hover:shadow-xl flex flex-col h-full active:scale-95 animate-in fade-in zoom-in-95`}
-                                >
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className={`w-12 h-12 ${theme.iconBg} ${theme.iconColor} rounded-[1rem] flex items-center justify-center text-xl shadow-inner`}>
-                                            <CatIcon size={24} />
-                                        </div>
-                                    </div>
-                                    <h3 className={`font-black ${theme.text} text-lg leading-tight line-clamp-2 pr-2 mb-auto`}>{category}</h3>
-                                    <div className="mt-3">
-                                        <span className={`text-[9px] uppercase font-black tracking-widest ${theme.badge} px-2.5 py-1 rounded-md shadow-sm`}>
-                                            {items.length} Modules
-                                        </span>
-                                    </div>
-                                </button>
-                            );
-                        })}
+                        {processedItems.map((item: any) => (
+                            <DiscoveryCard key={item.id} item={item} onClick={() => handleItemClick(item)} userData={userData} />
+                        ))}
                     </div>
                 )}
             </div>
