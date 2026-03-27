@@ -470,12 +470,13 @@ export default function App() {
                 ExamPlayerView={ExamPlayerView} 
                 onLogActivity={actions.logActivity}
             />
-          ) : activeTab === 'discovery' ? (
+) : activeTab === 'discovery' ? (
             <DiscoveryView 
                 networkDecks={networkDecks} 
                 userData={userData} 
                 onDownloadDeck={(deck: any) => { 
-                    actions.purchaseUnlock(deck.id, deck.price || 0, 'deck');
+                    // 🔥 Removed the 3rd argument here so TypeScript is happy!
+                    actions.purchaseUnlock(deck.id, deck.price || 0);
                     setActiveDeckKey(deck.id);
                     setActiveTab('flashcards');
                 }} 
