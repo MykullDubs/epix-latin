@@ -146,7 +146,7 @@ function ContextualCardBuilder({ config, onSave, onCancel }: any) {
 // ============================================================================
 //  1. SRB-POWERED STUDY MODE (SPACED REPETITION BRAIN)
 // ============================================================================
-function StudyModePlayer({ deckCards, userData, onToggleStar, deckId, initialSrbData, onFinish }: any) {
+function StudyModePlayer({ deckCards, userData, onToggleStar, deckId, initialSrbData }: any) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     const [showConjugations, setShowConjugations] = useState(false); 
@@ -193,32 +193,25 @@ function StudyModePlayer({ deckCards, userData, onToggleStar, deckId, initialSrb
     };
 
     const handleRateCard = async (rating: 'again' | 'good' | 'easy') => {
-        if (!userData?.uid || !currentCard) return;
+        if (!userData?.uid || !deckId || !currentCard) return;
 
-        // 🔥 SENSORY ENGINE: Physical Feedback
-        if ("vibrate" in navigator) {
-            if (rating === 'easy') navigator.vibrate([40, 30, 40]); // Subtle double-tap
-            else if (rating === 'good') navigator.vibrate(60);      // Solid single tap
-            else navigator.vibrate([100]);                          // Longer sharp buzz
-        }
-
+        // Omni-Mode fallback: We check if the card has a deckId directly
         const targetDeckId = currentCard.deckId || deckId;
+
         const currentStats = srbData[currentCard.id] || {};
         const newStats = calculateNextReview(rating, currentStats);
 
         setSrbData(prev => ({ ...prev, [currentCard.id]: newStats }));
 
-        // Fire to Firebase in background
+        // Fire to Firebase in the background (No awaiting to keep UI lightning fast)
         const progressRef = doc(db, 'artifacts', appId, 'users', userData.uid, 'deck_progress', targetDeckId, 'card_stats', currentCard.id);
         setDoc(progressRef, newStats, { merge: true }).catch(console.error);
 
-        // 🔥 FIX: Advance or Finish
         if (currentIndex < deckCards.length - 1) {
             setSlideDirection('right');
             setCurrentIndex(i => i + 1);
         } else {
-            // Deck Complete!
-            if (onFinish) onFinish(100); 
+            setIsFlipped(false);
         }
     };
 
@@ -267,10 +260,10 @@ function StudyModePlayer({ deckCards, userData, onToggleStar, deckId, initialSrb
                 setSlideDirection('left');
                 setCurrentIndex(i => i - 1);
             } else if (dragX < -SWIPE_THRESHOLD_X && currentIndex < deckCards.length - 1) {
+                // Swipe left translates to "Good" score if they don't flip
                 handleRateCard('good');
             } else if (dragY < SWIPE_THRESHOLD_Y || (Math.abs(dragX) < 10 && Math.abs(dragY) < 10)) {
                 setIsFlipped(true);
-                if ("vibrate" in navigator) navigator.vibrate(10); // Tiny haptic click on flip
             }
         }
         
@@ -390,73 +383,73 @@ function StudyModePlayer({ deckCards, userData, onToggleStar, deckId, initialSrb
                             </div>
                         </div>
                     </div>
-                </div>
 
-                {/* 🔥 SRB INTERFACE (REPLACES NEXT/PREV WHEN FLIPPED) */}
-                <div className="shrink-0 z-10 w-full mb-safe-4 min-h-[64px]">
-                    {!isFlipped ? (
-                        <div className="flex items-center justify-between px-2 animate-in fade-in duration-300">
-                            <button onClick={(e) => { e.stopPropagation(); setSlideDirection('left'); setCurrentIndex(i => i - 1); }} disabled={currentIndex === 0} className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-md border border-slate-100 dark:border-slate-700 disabled:opacity-30 transition-all active:scale-95 touch-manipulation">
-                                <ChevronLeft size={28} strokeWidth={3} className="-ml-1" />
-                            </button>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tap card to review</span>
-                            <button onClick={(e) => { e.stopPropagation(); setSlideDirection('right'); setCurrentIndex(i => i + 1); }} disabled={currentIndex === deckCards.length - 1} className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-md border border-slate-100 dark:border-slate-700 disabled:opacity-30 transition-all active:scale-95 touch-manipulation">
-                                <ChevronRight size={28} strokeWidth={3} className="ml-1" />
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-3 gap-3 px-2 animate-in slide-in-from-bottom-4 fade-in duration-300">
-                            <button onClick={() => handleRateCard('again')} className="flex flex-col items-center justify-center p-4 rounded-2xl bg-rose-50 dark:bg-rose-500/10 border-2 border-rose-200 dark:border-rose-500/30 text-rose-600 dark:text-rose-400 shadow-sm active:scale-95 transition-all">
-                                <span className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">{getIntervalLabel('again')}</span>
-                                <span className="font-black text-sm uppercase tracking-widest">Again</span>
-                            </button>
-                            <button onClick={() => handleRateCard('good')} className="flex flex-col items-center justify-center p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border-2 border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400 shadow-sm active:scale-95 transition-all">
-                                <span className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">{getIntervalLabel('good')}</span>
-                                <span className="font-black text-sm uppercase tracking-widest">Good</span>
-                            </button>
-                            <button onClick={() => handleRateCard('easy')} className="flex flex-col items-center justify-center p-4 rounded-2xl bg-sky-50 dark:bg-sky-500/10 border-2 border-sky-200 dark:border-sky-500/30 text-sky-600 dark:text-sky-400 shadow-sm active:scale-95 transition-all">
-                                <span className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">{getIntervalLabel('easy')}</span>
-                                <span className="font-black text-sm uppercase tracking-widest">Easy</span>
-                            </button>
+                    {/* CONJUGATION OVERLAY */}
+                    {showConjugations && currentCard.conjugations && (
+                        <div className="absolute inset-0 z-40 bg-white/95 dark:bg-slate-900/95 rounded-[3rem] p-6 flex flex-col animate-in slide-in-from-bottom-12 duration-300 backdrop-blur-md border-2 border-indigo-500/30">
+                            <div className="flex justify-between items-center mb-6">
+                                <div className="flex items-center gap-2">
+                                    <Paperclip size={18} className="text-indigo-500" />
+                                    <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest">Conjugation</span>
+                                </div>
+                                <button onClick={() => setShowConjugations(false)} className="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors active:scale-95">
+                                    <X size={20} className="text-slate-400" />
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pb-8">
+                                {Object.entries(currentCard.conjugations).map(([tense, forms]: any) => (
+                                    <div key={tense} className="space-y-2">
+                                        <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-tighter bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1.5 rounded-md w-fit">{tense}</h4>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {SUBJECT_ORDER.map((person) => {
+                                                const verb = forms[person];
+                                                if (!verb) return null;
+                                                return (
+                                                    <div key={person} className="flex flex-col p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50 shadow-sm">
+                                                        <span className="text-[9px] font-black text-slate-400 uppercase mb-0.5">{person}</span>
+                                                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{verb}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* CONJUGATION OVERLAY */}
-            {showConjugations && currentCard.conjugations && (
-                <div className="absolute inset-0 z-40 bg-white/95 dark:bg-slate-900/95 rounded-[3rem] p-6 flex flex-col animate-in slide-in-from-bottom-12 duration-300 backdrop-blur-md border-2 border-indigo-500/30">
-                    <div className="flex justify-between items-center mb-6">
-                        <div className="flex items-center gap-2">
-                            <Paperclip size={18} className="text-indigo-500" />
-                            <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest">Conjugation</span>
-                        </div>
-                        <button onClick={() => setShowConjugations(false)} className="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors active:scale-95">
-                            <X size={20} className="text-slate-400" />
+            {/* 🔥 SRB INTERFACE (REPLACES NEXT/PREV WHEN FLIPPED) */}
+            <div className="shrink-0 z-10 w-full mb-safe-4 min-h-[64px]">
+                {!isFlipped ? (
+                    <div className="flex items-center justify-between px-2 animate-in fade-in duration-300">
+                        <button onClick={(e) => { e.stopPropagation(); setSlideDirection('left'); setCurrentIndex(i => i - 1); }} disabled={currentIndex === 0} className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-md border border-slate-100 dark:border-slate-700 disabled:opacity-30 transition-all active:scale-95 touch-manipulation">
+                            <ChevronLeft size={28} strokeWidth={3} className="-ml-1" />
+                        </button>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tap card to review</span>
+                        <button onClick={(e) => { e.stopPropagation(); setSlideDirection('right'); setCurrentIndex(i => i + 1); }} disabled={currentIndex === deckCards.length - 1} className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-md border border-slate-100 dark:border-slate-700 disabled:opacity-30 transition-all active:scale-95 touch-manipulation">
+                            <ChevronRight size={28} strokeWidth={3} className="ml-1" />
                         </button>
                     </div>
-
-                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pb-8">
-                        {Object.entries(currentCard.conjugations).map(([tense, forms]: any) => (
-                            <div key={tense} className="space-y-2">
-                                <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-tighter bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1.5 rounded-md w-fit">{tense}</h4>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {SUBJECT_ORDER.map((person) => {
-                                        const verb = forms[person];
-                                        if (!verb) return null;
-                                        return (
-                                            <div key={person} className="flex flex-col p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50 shadow-sm">
-                                                <span className="text-[9px] font-black text-slate-400 uppercase mb-0.5">{person}</span>
-                                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{verb}</span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        ))}
+                ) : (
+                    <div className="grid grid-cols-3 gap-3 px-2 animate-in slide-in-from-bottom-4 fade-in duration-300">
+                        <button onClick={() => handleRateCard('again')} className="flex flex-col items-center justify-center p-4 rounded-2xl bg-rose-50 dark:bg-rose-500/10 border-2 border-rose-200 dark:border-rose-500/30 text-rose-600 dark:text-rose-400 shadow-sm active:scale-95 transition-all">
+                            <span className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">{getIntervalLabel('again')}</span>
+                            <span className="font-black text-sm uppercase tracking-widest">Again</span>
+                        </button>
+                        <button onClick={() => handleRateCard('good')} className="flex flex-col items-center justify-center p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border-2 border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400 shadow-sm active:scale-95 transition-all">
+                            <span className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">{getIntervalLabel('good')}</span>
+                            <span className="font-black text-sm uppercase tracking-widest">Good</span>
+                        </button>
+                        <button onClick={() => handleRateCard('easy')} className="flex flex-col items-center justify-center p-4 rounded-2xl bg-sky-50 dark:bg-sky-500/10 border-2 border-sky-200 dark:border-sky-500/30 text-sky-600 dark:text-sky-400 shadow-sm active:scale-95 transition-all">
+                            <span className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">{getIntervalLabel('easy')}</span>
+                            <span className="font-black text-sm uppercase tracking-widest">Easy</span>
+                        </button>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 }
@@ -489,8 +482,6 @@ function MatchingGame({ deckCards, onGameEnd }: any) {
             setIsLocked(true);
             const [idx1, idx2] = newFlipped;
             if (cards[idx1].pairId === cards[idx2].pairId) {
-                // 🔥 HAPTIC SUCCESS
-                if ("vibrate" in navigator) navigator.vibrate(40);
                 setTimeout(() => {
                     setSolved(prev => [...prev, idx1, idx2]);
                     setFlipped([]);
@@ -502,8 +493,6 @@ function MatchingGame({ deckCards, onGameEnd }: any) {
                     }
                 }, 600);
             } else {
-                // 🔥 HAPTIC FAILURE
-                if ("vibrate" in navigator) navigator.vibrate([100, 50, 100]);
                 setTimeout(() => { setFlipped([]); setIsLocked(false); }, 1000);
             }
         }
@@ -552,12 +541,6 @@ function QuizSessionView({ deckCards, onGameEnd }: any) {
         setIsProcessing(true);
         setSelectedOption(option);
         const isCorrect = option === currentCard.back;
-        
-        // 🔥 SENSORY FEEDBACK
-        if ("vibrate" in navigator) {
-            isCorrect ? navigator.vibrate(50) : navigator.vibrate([100, 50, 100]);
-        }
-
         if (isCorrect) { setScore(s => s + 1); setStreak(s => s + 1); } else { setStreak(0); }
 
         setTimeout(() => {
@@ -626,12 +609,7 @@ function QuizSessionView({ deckCards, onGameEnd }: any) {
 // ============================================================================
 //  4. MAIN FLASHCARD VIEW (HUB)
 // ============================================================================
-export default function FlashcardView({ 
-    allDecks, selectedDeckKey, onLogActivity, userData, 
-    onSaveCard, onToggleStar, onToggleArchive, onCreateFolder, 
-    onAssignToFolder, onHideDeck, onUpdateFolder, onDeleteFolder, 
-    user, onSelectDeck 
-}: any) { // 🔥 Added : any here to satisfy the build gatekeeper
+export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity, userData, onSaveCard, onToggleStar, onToggleArchive, onCreateFolder, onAssignToFolder, onHideDeck, onUpdateFolder, onDeleteFolder, user }: any) {
     const [internalMode, setInternalMode] = useState<'library' | 'menu' | 'playing' | 'create'>('library');
     const [activeGame, setActiveGame] = useState<'standard' | 'quiz' | 'match' | 'tower'>('standard');
     
@@ -644,6 +622,7 @@ export default function FlashcardView({
     
     const [showFolderModal, setShowFolderModal] = useState<{isOpen: boolean, editMode: boolean, oldName: string}>({isOpen: false, editMode: false, oldName: ''});
     
+    // 🔥 NEW: State for tracking SRB stats and Filtering due cards
     const [fetchedCards, setFetchedCards] = useState<any[]>([]);
     const [cardStats, setCardStats] = useState<Record<string, any>>({});
     const [isFetchingCards, setIsFetchingCards] = useState(false);
@@ -664,6 +643,7 @@ export default function FlashcardView({
         if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
     }, [deckFilter, internalMode]);
 
+    // 🔥 CACHE-FIRST FETCH ENGINE (Now fetches SRB stats too!)
     useEffect(() => {
         const fetchDeckCards = async () => {
             if (!selectedDeckKey || omniDeck) return;
@@ -675,6 +655,7 @@ export default function FlashcardView({
 
             setIsFetchingCards(true);
             try {
+                // 1. Fetch Cards
                 const masterDeck = allDecks[selectedDeckKey];
                 const masterUpdatedAt = masterDeck?.updatedAt || 0;
                 const cachedData = await getDeckFromCache(selectedDeckKey);
@@ -690,6 +671,7 @@ export default function FlashcardView({
                 }
                 setFetchedCards(finalCards);
 
+                // 2. Fetch SRB Stats for these cards
                 if (user?.uid) {
                     const statsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'deck_progress', selectedDeckKey, 'card_stats');
                     const statsSnap = await getDocs(statsRef);
@@ -709,9 +691,11 @@ export default function FlashcardView({
         fetchDeckCards();
     }, [selectedDeckKey, omniDeck, allDecks, user?.uid]);
 
+    // 🔥 THE FILTER: Which cards are due today?
     const dueCards = useMemo(() => {
         return cards.filter((c: any) => {
             const stat = cardStats[c.id];
+            // If they've never seen it, or the review date is in the past, it's due!
             return !stat?.nextReviewDate || stat.nextReviewDate <= Date.now();
         });
     }, [cards, cardStats]);
@@ -758,15 +742,21 @@ export default function FlashcardView({
         try {
             const allPromises = folderDecks.map(async (deck: any) => {
                 if (deck.id === 'custom') return deck.cards || [];
+                
                 const cachedData = await getDeckFromCache(deck.id);
-                if (cachedData && cachedData.updatedAt >= (deck.updatedAt || 0)) return cachedData.cards;
+                if (cachedData && cachedData.updatedAt >= (deck.updatedAt || 0)) {
+                    return cachedData.cards;
+                }
+
                 const cardsRef = collection(db, 'artifacts', appId, 'decks', deck.id, 'cards');
                 const snap = await getDocs(cardsRef);
                 const loadedCards = snap.docs.map(doc => doc.data());
+                
                 await saveDeckToCache(deck.id, loadedCards, deck.updatedAt || 0);
                 return loadedCards;
             });
 
+            // For Omni-Mode, we also need to gather the SRB stats for all decks
             const statsPromises = folderDecks.map(async (deck: any) => {
                 if (deck.id === 'custom') return [];
                 const statsRef = collection(db, 'artifacts', appId, 'users', user?.uid, 'deck_progress', deck.id, 'card_stats');
@@ -775,7 +765,10 @@ export default function FlashcardView({
             });
 
             const [allResults, allStats] = await Promise.all([Promise.all(allPromises), Promise.all(statsPromises)]);
+            
             const allCards = allResults.flat();
+            
+            // Build the master stats map
             const statsMap: Record<string, any> = {};
             allStats.flat().forEach((stat: any) => { statsMap[stat.id] = stat; });
             setCardStats(statsMap);
@@ -825,11 +818,14 @@ export default function FlashcardView({
         const filteredDecks = Object.entries(allDecks).filter(([key, deck]: any) => {
             const isArchived = userData?.deckPrefs?.[key]?.archived || false;
             const currentFolder = userData?.deckPrefs?.[key]?.folder || null;
+            
             if (deckFilter === 'archived') return isArchived;
             if (isArchived) return false; 
+
             if (deckFilter === 'all') return currentFolder === null;
             if (deckFilter === 'personal') return !deck.isPublished;
             if (deckFilter === 'network') return deck.isPublished;
+            
             if (customFolders.includes(deckFilter)) return currentFolder === deckFilter;
             return true;
         });
@@ -850,6 +846,7 @@ export default function FlashcardView({
         return (
             <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors relative">
                 {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
+                
                 {showFolderModal.isOpen && (
                     <FolderModal 
                         initialName={showFolderModal.editMode ? showFolderModal.oldName : ''}
@@ -879,11 +876,13 @@ export default function FlashcardView({
 
                     <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center gap-2 overflow-x-auto custom-scrollbar overscroll-x-contain">
                         <Filter size={16} className="text-slate-400 mr-2 shrink-0" />
+                        
                         {['all', 'personal', 'network', 'archived'].map((f: any) => (
                             <button key={f} onClick={() => setDeckFilter(f)} className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${deckFilter === f ? 'bg-slate-800 dark:bg-slate-700 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200'}`}>
                                 {f}
                             </button>
                         ))}
+                        
                         {customFolders.length > 0 && <div className="w-px h-5 bg-slate-300 dark:bg-slate-700 mx-2 shrink-0" />}
                         {customFolders.map((folderName: string) => {
                             const cTheme = FOLDER_COLORS[folderColors[folderName] || 'indigo'];
@@ -898,15 +897,18 @@ export default function FlashcardView({
 
                 <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 space-y-5 pb-28 relative z-10 custom-scrollbar overscroll-y-contain h-full">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        
                         {customFolders.includes(deckFilter) && (
                             <div className="col-span-full animate-in fade-in duration-300 mb-2 mt-2">
                                 <button onClick={() => setDeckFilter('all')} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-500 transition-colors w-fit bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 active:scale-95">
                                     <ArrowLeft size={14} /> Back to Library
                                 </button>
+                                
                                 <div className="flex items-center gap-3 mt-6 mb-4">
                                     <FolderOpen size={28} className={FOLDER_COLORS[folderColors[deckFilter] || 'indigo'].iconColor} />
                                     <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">{deckFilter}</h2>
                                 </div>
+                                
                                 <div className="flex gap-2">
                                     <button 
                                         onClick={() => {
@@ -932,6 +934,7 @@ export default function FlashcardView({
                         {deckFilter === 'all' && customFolders.map((folderName: string) => {
                             const itemCount = Object.keys(allDecks).filter(key => userData?.deckPrefs?.[key]?.folder === folderName && !userData?.deckPrefs?.[key]?.archived).length;
                             const theme = FOLDER_COLORS[folderColors[folderName] || 'indigo'];
+                            
                             return (
                                 <div key={`folder-${folderName}`} className="relative group h-full">
                                     <button 
@@ -950,12 +953,14 @@ export default function FlashcardView({
                                             </span>
                                         </div>
                                     </button>
+
                                     <button 
                                         onClick={(e) => { 
                                             e.preventDefault(); e.stopPropagation(); 
                                             setActiveOptionsFolder(folderName);
                                         }}
                                         className={`absolute top-3 right-3 p-2 rounded-full ${theme.iconColor} hover:bg-white/50 transition-colors active:bg-white/80 z-20`}
+                                        aria-label="Folder Options"
                                     >
                                         <MoreVertical size={20} />
                                     </button>
@@ -963,15 +968,24 @@ export default function FlashcardView({
                             );
                         })}
 
+                        {filteredDecks.length === 0 && deckFilter !== 'all' && customFolders.includes(deckFilter) && (
+                             <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[2.5rem] mt-4 text-slate-400 font-bold text-sm uppercase tracking-widest flex flex-col items-center gap-3">
+                                 <FolderPlus size={32} className="opacity-20" />
+                                 Folder is empty
+                             </div>
+                        )}
+
                         {filteredDecks.map(([key, deck]: any) => {
                             const displayTitle = deck.id === 'custom' ? "My Study Cards" : deck.title;
                             const theme = getDeckTheme(displayTitle);
                             const DeckIcon = deck.icon || theme.icon;
                             const cardCount = deck.id === 'custom' ? (deck.cards?.length || 0) : (deck.stats?.cardCount || 0);
+
                             return (
                                 <div key={key} className="relative group animate-in fade-in duration-300 h-full pt-2">
                                     <div className="absolute inset-x-4 -bottom-1 h-10 bg-slate-200 dark:bg-slate-800 rounded-[2rem] transition-transform duration-300 group-hover:translate-y-1.5" />
                                     <div className="absolute inset-x-2 -bottom-0 h-10 bg-slate-100 dark:bg-slate-800/80 rounded-[2rem] transition-transform duration-300 group-hover:translate-y-1" />
+
                                     <button 
                                         onClick={() => { onSelectDeck(key); setInternalMode('menu'); }} 
                                         className="w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] p-5 border-2 border-slate-50 dark:border-slate-800 hover:border-slate-100 dark:hover:border-slate-700 transition-all text-left shadow-sm group-hover:-translate-y-1 relative z-10 flex flex-col"
@@ -981,7 +995,9 @@ export default function FlashcardView({
                                                 {typeof DeckIcon === 'string' ? DeckIcon : <DeckIcon size={24}/>}
                                             </div>
                                         </div>
+                                        
                                         <h3 className="font-black text-slate-800 dark:text-white text-lg leading-tight line-clamp-2 pr-8 mb-3">{displayTitle}</h3>
+                                        
                                         <div className="mt-auto pt-1 flex flex-col gap-2">
                                             <div className="flex items-center gap-2">
                                                 <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest flex items-center gap-1">
@@ -990,13 +1006,16 @@ export default function FlashcardView({
                                             </div>
                                         </div>
                                     </button>
+
                                     <button 
                                         onClick={(e) => { 
-                                            e.preventDefault(); e.stopPropagation(); 
+                                            e.preventDefault();
+                                            e.stopPropagation(); 
                                             setActiveOptionsDeck(deck);
                                             setMenuView('main'); 
                                         }}
                                         className="absolute top-4 right-3 p-2 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors z-20"
+                                        aria-label="Deck Options"
                                     >
                                         <MoreVertical size={20} />
                                     </button>
@@ -1011,6 +1030,7 @@ export default function FlashcardView({
                         <div className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setActiveOptionsFolder(null)} />
                         <div className="bg-white dark:bg-slate-900 w-full rounded-t-[2.5rem] p-6 relative z-10 animate-in slide-in-from-bottom-full duration-300 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] pb-safe-6">
                             <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto mb-6" />
+                            
                             <div className="flex items-center gap-4 mb-6 px-2">
                                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm ${FOLDER_COLORS[folderColors[activeOptionsFolder] || 'indigo'].bg} ${FOLDER_COLORS[folderColors[activeOptionsFolder] || 'indigo'].iconColor}`}>
                                     <Folder size={24} fill="currentColor" />
@@ -1020,6 +1040,7 @@ export default function FlashcardView({
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Folder Settings</p>
                                 </div>
                             </div>
+
                             <div className="space-y-2">
                                 <button 
                                     onClick={() => { 
@@ -1030,6 +1051,7 @@ export default function FlashcardView({
                                 >
                                     <Edit3 size={20} className="text-indigo-500" /> Edit Folder
                                 </button>
+                                
                                 <button 
                                     onClick={() => { 
                                         launchOmniMode(activeOptionsFolder); 
@@ -1039,7 +1061,9 @@ export default function FlashcardView({
                                 >
                                     <Infinity size={20} className="text-emerald-500" /> Study Omni-Mode
                                 </button>
+
                                 <div className="h-4" />
+                                
                                 <button 
                                     onClick={() => { 
                                         if(onDeleteFolder) onDeleteFolder(activeOptionsFolder); 
@@ -1057,9 +1081,14 @@ export default function FlashcardView({
 
                 {activeOptionsDeck && (
                     <div className="fixed inset-0 z-[500] flex flex-col justify-end">
-                        <div className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setActiveOptionsDeck(null)} />
+                        <div 
+                            className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm transition-opacity" 
+                            onClick={() => setActiveOptionsDeck(null)} 
+                        />
                         <div className="bg-white dark:bg-slate-900 w-full rounded-t-[2.5rem] p-6 relative z-10 animate-in slide-in-from-bottom-full duration-300 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] pb-safe-6">
+                            
                             <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto mb-6" />
+                            
                             <div className="flex items-center gap-4 mb-6 px-2">
                                 <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-xl shadow-sm border border-slate-100 dark:border-slate-700">
                                     {activeOptionsDeck.icon || <Layers size={24} className="text-slate-400" />}
@@ -1081,6 +1110,7 @@ export default function FlashcardView({
                                         <span className="flex items-center gap-3"><FolderPlus size={20} className="text-indigo-500" /> Move to Folder</span>
                                         <ChevronRight size={18} className="text-slate-400" />
                                     </button>
+                                    
                                     {onToggleArchive && (
                                         <button 
                                             onClick={() => { 
@@ -1093,7 +1123,9 @@ export default function FlashcardView({
                                             {userData?.deckPrefs?.[activeOptionsDeck.id]?.archived ? 'Unarchive Deck' : 'Archive Deck'}
                                         </button>
                                     )}
+                                    
                                     <div className="h-4" />
+                                    
                                     <button 
                                         onClick={() => { 
                                             if (onHideDeck) onHideDeck(activeOptionsDeck.id);
@@ -1110,6 +1142,7 @@ export default function FlashcardView({
                                     <button onClick={() => setMenuView('main')} className="px-3 py-3 w-full flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors mb-2">
                                         <ArrowLeft size={14} /> Back
                                     </button>
+                                    
                                     <div className="max-h-60 overflow-y-auto custom-scrollbar space-y-2 pr-2">
                                         <button 
                                             onClick={() => { onAssignToFolder(activeOptionsDeck.id, null); setActiveOptionsDeck(null); setToastMsg("Removed from folder."); }}
@@ -1118,6 +1151,7 @@ export default function FlashcardView({
                                             <div className={`w-3 h-3 rounded-full ${userData?.deckPrefs?.[activeOptionsDeck.id]?.folder === null || !userData?.deckPrefs?.[activeOptionsDeck.id]?.folder ? 'bg-indigo-500 shadow-sm' : 'border-2 border-slate-300 dark:border-slate-600'}`} />
                                             None (Main Library)
                                         </button>
+
                                         {customFolders.map(folderName => (
                                             <button 
                                                 key={folderName}
@@ -1130,7 +1164,9 @@ export default function FlashcardView({
                                             </button>
                                         ))}
                                     </div>
+                                    
                                     <div className="h-4" />
+                                    
                                     <button 
                                         onClick={() => { setActiveOptionsDeck(null); setShowFolderModal({isOpen: true, editMode: false, oldName: ''}); }}
                                         className="w-full text-left px-5 py-4 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl text-sm font-black text-indigo-600 dark:text-indigo-400 flex items-center gap-3 transition-colors active:scale-[0.98]"
@@ -1142,6 +1178,103 @@ export default function FlashcardView({
                         </div>
                     </div>
                 )}
+            </div>
+        );
+    }
+
+    // --- MENU VIEW ---
+    if (internalMode === 'menu') {
+        const displayMenuTitle = deckTitle.includes('(Omni-Mode)') ? deckTitle.replace(' (Omni-Mode)', '') : deckTitle;
+        
+        return (
+            <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 relative overflow-hidden transition-colors">
+                <div className="px-6 pt-8 pb-4">
+                    <button onClick={handleBack} className="flex items-center text-slate-400 dark:text-slate-500 hover:text-indigo-600 mb-6 text-xs font-black uppercase tracking-widest transition-colors bg-white dark:bg-slate-800 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm w-fit active:scale-95">
+                        <ArrowLeft size={16} className="mr-2"/> Back
+                    </button>
+                    
+                    <div className="flex justify-between items-start mb-2">
+                        <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter">{displayMenuTitle}</h1>
+                        
+                        {!omniDeck && (
+                            <button 
+                                onClick={() => {
+                                    setBuilderConfig({ type: 'add_card', deck: resolvedDeck });
+                                    setInternalMode('create');
+                                }} 
+                                className="bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 p-3 rounded-2xl shadow-sm border border-indigo-100 dark:border-indigo-500/30 active:scale-95 transition-all"
+                                aria-label="Add Card"
+                            >
+                                <Plus size={20} strokeWidth={3} />
+                            </button>
+                        )}
+                    </div>
+                    
+                    {/* 🔥 THE NEW SRB STATUS PILL */}
+                    <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-lg flex items-center gap-2 w-fit mt-3 transition-colors ${
+                        isFetchingCards ? 'bg-slate-100 dark:bg-slate-800 text-slate-400' :
+                        dueCards.length === 0 ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500' : 
+                        'bg-rose-50 dark:bg-rose-500/10 text-rose-500'
+                    }`}>
+                        {isFetchingCards ? (
+                            <><Loader2 size={12} className="animate-spin" /> Calculating Matrix...</>
+                        ) : dueCards.length === 0 ? (
+                            <><CheckCircle2 size={12} /> All Caught Up • {cards.length} Total</>
+                        ) : (
+                            <><BrainCircuit size={12} className="animate-pulse" /> {dueCards.length} Due for Review • {cards.length} Total</>
+                        )}
+                    </span>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-24">
+                    {isFetchingCards ? (
+                        <div className="h-full flex flex-col items-center justify-center opacity-40">
+                            <Loader2 size={48} className="animate-spin mb-4 text-indigo-500" />
+                            <p className="font-black uppercase tracking-widest text-slate-500 text-xs">Decrypting Cards...</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 gap-4">
+                            
+                            {/* 🔥 THE SRB REVIEW BUTTON */}
+                            <button 
+                                onClick={() => launchGame('standard')} 
+                                className={`p-6 rounded-[2.5rem] border-[3px] shadow-sm hover:-translate-y-1 transition-all group text-left ${
+                                    dueCards.length > 0 
+                                        ? 'bg-rose-50 dark:bg-rose-500/5 border-rose-200 dark:border-rose-500/30 hover:border-rose-300 dark:hover:border-rose-500/50' 
+                                        : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-500/50'
+                                }`}
+                            >
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 group-hover:rotate-6 transition-transform ${dueCards.length > 0 ? 'bg-rose-100 dark:bg-rose-500/20 text-rose-500' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-500'}`}>
+                                    {dueCards.length > 0 ? <BrainCircuit size={28}/> : <Layers size={28}/>}
+                                </div>
+                                <h4 className="font-black text-slate-800 dark:text-white text-xl leading-none mb-2">
+                                    {dueCards.length > 0 ? 'Review Due' : 'Browse Deck'}
+                                </h4>
+                                <p className={`text-[10px] font-black uppercase tracking-widest ${dueCards.length > 0 ? 'text-rose-400' : 'text-slate-400'}`}>
+                                    {dueCards.length > 0 ? 'Spaced Repetition' : 'Standard Mode'}
+                                </p>
+                            </button>
+
+                            <button onClick={() => launchGame('quiz')} className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-100 dark:border-slate-800 shadow-sm hover:border-emerald-300 dark:hover:border-emerald-500/50 hover:-translate-y-1 transition-all group text-left">
+                                <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 rounded-2xl flex items-center justify-center mb-4 group-hover:-rotate-6 transition-transform"><HelpCircle size={28}/></div>
+                                <h4 className="font-black text-slate-800 dark:text-white text-xl leading-none mb-2">Quiz</h4>
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Multiple Choice</p>
+                            </button>
+
+                            <button onClick={() => launchGame('match')} className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-100 dark:border-slate-800 shadow-sm hover:border-purple-300 dark:hover:border-purple-500/50 hover:-translate-y-1 transition-all group text-left">
+                                <div className="w-14 h-14 bg-purple-50 dark:bg-purple-500/10 text-purple-500 rounded-2xl flex items-center justify-center mb-4 group-hover:rotate-12 transition-transform"><Puzzle size={28}/></div>
+                                <h4 className="font-black text-slate-800 dark:text-white text-xl leading-none mb-2">Match</h4>
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Speed Pairs</p>
+                            </button>
+
+                            <button className="bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-800 shadow-xl opacity-50 cursor-not-allowed group text-left relative overflow-hidden">
+                                <div className="w-14 h-14 bg-orange-500/20 text-orange-400 rounded-2xl flex items-center justify-center mb-4"><Flame size={28} fill="currentColor"/></div>
+                                <h4 className="font-black text-white text-xl leading-none mb-2">Tower</h4>
+                                <p className="text-[10px] text-orange-400 font-black uppercase tracking-widest">Survival</p>
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
         );
     }
@@ -1158,16 +1291,10 @@ export default function FlashcardView({
                 <div className="w-11"></div>
             </div>
             <div className="flex-1 overflow-hidden relative">
-                {activeGame === 'standard' && (
-                    <StudyModePlayer 
-                        deckCards={dueCards.length > 0 ? dueCards : cards} 
-                        initialSrbData={cardStats} 
-                        userData={userData} 
-                        onToggleStar={onToggleStar} 
-                        deckId={resolvedDeck?.id}
-                        onFinish={handleGameFinish} // 🔥 WIRED UP
-                    />
-                )}
+                {/* 🔥 SRB INJECTION: Pass the due cards and the raw stats map into the player */}
+                {activeGame === 'standard' && <StudyModePlayer deckCards={dueCards.length > 0 ? dueCards : cards} initialSrbData={cardStats} userData={userData} onToggleStar={onToggleStar} deckId={resolvedDeck?.id} />}
+                
+                {/* Quiz and Match still use the full deck for variety, but you could pass dueCards here too! */}
                 {activeGame === 'quiz' && <div className="h-full overflow-y-auto"><QuizSessionView deckCards={cards} onGameEnd={(res: any) => handleGameFinish(res.score ? (res.score/res.total)*100 : 0)} /></div>}
                 {activeGame === 'match' && <div className="h-full overflow-y-auto pt-6"><MatchingGame deckCards={cards} onGameEnd={(scorePct: number) => handleGameFinish(scorePct)} /></div>}
             </div>
@@ -1175,21 +1302,38 @@ export default function FlashcardView({
     );
 }
 
+// Extracted reusable Folder Modal component to keep the main render cleaner
 function FolderModal({ initialName, initialColor, isEdit, onSave, onClose }: any) {
     const [name, setName] = useState(initialName || '');
     const [color, setColor] = useState(initialColor || 'indigo');
+
     return (
         <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl border border-slate-100 dark:border-slate-800 animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-black text-2xl text-slate-800 dark:text-white mb-6 text-center">{isEdit ? 'Edit Folder' : 'New Folder'}</h3>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Midterm Prep" className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 font-bold text-slate-800 dark:text-white focus:border-indigo-500 outline-none mb-6 text-lg text-center" autoFocus />
+            <h3 className="font-black text-2xl text-slate-800 dark:text-white mb-6 text-center">
+                {isEdit ? 'Edit Folder' : 'New Folder'}
+            </h3>
+            
+            <input 
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g., Midterm Prep"
+                className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 font-bold text-slate-800 dark:text-white focus:border-indigo-500 outline-none mb-6 text-lg text-center"
+                autoFocus
+            />
+
             <div className="mb-8">
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-3 text-center">Select Theme Color</span>
                 <div className="flex justify-center gap-3">
                     {Object.keys(FOLDER_COLORS).map(c => (
-                        <button key={c} onClick={(e) => { e.preventDefault(); setColor(c); }} className={`w-8 h-8 rounded-full shadow-sm transition-all active:scale-90 ${FOLDER_COLORS[c].hex} ${color === c ? 'ring-4 ring-indigo-500/30 scale-110' : 'ring-2 ring-transparent opacity-70 hover:opacity-100'}`} />
+                        <button 
+                            key={c} 
+                            onClick={(e) => { e.preventDefault(); setColor(c); }}
+                            className={`w-8 h-8 rounded-full shadow-sm transition-all active:scale-90 ${FOLDER_COLORS[c].hex} ${color === c ? 'ring-4 ring-indigo-500/30 scale-110' : 'ring-2 ring-transparent opacity-70 hover:opacity-100'}`} 
+                        />
                     ))}
                 </div>
             </div>
+
             <div className="flex gap-3">
                 <button onClick={(e) => { e.preventDefault(); onClose(); }} className="flex-1 px-4 py-4 rounded-2xl font-black text-slate-500 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors active:scale-95">Cancel</button>
                 <button onClick={(e) => { e.preventDefault(); onSave(name, color); }} disabled={!name.trim()} className="flex-1 px-4 py-4 rounded-2xl font-black text-white bg-indigo-600 disabled:bg-indigo-400 active:scale-95 transition-all">Save</button>
