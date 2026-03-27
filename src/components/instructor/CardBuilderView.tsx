@@ -1,4 +1,3 @@
-// src/components/instructor/CardBuilderView.tsx
 import React, { useState, useEffect } from 'react';
 import { 
     Layers, Plus, X, Save, Edit3, Trash2, FileJson, Database, 
@@ -13,7 +12,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage, auth, appId } from '../../config/firebase';
 
 // ============================================================================
-//  NETWORK PUBLISHING MODAL (INLINE COMPONENT)
+//  NETWORK PUBLISHING MODAL (MOBILE OPTIMIZED)
 // ============================================================================
 const DeckShareModal = ({ deck, instructorClasses, onClose, onPublish }: any) => {
     const [visibility, setVisibility] = useState<'private' | 'restricted' | 'public'>(deck?.visibility || 'private');
@@ -34,37 +33,43 @@ const DeckShareModal = ({ deck, instructorClasses, onClose, onPublish }: any) =>
     };
 
     return (
-        <div className="fixed inset-0 z-[9999] bg-slate-900/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
-            <div className="bg-white dark:bg-slate-950 w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 duration-300">
-                <div className="px-8 py-6 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+        <div className="fixed inset-0 z-[9999] bg-slate-900/60 dark:bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300">
+            <div className="bg-white dark:bg-slate-950 w-full max-w-lg rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden border-t sm:border border-slate-100 dark:border-slate-800 animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300 max-h-[90vh] flex flex-col pb-safe">
+                <div className="px-6 sm:px-8 py-5 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
                     <div>
                         <h2 className="text-xl font-black text-slate-800 dark:text-white tracking-tight">Network Settings</h2>
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{deck?.title}</p>
                     </div>
-                    <button onClick={onClose} className="p-2 bg-white dark:bg-slate-800 rounded-full hover:bg-rose-50 dark:hover:bg-rose-900/30 text-slate-400 dark:text-slate-500 hover:text-rose-500 transition-colors shadow-sm"><X size={20} strokeWidth={3}/></button>
+                    <button onClick={onClose} className="p-2 bg-white dark:bg-slate-800 rounded-full hover:bg-rose-50 dark:hover:bg-rose-900/30 text-slate-400 dark:text-slate-500 hover:text-rose-500 transition-colors shadow-sm">
+                        <X size={20} strokeWidth={3}/>
+                    </button>
                 </div>
 
-                <div className="p-8 space-y-4">
-                    <button onClick={() => setVisibility('private')} className={`w-full p-5 rounded-2xl border-2 flex items-start gap-4 transition-all text-left ${visibility === 'private' ? 'bg-slate-50 dark:bg-slate-900 border-slate-800 dark:border-indigo-500' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'}`}>
-                        <div className={`p-3 rounded-full ${visibility === 'private' ? 'bg-slate-800 dark:bg-indigo-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}><Lock size={24} /></div>
-                        <div className="flex-1">
-                            <h4 className={`font-black text-lg ${visibility === 'private' ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>Classified (Private)</h4>
-                            <p className="text-xs font-bold text-slate-400 mt-1">Only you can view and present this deck.</p>
+                <div className="p-6 sm:p-8 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+                    <button onClick={() => setVisibility('private')} className={`w-full p-4 sm:p-5 rounded-2xl border-2 flex items-start gap-4 transition-all text-left ${visibility === 'private' ? 'bg-slate-50 dark:bg-slate-900 border-slate-800 dark:border-indigo-500' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'}`}>
+                        <div className={`p-3 rounded-full shrink-0 ${visibility === 'private' ? 'bg-slate-800 dark:bg-indigo-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                            <Lock size={20} className="sm:w-6 sm:h-6" />
                         </div>
-                        {visibility === 'private' && <CheckCircle2 size={24} className="text-slate-800 dark:text-indigo-400" />}
+                        <div className="flex-1">
+                            <h4 className={`font-black text-base sm:text-lg ${visibility === 'private' ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>Classified (Private)</h4>
+                            <p className="text-[10px] sm:text-xs font-bold text-slate-400 mt-1">Only you can view and present this deck.</p>
+                        </div>
+                        {visibility === 'private' && <CheckCircle2 size={24} className="text-slate-800 dark:text-indigo-400 shrink-0" />}
                     </button>
 
-                    <button onClick={() => setVisibility('restricted')} className={`w-full p-5 rounded-2xl border-2 flex flex-col gap-4 transition-all text-left ${visibility === 'restricted' ? 'bg-indigo-50/50 dark:bg-indigo-900/20 border-indigo-500' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-indigo-300'}`}>
+                    <button onClick={() => setVisibility('restricted')} className={`w-full p-4 sm:p-5 rounded-2xl border-2 flex flex-col gap-4 transition-all text-left ${visibility === 'restricted' ? 'bg-indigo-50/50 dark:bg-indigo-900/20 border-indigo-500' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-indigo-300'}`}>
                         <div className="flex items-start gap-4 w-full">
-                            <div className={`p-3 rounded-full ${visibility === 'restricted' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}><Users size={24} /></div>
-                            <div className="flex-1">
-                                <h4 className={`font-black text-lg ${visibility === 'restricted' ? 'text-indigo-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>Restricted Access</h4>
-                                <p className="text-xs font-bold text-slate-400 mt-1">Publish to specific cohorts.</p>
+                            <div className={`p-3 rounded-full shrink-0 ${visibility === 'restricted' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                                <Users size={20} className="sm:w-6 sm:h-6" />
                             </div>
-                            {visibility === 'restricted' && <CheckCircle2 size={24} className="text-indigo-600 dark:text-indigo-400" />}
+                            <div className="flex-1">
+                                <h4 className={`font-black text-base sm:text-lg ${visibility === 'restricted' ? 'text-indigo-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>Restricted Access</h4>
+                                <p className="text-[10px] sm:text-xs font-bold text-slate-400 mt-1">Publish to specific cohorts.</p>
+                            </div>
+                            {visibility === 'restricted' && <CheckCircle2 size={24} className="text-indigo-600 dark:text-indigo-400 shrink-0" />}
                         </div>
                         {visibility === 'restricted' && (
-                            <div className="w-full pt-4 border-t border-indigo-100 dark:border-indigo-500/20 grid grid-cols-2 gap-2">
+                            <div className="w-full pt-4 border-t border-indigo-100 dark:border-indigo-500/20 grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {instructorClasses?.map((cls: any) => (
                                     <div key={cls.id} onClick={(e) => { e.stopPropagation(); toggleClass(cls.id); }} className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors ${selectedClasses.includes(cls.id) ? 'bg-indigo-600 border-indigo-700 text-white' : 'bg-white dark:bg-slate-800 border-indigo-100 dark:border-slate-700 text-indigo-900 dark:text-indigo-400 hover:bg-indigo-50'}`}>
                                         <span className="font-bold text-xs truncate pr-2">{cls.name}</span>
@@ -75,18 +80,20 @@ const DeckShareModal = ({ deck, instructorClasses, onClose, onPublish }: any) =>
                         )}
                     </button>
 
-                    <button onClick={() => setVisibility('public')} className={`w-full p-5 rounded-2xl border-2 flex items-start gap-4 transition-all text-left ${visibility === 'public' ? 'bg-emerald-50/50 dark:bg-emerald-900/20 border-emerald-500' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-emerald-300'}`}>
-                        <div className={`p-3 rounded-full ${visibility === 'public' ? 'bg-emerald-500 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}><Globe size={24} /></div>
-                        <div className="flex-1">
-                            <h4 className={`font-black text-lg ${visibility === 'public' ? 'text-emerald-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>Global Network</h4>
-                            <p className="text-xs font-bold text-slate-400 mt-1">Open to all students on the platform.</p>
+                    <button onClick={() => setVisibility('public')} className={`w-full p-4 sm:p-5 rounded-2xl border-2 flex items-start gap-4 transition-all text-left ${visibility === 'public' ? 'bg-emerald-50/50 dark:bg-emerald-900/20 border-emerald-500' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-emerald-300'}`}>
+                        <div className={`p-3 rounded-full shrink-0 ${visibility === 'public' ? 'bg-emerald-500 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                            <Globe size={20} className="sm:w-6 sm:h-6" />
                         </div>
-                        {visibility === 'public' && <CheckCircle2 size={24} className="text-emerald-500 dark:text-emerald-400" />}
+                        <div className="flex-1">
+                            <h4 className={`font-black text-base sm:text-lg ${visibility === 'public' ? 'text-emerald-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>Global Network</h4>
+                            <p className="text-[10px] sm:text-xs font-bold text-slate-400 mt-1">Open to all students on the platform.</p>
+                        </div>
+                        {visibility === 'public' && <CheckCircle2 size={24} className="text-emerald-500 dark:text-emerald-400 shrink-0" />}
                     </button>
                 </div>
 
-                <div className="p-6 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex justify-end">
-                    <button onClick={handleSave} disabled={isSaving} className="px-8 py-4 bg-slate-900 dark:bg-indigo-600 text-white rounded-full font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center gap-2">
+                <div className="p-6 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex justify-end shrink-0 pb-safe-6">
+                    <button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto px-8 py-4 bg-slate-900 dark:bg-indigo-600 text-white rounded-full font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
                         {isSaving ? <><Loader2 size={16} className="animate-spin"/> Syncing...</> : 'Save Network Protocol'}
                     </button>
                 </div>
@@ -106,10 +113,10 @@ export default function CardBuilderView({
         front: '', back: '', type: 'noun', ipa: '', sentence: '', sentenceTrans: '', 
         grammarTags: '', deckId: initialDeckId || 'custom', imageUrl: '', audioUrl: '' 
     });
+    
     const [isCreatingDeck, setIsCreatingDeck] = useState(false);
     const [newDeckTitle, setNewDeckTitle] = useState('');
     
-    // 🔥 THE LEXICON MAP STATE
     const [domainPath, setDomainPath] = useState<string[]>([]);
     const [domainInput, setDomainInput] = useState('');
 
@@ -151,7 +158,6 @@ export default function CardBuilderView({
     const deckOptions = Object.entries(validDecks).map(([key, deck]: any) => ({ id: key, title: deck.title })); 
 
     // 🔥 THE NETWORK INTERCEPTOR
-    // Guarantees Firebase gets the right data, and updates local memory instantly.
     const handlePublishDeck = async (deckId: string, title: string, visibility: string, classes: string[]) => {
         const isPublic = visibility === 'public';
 
@@ -188,7 +194,6 @@ export default function CardBuilderView({
     };
 
     // 🔥 THE LITE AUTO-MAPPER
-    // Uses the ultra-fast gemini-2.5-flash-lite strictly for classification.
     const handleAutoMap = async () => {
         const titleToMap = builderTab === 'bulk' || builderTab === 'ai' ? bulkNewTitle : newDeckTitle;
         
@@ -226,7 +231,8 @@ export default function CardBuilderView({
 
             const data = await response.json();
             let rawText = data.candidates[0].content.parts[0].text;
-            rawText = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+            // Using hex codes to avoid markdown parser issues in the chat UI
+            rawText = rawText.replace(/^\x60\x60\x60(?:json)?\s*/i, '').replace(/\x60\x60\x60\s*$/i, '').trim();
             
             const pathArray = JSON.parse(rawText);
             if (Array.isArray(pathArray) && pathArray.length === 3) {
@@ -241,12 +247,22 @@ export default function CardBuilderView({
         }
     };
 
-    useEffect(() => { if (initialDeckId) setFormData(prev => ({...prev, deckId: initialDeckId})); }, [initialDeckId]);
+    useEffect(() => { 
+        if (initialDeckId) {
+            setFormData(prev => ({...prev, deckId: initialDeckId})); 
+        }
+    }, [initialDeckId]);
     
     useEffect(() => {
         const fetchDeckCards = async () => {
-            if (formData.deckId === 'new') { setCurrentDeckCards([]); return; }
-            if (formData.deckId === 'custom') { setCurrentDeckCards(availableDecks['custom']?.cards || []); return; }
+            if (formData.deckId === 'new') { 
+                setCurrentDeckCards([]); 
+                return; 
+            }
+            if (formData.deckId === 'custom') { 
+                setCurrentDeckCards(availableDecks['custom']?.cards || []); 
+                return; 
+            }
 
             setIsFetchingCards(true);
             try {
@@ -272,10 +288,11 @@ export default function CardBuilderView({
                 setIsCreatingDeck(false); 
                 setFormData({ ...formData, deckId: e.target.value }); 
             } 
-        } else { setFormData({ ...formData, [e.target.name]: e.target.value }); } 
+        } else { 
+            setFormData({ ...formData, [e.target.name]: e.target.value }); 
+        } 
     };
 
-    // 🔥 LEXICON MAP HANDLERS
     const handleAddDomain = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -315,7 +332,9 @@ export default function CardBuilderView({
             setToastMsg(`${isImage ? 'Image' : 'Audio'} payload secured! ✨`);
         } catch (err) {
             setToastMsg(`Upload failed. Check your connection.`);
-        } finally { setter(false); }
+        } finally { 
+            setter(false); 
+        }
     };
 
     const handleMagicAutoFill = async (e: React.MouseEvent) => {
@@ -377,24 +396,43 @@ export default function CardBuilderView({
             } else if (fetchedIpa) {
                 setFormData(prev => ({ ...prev, ipa: fetchedIpa }));
                 setToastMsg("Phonetics found! ✨ (Definition missing)");
-            } else { setToastMsg("No extended data found for this exact word."); }
-        } catch (err) { setToastMsg("Could not connect to dictionary engine."); } finally { setIsAutoFilling(false); }
+            } else { 
+                setToastMsg("No extended data found for this exact word."); 
+            }
+        } catch (err) { 
+            setToastMsg("Could not connect to dictionary engine."); 
+        } finally { 
+            setIsAutoFilling(false); 
+        }
     };
 
-    const addMorphology = () => { if (newMorphPart.part && newMorphPart.meaning) { setMorphology([...morphology, newMorphPart]); setNewMorphPart({ part: '', meaning: '', type: 'root' }); } };
-    const removeMorphology = (index: number) => { setMorphology(morphology.filter((_, i) => i !== index)); };
+    const addMorphology = () => { 
+        if (newMorphPart.part && newMorphPart.meaning) { 
+            setMorphology([...morphology, newMorphPart]); 
+            setNewMorphPart({ part: '', meaning: '', type: 'root' }); 
+        } 
+    };
+
+    const removeMorphology = (index: number) => { 
+        setMorphology(morphology.filter((_, i) => i !== index)); 
+    };
 
     const addConjugation = () => {
         if (!tempConj.verb.trim() || !tempConj.tense.trim()) return;
         setConjugations(prev => ({
-            ...prev, [tempConj.tense]: { ...(prev[tempConj.tense] || {}), [tempConj.person]: tempConj.verb.trim() }
+            ...prev, 
+            [tempConj.tense]: { 
+                ...(prev[tempConj.tense] || {}), 
+                [tempConj.person]: tempConj.verb.trim() 
+            }
         }));
         setTempConj({ ...tempConj, verb: '' });
     };
 
     const removeConjugation = (tense: string, person: string) => {
         setConjugations(prev => {
-            const next = { ...prev }; delete next[tense][person];
+            const next = { ...prev }; 
+            delete next[tense][person];
             if (Object.keys(next[tense]).length === 0) delete next[tense];
             return next;
         });
@@ -431,7 +469,10 @@ export default function CardBuilderView({
             console.log(`[Forge] Registering new deck: ${deckTitle} (${deckId})`);
             
             // 1. Give the UI immediate access
-            setLocalOptimisticDecks((prev: any) => ({ ...prev, [deckId]: { id: deckId, title: deckTitle, stats: { cardCount: 0 }, cards: [], domainPath: path } }));
+            setLocalOptimisticDecks((prev: any) => ({ 
+                ...prev, 
+                [deckId]: { id: deckId, title: deckTitle, stats: { cardCount: 0 }, cards: [], domainPath: path } 
+            }));
 
             const deckRef = doc(db, 'artifacts', appId, 'decks', deckId);
             const uid = auth.currentUser?.uid || 'unknown';
@@ -481,7 +522,9 @@ export default function CardBuilderView({
             await setDoc(deckRef, { updatedAt: Date.now() }, { merge: true });
 
             setToastMsg("Target eliminated.");
-        } catch (err) { setToastMsg("Error: Deletion failed."); }
+        } catch (err) { 
+            setToastMsg("Error: Deletion failed."); 
+        }
     };
 
     const handleSubmit = async (e: any) => { 
@@ -569,7 +612,9 @@ export default function CardBuilderView({
                 setImportProgress({ current: successCount, total: cardsArray.length });
                 setCurrentDeckCards(prev => [...prev, { ...cardData, id: newId }]);
                 await new Promise(resolve => setTimeout(resolve, 150));
-            } catch (err) { console.error(`Failed to save card: ${card.front}`, err); }
+            } catch (err) { 
+                console.error(`Failed to save card: ${card.front}`, err); 
+            }
         }
 
         try {
@@ -596,12 +641,17 @@ export default function CardBuilderView({
         setBuilderTab('single'); 
     };
 
-    // 🔥 HYBRID SMART DECODER
+    // 🔥 HYBRID SMART DECODER + MARKDOWN STRIPPER
     const handleBulkImport = async () => {
         try {
-            const rawData = JSON.parse(jsonInput);
+            let cleanInput = jsonInput.trim();
+            // Using hex codes (\x60) to prevent the chat parser from breaking on backticks!
+            if (cleanInput.startsWith('\x60\x60\x60')) {
+                cleanInput = cleanInput.replace(/^\x60\x60\x60(?:json)?\n?/i, '').replace(/\n?\x60\x60\x60$/i, '');
+            }
+
+            const rawData = JSON.parse(cleanInput);
             
-            // Check if the LLM included the "Master Forge" wrapper
             if (!Array.isArray(rawData) && rawData.cards && Array.isArray(rawData.cards)) {
                 if (rawData.domainPath && Array.isArray(rawData.domainPath)) {
                     setDomainPath(rawData.domainPath);
@@ -614,7 +664,8 @@ export default function CardBuilderView({
                 throw new Error("Format not recognized.");
             }
         } catch (e: any) {
-            alert("Invalid JSON format. Make sure it follows the Master Forge schema.");
+            alert("Invalid JSON format. Check for extra text or missing brackets.");
+            console.error(e);
         }
     };
 
@@ -633,7 +684,6 @@ export default function CardBuilderView({
         setIsImporting(true); 
         setToastMsg("Initializing Neural Forge & Auto-Mapper...");
 
-        // 🔥 UPGRADED PROMPT: Now demands a domainPath and enforces your Macro Domains
         const systemPrompt = `You are a curriculum designer for an app called Magister OS. 
         Your task is to generate a highly accurate, professional set of flashcards AND categorize them into our Lexicon Map.
         
@@ -683,14 +733,14 @@ export default function CardBuilderView({
             const data = await response.json();
             let rawText = data.candidates[0].content.parts[0].text;
             
-            rawText = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+            // Using hex codes to prevent the chat parser from breaking
+            rawText = rawText.replace(/^\x60\x60\x60(?:json)?\s*/i, '').replace(/\x60\x60\x60\s*$/i, '').trim();
             const aiResponse = JSON.parse(rawText);
             
             if (!aiResponse.cards || !Array.isArray(aiResponse.cards)) {
                 throw new Error("AI did not return the correct schema format.");
             }
 
-            // Auto-Map UI
             if (aiResponse.domainPath && Array.isArray(aiResponse.domainPath)) {
                 setDomainPath(aiResponse.domainPath);
                 setToastMsg(`Auto-Mapped to: ${aiResponse.domainPath.join(' > ')}`);
@@ -705,26 +755,20 @@ export default function CardBuilderView({
         }
     };
     
-    useEffect(() => { if (editingId && !currentDeckCards.some((c: any) => c.id === editingId)) { handleClear(); } }, [currentDeckCards, editingId]);
-
-    const jsonTemplate = `[\n  { "front": "canis", "back": "dog", "type": "noun", "imageUrl": "https://..." }\n]`;
-
-    // 🔥 REUSABLE RENDERER FOR THE DOMAIN MAP (With Auto-Map Button)
+    // 🔥 REUSABLE RENDERER FOR THE DOMAIN MAP (Mobile padded)
     const renderDomainBuilder = () => (
-        <div className="flex flex-col gap-3 p-5 bg-indigo-50/50 dark:bg-indigo-500/5 rounded-2xl border border-indigo-100 dark:border-indigo-500/10 mt-4 animate-in slide-in-from-top-2">
-            <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 p-4 sm:p-5 bg-indigo-50/50 dark:bg-indigo-500/5 rounded-2xl border border-indigo-100 dark:border-indigo-500/10 mt-4 animate-in slide-in-from-top-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                     <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest flex items-center gap-1.5 mb-1">
                         <Map size={14}/> Lexicon Map
                     </label>
-                    <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                        Map this module's location in the global network.
-                    </p>
+                    <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400">Map this module's location in the global network.</p>
                 </div>
                 
                 <button 
                     onClick={(e) => { e.preventDefault(); handleAutoMap(); }}
-                    className="flex items-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md active:scale-95 transition-all"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md active:scale-95 transition-all"
                 >
                     <Wand2 size={14} /> Auto-Map
                 </button>
@@ -745,7 +789,7 @@ export default function CardBuilderView({
                                 <X size={12} strokeWidth={3}/>
                             </button>
                         </div>
-                        {idx < domainPath.length - 1 && <ChevronRight size={14} className="text-indigo-300 dark:text-indigo-500/50" />}
+                        {idx < domainPath.length - 1 && <ChevronRight size={14} className="text-indigo-300 dark:text-indigo-500/50 hidden sm:block" />}
                     </React.Fragment>
                 ))}
             </div>
@@ -755,15 +799,17 @@ export default function CardBuilderView({
                     value={domainInput} 
                     onChange={(e) => setDomainInput(e.target.value)} 
                     onKeyDown={handleAddDomain}
-                    placeholder={domainPath.length === 0 ? "Type Macro Domain & press Enter" : "Add next sub-level & press Enter"} 
+                    placeholder="Type level & press Enter" 
                     className="w-full p-3 rounded-xl bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 focus:border-indigo-500 dark:text-white font-bold outline-none transition-colors shadow-sm text-sm"
                 />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black uppercase tracking-widest text-slate-400 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded-md bg-slate-50 dark:bg-slate-800 pointer-events-none">
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black uppercase tracking-widest text-slate-400 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded-md bg-slate-50 dark:bg-slate-800 pointer-events-none hidden sm:block">
                     Enter ↵
                 </div>
             </div>
         </div>
     );
+
+    const jsonTemplate = `[\n  { "front": "canis", "back": "dog", "type": "noun", "imageUrl": "https://..." }\n]`;
 
     return (
         <div className="space-y-6 relative pb-12 font-sans transition-colors duration-300">
@@ -778,18 +824,20 @@ export default function CardBuilderView({
                 />
             )}
 
+            {/* Disambiguation Modal */}
             {showDefSelector && (
-                <div className="fixed inset-0 z-[9999] bg-slate-900/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-950 w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 duration-300 max-h-[80vh] flex flex-col">
-                        
+                <div className="fixed inset-0 z-[9999] bg-slate-900/60 dark:bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-950 w-full max-w-xl rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden border-t sm:border border-slate-100 dark:border-slate-800 animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300 max-h-[85vh] flex flex-col pb-safe">
                         <div className="px-6 py-5 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
                             <div>
                                 <h2 className="text-xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-2">
                                     <BookOpen size={20} className="text-indigo-500" /> Disambiguation Required
                                 </h2>
-                                <p className="text-xs font-bold text-slate-400 mt-1">Select the correct definition for <span className="text-indigo-500 uppercase tracking-widest ml-1">"{formData.front}"</span></p>
+                                <p className="text-xs font-bold text-slate-400 mt-1">Select the definition for <span className="text-indigo-500 uppercase tracking-widest ml-1">"{formData.front}"</span></p>
                             </div>
-                            <button onClick={() => setShowDefSelector(false)} className="p-2 bg-white dark:bg-slate-800 rounded-full hover:bg-rose-50 dark:hover:bg-rose-900/30 text-slate-400 dark:text-slate-500 hover:text-rose-500 transition-colors shadow-sm"><X size={20} strokeWidth={3}/></button>
+                            <button onClick={() => setShowDefSelector(false)} className="p-2 bg-white dark:bg-slate-800 rounded-full hover:bg-rose-50 dark:hover:bg-rose-900/30 text-slate-400 hover:text-rose-500 transition-colors shadow-sm">
+                                <X size={20} strokeWidth={3}/>
+                            </button>
                         </div>
 
                         <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-3 bg-slate-50 dark:bg-slate-950">
@@ -821,8 +869,8 @@ export default function CardBuilderView({
                 {editingId && <button onClick={handleClear} className="text-xs font-bold bg-white dark:bg-slate-800 dark:text-white px-3 py-1 rounded-lg shadow-sm hover:text-indigo-600 dark:hover:text-indigo-400">Cancel Edit</button>}
             </div>
 
-            {/* 🔥 3-WAY TAB SELECTOR */}
-            <div className="flex gap-4 border-b-2 border-slate-100 dark:border-slate-800 relative bottom-[-1px] overflow-x-auto custom-scrollbar">
+            {/* 🔥 3-WAY TAB SELECTOR (Mobile: Scrollable X) */}
+            <div className="flex gap-4 border-b-2 border-slate-100 dark:border-slate-800 relative bottom-[-1px] overflow-x-auto custom-scrollbar scroll-smooth whitespace-nowrap">
                 <button disabled={isImporting} onClick={() => setBuilderTab('single')} className={`pb-4 shrink-0 text-sm font-black uppercase tracking-widest transition-colors border-b-4 flex items-center gap-2 ${builderTab === 'single' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-400 dark:text-slate-600 hover:text-slate-600'} disabled:opacity-50`}>
                     <Edit3 size={16} /> Single Target
                 </button>
@@ -834,10 +882,10 @@ export default function CardBuilderView({
                 </button>
             </div>
 
-            {/* 🔥 RENDER BASED ON TAB */}
+            {/* 🔥 TAB 1: SINGLE TARGET */}
             {builderTab === 'single' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <section className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
+                    <section className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
                         <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest mb-4 flex items-center gap-2">
                             <Database size={16} className="text-indigo-500" /> Target Deck
                         </h3>
@@ -854,11 +902,12 @@ export default function CardBuilderView({
                         )}
                     </section>
 
-                    <section className="space-y-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
+                    <section className="space-y-4 bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
                         <div className="flex items-center justify-between mb-2">
                             <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest">Core Data</h3>
                         </div>
                         
+                        {/* Mobile Grid Optimization: Stacks to 1 col on mobile, 2 on tablet+ */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                             <div className="flex flex-col gap-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Target Word (Front)</label>
@@ -871,10 +920,7 @@ export default function CardBuilderView({
                                         placeholder="e.g. Incorporate" 
                                     />
                                     <button 
-                                        type="button"
-                                        onClick={handleMagicAutoFill}
-                                        disabled={isAutoFilling || !formData.front.trim()}
-                                        title="Magic Auto-Fill (Dictionary)"
+                                        type="button" onClick={handleMagicAutoFill} disabled={isAutoFilling || !formData.front.trim()} title="Magic Auto-Fill"
                                         className="absolute right-2 p-2 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-500/40 rounded-xl transition-all disabled:opacity-30 disabled:hover:bg-indigo-100 active:scale-95 shadow-sm"
                                     >
                                         {isAutoFilling ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
@@ -887,48 +933,33 @@ export default function CardBuilderView({
                             </div>
                         </div>
 
+                        {/* Mobile Grid Optimization: Stacks 1 col on mobile, 3 cols on tablet+ */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="flex flex-col gap-2 md:col-span-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Phonetics (IPA)</label>
-                                <input 
-                                    name="ipa" 
-                                    value={formData.ipa} 
-                                    onChange={handleChange} 
-                                    className="w-full p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 font-mono text-slate-800 dark:text-white focus:border-indigo-500 outline-none transition-colors" 
-                                    placeholder="e.g. /ɪnˈkɔːpəɹeɪt/" 
-                                />
+                                <input name="ipa" value={formData.ipa} onChange={handleChange} className="w-full p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 font-mono text-slate-800 dark:text-white focus:border-indigo-500 outline-none transition-colors" placeholder="e.g. /ɪnˈkɔːpəɹeɪt/" />
                             </div>
-
                             <div className="flex flex-col gap-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Word Type</label>
-                                <select 
-                                    name="type" 
-                                    value={formData.type} 
-                                    onChange={handleChange} 
-                                    className="w-full p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 font-bold dark:text-white focus:border-indigo-500 outline-none cursor-pointer transition-colors"
-                                >
-                                    <option value="noun">Noun</option>
-                                    <option value="verb">Verb</option>
-                                    <option value="adjective">Adjective</option>
-                                    <option value="adverb">Adverb</option>
+                                <select name="type" value={formData.type} onChange={handleChange} className="w-full p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 font-bold dark:text-white focus:border-indigo-500 outline-none cursor-pointer transition-colors">
+                                    <option value="noun">Noun</option><option value="verb">Verb</option><option value="adjective">Adjective</option><option value="adverb">Adverb</option>
                                 </select>
                             </div>
                         </div>
                     </section>
 
-                    <section className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-inner transition-colors">
+                    <section className="bg-slate-50 dark:bg-slate-900/50 p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-inner transition-colors">
                         <div className="flex items-center gap-2 mb-4">
                             <UploadCloud size={16} className="text-indigo-500" />
                             <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest">Media Payload</h3>
                         </div>
+                        {/* Mobile Grid Optimization: Stacks 1 col on mobile, 2 cols on tablet+ */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            
-                            {/* Image Dropzone */}
                             <div className="bg-white dark:bg-slate-900 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col items-center justify-center text-center relative hover:border-indigo-400 transition-colors group">
                                 {formData.imageUrl ? (
                                     <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800">
                                         <img src={formData.imageUrl} alt="Card preview" className="w-full h-full object-cover" />
-                                        <button type="button" onClick={() => setFormData(prev => ({...prev, imageUrl: ''}))} className="absolute top-2 right-2 bg-rose-500 text-white p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14}/></button>
+                                        <button type="button" onClick={() => setFormData(prev => ({...prev, imageUrl: ''}))} className="absolute top-2 right-2 bg-rose-500 text-white p-2 sm:p-1.5 rounded-full shadow-lg opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} className="sm:w-4 sm:h-4"/></button>
                                     </div>
                                 ) : (
                                     <>
@@ -939,14 +970,12 @@ export default function CardBuilderView({
                                     </>
                                 )}
                             </div>
-
-                            {/* Audio Dropzone */}
                             <div className="bg-white dark:bg-slate-900 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col items-center justify-center text-center relative hover:border-indigo-400 transition-colors group">
                                 {formData.audioUrl ? (
                                     <div className="w-full flex flex-col items-center gap-3">
                                         <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center"><Music size={20} /></div>
                                         <audio src={formData.audioUrl} controls className="w-full h-8 opacity-80" />
-                                        <button type="button" onClick={() => setFormData(prev => ({...prev, audioUrl: ''}))} className="text-[10px] font-black uppercase text-rose-500 hover:text-rose-600 tracking-widest flex items-center gap-1"><Trash2 size={12}/> Remove Audio</button>
+                                        <button type="button" onClick={() => setFormData(prev => ({...prev, audioUrl: ''}))} className="text-[10px] font-black uppercase text-rose-500 hover:text-rose-600 tracking-widest flex items-center gap-1 p-2"><Trash2 size={12}/> Remove Audio</button>
                                     </div>
                                 ) : (
                                     <>
@@ -957,11 +986,10 @@ export default function CardBuilderView({
                                     </>
                                 )}
                             </div>
-
                         </div>
                     </section>
 
-                    <section className="space-y-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
+                    <section className="space-y-4 bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest flex items-center gap-2">
                                 <Paperclip size={16} className="text-indigo-500" /> Conjugation Forge
@@ -969,13 +997,14 @@ export default function CardBuilderView({
                             <span className="text-[9px] font-black uppercase text-slate-400 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded">Beta</span>
                         </div>
                         
-                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-stretch">
-                            <input value={tempConj.tense} onChange={(e) => setTempConj({...tempConj, tense: e.target.value})} className="sm:col-span-1 p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs font-black dark:text-white outline-none focus:border-indigo-500" placeholder="Tense (e.g. Present)" />
-                            <select value={tempConj.person} onChange={(e) => setTempConj({...tempConj, person: e.target.value})} className="sm:col-span-1 p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs font-black dark:text-white outline-none">
+                        {/* 🔥 Mobile Grid Optimization: 2 columns on mobile, 4 on tablet+ */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 items-stretch">
+                            <input value={tempConj.tense} onChange={(e) => setTempConj({...tempConj, tense: e.target.value})} className="col-span-1 p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs font-black dark:text-white outline-none focus:border-indigo-500 min-h-[44px]" placeholder="Tense" />
+                            <select value={tempConj.person} onChange={(e) => setTempConj({...tempConj, person: e.target.value})} className="col-span-1 p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs font-black dark:text-white outline-none min-h-[44px] bg-transparent">
                                 {['1s', '2s', '3s', '1p', '2p', '3p'].map(p => <option key={p} value={p}>{p}</option>)}
                             </select>
-                            <input value={tempConj.verb} onChange={(e) => setTempConj({...tempConj, verb: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && addConjugation()} className="sm:col-span-1 p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs font-bold dark:text-white outline-none focus:border-indigo-500" placeholder="Form (e.g. Amo)" />
-                            <button type="button" onClick={addConjugation} className="bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-500 transition-colors shadow-md active:scale-95 flex items-center justify-center"><Plus size={20}/></button>
+                            <input value={tempConj.verb} onChange={(e) => setTempConj({...tempConj, verb: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && addConjugation()} className="col-span-1 md:col-span-1 p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 text-xs font-bold dark:text-white outline-none focus:border-indigo-500 min-h-[44px]" placeholder="Form (Amo)" />
+                            <button type="button" onClick={addConjugation} className="col-span-1 md:col-span-1 bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-500 transition-colors shadow-md active:scale-95 flex items-center justify-center min-h-[44px]"><Plus size={20}/></button>
                         </div>
 
                         {Object.keys(conjugations).length > 0 && (
@@ -987,8 +1016,8 @@ export default function CardBuilderView({
                                             {Object.entries(forms).map(([person, verb]: any) => (
                                                 <div key={person} className="relative group bg-white dark:bg-slate-800 p-2 rounded-lg border border-slate-100 dark:border-slate-700 shadow-sm">
                                                     <span className="text-[8px] font-black text-slate-400 block mb-0.5">{person}</span>
-                                                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">{verb}</span>
-                                                    <button onClick={() => removeConjugation(tense, person)} className="absolute -top-1 -right-1 bg-rose-500 text-white p-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"><X size={10} strokeWidth={4}/></button>
+                                                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate block">{verb}</span>
+                                                    <button onClick={() => removeConjugation(tense, person)} className="absolute -top-2 -right-2 bg-rose-500 text-white p-1 rounded-full opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity"><X size={12} strokeWidth={4}/></button>
                                                 </div>
                                             ))}
                                         </div>
@@ -998,47 +1027,50 @@ export default function CardBuilderView({
                         )}
                     </section>
 
-                    <section className="space-y-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
+                    <section className="space-y-4 bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
                         <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest">Morphology Breakdowns</h3>
-                        <div className="flex gap-2 items-stretch">
-                            <input value={newMorphPart.part} onChange={(e) => setNewMorphPart({...newMorphPart, part: e.target.value})} className="flex-1 p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-sm font-bold outline-none focus:border-indigo-500" placeholder="Root/Suffix" />
-                            <input value={newMorphPart.meaning} onChange={(e) => setNewMorphPart({...newMorphPart, meaning: e.target.value})} className="flex-1 p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-sm font-bold outline-none focus:border-indigo-500" placeholder="Meaning" />
-                            <button type="button" onClick={addMorphology} className="bg-slate-900 dark:bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-600 transition-colors shadow-md active:scale-95"><Plus size={20}/></button>
+                        {/* 🔥 Mobile Flex Optimization: Columns on mobile, row on tablet+ */}
+                        <div className="flex flex-col sm:flex-row gap-2 items-stretch">
+                            <div className="flex gap-2 flex-1">
+                                <input value={newMorphPart.part} onChange={(e) => setNewMorphPart({...newMorphPart, part: e.target.value})} className="flex-1 p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-sm font-bold outline-none focus:border-indigo-500 min-h-[44px]" placeholder="Root/Suffix" />
+                                <input value={newMorphPart.meaning} onChange={(e) => setNewMorphPart({...newMorphPart, meaning: e.target.value})} className="flex-1 p-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-sm font-bold outline-none focus:border-indigo-500 min-h-[44px]" placeholder="Meaning" />
+                            </div>
+                            <button type="button" onClick={addMorphology} className="w-full sm:w-auto bg-slate-900 dark:bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-600 transition-colors shadow-md active:scale-95 flex justify-center items-center min-h-[44px]"><Plus size={20}/></button>
                         </div>
                         <div className="flex flex-wrap gap-2 mt-4">
                             {morphology.map((m, i) => (
                                 <div key={i} className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-500/20 pl-4 pr-2 py-2 rounded-full text-sm shadow-sm transition-colors">
                                     <span className="font-black text-indigo-900 dark:text-indigo-400">{m.part}</span><span className="text-indigo-700 dark:text-indigo-500 font-bold">({m.meaning})</span>
-                                    <button type="button" onClick={() => removeMorphology(i)} className="text-indigo-400 dark:text-indigo-500 hover:text-rose-500 ml-1 bg-white dark:bg-slate-800 rounded-full p-1 shadow-sm"><X size={14}/></button>
+                                    <button type="button" onClick={() => removeMorphology(i)} className="text-indigo-400 dark:text-indigo-500 hover:text-rose-500 ml-1 bg-white dark:bg-slate-800 rounded-full p-1.5 shadow-sm"><X size={14}/></button>
                                 </div>
                             ))}
                         </div>
                     </section>
 
                     <button onClick={handleSubmit} className={`w-full text-white p-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3 ${editingId ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/30'}`}>
-                        {editingId ? <><Save size={20}/> Update Vocabulary Target</> : <><Plus size={20}/> Forge Vocabulary Target</>}
+                        {editingId ? <><Save size={20}/> Update Target</> : <><Plus size={20}/> Forge Target</>}
                     </button>
                 </div>
             )}
 
-            {/* 🔥 THE NEURAL FORGE TAB */}
+            {/* 🔥 TAB 2: NEURAL FORGE */}
             {builderTab === 'ai' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <section className="bg-gradient-to-br from-indigo-500 to-cyan-400 p-8 rounded-3xl shadow-xl transition-colors text-white relative overflow-hidden">
+                    <section className="bg-gradient-to-br from-indigo-500 to-cyan-400 p-6 sm:p-8 rounded-3xl shadow-xl transition-colors text-white relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none"><Sparkles size={120}/></div>
                         <div className="relative z-10">
-                            <h2 className="font-black text-3xl tracking-tighter mb-2">Neural Auto-Forge</h2>
-                            <p className="text-sm font-bold opacity-90 max-w-sm mb-6">Describe the deck you want to build, and Magister OS will generate it instantly using AI.</p>
+                            <h2 className="font-black text-2xl sm:text-3xl tracking-tighter mb-2">Neural Auto-Forge</h2>
+                            <p className="text-xs sm:text-sm font-bold opacity-90 max-w-sm mb-6">Describe the deck you want to build, and Magister OS will generate it instantly using AI.</p>
                             
                             <textarea 
                                 value={aiPrompt} 
                                 onChange={(e) => setAiPrompt(e.target.value)} 
                                 disabled={isImporting} 
                                 placeholder="e.g. '15 advanced medical terms in Spanish for emergency room nurses'" 
-                                className="w-full h-32 bg-white/10 backdrop-blur-md text-white placeholder-white/50 p-5 rounded-2xl font-bold text-lg border-2 border-white/20 focus:border-white outline-none resize-none custom-scrollbar mb-4" 
+                                className="w-full h-32 bg-white/10 backdrop-blur-md text-white placeholder-white/50 p-4 sm:p-5 rounded-2xl font-bold text-base sm:text-lg border-2 border-white/20 focus:border-white outline-none resize-none custom-scrollbar mb-4" 
                             />
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="bg-black/20 p-4 rounded-xl border border-white/10">
                                     <label className="text-[10px] font-black uppercase tracking-widest block mb-2 opacity-80">Target Language</label>
                                     <input 
@@ -1063,13 +1095,13 @@ export default function CardBuilderView({
                         </div>
                     </section>
 
-                    <section className="bg-slate-50 dark:bg-slate-900 p-6 rounded-3xl border-2 border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+                    <section className="bg-slate-50 dark:bg-slate-900 p-4 sm:p-6 rounded-3xl border-2 border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
                         <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest mb-4">Destination Deck</h3>
-                        <div className="flex flex-col md:flex-row gap-4 mb-4">
-                            <button onClick={() => setBulkDestination('new')} disabled={isImporting} className={`flex-1 p-4 rounded-xl border-2 flex items-center gap-3 transition-colors ${bulkDestination === 'new' ? 'border-indigo-600 dark:border-indigo-500 bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-transparent text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'} disabled:opacity-50`}>
+                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4">
+                            <button onClick={() => setBulkDestination('new')} disabled={isImporting} className={`flex-1 p-4 rounded-xl border-2 flex items-center justify-center sm:justify-start gap-3 transition-colors ${bulkDestination === 'new' ? 'border-indigo-600 dark:border-indigo-500 bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-transparent text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'} disabled:opacity-50`}>
                                 <FolderPlus size={20} /> <span className="font-black text-sm uppercase">Create New</span>
                             </button>
-                            <button onClick={() => setBulkDestination('existing')} disabled={isImporting} className={`flex-1 p-4 rounded-xl border-2 flex items-center gap-3 transition-colors ${bulkDestination === 'existing' ? 'border-indigo-600 dark:border-indigo-500 bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-transparent text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'} disabled:opacity-50`}>
+                            <button onClick={() => setBulkDestination('existing')} disabled={isImporting} className={`flex-1 p-4 rounded-xl border-2 flex items-center justify-center sm:justify-start gap-3 transition-colors ${bulkDestination === 'existing' ? 'border-indigo-600 dark:border-indigo-500 bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-transparent text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'} disabled:opacity-50`}>
                                 <FolderOpen size={20} /> <span className="font-black text-sm uppercase">Add to Existing</span>
                             </button>
                         </div>
@@ -1096,16 +1128,16 @@ export default function CardBuilderView({
                 </div>
             )}
 
-            {/* THE BULK IMPORT TAB */}
+            {/* 🔥 TAB 3: BULK JSON IMPORT */}
             {builderTab === 'bulk' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <section className="bg-slate-50 dark:bg-slate-900 p-6 rounded-3xl border-2 border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+                    <section className="bg-slate-50 dark:bg-slate-900 p-4 sm:p-6 rounded-3xl border-2 border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
                         <h3 className="font-black text-slate-800 dark:text-slate-300 text-xs uppercase tracking-widest mb-4">Destination Deck</h3>
-                        <div className="flex flex-col md:flex-row gap-4 mb-4">
-                            <button onClick={() => setBulkDestination('new')} disabled={isImporting} className={`flex-1 p-4 rounded-xl border-2 flex items-center gap-3 transition-colors ${bulkDestination === 'new' ? 'border-indigo-600 dark:border-indigo-500 bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-transparent text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'} disabled:opacity-50`}>
+                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4">
+                            <button onClick={() => setBulkDestination('new')} disabled={isImporting} className={`flex-1 p-4 rounded-xl border-2 flex items-center justify-center sm:justify-start gap-3 transition-colors ${bulkDestination === 'new' ? 'border-indigo-600 dark:border-indigo-500 bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-transparent text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'} disabled:opacity-50`}>
                                 <FolderPlus size={20} /> <span className="font-black text-sm uppercase">Create New</span>
                             </button>
-                            <button onClick={() => setBulkDestination('existing')} disabled={isImporting} className={`flex-1 p-4 rounded-xl border-2 flex items-center gap-3 transition-colors ${bulkDestination === 'existing' ? 'border-indigo-600 dark:border-indigo-500 bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-transparent text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'} disabled:opacity-50`}>
+                            <button onClick={() => setBulkDestination('existing')} disabled={isImporting} className={`flex-1 p-4 rounded-xl border-2 flex items-center justify-center sm:justify-start gap-3 transition-colors ${bulkDestination === 'existing' ? 'border-indigo-600 dark:border-indigo-500 bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'border-slate-200 dark:border-slate-700 bg-transparent text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'} disabled:opacity-50`}>
                                 <FolderOpen size={20} /> <span className="font-black text-sm uppercase">Add to Existing</span>
                             </button>
                         </div>
@@ -1122,21 +1154,21 @@ export default function CardBuilderView({
                         )}
                     </section>
 
-                    <section className="bg-slate-900 dark:bg-black p-6 rounded-3xl border-4 border-slate-800 shadow-xl transition-colors">
-                        <div className="flex items-center justify-between mb-4">
+                    <section className="bg-slate-900 dark:bg-black p-4 sm:p-6 rounded-3xl border-4 border-slate-800 shadow-xl transition-colors">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
                             <h3 className="font-black text-white text-sm uppercase tracking-widest">JSON Payload</h3>
-                            <button disabled={isImporting} onClick={() => setJsonInput(jsonTemplate)} className="text-[10px] font-black uppercase text-indigo-400 hover:text-white transition-colors tracking-widest bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">Paste Template</button>
+                            <button disabled={isImporting} onClick={() => setJsonInput(jsonTemplate)} className="w-full sm:w-auto text-[10px] font-black uppercase text-indigo-400 hover:text-white transition-colors tracking-widest bg-white/5 px-3 py-2 sm:py-1.5 rounded-lg border border-white/10 active:scale-95">Paste Template</button>
                         </div>
-                        <textarea value={jsonInput} onChange={(e) => setJsonInput(e.target.value)} disabled={isImporting} placeholder="Paste your JSON array here..." className="w-full h-64 bg-slate-950 text-emerald-400 p-4 rounded-2xl font-mono text-sm border-2 border-slate-800 focus:border-indigo-500 outline-none resize-y custom-scrollbar" />
+                        <textarea value={jsonInput} onChange={(e) => setJsonInput(e.target.value)} disabled={isImporting} placeholder="Paste JSON array or Master Payload here..." className="w-full h-64 bg-slate-950 text-emerald-400 p-4 rounded-2xl font-mono text-sm border-2 border-slate-800 focus:border-indigo-500 outline-none resize-y custom-scrollbar" />
                     </section>
 
                     <button onClick={handleBulkImport} disabled={!jsonInput.trim() || isImporting} className={`w-full text-white p-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-3 ${isImporting ? 'bg-amber-500' : 'bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-300 dark:disabled:bg-slate-800'}`}>
-                        {isImporting ? <><Loader2 size={20} className="animate-spin" /> Forging Targets...</> : <><Database size={20}/> Process & Import Deck</>}
+                        {isImporting ? <><Loader2 size={20} className="animate-spin" /> Processing...</> : <><Database size={20}/> Import Payload</>}
                     </button>
                 </div>
             )}
 
-            {/* DECK INVENTORY (Now dynamically fetches subcollection cards) */}
+            {/* 🔥 DECK INVENTORY LIST */}
             {formData.deckId && (
                 <div className="pt-10 mt-10 border-t-2 border-slate-100 dark:border-slate-800 transition-colors">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -1159,18 +1191,20 @@ export default function CardBuilderView({
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {currentDeckCards.map((card: any) => (
                                 <div key={card.id} onClick={() => !isImporting && handleSelectCard(card)} className={`p-4 rounded-2xl border-2 flex justify-between items-center cursor-pointer transition-all group ${editingId === card.id ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-500 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-500/50'}`}>
-                                    <div className="flex flex-col">
+                                    <div className="flex flex-col pr-4">
                                         <span className="font-black text-slate-800 dark:text-white transition-colors">{card.front}</span>
                                         <span className="text-xs font-bold text-slate-400 mt-0.5">{card.back}</span>
                                         
-                                        <div className="flex items-center gap-2 mt-2">
+                                        <div className="flex flex-wrap items-center gap-2 mt-2">
                                             {card.imageUrl && <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-indigo-500"><ImageIcon size={10} /> Image</span>}
                                             {card.audioUrl && <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-indigo-500"><Music size={10} /> Audio</span>}
                                             {card.conjugations && <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-indigo-500"><Paperclip size={10}/> Conjs</span>}
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900 transition-colors"><Edit3 size={14} /></div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900 transition-colors">
+                                            <Edit3 size={14} />
+                                        </div>
                                         {!(INITIAL_SYSTEM_DECKS as any)[formData.deckId] && (
                                             <button onClick={(e) => { e.stopPropagation(); !isImporting && handleDeleteCard(card.id); }} className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-300 hover:bg-rose-500 hover:text-white transition-all">
                                                 <Trash2 size={14}/>
