@@ -156,11 +156,10 @@ export default function CardBuilderView({
         const isPublic = visibility === 'public';
 
         try {
-            // 1. Force the exact fields Firebase needs for the Discovery Radar
             const deckRef = doc(db, 'artifacts', appId, 'decks', deckId);
             await setDoc(deckRef, {
                 visibility: visibility,
-                isPublished: isPublic, // 🔥 CRITICAL FOR DISCOVERY VIEW
+                isPublished: isPublic,
                 allowedClasses: classes,
                 updatedAt: Date.now()
             }, { merge: true });
@@ -168,12 +167,10 @@ export default function CardBuilderView({
             console.error("Failed to update network access:", e);
         }
 
-        // 2. Alert the parent router if it needs to know
         if (onPublishDeck) {
             try { await onPublishDeck(deckId, title, visibility, classes); } catch(e) {}
         }
 
-        // 3. Update local optimistic state so the UI stops gaslighting you!
         setLocalOptimisticDecks((prev: any) => {
             if (!prev[deckId]) return prev;
             return {
@@ -188,6 +185,60 @@ export default function CardBuilderView({
         });
 
         setToastMsg(`Access updated to: ${visibility.toUpperCase()}`);
+    };
+
+    // 🔥 THE LITE AUTO-MAPPER
+    // Uses the ultra-fast gemini-2.5-flash-lite strictly for classification.
+    const handleAutoMap = async () => {
+        const titleToMap = builderTab === 'bulk' || builderTab === 'ai' ? bulkNewTitle : newDeckTitle;
+        
+        if (!titleToMap.trim()) {
+            setToastMsg("Please enter a Deck Title to map.");
+            return;
+        }
+
+        const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;        
+        if (!apiKey) return setToastMsg("CRITICAL: Missing API Key.");
+
+        setToastMsg("Scanning ontology with Flash-Lite...");
+
+        const systemPrompt = `You are a routing algorithm for a curriculum app.
+        Categorize the subject "${titleToMap}" into our 3-level Lexicon Map.
+        
+        RULES:
+        1. Level 1 MUST be exactly one of: "Culinary & Hospitality", "STEM & Medical", "Commerce & Trade", "Daily Survival", "Linguistics & Phonetics", "Arts & Culture".
+        2. Level 2 is the broad industry/category (e.g., "Finance", "Biology").
+        3. Level 3 is the specific topic (e.g., "Accounting", "Cellular Structure").
+        
+        Return ONLY a raw JSON array of 3 strings. Example format: ["STEM & Medical", "Computer Science", "Frontend Development"]`;
+
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ role: "user", parts: [{ text: systemPrompt }] }],
+                    generationConfig: { responseMimeType: "application/json" }
+                })
+            });
+
+            if (!response.ok) throw new Error("Lite API call failed");
+
+            const data = await response.json();
+            let rawText = data.candidates[0].content.parts[0].text;
+            rawText = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+            
+            const pathArray = JSON.parse(rawText);
+            if (Array.isArray(pathArray) && pathArray.length === 3) {
+                setDomainPath(pathArray);
+                setToastMsg("Path Locked! ✨");
+            } else {
+                throw new Error("Invalid AI schema");
+            }
+        } catch (err) {
+            console.error("Auto-Map Error:", err);
+            setToastMsg("Auto-Map failed. Please enter path manually.");
+        }
     };
 
     useEffect(() => { if (initialDeckId) setFormData(prev => ({...prev, deckId: initialDeckId})); }, [initialDeckId]);
@@ -371,7 +422,6 @@ export default function CardBuilderView({
         })); 
         setMorphology([]); 
         setConjugations({});
-        // Reset lexicon map when starting a fresh card/deck logic
         setDomainPath([]);
         setDomainInput('');
     };
@@ -546,13 +596,25 @@ export default function CardBuilderView({
         setBuilderTab('single'); 
     };
 
+    // 🔥 HYBRID SMART DECODER
     const handleBulkImport = async () => {
         try {
-            const importedCards = JSON.parse(jsonInput);
-            if (!Array.isArray(importedCards)) throw new Error("JSON must be an array");
-            await executeBulkIngest(importedCards, "Bulk import complete!");
+            const rawData = JSON.parse(jsonInput);
+            
+            // Check if the LLM included the "Master Forge" wrapper
+            if (!Array.isArray(rawData) && rawData.cards && Array.isArray(rawData.cards)) {
+                if (rawData.domainPath && Array.isArray(rawData.domainPath)) {
+                    setDomainPath(rawData.domainPath);
+                    setToastMsg("Domain Map detected in JSON! ✨");
+                }
+                await executeBulkIngest(rawData.cards, "Master Payload imported!");
+            } else if (Array.isArray(rawData)) {
+                await executeBulkIngest(rawData, "Bulk import complete!");
+            } else {
+                throw new Error("Format not recognized.");
+            }
         } catch (e: any) {
-            alert("Invalid JSON format. Check for missing commas or brackets.");
+            alert("Invalid JSON format. Make sure it follows the Master Forge schema.");
         }
     };
 
@@ -569,25 +631,34 @@ export default function CardBuilderView({
         }
 
         setIsImporting(true); 
-        setToastMsg("Initializing Neural Forge. Please wait...");
+        setToastMsg("Initializing Neural Forge & Auto-Mapper...");
 
+        // 🔥 UPGRADED PROMPT: Now demands a domainPath and enforces your Macro Domains
         const systemPrompt = `You are a curriculum designer for an app called Magister OS. 
-        Your task is to generate a highly accurate, professional set of flashcards based on the user's prompt.
+        Your task is to generate a highly accurate, professional set of flashcards AND categorize them into our Lexicon Map.
+        
+        RULES FOR THE LEXICON MAP (domainPath):
+        1. It must be an array of 3 strings: [Macro Domain, Category, Specific Topic].
+        2. The FIRST string (Macro Domain) MUST be an exact match to one of these: "Culinary & Hospitality", "STEM & Medical", "Commerce & Trade", "Daily Survival", "Linguistics & Phonetics", "Arts & Culture".
+        
         You MUST generate EXACTLY ${aiCardCount} cards.
         The target language is ${aiTargetLanguage}.
         
         JSON SCHEMA:
-        [
-          {
-            "front": "Target word/concept in ${aiTargetLanguage}",
-            "back": "Definition/translation in English",
-            "type": "noun", 
-            "ipa": "/phonetics in IPA format/",
-            "morphology": [{"part": "The word itself or a root", "meaning": "Root meaning", "type": "root"}],
-            "usage": {"sentence": "A simple example sentence in ${aiTargetLanguage}", "translation": "The English translation of the sentence"},
-            "grammarTags": ["AI_Generated", "${aiTargetLanguage}"]
-          }
-        ]
+        {
+          "domainPath": ["Macro Domain", "Category", "Specific Topic"],
+          "cards": [
+            {
+              "front": "Target word/concept in ${aiTargetLanguage}",
+              "back": "Definition/translation in English",
+              "type": "noun", 
+              "ipa": "/phonetics in IPA format/",
+              "morphology": [{"part": "The word itself or a root", "meaning": "Root meaning", "type": "root"}],
+              "usage": {"sentence": "A simple example sentence in ${aiTargetLanguage}", "translation": "The English translation of the sentence"},
+              "grammarTags": ["AI_Generated", "${aiTargetLanguage}"]
+            }
+          ]
+        }
         
         USER PROMPT: "${aiPrompt}"`;
 
@@ -613,11 +684,19 @@ export default function CardBuilderView({
             let rawText = data.candidates[0].content.parts[0].text;
             
             rawText = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
-            const aiCards = JSON.parse(rawText);
+            const aiResponse = JSON.parse(rawText);
             
-            if (!Array.isArray(aiCards)) throw new Error("AI did not return an array.");
+            if (!aiResponse.cards || !Array.isArray(aiResponse.cards)) {
+                throw new Error("AI did not return the correct schema format.");
+            }
 
-            await executeBulkIngest(aiCards, "Neural Forge Complete!");
+            // Auto-Map UI
+            if (aiResponse.domainPath && Array.isArray(aiResponse.domainPath)) {
+                setDomainPath(aiResponse.domainPath);
+                setToastMsg(`Auto-Mapped to: ${aiResponse.domainPath.join(' > ')}`);
+            }
+
+            await executeBulkIngest(aiResponse.cards, "Neural Forge & Mapping Complete!");
 
         } catch (err) {
             console.error("Neural Forge Error:", err);
@@ -630,19 +709,28 @@ export default function CardBuilderView({
 
     const jsonTemplate = `[\n  { "front": "canis", "back": "dog", "type": "noun", "imageUrl": "https://..." }\n]`;
 
-    // 🔥 REUSABLE RENDERER FOR THE DOMAIN MAP
+    // 🔥 REUSABLE RENDERER FOR THE DOMAIN MAP (With Auto-Map Button)
     const renderDomainBuilder = () => (
         <div className="flex flex-col gap-3 p-5 bg-indigo-50/50 dark:bg-indigo-500/5 rounded-2xl border border-indigo-100 dark:border-indigo-500/10 mt-4 animate-in slide-in-from-top-2">
-            <div>
-                <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest flex items-center gap-1.5 mb-1">
-                    <Map size={14}/> Lexicon Map (Optional)
-                </label>
-                <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                    Map this module's location in the global network (e.g., Entertainment &gt; Movies &gt; Story).
-                </p>
+            <div className="flex items-center justify-between">
+                <div>
+                    <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest flex items-center gap-1.5 mb-1">
+                        <Map size={14}/> Lexicon Map
+                    </label>
+                    <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                        Map this module's location in the global network.
+                    </p>
+                </div>
+                
+                <button 
+                    onClick={(e) => { e.preventDefault(); handleAutoMap(); }}
+                    className="flex items-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md active:scale-95 transition-all"
+                >
+                    <Wand2 size={14} /> Auto-Map
+                </button>
             </div>
             
-            <div className="flex flex-wrap items-center gap-2 min-h-[32px]">
+            <div className="flex flex-wrap items-center gap-2 min-h-[32px] mt-2">
                 {domainPath.length === 0 && (
                     <span className="text-xs font-bold text-slate-400 italic">Root Level (Uncategorized)</span>
                 )}
