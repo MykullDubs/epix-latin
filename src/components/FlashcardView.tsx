@@ -639,19 +639,18 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const [isFetchingCards, setIsFetchingCards] = useState(false);
     
     const [sessionCards, setSessionCards] = useState<any[]>([]);
-    
-    // 🔥 SHARED SWIPE TRACKER
+    const [libTouchStart, setLibTouchStart] = useState<{x: number, y: number} | null>(null);
     const [touchStartCoords, setTouchStartCoords] = useState<{x: number, y: number} | null>(null);
-    
     const [builderConfig, setBuilderConfig] = useState<{type: 'new_deck', folder: string | null} | {type: 'add_card', deck: any} | null>(null);
 
     const [omniDeck, setOmniDeck] = useState<any>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const filterBarRef = useRef<HTMLDivElement>(null);
 
-    const resolvedDeck = omniDeck || allDecks[selectedDeckKey] || Object.values(allDecks)[0];
+    // 🔥 THE FALLBACK TRAP FIX
+    const resolvedDeck = omniDeck || (selectedDeckKey ? allDecks[selectedDeckKey] : null);
     const cards = omniDeck ? omniDeck.cards : fetchedCards;
-    const deckTitle = resolvedDeck?.id === 'custom' ? "My Study Cards" : resolvedDeck?.title;
+    const deckTitle = resolvedDeck ? (resolvedDeck.id === 'custom' ? "My Study Cards" : resolvedDeck.title) : "";
 
     const customFolders: string[] = userData?.studyFolders || [];
     const folderColors: Record<string, string> = userData?.folderColors || {};
@@ -721,28 +720,39 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         });
     }, [cards, cardStats]);
 
-    // 🔥 BULLETPROOF STATE NAVIGATOR (No history API conflicts!)
+    // 🔥 THE SAFE STATE CONTROLLER
     const handleBack = () => {
-        if (internalMode === 'playing') setInternalMode('menu');
+        if (activeOptionsDeck) setActiveOptionsDeck(null);
+        else if (activeOptionsFolder) setActiveOptionsFolder(null);
+        else if (showFolderModal.isOpen) setShowFolderModal({isOpen: false, editMode: false, oldName: ''});
+        else if (internalMode === 'playing') setInternalMode('menu');
         else if (internalMode === 'create') setInternalMode(builderConfig?.type === 'add_card' ? 'menu' : 'library');
-        else { 
-            setInternalMode('library'); 
-            onSelectDeck(null); 
-            setOmniDeck(null); 
+        else if (internalMode === 'menu') {
+            setInternalMode('library');
+            onSelectDeck(null);
+            setOmniDeck(null);
+        } else if (internalMode === 'library' && deckFilter !== 'all') {
+            setDeckFilter('all');
+        } else {
+            // If they are at the very root of the library, close the Study Hub entirely
+            if (onSelectDeck) onSelectDeck(null);
         }
     };
 
     const handleGameFinish = (scorePct: number) => {
         const baseMultiplier = activeGame === 'quiz' ? 10 : activeGame === 'match' ? 15 : 5;
         const earnedXP = Math.round((cards.length * baseMultiplier) * (scorePct / 100)); 
-        onLogActivity(resolvedDeck.id || 'custom', earnedXP, `${deckTitle} (${activeGame})`, { scorePct, mode: activeGame });
+        onLogActivity(resolvedDeck?.id || 'custom', earnedXP, `${deckTitle} (${activeGame})`, { scorePct, mode: activeGame });
         
-        setInternalMode('menu');
+        handleBack();
         setTimeout(() => setToastMsg(`Protocol Complete! +${earnedXP} XP Earned!`), 100);
     };
 
     const launchGame = (mode: 'standard' | 'quiz' | 'match' | 'tower') => {
-        if (cards.length === 0) return setToastMsg("This deck has no cards.");
+        if (cards.length === 0) {
+            setToastMsg("This deck has no cards.");
+            return;
+        }
 
         const studySnapshot = mode === 'standard' && dueCards.length > 0 ? [...dueCards] : [...cards];
         setSessionCards(studySnapshot);
@@ -751,18 +761,34 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         setInternalMode('playing');
     };
 
-    // 🔥 CUSTOM EDGE-SWIPE RECOGNIZER
+    // 🔥 ON-SCREEN SWIPE GESTURE CONTROLS
     const handleSwipeStart = (e: React.TouchEvent) => {
         setTouchStartCoords({ x: e.touches[0].clientX, y: e.touches[0].clientY });
     };
 
-    const handleLibrarySwipeEnd = (e: React.TouchEvent) => {
+    const handleMenuSwipeEnd = (e: React.TouchEvent) => {
         if (!touchStartCoords) return;
+        const deltaX = touchStartCoords.x - e.changedTouches[0].clientX;
+        const deltaY = touchStartCoords.y - e.changedTouches[0].clientY;
+
+        // If they swiped right across the screen (deltaX is extremely negative)
+        if (deltaX < -70 && Math.abs(deltaX) > Math.abs(deltaY)) {
+            handleBack();
+        }
+        setTouchStartCoords(null);
+    };
+
+    const handleLibrarySwipeStart = (e: React.TouchEvent) => {
+        setLibTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    };
+
+    const handleLibrarySwipeEnd = (e: React.TouchEvent) => {
+        if (!libTouchStart) return;
         const touchEndX = e.changedTouches[0].clientX;
         const touchEndY = e.changedTouches[0].clientY;
 
-        const deltaX = touchStartCoords.x - touchEndX; 
-        const deltaY = touchStartCoords.y - touchEndY;
+        const deltaX = libTouchStart.x - touchEndX; 
+        const deltaY = libTouchStart.y - touchEndY;
 
         if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
             const allFilters = ['all', 'personal', 'network', 'archived', ...customFolders];
@@ -776,19 +802,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 if ("vibrate" in navigator) navigator.vibrate(15); 
             }
         }
-        setTouchStartCoords(null);
-    };
-
-    const handleMenuSwipeEnd = (e: React.TouchEvent) => {
-        if (!touchStartCoords) return;
-        const deltaX = touchStartCoords.x - e.changedTouches[0].clientX;
-        const deltaY = touchStartCoords.y - e.changedTouches[0].clientY;
-
-        // If they swiped right significantly (negative deltaX)
-        if (deltaX < -70 && Math.abs(deltaX) > Math.abs(deltaY)) {
-            handleBack();
-        }
-        setTouchStartCoords(null);
+        setLibTouchStart(null);
     };
 
     const launchOmniMode = async (folderName: string) => {
@@ -827,6 +841,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             });
 
             const [allResults, allStats] = await Promise.all([Promise.all(allPromises), Promise.all(statsPromises)]);
+            
             const allCards = allResults.flat();
             
             const statsMap: Record<string, any> = {};
@@ -867,7 +882,9 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 onSave={handleSaveFromBuilder} 
                 onCancel={(success?: boolean) => {
                     handleBack();
-                    if (success) setTimeout(() => setToastMsg(builderConfig.type === 'new_deck' ? "Deck Forged." : "Card Appended."), 100);
+                    if (success) {
+                        setTimeout(() => setToastMsg(builderConfig.type === 'new_deck' ? "Deck Forged." : "Card Appended."), 100);
+                    }
                 }} 
             />
         );
@@ -899,7 +916,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 await onCreateFolder(folderName.trim(), color);
                 setToastMsg(`Folder "${folderName.trim()}" created.`);
             }
-            setShowFolderModal({isOpen: false, editMode: false, oldName: ''});
+            handleBack();
         };
 
         return (
@@ -912,7 +929,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         initialColor={showFolderModal.editMode ? folderColors[showFolderModal.oldName] : 'indigo'}
                         isEdit={showFolderModal.editMode}
                         onSave={handleSaveNewFolder}
-                        onClose={() => setShowFolderModal({isOpen: false, editMode: false, oldName: ''})}
+                        onClose={handleBack}
                     />
                 )}
 
@@ -966,7 +983,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
                 <div 
                     ref={scrollContainerRef} 
-                    onTouchStart={handleSwipeStart}
+                    onTouchStart={handleLibrarySwipeStart}
                     onTouchEnd={handleLibrarySwipeEnd}
                     className="flex-1 overflow-y-auto p-6 space-y-5 pb-28 relative z-10 custom-scrollbar overscroll-y-contain h-full"
                 >
@@ -1103,7 +1120,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
                 {activeOptionsFolder && (
                     <div className="fixed inset-0 z-[500] flex flex-col justify-end">
-                        <div className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setActiveOptionsFolder(null)} />
+                        <div className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm transition-opacity" onClick={handleBack} />
                         <div className="bg-white dark:bg-slate-900 w-full rounded-t-[2.5rem] p-6 relative z-10 animate-in slide-in-from-bottom-full duration-300 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] pb-safe-6">
                             <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto mb-6" />
                             
@@ -1159,7 +1176,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     <div className="fixed inset-0 z-[500] flex flex-col justify-end">
                         <div 
                             className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm transition-opacity" 
-                            onClick={() => setActiveOptionsDeck(null)} 
+                            onClick={handleBack} 
                         />
                         <div className="bg-white dark:bg-slate-900 w-full rounded-t-[2.5rem] p-6 relative z-10 animate-in slide-in-from-bottom-full duration-300 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] pb-safe-6">
                             
@@ -1361,7 +1378,11 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
     // --- PLAYING VIEW ---
     return (
-        <div className="h-[100dvh] flex flex-col bg-slate-50 dark:bg-slate-950 animate-in slide-in-from-bottom-8 duration-500 relative z-[100] transition-colors pb-safe">
+        <div 
+            onTouchStart={handleSwipeStart}
+            onTouchEnd={handleMenuSwipeEnd}
+            className="h-[100dvh] flex flex-col bg-slate-50 dark:bg-slate-950 animate-in slide-in-from-bottom-8 duration-500 relative z-[100] transition-colors pb-safe"
+        >
             <div className="px-4 py-4 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center shrink-0">
                 <button onClick={handleBack} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition-colors"><X size={20} strokeWidth={3}/></button>
                 <div className="flex flex-col items-center">
