@@ -1321,7 +1321,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             </div>
             <div className="flex-1 overflow-hidden relative">
                 {/* 🔥 SRB INJECTION: Pass the sessionCards and the raw stats map into the player */}
-{activeGame === 'standard' && <StudyModePlayer deckCards={sessionCards} initialSrbData={cardStats} user={user} userData={userData} onToggleStar={onToggleStar} deckId={selectedDeckKey} onFinish={handleFinish} />}
+{activeGame === 'standard' && <StudyModePlayer deckCards={sessionCards} initialSrbData={cardStats} user={user} userData={userData} onToggleStar={onToggleStar} deckId={selectedDeckKey} onFinish={handleGameFinish} />}
                 {/* Quiz and Match still use the session cards */}
                 {activeGame === 'quiz' && <div className="h-full overflow-y-auto"><QuizSessionView deckCards={sessionCards} onGameEnd={(res: any) => handleGameFinish(res.score ? (res.score/res.total)*100 : 0)} /></div>}
                 {activeGame === 'match' && <div className="h-full overflow-y-auto pt-6"><MatchingGame deckCards={sessionCards} onGameEnd={(scorePct: number) => handleGameFinish(scorePct)} /></div>}
