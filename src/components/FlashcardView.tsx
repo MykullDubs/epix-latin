@@ -648,12 +648,56 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const filterBarRef = useRef<HTMLDivElement>(null);
 
     // 🔥 THE FALLBACK TRAP FIX
+    // We only try to resolve a deck if there's an actual selectedDeckKey. This stops it from guessing "My Study Cards"
     const resolvedDeck = omniDeck || (selectedDeckKey ? allDecks[selectedDeckKey] : null);
     const cards = omniDeck ? omniDeck.cards : fetchedCards;
     const deckTitle = resolvedDeck ? (resolvedDeck.id === 'custom' ? "My Study Cards" : resolvedDeck.title) : "";
 
     const customFolders: string[] = userData?.studyFolders || [];
     const folderColors: Record<string, string> = userData?.folderColors || {};
+
+    // 🔥 THE SAFE STATE CONTROLLER (No more window.history teleportation!)
+    const handleBack = () => {
+        // Step 1: Close any active modals
+        if (activeOptionsDeck) setActiveOptionsDeck(null);
+        else if (activeOptionsFolder) setActiveOptionsFolder(null);
+        else if (showFolderModal.isOpen) setShowFolderModal({isOpen: false, editMode: false, oldName: ''});
+        
+        // Step 2: Retreat from active views
+        else if (internalMode === 'playing') setInternalMode('menu');
+        else if (internalMode === 'create') setInternalMode(builderConfig?.type === 'add_card' ? 'menu' : 'library');
+        else if (internalMode === 'menu') {
+            setInternalMode('library');
+            if (onSelectDeck) onSelectDeck(null); // Safely alert parent without destroying router state
+            setOmniDeck(null);
+        } 
+        
+        // Step 3: Exit active folders
+        else if (internalMode === 'library' && deckFilter !== 'all') {
+            setDeckFilter('all');
+        } 
+        
+        // Step 4: If nothing else is open, we let the parent close us
+        else {
+            if (onSelectDeck) onSelectDeck(null);
+        }
+    };
+
+    // 🔥 POPSTATE LISTENER: Safely intercepts Android back button WITHOUT crashing the router
+    useEffect(() => {
+        const handleNativeSwipe = (e: PopStateEvent) => {
+            // We use a dummy state to absorb the browser back button, then fire our React state update
+            handleBack();
+        };
+        window.addEventListener('popstate', handleNativeSwipe);
+        
+        // Push a dummy state so the browser has something to 'pop'
+        if (internalMode !== 'library' || deckFilter !== 'all' || activeOptionsDeck || activeOptionsFolder || showFolderModal.isOpen) {
+            window.history.pushState({ modal: true }, '');
+        }
+
+        return () => window.removeEventListener('popstate', handleNativeSwipe);
+    }, [internalMode, deckFilter, activeOptionsDeck, activeOptionsFolder, showFolderModal, onSelectDeck]);
 
     useEffect(() => {
         if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
@@ -720,34 +764,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         });
     }, [cards, cardStats]);
 
-    // 🔥 THE SAFE STATE CONTROLLER
-    const handleBack = () => {
-        if (activeOptionsDeck) setActiveOptionsDeck(null);
-        else if (activeOptionsFolder) setActiveOptionsFolder(null);
-        else if (showFolderModal.isOpen) setShowFolderModal({isOpen: false, editMode: false, oldName: ''});
-        else if (internalMode === 'playing') setInternalMode('menu');
-        else if (internalMode === 'create') setInternalMode(builderConfig?.type === 'add_card' ? 'menu' : 'library');
-        else if (internalMode === 'menu') {
-            setInternalMode('library');
-            onSelectDeck(null);
-            setOmniDeck(null);
-        } else if (internalMode === 'library' && deckFilter !== 'all') {
-            setDeckFilter('all');
-        } else {
-            // If they are at the very root of the library, close the Study Hub entirely
-            if (onSelectDeck) onSelectDeck(null);
-        }
-    };
-
-    const handleGameFinish = (scorePct: number) => {
-        const baseMultiplier = activeGame === 'quiz' ? 10 : activeGame === 'match' ? 15 : 5;
-        const earnedXP = Math.round((cards.length * baseMultiplier) * (scorePct / 100)); 
-        onLogActivity(resolvedDeck?.id || 'custom', earnedXP, `${deckTitle} (${activeGame})`, { scorePct, mode: activeGame });
-        
-        handleBack();
-        setTimeout(() => setToastMsg(`Protocol Complete! +${earnedXP} XP Earned!`), 100);
-    };
-
     const launchGame = (mode: 'standard' | 'quiz' | 'match' | 'tower') => {
         if (cards.length === 0) {
             setToastMsg("This deck has no cards.");
@@ -761,6 +777,15 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         setInternalMode('playing');
     };
 
+    const handleGameFinish = (scorePct: number) => {
+        const baseMultiplier = activeGame === 'quiz' ? 10 : activeGame === 'match' ? 15 : 5;
+        const earnedXP = Math.round((cards.length * baseMultiplier) * (scorePct / 100)); 
+        onLogActivity(resolvedDeck?.id || 'custom', earnedXP, `${deckTitle} (${activeGame})`, { scorePct, mode: activeGame });
+        
+        handleBack();
+        setTimeout(() => setToastMsg(`Protocol Complete! +${earnedXP} XP Earned!`), 100);
+    };
+
     // 🔥 ON-SCREEN SWIPE GESTURE CONTROLS
     const handleSwipeStart = (e: React.TouchEvent) => {
         setTouchStartCoords({ x: e.touches[0].clientX, y: e.touches[0].clientY });
@@ -771,7 +796,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         const deltaX = touchStartCoords.x - e.changedTouches[0].clientX;
         const deltaY = touchStartCoords.y - e.changedTouches[0].clientY;
 
-        // If they swiped right across the screen (deltaX is extremely negative)
+        // Swiped right across the screen
         if (deltaX < -70 && Math.abs(deltaX) > Math.abs(deltaY)) {
             handleBack();
         }
@@ -841,7 +866,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             });
 
             const [allResults, allStats] = await Promise.all([Promise.all(allPromises), Promise.all(statsPromises)]);
-            
             const allCards = allResults.flat();
             
             const statsMap: Record<string, any> = {};
@@ -882,9 +906,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 onSave={handleSaveFromBuilder} 
                 onCancel={(success?: boolean) => {
                     handleBack();
-                    if (success) {
-                        setTimeout(() => setToastMsg(builderConfig.type === 'new_deck' ? "Deck Forged." : "Card Appended."), 100);
-                    }
+                    if (success) setTimeout(() => setToastMsg(builderConfig.type === 'new_deck' ? "Deck Forged." : "Card Appended."), 100);
                 }} 
             />
         );
