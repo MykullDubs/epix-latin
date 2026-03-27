@@ -654,7 +654,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const customFolders: string[] = userData?.studyFolders || [];
     const folderColors: Record<string, string> = userData?.folderColors || {};
 
-    // 🔥 1. BULLETPROOF STATE CONTROLLER
+   // 🔥 1. BULLETPROOF STATE CONTROLLER
     const handleBack = () => {
         // 1. Close modals first
         if (activeOptionsDeck) { setActiveOptionsDeck(null); return; }
@@ -674,7 +674,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         if (internalMode === 'menu') {
             setInternalMode('library');
             setOmniDeck(null);
-            if (onSelectDeck) onSelectDeck(null);
+            // 🔥 REMOVED onSelectDeck(null) from here so it doesn't alert the parent router!
             return;
         }
 
@@ -684,7 +684,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         // 6. Full exit (Let the main app Router handle the final exit back to dashboard)
         if (onSelectDeck) onSelectDeck(null);
     };
-
+    
     // 🔥 2. NATIVE DOM POPSTATE LISTENER (Always uses fresh state)
     const handleBackRef = useRef(handleBack);
     useEffect(() => {
