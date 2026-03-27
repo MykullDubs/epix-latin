@@ -655,6 +655,17 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
     const [omniDeck, setOmniDeck] = useState<any>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const filterBarRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        // Whenever the tab changes, find the active button and slide it to the center!
+        if (filterBarRef.current) {
+            const activeTab = filterBarRef.current.querySelector('[data-active="true"]');
+            if (activeTab) {
+                activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            }
+        }
+    }, [deckFilter]);
 
     const resolvedDeck = omniDeck || allDecks[selectedDeckKey] || Object.values(allDecks)[0];
     const cards = omniDeck ? omniDeck.cards : fetchedCards;
@@ -932,11 +943,11 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         </button>
                     </div>
 
-                    <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center gap-2 overflow-x-auto custom-scrollbar overscroll-x-contain">
+                       <div ref={filterBarRef} className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center gap-2 overflow-x-auto custom-scrollbar overscroll-x-contain scroll-smooth">
                         <Filter size={16} className="text-slate-400 mr-2 shrink-0" />
                         
                         {['all', 'personal', 'network', 'archived'].map((f: any) => (
-                            <button key={f} onClick={() => setDeckFilter(f)} className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${deckFilter === f ? 'bg-slate-800 dark:bg-slate-700 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200'}`}>
+                            <button key={f} onClick={() => setDeckFilter(f)} data-active={deckFilter === f} className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${deckFilter === f ? 'bg-slate-800 dark:bg-slate-700 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200'}`}>
                                 {f}
                             </button>
                         ))}
@@ -945,7 +956,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         {customFolders.map((folderName: string) => {
                             const cTheme = FOLDER_COLORS[folderColors[folderName] || 'indigo'];
                             return (
-                                <button key={folderName} onClick={() => setDeckFilter(folderName)} className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 active:scale-95 ${deckFilter === folderName ? `${cTheme.hex} text-white shadow-md` : `${cTheme.bg} ${cTheme.iconColor}`}`}>
+                                <button key={folderName} onClick={() => setDeckFilter(folderName)} data-active={deckFilter === folderName} className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 active:scale-95 ${deckFilter === folderName ? `${cTheme.hex} text-white shadow-md` : `${cTheme.bg} ${cTheme.iconColor}`}`}>
                                     <Folder size={12} fill="currentColor" /> {folderName}
                                 </button>
                             );
