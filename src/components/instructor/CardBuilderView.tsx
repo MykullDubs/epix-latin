@@ -123,12 +123,9 @@ export default function CardBuilderView({
 
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [localOptimisticDecks, setLocalOptimisticDecks] = useState<any>({});
     const [showShareModal, setShowShareModal] = useState(false);
     
-    // 🔥 OPTIMISTIC STATE DECLARATION RESTORED
-    const [localOptimisticDecks, setLocalOptimisticDecks] = useState<any>({});
-    
-    // 🔥 3-WAY BUILDER TAB STATE
     const [builderTab, setBuilderTab] = useState<'single' | 'bulk' | 'ai'>('single');
     
     const [jsonInput, setJsonInput] = useState<string>('');
@@ -138,7 +135,6 @@ export default function CardBuilderView({
     const [bulkNewTitle, setBulkNewTitle] = useState('');
     const [bulkExistingId, setBulkExistingId] = useState('custom');
 
-    // 🔥 AI AUTO-FORGE STATE
     const [aiPrompt, setAiPrompt] = useState('');
     const [aiTargetLanguage, setAiTargetLanguage] = useState('Spanish');
     const [aiCardCount, setAiCardCount] = useState(10);
@@ -146,23 +142,15 @@ export default function CardBuilderView({
     const [currentDeckCards, setCurrentDeckCards] = useState<any[]>([]);
     const [isFetchingCards, setIsFetchingCards] = useState(false);
 
-    // 🔥 OPTIMISTIC MERGE
     const validDecks = { ...availableDecks, ...localOptimisticDecks };
     const deckOptions = Object.entries(validDecks).map(([key, deck]: any) => ({ id: key, title: deck.title })); 
 
     useEffect(() => { if (initialDeckId) setFormData(prev => ({...prev, deckId: initialDeckId})); }, [initialDeckId]);
     
-    // 🔥 CLEAN FETCHER (No Infinite Loops)
     useEffect(() => {
         const fetchDeckCards = async () => {
-            if (formData.deckId === 'new') { 
-                setCurrentDeckCards([]); 
-                return; 
-            }
-            if (formData.deckId === 'custom') { 
-                setCurrentDeckCards(availableDecks['custom']?.cards || []); 
-                return; 
-            }
+            if (formData.deckId === 'new') { setCurrentDeckCards([]); return; }
+            if (formData.deckId === 'custom') { setCurrentDeckCards(availableDecks['custom']?.cards || []); return; }
 
             setIsFetchingCards(true);
             try {
@@ -176,7 +164,6 @@ export default function CardBuilderView({
                 setIsFetchingCards(false);
             }
         };
-
         fetchDeckCards();
     }, [formData.deckId]);
     
@@ -326,10 +313,10 @@ export default function CardBuilderView({
         setConjugations({});
     };
 
-const registerNewDeck = async (deckId: string, deckTitle: string) => {
+    // 🔥 THE FIX: Perfectly formed Deck Creation
+    const registerNewDeck = async (deckId: string, deckTitle: string) => {
         try {
-            // Tell the UI the deck exists so Network Access works
-            setLocalOptimisticDecks((prev: any) => ({ ...prev, [deckId]: { id: deckId, title: deckTitle } }));
+            setLocalOptimisticDecks((prev: any) => ({ ...prev, [deckId]: { id: deckId, title: deckTitle, stats: { cardCount: 0 } } }));
 
             const deckRef = doc(db, 'artifacts', appId, 'decks', deckId);
             await setDoc(deckRef, { 
@@ -338,16 +325,21 @@ const registerNewDeck = async (deckId: string, deckTitle: string) => {
                 title: deckTitle, 
                 type: 'vocabulary', 
                 createdAt: new Date().toISOString(),
-                updatedAt: Date.now(),
-                // 🔥 THE FIX: Stamp your ownership so the Library pulls it down!
-                authorId: auth.currentUser?.uid, 
-                authorEmail: auth.currentUser?.email,
+                updatedAt: Date.now(), // Triggers UI listeners
+                authorId: auth.currentUser?.uid || 'unknown',
+                instructorId: auth.currentUser?.uid || 'unknown',
                 visibility: 'private',
-                allowedClasses: []
+                stats: { cardCount: 0 } 
             }, { merge: true });
-        } catch (err) { 
-            console.error("Failed to register deck:", err); 
-        }
+            
+            // Explicitly link it to your personal profile so the Library knows you own it
+            if (auth.currentUser?.uid) {
+                const userRef = doc(db, 'artifacts', appId, 'users', auth.currentUser.uid);
+                await setDoc(userRef, {
+                    deckPrefs: { [deckId]: { folder: null, archived: false, addedAt: Date.now() } }
+                }, { merge: true });
+            }
+        } catch (err) { console.error("Failed to register deck:", err); }
     };
 
     const handleDeleteCard = async (cardId: string) => {
@@ -356,6 +348,11 @@ const registerNewDeck = async (deckId: string, deckTitle: string) => {
             await onDeleteCard(formData.deckId, cardId); 
             setCurrentDeckCards(prev => prev.filter(c => c.id !== cardId));
             if (editingId === cardId) handleClear();
+            
+            // Trigger refresh
+            const deckRef = doc(db, 'artifacts', appId, 'decks', formData.deckId);
+            await setDoc(deckRef, { updatedAt: Date.now() }, { merge: true });
+
             setToastMsg("Target eliminated.");
         } catch (err) { setToastMsg("Error: Deletion failed."); }
     };
@@ -393,6 +390,12 @@ const registerNewDeck = async (deckId: string, deckTitle: string) => {
             setCurrentDeckCards(prev => [...prev, { ...cardData, id: newCardId }]);
             setToastMsg("Target Forged Successfully"); 
         } 
+
+        // 🔥 THE FIX: Touch the deck so the app's live listener updates the dashboard!
+        try {
+            const deckRef = doc(db, 'artifacts', appId, 'decks', finalDeckId);
+            await setDoc(deckRef, { updatedAt: Date.now() }, { merge: true });
+        } catch(e) {}
 
         handleClear(); 
         if (isCreatingDeck) { 
@@ -436,11 +439,19 @@ const registerNewDeck = async (deckId: string, deckTitle: string) => {
                 const newId = await onSaveCard(finalDeckId, cardData, true); 
                 successCount++;
                 setImportProgress({ current: successCount, total: cardsArray.length });
-                
                 setCurrentDeckCards(prev => [...prev, { ...cardData, id: newId }]);
                 await new Promise(resolve => setTimeout(resolve, 150));
             } catch (err) { console.error(`Failed to save: ${card.front}`, err); }
         }
+
+        // 🔥 THE FIX: Update the deck's cardCount and Timestamp so the parent listener sees it!
+        try {
+            const deckRef = doc(db, 'artifacts', appId, 'decks', finalDeckId);
+            await setDoc(deckRef, { 
+                updatedAt: Date.now(),
+                'stats.cardCount': (validDecks[finalDeckId]?.stats?.cardCount || 0) + successCount
+            }, { merge: true });
+        } catch(e) {}
 
         setToastMsg(`${successMessage} (${successCount} Targets)`);
         setJsonInput('');
