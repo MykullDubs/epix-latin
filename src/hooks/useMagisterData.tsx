@@ -75,8 +75,8 @@ export function useMagisterData() {
         setInstructorClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
-      const unsubPublished = onSnapshot(collection(db, 'artifacts', appId, 'published_decks'), (snap) => {
-        setPublishedDecks(snap.docs.map(d => d.data()));
+const unsubPublished = onSnapshot(collection(db, 'artifacts', appId, 'decks'), (snap) => {
+  setPublishedDecks(snap.docs.map(d => d.data()));
       });
 
       const unsubCurriculums = onSnapshot(collectionGroup(db, 'custom_curriculums'), (snap) => {
