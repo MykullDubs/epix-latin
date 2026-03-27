@@ -313,33 +313,48 @@ export default function CardBuilderView({
         setConjugations({});
     };
 
-    // 🔥 THE FIX: Perfectly formed Deck Creation
+    // 🔥 THE FIX: Overloading the Deck object so no parent component filter rejects it!
     const registerNewDeck = async (deckId: string, deckTitle: string) => {
         try {
-            setLocalOptimisticDecks((prev: any) => ({ ...prev, [deckId]: { id: deckId, title: deckTitle, stats: { cardCount: 0 } } }));
+            console.log(`[Forge] Registering new deck: ${deckTitle} (${deckId})`);
+            
+            // 1. Give the UI immediate access
+            setLocalOptimisticDecks((prev: any) => ({ ...prev, [deckId]: { id: deckId, title: deckTitle, stats: { cardCount: 0 }, cards: [] } }));
 
             const deckRef = doc(db, 'artifacts', appId, 'decks', deckId);
+            const uid = auth.currentUser?.uid || 'unknown';
+            
+            // 2. Blast the database with every possible legacy field
             await setDoc(deckRef, { 
                 id: deckId, 
                 key: deckId, 
                 title: deckTitle, 
                 type: 'vocabulary', 
                 createdAt: new Date().toISOString(),
-                updatedAt: Date.now(), // Triggers UI listeners
-                authorId: auth.currentUser?.uid || 'unknown',
-                instructorId: auth.currentUser?.uid || 'unknown',
-                visibility: 'private',
-                stats: { cardCount: 0 } 
+                updatedAt: Date.now(),
+                authorId: uid,           // Legacy Auth
+                instructorId: uid,       // Legacy Auth
+                userId: uid,             // Legacy Auth
+                ownerId: uid,            // Legacy Auth
+                visibility: 'private',   // Ensures it isn't hidden
+                isPublished: false,      // Ensures it shows up in 'Personal'
+                stats: { cardCount: 0 },
+                cards: []                // 🔥 LEGACY BYPASS: Tricks old .length > 0 filters!
             }, { merge: true });
             
-            // Explicitly link it to your personal profile so the Library knows you own it
-            if (auth.currentUser?.uid) {
-                const userRef = doc(db, 'artifacts', appId, 'users', auth.currentUser.uid);
+            // 3. Link it explicitly to the user profile
+            if (uid !== 'unknown') {
+                console.log(`[Forge] Linking deck to user profile: ${uid}`);
+                const userRef = doc(db, 'artifacts', appId, 'users', uid);
                 await setDoc(userRef, {
                     deckPrefs: { [deckId]: { folder: null, archived: false, addedAt: Date.now() } }
                 }, { merge: true });
             }
-        } catch (err) { console.error("Failed to register deck:", err); }
+            console.log(`[Forge] Deck registration complete.`);
+        } catch (err) { 
+            console.error("[Forge] Failed to register deck:", err); 
+            alert("Failed to register the deck to Firebase. Check console.");
+        }
     };
 
     const handleDeleteCard = async (cardId: string) => {
@@ -349,7 +364,6 @@ export default function CardBuilderView({
             setCurrentDeckCards(prev => prev.filter(c => c.id !== cardId));
             if (editingId === cardId) handleClear();
             
-            // Trigger refresh
             const deckRef = doc(db, 'artifacts', appId, 'decks', formData.deckId);
             await setDoc(deckRef, { updatedAt: Date.now() }, { merge: true });
 
@@ -391,7 +405,6 @@ export default function CardBuilderView({
             setToastMsg("Target Forged Successfully"); 
         } 
 
-        // 🔥 THE FIX: Touch the deck so the app's live listener updates the dashboard!
         try {
             const deckRef = doc(db, 'artifacts', appId, 'decks', finalDeckId);
             await setDoc(deckRef, { updatedAt: Date.now() }, { merge: true });
@@ -441,17 +454,20 @@ export default function CardBuilderView({
                 setImportProgress({ current: successCount, total: cardsArray.length });
                 setCurrentDeckCards(prev => [...prev, { ...cardData, id: newId }]);
                 await new Promise(resolve => setTimeout(resolve, 150));
-            } catch (err) { console.error(`Failed to save: ${card.front}`, err); }
+            } catch (err) { console.error(`Failed to save card: ${card.front}`, err); }
         }
 
-        // 🔥 THE FIX: Update the deck's cardCount and Timestamp so the parent listener sees it!
+        // 🔥 THE FIX: Safely update stats with an object instead of dot-notation for setDoc
         try {
+            console.log(`[Forge] Updating final stats for deck: ${finalDeckId}`);
             const deckRef = doc(db, 'artifacts', appId, 'decks', finalDeckId);
             await setDoc(deckRef, { 
                 updatedAt: Date.now(),
-                'stats.cardCount': (validDecks[finalDeckId]?.stats?.cardCount || 0) + successCount
+                stats: { cardCount: (validDecks[finalDeckId]?.stats?.cardCount || 0) + successCount }
             }, { merge: true });
-        } catch(e) {}
+        } catch(e) {
+            console.error("[Forge] Failed to update deck stats:", e);
+        }
 
         setToastMsg(`${successMessage} (${successCount} Targets)`);
         setJsonInput('');
