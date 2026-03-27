@@ -647,8 +647,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const filterBarRef = useRef<HTMLDivElement>(null);
 
-    // 🔥 THE FALLBACK TRAP FIX
-    // We only try to resolve a deck if there's an actual selectedDeckKey. This stops it from guessing "My Study Cards"
     const resolvedDeck = omniDeck || (selectedDeckKey ? allDecks[selectedDeckKey] : null);
     const cards = omniDeck ? omniDeck.cards : fetchedCards;
     const deckTitle = resolvedDeck ? (resolvedDeck.id === 'custom' ? "My Study Cards" : resolvedDeck.title) : "";
@@ -656,48 +654,64 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const customFolders: string[] = userData?.studyFolders || [];
     const folderColors: Record<string, string> = userData?.folderColors || {};
 
-    // 🔥 THE SAFE STATE CONTROLLER (No more window.history teleportation!)
+    // 🔥 1. BULLETPROOF STATE CONTROLLER
     const handleBack = () => {
-        // Step 1: Close any active modals
-        if (activeOptionsDeck) setActiveOptionsDeck(null);
-        else if (activeOptionsFolder) setActiveOptionsFolder(null);
-        else if (showFolderModal.isOpen) setShowFolderModal({isOpen: false, editMode: false, oldName: ''});
-        
-        // Step 2: Retreat from active views
-        else if (internalMode === 'playing') setInternalMode('menu');
-        else if (internalMode === 'create') setInternalMode(builderConfig?.type === 'add_card' ? 'menu' : 'library');
-        else if (internalMode === 'menu') {
-            setInternalMode('library');
-            if (onSelectDeck) onSelectDeck(null); // Safely alert parent without destroying router state
-            setOmniDeck(null);
-        } 
-        
-        // Step 3: Exit active folders
-        else if (internalMode === 'library' && deckFilter !== 'all') {
-            setDeckFilter('all');
-        } 
-        
-        // Step 4: If nothing else is open, we let the parent close us
-        else {
-            if (onSelectDeck) onSelectDeck(null);
+        // 1. Close modals first
+        if (activeOptionsDeck) { setActiveOptionsDeck(null); return; }
+        if (activeOptionsFolder) { setActiveOptionsFolder(null); return; }
+        if (showFolderModal.isOpen) { setShowFolderModal({isOpen: false, editMode: false, oldName: ''}); return; }
+
+        // 2. Exit playing → menu
+        if (internalMode === 'playing') { setInternalMode('menu'); return; }
+
+        // 3. Exit create → correct destination
+        if (internalMode === 'create') {
+            setInternalMode(builderConfig?.type === 'add_card' ? 'menu' : 'library');
+            return;
         }
+
+        // 4. Exit menu → library
+        if (internalMode === 'menu') {
+            setInternalMode('library');
+            setOmniDeck(null);
+            if (onSelectDeck) onSelectDeck(null);
+            return;
+        }
+
+        // 5. Exit folder filter → all
+        if (deckFilter !== 'all') { setDeckFilter('all'); return; }
+
+        // 6. Full exit (Let the main app Router handle the final exit back to dashboard)
+        if (onSelectDeck) onSelectDeck(null);
     };
 
-    // 🔥 POPSTATE LISTENER: Safely intercepts Android back button WITHOUT crashing the router
+    // 🔥 2. NATIVE DOM POPSTATE LISTENER (Always uses fresh state)
+    const handleBackRef = useRef(handleBack);
     useEffect(() => {
-        const handleNativeSwipe = (e: PopStateEvent) => {
-            // We use a dummy state to absorb the browser back button, then fire our React state update
-            handleBack();
-        };
-        window.addEventListener('popstate', handleNativeSwipe);
-        
-        // Push a dummy state so the browser has something to 'pop'
-        if (internalMode !== 'library' || deckFilter !== 'all' || activeOptionsDeck || activeOptionsFolder || showFolderModal.isOpen) {
+        handleBackRef.current = handleBack;
+    }, [handleBack]);
+
+    useEffect(() => {
+        const handleNativeBack = () => handleBackRef.current();
+        window.addEventListener('popstate', handleNativeBack);
+        return () => window.removeEventListener('popstate', handleNativeBack);
+    }, []);
+
+    // 🔥 3. STRICT HISTORY STACK PUSHER (Only triggers when actually entering a new layer)
+    const prevModeRef = useRef(internalMode);
+    useEffect(() => {
+        const enteredNewLayer =
+            internalMode !== 'library' ||
+            deckFilter !== 'all' ||
+            !!activeOptionsDeck ||
+            !!activeOptionsFolder ||
+            showFolderModal.isOpen;
+
+        if (enteredNewLayer && prevModeRef.current !== internalMode) {
             window.history.pushState({ modal: true }, '');
         }
-
-        return () => window.removeEventListener('popstate', handleNativeSwipe);
-    }, [internalMode, deckFilter, activeOptionsDeck, activeOptionsFolder, showFolderModal, onSelectDeck]);
+        prevModeRef.current = internalMode;
+    }, [internalMode, deckFilter, activeOptionsDeck, activeOptionsFolder, showFolderModal.isOpen]);
 
     useEffect(() => {
         if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
@@ -866,6 +880,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             });
 
             const [allResults, allStats] = await Promise.all([Promise.all(allPromises), Promise.all(statsPromises)]);
+            
             const allCards = allResults.flat();
             
             const statsMap: Record<string, any> = {};
@@ -906,7 +921,9 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 onSave={handleSaveFromBuilder} 
                 onCancel={(success?: boolean) => {
                     handleBack();
-                    if (success) setTimeout(() => setToastMsg(builderConfig.type === 'new_deck' ? "Deck Forged." : "Card Appended."), 100);
+                    if (success) {
+                        setTimeout(() => setToastMsg(builderConfig.type === 'new_deck' ? "Deck Forged." : "Card Appended."), 100);
+                    }
                 }} 
             />
         );
@@ -1013,7 +1030,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         
                         {customFolders.includes(deckFilter) && (
                             <div className="col-span-full animate-in fade-in duration-300 mb-2 mt-2">
-                                <button onClick={() => setDeckFilter('all')} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-500 transition-colors w-fit bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 active:scale-95">
+                                <button onClick={handleBack} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-500 transition-colors w-fit bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 active:scale-95">
                                     <ArrowLeft size={14} /> Back to Library
                                 </button>
                                 
