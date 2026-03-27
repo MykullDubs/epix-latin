@@ -123,7 +123,6 @@ export default function CardBuilderView({
 
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [localOptimisticDecks, setLocalOptimisticDecks] = useState<any>({});
     const [showShareModal, setShowShareModal] = useState(false);
     
     // 🔥 3-WAY BUILDER TAB STATE
@@ -144,28 +143,33 @@ export default function CardBuilderView({
     const [currentDeckCards, setCurrentDeckCards] = useState<any[]>([]);
     const [isFetchingCards, setIsFetchingCards] = useState(false);
 
-    const validDecks = { ...availableDecks, ...localOptimisticDecks };
+    // We still use this to populate the dropdown select menus
+    const validDecks = { ...availableDecks };
     const deckOptions = Object.entries(validDecks).map(([key, deck]: any) => ({ id: key, title: deck.title })); 
 
     useEffect(() => { if (initialDeckId) setFormData(prev => ({...prev, deckId: initialDeckId})); }, [initialDeckId]);
     
+    // 🔥 THE FIX: A completely clean, loop-free fetcher
     useEffect(() => {
         const fetchDeckCards = async () => {
-            if (formData.deckId === 'new') { setCurrentDeckCards([]); return; }
-            if (formData.deckId === 'custom') { setCurrentDeckCards(validDecks['custom']?.cards || []); return; }
+            if (formData.deckId === 'new') { 
+                setCurrentDeckCards([]); 
+                return; 
+            }
+            if (formData.deckId === 'custom') { 
+                setCurrentDeckCards(availableDecks['custom']?.cards || []); 
+                return; 
+            }
 
             setIsFetchingCards(true);
             try {
-                const optimisticCards = localOptimisticDecks[formData.deckId]?.cards || [];
                 const cardsRef = collection(db, 'artifacts', appId, 'decks', formData.deckId, 'cards');
                 const snap = await getDocs(cardsRef);
                 const loadedCards = snap.docs.map(doc => doc.data());
                 
-                const mergedCards = [...loadedCards];
-                optimisticCards.forEach((optCard: any) => {
-                    if (!mergedCards.some(c => c.id === optCard.id)) mergedCards.push(optCard);
-                });
-                setCurrentDeckCards(mergedCards);
+                // We no longer rely on localOptimisticDecks merging because executeBulkIngest
+                // and handleSubmit immediately update currentDeckCards in state!
+                setCurrentDeckCards(loadedCards);
             } catch (err) {
                 console.error("Failed to fetch cards:", err);
             } finally {
@@ -174,7 +178,7 @@ export default function CardBuilderView({
         };
 
         fetchDeckCards();
-    }, [formData.deckId, validDecks]);
+    }, [formData.deckId]); // <-- NO MORE validDecks IN DEPENDENCY ARRAY
     
     const handleChange = (e: any) => { 
         if (e.target.name === 'deckId') { 
@@ -444,15 +448,15 @@ export default function CardBuilderView({
         }
     };
 
-// 🔥 THE NEURAL FORGE LOGIC (Secure Environment Edition)
+    // 🔥 THE NEURAL FORGE LOGIC (Secure Environment Edition)
     const handleNeuralForge = async () => {
         if (!aiPrompt.trim()) {
             setToastMsg("Provide a prompt for the AI to forge.");
             return;
         }
 
-        // 🛡️ SECURITY UPGRADE: Pulling the key securely from your .env file
-const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;        
+        // 🛡️ Pulls from your .env file
+        const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;        
         if (!apiKey) {
             setToastMsg("CRITICAL: Missing Gemini API Key in .env file.");
             return;
