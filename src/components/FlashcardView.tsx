@@ -913,8 +913,20 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         );
     }
 
-    if (internalMode === 'library') {
-        const filteredDecks = Object.entries(allDecks).filter(([key, deck]: any) => {
+const filteredDecks = Object.entries(allDecks).filter(([key, deck]: any) => {
+            // 🔥 1. THE VAULT GATEKEEPER
+            // Does the user actually own or have rights to this deck?
+            const isCustom = key === 'custom';
+            const isAuthor = deck.authorId === user?.uid || deck.ownerId === user?.uid;
+            const isUnlocked = userData?.unlocks?.[key];
+            const hasPrefs = !!userData?.deckPrefs?.[key]; // If they've moved it to a folder, it's theirs
+
+            const inMyVault = isCustom || isAuthor || isUnlocked || hasPrefs;
+            
+            // If it's a global deck they haven't downloaded, banish it from the Study Hub!
+            if (!inMyVault) return false; 
+
+            // 🔥 2. FOLDER & ARCHIVE ROUTING
             const isArchived = userData?.deckPrefs?.[key]?.archived || false;
             const currentFolder = userData?.deckPrefs?.[key]?.folder || null;
             
@@ -922,13 +934,12 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             if (isArchived) return false; 
 
             if (deckFilter === 'all') return currentFolder === null;
-            if (deckFilter === 'personal') return !deck.isPublished;
-            if (deckFilter === 'network') return deck.isPublished;
+            if (deckFilter === 'created') return (isCustom || isAuthor) && currentFolder === null;
+            if (deckFilter === 'downloaded') return (!isCustom && !isAuthor) && currentFolder === null;
             
             if (customFolders.includes(deckFilter)) return currentFolder === deckFilter;
             return true;
         });
-
         const handleSaveNewFolder = async (folderName: string, color: string) => {
             if (!folderName.trim()) return;
             if (showFolderModal.editMode && onUpdateFolder) {
@@ -974,10 +985,11 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         </button>
                     </div>
 
-                    <div ref={filterBarRef} className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center gap-2 overflow-x-auto custom-scrollbar overscroll-x-contain scroll-smooth">
+                <div ref={filterBarRef} className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center gap-2 overflow-x-auto custom-scrollbar overscroll-x-contain scroll-smooth">
                         <Filter size={16} className="text-slate-400 mr-2 shrink-0" />
                         
-                        {['all', 'personal', 'network', 'archived'].map((f: any) => (
+                        {/* 🔥 Changed to Created and Downloaded */}
+                        {['all', 'created', 'downloaded', 'archived'].map((f: any) => (
                             <button 
                                 key={f} 
                                 onClick={() => {
