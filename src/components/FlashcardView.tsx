@@ -913,14 +913,20 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         );
     }
 
-    if (internalMode === 'library') {
+if (internalMode === 'library') {
         const filteredDecks = Object.entries(allDecks).filter(([key, deck]: any) => {
             // 🔥 1. THE VAULT GATEKEEPER
-            // Does the user actually own or have rights to this deck?
             const isCustom = key === 'custom';
             const isAuthor = deck.authorId === user?.uid || deck.ownerId === user?.uid;
-            const isUnlocked = userData?.unlocks?.[key];
-            const hasPrefs = !!userData?.deckPrefs?.[key]; // If they've moved it to a folder, it's theirs
+            
+            // Check all possible places a downloaded deck might register (Objects or Arrays)
+            const isUnlocked = 
+                userData?.unlocks?.[key] || 
+                (Array.isArray(userData?.unlocks) && userData.unlocks.includes(key)) ||
+                (Array.isArray(userData?.inventory) && userData.inventory.includes(key));
+            
+            // If they've moved it to a folder or we explicitly added it via Download
+            const hasPrefs = !!userData?.deckPrefs?.[key]; 
 
             const inMyVault = isCustom || isAuthor || isUnlocked || hasPrefs;
             
