@@ -734,30 +734,47 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             return !stat?.nextReviewDate || stat.nextReviewDate <= Date.now();
         });
     }, [cards, cardStats]);
+    // 👇 1. PASTE THE NATIVE SWIPE TRACKER HERE 👇
+    useEffect(() => {
+        const handleNativeSwipe = () => {
+            // Close Modals First
+            if (activeOptionsDeck) setActiveOptionsDeck(null);
+            else if (activeOptionsFolder) setActiveOptionsFolder(null);
+            else if (showFolderModal.isOpen) setShowFolderModal({isOpen: false, editMode: false, oldName: ''});
+            // Then handle Views
+            else if (internalMode === 'playing') setInternalMode('menu');
+            else if (internalMode === 'create') setInternalMode(builderConfig?.type === 'add_card' ? 'menu' : 'library');
+            else if (internalMode === 'menu') {
+                setInternalMode('library');
+                onSelectDeck(null);
+            }
+        };
+        window.addEventListener('popstate', handleNativeSwipe);
+        return () => window.removeEventListener('popstate', handleNativeSwipe);
+    }, [internalMode, activeOptionsDeck, activeOptionsFolder, showFolderModal, builderConfig]);
+    // 👆 END PASTE 👆
 
-    const launchGame = (mode: 'standard' | 'quiz' | 'match' | 'tower') => {
-        if (cards.length === 0) {
-            setToastMsg("This deck has no cards.");
-            return;
-        }
-
-        // 🔥 2. LOCK THE SESSION SNAPSHOT
-        const studySnapshot = mode === 'standard' && dueCards.length > 0 ? [...dueCards] : [...cards];
-        setSessionCards(studySnapshot);
-
-        setActiveGame(mode);
+   const launchGame = (mode: 'standard' | 'quiz' | 'match') => {
+        if (fetchedCards.length === 0) return setToastMsg("Deck is empty.");
+        
+        window.history.pushState({ view: 'playing' }, ''); // 🔥 Tell browser we went forward
+        
+        const snapshot = mode === 'standard' && dueCards.length > 0 ? [...dueCards] : [...fetchedCards];
+        setSessionCards(snapshot);
+        setActiveGame(mode); 
         setInternalMode('playing');
     };
 
+    const handleFinish = (result: any) => {
+        const score = typeof result === 'number' ? result : (result.score / result.total) * 100;
+        onLogActivity(selectedDeckKey, 50, `${deckTitle} Review`, { scorePct: score, mode: activeGame });
+        
+        window.history.back(); // 🔥 Auto-swipe back to menu via history
+        setToastMsg("Session Complete! +50 XP");
+    };
+
     const handleBack = () => {
-        if (internalMode === 'playing') setInternalMode('menu');
-        else if (internalMode === 'menu') { 
-            setInternalMode('library'); 
-            onSelectDeck(null); 
-            setOmniDeck(null); 
-            setFetchedCards([]); 
-            setCardStats({});
-        }
+        window.history.back(); // 🔥 Let the popstate listener handle the routing!
     };
 
     const handleGameFinish = (scorePct: number) => {
@@ -1061,9 +1078,8 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                     <div className="absolute inset-x-2 -bottom-0 h-10 bg-slate-100 dark:bg-slate-800/80 rounded-[2rem] transition-transform duration-300 group-hover:translate-y-1" />
 
                                     <button 
-                                        onClick={() => { onSelectDeck(key); setInternalMode('menu'); }} 
-                                        className="w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] p-5 border-2 border-slate-50 dark:border-slate-800 hover:border-slate-100 dark:hover:border-slate-700 transition-all text-left shadow-sm group-hover:-translate-y-1 relative z-10 flex flex-col"
-                                    >
+                                    <button key={key} onClick={() => { window.history.pushState({ view: 'menu' }, ''); onSelectDeck(key); setInternalMode('menu'); }} className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border-2 border-b-8 border-slate-100 dark:border-slate-800 text-left active:translate-y-1 active:border-b-2 transition-all hover:border-indigo-500 shadow-sm"> 
+                                      
                                         <div className="flex justify-between items-start mb-4">
                                             <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center text-xl border shadow-inner group-hover:scale-110 transition-transform ${theme.bg} ${theme.color} ${theme.border}`}>
                                                 {typeof DeckIcon === 'string' ? DeckIcon : <DeckIcon size={24}/>}
