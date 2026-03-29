@@ -1,5 +1,5 @@
 // src/components/DiscoveryView.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
     Search, Globe, BookOpen, Utensils, HeartPulse, 
     Briefcase, Plane, Palette, ChevronRight, ArrowLeft, 
@@ -9,7 +9,6 @@ import {
 import { Toast } from './Toast';
 
 // 🔥 EXPANDED ONTOLOGY LEVEL 1 (The Macro Domains)
-// Infused with gradients and shadows for maximum UI juice
 const MACRO_DOMAINS = [
     { id: 'stem', title: 'STEM & Medical', icon: HeartPulse, gradient: 'from-emerald-400 to-teal-600', text: 'text-emerald-500', shadow: 'shadow-emerald-500/30', desc: 'Anatomy, biology, and healthcare' },
     { id: 'tech', title: 'Technology & Logic', icon: Cpu, gradient: 'from-blue-500 to-indigo-600', text: 'text-blue-500', shadow: 'shadow-blue-500/30', desc: 'Software, AI, and engineering' },
@@ -24,17 +23,14 @@ const MACRO_DOMAINS = [
 
 export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userData }: any) {
     // 1. NAVIGATION STATE
-    // [] = Root Radar View. ['STEM & Medical'] = Level 1. ['STEM & Medical', 'Anatomy'] = Level 2.
     const [domainPath, setDomainPath] = useState<string[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [touchStartCoords, setTouchStartCoords] = useState<{x: number, y: number} | null>(null);
     const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-    // Convert Firestore object dict to a flat array for the engine to process
     const globalDecks = useMemo(() => Object.values(networkDecks), [networkDecks]);
 
-    // 🔥 2. THE DYNAMIC REDUCER ENGINE (Protected Feature)
-    // Calculates exactly what folders and decks exist at the user's current depth
+    // 🔥 2. THE DYNAMIC REDUCER ENGINE
     const { currentFolders, currentDecks } = useMemo(() => {
         const folders = new Set<string>();
         const decks: any[] = [];
@@ -42,15 +38,12 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
         globalDecks.forEach((deck: any) => {
             const path = deck.domainPath || [];
             
-            // Does this deck belong in our current path?
             const matchesPath = domainPath.every((p, i) => path[i] === p);
-            if (!matchesPath) return; // Skip it, it's in a different branch
+            if (!matchesPath) return; 
 
             if (path.length > domainPath.length) {
-                // There is another layer deeper! Add it as a folder.
                 folders.add(path[domainPath.length]);
             } else {
-                // This deck lives exactly at this coordinate!
                 decks.push(deck);
             }
         });
@@ -61,25 +54,42 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
         };
     }, [globalDecks, domainPath]);
 
-    // Determine the color theme based on the root macro domain they clicked
     const rootDomainName = domainPath[0];
     const rootMacroConfig = MACRO_DOMAINS.find(m => m.title === rootDomainName);
     const ThemeIcon = rootMacroConfig?.icon || Layers;
     const themeGradient = rootMacroConfig?.gradient || 'from-slate-400 to-slate-600';
     const themeShadow = rootMacroConfig?.shadow || 'shadow-slate-500/20';
 
-    // --- NAVIGATION GESTURES ---
+    // 🔥 3. BULLETPROOF NAVIGATION CONTROLLER
+    const handleBack = () => {
+        if (domainPath.length > 0) {
+            // Peel off the deepest folder layer
+            setDomainPath(prev => prev.slice(0, -1));
+        }
+        // If domainPath.length === 0, the browser will naturally exit back to the Home View!
+    };
+
+    // The fresh closure reference to survive the event listener
+    const handleBackRef = useRef(handleBack);
+    useEffect(() => {
+        handleBackRef.current = handleBack;
+    }, [domainPath]);
+
+    // Mount the popstate listener ONCE
+    useEffect(() => {
+        const handleNativeBack = (e: PopStateEvent) => handleBackRef.current();
+        window.addEventListener('popstate', handleNativeBack);
+        return () => window.removeEventListener('popstate', handleNativeBack);
+    }, []);
+
+    // Going deeper: drop a history breadcrumb first!
     const handleNavigateIn = (folderName: string) => {
+        window.history.pushState({ view: 'discovery_depth' }, '');
         setDomainPath(prev => [...prev, folderName]);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    const handleNavigateOut = () => {
-        if (domainPath.length > 0) {
-            setDomainPath(prev => prev.slice(0, -1));
-        }
-    };
-
+    // Swipe controls (tied to native back)
     const handleSwipeStart = (e: React.TouchEvent) => {
         setTouchStartCoords({ x: e.touches[0].clientX, y: e.touches[0].clientY });
     };
@@ -89,9 +99,9 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
         const deltaX = touchStartCoords.x - e.changedTouches[0].clientX;
         const deltaY = touchStartCoords.y - e.changedTouches[0].clientY;
 
-        // Strict right-swipe detection for "Back"
         if (deltaX < -70 && Math.abs(deltaX) > Math.abs(deltaY)) {
-            handleNavigateOut();
+            // Only trigger back if we are deep inside folders
+            if (domainPath.length > 0) window.history.back();
         }
         setTouchStartCoords(null);
     };
@@ -102,20 +112,17 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
             <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors relative">
                 {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
                 
-                {/* GLOSSY HEADER */}
                 <div className="px-6 pt-safe-8 pb-4 shrink-0 bg-white/80 dark:bg-slate-950/80 backdrop-blur-2xl border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30">
                     <div className="flex justify-between items-end mb-4">
                         <div>
                             <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter italic pr-2">RADAR</h1>
                             <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] flex items-center gap-1.5 mt-1"><Map size={12}/> Global Lexicon</p>
                         </div>
-                        {/* User Flux Display */}
                         <div className="bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3 py-1.5 rounded-xl font-black text-sm flex items-center gap-1.5 shadow-sm border border-amber-200 dark:border-amber-500/20">
                             <Sparkles size={14}/> {userData?.flux || 0} Flux
                         </div>
                     </div>
                     
-                    {/* Search Bar */}
                     <div className="relative group mt-2">
                         <div className="absolute inset-0 bg-indigo-500/10 rounded-[2rem] blur-xl group-focus-within:bg-indigo-500/30 transition-all duration-500 pointer-events-none" />
                         <div className="relative flex items-center">
@@ -133,36 +140,29 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
 
                 <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar pb-32">
                     
-                    {/* A. THE FRONTIER (Algorithmic Push) */}
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Sparkles size={14} className="text-amber-500"/> The Frontier</h4>
                         <button 
                             onClick={() => handleNavigateIn('Linguistics & Phonetics')}
                             className="w-full bg-gradient-to-br from-slate-900 to-indigo-950 dark:from-indigo-900 dark:to-slate-950 p-6 rounded-[2.5rem] text-left shadow-2xl shadow-indigo-900/20 group active:scale-[0.98] transition-all relative overflow-hidden border border-indigo-500/30"
                         >
-                            {/* Glassmorphism flare */}
                             <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-500/30 blur-3xl rounded-full group-hover:bg-indigo-400/40 transition-colors" />
-                            
                             <div className="bg-white/10 backdrop-blur-md w-14 h-14 rounded-2xl flex items-center justify-center text-indigo-300 mb-4 border border-white/10 group-hover:scale-110 transition-transform shadow-inner">
                                 <BookOpen size={28} />
                             </div>
                             <h3 className="font-black text-white text-2xl leading-tight mb-2 relative z-10">Future Ethics & Tech</h3>
                             <p className="text-indigo-200 text-sm font-bold opacity-90 line-clamp-2 relative z-10">Advanced C1 grammar, debate logic, and the vocabulary of AI disruption.</p>
-                            
                             <div className="absolute bottom-6 right-6 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-1">
                                 Discover <ChevronRight size={12}/>
                             </div>
                         </button>
                     </div>
 
-                    {/* B. MACRO DOMAINS (The Juiced Grid) */}
                     <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100">
                         <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Globe2 size={14}/> Lexicon Sectors</h4>
                         <div className="grid grid-cols-2 gap-4">
                             {MACRO_DOMAINS.map((domain) => {
                                 const Icon = domain.icon;
-                                
-                                // 🔥 PROTECTED FEATURE: Determine if this macro domain actually has content in the database yet
                                 const hasContent = globalDecks.some((d: any) => d.domainPath?.[0] === domain.title);
                                 
                                 return (
@@ -197,9 +197,9 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
         >
             {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
 
-            {/* GLOSSY DRILL-DOWN HEADER */}
             <div className="px-6 pt-safe-8 pb-6 shrink-0 bg-white/80 dark:bg-slate-950/80 backdrop-blur-2xl border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 shadow-sm">
-                <button onClick={handleNavigateOut} className="flex items-center text-slate-400 hover:text-indigo-600 mb-6 text-xs font-black uppercase tracking-widest bg-white dark:bg-slate-900 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm active:scale-95 transition-all">
+                {/* 🔥 The Back button now taps into the browser history natively */}
+                <button onClick={() => window.history.back()} className="flex items-center text-slate-400 hover:text-indigo-600 mb-6 text-xs font-black uppercase tracking-widest bg-white dark:bg-slate-900 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm active:scale-95 transition-all">
                     <ArrowLeft size={14} className="mr-2"/> Back
                 </button>
                 
@@ -226,7 +226,6 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
 
             <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar pb-32">
                 
-                {/* 1. RENDER GENERATED FOLDERS (If they exist at this level) */}
                 {currentFolders.length > 0 && (
                     <div>
                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Map size={14}/> Pathways</h4>
@@ -250,13 +249,11 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                     </div>
                 )}
 
-                {/* 2. RENDER ACTUAL DECKS (If they exist at this level) */}
                 {currentDecks.length > 0 && (
                     <div>
                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Layers size={14}/> Available Modules</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {currentDecks.map((deck) => {
-                                // 🔥 PROTECTED FEATURE: Accurate Lock & Price logic
                                 const isUnlocked = userData?.unlocks?.[deck.id];
                                 const cardCount = deck.stats?.cardCount || deck.cards?.length || 0;
 
@@ -285,7 +282,6 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                                             <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800 flex gap-2">
                                                 <button 
                                                     onClick={() => {
-                                                        // 🔥 PROTECTED FEATURE: Download logic
                                                         if (isUnlocked || !deck.price) {
                                                             onDownloadDeck(deck);
                                                             setToastMsg(`Downloading ${deck.title} to Vault...`);
@@ -297,7 +293,6 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                                                 >
                                                     {isUnlocked || !deck.price ? <><Download size={14}/> Download</> : <><Lock size={14}/> Unlock</>}
                                                 </button>
-                                                {/* Visual placeholder for a preview button to match the juiced design */}
                                                 <button className="px-4 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-colors flex items-center justify-center">
                                                     Preview
                                                 </button>
@@ -310,7 +305,6 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                     </div>
                 )}
 
-                {/* 3. DEAD END FALLBACK (Uncharted Territory) */}
                 {currentFolders.length === 0 && currentDecks.length === 0 && (
                     <div className="py-16 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in-95">
                         <div className="w-24 h-24 bg-slate-100 dark:bg-slate-800/50 rounded-full flex items-center justify-center text-slate-300 dark:text-slate-600 mb-6 border-4 border-white dark:border-slate-900 shadow-inner">
