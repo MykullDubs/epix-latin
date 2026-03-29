@@ -4,7 +4,7 @@ import {
     ArrowLeft, X, Library, Layers, HelpCircle, Puzzle, Flame, 
     Filter, ChevronRight, Archive, Plus, Loader2,
     MoreVertical, FolderPlus, Trash2, Folder, FolderOpen, Edit3, Infinity,
-    Calculator, FlaskConical, Palette, Utensils, Plane, HeartPulse, Activity, BookText, Code, BrainCircuit, Music, CheckCircle2
+    Calculator, FlaskConical, Palette, Utensils, Plane, HeartPulse, Activity, BookText, Code, BrainCircuit
 } from 'lucide-react';
 import { Toast } from './Toast'; 
 import { collection, getDocs } from 'firebase/firestore';
@@ -39,7 +39,7 @@ const getDeckTheme = (title: string = '') => {
     return { icon: Layers, color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-500/10', border: 'border-indigo-100 dark:border-indigo-500/20' };
 };
 
-export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity, userData, onSaveCard, onToggleStar, onToggleArchive, onCreateFolder, onAssignToFolder, onHideDeck, onUpdateFolder, onDeleteFolder, user }: any) {
+export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity, userData, onSaveCard, onToggleStar, onToggleArchive, onCreateFolder, onAssignToFolder, onHideDeck, onUpdateFolder, onDeleteFolder, onReorderFolders, user }: any) {
     const [internalMode, setInternalMode] = useState<'library' | 'menu' | 'playing' | 'create'>('library');
     const [activeGame, setActiveGame] = useState<'standard' | 'quiz' | 'match' | 'tower'>('standard');
     
@@ -63,7 +63,18 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
     // 🔥 DRAG AND DROP STATES
     const [draggedDeckId, setDraggedDeckId] = useState<string | null>(null);
+    const [draggedFolder, setDraggedFolder] = useState<string | null>(null);
     const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
+
+    // 🔥 OPTIMISTIC FOLDER STATE (For instant visual reordering)
+    const [localFolders, setLocalFolders] = useState<string[]>([]);
+    
+    useEffect(() => {
+        // Only sync from Firebase if we aren't currently dragging something (prevents jitter)
+        if (!draggedFolder) {
+            setLocalFolders(userData?.studyFolders || []);
+        }
+    }, [userData?.studyFolders, draggedFolder]);
 
     const [omniDeck, setOmniDeck] = useState<any>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -73,7 +84,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const cards = omniDeck ? omniDeck.cards : fetchedCards;
     const deckTitle = resolvedDeck ? (resolvedDeck.id === 'custom' ? "My Study Cards" : resolvedDeck.title) : "";
 
-    const customFolders: string[] = userData?.studyFolders || [];
     const folderColors: Record<string, string> = userData?.folderColors || {};
 
     const handleBack = () => {
@@ -221,7 +231,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         const deltaY = libTouchStart.y - touchEndY;
 
         if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
-            const allFilters = ['all', 'created', 'downloaded', 'archived', ...customFolders];
+            const allFilters = ['all', 'created', 'downloaded', 'archived', ...localFolders];
             const currentIndex = allFilters.indexOf(deckFilter);
 
             if (deltaX > 0 && currentIndex < allFilters.length - 1) {
@@ -345,7 +355,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             if (deckFilter === 'created') return (isCustom || isAuthor) && currentFolder === null;
             if (deckFilter === 'downloaded') return (!isCustom && !isAuthor) && currentFolder === null;
             
-            if (customFolders.includes(deckFilter)) return currentFolder === deckFilter;
+            if (localFolders.includes(deckFilter)) return currentFolder === deckFilter;
             return true;
         });
 
@@ -411,8 +421,8 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             </button>
                         ))}
                         
-                        {customFolders.length > 0 && <div className="w-px h-5 bg-slate-300 dark:bg-slate-700 mx-2 shrink-0" />}
-                        {customFolders.map((folderName: string) => {
+                        {localFolders.length > 0 && <div className="w-px h-5 bg-slate-300 dark:bg-slate-700 mx-2 shrink-0" />}
+                        {localFolders.map((folderName: string) => {
                             const cTheme = FOLDER_COLORS[folderColors[folderName] || 'indigo'];
                             return (
                                 <button 
@@ -439,7 +449,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 >
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         
-                        {customFolders.includes(deckFilter) && (
+                        {localFolders.includes(deckFilter) && (
                             <div className="col-span-full animate-in fade-in duration-300 mb-2 mt-2">
                                 <button onClick={() => window.history.back()} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-500 transition-colors w-fit bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 active:scale-95">
                                     <ArrowLeft size={14} /> Back to Library
@@ -473,30 +483,55 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             </div>
                         )}
 
-                        {deckFilter === 'all' && customFolders.map((folderName: string) => {
+                        {deckFilter === 'all' && localFolders.map((folderName: string) => {
                             const itemCount = Object.keys(allDecks).filter(key => userData?.deckPrefs?.[key]?.folder === folderName && !userData?.deckPrefs?.[key]?.archived).length;
                             const theme = FOLDER_COLORS[folderColors[folderName] || 'indigo'];
                             
                             const isDragTarget = dragOverFolder === folderName;
+                            const isBeingDragged = draggedFolder === folderName;
                             
                             return (
                                 <div 
                                     key={`folder-${folderName}`} 
-                                    className={`relative group h-full transition-all duration-300 rounded-[2rem] ${isDragTarget ? 'scale-105 ring-4 ring-indigo-500/50 shadow-xl z-20' : ''}`}
+                                    className={`relative group h-full transition-all duration-300 rounded-[2rem] ${isDragTarget ? 'scale-105 ring-4 ring-indigo-500/50 shadow-xl z-20' : ''} ${isBeingDragged ? 'opacity-40 scale-95' : ''}`}
+                                    draggable={true}
+                                    onDragStart={(e) => {
+                                        setDraggedFolder(folderName);
+                                        e.dataTransfer.setData('folder', folderName);
+                                        e.dataTransfer.effectAllowed = 'move';
+                                    }}
                                     onDragOver={(e) => {
                                         e.preventDefault();
-                                        if (draggedDeckId) setDragOverFolder(folderName);
+                                        if (draggedDeckId || (draggedFolder && draggedFolder !== folderName)) {
+                                            setDragOverFolder(folderName);
+                                        }
                                     }}
                                     onDragLeave={() => setDragOverFolder(null)}
                                     onDrop={(e) => {
                                         e.preventDefault();
                                         const deckId = e.dataTransfer.getData('text/plain');
+                                        const droppedFolder = e.dataTransfer.getData('folder');
+
                                         if (deckId && onAssignToFolder) {
+                                            // 🔥 LOGIC: Deck dropped into Folder
                                             onAssignToFolder(deckId, folderName);
                                             setToastMsg(`Moved to ${folderName}`);
+                                        } else if (droppedFolder && droppedFolder !== folderName && onReorderFolders) {
+                                            // 🔥 LOGIC: Folder dropped onto Folder (Reorder)
+                                            const draggedIdx = localFolders.indexOf(droppedFolder);
+                                            const targetIdx = localFolders.indexOf(folderName);
+                                            
+                                            const newFolders = [...localFolders];
+                                            newFolders.splice(draggedIdx, 1);
+                                            newFolders.splice(targetIdx, 0, droppedFolder);
+                                            
+                                            setLocalFolders(newFolders);
+                                            onReorderFolders(newFolders); 
                                         }
+                                        
                                         setDragOverFolder(null);
                                         setDraggedDeckId(null);
+                                        setDraggedFolder(null);
                                     }}
                                 >
                                     <button 
@@ -504,15 +539,15 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                             window.history.pushState({ view: 'folder' }, '');
                                             setDeckFilter(folderName);
                                         }} 
-                                        className={`w-full ${theme.bg} rounded-[2rem] p-5 border-4 ${theme.border} transition-all text-left flex flex-col h-full animate-in fade-in duration-300 relative z-10 ${isDragTarget ? 'bg-indigo-100 dark:bg-indigo-900/40 border-indigo-300' : 'hover:-translate-y-1 shadow-sm hover:shadow-xl'}`}
+                                        className={`w-full ${theme.bg} rounded-[2rem] p-5 border-4 ${theme.border} transition-all text-left flex flex-col h-full animate-in fade-in duration-300 relative z-10 cursor-grab active:cursor-grabbing ${isDragTarget ? 'bg-indigo-100 dark:bg-indigo-900/40 border-indigo-300' : 'hover:-translate-y-1 shadow-sm hover:shadow-xl'}`}
                                     >
-                                        <div className="flex justify-between items-start mb-4">
+                                        <div className="flex justify-between items-start mb-4 pointer-events-none">
                                             <div className={`w-12 h-12 ${theme.iconBg} ${theme.iconColor} rounded-[1rem] flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform`}>
                                                 <Folder size={24} fill="currentColor" className={isDragTarget ? 'animate-bounce' : ''} />
                                             </div>
                                         </div>
-                                        <h3 className={`font-black ${theme.text} text-lg leading-tight line-clamp-2 pr-6 mb-auto`}>{folderName}</h3>
-                                        <div className="mt-3">
+                                        <h3 className={`font-black ${theme.text} text-lg leading-tight line-clamp-2 pr-6 mb-auto pointer-events-none`}>{folderName}</h3>
+                                        <div className="mt-3 pointer-events-none">
                                             <span className={`text-[9px] uppercase font-black tracking-widest ${theme.badge} px-2.5 py-1 rounded-md shadow-sm`}>
                                                 {itemCount} Decks
                                             </span>
@@ -534,7 +569,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             );
                         })}
 
-                        {filteredDecks.length === 0 && deckFilter !== 'all' && customFolders.includes(deckFilter) && (
+                        {filteredDecks.length === 0 && deckFilter !== 'all' && localFolders.includes(deckFilter) && (
                              <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[2.5rem] mt-4 text-slate-400 font-bold text-sm uppercase tracking-widest flex flex-col items-center gap-3">
                                  <FolderPlus size={32} className="opacity-20" />
                                  Folder is empty
@@ -551,10 +586,11 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             return (
                                 <div 
                                     key={key} 
-                                    className={`relative group animate-in fade-in duration-300 h-full pt-2 transition-all ${isDragging ? 'opacity-40 scale-95' : ''}`}
+                                    className={`relative group animate-in fade-in duration-300 h-full pt-3 transition-all ${isDragging ? 'opacity-40 scale-95' : ''}`}
                                 >
-                                    <div className="absolute inset-x-4 -bottom-1 h-10 bg-slate-200 dark:bg-slate-800 rounded-[2rem] transition-transform duration-300 group-hover:translate-y-1.5" />
-                                    <div className="absolute inset-x-2 -bottom-0 h-10 bg-slate-100 dark:bg-slate-800/80 rounded-[2rem] transition-transform duration-300 group-hover:translate-y-1" />
+                                    {/* 🔥 VISUALS: THE DECK STACK EFFECT */}
+                                    <div className="absolute inset-x-3 top-1 bottom-2 bg-slate-200/50 dark:bg-slate-800/50 rounded-[2rem] border border-slate-200 dark:border-slate-700 -rotate-2 transition-transform duration-300 group-hover:-rotate-3 group-hover:translate-y-1" />
+                                    <div className="absolute inset-x-1.5 top-2 bottom-1 bg-slate-100/80 dark:bg-slate-800/80 rounded-[2rem] border border-slate-200 dark:border-slate-700 rotate-1 transition-transform duration-300 group-hover:rotate-2 group-hover:translate-y-0.5" />
 
                                     <button 
                                         draggable={true}
@@ -572,10 +608,10 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                             onSelectDeck(key); 
                                             setInternalMode('menu'); 
                                         }} 
-                                        className="w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] p-5 border-2 border-slate-50 dark:border-slate-800 hover:border-slate-100 dark:hover:border-slate-700 transition-all text-left shadow-sm group-hover:-translate-y-1 relative z-10 flex flex-col cursor-grab active:cursor-grabbing"
+                                        className="w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] p-5 border-2 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all text-left shadow-sm relative z-10 flex flex-col cursor-grab active:cursor-grabbing"
                                     > 
                                         <div className="flex justify-between items-start mb-4 pointer-events-none">
-                                            <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center text-xl border shadow-inner group-hover:scale-110 transition-transform ${theme.bg} ${theme.color} ${theme.border}`}>
+                                            <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center text-xl border shadow-inner transition-transform ${theme.bg} ${theme.color} ${theme.border}`}>
                                                 {typeof DeckIcon === 'string' ? DeckIcon : <DeckIcon size={24}/>}
                                             </div>
                                         </div>
@@ -598,7 +634,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                             setActiveOptionsDeck(deck);
                                             setMenuView('main'); 
                                         }}
-                                        className="absolute top-4 right-3 p-2 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors z-20"
+                                        className="absolute top-4 right-2 p-2 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors z-20"
                                         aria-label="Deck Options"
                                     >
                                         <MoreVertical size={20} />
@@ -732,7 +768,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                             None (Main Library)
                                         </button>
 
-                                        {customFolders.map(folderName => (
+                                        {localFolders.map(folderName => (
                                             <button 
                                                 key={folderName}
                                                 onClick={() => { 
