@@ -112,15 +112,24 @@ export default function App() {
       }
   };
 
-  // 🔥 FOLDER REORDERING ENGINE
+  // 🔥 FOLDER & DECK REORDERING ENGINES
   const handleReorderFolders = async (newOrder: string[]) => {
       if (!user?.uid) return;
       try {
           const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
-          // Set to merge true just to be safe, so we don't overwrite the whole user object
           await setDoc(userRef, { studyFolders: newOrder }, { merge: true });
       } catch (err) {
           console.error("Failed to sync folder order to the network:", err);
+      }
+  };
+
+  const handleReorderDecks = async (newOrder: string[]) => {
+      if (!user?.uid) return;
+      try {
+          const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
+          await setDoc(userRef, { deckOrder: newOrder }, { merge: true });
+      } catch (err) {
+          console.error("Failed to sync deck order to the network:", err);
       }
   };
 
@@ -480,13 +489,12 @@ export default function App() {
                 ExamPlayerView={ExamPlayerView} 
                 onLogActivity={actions.logActivity}
             />
-) : activeTab === 'discovery' ? (
+          ) : activeTab === 'discovery' ? (
             <DiscoveryView 
                 networkDecks={networkDecks} 
                 userData={userData} 
                 onDownloadDeck={(deck: any) => { 
                     actions.purchaseUnlock(deck.id, deck.price || 0);
-                    // 🔥 EXPLICITLY add to user's library preferences so the Vault Gatekeeper sees it!
                     if (actions.assignDeckToFolder) {
                         actions.assignDeckToFolder(deck.id, null);
                     }
@@ -516,7 +524,8 @@ export default function App() {
                 onHideDeck={actions.hideDeck}
                 onUpdateFolder={actions.updateStudyFolder}
                 onDeleteFolder={actions.deleteStudyFolder}
-                onReorderFolders={handleReorderFolders} // 🔥 PLUGGED IN HERE!
+                onReorderFolders={handleReorderFolders} 
+                onReorderDecks={handleReorderDecks} // 🔥 PLUGGED IN HERE!
             />
           ) : activeTab === 'profile' ? (
             <ProfileView user={user} userData={userData} />
