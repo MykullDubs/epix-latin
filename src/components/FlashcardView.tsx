@@ -4,7 +4,7 @@ import {
     ArrowLeft, X, Library, Layers, HelpCircle, Puzzle, Flame, 
     Filter, ChevronRight, Archive, Plus, Loader2,
     MoreVertical, FolderPlus, Trash2, Folder, FolderOpen, Edit3, Infinity,
-    Calculator, FlaskConical, Palette, Utensils, Plane, HeartPulse, Activity, BookText, Code, BrainCircuit
+    Calculator, FlaskConical, Palette, Utensils, Plane, HeartPulse, Activity, BookText, Code, BrainCircuit, Music, CheckCircle2
 } from 'lucide-react';
 import { Toast } from './Toast'; 
 import { collection, getDocs } from 'firebase/firestore';
