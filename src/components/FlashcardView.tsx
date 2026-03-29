@@ -72,7 +72,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const customFolders: string[] = userData?.studyFolders || [];
     const folderColors: Record<string, string> = userData?.folderColors || {};
 
-    // 🔥 PRE-FILTER THE DECKS (We use memo to prevent expensive re-renders)
     const filteredDecks = useMemo(() => {
         return Object.entries(allDecks).filter(([key, deck]: any) => {
             const isCustom = key === 'custom';
@@ -103,37 +102,30 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         });
     }, [allDecks, deckFilter, user?.uid, userData?.unlocks, userData?.inventory, userData?.deckPrefs, customFolders]);
 
-    // 🔥 OPTIMISTIC STATE ARRAYS (For the physics engines)
     const [localFolders, setLocalFolders] = useState<string[]>([]);
     const [localDecks, setLocalDecks] = useState<any[]>([]);
 
-    // 🔥 DRAG AND DROP STATUS TRACKERS
     const [draggedItem, setDraggedItem] = useState<{ id: string, type: 'folder' | 'deck' } | null>(null);
-    const [dragOverGapId, setDragOverGapId] = useState<string | null>(null); // The physical target moving out of the way
-    const [dragOverFolderCatch, setDragOverFolderCatch] = useState<string | null>(null); // For Deck -> Folder nesting
+    const [dragOverGapId, setDragOverGapId] = useState<string | null>(null); 
+    const [dragOverFolderCatch, setDragOverFolderCatch] = useState<string | null>(null); 
     
-    // Sync Local Folders (unless dragging)
+    // 🔥 FIXED OPTIMISTIC SYNC: Now purely depends on DB payload, ignoring drag states so it doesn't snap back!
     useEffect(() => {
-        if (!draggedItem) {
-            setLocalFolders(userData?.studyFolders || []);
-        }
-    }, [userData?.studyFolders, draggedItem]);
+        setLocalFolders(userData?.studyFolders || []);
+    }, [userData?.studyFolders]);
 
-    // Sync Local Decks (unless dragging) & apply custom sorting!
     useEffect(() => {
-        if (!draggedItem) {
-            const order = userData?.deckOrder || [];
-            const sorted = [...filteredDecks].sort((a, b) => {
-                const aIdx = order.indexOf(a[0]);
-                const bIdx = order.indexOf(b[0]);
-                if (aIdx === -1 && bIdx === -1) return 0;
-                if (aIdx === -1) return 1;
-                if (bIdx === -1) return -1;
-                return aIdx - bIdx;
-            });
-            setLocalDecks(sorted);
-        }
-    }, [filteredDecks, userData?.deckOrder, draggedItem]);
+        const order = userData?.deckOrder || [];
+        const sorted = [...filteredDecks].sort((a, b) => {
+            const aIdx = order.indexOf(a[0]);
+            const bIdx = order.indexOf(b[0]);
+            if (aIdx === -1 && bIdx === -1) return 0;
+            if (aIdx === -1) return 1;
+            if (bIdx === -1) return -1;
+            return aIdx - bIdx;
+        });
+        setLocalDecks(sorted);
+    }, [filteredDecks, userData?.deckOrder]);
 
 
     const handleBack = () => {
@@ -519,7 +511,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                     className={`relative group transition-all duration-300 h-full ${
                                         isDragged ? 'opacity-40 scale-95 z-0' : 'z-10'
                                     } ${
-                                        isGap ? 'translate-x-4 scale-95 ring-2 ring-indigo-500/50 rounded-[2rem]' : ''
+                                        isGap ? 'translate-x-3 scale-[0.95] opacity-75 border-indigo-300 dark:border-indigo-700' : ''
                                     } ${
                                         isCatchingDeck ? 'scale-105 ring-4 ring-indigo-500 shadow-xl' : ''
                                     }`}
@@ -578,7 +570,8 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                                 <Folder size={24} fill="currentColor" />
                                             </div>
                                         </div>
-                                        <h3 className={`font-black ${theme.text} text-lg leading-tight line-clamp-2 pr-6 mb-auto pointer-events-none`}>{folderName}</h3>
+                                        {/* 🔥 UPDATED FONT SIZE */}
+                                        <h3 className={`font-black ${theme.text} text-base leading-snug line-clamp-3 pr-4 mb-auto pointer-events-none`}>{folderName}</h3>
                                         <div className="mt-3 pointer-events-none">
                                             <span className={`text-[9px] uppercase font-black tracking-widest ${theme.badge} px-2.5 py-1 rounded-md shadow-sm`}>
                                                 {itemCount} Decks
@@ -623,7 +616,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                     className={`relative group transition-all duration-300 h-full pt-3 ${
                                         isDragged ? 'opacity-40 scale-95 z-0' : 'z-10'
                                     } ${
-                                        isGap ? 'translate-x-6 scale-95 blur-[1px] opacity-80' : ''
+                                        isGap ? 'scale-95 translate-x-3 opacity-60 border-indigo-300 dark:border-indigo-700' : ''
                                     }`}
                                     draggable={true}
                                     onDragStart={(e) => {
@@ -678,7 +671,8 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                             </div>
                                         </div>
                                         
-                                        <h3 className="font-black text-slate-800 dark:text-white text-lg leading-tight line-clamp-2 pr-8 mb-3 pointer-events-none">{displayTitle}</h3>
+                                        {/* 🔥 UPDATED FONT SIZE */}
+                                        <h3 className="font-black text-slate-800 dark:text-white text-base leading-snug line-clamp-3 pr-6 mb-2 pointer-events-none">{displayTitle}</h3>
                                         
                                         <div className="mt-auto pt-1 flex flex-col gap-2 pointer-events-none">
                                             <div className="flex items-center gap-2">
