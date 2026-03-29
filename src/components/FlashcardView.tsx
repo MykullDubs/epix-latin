@@ -39,7 +39,7 @@ const getDeckTheme = (title: string = '') => {
     return { icon: Layers, color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-500/10', border: 'border-indigo-100 dark:border-indigo-500/20' };
 };
 
-export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity, userData, onSaveCard, onToggleStar, onToggleArchive, onCreateFolder, onAssignToFolder, onHideDeck, onUpdateFolder, onDeleteFolder, onReorderFolders, user }: any) {
+export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity, userData, onSaveCard, onToggleStar, onToggleArchive, onCreateFolder, onAssignToFolder, onHideDeck, onUpdateFolder, onDeleteFolder, onReorderFolders, onReorderDecks, user }: any) {
     const [internalMode, setInternalMode] = useState<'library' | 'menu' | 'playing' | 'create'>('library');
     const [activeGame, setActiveGame] = useState<'standard' | 'quiz' | 'match' | 'tower'>('standard');
     
@@ -61,21 +61,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const [touchStartCoords, setTouchStartCoords] = useState<{x: number, y: number} | null>(null);
     const [builderConfig, setBuilderConfig] = useState<{type: 'new_deck', folder: string | null} | {type: 'add_card', deck: any} | null>(null);
 
-    // 🔥 DRAG AND DROP STATES
-    const [draggedDeckId, setDraggedDeckId] = useState<string | null>(null);
-    const [draggedFolder, setDraggedFolder] = useState<string | null>(null);
-    const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
-
-    // 🔥 OPTIMISTIC FOLDER STATE (For instant visual reordering)
-    const [localFolders, setLocalFolders] = useState<string[]>([]);
-    
-    useEffect(() => {
-        // Only sync from Firebase if we aren't currently dragging something (prevents jitter)
-        if (!draggedFolder) {
-            setLocalFolders(userData?.studyFolders || []);
-        }
-    }, [userData?.studyFolders, draggedFolder]);
-
     const [omniDeck, setOmniDeck] = useState<any>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const filterBarRef = useRef<HTMLDivElement>(null);
@@ -84,7 +69,72 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const cards = omniDeck ? omniDeck.cards : fetchedCards;
     const deckTitle = resolvedDeck ? (resolvedDeck.id === 'custom' ? "My Study Cards" : resolvedDeck.title) : "";
 
+    const customFolders: string[] = userData?.studyFolders || [];
     const folderColors: Record<string, string> = userData?.folderColors || {};
+
+    // 🔥 PRE-FILTER THE DECKS (We use memo to prevent expensive re-renders)
+    const filteredDecks = useMemo(() => {
+        return Object.entries(allDecks).filter(([key, deck]: any) => {
+            const isCustom = key === 'custom';
+            const isAuthor = deck.authorId === user?.uid || deck.ownerId === user?.uid;
+            
+            const isUnlocked = 
+                userData?.unlocks?.[key] || 
+                (Array.isArray(userData?.unlocks) && userData.unlocks.includes(key)) ||
+                (Array.isArray(userData?.inventory) && userData.inventory.includes(key));
+            
+            const hasPrefs = !!userData?.deckPrefs?.[key]; 
+            const inMyVault = isCustom || isAuthor || isUnlocked || hasPrefs;
+            
+            if (!inMyVault) return false; 
+
+            const isArchived = userData?.deckPrefs?.[key]?.archived || false;
+            const currentFolder = userData?.deckPrefs?.[key]?.folder || null;
+            
+            if (deckFilter === 'archived') return isArchived;
+            if (isArchived) return false; 
+
+            if (deckFilter === 'all') return currentFolder === null;
+            if (deckFilter === 'created') return (isCustom || isAuthor) && currentFolder === null;
+            if (deckFilter === 'downloaded') return (!isCustom && !isAuthor) && currentFolder === null;
+            
+            if (customFolders.includes(deckFilter)) return currentFolder === deckFilter;
+            return true;
+        });
+    }, [allDecks, deckFilter, user?.uid, userData?.unlocks, userData?.inventory, userData?.deckPrefs, customFolders]);
+
+    // 🔥 OPTIMISTIC STATE ARRAYS (For the physics engines)
+    const [localFolders, setLocalFolders] = useState<string[]>([]);
+    const [localDecks, setLocalDecks] = useState<any[]>([]);
+
+    // 🔥 DRAG AND DROP STATUS TRACKERS
+    const [draggedItem, setDraggedItem] = useState<{ id: string, type: 'folder' | 'deck' } | null>(null);
+    const [dragOverGapId, setDragOverGapId] = useState<string | null>(null); // The physical target moving out of the way
+    const [dragOverFolderCatch, setDragOverFolderCatch] = useState<string | null>(null); // For Deck -> Folder nesting
+    
+    // Sync Local Folders (unless dragging)
+    useEffect(() => {
+        if (!draggedItem) {
+            setLocalFolders(userData?.studyFolders || []);
+        }
+    }, [userData?.studyFolders, draggedItem]);
+
+    // Sync Local Decks (unless dragging) & apply custom sorting!
+    useEffect(() => {
+        if (!draggedItem) {
+            const order = userData?.deckOrder || [];
+            const sorted = [...filteredDecks].sort((a, b) => {
+                const aIdx = order.indexOf(a[0]);
+                const bIdx = order.indexOf(b[0]);
+                if (aIdx === -1 && bIdx === -1) return 0;
+                if (aIdx === -1) return 1;
+                if (bIdx === -1) return -1;
+                return aIdx - bIdx;
+            });
+            setLocalDecks(sorted);
+        }
+    }, [filteredDecks, userData?.deckOrder, draggedItem]);
+
 
     const handleBack = () => {
         if (activeOptionsDeck) { setActiveOptionsDeck(null); return; }
@@ -330,34 +380,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     }
 
     if (internalMode === 'library') {
-        const filteredDecks = Object.entries(allDecks).filter(([key, deck]: any) => {
-            const isCustom = key === 'custom';
-            const isAuthor = deck.authorId === user?.uid || deck.ownerId === user?.uid;
-            
-            const isUnlocked = 
-                userData?.unlocks?.[key] || 
-                (Array.isArray(userData?.unlocks) && userData.unlocks.includes(key)) ||
-                (Array.isArray(userData?.inventory) && userData.inventory.includes(key));
-            
-            const hasPrefs = !!userData?.deckPrefs?.[key]; 
-
-            const inMyVault = isCustom || isAuthor || isUnlocked || hasPrefs;
-            
-            if (!inMyVault) return false; 
-
-            const isArchived = userData?.deckPrefs?.[key]?.archived || false;
-            const currentFolder = userData?.deckPrefs?.[key]?.folder || null;
-            
-            if (deckFilter === 'archived') return isArchived;
-            if (isArchived) return false; 
-
-            if (deckFilter === 'all') return currentFolder === null;
-            if (deckFilter === 'created') return (isCustom || isAuthor) && currentFolder === null;
-            if (deckFilter === 'downloaded') return (!isCustom && !isAuthor) && currentFolder === null;
-            
-            if (localFolders.includes(deckFilter)) return currentFolder === deckFilter;
-            return true;
-        });
 
         const handleSaveNewFolder = async (folderName: string, color: string) => {
             if (!folderName.trim()) return;
@@ -487,51 +509,61 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             const itemCount = Object.keys(allDecks).filter(key => userData?.deckPrefs?.[key]?.folder === folderName && !userData?.deckPrefs?.[key]?.archived).length;
                             const theme = FOLDER_COLORS[folderColors[folderName] || 'indigo'];
                             
-                            const isDragTarget = dragOverFolder === folderName;
-                            const isBeingDragged = draggedFolder === folderName;
+                            const isDragged = draggedItem?.id === folderName;
+                            const isGap = dragOverGapId === folderName && draggedItem?.type === 'folder';
+                            const isCatchingDeck = dragOverFolderCatch === folderName && draggedItem?.type === 'deck';
                             
                             return (
                                 <div 
                                     key={`folder-${folderName}`} 
-                                    className={`relative group h-full transition-all duration-300 rounded-[2rem] ${isDragTarget ? 'scale-105 ring-4 ring-indigo-500/50 shadow-xl z-20' : ''} ${isBeingDragged ? 'opacity-40 scale-95' : ''}`}
+                                    className={`relative group transition-all duration-300 h-full ${
+                                        isDragged ? 'opacity-40 scale-95 z-0' : 'z-10'
+                                    } ${
+                                        isGap ? 'translate-x-4 scale-95 ring-2 ring-indigo-500/50 rounded-[2rem]' : ''
+                                    } ${
+                                        isCatchingDeck ? 'scale-105 ring-4 ring-indigo-500 shadow-xl' : ''
+                                    }`}
                                     draggable={true}
                                     onDragStart={(e) => {
-                                        setDraggedFolder(folderName);
-                                        e.dataTransfer.setData('folder', folderName);
+                                        setDraggedItem({ id: folderName, type: 'folder' });
                                         e.dataTransfer.effectAllowed = 'move';
+                                    }}
+                                    onDragEnd={() => {
+                                        setDraggedItem(null);
+                                        setDragOverGapId(null);
+                                        setDragOverFolderCatch(null);
                                     }}
                                     onDragOver={(e) => {
                                         e.preventDefault();
-                                        if (draggedDeckId || (draggedFolder && draggedFolder !== folderName)) {
-                                            setDragOverFolder(folderName);
+                                        if (draggedItem?.type === 'folder' && draggedItem.id !== folderName) {
+                                            setDragOverGapId(folderName);
+                                        } else if (draggedItem?.type === 'deck') {
+                                            setDragOverFolderCatch(folderName);
                                         }
                                     }}
-                                    onDragLeave={() => setDragOverFolder(null)}
+                                    onDragLeave={() => {
+                                        if (dragOverGapId === folderName) setDragOverGapId(null);
+                                        if (dragOverFolderCatch === folderName) setDragOverFolderCatch(null);
+                                    }}
                                     onDrop={(e) => {
                                         e.preventDefault();
-                                        const deckId = e.dataTransfer.getData('text/plain');
-                                        const droppedFolder = e.dataTransfer.getData('folder');
-
-                                        if (deckId && onAssignToFolder) {
-                                            // 🔥 LOGIC: Deck dropped into Folder
-                                            onAssignToFolder(deckId, folderName);
-                                            setToastMsg(`Moved to ${folderName}`);
-                                        } else if (droppedFolder && droppedFolder !== folderName && onReorderFolders) {
-                                            // 🔥 LOGIC: Folder dropped onto Folder (Reorder)
-                                            const draggedIdx = localFolders.indexOf(droppedFolder);
+                                        if (draggedItem?.type === 'folder') {
+                                            const draggedIdx = localFolders.indexOf(draggedItem.id);
                                             const targetIdx = localFolders.indexOf(folderName);
-                                            
-                                            const newFolders = [...localFolders];
-                                            newFolders.splice(draggedIdx, 1);
-                                            newFolders.splice(targetIdx, 0, droppedFolder);
-                                            
-                                            setLocalFolders(newFolders);
-                                            onReorderFolders(newFolders); 
+                                            if (draggedIdx !== -1 && targetIdx !== -1) {
+                                                const newFolders = [...localFolders];
+                                                newFolders.splice(draggedIdx, 1);
+                                                newFolders.splice(targetIdx, 0, draggedItem.id);
+                                                setLocalFolders(newFolders);
+                                                if (onReorderFolders) onReorderFolders(newFolders); 
+                                            }
+                                        } else if (draggedItem?.type === 'deck') {
+                                            if (onAssignToFolder) onAssignToFolder(draggedItem.id, folderName);
+                                            setToastMsg(`Moved to ${folderName}`);
                                         }
-                                        
-                                        setDragOverFolder(null);
-                                        setDraggedDeckId(null);
-                                        setDraggedFolder(null);
+                                        setDraggedItem(null);
+                                        setDragOverGapId(null);
+                                        setDragOverFolderCatch(null);
                                     }}
                                 >
                                     <button 
@@ -539,11 +571,11 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                             window.history.pushState({ view: 'folder' }, '');
                                             setDeckFilter(folderName);
                                         }} 
-                                        className={`w-full ${theme.bg} rounded-[2rem] p-5 border-4 ${theme.border} transition-all text-left flex flex-col h-full animate-in fade-in duration-300 relative z-10 cursor-grab active:cursor-grabbing ${isDragTarget ? 'bg-indigo-100 dark:bg-indigo-900/40 border-indigo-300' : 'hover:-translate-y-1 shadow-sm hover:shadow-xl'}`}
+                                        className={`w-full ${theme.bg} rounded-[2rem] p-5 border-4 ${theme.border} transition-all text-left flex flex-col h-full relative cursor-grab active:cursor-grabbing ${!isGap && !isCatchingDeck ? 'hover:-translate-y-1 shadow-sm hover:shadow-xl' : ''}`}
                                     >
                                         <div className="flex justify-between items-start mb-4 pointer-events-none">
                                             <div className={`w-12 h-12 ${theme.iconBg} ${theme.iconColor} rounded-[1rem] flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform`}>
-                                                <Folder size={24} fill="currentColor" className={isDragTarget ? 'animate-bounce' : ''} />
+                                                <Folder size={24} fill="currentColor" />
                                             </div>
                                         </div>
                                         <h3 className={`font-black ${theme.text} text-lg leading-tight line-clamp-2 pr-6 mb-auto pointer-events-none`}>{folderName}</h3>
@@ -569,46 +601,76 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             );
                         })}
 
-                        {filteredDecks.length === 0 && deckFilter !== 'all' && localFolders.includes(deckFilter) && (
+                        {localDecks.length === 0 && deckFilter !== 'all' && localFolders.includes(deckFilter) && (
                              <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[2.5rem] mt-4 text-slate-400 font-bold text-sm uppercase tracking-widest flex flex-col items-center gap-3">
                                  <FolderPlus size={32} className="opacity-20" />
                                  Folder is empty
                              </div>
                         )}
 
-                        {filteredDecks.map(([key, deck]: any) => {
+                        {localDecks.map(([key, deck]: any) => {
                             const displayTitle = deck.id === 'custom' ? "My Study Cards" : deck.title;
                             const theme = getDeckTheme(displayTitle);
                             const DeckIcon = deck.icon || theme.icon;
                             const cardCount = deck.id === 'custom' ? (deck.cards?.length || 0) : (deck.stats?.cardCount || 0);
-                            const isDragging = draggedDeckId === key;
+                            
+                            const isDragged = draggedItem?.id === key;
+                            const isGap = dragOverGapId === key && draggedItem?.type === 'deck';
 
                             return (
                                 <div 
                                     key={key} 
-                                    className={`relative group animate-in fade-in duration-300 h-full pt-3 transition-all ${isDragging ? 'opacity-40 scale-95' : ''}`}
+                                    className={`relative group transition-all duration-300 h-full pt-3 ${
+                                        isDragged ? 'opacity-40 scale-95 z-0' : 'z-10'
+                                    } ${
+                                        isGap ? 'translate-x-6 scale-95 blur-[1px] opacity-80' : ''
+                                    }`}
+                                    draggable={true}
+                                    onDragStart={(e) => {
+                                        setDraggedItem({ id: key, type: 'deck' });
+                                        e.dataTransfer.effectAllowed = 'move';
+                                    }}
+                                    onDragEnd={() => {
+                                        setDraggedItem(null);
+                                        setDragOverGapId(null);
+                                    }}
+                                    onDragOver={(e) => {
+                                        e.preventDefault();
+                                        if (draggedItem?.type === 'deck' && draggedItem.id !== key) {
+                                            setDragOverGapId(key);
+                                        }
+                                    }}
+                                    onDragLeave={() => {
+                                        if (dragOverGapId === key) setDragOverGapId(null);
+                                    }}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        if (draggedItem?.type === 'deck') {
+                                            const draggedIdx = localDecks.findIndex(d => d[0] === draggedItem.id);
+                                            const targetIdx = localDecks.findIndex(d => d[0] === key);
+                                            if (draggedIdx !== -1 && targetIdx !== -1) {
+                                                const newDecks = [...localDecks];
+                                                const [removed] = newDecks.splice(draggedIdx, 1);
+                                                newDecks.splice(targetIdx, 0, removed);
+                                                setLocalDecks(newDecks);
+                                                if (onReorderDecks) onReorderDecks(newDecks.map(d => d[0]));
+                                            }
+                                        }
+                                        setDraggedItem(null);
+                                        setDragOverGapId(null);
+                                    }}
                                 >
                                     {/* 🔥 VISUALS: THE DECK STACK EFFECT */}
-                                    <div className="absolute inset-x-3 top-1 bottom-2 bg-slate-200/50 dark:bg-slate-800/50 rounded-[2rem] border border-slate-200 dark:border-slate-700 -rotate-2 transition-transform duration-300 group-hover:-rotate-3 group-hover:translate-y-1" />
-                                    <div className="absolute inset-x-1.5 top-2 bottom-1 bg-slate-100/80 dark:bg-slate-800/80 rounded-[2rem] border border-slate-200 dark:border-slate-700 rotate-1 transition-transform duration-300 group-hover:rotate-2 group-hover:translate-y-0.5" />
+                                    <div className="absolute inset-x-3 top-1 bottom-2 bg-slate-200/50 dark:bg-slate-800/50 rounded-[2rem] border border-slate-200 dark:border-slate-700 -rotate-2 transition-transform duration-300 group-hover:-rotate-3 group-hover:translate-y-1 pointer-events-none" />
+                                    <div className="absolute inset-x-1.5 top-2 bottom-1 bg-slate-100/80 dark:bg-slate-800/80 rounded-[2rem] border border-slate-200 dark:border-slate-700 rotate-1 transition-transform duration-300 group-hover:rotate-2 group-hover:translate-y-0.5 pointer-events-none" />
 
                                     <button 
-                                        draggable={true}
-                                        onDragStart={(e) => {
-                                            setDraggedDeckId(key);
-                                            e.dataTransfer.setData('text/plain', key);
-                                            e.dataTransfer.effectAllowed = 'move';
-                                        }}
-                                        onDragEnd={() => {
-                                            setDraggedDeckId(null);
-                                            setDragOverFolder(null);
-                                        }}
                                         onClick={() => { 
                                             window.history.pushState({ view: 'menu' }, ''); 
                                             onSelectDeck(key); 
                                             setInternalMode('menu'); 
                                         }} 
-                                        className="w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] p-5 border-2 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all text-left shadow-sm relative z-10 flex flex-col cursor-grab active:cursor-grabbing"
+                                        className={`w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] p-5 border-2 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all text-left shadow-sm relative z-10 flex flex-col cursor-grab active:cursor-grabbing ${!isGap ? 'group-hover:-translate-y-1' : ''}`}
                                     > 
                                         <div className="flex justify-between items-start mb-4 pointer-events-none">
                                             <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center text-xl border shadow-inner transition-transform ${theme.bg} ${theme.color} ${theme.border}`}>
