@@ -87,7 +87,6 @@ export default function App() {
       const newInventory = [...(userData.inventory || []), itemId];
       
       try {
-          // 🔥 FIXED PATH: Now writes correctly to the multi-tenant architecture
           const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
           await updateDoc(userRef, {
               flux: newFlux,
@@ -104,13 +103,24 @@ export default function App() {
       const newEquipped = { ...(userData.equipped || {}), [category]: itemId };
       
       try {
-          // 🔥 FIXED PATH
           const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
           await updateDoc(userRef, {
               equipped: newEquipped
           });
       } catch (err) {
           console.error("Equip protocol failed:", err);
+      }
+  };
+
+  // 🔥 FOLDER REORDERING ENGINE
+  const handleReorderFolders = async (newOrder: string[]) => {
+      if (!user?.uid) return;
+      try {
+          const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
+          // Set to merge true just to be safe, so we don't overwrite the whole user object
+          await setDoc(userRef, { studyFolders: newOrder }, { merge: true });
+      } catch (err) {
+          console.error("Failed to sync folder order to the network:", err);
       }
   };
 
@@ -506,6 +516,7 @@ export default function App() {
                 onHideDeck={actions.hideDeck}
                 onUpdateFolder={actions.updateStudyFolder}
                 onDeleteFolder={actions.deleteStudyFolder}
+                onReorderFolders={handleReorderFolders} // 🔥 PLUGGED IN HERE!
             />
           ) : activeTab === 'profile' ? (
             <ProfileView user={user} userData={userData} />
