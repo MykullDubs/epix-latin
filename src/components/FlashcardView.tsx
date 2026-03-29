@@ -643,6 +643,10 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const [touchStartCoords, setTouchStartCoords] = useState<{x: number, y: number} | null>(null);
     const [builderConfig, setBuilderConfig] = useState<{type: 'new_deck', folder: string | null} | {type: 'add_card', deck: any} | null>(null);
 
+    // 🔥 DRAG AND DROP STATES
+    const [draggedDeckId, setDraggedDeckId] = useState<string | null>(null);
+    const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
+
     const [omniDeck, setOmniDeck] = useState<any>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const filterBarRef = useRef<HTMLDivElement>(null);
@@ -654,38 +658,24 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const customFolders: string[] = userData?.studyFolders || [];
     const folderColors: Record<string, string> = userData?.folderColors || {};
 
-    // 🔥 1. BULLETPROOF STATE CONTROLLER
     const handleBack = () => {
-        // 1. Close modals first
         if (activeOptionsDeck) { setActiveOptionsDeck(null); return; }
         if (activeOptionsFolder) { setActiveOptionsFolder(null); return; }
         if (showFolderModal.isOpen) { setShowFolderModal({isOpen: false, editMode: false, oldName: ''}); return; }
-
-        // 2. Exit playing → menu
         if (internalMode === 'playing') { setInternalMode('menu'); return; }
-
-        // 3. Exit create → correct destination
         if (internalMode === 'create') {
             setInternalMode(builderConfig?.type === 'add_card' ? 'menu' : 'library');
             return;
         }
-
-        // 4. Exit menu → library
         if (internalMode === 'menu') {
             setInternalMode('library');
             setOmniDeck(null);
-            // Intentionally missing onSelectDeck(null) so we don't alert the parent router
             return;
         }
-
-        // 5. Exit folder filter → all
         if (deckFilter !== 'all') { setDeckFilter('all'); return; }
-
-        // 6. Full exit (Let the main app Router handle the final exit back to dashboard)
         if (onSelectDeck) onSelectDeck(null);
     };
 
-    // 🔥 2. NATIVE DOM POPSTATE LISTENER (Always uses fresh state)
     const handleBackRef = useRef(handleBack);
     useEffect(() => {
         handleBackRef.current = handleBack;
@@ -785,7 +775,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         setTimeout(() => setToastMsg(`Protocol Complete! +${earnedXP} XP Earned!`), 100);
     };
 
-    // 🔥 ON-SCREEN SWIPE GESTURE CONTROLS
     const handleSwipeStart = (e: React.TouchEvent) => {
         setTouchStartCoords({ x: e.touches[0].clientX, y: e.touches[0].clientY });
     };
@@ -795,7 +784,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         const deltaX = touchStartCoords.x - e.changedTouches[0].clientX;
         const deltaY = touchStartCoords.y - e.changedTouches[0].clientY;
 
-        // Swiped right across the screen
         if (deltaX < -70 && Math.abs(deltaX) > Math.abs(deltaY)) {
             window.history.back(); 
         }
@@ -915,25 +903,20 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
 if (internalMode === 'library') {
         const filteredDecks = Object.entries(allDecks).filter(([key, deck]: any) => {
-            // 🔥 1. THE VAULT GATEKEEPER
             const isCustom = key === 'custom';
             const isAuthor = deck.authorId === user?.uid || deck.ownerId === user?.uid;
             
-            // Check all possible places a downloaded deck might register (Objects or Arrays)
             const isUnlocked = 
                 userData?.unlocks?.[key] || 
                 (Array.isArray(userData?.unlocks) && userData.unlocks.includes(key)) ||
                 (Array.isArray(userData?.inventory) && userData.inventory.includes(key));
             
-            // If they've moved it to a folder or we explicitly added it via Download
             const hasPrefs = !!userData?.deckPrefs?.[key]; 
 
             const inMyVault = isCustom || isAuthor || isUnlocked || hasPrefs;
             
-            // If it's a global deck they haven't downloaded, banish it from the Study Hub!
             if (!inMyVault) return false; 
 
-            // 🔥 2. FOLDER & ARCHIVE ROUTING
             const isArchived = userData?.deckPrefs?.[key]?.archived || false;
             const currentFolder = userData?.deckPrefs?.[key]?.folder || null;
             
@@ -996,7 +979,6 @@ if (internalMode === 'library') {
                     <div ref={filterBarRef} className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center gap-2 overflow-x-auto custom-scrollbar overscroll-x-contain scroll-smooth">
                         <Filter size={16} className="text-slate-400 mr-2 shrink-0" />
                         
-                        {/* 🔥 CHANGED TABS: Created and Downloaded */}
                         {['all', 'created', 'downloaded', 'archived'].map((f: any) => (
                             <button 
                                 key={f} 
@@ -1077,18 +1059,39 @@ if (internalMode === 'library') {
                             const itemCount = Object.keys(allDecks).filter(key => userData?.deckPrefs?.[key]?.folder === folderName && !userData?.deckPrefs?.[key]?.archived).length;
                             const theme = FOLDER_COLORS[folderColors[folderName] || 'indigo'];
                             
+                            // 🔥 FOLDER DROP ZONE
+                            const isDragTarget = dragOverFolder === folderName;
+                            
                             return (
-                                <div key={`folder-${folderName}`} className="relative group h-full">
+                                <div 
+                                    key={`folder-${folderName}`} 
+                                    className={`relative group h-full transition-all duration-300 rounded-[2rem] ${isDragTarget ? 'scale-105 ring-4 ring-indigo-500/50 shadow-xl z-20' : ''}`}
+                                    onDragOver={(e) => {
+                                        e.preventDefault(); // Must prevent default to allow drop
+                                        if (draggedDeckId) setDragOverFolder(folderName);
+                                    }}
+                                    onDragLeave={() => setDragOverFolder(null)}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        const deckId = e.dataTransfer.getData('text/plain');
+                                        if (deckId && onAssignToFolder) {
+                                            onAssignToFolder(deckId, folderName);
+                                            setToastMsg(`Moved to ${folderName}`);
+                                        }
+                                        setDragOverFolder(null);
+                                        setDraggedDeckId(null);
+                                    }}
+                                >
                                     <button 
                                         onClick={() => {
                                             window.history.pushState({ view: 'folder' }, '');
                                             setDeckFilter(folderName);
                                         }} 
-                                        className={`w-full ${theme.bg} rounded-[2rem] p-5 border-4 ${theme.border} hover:-translate-y-1 transition-all text-left shadow-sm hover:shadow-xl flex flex-col h-full animate-in fade-in duration-300 relative z-10`}
+                                        className={`w-full ${theme.bg} rounded-[2rem] p-5 border-4 ${theme.border} transition-all text-left flex flex-col h-full animate-in fade-in duration-300 relative z-10 ${isDragTarget ? 'bg-indigo-100 dark:bg-indigo-900/40 border-indigo-300' : 'hover:-translate-y-1 shadow-sm hover:shadow-xl'}`}
                                     >
                                         <div className="flex justify-between items-start mb-4">
                                             <div className={`w-12 h-12 ${theme.iconBg} ${theme.iconColor} rounded-[1rem] flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform`}>
-                                                <Folder size={24} fill="currentColor" />
+                                                <Folder size={24} fill="currentColor" className={isDragTarget ? 'animate-bounce' : ''} />
                                             </div>
                                         </div>
                                         <h3 className={`font-black ${theme.text} text-lg leading-tight line-clamp-2 pr-6 mb-auto`}>{folderName}</h3>
@@ -1127,28 +1130,45 @@ if (internalMode === 'library') {
                             const DeckIcon = deck.icon || theme.icon;
                             const cardCount = deck.id === 'custom' ? (deck.cards?.length || 0) : (deck.stats?.cardCount || 0);
 
+                            // 🔥 DRAGGABLE DECK
+                            const isDragging = draggedDeckId === key;
+
                             return (
-                                <div key={key} className="relative group animate-in fade-in duration-300 h-full pt-2">
+                                <div 
+                                    key={key} 
+                                    className={`relative group animate-in fade-in duration-300 h-full pt-2 transition-all ${isDragging ? 'opacity-40 scale-95' : ''}`}
+                                >
                                     <div className="absolute inset-x-4 -bottom-1 h-10 bg-slate-200 dark:bg-slate-800 rounded-[2rem] transition-transform duration-300 group-hover:translate-y-1.5" />
                                     <div className="absolute inset-x-2 -bottom-0 h-10 bg-slate-100 dark:bg-slate-800/80 rounded-[2rem] transition-transform duration-300 group-hover:translate-y-1" />
 
                                     <button 
+                                        draggable={true}
+                                        onDragStart={(e) => {
+                                            setDraggedDeckId(key);
+                                            e.dataTransfer.setData('text/plain', key);
+                                            e.dataTransfer.effectAllowed = 'move';
+                                            // Optional: Hide the default drag image or replace it
+                                        }}
+                                        onDragEnd={() => {
+                                            setDraggedDeckId(null);
+                                            setDragOverFolder(null);
+                                        }}
                                         onClick={() => { 
                                             window.history.pushState({ view: 'menu' }, ''); 
                                             onSelectDeck(key); 
                                             setInternalMode('menu'); 
                                         }} 
-                                        className="w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] p-5 border-2 border-slate-50 dark:border-slate-800 hover:border-slate-100 dark:hover:border-slate-700 transition-all text-left shadow-sm group-hover:-translate-y-1 relative z-10 flex flex-col"
+                                        className="w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] p-5 border-2 border-slate-50 dark:border-slate-800 hover:border-slate-100 dark:hover:border-slate-700 transition-all text-left shadow-sm group-hover:-translate-y-1 relative z-10 flex flex-col cursor-grab active:cursor-grabbing"
                                     > 
-                                        <div className="flex justify-between items-start mb-4">
+                                        <div className="flex justify-between items-start mb-4 pointer-events-none">
                                             <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center text-xl border shadow-inner group-hover:scale-110 transition-transform ${theme.bg} ${theme.color} ${theme.border}`}>
                                                 {typeof DeckIcon === 'string' ? DeckIcon : <DeckIcon size={24}/>}
                                             </div>
                                         </div>
                                         
-                                        <h3 className="font-black text-slate-800 dark:text-white text-lg leading-tight line-clamp-2 pr-8 mb-3">{displayTitle}</h3>
+                                        <h3 className="font-black text-slate-800 dark:text-white text-lg leading-tight line-clamp-2 pr-8 mb-3 pointer-events-none">{displayTitle}</h3>
                                         
-                                        <div className="mt-auto pt-1 flex flex-col gap-2">
+                                        <div className="mt-auto pt-1 flex flex-col gap-2 pointer-events-none">
                                             <div className="flex items-center gap-2">
                                                 <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest flex items-center gap-1">
                                                     <Layers size={10} /> {cardCount}
