@@ -48,8 +48,8 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
   const todayLessons = isToday ? (userData?.dailyLessons || 0) : 0;
 
   const dailyQuests = [
-      { id: 1, title: 'Earn 50 XP', target: 50, current: Math.min(todayXp, 50), icon: <Zap size={16} className="text-yellow-500" aria-hidden="true" /> },
-      { id: 2, title: 'Complete 1 Lesson', target: 1, current: Math.min(todayLessons, 1), icon: <BookOpen size={16} className="text-indigo-500 dark:text-indigo-400" aria-hidden="true" /> },
+      { id: 1, title: 'Earn 50 XP', target: 50, current: Math.min(todayXp, 50), icon: <Zap size={14} className="text-yellow-500" aria-hidden="true" /> },
+      { id: 2, title: '1 Lesson', target: 1, current: Math.min(todayLessons, 1), icon: <BookOpen size={14} className="text-indigo-500 dark:text-indigo-400" aria-hidden="true" /> },
   ];
 
   const [dismissedQuests, setDismissedQuests] = useState<number[]>(() => {
@@ -75,13 +75,11 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
 
   // 🔥 GLOBAL REVIEW: IF ACTIVATED, TAKEOVER THE SCREEN
   if (launchDailyReview) {
-      // 🔥 Filter out archived decks before compiling the queue
       const activeDecks = Object.entries(allDecks || {}).filter(([key, deck]) => {
           const isArchived = userData?.deckPrefs?.[key]?.archived || false;
           return !isArchived;
       }).map(([_, deck]) => deck);
 
-      // Flattens all cards from NON-ARCHIVED decks into a single massive study array
       const masterDeck = {
           id: 'global_review',
           title: 'Daily Review',
@@ -164,51 +162,57 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                 </div>
             </section>
 
-            <div className="px-6 space-y-8 mt-8">
+            <div className="px-6 space-y-6 mt-6">
 
               <InstallPWA />
 
-              {/* 3. DAILY QUESTS WIDGET */}
+              {/* 🔥 3. ULTRA-COMPACT DAILY TARGETS (BENTO GRID) */}
               {visibleQuests.length > 0 && (
-                  <section className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border-2 border-slate-100 dark:border-slate-800 shadow-sm animate-in slide-in-from-bottom-4 transition-all duration-500">
-                      <div className="flex items-center justify-between mb-5">
-                          <h3 className="font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                              <Target size={18} className="text-rose-500 dark:text-rose-400" aria-hidden="true" /> Daily Quests
+                  <section className="animate-in slide-in-from-bottom-4 transition-all duration-500 mb-2">
+                      <div className="flex justify-between items-end mb-3 ml-1">
+                          <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                              <Target size={16} className="text-rose-500" /> Daily Targets
                           </h3>
-                          <span className="text-xs font-black text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 px-2 py-1 rounded-md uppercase tracking-widest transition-colors duration-300">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                               Resets in {hoursRemaining}h
                           </span>
                       </div>
 
-                      <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
                           {visibleQuests.map(quest => {
                               const pct = Math.min(100, Math.round((quest.current / quest.target) * 100));
                               const isDone = quest.current >= quest.target;
                               
                               return (
-                                  <div key={quest.id} className="relative animate-in fade-in" aria-label={`${quest.title}: ${isDone ? 'Completed' : `${quest.current} out of ${quest.target}`}`}>
-                                      <div className="flex justify-between items-end mb-2">
-                                          <div className="flex items-center gap-2">
-                                              <div className={`${isDone ? 'opacity-50 grayscale' : ''} transition-all`}>{quest.icon}</div>
-                                              <span className={`text-sm font-bold ${isDone ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'}`}>{quest.title}</span>
+                                  <div key={quest.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border-2 border-slate-100 dark:border-slate-800 shadow-sm flex flex-col relative overflow-hidden group">
+                                      <div className="flex items-start justify-between mb-3 relative z-10">
+                                          <div className={`p-2 rounded-xl ${isDone ? 'bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10' : 'bg-slate-50 text-slate-500 dark:bg-slate-800'}`}>
+                                              {quest.icon}
                                           </div>
-                                          
                                           {isDone ? (
                                               <button 
-                                                  onClick={() => handleDismissQuest(quest.id)}
-                                                  className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-600 text-white px-2.5 py-1 rounded-lg text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm"
+                                                  onClick={() => handleDismissQuest(quest.id)} 
+                                                  className="text-[9px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/20 px-2 py-1 rounded-md active:scale-95 transition-all"
                                               >
-                                                  <Check size={14} strokeWidth={3} /> Clear
+                                                  Clear
                                               </button>
                                           ) : (
-                                              <span className="text-xs font-black text-slate-400 dark:text-slate-500">
+                                              <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 pt-1">
                                                   {quest.current}/{quest.target}
                                               </span>
                                           )}
                                       </div>
-                                      <div className="h-2.5 w-full bg-slate-50 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-100 dark:border-slate-700 transition-colors duration-300">
-                                          <div className={`h-full transition-all duration-1000 ${isDone ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]' : 'bg-rose-500'}`} style={{ width: `${pct}%` }} />
+                                      
+                                      <div className="relative z-10">
+                                          <h4 className={`text-xs font-bold mb-2.5 line-clamp-1 ${isDone ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                                              {quest.title}
+                                          </h4>
+                                          <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                              <div className={`h-full transition-all duration-1000 ${isDone ? 'bg-emerald-500' : 'bg-rose-500'}`} style={{ width: `${pct}%` }} />
+                                          </div>
                                       </div>
+
+                                      {isDone && <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none" />}
                                   </div>
                               );
                           })}
@@ -216,7 +220,7 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                   </section>
               )}
 
-              {/* 🔥 3.5. GLOBAL DAILY REVIEW BANNER (SRS) */}
+              {/* 3.5. GLOBAL DAILY REVIEW BANNER (SRS) */}
               {allDecks && Object.keys(allDecks).length > 0 && (
                   <section className="animate-in slide-in-from-bottom-4 duration-500 delay-75">
                       <div className="flex items-center gap-3 mb-4 ml-1">
