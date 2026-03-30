@@ -259,16 +259,14 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
 
               {/* 🔥 3. ACTION CENTER CAROUSEL */}
               <section className="animate-in slide-in-from-bottom-4 transition-all duration-500">
-                  <div className="flex justify-between items-end mb-3 ml-1">
+                  <div className="mb-3 ml-1">
                       <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
                           <Activity size={16} className="text-indigo-500" /> Action Center
                       </h3>
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                          Resets in {hoursRemaining}h
-                      </span>
                   </div>
 
-                  <div className="flex gap-3 overflow-x-auto custom-scrollbar snap-x pb-2 -mx-6 px-6">
+                  {/* NOTE: Swapped custom-scrollbar for hide-scrollbar */}
+                  <div className="flex gap-3 overflow-x-auto hide-scrollbar snap-x pb-2 -mx-6 px-6" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                       
                       {/* CARD 1: COMBINED DAILY TARGETS */}
                       <div className="snap-start shrink-0 w-[150px] h-32 relative bg-gradient-to-br from-emerald-400 to-teal-600 rounded-[1.5rem] p-4 shadow-lg shadow-emerald-500/20 overflow-hidden flex flex-col justify-between border border-emerald-400/50">
@@ -280,9 +278,13 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                               <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md shadow-inner">
                                   <Target size={16} className="text-white" />
                               </div>
-                              {allQuestsDone && (
+                              {allQuestsDone ? (
                                   <span className="flex items-center justify-center w-6 h-6 bg-white text-emerald-600 rounded-full shadow-sm">
                                       <Check size={12} strokeWidth={3} />
+                                  </span>
+                              ) : (
+                                  <span className="text-[9px] font-black uppercase tracking-widest text-emerald-50 bg-black/20 px-2 py-1 rounded-lg backdrop-blur-md border border-white/10 shadow-sm">
+                                      {hoursRemaining}h
                                   </span>
                               )}
                           </div>
@@ -372,7 +374,7 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                         </button>
                     </div>
                     
-                    <div className="flex gap-4 overflow-x-auto pb-8 -mx-6 px-6 custom-scrollbar snap-x pt-2">
+                    <div className="flex gap-4 overflow-x-auto pb-8 -mx-6 px-6 hide-scrollbar snap-x pt-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                         {classes.map((cls: any) => { 
                             const primaryCurriculum = curriculums?.find((c: any) => cls.assignedCurriculums?.includes(c.id));
                             const effectiveSubject = cls.subject || primaryCurriculum?.subject || 'General Studies';
@@ -435,6 +437,7 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                     </button>
                  </section>
               )}
+
             </div>
         </main>
     </div>
