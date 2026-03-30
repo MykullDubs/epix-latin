@@ -5,7 +5,7 @@ import {
     Filter, ChevronRight, Archive, Plus, Loader2,
     MoreVertical, FolderPlus, Trash2, Folder, FolderOpen, Edit3, Infinity,
     HeartPulse, Cpu, Briefcase, Palette, Utensils, Globe2, Activity, ShieldAlert, MonitorPlay,
-    BrainCircuit, CheckCircle2
+    Calculator, FlaskConical, Plane, BookText, Code, BrainCircuit, Music, CheckCircle2
 } from 'lucide-react';
 import { Toast } from './Toast'; 
 import { collection, getDocs } from 'firebase/firestore';
@@ -16,13 +16,14 @@ import { saveDeckToCache, getDeckFromCache } from '../utils/localCache';
 import ContextualBuilder from './ContextualBuilder';
 import { StudyModePlayer, MatchingGame, QuizSessionView } from './StudyEngines';
 
+// 🔥 JUICED FOLDER COLORS (Now with Gradients & Glows)
 const FOLDER_COLORS: Record<string, any> = {
-    indigo: { bg: 'bg-indigo-50 dark:bg-indigo-900/20', border: 'border-indigo-100 dark:border-indigo-500/30', text: 'text-indigo-900 dark:text-indigo-100', iconBg: 'bg-white dark:bg-indigo-500/30', iconColor: 'text-indigo-600 dark:text-indigo-400', badge: 'bg-white/60 dark:bg-black/20 text-indigo-600 dark:text-indigo-300', hex: 'bg-indigo-500' },
-    rose: { bg: 'bg-rose-50 dark:bg-rose-900/20', border: 'border-rose-100 dark:border-rose-500/30', text: 'text-rose-900 dark:text-rose-100', iconBg: 'bg-white dark:bg-rose-500/30', iconColor: 'text-rose-600 dark:text-rose-400', badge: 'bg-white/60 dark:bg-black/20 text-rose-600 dark:text-rose-300', hex: 'bg-rose-500' },
-    emerald: { bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-100 dark:border-emerald-500/30', text: 'text-emerald-900 dark:text-emerald-100', iconBg: 'bg-white dark:bg-emerald-500/30', iconColor: 'text-emerald-600 dark:text-emerald-400', badge: 'bg-white/60 dark:bg-black/20 text-emerald-600 dark:text-emerald-300', hex: 'bg-emerald-500' },
-    amber: { bg: 'bg-amber-50 dark:bg-amber-900/20', border: 'border-amber-100 dark:border-amber-500/30', text: 'text-amber-900 dark:text-amber-100', iconBg: 'bg-white dark:bg-amber-500/30', iconColor: 'text-amber-600 dark:text-amber-400', badge: 'bg-white/60 dark:bg-black/20 text-amber-600 dark:text-amber-300', hex: 'bg-amber-500' },
-    sky: { bg: 'bg-sky-50 dark:bg-sky-900/20', border: 'border-sky-100 dark:border-sky-500/30', text: 'text-sky-900 dark:text-sky-100', iconBg: 'bg-white dark:bg-sky-500/30', iconColor: 'text-sky-600 dark:text-sky-400', badge: 'bg-white/60 dark:bg-black/20 text-sky-600 dark:text-sky-300', hex: 'bg-sky-500' },
-    fuchsia: { bg: 'bg-fuchsia-50 dark:bg-fuchsia-900/20', border: 'border-fuchsia-100 dark:border-fuchsia-500/30', text: 'text-fuchsia-900 dark:text-fuchsia-100', iconBg: 'bg-white dark:bg-fuchsia-500/30', iconColor: 'text-fuchsia-600 dark:text-fuchsia-400', badge: 'bg-white/60 dark:bg-black/20 text-fuchsia-600 dark:text-fuchsia-300', hex: 'bg-fuchsia-500' }
+    indigo: { bg: 'bg-white dark:bg-slate-900', border: 'border-slate-100 dark:border-slate-800', hover: 'hover:border-indigo-300 dark:hover:border-indigo-500/50', textColor: 'text-indigo-500 dark:text-indigo-400', iconBg: 'bg-gradient-to-br from-indigo-400 to-indigo-600 shadow-lg shadow-indigo-500/30', iconColor: 'text-white', badge: 'bg-slate-100 dark:bg-slate-800 text-indigo-500', hex: 'bg-indigo-500' },
+    rose: { bg: 'bg-white dark:bg-slate-900', border: 'border-slate-100 dark:border-slate-800', hover: 'hover:border-rose-300 dark:hover:border-rose-500/50', textColor: 'text-rose-500 dark:text-rose-400', iconBg: 'bg-gradient-to-br from-rose-400 to-rose-600 shadow-lg shadow-rose-500/30', iconColor: 'text-white', badge: 'bg-slate-100 dark:bg-slate-800 text-rose-500', hex: 'bg-rose-500' },
+    emerald: { bg: 'bg-white dark:bg-slate-900', border: 'border-slate-100 dark:border-slate-800', hover: 'hover:border-emerald-300 dark:hover:border-emerald-500/50', textColor: 'text-emerald-500 dark:text-emerald-400', iconBg: 'bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/30', iconColor: 'text-white', badge: 'bg-slate-100 dark:bg-slate-800 text-emerald-500', hex: 'bg-emerald-500' },
+    amber: { bg: 'bg-white dark:bg-slate-900', border: 'border-slate-100 dark:border-slate-800', hover: 'hover:border-amber-300 dark:hover:border-amber-500/50', textColor: 'text-amber-500 dark:text-amber-400', iconBg: 'bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg shadow-amber-500/30', iconColor: 'text-white', badge: 'bg-slate-100 dark:bg-slate-800 text-amber-500', hex: 'bg-amber-500' },
+    sky: { bg: 'bg-white dark:bg-slate-900', border: 'border-slate-100 dark:border-slate-800', hover: 'hover:border-sky-300 dark:hover:border-sky-500/50', textColor: 'text-sky-500 dark:text-sky-400', iconBg: 'bg-gradient-to-br from-sky-400 to-sky-600 shadow-lg shadow-sky-500/30', iconColor: 'text-white', badge: 'bg-slate-100 dark:bg-slate-800 text-sky-500', hex: 'bg-sky-500' },
+    fuchsia: { bg: 'bg-white dark:bg-slate-900', border: 'border-slate-100 dark:border-slate-800', hover: 'hover:border-fuchsia-300 dark:hover:border-fuchsia-500/50', textColor: 'text-fuchsia-500 dark:text-fuchsia-400', iconBg: 'bg-gradient-to-br from-fuchsia-400 to-fuchsia-600 shadow-lg shadow-fuchsia-500/30', iconColor: 'text-white', badge: 'bg-slate-100 dark:bg-slate-800 text-fuchsia-500', hex: 'bg-fuchsia-500' }
 };
 
 // 🔥 UNIFIED DISCOVERY THEMES
@@ -30,26 +31,28 @@ const getDeckTheme = (title: string = '') => {
     const str = title.toLowerCase();
     
     // STEM & Medical
-    if (str.match(/stem|medical|anatomy|bio|health|doctor|sci/)) return { icon: HeartPulse, color: 'text-emerald-500 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-100 dark:border-emerald-500/20' };
+    if (str.match(/stem|medical|anatomy|bio|health|doctor|sci|chem|phys|cell/)) return { icon: HeartPulse, gradient: 'from-emerald-400 to-teal-600', shadow: 'shadow-emerald-500/30' };
     // Technology & Logic
-    if (str.match(/tech|logic|code|comp|program|software/)) return { icon: Cpu, color: 'text-blue-500 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'border-blue-100 dark:border-blue-500/20' };
+    if (str.match(/tech|logic|code|comp|program|software/)) return { icon: Cpu, gradient: 'from-blue-500 to-indigo-600', shadow: 'shadow-blue-500/30' };
     // Commerce & Trade
-    if (str.match(/business|commerce|trade|finance|corporate/)) return { icon: Briefcase, color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-200 dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-700' };
+    if (str.match(/business|commerce|trade|finance|corporate/)) return { icon: Briefcase, gradient: 'from-slate-600 to-slate-800', shadow: 'shadow-slate-500/30' };
     // Arts & Culture
-    if (str.match(/art|culture|history|design|draw/)) return { icon: Palette, color: 'text-fuchsia-500 dark:text-fuchsia-400', bg: 'bg-fuchsia-50 dark:bg-fuchsia-500/10', border: 'border-fuchsia-100 dark:border-fuchsia-500/20' };
+    if (str.match(/art|culture|history|design|draw|paint|color/)) return { icon: Palette, gradient: 'from-fuchsia-500 to-purple-600', shadow: 'shadow-fuchsia-500/30' };
     // Culinary & Hospitality
-    if (str.match(/culinary|hospitality|food|kitchen|cook|eat/)) return { icon: Utensils, color: 'text-orange-500 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-500/10', border: 'border-orange-100 dark:border-orange-500/20' };
+    if (str.match(/culinary|hospitality|food|kitchen|cook|eat/)) return { icon: Utensils, gradient: 'from-orange-400 to-rose-500', shadow: 'shadow-orange-500/30' };
     // Society & Politics
-    if (str.match(/society|politics|law|ethics|government/)) return { icon: Globe2, color: 'text-cyan-500 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-500/10', border: 'border-cyan-100 dark:border-cyan-500/20' };
+    if (str.match(/society|politics|law|ethics|government/)) return { icon: Globe2, gradient: 'from-cyan-500 to-blue-500', shadow: 'shadow-cyan-500/30' };
     // Linguistics & Phonetics
-    if (str.match(/linguistics|phonetics|grammar|syntax|verb|read|english|vocab|word/)) return { icon: Activity, color: 'text-violet-500 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-500/10', border: 'border-violet-100 dark:border-violet-500/20' };
+    if (str.match(/linguistics|phonetics|grammar|syntax|verb|read|english|vocab|word/)) return { icon: Activity, gradient: 'from-violet-500 to-indigo-500', shadow: 'shadow-violet-500/30' };
     // Daily Survival
-    if (str.match(/survival|emergency|navigate|travel|place/)) return { icon: ShieldAlert, color: 'text-rose-500 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-500/10', border: 'border-rose-100 dark:border-rose-500/20' };
+    if (str.match(/survival|emergency|navigate|travel|place|city|country/)) return { icon: ShieldAlert, gradient: 'from-rose-400 to-red-600', shadow: 'shadow-rose-500/30' };
     // Media & Entertainment
-    if (str.match(/media|entertainment|movie|game|music|play/)) return { icon: MonitorPlay, color: 'text-pink-500 dark:text-pink-400', bg: 'bg-pink-50 dark:bg-pink-500/10', border: 'border-pink-100 dark:border-pink-500/20' };
+    if (str.match(/media|entertainment|movie|game|music|play|audio|song|sound/)) return { icon: MonitorPlay, gradient: 'from-pink-500 to-rose-400', shadow: 'shadow-pink-500/30' };
+    // Math specific
+    if (str.match(/math|calc|num|algebra|geometry/)) return { icon: Calculator, gradient: 'from-rose-500 to-pink-600', shadow: 'shadow-rose-500/30' };
     
-    // Default 
-    return { icon: Layers, color: 'text-indigo-500 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-500/10', border: 'border-indigo-100 dark:border-indigo-500/20' };
+    // Default
+    return { icon: Layers, gradient: 'from-indigo-400 to-indigo-600', shadow: 'shadow-indigo-500/30' };
 };
 
 export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity, userData, onSaveCard, onToggleStar, onToggleArchive, onCreateFolder, onAssignToFolder, onHideDeck, onUpdateFolder, onDeleteFolder, onReorderFolders, onReorderDecks, user }: any) {
@@ -460,7 +463,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                         setDeckFilter(folderName);
                                     }} 
                                     data-active={deckFilter === folderName} 
-                                    className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 active:scale-95 ${deckFilter === folderName ? `${cTheme.hex} text-white shadow-md` : `${cTheme.bg} ${cTheme.iconColor}`}`}
+                                    className={`shrink-0 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 active:scale-95 ${deckFilter === folderName ? `${cTheme.hex} text-white shadow-md` : `${cTheme.bg} ${cTheme.textColor}`}`}
                                 >
                                     <Folder size={12} fill="currentColor" /> {folderName}
                                 </button>
@@ -484,7 +487,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                 </button>
                                 
                                 <div className="flex items-center gap-3 mt-6 mb-4">
-                                    <FolderOpen size={28} className={FOLDER_COLORS[folderColors[deckFilter] || 'indigo'].iconColor} />
+                                    <FolderOpen size={28} className={FOLDER_COLORS[folderColors[deckFilter] || 'indigo'].textColor} />
                                     <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">{deckFilter}</h2>
                                 </div>
                                 
@@ -577,14 +580,14 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                             window.history.pushState({ view: 'folder' }, '');
                                             setDeckFilter(folderName);
                                         }} 
-                                        className={`w-full ${theme.bg} rounded-[2rem] ${isDense ? 'p-4 sm:p-5' : 'p-5'} border-4 ${theme.border} transition-all text-left flex flex-col h-full relative cursor-grab active:cursor-grabbing ${!isGap && !isCatchingDeck ? 'hover:-translate-y-1 shadow-sm hover:shadow-xl' : ''}`}
+                                        className={`w-full bg-white dark:bg-slate-900 rounded-[2rem] ${isDense ? 'p-4 sm:p-5' : 'p-5'} border-2 border-slate-100 dark:border-slate-800 transition-all text-left flex flex-col h-full relative cursor-grab active:cursor-grabbing ${!isGap && !isCatchingDeck ? `hover:-translate-y-1 shadow-sm hover:shadow-xl ${theme.hover}` : ''}`}
                                     >
                                         <div className="flex justify-between items-start mb-4 pointer-events-none">
-                                            <div className={`${isDense ? 'w-10 h-10 rounded-xl' : 'w-12 h-12 rounded-[1rem]'} flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform ${theme.iconBg} ${theme.iconColor}`}>
+                                            <div className={`${isDense ? 'w-10 h-10 rounded-xl' : 'w-14 h-14 rounded-2xl'} ${theme.iconBg} ${theme.iconColor} flex items-center justify-center text-xl group-hover:scale-110 transition-transform`}>
                                                 <Folder size={isDense ? 20 : 24} fill="currentColor" className={isCatchingDeck ? 'animate-bounce' : ''} />
                                             </div>
                                         </div>
-                                        <h3 className={`font-black ${theme.text} ${isDense ? 'text-sm' : 'text-base'} leading-snug line-clamp-3 pr-4 mb-auto pointer-events-none`}>{folderName}</h3>
+                                        <h3 className={`font-black text-slate-800 dark:text-white ${isDense ? 'text-sm' : 'text-base'} leading-snug line-clamp-3 pr-4 mb-auto pointer-events-none`}>{folderName}</h3>
                                         <div className="mt-3 pointer-events-none">
                                             <span className={`text-[9px] uppercase font-black tracking-widest ${theme.badge} px-2.5 py-1 rounded-md shadow-sm`}>
                                                 {itemCount} Decks
@@ -598,7 +601,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                             window.history.pushState({ view: 'modal' }, '');
                                             setActiveOptionsFolder(folderName);
                                         }}
-                                        className={`absolute ${isDense ? 'top-3 right-2' : 'top-3 right-3'} p-2 rounded-full ${theme.iconColor} hover:bg-white/50 transition-colors active:bg-white/80 z-20`}
+                                        className={`absolute ${isDense ? 'top-3 right-2' : 'top-3 right-3'} p-2 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors z-20`}
                                         aria-label="Folder Options"
                                     >
                                         <MoreVertical size={20} />
@@ -676,10 +679,10 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                             onSelectDeck(key); 
                                             setInternalMode('menu'); 
                                         }} 
-                                        className={`w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] ${isDense ? 'p-4 sm:p-5' : 'p-5'} border-2 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all text-left shadow-sm relative z-10 flex flex-col cursor-grab active:cursor-grabbing ${!isGap ? 'group-hover:-translate-y-1' : ''}`}
+                                        className={`w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] ${isDense ? 'p-4 sm:p-5' : 'p-5'} border-2 border-slate-100 dark:border-slate-800 transition-all text-left shadow-sm relative z-10 flex flex-col cursor-grab active:cursor-grabbing ${!isGap ? 'group-hover:-translate-y-1 hover:shadow-xl hover:border-indigo-200 dark:hover:border-indigo-500/50' : ''}`}
                                     > 
                                         <div className={`flex justify-between items-start ${isDense ? 'mb-3' : 'mb-4'} pointer-events-none`}>
-                                            <div className={`${isDense ? 'w-10 h-10 rounded-xl' : 'w-12 h-12 rounded-[1rem]'} flex items-center justify-center text-xl border shadow-inner transition-transform ${theme.bg} ${theme.color} ${theme.border}`}>
+                                            <div className={`${isDense ? 'w-10 h-10 rounded-xl' : 'w-14 h-14 rounded-2xl'} flex items-center justify-center text-white text-xl shadow-lg transition-transform bg-gradient-to-br ${theme.gradient} ${theme.shadow} group-hover:scale-110`}>
                                                 {typeof DeckIcon === 'string' ? DeckIcon : <DeckIcon size={isDense ? 20 : 24}/>}
                                             </div>
                                         </div>
@@ -719,7 +722,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         <div className="bg-white dark:bg-slate-900 w-full rounded-t-[2.5rem] p-6 relative z-10 animate-in slide-in-from-bottom-full duration-300 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] pb-safe-6">
                             <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto mb-6" />
                             <div className="flex items-center gap-4 mb-6 px-2">
-                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm ${FOLDER_COLORS[folderColors[activeOptionsFolder] || 'indigo'].bg} ${FOLDER_COLORS[folderColors[activeOptionsFolder] || 'indigo'].iconColor}`}>
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm ${FOLDER_COLORS[folderColors[activeOptionsFolder] || 'indigo'].iconBg} ${FOLDER_COLORS[folderColors[activeOptionsFolder] || 'indigo'].iconColor}`}>
                                     <Folder size={24} fill="currentColor" />
                                 </div>
                                 <div>
