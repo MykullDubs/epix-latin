@@ -78,24 +78,10 @@ export default function App() {
   const activeOSTheme = OS_THEMES[userData?.equipped?.themes] || OS_THEMES.default;
 
   // ==========================================================================
-  //  THE FLUX ECONOMY (Black Market Handlers)
+  //  THE FLUX ECONOMY (Equipment Handler)
   // ==========================================================================
-  const handlePurchaseCosmetic = async (itemId: string, price: number, category: string) => {
-      if (!user || !userData) return;
-      
-      const newFlux = (userData.flux || 0) - price;
-      const newInventory = [...(userData.inventory || []), itemId];
-      
-      try {
-          const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
-          await updateDoc(userRef, {
-              flux: newFlux,
-              inventory: newInventory
-          });
-      } catch (err) {
-          console.error("Transaction failed:", err);
-      }
-  };
+  
+  // Note: Purchase Logic was moved securely into useMagisterData.ts (actions.purchaseItem)
 
   const handleEquipCosmetic = async (itemId: string, category: string) => {
       if (!user || !userData) return;
@@ -493,8 +479,12 @@ export default function App() {
             <DiscoveryView 
                 networkDecks={networkDecks} 
                 userData={userData} 
-                onDownloadDeck={(deck: any) => { 
-                    actions.purchaseUnlock(deck.id, deck.price || 0);
+                activeOrg={activeOrg} // 🔥 WIRED UP
+                onPurchase={actions.purchaseItem} // 🔥 WIRED UP
+                onDownloadDeck={async (deck: any) => { 
+                    // Automatically buy/unlock the standard deck using the universal engine
+                    await actions.purchaseItem(deck.id, deck.price || 0, 'deck');
+                    
                     if (actions.assignDeckToFolder) {
                         actions.assignDeckToFolder(deck.id, null);
                     }
@@ -505,7 +495,8 @@ export default function App() {
           ) : activeTab === 'store' ? (
             <StorefrontView 
                 userData={userData} 
-                onPurchase={handlePurchaseCosmetic} 
+                activeOrg={activeOrg} // 🔥 WIRED UP
+                onPurchase={actions.purchaseItem} // 🔥 WIRED UP
                 onEquip={handleEquipCosmetic} 
             />
           ) : activeTab === 'flashcards' ? (
@@ -517,6 +508,7 @@ export default function App() {
                 onSaveCard={actions.saveCard} 
                 userData={userData} 
                 user={user} 
+                activeOrg={activeOrg}
                 onToggleStar={actions.toggleCardStar} 
                 onToggleArchive={actions.toggleDeckArchive} 
                 onCreateFolder={actions.createStudyFolder}
@@ -525,7 +517,7 @@ export default function App() {
                 onUpdateFolder={actions.updateStudyFolder}
                 onDeleteFolder={actions.deleteStudyFolder}
                 onReorderFolders={handleReorderFolders} 
-                onReorderDecks={handleReorderDecks} // 🔥 PLUGGED IN HERE!
+                onReorderDecks={handleReorderDecks}
             />
           ) : activeTab === 'profile' ? (
             <ProfileView user={user} userData={userData} />
