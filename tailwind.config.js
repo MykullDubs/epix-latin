@@ -1,3 +1,4 @@
+// tailwind.config.js - MUST BE IN THE PROJECT ROOT (next to package.json)
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
@@ -8,7 +9,7 @@ module.exports = {
     extend: {
       colors: {
         // 🔥 THE INTERCEPT: We hijack 'indigo' and route it to our CSS variables
-        // We use a simpler string format to ensure the CSS variable is read
+        // We use a clean syntax to ensure compatibility with modern Tailwind.
         indigo: {
           50: 'rgb(var(--theme-primary-50))',
           100: 'rgb(var(--theme-primary-100))',
