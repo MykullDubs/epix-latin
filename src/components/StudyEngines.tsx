@@ -9,6 +9,13 @@ import { db, appId } from '../config/firebase';
 
 const SUBJECT_ORDER = ['1s', '2s', '3s', '1p', '2p', '3p'];
 
+// 🔥 THE RTL AUTO-DETECTOR
+// Scans for Arabic, Hebrew, Farsi, and Urdu Unicode blocks
+const isTextRTL = (text?: string) => {
+    if (!text) return false;
+    return /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/.test(text);
+};
+
 export function StudyModePlayer({ setParentCardStats, user, deckCards, userData, onToggleStar, deckId, initialSrbData, onFinish }: any) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
@@ -193,7 +200,11 @@ export function StudyModePlayer({ setParentCardStats, user, deckCards, userData,
                                 </div>
                             )}
 
-                            <h2 className="text-4xl md:text-5xl font-black text-white leading-tight relative z-10 w-full px-4 break-words overflow-hidden">{currentCard.front}</h2>                            
+                            {/* 🔥 RTL-ENABLED FRONT */}
+                            <h2 dir={isTextRTL(currentCard.front) ? 'rtl' : 'ltr'} className="text-4xl md:text-5xl font-black text-white leading-tight relative z-10 w-full px-4 break-words overflow-hidden">
+                                {currentCard.front}
+                            </h2>                            
+                            
                             {currentCard.ipa && (
                                 <p className="text-base font-bold text-indigo-400 mt-4 px-3 py-1 rounded-lg relative z-10" style={{ direction: 'ltr', fontFamily: 'Arial, sans-serif' }}>
                                     {currentCard.ipa}
@@ -219,7 +230,10 @@ export function StudyModePlayer({ setParentCardStats, user, deckCards, userData,
                                 
                                 <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[9px] font-black uppercase tracking-widest mb-4 mt-8">{currentCard.type}</span>
                                 
-                                <h2 className="text-3xl md:text-4xl font-black text-slate-900 leading-tight mb-4">{currentCard.back}</h2>
+                                {/* 🔥 RTL-ENABLED BACK */}
+                                <h2 dir={isTextRTL(currentCard.back) ? 'rtl' : 'ltr'} className="text-3xl md:text-4xl font-black text-slate-900 leading-tight mb-4">
+                                    {currentCard.back}
+                                </h2>
                                 
                                 {currentCard.imageUrl && (
                                     <div className="w-full aspect-video rounded-2xl overflow-hidden mb-4 border-2 border-slate-50 shadow-inner shrink-0">
@@ -238,8 +252,8 @@ export function StudyModePlayer({ setParentCardStats, user, deckCards, userData,
                                     <div className="flex flex-wrap justify-center gap-2 mt-2 pb-8">
                                         {currentCard.morphology.map((m: any, i: number) => (
                                             <div key={i} className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl shadow-sm text-[10px] uppercase tracking-wider transition-colors">
-                                                <span className="font-black text-indigo-600 mr-1">{m.part}</span>
-                                                <span className="font-bold text-slate-500">{m.meaning}</span>
+                                                <span dir={isTextRTL(m.part) ? 'rtl' : 'ltr'} className="font-black text-indigo-600 mr-1">{m.part}</span>
+                                                <span dir={isTextRTL(m.meaning) ? 'rtl' : 'ltr'} className="font-bold text-slate-500">{m.meaning}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -276,7 +290,8 @@ export function StudyModePlayer({ setParentCardStats, user, deckCards, userData,
                                                 return (
                                                     <div key={person} className="flex flex-col p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50 shadow-sm">
                                                         <span className="text-[9px] font-black text-slate-400 uppercase mb-0.5">{person}</span>
-                                                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{verb}</span>
+                                                        {/* 🔥 RTL-ENABLED VERBS */}
+                                                        <span dir={isTextRTL(verb) ? 'rtl' : 'ltr'} className="text-sm font-bold text-slate-700 dark:text-slate-200">{verb}</span>
                                                     </div>
                                                 );
                                             })}
@@ -289,6 +304,7 @@ export function StudyModePlayer({ setParentCardStats, user, deckCards, userData,
                 </div>
             </div>
 
+            {/* SRB INTERFACE */}
             <div className="shrink-0 z-10 w-full mb-safe-4 min-h-[64px]">
                 {!isFlipped ? (
                     <div className="flex items-center justify-between px-2 animate-in fade-in duration-300">
@@ -377,7 +393,13 @@ export function MatchingGame({ deckCards, onGameEnd }: any) {
                     const isFlipped = flipped.includes(i);
                     const isSolved = solved.includes(i);
                     return (
-                        <button key={i} onClick={() => handleCardClick(i)} disabled={isSolved} className={`relative aspect-square rounded-2xl text-sm font-bold flex items-center justify-center p-2 text-center transition-all duration-300 transform ${isSolved ? 'opacity-0 scale-75' : isFlipped ? 'bg-indigo-600 text-white shadow-lg scale-105' : 'bg-white dark:bg-slate-800 border-[3px] border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 shadow-[0_4px_0_rgb(226,232,240)] dark:shadow-[0_4px_0_rgb(51,65,85)] active:translate-y-1 active:shadow-none'}`}>
+                        <button 
+                            key={i} 
+                            onClick={() => handleCardClick(i)} 
+                            disabled={isSolved} 
+                            dir={isTextRTL(card.text) ? 'rtl' : 'ltr'} 
+                            className={`relative aspect-square rounded-2xl text-sm font-bold flex items-center justify-center p-2 text-center transition-all duration-300 transform ${isSolved ? 'opacity-0 scale-75' : isFlipped ? 'bg-indigo-600 text-white shadow-lg scale-105' : 'bg-white dark:bg-slate-800 border-[3px] border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 shadow-[0_4px_0_rgb(226,232,240)] dark:shadow-[0_4px_0_rgb(51,65,85)] active:translate-y-1 active:shadow-none'}`}
+                        >
                             {isFlipped ? card.text : <Puzzle size={24} className="text-slate-300 dark:text-slate-600 opacity-50" />}
                         </button>
                     );
@@ -455,7 +477,11 @@ export function QuizSessionView({ deckCards, onGameEnd }: any) {
                 )}
 
                 <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1 rounded-full">Translate</span>
-                <h2 className="text-3xl md:text-4xl font-black text-slate-800 dark:text-white leading-tight">{currentCard.front}</h2>
+                
+                {/* 🔥 RTL-ENABLED QUIZ FRONT */}
+                <h2 dir={isTextRTL(currentCard.front) ? 'rtl' : 'ltr'} className="text-3xl md:text-4xl font-black text-slate-800 dark:text-white leading-tight">
+                    {currentCard.front}
+                </h2>
             </div>
 
             <div className="space-y-3 flex-1">
@@ -467,7 +493,13 @@ export function QuizSessionView({ deckCards, onGameEnd }: any) {
                         else btnClass = "opacity-40 border-slate-100 dark:border-slate-800 translate-y-[4px]";
                     }
                     return (
-                        <button key={idx} onClick={() => handleOptionClick(opt)} disabled={isProcessing} className={`w-full p-4 rounded-2xl font-black text-lg transition-all ${btnClass}`}>
+                        <button 
+                            key={idx} 
+                            dir={isTextRTL(opt) ? 'rtl' : 'ltr'} 
+                            onClick={() => handleOptionClick(opt)} 
+                            disabled={isProcessing} 
+                            className={`w-full p-4 rounded-2xl font-black text-lg transition-all ${btnClass}`}
+                        >
                             {opt}
                         </button>
                     );
