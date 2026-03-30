@@ -95,29 +95,25 @@ export default function App() {
 
   // Determine active background theme based on equipped cosmetics
   const activeOSTheme = OS_THEMES[userData?.equipped?.themes] || OS_THEMES.default;
-  const activeThemeId = userData?.equipped?.themes || 'default';
+const activeThemeId = userData?.equipped?.themes || 'default';
 
- // 🔥 THE HARMONIZED ROOT INJECTOR
   useEffect(() => {
       const root = document.documentElement;
       
-      // 1. Convert classes to an array so we can iterate safely
-      const currentClasses = Array.from(root.classList);
+      // Clear previous theme classes
+      root.classList.remove('theme-hacker', 'theme-synth');
       
-      // 2. Remove ONLY classes that start with "theme-" 
-      // This leaves the "dark" class (Day/Night) completely alone!
-      currentClasses.forEach(cls => {
-          if (cls.startsWith('theme-')) {
-              root.classList.remove(cls);
-          }
-      });
-      
-      // 3. Inject the newly equipped theme class (if it's not default)
-      if (activeThemeId && activeThemeId !== 'default') {
-          // Normalizes theme_hacker -> theme-hacker to match CSS
-          const cssClass = activeThemeId.replace('_', '-');
+      // Inject the newly equipped theme
+      if (activeThemeId !== 'default') {
+          // Normalizes 'theme_hacker' to 'theme-hacker' to match our CSS
+          const cssClass = activeThemeId.replace('_', '-'); 
           root.classList.add(cssClass);
       }
+
+      // 🔥 FORCE REPAINT: This ensures the browser re-evaluates the CSS variables
+      root.style.display = 'none';
+      root.offsetHeight; // trigger reflow
+      root.style.display = '';
   }, [activeThemeId]);
 
 const handleEquipCosmetic = async (itemId: string, category: string) => {
