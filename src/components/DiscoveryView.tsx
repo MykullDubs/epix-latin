@@ -5,8 +5,8 @@ import {
     Briefcase, Plane, Palette, ChevronRight, ArrowLeft, 
     Map, Compass, Sparkles, Activity, Layers, Download, Lock,
     MonitorPlay, Globe2, ShieldAlert, Cpu, GraduationCap,
-    Clock, SignalHigh, PlayCircle, FileText, CheckCircle2, Zap, Unlock
-    HelpCircle, X 
+    Clock, SignalHigh, PlayCircle, FileText, CheckCircle2, Zap,
+    HelpCircle, X, Unlock
 } from 'lucide-react';
 import { Toast } from './Toast';
 
