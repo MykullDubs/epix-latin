@@ -78,6 +78,11 @@ export default function StorefrontView({ userData, activeOrg, onPurchase, onEqui
     const handleEquipClick = (item: any) => {
         onEquip(item.id, activeTab);
         setToastMsg(`Equipped: ${item.name}`);
+        
+        // Ensure immediate refresh of the App.tsx state by forcing a tiny re-render delay
+        setTimeout(() => {
+            window.dispatchEvent(new Event('resize')); 
+        }, 50);
     };
 
     const renderItemCard = (item: any) => {
@@ -95,7 +100,7 @@ export default function StorefrontView({ userData, activeOrg, onPurchase, onEqui
 
                 {/* Equipped Badge */}
                 {isEquipped && (
-                    <div className="absolute top-4 right-4 bg-emerald-500 text-white px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-1 shadow-md">
+                    <div className="absolute top-4 right-4 bg-emerald-500 text-white px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-1 shadow-md z-20">
                         <Check size={12} strokeWidth={3} /> Active
                     </div>
                 )}
