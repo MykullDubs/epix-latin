@@ -51,7 +51,6 @@ export function useMagisterData() {
         setAllAppLessons(fetchedLessons);
       });
 
-      // 🔥 Note: You will eventually update this listener to point to the new 'decks' collection!
       const unsubCards = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'custom_cards'), (snap) => {
         const cards = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         const decks: any = { custom: { title: 'My Study Cards', cards: [] } };
@@ -75,8 +74,8 @@ export function useMagisterData() {
         setInstructorClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
-const unsubPublished = onSnapshot(collection(db, 'artifacts', appId, 'decks'), (snap) => {
-  setPublishedDecks(snap.docs.map(d => d.data()));
+      const unsubPublished = onSnapshot(collection(db, 'artifacts', appId, 'decks'), (snap) => {
+        setPublishedDecks(snap.docs.map(d => d.data()));
       });
 
       const unsubCurriculums = onSnapshot(collectionGroup(db, 'custom_curriculums'), (snap) => {
@@ -228,28 +227,65 @@ const unsubPublished = onSnapshot(collection(db, 'artifacts', appId, 'decks'), (
         await setDoc(prefRef, { hidden: true }, { merge: true });
     },
 
-    // 🔥 ECONOMY VAULT
-    purchaseUnlock: async (itemId: string, price: number) => {
-        if (!user || !user.uid) return false;
-        const currentCoins = userData?.profile?.main?.coins || userData?.coins || 0;
+    // ========================================================================
+    // 🔥 ECONOMY VAULT (UNIVERSAL TRANSACTION ENGINE)
+    // ========================================================================
+    purchaseItem: async (itemId: string, price: number, category: string, extraData?: any) => {
+        if (!user || !user.uid) return { success: false, msg: "Auth session expired." };
         
-        if (currentCoins < price) return false;
+        // Grab the current Flux balance
+        const currentFlux = userData?.coins || userData?.profile?.main?.coins || 0; 
+        
+        if (currentFlux < price) {
+            return { success: false, msg: "Insufficient Flux for decryption." };
+        }
+
+        const batch = writeBatch(db);
+        const userRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main');
+        const rootUserRef = doc(db, 'artifacts', appId, 'users', user.uid);
+        
+        // 1. Deduct Flux
+        const balanceUpdate = { coins: increment(-price) };
+        batch.update(userRef, balanceUpdate);
+        batch.update(rootUserRef, { 'profile.main.coins': increment(-price) });
+
+        // 2. Update Inventory
+        batch.update(userRef, { inventory: arrayUnion(itemId) });
+        batch.update(rootUserRef, { 'profile.main.inventory': arrayUnion(itemId) });
+
+        // 3. Logic for Elective Courses (Solo Study)
+        if (category === 'course' && extraData) {
+            const newClass = {
+                id: itemId,
+                title: extraData.title || "New Course",
+                subject: extraData.subject || "Elective",
+                type: 'solo', // 🔥 This triggers the unique "Solo" badge on HomeView
+                progressPct: 0,
+                unlockedAt: Date.now()
+            };
+            
+            batch.update(userRef, { enrolledClasses: arrayUnion(newClass) });
+            batch.update(rootUserRef, { 'profile.main.enrolledClasses': arrayUnion(newClass) });
+        }
+
+        // 4. Log the Transaction
+        const logRef = doc(collection(db, 'artifacts', appId, 'activity_logs'));
+        batch.set(logRef, {
+            studentId: user.uid,
+            studentEmail: user.email,
+            type: 'purchase',
+            itemId,
+            category,
+            price,
+            timestamp: Date.now()
+        });
 
         try {
-            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
-                coins: increment(-price)
-            });
-            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid), {
-                'profile.main.coins': increment(-price)
-            });
-
-            const prefRef = doc(db, 'artifacts', appId, 'users', user.uid, 'unlocks', itemId);
-            await setDoc(prefRef, { unlockedAt: Date.now(), pricePaid: price });
-
-            return true;
+            await batch.commit();
+            return { success: true, msg: "Asset decrypted. Check your Vault." };
         } catch (err) {
-            console.error("Transaction failed:", err);
-            return false;
+            console.error("Transaction Error:", err);
+            return { success: false, msg: "Network error during transaction." };
         }
     },
     
