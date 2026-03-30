@@ -11,7 +11,7 @@ import {
     Lock, Play, ChevronRight, Monitor, FileText, ChevronDown, 
     ChevronUp, Trophy, Zap, Flame, Plus, User, Heart,
     Mic, Square, Volume2, Loader2, Shield, Map, Gamepad2,
-    Triangle, Circle, XCircle, X, ArrowDownCircle, Settings
+    Triangle, Circle, XCircle, X, ArrowDownCircle, Settings, Sparkles
 } from 'lucide-react';
 
 import StudentGradebook from './StudentGradebook';
@@ -23,11 +23,11 @@ import AvatarForge from './AvatarForge';
 // --- THEME HELPER (Dark Mode Upgraded) ---
 const getSubjectTheme = (subject: string) => {
     const sub = subject?.toLowerCase() || '';
-    if (sub.includes('math')) return { color: 'text-rose-500 dark:text-rose-400', bg: 'bg-rose-500 dark:bg-rose-600', light: 'bg-rose-100 dark:bg-rose-500/10', border: 'border-rose-200 dark:border-rose-500/20' };
-    if (sub.includes('science') || sub.includes('bio')) return { color: 'text-emerald-500 dark:text-emerald-400', bg: 'bg-emerald-500 dark:bg-emerald-600', light: 'bg-emerald-100 dark:bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-500/20' };
-    if (sub.includes('social') || sub.includes('history')) return { color: 'text-amber-500 dark:text-amber-400', bg: 'bg-amber-500 dark:bg-amber-600', light: 'bg-amber-100 dark:bg-amber-500/10', border: 'border-amber-200 dark:border-amber-500/20' };
-    if (sub.includes('read') || sub.includes('english')) return { color: 'text-cyan-500 dark:text-cyan-400', bg: 'bg-cyan-500 dark:bg-cyan-600', light: 'bg-cyan-100 dark:bg-cyan-500/10', border: 'border-cyan-200 dark:border-cyan-500/20' };
-    return { color: 'text-indigo-500 dark:text-indigo-400', bg: 'bg-indigo-500 dark:bg-indigo-600', light: 'bg-indigo-100 dark:bg-indigo-500/10', border: 'border-indigo-200 dark:border-indigo-500/20' };
+    if (sub.includes('math')) return { color: 'text-rose-500 dark:text-rose-400', bg: 'bg-rose-500 dark:bg-rose-600', light: 'bg-rose-100 dark:bg-rose-500/10', border: 'border-rose-200 dark:border-rose-500/20', glow: 'shadow-rose-500/30' };
+    if (sub.includes('science') || sub.includes('bio')) return { color: 'text-emerald-500 dark:text-emerald-400', bg: 'bg-emerald-500 dark:bg-emerald-600', light: 'bg-emerald-100 dark:bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-500/20', glow: 'shadow-emerald-500/30' };
+    if (sub.includes('social') || sub.includes('history')) return { color: 'text-amber-500 dark:text-amber-400', bg: 'bg-amber-500 dark:bg-amber-600', light: 'bg-amber-100 dark:bg-amber-500/10', border: 'border-amber-200 dark:border-amber-500/20', glow: 'shadow-amber-500/30' };
+    if (sub.includes('read') || sub.includes('english')) return { color: 'text-cyan-500 dark:text-cyan-400', bg: 'bg-cyan-500 dark:bg-cyan-600', light: 'bg-cyan-100 dark:bg-cyan-500/10', border: 'border-cyan-200 dark:border-cyan-500/20', glow: 'shadow-cyan-500/30' };
+    return { color: 'text-indigo-500 dark:text-indigo-400', bg: 'bg-indigo-500 dark:bg-indigo-600', light: 'bg-indigo-100 dark:bg-indigo-500/10', border: 'border-indigo-200 dark:border-indigo-500/20', glow: 'shadow-indigo-500/30' };
 };
 
 // ============================================================================
@@ -186,10 +186,10 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
 
   if (view === 'list') {
     return (
-      <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 shadow-inner p-4 md:p-6 overflow-hidden animate-in fade-in duration-500 font-sans transition-colors duration-300">
+      <div className="flex flex-col h-full bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl rounded-[2.5rem] border border-white/20 dark:border-slate-800 shadow-xl p-4 md:p-6 overflow-hidden animate-in fade-in duration-500 font-sans transition-colors duration-300">
         <header className="flex justify-between items-center mb-6 px-2">
             <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-indigo-500/10 text-indigo-500 rounded-2xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-indigo-500/10 text-indigo-500 rounded-2xl flex items-center justify-center shadow-inner">
                     <MessageSquare size={20} />
                 </div>
                 <div>
@@ -206,11 +206,11 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
 
         <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2 pb-20">
             {isCreating && (
-                <form onSubmit={handleCreateTopic} className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-indigo-200 dark:border-indigo-500/30 shadow-xl mb-8 relative overflow-hidden group">
+                <form onSubmit={handleCreateTopic} className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-6 rounded-[2rem] border border-indigo-200 dark:border-indigo-500/30 shadow-xl mb-8 relative overflow-hidden group">
                     <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500" />
                     <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Directive Title..." className="w-full bg-transparent text-xl font-black text-slate-800 dark:text-slate-100 outline-none mb-3 placeholder:text-slate-300 dark:placeholder:text-slate-700" />
                     <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Enter details..." className="w-full bg-transparent text-sm text-slate-600 dark:text-slate-400 outline-none min-h-[100px] resize-none placeholder:text-slate-300 dark:placeholder:text-slate-700" />
-                    <div className="flex gap-3 justify-end mt-4 pt-4 border-t border-slate-100 dark:border-slate-800/50">
+                    <div className="flex gap-3 justify-end mt-4 pt-4 border-t border-slate-200/50 dark:border-slate-800/50">
                         <button type="button" onClick={() => setIsCreating(false)} className="px-6 py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-black text-[10px] uppercase tracking-widest transition-colors">Cancel</button>
                         <button type="submit" className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md transition-colors flex items-center gap-2">Broadcast <Send size={14}/></button>
                     </div>
@@ -226,15 +226,15 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
             )}
 
             {topics.map(t => (
-                <button key={t.id} onClick={() => { setActiveTopic(t); setView('thread'); }} className="w-full bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-500/40 transition-all text-left relative overflow-hidden group">
+                <button key={t.id} onClick={() => { setActiveTopic(t); setView('thread'); }} className="w-full bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm p-6 rounded-[2rem] border border-white/40 dark:border-slate-800 shadow-sm hover:shadow-lg hover:border-indigo-300 dark:hover:border-indigo-500/40 transition-all text-left relative overflow-hidden group">
                     <div className="absolute left-0 top-0 w-1.5 h-full bg-slate-200 dark:bg-slate-800 group-hover:bg-indigo-500 transition-colors" />
                     <div className="flex justify-between items-start gap-4 mb-3">
                         <h4 className="text-lg font-black text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors leading-tight">{t.title}</h4>
-                        <span className="shrink-0 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-1"><ChevronRight size={12} /> Enter</span>
+                        <span className="shrink-0 bg-slate-200/50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-1"><ChevronRight size={12} /> Enter</span>
                     </div>
                     <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-5 font-medium leading-relaxed">{t.content}</p>
                     
-                    <div className="flex items-center justify-between pt-4 border-t border-slate-50 dark:border-slate-800/50">
+                    <div className="flex items-center justify-between pt-4 border-t border-slate-200/50 dark:border-slate-800/50">
                         <div className="flex items-center gap-3 text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">
                             <ForumAvatar url={t.authorAvatarUrl} name={t.authorName} role={t.role} size="xs" />
                             <span className="truncate max-w-[120px]">{t.authorName}</span>
@@ -250,8 +250,8 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
 
   // --- THREAD VIEW ---
   return (
-    <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-inner overflow-hidden animate-in slide-in-from-right-8 duration-500 font-sans transition-colors duration-300">
-        <header className="bg-white dark:bg-slate-900/80 backdrop-blur-md p-4 md:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-sm z-30 transition-colors duration-300 shrink-0">
+    <div className="flex flex-col h-full bg-white/50 dark:bg-slate-950/50 backdrop-blur-2xl rounded-[2.5rem] border border-white/20 dark:border-slate-800 shadow-xl overflow-hidden animate-in slide-in-from-right-8 duration-500 font-sans transition-colors duration-300">
+        <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-4 md:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-sm z-30 transition-colors duration-300 shrink-0">
             <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-400 dark:text-slate-500 font-black text-xs uppercase hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors active:scale-95"><ArrowLeft size={16} /> Retreat</button>
             <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.2em] bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1.5 rounded-full border border-indigo-100 dark:border-indigo-500/20 flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" /> Live Thread
@@ -259,7 +259,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
         </header>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar relative">
-            <div className="bg-gradient-to-br from-indigo-900 to-slate-900 dark:from-indigo-950 dark:to-black text-white px-6 py-10 md:p-12 relative overflow-hidden shrink-0 border-b-4 border-indigo-500">
+            <div className="bg-gradient-to-br from-indigo-900 to-slate-900 dark:from-indigo-950 dark:to-black text-white px-6 py-10 md:p-12 relative overflow-hidden shrink-0 border-b-4 border-indigo-500 shadow-inner">
                 <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none"><Zap size={120} /></div>
                 <div className="max-w-3xl mx-auto relative z-10">
                     <div className="flex items-center gap-3 mb-6">
@@ -282,16 +282,16 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
 
             <div className="max-w-3xl mx-auto p-4 md:p-8 pb-32">
                 {isCreating && (
-                    <form onSubmit={handlePostResponse} className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border-2 border-indigo-200 dark:border-indigo-500/30 shadow-xl mb-10 animate-in slide-in-from-top-4 duration-300 relative overflow-hidden">
+                    <form onSubmit={handlePostResponse} className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-6 md:p-8 rounded-[2rem] border-2 border-indigo-200 dark:border-indigo-500/30 shadow-xl mb-10 animate-in slide-in-from-top-4 duration-300 relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-cyan-400" />
                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">New Transmission</h4>
                         
-                        <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Transmission Header..." className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm font-black text-slate-800 dark:text-slate-100 outline-none focus:border-indigo-500 mb-3" />
-                        <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Write data..." className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-600 dark:text-slate-400 outline-none focus:border-indigo-500 min-h-[100px] resize-none mb-4" />
+                        <input autoFocus value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Transmission Header..." className="w-full bg-slate-50/50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm font-black text-slate-800 dark:text-slate-100 outline-none focus:border-indigo-500 mb-3" />
+                        <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="Write data..." className="w-full bg-slate-50/50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-600 dark:text-slate-400 outline-none focus:border-indigo-500 min-h-[100px] resize-none mb-4" />
                         
                         <VoiceRecorder onRecordingComplete={setPendingAudio} onCancel={() => setPendingAudio(null)} />
                         
-                        <div className="flex gap-3 justify-end mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
+                        <div className="flex gap-3 justify-end mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                             <button type="button" onClick={() => setIsCreating(false)} className="px-6 py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-black text-[10px] uppercase tracking-widest transition-colors">Cancel</button>
                             <button type="submit" disabled={isUploading} className="px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 transition-colors">
                                 {isUploading ? <Loader2 size={14} className="animate-spin" /> : <><Send size={14}/> Send</>}
@@ -309,7 +309,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                     ) : (
                         responses.map((res) => (
                             <article key={res.id} className="relative">
-                                <div className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm relative z-10 transition-colors duration-300">
+                                <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-md p-6 md:p-8 rounded-[2rem] border border-white/50 dark:border-slate-800 shadow-lg relative z-10 transition-colors duration-300">
                                     <div className="flex items-start justify-between gap-4 mb-4">
                                         <div className="flex items-center gap-4">
                                             <ForumAvatar url={res.authorAvatarUrl} name={res.authorName} role={res.role} size="md" />
@@ -330,7 +330,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                                         </div>
                                     )}
                                     
-                                    <div className="flex items-center gap-4 pt-4 border-t border-slate-100 dark:border-slate-800/60">
+                                    <div className="flex items-center gap-4 pt-4 border-t border-slate-200/60 dark:border-slate-800/60">
                                         <button onClick={() => handleToggleLike(res.id, res.likes || [], res.authorId)} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all border ${res.likes?.includes(auth.currentUser?.uid) ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-900/50 text-rose-500 dark:text-rose-400 shadow-sm' : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-rose-400'}`}>
                                             <Heart size={14} className={res.likes?.includes(auth.currentUser?.uid) ? 'fill-rose-500 dark:fill-rose-400' : ''} /> 
                                             <span className="text-[10px] font-black uppercase tracking-widest">{res.likes?.length || 0}</span>
@@ -344,7 +344,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                                 {(res.comments?.length > 0 || replyingToId === res.id) && (
                                     <div className="ml-8 md:ml-12 mt-4 space-y-3 relative before:absolute before:-left-6 before:top-0 before:bottom-6 before:w-px before:bg-slate-200 dark:before:bg-slate-800">
                                         {res.comments?.map((comment: any, idx: number) => (
-                                            <div key={idx} className="bg-slate-100/50 dark:bg-slate-900/50 p-4 rounded-[1.5rem] border border-slate-200 dark:border-slate-800/80 transition-colors relative before:absolute before:-left-6 before:top-6 before:w-6 before:h-px before:bg-slate-200 dark:before:bg-slate-800">
+                                            <div key={idx} className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm p-4 rounded-[1.5rem] border border-white/40 dark:border-slate-800/80 transition-colors relative before:absolute before:-left-6 before:top-6 before:w-6 before:h-px before:bg-slate-200 dark:before:bg-slate-800">
                                                 <div className="flex items-center gap-3 mb-2">
                                                     <ForumAvatar url={comment.authorAvatarUrl} name={comment.authorName} role={comment.role} size="xs" />
                                                     <span className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">{comment.authorName}</span>
@@ -362,7 +362,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                                                     value={commentText} 
                                                     onChange={e => setCommentText(e.target.value)} 
                                                     placeholder="Enter command to reply..." 
-                                                    className="w-full bg-white dark:bg-slate-900 border-2 border-indigo-200 dark:border-indigo-500/50 text-slate-800 dark:text-slate-100 rounded-2xl pl-10 pr-14 py-4 text-xs font-mono font-bold outline-none focus:border-indigo-500 dark:focus:border-indigo-400 transition-colors shadow-sm" 
+                                                    className="w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-2 border-indigo-200 dark:border-indigo-500/50 text-slate-800 dark:text-slate-100 rounded-2xl pl-10 pr-14 py-4 text-xs font-mono font-bold outline-none focus:border-indigo-500 dark:focus:border-indigo-400 transition-colors shadow-sm" 
                                                     onKeyDown={(e) => e.key === 'Enter' && handlePostComment(res.id)} 
                                                 />
                                                 <button 
@@ -440,7 +440,7 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogAc
                 [`joined.${safeEmail}`]: {
                     name: userData?.name || studentEmail,
                     equipped: userData?.equipped || {},
-                    avatarUrl: userData?.profile?.main?.avatarUrl || userData?.avatarUrl || '' // 🔥 Check both paths!
+                    avatarUrl: userData?.profile?.main?.avatarUrl || userData?.avatarUrl || '' 
                 } 
             }).catch(e => console.log("Could not ping lobby arrival:", e));
         }
@@ -472,11 +472,9 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogAc
         });
     };
 
-    // 🔥 FIXED PATH IN AVATAR SAVE
     const handleSaveAvatar = async (finalUrl: string, config: any) => {
         if (!auth.currentUser?.uid) return;
         try {
-            // Must save to the correct multitenant path!
             const userRef = doc(db, 'artifacts', appId, 'users', auth.currentUser.uid);
             const newEquipped = { ...(userData?.equipped || {}) };
             delete newEquipped.avatars;
@@ -487,7 +485,6 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogAc
                 'equipped': newEquipped
             });
 
-            // Push to the projector immediately
             const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
             await updateDoc(sessionRef, {
                 [`joined.${safeEmail}.avatarUrl`]: finalUrl,
@@ -628,7 +625,7 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, 
                 [`joined.${safeEmail}`]: {
                     name: userData?.name || studentEmail,
                     equipped: userData?.equipped || {},
-                    avatarUrl: userData?.profile?.main?.avatarUrl || userData?.avatarUrl || '' // 🔥 Ensure custom URLs are pushed
+                    avatarUrl: userData?.profile?.main?.avatarUrl || userData?.avatarUrl || ''
                 }
             }).catch(e => console.log("Could not ping lobby arrival:", e));
         }
@@ -675,7 +672,6 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, 
         });
     };
 
-    // 🔥 FIXED PATH IN AVATAR SAVE
     const handleSaveAvatar = async (finalUrl: string, config: any) => {
         if (!auth.currentUser?.uid) return;
         try {
@@ -906,54 +902,63 @@ export default function StudentClassView({
       );
   }
 
-return (
+  return (
     <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden animate-in fade-in duration-500 font-sans relative transition-colors duration-300">
       
-      {/* 🔥 UPGRADED DYNAMIC HEADER */}
-      <header className={`shrink-0 z-10 relative shadow-xl transition-all duration-500 ease-in-out overflow-hidden ${theme.bg} ${isScrolled ? 'rounded-b-3xl p-5 md:p-6' : 'rounded-b-[3rem] p-6 md:p-10 pt-10 md:pt-16'}`}>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+      {/* 🔥 THE TEMPTRESS HERO HEADER: Deep glassmorphism and ambient glow */}
+      <header className={`shrink-0 z-10 relative transition-all duration-500 ease-in-out overflow-hidden bg-transparent ${isScrolled ? 'p-5 md:p-6' : 'p-6 md:p-10 pt-10 md:pt-16'}`}>
+        
+        {/* Ambient Glows behind the header */}
+        <div className={`absolute top-0 right-0 w-[500px] h-[500px] rounded-full blur-[100px] -mr-32 -mt-32 pointer-events-none opacity-40 dark:opacity-20 ${theme.bg}`} />
+        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-white/60 dark:from-slate-900/80 to-transparent pointer-events-none z-0" />
         
         {/* Top Bar: Always Visible */}
         <div className="flex items-center justify-between relative z-20">
-            <button onClick={onBack} className="flex items-center gap-2 text-white/90 hover:text-white transition-colors text-xs font-black uppercase tracking-widest active:scale-95">
-                <ArrowLeft size={16} /> BACK TO HUB
+            <button onClick={onBack} className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors text-xs font-black uppercase tracking-widest active:scale-95 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 dark:border-slate-800 shadow-sm">
+                <ArrowLeft size={16} /> Return to Hub
             </button>
 
-            <span className={`text-white font-black text-xs uppercase tracking-widest truncate max-w-[150px] md:max-w-xs transition-all duration-500 ${isScrolled ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 pointer-events-none'}`}>
+            <span className={`text-slate-800 dark:text-white font-black text-xs uppercase tracking-widest truncate max-w-[150px] md:max-w-xs transition-all duration-500 ${isScrolled ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 pointer-events-none'}`}>
                 {classData.name}
             </span>
         </div>
 
         {/* The Collapsible Banner Content */}
-        <div className={`relative z-10 transition-all duration-500 ease-in-out origin-top ${isScrolled ? 'max-h-0 opacity-0 scale-95' : 'max-h-[500px] opacity-100 scale-100 mt-6'}`}>
-            <span className="inline-block px-3 py-1.5 bg-black/20 text-white rounded-xl text-[10px] font-black uppercase tracking-widest mb-3 backdrop-blur-md border border-white/10 shadow-inner">
-                {classData?.grade || 'General'} • {classData?.subject || 'Subject'}
-            </span>
-            <h2 className="text-4xl md:text-5xl font-black text-white leading-tight mb-2 tracking-tighter drop-shadow-sm">
+        <div className={`relative z-10 transition-all duration-500 ease-in-out origin-top ${isScrolled ? 'max-h-0 opacity-0 scale-95' : 'max-h-[500px] opacity-100 scale-100 mt-8'}`}>
+            <div className={`inline-flex items-center gap-2 px-3 py-1 ${theme.light} ${theme.color} text-[9px] font-black uppercase tracking-widest rounded-full border ${theme.border} mb-4 shadow-sm`}>
+                <Sparkles size={10} /> {assignedCurriculums.length} Modules Await
+            </div>
+            
+            <h2 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white leading-tight mb-3 tracking-tighter drop-shadow-sm">
                 {classData.name}
             </h2>
-            <div className="flex items-center gap-2 mt-4">
-                <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
-                <p className="text-white/90 font-bold text-sm md:text-base line-clamp-1">
-                    {classData.description || "Your learning adventure starts here."}
-                </p>
-            </div>
+            
+            <p className="text-slate-600 dark:text-slate-300 font-bold text-sm md:text-base line-clamp-2 max-w-[90%] leading-relaxed">
+                {classData.description || "Unlock the secrets of this curriculum. Master the nodes, expand your mind, and claim your rewards."}
+            </p>
         </div>
       </header>
 
-      {/* 🔥 ATTACH THE SCROLL LISTENER HERE */}
-      <main className="flex-1 overflow-y-auto custom-scrollbar relative px-2 md:px-6 pb-48 pt-6" onScroll={handleScroll}>
+      {/* 🔥 MAIN CONTENT AREA */}
+      <main className="flex-1 overflow-y-auto custom-scrollbar relative px-2 md:px-6 pb-48 z-20" onScroll={handleScroll}>
 
         {liveSession && activeSubTab !== 'live' && (
-            <div className="px-4 mb-6 animate-in slide-in-from-top-4 fade-in duration-500">
-                <button onClick={() => setActiveSubTab('live')} className="w-full bg-black rounded-[2rem] p-1 shadow-2xl relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-white opacity-10 animate-pulse" />
-                    <div className="relative bg-slate-950 rounded-[1.8rem] p-4 flex items-center justify-between border border-slate-800">
+            <div className="px-4 mb-8 animate-in slide-in-from-top-4 fade-in duration-500">
+                <button onClick={() => setActiveSubTab('live')} className="w-full bg-slate-900 dark:bg-black rounded-[2rem] p-1 shadow-2xl shadow-indigo-500/20 relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-white opacity-5 animate-pulse" />
+                    <div className="relative bg-slate-800/50 dark:bg-slate-950 rounded-[1.8rem] p-4 flex items-center justify-between border border-slate-700/50 dark:border-slate-800 backdrop-blur-xl">
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center animate-bounce-slow"><Zap size={24} className="text-black" fill="currentColor" /></div>
-                            <div className="text-left"><h4 className="text-white font-black text-lg tracking-widest uppercase">LIVE PROTOCOL ACTIVE!</h4><p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Join the classroom engage now</p></div>
+                            <div className="w-12 h-12 bg-white dark:bg-indigo-500/20 rounded-full flex items-center justify-center animate-bounce-slow border border-white/20">
+                                <Zap size={24} className="text-indigo-600 dark:text-indigo-400" fill="currentColor" />
+                            </div>
+                            <div className="text-left">
+                                <h4 className="text-white font-black text-lg tracking-widest uppercase">LIVE PROTOCOL ACTIVE!</h4>
+                                <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Join the classroom engage now</p>
+                            </div>
                         </div>
-                        <div className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center text-white"><ChevronRight size={20} strokeWidth={3} /></div>
+                        <div className="w-10 h-10 bg-slate-700 dark:bg-slate-900 rounded-full flex items-center justify-center text-white border border-white/10 group-hover:bg-indigo-500 transition-colors">
+                            <ChevronRight size={20} strokeWidth={3} />
+                        </div>
                     </div>
                 </button>
             </div>
@@ -962,21 +967,26 @@ return (
         {activeSubTab === 'lessons' && (
           <div className="animate-in fade-in slide-in-from-bottom-4">
              {assignedCurriculums.length > 0 ? (
-                 <section className="space-y-8 mb-10 max-w-lg mx-auto">
+                 <section className="space-y-8 mb-10 max-w-xl mx-auto">
                      {assignedCurriculums.map((curr: any) => (
                          <CurriculumPathway key={curr.id} curr={curr} lessons={lessons} completedItems={completedItems} isExpanded={!!expandedRoadmaps[curr.id]} onToggle={() => toggleRoadmap(curr.id)} onSelectLesson={onSelectLesson} theme={theme} />
                      ))}
                  </section>
              ) : (
-                <div className="text-center p-12 bg-white dark:bg-slate-900 rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-slate-800 m-4 transition-colors duration-300">
+                <div className="text-center p-12 bg-white/50 dark:bg-slate-900/30 backdrop-blur-md rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-slate-800 m-4 transition-colors duration-300">
                     <Map size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
                     <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 mb-2">Map Loading...</h3>
                     <p className="text-slate-500 dark:text-slate-400 font-bold">Your instructor hasn't drawn the path yet.</p>
                 </div>
              )}
+             
              {standaloneLessons.length > 0 && (
-                 <section className="space-y-4 mb-10 px-4 max-w-lg mx-auto">
-                     <div className="flex items-center gap-3 ml-2 mb-6"><div className="h-1 flex-1 bg-slate-200 dark:bg-slate-800 rounded-full" /><h3 className="text-sm font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Bonus Quests</h3><div className="h-1 flex-1 bg-slate-200 dark:bg-slate-800 rounded-full" /></div>
+                 <section className="space-y-4 mb-10 px-4 max-w-xl mx-auto">
+                     <div className="flex items-center gap-3 ml-2 mb-6">
+                         <div className="h-px flex-1 bg-gradient-to-r from-transparent to-slate-200 dark:to-slate-800" />
+                         <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Bonus Quests</h3>
+                         <div className="h-px flex-1 bg-gradient-to-l from-transparent to-slate-200 dark:to-slate-800" />
+                     </div>
                      {standaloneLessons.map((item: any) => (<StandaloneAssignmentCard key={item.id} item={item} isCompleted={completedItems.includes(item.id)} onSelectLesson={onSelectLesson} theme={theme} />))}
                  </section>
              )}
@@ -985,7 +995,7 @@ return (
 
         {activeSubTab === 'leaderboard' && <LeaderboardView studentEmails={classData.studentEmails} currentUserEmail={userData.email} />}
         {activeSubTab === 'exams' && (
-          <section className="space-y-4 px-4 max-w-lg mx-auto">
+          <section className="space-y-4 px-4 max-w-xl mx-auto">
             {examList.length === 0 ? <div className="text-center py-20 opacity-40"><FileText size={48} className="mx-auto mb-4 text-slate-800 dark:text-slate-100" /><p className="font-black text-xs uppercase tracking-widest leading-loose text-slate-800 dark:text-slate-100">No active exams assigned.</p></div> : examList.map((item: any) => <ExamCard key={item.id} item={item} onSelectLesson={onSelectLesson} />)}
           </section>
         )}
@@ -993,8 +1003,9 @@ return (
         {activeSubTab === 'grades' && <StudentGradebook classData={classData} user={userData} />}
       </main>
 
+      {/* 🔥 THE SENSUAL BOTTOM NAV: Deep glassmorphism */}
       <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-[550px] z-[100] px-2">
-          <div className="bg-slate-900/95 dark:bg-slate-900/95 backdrop-blur-2xl p-2 rounded-full shadow-2xl border border-white/10 flex items-center justify-between gap-1 transition-colors duration-300">
+          <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl p-2 rounded-full shadow-2xl border border-white/40 dark:border-white/10 flex items-center justify-between gap-1 transition-colors duration-300">
             {[
               { id: 'lessons', label: 'Roadmap', icon: <BookOpen size={18} /> },
               { id: 'leaderboard', label: 'Rankings', icon: <Trophy size={18} /> },
@@ -1004,7 +1015,7 @@ return (
             ].map((tab) => {
               const isActive = activeSubTab === tab.id;
               return (
-                <button key={tab.id} onClick={() => setActiveSubTab(tab.id as any)} className={`flex flex-1 items-center justify-center gap-2 py-3.5 px-4 rounded-full transition-all duration-300 ${isActive ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>
+                <button key={tab.id} onClick={() => setActiveSubTab(tab.id as any)} className={`flex flex-1 items-center justify-center gap-2 py-3.5 px-4 rounded-full transition-all duration-300 ${isActive ? 'bg-indigo-600 dark:bg-indigo-500 text-white shadow-[0_0_20px_rgba(99,102,241,0.4)] scale-105' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5'}`}>
                   {tab.icon}
                   {isActive && <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap animate-in slide-in-from-left-2">{tab.label}</span>}
                 </button>
@@ -1016,6 +1027,7 @@ return (
   );
 }
 
+// 🔥 UPDATED CURRICULUM PATHWAY: The Seductive Timeline
 const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle, onSelectLesson, theme }: any) => {
     const currLessons = (curr.lessonIds || []).map((id: string) => lessons.find((l: any) => l.id === id)).filter(Boolean);
     const completedCountInCurr = currLessons.filter((l: any) => completedItems.includes(l.id)).length;
@@ -1023,29 +1035,43 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
     const activeNodeIndex = currLessons.findIndex((l: any) => !completedItems.includes(l.id));
     const normalizedActiveIndex = activeNodeIndex === -1 ? currLessons.length - 1 : activeNodeIndex;
     const headerAccent = curr.themeColor || '#6366f1';
+    
     return (
         <article className="bg-transparent relative pb-8">
-            <button className="w-full text-left bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[3rem] border-2 border-slate-100 dark:border-slate-800 shadow-xl relative overflow-hidden group transition-colors duration-300" onClick={onToggle}>
-                <div className="absolute inset-0 opacity-10 transition-opacity group-hover:opacity-20" style={{ backgroundColor: headerAccent }} />
+            
+            {/* The Header Pill */}
+            <button className="w-full text-left bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 md:p-8 rounded-[3rem] border border-white/40 dark:border-slate-800 shadow-xl relative overflow-hidden group transition-colors duration-300" onClick={onToggle}>
+                <div className="absolute inset-0 opacity-5 transition-opacity group-hover:opacity-10" style={{ backgroundColor: headerAccent }} />
+                <div className="absolute right-0 top-0 w-32 h-full bg-gradient-to-l to-transparent pointer-events-none opacity-20" style={{ backgroundImage: `linear-gradient(to left, ${headerAccent}, transparent)` }} />
+                
                 <div className="relative z-10 flex items-center justify-between mb-6">
                     <div>
-                        <span className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-xl text-[10px] font-black uppercase mb-3 inline-block transition-colors duration-300">{curr.grade || 'Pathway'}</span>
-                        <h3 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-slate-100 pr-4 leading-tight">{curr.title}</h3>
+                        <span className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-xl text-[10px] font-black uppercase mb-3 inline-block transition-colors duration-300 shadow-inner dark:shadow-none">{curr.grade || 'Pathway'}</span>
+                        <h3 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-slate-100 pr-4 leading-tight tracking-tight">{curr.title}</h3>
                     </div>
-                    <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center text-slate-400 dark:text-slate-500 group-hover:bg-slate-200 dark:group-hover:bg-slate-700 transition-colors duration-300"><ChevronUp size={24} className={isExpanded ? '' : 'rotate-180 transition-transform'} /></div>
+                    <div className="w-12 h-12 bg-white/50 dark:bg-slate-800/50 backdrop-blur-md rounded-2xl flex items-center justify-center text-slate-400 dark:text-slate-300 border border-white/20 dark:border-white/5 shadow-sm group-hover:scale-110 transition-all duration-300">
+                        <ChevronUp size={24} className={isExpanded ? '' : 'rotate-180 transition-transform'} />
+                    </div>
                 </div>
-                <div className="flex items-center gap-4">
-                    <div className="h-3 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden relative shadow-inner dark:shadow-none flex-1 transition-colors duration-300">
-                        <div className="h-full transition-all duration-1000" style={{ width: `${progressPercent}%`, backgroundColor: headerAccent }} />
+                
+                {/* Sleek mastery bar */}
+                <div className="flex items-center gap-4 relative z-10">
+                    <div className="h-3 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden relative shadow-inner dark:shadow-none flex-1 p-0.5 transition-colors duration-300">
+                        <div className="h-full rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(255,255,255,0.5)]" style={{ width: `${progressPercent}%`, backgroundColor: headerAccent }} />
                     </div>
-                    <span className="text-sm font-black text-slate-400 dark:text-slate-500 shrink-0">{progressPercent}%</span>
+                    <span className="text-sm font-black text-slate-500 dark:text-slate-400 shrink-0">{progressPercent}%</span>
                 </div>
             </button>
-            <div className={`overflow-hidden transition-all duration-700 ${isExpanded ? 'max-h-[5000px] opacity-100 mt-[-2rem]' : 'max-h-0 opacity-0 pointer-events-none'}`}>
-                <div className="pt-16 pb-12 px-1 sm:px-4 bg-slate-100/50 dark:bg-slate-900/50 rounded-b-[3rem] border-2 border-t-0 border-slate-100 dark:border-slate-800 relative transition-colors duration-300">
+
+            {/* The Spine / Nodes */}
+            <div className={`overflow-hidden transition-all duration-700 ${isExpanded ? 'max-h-[5000px] opacity-100 mt-4' : 'max-h-0 opacity-0 pointer-events-none'}`}>
+                <div className="pt-8 pb-12 px-1 sm:px-4 relative transition-colors duration-300">
                     <div className="relative max-w-sm mx-auto w-full">
-                        <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-6 sm:w-8 bg-slate-200/60 dark:bg-slate-800/60 rounded-full z-0 transition-colors duration-300" />
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-6 sm:w-8 rounded-full transition-all duration-1000 z-0 shadow-inner dark:shadow-none" style={{ height: `${currLessons.length > 1 ? (normalizedActiveIndex / (currLessons.length - 1)) * 100 : 100}%`, backgroundColor: headerAccent }} />
+                        
+                        {/* The Glowing Nerve */}
+                        <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-1 bg-slate-200 dark:bg-slate-800/60 rounded-full z-0 transition-colors duration-300" />
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 rounded-full transition-all duration-1000 z-0 shadow-[0_0_15px_rgba(99,102,241,0.5)]" style={{ height: `${currLessons.length > 1 ? (normalizedActiveIndex / (currLessons.length - 1)) * 100 : 100}%`, backgroundColor: headerAccent }} />
+                        
                         <div className="relative z-10 flex flex-col gap-8 sm:gap-12 py-8">
                             {currLessons.map((item: any, index: number) => {
                                 const isCompleted = completedItems.includes(item.id);
@@ -1053,24 +1079,38 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
                                 const isLocked = index > normalizedActiveIndex;
                                 const isExam = item.contentType === 'exam' || item.contentType === 'test';
                                 const isLeft = index % 2 === 0;
+
                                 return (
-                                    <div key={item.id} className={`relative flex w-full items-center min-h-[90px] ${isLocked ? 'opacity-60' : ''}`}>
+                                    <div key={item.id} className={`relative flex w-full items-center min-h-[90px] ${isLocked ? 'opacity-50 grayscale-[50%]' : ''}`}>
+                                        
+                                        {/* Left Side Label */}
                                         <div className={`w-1/2 flex justify-end pr-10 sm:pr-14 z-10 ${!isLeft ? 'invisible' : ''}`}>
-                                            <div className={`bg-white dark:bg-slate-900 p-3 rounded-2xl shadow-sm border-2 ${isCurrent ? 'border-indigo-300 dark:border-indigo-500/50 scale-105' : 'border-slate-100 dark:border-slate-800'} w-full max-w-[150px] text-right transition-colors duration-300`}>
-                                                <span className={`text-[9px] font-black uppercase mb-1 ${isCurrent ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>{isExam ? 'Checkpoint' : `Module ${index + 1}`}</span>
-                                                <h4 className="font-black text-[11px] sm:text-sm text-slate-800 dark:text-slate-100 leading-tight">{item.title}</h4>
+                                            <div className={`bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-4 rounded-3xl shadow-lg border border-white/40 dark:border-slate-700 w-full max-w-[160px] text-right transition-all duration-300 ${isCurrent ? 'scale-105 shadow-xl' : 'hover:scale-[1.02]'} ${isLocked ? 'pointer-events-none' : 'cursor-pointer'}`} onClick={() => !isLocked && onSelectLesson(item)}>
+                                                <span className={`text-[9px] font-black uppercase mb-1 block tracking-widest ${isCurrent ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>{isExam ? 'Checkpoint' : `Module 0${index + 1}`}</span>
+                                                <h4 className="font-black text-xs sm:text-sm text-slate-800 dark:text-slate-100 leading-tight">{item.title}</h4>
                                             </div>
                                         </div>
+                                        
+                                        {/* Center Node: The Heartbeat */}
                                         <div className={`absolute left-1/2 top-1/2 -translate-y-1/2 z-20 ${isLeft ? '-translate-x-[30%]' : '-translate-x-[70%]'}`}>
-                                            <button disabled={isLocked} onClick={() => onSelectLesson(item)} className={`relative w-16 h-16 sm:w-20 rounded-full flex items-center justify-center border-[6px] transition-all shadow-xl ${isCompleted ? 'bg-emerald-500 border-white dark:border-slate-900 text-white' : isCurrent ? `bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 scale-110 animate-bounce-slow shadow-2xl` : 'bg-slate-100 dark:bg-slate-800 border-white dark:border-slate-900 text-slate-400 dark:text-slate-500 cursor-not-allowed'}`} style={{ ...(isCurrent && !isExam ? { borderColor: headerAccent, color: headerAccent } : {}) }}>
+                                            <button disabled={isLocked} onClick={() => onSelectLesson(item)} className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center border-4 transition-all duration-500 ${isCompleted ? 'bg-indigo-500 border-indigo-200 dark:border-indigo-900 text-white shadow-lg shadow-indigo-500/20' : isCurrent ? `bg-slate-900 text-white scale-110 shadow-[0_0_30px_rgba(99,102,241,0.6)]` : 'bg-slate-100 dark:bg-slate-900 border-white dark:border-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'}`} style={{ ...(isCurrent && !isExam ? { borderColor: headerAccent } : {}) }}>
                                                 {isCompleted ? <CheckCircle2 size={24} strokeWidth={3} /> : isLocked ? <Lock size={20} /> : isExam ? <Trophy size={24} fill={isCurrent ? "currentColor" : "none"} /> : <Play size={24} className="ml-1" fill={isCurrent ? "currentColor" : "none"} />}
-                                                {isCurrent && <div className="absolute inset-0 -m-3 border-4 rounded-full animate-ping opacity-40" style={{ borderColor: isExam ? '#f43f5e' : headerAccent }} />}
+                                                
+                                                {/* The Pulse Effect */}
+                                                {isCurrent && (
+                                                    <>
+                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-20" style={{ backgroundColor: headerAccent }}></span>
+                                                        <div className="absolute inset-0 -m-2 border border-white/20 rounded-full animate-spin-slow" style={{ borderColor: headerAccent }} />
+                                                    </>
+                                                )}
                                             </button>
                                         </div>
+                                        
+                                        {/* Right Side Label */}
                                         <div className={`w-1/2 flex justify-start pl-10 sm:pl-14 z-10 ${isLeft ? 'invisible' : ''}`}>
-                                            <div className={`bg-white dark:bg-slate-900 p-3 rounded-2xl shadow-sm border-2 ${isCurrent ? 'border-indigo-300 dark:border-indigo-500/50 scale-105' : 'border-slate-100 dark:border-slate-800'} w-full max-w-[150px] text-left transition-colors duration-300`}>
-                                                <span className={`text-[9px] font-black uppercase mb-1 ${isCurrent ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>{isExam ? 'Checkpoint' : `Module ${index + 1}`}</span>
-                                                <h4 className="font-black text-[11px] sm:text-sm text-slate-800 dark:text-slate-100 leading-tight">{item.title}</h4>
+                                            <div className={`bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-4 rounded-3xl shadow-lg border border-white/40 dark:border-slate-700 w-full max-w-[160px] text-left transition-all duration-300 ${isCurrent ? 'scale-105 shadow-xl' : 'hover:scale-[1.02]'} ${isLocked ? 'pointer-events-none' : 'cursor-pointer'}`} onClick={() => !isLocked && onSelectLesson(item)}>
+                                                <span className={`text-[9px] font-black uppercase mb-1 block tracking-widest ${isCurrent ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>{isExam ? 'Checkpoint' : `Module 0${index + 1}`}</span>
+                                                <h4 className="font-black text-xs sm:text-sm text-slate-800 dark:text-slate-100 leading-tight">{item.title}</h4>
                                             </div>
                                         </div>
                                     </div>
@@ -1085,15 +1125,27 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
 };
 
 const StandaloneAssignmentCard = ({ item, isCompleted, onSelectLesson, theme }: any) => (
-    <button className={`w-full text-left p-5 border-4 bg-white dark:bg-slate-900 rounded-[2.5rem] flex items-center gap-4 transition-all group ${isCompleted ? 'border-emerald-100 dark:border-emerald-500/20' : 'border-slate-100 dark:border-slate-800 shadow-md hover:border-indigo-100 dark:hover:border-indigo-500/30'}`} onClick={() => onSelectLesson(item)}>
-        <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center border-4 border-white dark:border-slate-900 shadow-inner dark:shadow-none transition-colors shrink-0 ${isCompleted ? 'bg-emerald-500 text-white' : `${theme.bg} text-white`}`}>{isCompleted ? <CheckCircle2 size={28} strokeWidth={3} /> : item.type === 'arcade_game' ? <Gamepad2 size={28} /> : <Play size={28} className="ml-1" fill="currentColor" />}</div>
-        <div className="flex-1 pr-2"><span className={`text-[10px] font-black uppercase mb-1 block ${isCompleted ? 'text-emerald-500 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>{isCompleted ? 'Completed' : 'Special Assignment'}</span><h4 className="font-black text-slate-800 dark:text-slate-100 text-xl leading-tight transition-colors">{item.title}</h4></div>
+    <button className={`w-full text-left p-5 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl rounded-[2.5rem] flex items-center gap-5 transition-all group overflow-hidden relative ${isCompleted ? 'border border-emerald-200 dark:border-emerald-500/20 opacity-70' : `border border-white/40 dark:border-slate-800 shadow-xl hover:shadow-2xl hover:scale-[1.02]`}`} onClick={() => onSelectLesson(item)}>
+        <div className={`absolute top-0 right-0 w-32 h-full bg-gradient-to-l to-transparent opacity-10 pointer-events-none ${isCompleted ? 'from-emerald-500' : theme.bg.replace('bg-', 'from-')}`} />
+        <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center border border-white/20 shadow-lg transition-colors shrink-0 ${isCompleted ? 'bg-emerald-500 text-white' : `${theme.bg} text-white`}`}>
+            {isCompleted ? <CheckCircle2 size={24} strokeWidth={3} /> : item.type === 'arcade_game' ? <Gamepad2 size={24} /> : <Play size={24} className="ml-1" fill="currentColor" />}
+        </div>
+        <div className="flex-1 pr-2 relative z-10">
+            <span className={`text-[9px] font-black uppercase mb-1 block tracking-widest ${isCompleted ? 'text-emerald-500 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                {isCompleted ? 'Completed' : 'Special Assignment'}
+            </span>
+            <h4 className="font-black text-slate-800 dark:text-slate-100 text-lg leading-tight transition-colors tracking-tight">{item.title}</h4>
+        </div>
     </button>
 );
 
 const ExamCard = ({ item, onSelectLesson }: any) => (
-    <button className="w-full text-left p-6 border-4 border-rose-100 dark:border-rose-500/20 bg-rose-50/50 dark:bg-rose-500/10 rounded-[3rem] flex items-center gap-5 transition-all group duration-300" onClick={() => onSelectLesson(item)}>
-      <div className="w-20 h-20 rounded-[2rem] flex items-center justify-center bg-white dark:bg-slate-900 text-rose-500 dark:text-rose-400 shadow-lg border-4 border-rose-100 dark:border-rose-500/20 shrink-0 transition-colors duration-300"><Trophy size={36} fill="currentColor" /></div>
-      <div><span className="text-[10px] font-black uppercase text-rose-500 dark:text-rose-400 tracking-widest bg-rose-100 dark:bg-rose-500/20 px-3 py-1 rounded-lg mb-2 inline-block transition-colors duration-300">High-Stakes Assessment</span><h4 className="font-black text-slate-900 dark:text-white text-2xl leading-tight transition-colors">{item.title}</h4></div>
+    <button className="w-full text-left p-6 border border-rose-200 dark:border-rose-500/20 bg-rose-50/80 dark:bg-rose-900/20 backdrop-blur-xl rounded-[3rem] flex items-center gap-5 transition-all group duration-300 shadow-xl hover:shadow-2xl hover:shadow-rose-500/10 hover:scale-[1.02] relative overflow-hidden" onClick={() => onSelectLesson(item)}>
+      <div className="absolute top-0 left-0 w-2 h-full bg-rose-500" />
+      <div className="w-16 h-16 rounded-[1.5rem] flex items-center justify-center bg-white dark:bg-slate-900 text-rose-500 dark:text-rose-400 shadow-lg border border-rose-100 dark:border-rose-500/20 shrink-0 transition-colors duration-300 relative z-10"><Trophy size={28} fill="currentColor" /></div>
+      <div className="relative z-10">
+          <span className="text-[9px] font-black uppercase text-rose-500 dark:text-rose-400 tracking-widest bg-rose-100 dark:bg-rose-500/20 px-3 py-1 rounded-full mb-2 inline-block transition-colors duration-300 border border-rose-200 dark:border-rose-500/30">High-Stakes Assessment</span>
+          <h4 className="font-black text-slate-900 dark:text-white text-2xl leading-tight transition-colors tracking-tight">{item.title}</h4>
+      </div>
     </button>
 );
