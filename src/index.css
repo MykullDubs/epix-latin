@@ -3,43 +3,43 @@
 @tailwind utilities;
 
 @layer base {
-  /* Default Indigo Values */
+  /* Default "Primary" (Indigo) values. */
   :root {
-    --theme-primary-50: 238 242 255;
-    --theme-primary-100: 224 231 255;
-    --theme-primary-200: 199 210 254;
-    --theme-primary-300: 165 180 252;
-    --theme-primary-400: 129 140 248;
-    --theme-primary-500: 99 102 241;
-    --theme-primary-600: 79 70 229;
-    --theme-primary-900: 49 46 129;
-    --theme-primary-950: 30 27 75;
+    --theme-primary-50: #eef2ff;
+    --theme-primary-100: #e0e7ff;
+    --theme-primary-200: #c7d2fe;
+    --theme-primary-300: #a5b4fc;
+    --theme-primary-400: #818cf8;
+    --theme-primary-500: #6366f1;
+    --theme-primary-600: #4f46e5;
+    --theme-primary-900: #312e81;
+    --theme-primary-950: #1e1b4b;
   }
 
   /* 🔥 TERMINAL GREEN OVERRIDE */
   html.theme-hacker {
-    --theme-primary-50: 236 253 245;
-    --theme-primary-100: 209 250 229;
-    --theme-primary-200: 167 243 208;
-    --theme-primary-300: 110 231 183;
-    --theme-primary-400: 52 211 153;
-    --theme-primary-500: 16 185 129;
-    --theme-primary-600: 5 150 105;
-    --theme-primary-900: 6 78 59;
-    --theme-primary-950: 2 44 34;
+    --theme-primary-50: #ecfdf5;
+    --theme-primary-100: #d1fae5;
+    --theme-primary-200: #a7f3d0;
+    --theme-primary-300: #6ee7b7;
+    --theme-primary-400: #34d399;
+    --theme-primary-500: #10b981;
+    --theme-primary-600: #059669;
+    --theme-primary-900: #064e3b;
+    --theme-primary-950: #022c22;
   }
 
   /* 🔥 SYNTHWAVE OVERRIDE */
   html.theme-synth {
-    --theme-primary-50: 253 244 255;
-    --theme-primary-100: 250 232 255;
-    --theme-primary-200: 245 208 254;
-    --theme-primary-300: 240 171 252;
-    --theme-primary-400: 232 121 249;
-    --theme-primary-500: 217 70 239;
-    --theme-primary-600: 192 38 211;
-    --theme-primary-900: 112 26 117;
-    --theme-primary-950: 74 4 78;
+    --theme-primary-50: #fdf4ff;
+    --theme-primary-100: #fae8ff;
+    --theme-primary-200: #f5d0fe;
+    --theme-primary-300: #f0abfc;
+    --theme-primary-400: #e879f9;
+    --theme-primary-500: #d946ef;
+    --theme-primary-600: #c026d3;
+    --theme-primary-900: #701a75;
+    --theme-primary-950: #4a044e;
   }
 }
 
