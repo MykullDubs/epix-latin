@@ -1,10 +1,10 @@
 // src/components/HomeView.tsx
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import { 
     GraduationCap, Globe, Flame, Zap, Trophy, 
     School, Layers, Feather, Target, BookOpen, 
     Microscope, Terminal, Calculator, Palette, BookText,
-    Check, Brain, Play, HeartPulse, Cpu, Briefcase, 
+    Brain, Play, HeartPulse, Cpu, Briefcase, 
     Utensils, Globe2, Activity, ShieldAlert, MonitorPlay, 
     FlaskConical, Plane, Music, Code
 } from 'lucide-react';
@@ -59,33 +59,16 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
   const themeColor = activeOrg?.themeColor || '#4f46e5'; 
   const themeName = activeOrg?.name || 'Magister';
 
+  // --- DAILY TARGETS LOGIC ---
   const todayStr = new Date().toDateString();
   const isToday = userData?.lastActivityDate === todayStr;
   
   const todayXp = isToday ? (userData?.dailyXp || 0) : 0;
   const todayLessons = isToday ? (userData?.dailyLessons || 0) : 0;
 
-  const dailyQuests = [
-      { id: 1, title: 'Earn 50 XP', target: 50, current: Math.min(todayXp, 50), icon: <Zap size={14} className="text-yellow-500" aria-hidden="true" /> },
-      { id: 2, title: '1 Lesson', target: 1, current: Math.min(todayLessons, 1), icon: <BookOpen size={14} className="text-indigo-500 dark:text-indigo-400" aria-hidden="true" /> },
-  ];
-
-  const [dismissedQuests, setDismissedQuests] = useState<number[]>(() => {
-      try {
-          const saved = localStorage.getItem(`dismissedQuests_${todayStr}`);
-          return saved ? JSON.parse(saved) : [];
-      } catch (e) {
-          return [];
-      }
-  });
-
-  const handleDismissQuest = (questId: number) => {
-      const updated = [...dismissedQuests, questId];
-      setDismissedQuests(updated);
-      localStorage.setItem(`dismissedQuests_${todayStr}`, JSON.stringify(updated));
-  };
-
-  const visibleQuests = dailyQuests.filter(q => !dismissedQuests.includes(q.id));
+  const xpDone = todayXp >= 50;
+  const lessonsDone = todayLessons >= 1;
+  const allQuestsDone = xpDone && lessonsDone;
 
   const now = new Date();
   const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -180,101 +163,88 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                 </div>
             </section>
 
-            <div className="px-6 space-y-6 mt-6">
+            <div className="px-6 space-y-8 mt-6">
 
               <InstallPWA />
 
-              {/* 🔥 3. ULTRA-COMPACT DAILY TARGETS (BENTO GRID) */}
-              {visibleQuests.length > 0 && (
-                  <section className="animate-in slide-in-from-bottom-4 transition-all duration-500 mb-2">
-                      <div className="flex justify-between items-end mb-3 ml-1">
-                          <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
-                              <Target size={16} className="text-rose-500" /> Daily Targets
-                          </h3>
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                              Resets in {hoursRemaining}h
-                          </span>
-                      </div>
+              {/* 🔥 3. ULTRA-COMPACT DAILY ROUTINE (BENTO GRID) */}
+              <section className="animate-in slide-in-from-bottom-4 transition-all duration-500 mb-2">
+                  <div className="flex justify-between items-end mb-3 ml-1">
+                      <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                          <Target size={16} className="text-rose-500" /> Daily Routine
+                      </h3>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                          Resets in {hoursRemaining}h
+                      </span>
+                  </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                          {visibleQuests.map(quest => {
-                              const pct = Math.min(100, Math.round((quest.current / quest.target) * 100));
-                              const isDone = quest.current >= quest.target;
-                              
-                              return (
-                                  <div key={quest.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border-2 border-slate-100 dark:border-slate-800 shadow-sm flex flex-col relative overflow-hidden group">
-                                      <div className="flex items-start justify-between mb-3 relative z-10">
-                                          <div className={`p-2 rounded-xl ${isDone ? 'bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10' : 'bg-slate-50 text-slate-500 dark:bg-slate-800'}`}>
-                                              {quest.icon}
-                                          </div>
-                                          {isDone ? (
-                                              <button 
-                                                  onClick={() => handleDismissQuest(quest.id)} 
-                                                  className="text-[9px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/20 px-2 py-1 rounded-md active:scale-95 transition-all"
-                                              >
-                                                  Clear
-                                              </button>
-                                          ) : (
-                                              <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 pt-1">
-                                                  {quest.current}/{quest.target}
-                                              </span>
-                                          )}
-                                      </div>
-                                      
-                                      <div className="relative z-10">
-                                          <h4 className={`text-xs font-bold mb-2.5 line-clamp-1 ${isDone ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'}`}>
-                                              {quest.title}
-                                          </h4>
-                                          <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                              <div className={`h-full transition-all duration-1000 ${isDone ? 'bg-emerald-500' : 'bg-rose-500'}`} style={{ width: `${pct}%` }} />
-                                          </div>
-                                      </div>
-
-                                      {isDone && <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none" />}
-                                  </div>
-                              );
-                          })}
-                      </div>
-                  </section>
-              )}
-
-              {/* 3.5. GLOBAL DAILY REVIEW BANNER (SRS) */}
-              {allDecks && Object.keys(allDecks).length > 0 && (
-                  <section className="animate-in slide-in-from-bottom-4 duration-500 delay-75">
-                      <div className="flex items-center gap-3 mb-4 ml-1">
-                          <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
-                              <Brain size={18} className="text-indigo-500" /> Daily Habits
-                          </h3>
-                      </div>
-
-                      <button 
-                          onClick={() => setLaunchDailyReview(true)}
-                          className="w-full relative bg-gradient-to-br from-indigo-900 to-slate-900 dark:from-indigo-950 dark:to-black rounded-[2.5rem] p-6 md:p-8 border-4 border-indigo-500/30 shadow-2xl overflow-hidden group text-left transition-all active:scale-[0.98]"
-                      >
-                          <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
-                              <Brain size={100} />
+                  <div className="grid grid-cols-2 gap-3 h-36">
+                       
+                       {/* LEFT CARD: COMBINED DAILY QUESTS */}
+                       <div className="bg-white dark:bg-slate-900 p-4 rounded-[1.5rem] border-2 border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between group relative overflow-hidden transition-colors duration-300">
+                          <div className="flex items-center justify-between mb-2 relative z-10">
+                               <span className="text-xs font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider">Targets</span>
+                               {allQuestsDone && (
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/20 px-2 py-1 rounded-md">
+                                        Done
+                                    </span>
+                               )}
                           </div>
-                          <div className="absolute -inset-24 bg-gradient-to-r from-indigo-500/20 to-cyan-500/20 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
 
-                          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                              <div>
-                                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-500/20 text-indigo-300 rounded-lg text-[10px] font-black uppercase tracking-widest mb-3 border border-indigo-400/20 backdrop-blur-md">
-                                      <Zap size={12} className="text-yellow-400" fill="currentColor" /> Optimized Review
-                                  </span>
-                                  <h2 className="text-3xl font-black text-white tracking-tight mb-2">Global Queue</h2>
-                                  <p className="text-indigo-200/80 text-sm font-bold max-w-xs leading-relaxed">
-                                      The algorithm has compiled the exact targets you are about to forget.
-                                  </p>
-                              </div>
+                          <div className="space-y-4 relative z-10 mt-auto">
+                               {/* XP Progress */}
+                               <div>
+                                    <div className="flex justify-between text-[10px] font-bold mb-1.5">
+                                         <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5"><Zap size={12} className="text-yellow-500" fill="currentColor" /> 50 XP</span>
+                                         <span className={xpDone ? "text-emerald-500" : "text-slate-400"}>{Math.min(todayXp, 50)}/50</span>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                         <div className={`h-full transition-all duration-1000 ${xpDone ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]' : 'bg-yellow-400'}`} style={{ width: `${Math.min(100, (todayXp / 50) * 100)}%` }} />
+                                    </div>
+                               </div>
+                               
+                               {/* Lesson Progress */}
+                               <div>
+                                    <div className="flex justify-between text-[10px] font-bold mb-1.5">
+                                         <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5"><BookOpen size={12} className="text-indigo-500" /> 1 Lesson</span>
+                                         <span className={lessonsDone ? "text-emerald-500" : "text-slate-400"}>{Math.min(todayLessons, 1)}/1</span>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                         <div className={`h-full transition-all duration-1000 ${lessonsDone ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]' : 'bg-indigo-500'}`} style={{ width: `${Math.min(100, (todayLessons / 1) * 100)}%` }} />
+                                    </div>
+                               </div>
+                          </div>
+                          {allQuestsDone && <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none" />}
+                      </div>
 
-                              <div className="shrink-0 flex items-center justify-center w-14 h-14 bg-white text-indigo-900 rounded-[1.2rem] shadow-[0_0_30px_rgba(255,255,255,0.2)] group-hover:scale-110 transition-transform">
-                                  <Play size={20} className="ml-1" fill="currentColor" />
-                              </div>
+                       {/* RIGHT CARD: GLOBAL QUEUE / SPATIAL REPETITION */}
+                       <button 
+                          onClick={() => setLaunchDailyReview(true)}
+                          className="w-full h-full relative bg-gradient-to-br from-indigo-900 to-slate-900 dark:from-indigo-950 dark:to-black rounded-[1.5rem] p-4 border-2 border-indigo-500/30 shadow-md overflow-hidden group text-left transition-all active:scale-[0.98] flex flex-col justify-between"
+                      >
+                          <div className="absolute -right-4 -bottom-4 p-4 opacity-20 group-hover:opacity-30 transition-opacity pointer-events-none">
+                              <Brain size={80} className="text-indigo-300" />
+                          </div>
+                          <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+
+                          <div className="relative z-10 flex justify-between items-start mb-2">
+                               <div className="w-8 h-8 rounded-xl bg-indigo-500/20 flex items-center justify-center border border-indigo-400/20 backdrop-blur-md">
+                                    <Brain size={16} className="text-indigo-300" />
+                               </div>
+                               <span className="flex items-center justify-center w-6 h-6 bg-white/10 text-white rounded-full shadow-sm group-hover:scale-110 transition-transform backdrop-blur-md">
+                                    <Play size={10} className="ml-0.5" fill="currentColor" />
+                               </span>
+                          </div>
+                          
+                          <div className="relative z-10 mt-auto pt-4">
+                               <h3 className="text-lg font-black text-white leading-tight mb-1">Global Queue</h3>
+                               <p className="text-[9px] font-black uppercase tracking-widest text-indigo-300/80">Spaced Review</p>
                           </div>
                       </button>
-                  </section>
-              )}
-              
+
+                  </div>
+              </section>
+
               {/* 4. ACTIVE SUBJECTS SECTION */}
               {classes && classes.length > 0 ? (
                 <section className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
