@@ -234,7 +234,7 @@ export function useMagisterData() {
         if (!user || !user.uid) return { success: false, msg: "Auth session expired." };
         
         // Grab the current Flux balance
-        const currentFlux = userData?.coins || userData?.profile?.main?.coins || 0; 
+        const currentFlux = userData?.coins || userData?.profile?.main?.coins || userData?.flux || 0; 
         
         if (currentFlux < price) {
             return { success: false, msg: "Insufficient Flux for decryption." };
@@ -290,6 +290,23 @@ export function useMagisterData() {
     },
     
     // STANDARD CLASS/CONTENT MANAGEMENT
+    
+    // 🔥 NEW: SAVE CLASS DRAG & DROP ORDER
+    reorderClasses: async (newOrder: string[]) => {
+      if (!user) return;
+      try {
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
+              classOrder: newOrder
+          });
+          // Redundant root sync
+          await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid), {
+              'profile.main.classOrder': newOrder
+          }).catch(() => {});
+      } catch (e) {
+          console.error("Failed to save layout.", e);
+      }
+    },
+
     createClass: async (className: string) => {
       if (!user) return;
       await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'classes'), {
@@ -578,6 +595,7 @@ export function useMagisterData() {
         ...userData,
         cardPrefs,
         deckPrefs,
+        classOrder: userData.classOrder || userData?.profile?.main?.classOrder || [], // 🔥 EXPOSE SAVED ORDER
         studyFolders: userData.studyFolders || userData?.profile?.main?.studyFolders || [],
         folderColors: userData.folderColors || userData?.profile?.main?.folderColors || {}
     };
