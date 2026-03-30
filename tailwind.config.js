@@ -7,19 +7,28 @@ export default {
   theme: {
     extend: {
       colors: {
-        // 🔥 THE RED BUTTON TEST
+        // 🔥 THE REAL INTERCEPT
         indigo: {
-          50: '#ff0000',
-          100: '#ff0000',
-          200: '#ff0000',
-          300: '#ff0000',
-          400: '#ff0000',
-          500: '#ff0000', // This should turn almost every button in your app RED
-          600: '#ff0000',
-          900: '#ff0000',
-          950: '#ff0000',
+          50: 'rgb(var(--theme-primary-50) / <alpha-value>)',
+          100: 'rgb(var(--theme-primary-100) / <alpha-value>)',
+          200: 'rgb(var(--theme-primary-200) / <alpha-value>)',
+          300: 'rgb(var(--theme-primary-300) / <alpha-value>)',
+          400: 'rgb(var(--theme-primary-400) / <alpha-value>)',
+          500: 'rgb(var(--theme-primary-500) / <alpha-value>)',
+          600: 'rgb(var(--theme-primary-600) / <alpha-value>)',
+          900: 'rgb(var(--theme-primary-900) / <alpha-value>)',
+          950: 'rgb(var(--theme-primary-950) / <alpha-value>)',
         }
       },
+      keyframes: {
+        shimmer: {
+          '0%': { backgroundPosition: '200% 0' },
+          '100%': { backgroundPosition: '-200% 0' },
+        }
+      },
+      animation: {
+        shimmer: 'shimmer 8s linear infinite',
+      }
     },
   },
   plugins: [],
