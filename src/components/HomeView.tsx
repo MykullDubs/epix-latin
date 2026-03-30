@@ -12,7 +12,6 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db, appId } from '../config/firebase';
 import { saveDeckToCache, getDeckFromCache } from '../utils/localCache';
 import { calculateLevel } from '../utils/profileHelpers';
-import InstallPWA from './InstallPWA';
 import { StudyModePlayer } from './StudyEngines'; 
 import { Toast } from './Toast';
 import { auth } from '../config/firebase'; 
@@ -255,19 +254,22 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
             </section>
 
             <div className="px-6 space-y-8 mt-6">
-              <InstallPWA />
 
               {/* 🔥 3. ACTION CENTER CAROUSEL */}
               <section className="animate-in slide-in-from-bottom-4 transition-all duration-500">
-                  <div className="mb-3 ml-1">
+                  <div className="flex justify-between items-end mb-3 ml-1">
                       <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
                           <Activity size={16} className="text-indigo-500" /> Action Center
                       </h3>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                          Resets in {hoursRemaining}h
+                      </span>
                   </div>
 
-                  {/* 🔥 ADDED INVISIBLE SPACERS TO PREVENT BORDER COLLISION ON SWIPE */}
+                  {/* STRICT MATH SPACERS APPLIED HERE (w-3 + gap-3 = 24px) */}
                   <div className="flex gap-3 overflow-x-auto hide-scrollbar snap-x pb-2 -mx-6" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                      <div className="w-3 shrink-0" /> {/* Left Spacer */}
+                      
+                      <div className="w-3 shrink-0" aria-hidden="true" /> {/* Left Edge Spacer */}
                       
                       {/* CARD 1: COMBINED DAILY TARGETS */}
                       <div className="snap-start shrink-0 w-[150px] h-32 relative bg-gradient-to-br from-emerald-400 to-teal-600 rounded-[1.5rem] p-4 shadow-lg shadow-emerald-500/20 overflow-hidden flex flex-col justify-between border border-emerald-400/50">
@@ -359,7 +361,7 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                           </div>
                       </button>
                       
-                      <div className="w-3 shrink-0" /> {/* Right Spacer */}
+                      <div className="w-3 shrink-0" aria-hidden="true" /> {/* Right Edge Spacer */}
                   </div>
               </section>
 
@@ -376,9 +378,10 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                         </button>
                     </div>
                     
-                    {/* 🔥 ADDED INVISIBLE SPACERS TO PREVENT BORDER COLLISION ON SWIPE */}
+                    {/* STRICT MATH SPACERS APPLIED HERE (w-2 + gap-4 = 24px) */}
                     <div className="flex gap-4 overflow-x-auto pb-8 -mx-6 hide-scrollbar snap-x pt-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                        <div className="w-2 shrink-0" /> {/* Left Spacer */}
+                        
+                        <div className="w-2 shrink-0" aria-hidden="true" /> {/* Left Edge Spacer */}
 
                         {classes.map((cls: any) => { 
                             const primaryCurriculum = curriculums?.find((c: any) => cls.assignedCurriculums?.includes(c.id));
@@ -429,7 +432,7 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                             ); 
                         })}
 
-                        <div className="w-2 shrink-0" /> {/* Right Spacer */}
+                        <div className="w-2 shrink-0" aria-hidden="true" /> {/* Right Edge Spacer */}
                     </div>
                 </section>
               ) : (
