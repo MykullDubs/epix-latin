@@ -1,5 +1,9 @@
+// src/components/StorefrontView.tsx
 import React, { useState } from 'react';
-import { ShoppingBag, Zap, Sparkles, Paintbrush, CircleUser, Tag, Check, Lock, AlertCircle, X } from 'lucide-react';
+import { 
+    ShoppingBag, Zap, Sparkles, Paintbrush, CircleUser, 
+    Tag, Check, Lock, AlertCircle, X, GraduationCap, Globe 
+} from 'lucide-react';
 import { Toast } from './Toast';
 
 // ============================================================================
@@ -34,7 +38,7 @@ const RARITY_COLORS: any = {
     legendary: 'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-900/30 dark:border-amber-700/50 dark:text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
 };
 
-export default function StorefrontView({ userData, onPurchase, onEquip }: any) {
+export default function StorefrontView({ userData, activeOrg, onPurchase, onEquip }: any) {
     const [activeTab, setActiveTab] = useState<'avatars' | 'auras' | 'titles' | 'themes'>('avatars');
     const [selectedItem, setSelectedItem] = useState<any | null>(null);
     const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -43,6 +47,11 @@ export default function StorefrontView({ userData, onPurchase, onEquip }: any) {
     const fluxBalance = userData?.flux || 0;
     const inventory = userData?.inventory || [];
     const equipped = userData?.equipped || {};
+
+    // UI Metadata
+    const themeColor = activeOrg?.themeColor || '#4f46e5'; 
+    const themeName = activeOrg?.name || 'Magister';
+    const targetLang = userData?.targetLanguage || "English";
 
     const handleBuy = async () => {
         if (!selectedItem) return;
@@ -133,43 +142,55 @@ export default function StorefrontView({ userData, onPurchase, onEquip }: any) {
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors relative">
             {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
 
-            {/* HEADER: Balance & Navigation */}
-            <div className="sticky top-0 z-30 w-full flex flex-col shrink-0">
-                <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl px-6 py-5 flex justify-between items-center pt-safe border-b border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white p-2.5 rounded-xl shadow-md shadow-indigo-500/20">
-                            <ShoppingBag size={22} strokeWidth={3}/>
+            {/* 🔥 SYNCED GLOBAL HEADER */}
+            <header className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm transition-colors duration-300">
+                <div className="flex items-center gap-3">
+                    {activeOrg?.logoUrl ? (
+                        <img src={activeOrg.logoUrl} alt={`${themeName} Logo`} className="w-8 h-8 object-contain rounded-md" />
+                    ) : (
+                        <div className="text-white p-1.5 rounded-lg shadow-sm" style={{ backgroundColor: themeColor }} aria-hidden="true">
+                            <GraduationCap size={18} strokeWidth={3}/>
                         </div>
-                        <div>
-                            <span className="font-black text-slate-800 dark:text-white text-xl uppercase tracking-tighter block leading-none">Flux Exchange</span>
-                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Digital Black Market</span>
-                        </div>
-                    </div>
-                    
-                    {/* The Flux Wallet */}
-                    <div className="bg-amber-100 dark:bg-amber-500/10 border-2 border-amber-200 dark:border-amber-500/30 px-4 py-2 rounded-2xl flex items-center gap-2 shadow-sm">
-                        <Zap size={18} className="text-amber-500 fill-amber-500" />
-                        <span className="font-black text-amber-600 dark:text-amber-400 text-lg tracking-tight">{fluxBalance.toLocaleString()}</span>
-                    </div>
+                    )}
+                    <span className="font-black tracking-tighter text-lg truncate max-w-[150px]" style={{ color: themeColor }}>
+                        Store
+                    </span>
                 </div>
+                <div className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 shrink-0 transition-colors duration-300" aria-label={`Target Language: ${targetLang}`}>
+                    <Globe size={14} className="text-slate-400 dark:text-slate-500" aria-hidden="true"/>
+                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide">{targetLang}</span>
+                </div>
+            </header>
 
-                {/* Tabs */}
-                <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center gap-3 overflow-x-auto custom-scrollbar overscroll-x-contain">
-                    {[
-                        { id: 'avatars', icon: CircleUser, label: 'Avatars' },
-                        { id: 'auras', icon: Sparkles, label: 'Auras' },
-                        { id: 'titles', icon: Tag, label: 'Titles' },
-                        { id: 'themes', icon: Paintbrush, label: 'Themes' },
-                    ].map((tab: any) => (
-                        <button 
-                            key={tab.id} 
-                            onClick={() => setActiveTab(tab.id as any)} 
-                            className={`shrink-0 px-5 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 ${activeTab === tab.id ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
-                        >
-                            <tab.icon size={14} /> {tab.label}
-                        </button>
-                    ))}
+            {/* PAGE HEADER */}
+            <div className="px-6 pt-6 pb-2 shrink-0">
+                <div className="flex justify-between items-end mb-4">
+                    <div>
+                        <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight">Flux Exchange</h2>
+                        <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] flex items-center gap-1.5 mt-1"><ShoppingBag size={12}/> Digital Black Market</p>
+                    </div>
+                    <div className="bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3 py-1.5 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-sm border border-amber-200 dark:border-amber-500/20">
+                        <Zap size={14} className="fill-amber-500" /> {fluxBalance.toLocaleString()} Flux
+                    </div>
                 </div>
+            </div>
+
+            {/* TABS FILTER */}
+            <div className="border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center gap-3 overflow-x-auto custom-scrollbar overscroll-x-contain shrink-0">
+                {[
+                    { id: 'avatars', icon: CircleUser, label: 'Avatars' },
+                    { id: 'auras', icon: Sparkles, label: 'Auras' },
+                    { id: 'titles', icon: Tag, label: 'Titles' },
+                    { id: 'themes', icon: Paintbrush, label: 'Themes' },
+                ].map((tab: any) => (
+                    <button 
+                        key={tab.id} 
+                        onClick={() => setActiveTab(tab.id as any)} 
+                        className={`shrink-0 px-5 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 ${activeTab === tab.id ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                    >
+                        <tab.icon size={14} /> {tab.label}
+                    </button>
+                ))}
             </div>
 
             {/* CATALOG GRID */}
