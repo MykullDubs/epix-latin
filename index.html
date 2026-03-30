@@ -48,14 +48,14 @@
       }
     </style>
     
-    <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
         darkMode: 'class',
         theme: {
           extend: {
             colors: {
-              // This forces the CDN to route all 'indigo' classes to our CSS variables!
+              // 1. THE ACCENT PALETTE (Buttons, Icons, Highlights)
               indigo: {
                 50: 'rgb(var(--theme-primary-50) / <alpha-value>)',
                 100: 'rgb(var(--theme-primary-100) / <alpha-value>)',
@@ -66,12 +66,27 @@
                 600: 'rgb(var(--theme-primary-600) / <alpha-value>)',
                 900: 'rgb(var(--theme-primary-900) / <alpha-value>)',
                 950: 'rgb(var(--theme-primary-950) / <alpha-value>)',
+              },
+              // 2. THE STRUCTURAL PALETTE (Backgrounds, Borders, Panels)
+              slate: {
+                50: 'rgb(var(--theme-neutral-50) / <alpha-value>)',
+                100: 'rgb(var(--theme-neutral-100) / <alpha-value>)',
+                200: 'rgb(var(--theme-neutral-200) / <alpha-value>)',
+                300: 'rgb(var(--theme-neutral-300) / <alpha-value>)',
+                400: 'rgb(var(--theme-neutral-400) / <alpha-value>)',
+                500: 'rgb(var(--theme-neutral-500) / <alpha-value>)',
+                600: 'rgb(var(--theme-neutral-600) / <alpha-value>)',
+                700: 'rgb(var(--theme-neutral-700) / <alpha-value>)',
+                800: 'rgb(var(--theme-neutral-800) / <alpha-value>)',
+                900: 'rgb(var(--theme-neutral-900) / <alpha-value>)',
+                950: 'rgb(var(--theme-neutral-950) / <alpha-value>)',
               }
             }
           }
         }
       }
     </script>
+
     
     <style>
       /* Mobile safe area fix */
