@@ -74,10 +74,23 @@ export default function App() {
       return publicDecks;
   }, [allDecks]);
 
-  // 🔥 MERGE LIVE COHORTS WITH SOLO ELECTIVES
+  // 🔥 MERGE LIVE COHORTS WITH SOLO ELECTIVES & APPLY SAVED ORDER
   const combinedClasses = useMemo(() => {
       const soloCourses = userData?.enrolledClasses || userData?.profile?.main?.enrolledClasses || [];
-      return [...enrolledClasses, ...soloCourses];
+      const merged = [...enrolledClasses, ...soloCourses];
+      
+      const savedOrder = userData?.classOrder;
+      if (savedOrder && savedOrder.length > 0) {
+          return merged.sort((a, b) => {
+              const indexA = savedOrder.indexOf(a.id);
+              const indexB = savedOrder.indexOf(b.id);
+              if (indexA === -1) return 1;
+              if (indexB === -1) return -1;
+              return indexA - indexB;
+          });
+      }
+      
+      return merged;
   }, [enrolledClasses, userData]);
 
   // Determine active background theme based on equipped cosmetics
@@ -235,7 +248,6 @@ export default function App() {
   useEffect(() => {
     if (!isHydrated.current) return;
 
-    // 🔥 FIXED TYPO HERE
     const params = new URLSearchParams(window.location.search);
     params.set('view', currentView);
     params.set('tab', activeTab);
@@ -543,7 +555,7 @@ export default function App() {
                 classes={combinedClasses} 
                 curriculums={allCurriculums} 
                 onSelectClass={setActiveStudentClass} 
-                onReorderClasses={actions.reorderClasses} // 🔥 WIRED UP HERE
+                onReorderClasses={actions.reorderClasses} // 🔥 EXPLICITLY WIRED
                 userData={userData} 
                 user={user}
                 activeOrg={activeOrg} 
