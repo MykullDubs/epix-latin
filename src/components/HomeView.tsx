@@ -6,7 +6,7 @@ import {
     Microscope, Terminal, Calculator, Palette, BookText,
     Check, Brain, Play, HeartPulse, Cpu, Briefcase, 
     Utensils, Globe2, Activity, ShieldAlert, MonitorPlay, 
-    FlaskConical, Plane, Music, Code, Loader2, X
+    FlaskConical, Plane, Music, Code, Loader2, X, Plus
 } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db, appId } from '../config/firebase';
@@ -17,7 +17,7 @@ import { StudyModePlayer } from './StudyEngines';
 import { Toast } from './Toast';
 import { auth } from '../config/firebase'; 
 
-// 🔥 UNIFIED DISCOVERY THEMES (Juiced with Gradients, Text Colors, and Shadow Glows)
+// 🔥 UNIFIED DISCOVERY THEMES
 const getSubjectTheme = (subject: string = '') => {
     const str = subject.toLowerCase();
     
@@ -35,7 +35,7 @@ const getSubjectTheme = (subject: string = '') => {
     return { icon: Layers, gradient: 'from-indigo-400 to-indigo-600', shadow: 'shadow-indigo-500/30', textColor: 'text-indigo-500 dark:text-indigo-400', bgColor: 'bg-indigo-50 dark:bg-indigo-500/10' };
 };
 
-export default function HomeView({ setActiveTab, classes, curriculums = [], onSelectClass, userData, user, activeOrg, allDecks }: any) {
+export default function HomeView({ setActiveTab, classes, curriculums = [], onSelectClass, userData, user, activeOrg, allDecks, setBuilderConfig, setInternalMode }: any) {
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
   const [launchDailyReview, setLaunchDailyReview] = useState(false);
@@ -59,9 +59,10 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
   const todayXp = isToday ? (userData?.dailyXp || 0) : 0;
   const todayLessons = isToday ? (userData?.dailyLessons || 0) : 0;
 
-  const xpDone = todayXp >= 50;
-  const lessonsDone = todayLessons >= 1;
-  const allQuestsDone = xpDone && lessonsDone;
+  const dailyQuests = [
+      { id: 1, title: 'Earn 50 XP', target: 50, current: Math.min(todayXp, 50), icon: <Zap size={16} className="text-yellow-500" aria-hidden="true" /> },
+      { id: 2, title: 'Learn 1 Concept', target: 1, current: Math.min(todayLessons, 1), icon: <BookOpen size={16} className="text-indigo-500 dark:text-indigo-400" aria-hidden="true" /> },
+  ];
 
   const now = new Date();
   const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -72,7 +73,6 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
       setIsCompilingQueue(true);
       
       try {
-          // 1. Locate all eligible decks
           const activeDecks = Object.entries(allDecks || {}).filter(([key, deck]: any) => {
               const isCustom = key === 'custom';
               const isAuthor = deck.authorId === user?.uid || deck.ownerId === user?.uid;
@@ -92,7 +92,6 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
               return;
           }
 
-          // 2. Multi-fetch the cards AND their stats
           const allPromises = activeDecks.map(async (deck: any) => {
               let loadedCards: any[] = [];
               if (deck.id === 'custom') {
@@ -109,7 +108,6 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                   }
               }
               
-              // Tag cards with deckId so the StudyModePlayer routes the stats correctly!
               loadedCards = loadedCards.map(c => ({...c, deckId: deck.id}));
 
               const statsRef = collection(db, 'artifacts', appId, 'users', user?.uid, 'deck_progress', deck.id, 'card_stats');
@@ -124,7 +122,6 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
           let allDueCards: any[] = [];
           const globalStatsMap: Record<string, any> = {};
 
-          // 3. Calculate Due Status across all decks
           results.forEach(({ cards, stats }) => {
               const deckStatsMap: Record<string, any> = {};
               stats.forEach((s: any) => { 
@@ -146,7 +143,6 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
               return;
           }
 
-          // 4. Shuffle and cap at 40 cards so the review doesn't take 2 hours
           allDueCards.sort(() => Math.random() - 0.5);
           const dailyCap = allDueCards.slice(0, 40); 
 
@@ -162,7 +158,6 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
       }
   };
 
-  // 🔥 NEW GLOBAL REVIEW INTERFACE
   if (launchDailyReview && compiledQueue) {
       return (
           <div className="fixed inset-0 z-[9999] bg-slate-950 animate-in slide-in-from-bottom-8 duration-500 flex flex-col">
@@ -219,37 +214,39 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
 
         <main ref={scrollViewportRef} className="flex-1 overflow-y-auto custom-scrollbar pb-32 focus:outline-none" tabIndex={-1}>
             
-            {/* 2. HERO SECTION (Now Ultra Compact & Styled like Discovery Nodes) */}
-            <section className="bg-white dark:bg-slate-900 pt-6 pb-6 px-6 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 dark:border-slate-800 relative z-10 transition-colors duration-300">
-                <div className="grid grid-cols-3 gap-4">
-                    <div className="flex flex-col items-center gap-3">
-                        <div className={`w-full max-w-[100px] aspect-square rounded-[1.5rem] flex flex-col items-center justify-center text-white shadow-lg transition-transform ${streak > 0 && isToday ? 'bg-gradient-to-br from-orange-400 to-rose-500 shadow-orange-500/30 hover:scale-105' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 shadow-none'}`}>
-                            <Flame size={24} aria-hidden="true" className={`mb-1.5 ${streak > 0 && isToday ? 'fill-white' : ''}`}/>
-                            <span className="text-2xl font-black leading-none tracking-tight">{streak}</span>
+            {/* 2. COMPACT HERO SECTION */}
+            <section className="bg-white dark:bg-slate-900 pt-4 pb-5 px-6 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 dark:border-slate-800 relative z-10 transition-colors duration-300">
+                
+                {/* COMPACT STATS BENTO */}
+                <div className="grid grid-cols-3 gap-3">
+                    <div className={`p-3 rounded-2xl flex flex-col items-center justify-center text-white shadow-md transition-transform ${streak > 0 && isToday ? 'bg-gradient-to-br from-orange-400 to-rose-500 shadow-orange-500/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 shadow-none'}`}>
+                        <div className="flex items-center gap-1.5 mb-1">
+                            <Flame size={16} aria-hidden="true" className={streak > 0 && isToday ? 'fill-white' : ''}/>
+                            <span className="text-lg font-black leading-none">{streak}</span>
                         </div>
-                        <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Day Streak</span>
+                        <span className="text-[9px] font-black uppercase tracking-widest opacity-80">Streak</span>
                     </div>
-                    
-                    <div className="flex flex-col items-center gap-3">
-                        <div className="w-full max-w-[100px] aspect-square rounded-[1.5rem] flex flex-col items-center justify-center text-white shadow-lg transition-transform bg-gradient-to-br from-amber-400 to-orange-500 shadow-amber-500/30 hover:scale-105">
-                            <Zap size={24} aria-hidden="true" className="mb-1.5 fill-white"/>
-                            <span className="text-2xl font-black leading-none tracking-tight">{xp}</span>
+
+                    <div className="p-3 rounded-2xl flex flex-col items-center justify-center text-white shadow-md bg-gradient-to-br from-amber-400 to-orange-500 shadow-amber-500/30">
+                        <div className="flex items-center gap-1.5 mb-1">
+                            <Zap size={16} aria-hidden="true" className="fill-white"/>
+                            <span className="text-lg font-black leading-none">{xp}</span>
                         </div>
-                        <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Total XP</span>
+                        <span className="text-[9px] font-black uppercase tracking-widest opacity-80">Total XP</span>
                     </div>
-                    
-                    <div className="flex flex-col items-center gap-3">
-                        <div className="w-full max-w-[100px] aspect-square rounded-[1.5rem] flex flex-col items-center justify-center text-white shadow-lg transition-transform bg-gradient-to-br from-emerald-400 to-teal-600 shadow-emerald-500/30 hover:scale-105">
-                            <Trophy size={24} aria-hidden="true" className="mb-1.5 fill-white"/>
-                            <span className="text-2xl font-black leading-none tracking-tight">{level}</span>
+
+                    <div className="p-3 rounded-2xl flex flex-col items-center justify-center text-white shadow-md bg-gradient-to-br from-emerald-400 to-teal-600 shadow-emerald-500/30">
+                        <div className="flex items-center gap-1.5 mb-1">
+                            <Trophy size={16} aria-hidden="true" className="fill-white"/>
+                            <span className="text-lg font-black leading-none">{level}</span>
                         </div>
-                        <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Level</span>
+                        <span className="text-[9px] font-black uppercase tracking-widest opacity-80">Level</span>
                     </div>
                 </div>
 
                 {/* PROGRESS BAR */}
-                <div className="mt-6 flex items-center gap-3" aria-label={`Progress to next level: ${progressPct}%`}>
-                    <div className="flex-1 h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner dark:shadow-none transition-colors duration-300">
+                <div className="mt-5 flex items-center gap-3" aria-label={`Progress to next level: ${progressPct}%`}>
+                    <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner dark:shadow-none transition-colors duration-300">
                         <div 
                             className="h-full transition-all duration-1000 ease-out" 
                             style={{ width: `${progressPct}%`, backgroundColor: themeColor }}
@@ -265,83 +262,100 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
 
               <InstallPWA />
 
-              {/* 🔥 3. ULTRA-COMPACT DAILY ROUTINE (BENTO GRID) */}
-              <section className="animate-in slide-in-from-bottom-4 transition-all duration-500 mb-2">
+              {/* 🔥 3. ACTION CENTER (Global Queue + Studio + Quest Carousel) */}
+              <section className="animate-in slide-in-from-bottom-4 transition-all duration-500">
                   <div className="flex justify-between items-end mb-3 ml-1">
                       <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
-                          <Target size={16} className="text-rose-500" /> Daily Routine
+                          <Activity size={16} className="text-indigo-500" /> Action Center
                       </h3>
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                           Resets in {hoursRemaining}h
                       </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 h-36">
-                       
-                       {/* LEFT CARD: COMBINED DAILY QUESTS */}
-                       <div className="bg-white dark:bg-slate-900 p-4 rounded-[1.5rem] border-2 border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between group relative overflow-hidden transition-colors duration-300">
-                          <div className="flex items-center justify-between mb-2 relative z-10">
-                               <span className="text-xs font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider">Targets</span>
-                               {allQuestsDone && (
-                                    <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/20 px-2 py-1 rounded-md">
-                                        Done
-                                    </span>
-                               )}
-                          </div>
-
-                          <div className="space-y-4 relative z-10 mt-auto">
-                               {/* XP Progress */}
-                               <div>
-                                    <div className="flex justify-between text-[10px] font-bold mb-1.5">
-                                         <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5"><Zap size={12} className="text-yellow-500" fill="currentColor" /> 50 XP</span>
-                                         <span className={xpDone ? "text-emerald-500" : "text-slate-400"}>{Math.min(todayXp, 50)}/50</span>
-                                    </div>
-                                    <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                         <div className={`h-full transition-all duration-1000 ${xpDone ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]' : 'bg-yellow-400'}`} style={{ width: `${Math.min(100, (todayXp / 50) * 100)}%` }} />
-                                    </div>
-                               </div>
-                               
-                               {/* Lesson Progress */}
-                               <div>
-                                    <div className="flex justify-between text-[10px] font-bold mb-1.5">
-                                         <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5"><BookOpen size={12} className="text-indigo-500" /> 1 Lesson</span>
-                                         <span className={lessonsDone ? "text-emerald-500" : "text-slate-400"}>{Math.min(todayLessons, 1)}/1</span>
-                                    </div>
-                                    <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                         <div className={`h-full transition-all duration-1000 ${lessonsDone ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]' : 'bg-indigo-500'}`} style={{ width: `${Math.min(100, (todayLessons / 1) * 100)}%` }} />
-                                    </div>
-                               </div>
-                          </div>
-                          {allQuestsDone && <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none" />}
-                      </div>
-
-                       {/* RIGHT CARD: GLOBAL QUEUE / SPATIAL REPETITION */}
-                       <button 
+                  {/* TOP ROW: Primary Actions */}
+                  <div className="grid grid-cols-2 gap-3 mb-3 h-32">
+                      {/* GLOBAL QUEUE */}
+                      <button 
                           onClick={handleLaunchGlobalQueue}
                           disabled={isCompilingQueue}
-                          className="w-full h-full relative bg-gradient-to-br from-indigo-900 to-slate-900 dark:from-indigo-950 dark:to-black rounded-[1.5rem] p-4 border-2 border-indigo-500/30 shadow-md overflow-hidden group text-left transition-all active:scale-[0.98] flex flex-col justify-between"
+                          className="w-full h-full relative bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-[1.5rem] p-4 shadow-lg shadow-indigo-500/20 overflow-hidden group text-left transition-all active:scale-[0.98] flex flex-col justify-between border border-indigo-400/50"
                       >
                           <div className="absolute -right-4 -bottom-4 p-4 opacity-20 group-hover:opacity-30 transition-opacity pointer-events-none">
-                              <Brain size={80} className="text-indigo-300" />
+                              <Brain size={80} className="text-white" />
                           </div>
-                          <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-
-                          <div className="relative z-10 flex justify-between items-start mb-2">
-                               <div className="w-8 h-8 rounded-xl bg-indigo-500/20 flex items-center justify-center border border-indigo-400/20 backdrop-blur-md">
-                                    <Brain size={16} className="text-indigo-300" />
-                               </div>
-                               <span className="flex items-center justify-center w-6 h-6 bg-white/10 text-white rounded-full shadow-sm group-hover:scale-110 transition-transform backdrop-blur-md">
-                                    {isCompilingQueue ? <Loader2 size={10} className="animate-spin" /> : <Play size={10} className="ml-0.5" fill="currentColor" />}
-                               </span>
+                          <div className="relative z-10 flex justify-between items-start mb-2 w-full">
+                              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md shadow-inner">
+                                  <Brain size={16} className="text-white" />
+                              </div>
+                              <span className="flex items-center justify-center w-6 h-6 bg-white text-indigo-600 rounded-full shadow-sm group-hover:scale-110 transition-transform">
+                                  {isCompilingQueue ? <Loader2 size={10} className="animate-spin" /> : <Play size={10} className="ml-0.5" fill="currentColor" />}
+                              </span>
                           </div>
-                          
-                          <div className="relative z-10 mt-auto pt-4">
-                               <h3 className="text-lg font-black text-white leading-tight mb-1">Global Queue</h3>
-                               <p className="text-[9px] font-black uppercase tracking-widest text-indigo-300/80">Spaced Review</p>
+                          <div className="relative z-10 mt-auto pt-2">
+                              <h3 className="text-sm font-black text-white leading-tight mb-0.5">Global Queue</h3>
+                              <p className="text-[9px] font-black uppercase tracking-widest text-indigo-200">Spaced Review</p>
                           </div>
                       </button>
 
+                      {/* STUDIO */}
+                      <button 
+                          onClick={() => {
+                              setActiveTab('create');
+                              // Assuming these exist in App.tsx or we trigger tab change which handles it
+                          }}
+                          className="w-full h-full relative bg-gradient-to-br from-fuchsia-500 to-purple-600 rounded-[1.5rem] p-4 shadow-lg shadow-fuchsia-500/20 overflow-hidden group text-left transition-all active:scale-[0.98] flex flex-col justify-between border border-fuchsia-400/50"
+                      >
+                          <div className="absolute -right-4 -bottom-4 p-4 opacity-20 group-hover:opacity-30 transition-opacity pointer-events-none">
+                              <Feather size={80} className="text-white" />
+                          </div>
+                          <div className="relative z-10 flex justify-between items-start mb-2 w-full">
+                              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md shadow-inner">
+                                  <Feather size={16} className="text-white" />
+                              </div>
+                              <span className="flex items-center justify-center w-6 h-6 bg-white text-fuchsia-600 rounded-full shadow-sm group-hover:scale-110 transition-transform">
+                                  <Plus size={12} strokeWidth={3} />
+                              </span>
+                          </div>
+                          <div className="relative z-10 mt-auto pt-2">
+                              <h3 className="text-sm font-black text-white leading-tight mb-0.5">Studio</h3>
+                              <p className="text-[9px] font-black uppercase tracking-widest text-fuchsia-200">Create Content</p>
+                          </div>
+                      </button>
                   </div>
+
+                  {/* BOTTOM ROW: Quests Carousel */}
+                  {dailyQuests.length > 0 && (
+                      <div className="flex gap-3 overflow-x-auto custom-scrollbar snap-x pb-2 -mx-6 px-6">
+                          {dailyQuests.map(quest => {
+                              const pct = Math.min(100, Math.round((quest.current / quest.target) * 100));
+                              const isDone = quest.current >= quest.target;
+                              
+                              return (
+                                  <div key={quest.id} className="snap-start shrink-0 w-[200px] bg-white dark:bg-slate-900 p-4 rounded-[1.5rem] border-2 border-slate-100 dark:border-slate-800 shadow-sm flex flex-col relative overflow-hidden group hover:border-indigo-200 transition-colors">
+                                      <div className="flex items-start justify-between mb-3 relative z-10">
+                                          <div className={`p-2 rounded-xl shadow-sm ${isDone ? 'bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10' : 'bg-slate-50 text-slate-500 dark:bg-slate-800'}`}>
+                                              {quest.icon}
+                                          </div>
+                                          <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 pt-1 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                                              {quest.current}/{quest.target}
+                                          </span>
+                                      </div>
+                                      
+                                      <div className="relative z-10 mt-auto">
+                                          <h4 className={`text-xs font-bold mb-2.5 line-clamp-1 ${isDone ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                                              {quest.title}
+                                          </h4>
+                                          <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                              <div className={`h-full transition-all duration-1000 ${isDone ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{ width: `${pct}%` }} />
+                                          </div>
+                                      </div>
+                                      {isDone && <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none" />}
+                                  </div>
+                              );
+                          })}
+                      </div>
+                  )}
               </section>
 
               {/* 4. ACTIVE SUBJECTS SECTION */}
@@ -420,47 +434,6 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                     </button>
                  </section>
               )}
-
-              {/* 5. ACTION CARDS */}
-              <section className="grid grid-cols-2 gap-4 animate-in slide-in-from-bottom-4 duration-500 delay-200">
-                <button 
-                    onClick={() => setActiveTab('practice')} 
-                    className="relative h-32 rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 dark:border-slate-800 group text-left transition-all active:scale-95 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950"
-                >
-                    <div className="absolute inset-0 bg-white dark:bg-slate-900 transition-colors duration-300"></div>
-                    <div className="absolute -right-4 -bottom-4 text-orange-500 opacity-10 transform rotate-12 group-hover:scale-125 transition-transform duration-700">
-                        <Layers size={80} aria-hidden="true" />
-                    </div>
-                    <div className="relative z-10 p-5 h-full flex flex-col justify-between">
-                        <div className="w-8 h-8 bg-orange-50 dark:bg-orange-500/10 rounded-xl flex items-center justify-center text-orange-500 dark:text-orange-400 transition-colors duration-300">
-                            <Layers size={16} aria-hidden="true" />
-                        </div>
-                        <div>
-                            <h3 className="text-slate-800 dark:text-slate-100 font-black text-lg mb-0.5 leading-none">Practice</h3>
-                            <p className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest">Memory Vault</p>
-                        </div>
-                    </div>
-                </button>
-
-                <button 
-                    onClick={() => setActiveTab('create')} 
-                    className="relative h-32 rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 dark:border-slate-800 group text-left transition-all active:scale-95 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950"
-                >
-                    <div className="absolute inset-0 bg-white dark:bg-slate-900 transition-colors duration-300"></div>
-                    <div className="absolute -right-4 -bottom-4 text-emerald-500 opacity-10 transform -rotate-12 group-hover:scale-125 transition-transform duration-700">
-                        <Feather size={80} aria-hidden="true" />
-                    </div>
-                    <div className="relative z-10 p-5 h-full flex flex-col justify-between">
-                        <div className="w-8 h-8 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 transition-colors duration-300">
-                            <Feather size={16} aria-hidden="true" />
-                        </div>
-                        <div>
-                            <h3 className="text-slate-800 dark:text-slate-100 font-black text-lg mb-0.5 leading-none">Studio</h3>
-                            <p className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest">Create Content</p>
-                        </div>
-                    </div>
-                </button>
-              </section>
 
             </div>
         </main>
