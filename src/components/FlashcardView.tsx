@@ -16,7 +16,7 @@ import { saveDeckToCache, getDeckFromCache } from '../utils/localCache';
 import ContextualBuilder from './ContextualBuilder';
 import { StudyModePlayer, MatchingGame, QuizSessionView } from './StudyEngines';
 
-// 🔥 JUICED FOLDER COLORS (Now with Gradients & Glows)
+// 🔥 JUICED FOLDER COLORS
 const FOLDER_COLORS: Record<string, any> = {
     indigo: { bg: 'bg-white dark:bg-slate-900', border: 'border-slate-100 dark:border-slate-800', hover: 'hover:border-indigo-300 dark:hover:border-indigo-500/50', textColor: 'text-indigo-500 dark:text-indigo-400', iconBg: 'bg-gradient-to-br from-indigo-400 to-indigo-600 shadow-lg shadow-indigo-500/30', iconColor: 'text-white', badge: 'bg-slate-100 dark:bg-slate-800 text-indigo-500', hex: 'bg-indigo-500' },
     rose: { bg: 'bg-white dark:bg-slate-900', border: 'border-slate-100 dark:border-slate-800', hover: 'hover:border-rose-300 dark:hover:border-rose-500/50', textColor: 'text-rose-500 dark:text-rose-400', iconBg: 'bg-gradient-to-br from-rose-400 to-rose-600 shadow-lg shadow-rose-500/30', iconColor: 'text-white', badge: 'bg-slate-100 dark:bg-slate-800 text-rose-500', hex: 'bg-rose-500' },
@@ -30,28 +30,17 @@ const FOLDER_COLORS: Record<string, any> = {
 const getDeckTheme = (title: string = '') => {
     const str = title.toLowerCase();
     
-    // STEM & Medical
     if (str.match(/stem|medical|anatomy|bio|health|doctor|sci|chem|phys|cell/)) return { icon: HeartPulse, gradient: 'from-emerald-400 to-teal-600', shadow: 'shadow-emerald-500/30' };
-    // Technology & Logic
     if (str.match(/tech|logic|code|comp|program|software/)) return { icon: Cpu, gradient: 'from-blue-500 to-indigo-600', shadow: 'shadow-blue-500/30' };
-    // Commerce & Trade
     if (str.match(/business|commerce|trade|finance|corporate/)) return { icon: Briefcase, gradient: 'from-slate-600 to-slate-800', shadow: 'shadow-slate-500/30' };
-    // Arts & Culture
     if (str.match(/art|culture|history|design|draw|paint|color/)) return { icon: Palette, gradient: 'from-fuchsia-500 to-purple-600', shadow: 'shadow-fuchsia-500/30' };
-    // Culinary & Hospitality
     if (str.match(/culinary|hospitality|food|kitchen|cook|eat/)) return { icon: Utensils, gradient: 'from-orange-400 to-rose-500', shadow: 'shadow-orange-500/30' };
-    // Society & Politics
     if (str.match(/society|politics|law|ethics|government/)) return { icon: Globe2, gradient: 'from-cyan-500 to-blue-500', shadow: 'shadow-cyan-500/30' };
-    // Linguistics & Phonetics
-    if (str.match(/linguistics|phonetics|grammar|syntax|verb|read|english|vocab|word/)) return { icon: Activity, gradient: 'from-violet-500 to-indigo-500', shadow: 'shadow-violet-500/30' };
-    // Daily Survival
+    if (str.match(/linguistics|phonetics|grammar|syntax|verb|read|english|vocab|word|lit/)) return { icon: Activity, gradient: 'from-violet-500 to-indigo-500', shadow: 'shadow-violet-500/30' };
     if (str.match(/survival|emergency|navigate|travel|place|city|country/)) return { icon: ShieldAlert, gradient: 'from-rose-400 to-red-600', shadow: 'shadow-rose-500/30' };
-    // Media & Entertainment
     if (str.match(/media|entertainment|movie|game|music|play|audio|song|sound/)) return { icon: MonitorPlay, gradient: 'from-pink-500 to-rose-400', shadow: 'shadow-pink-500/30' };
-    // Math specific
     if (str.match(/math|calc|num|algebra|geometry/)) return { icon: Calculator, gradient: 'from-rose-500 to-pink-600', shadow: 'shadow-rose-500/30' };
     
-    // Default
     return { icon: Layers, gradient: 'from-indigo-400 to-indigo-600', shadow: 'shadow-indigo-500/30' };
 };
 
@@ -239,35 +228,28 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         });
     }, [cards, cardStats]);
 
-   const launchGame = (mode: 'standard' | 'quiz' | 'match' | 'tower') => {
+    const launchGame = (mode: 'standard' | 'quiz' | 'match' | 'tower') => {
         if (cards.length === 0) {
             setToastMsg("This deck has no cards.");
             return;
         }
 
         window.history.pushState({ view: 'playing' }, ''); 
-        
         let studySnapshot = [];
         
         if (mode === 'standard') {
-            // If they have due cards, prioritize the SRB matrix
             if (dueCards.length > 0) {
                 studySnapshot = [...dueCards];
             } else {
-                // Otherwise, they are browsing the full deck
                 studySnapshot = [...cards];
             }
 
-            // 🔥 THE SEQUENTIAL OVERRIDE
-            // If the deck is marked as sequential, force sort it by the 'order' property
             if (resolvedDeck?.isSequential) {
                 studySnapshot.sort((a, b) => (a.order || 0) - (b.order || 0));
             } else if (dueCards.length === 0) {
-                // If it's NOT sequential, and we are just browsing, shuffle it to keep it fresh
                 studySnapshot.sort(() => Math.random() - 0.5);
             }
         } else {
-            // For Quiz and Match, we usually want random, but we can pass the whole array
             studySnapshot = [...cards];
         }
 
@@ -275,6 +257,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         setActiveGame(mode);
         setInternalMode('playing');
     };
+
     const handleGameFinish = (scorePct: number) => {
         const baseMultiplier = activeGame === 'quiz' ? 10 : activeGame === 'match' ? 15 : 5;
         const earnedXP = Math.round((cards.length * baseMultiplier) * (scorePct / 100)); 
@@ -609,7 +592,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                                 <Folder size={isDense ? 20 : 24} fill="currentColor" className={isCatchingDeck ? 'animate-bounce' : ''} />
                                             </div>
                                         </div>
-                                        <h3 className={`font-black text-slate-800 dark:text-white ${isDense ? 'text-sm' : 'text-base'} leading-snug line-clamp-3 pr-4 mb-auto pointer-events-none`}>{folderName}</h3>
+                                        <h3 className={`font-black ${theme.text} ${isDense ? 'text-sm' : 'text-base'} leading-snug line-clamp-3 pr-4 mb-auto pointer-events-none`}>{folderName}</h3>
                                         <div className="mt-3 pointer-events-none">
                                             <span className={`text-[9px] uppercase font-black tracking-widest ${theme.badge} px-2.5 py-1 rounded-md shadow-sm`}>
                                                 {itemCount} Decks
@@ -623,7 +606,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                             window.history.pushState({ view: 'modal' }, '');
                                             setActiveOptionsFolder(folderName);
                                         }}
-                                        className={`absolute ${isDense ? 'top-3 right-2' : 'top-3 right-3'} p-2 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors z-20`}
+                                        className={`absolute ${isDense ? 'top-3 right-2' : 'top-3 right-3'} p-2 rounded-full ${theme.iconColor} hover:bg-white/50 transition-colors active:bg-white/80 z-20`}
                                         aria-label="Folder Options"
                                     >
                                         <MoreVertical size={20} />
@@ -644,6 +627,9 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             const theme = getDeckTheme(displayTitle);
                             const DeckIcon = deck.icon || theme.icon;
                             const cardCount = deck.id === 'custom' ? (deck.cards?.length || 0) : (deck.stats?.cardCount || 0);
+                            
+                            // 🔥 GRAB THE LANGUAGES (Fallback to empty array if none)
+                            const languages = deck.languages || [];
                             
                             const isDragged = draggedItem?.id === key;
                             const isGap = dragOverGapId === key && draggedItem?.type === 'deck';
@@ -701,12 +687,23 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                             onSelectDeck(key); 
                                             setInternalMode('menu'); 
                                         }} 
-                                        className={`w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] ${isDense ? 'p-4 sm:p-5' : 'p-5'} border-2 border-slate-100 dark:border-slate-800 transition-all text-left shadow-sm relative z-10 flex flex-col cursor-grab active:cursor-grabbing ${!isGap ? 'group-hover:-translate-y-1 hover:shadow-xl hover:border-indigo-200 dark:hover:border-indigo-500/50' : ''}`}
+                                        className={`w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] ${isDense ? 'p-4 sm:p-5' : 'p-5'} border-2 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all text-left shadow-sm relative z-10 flex flex-col cursor-grab active:cursor-grabbing ${!isGap ? 'group-hover:-translate-y-1' : ''}`}
                                     > 
                                         <div className={`flex justify-between items-start ${isDense ? 'mb-3' : 'mb-4'} pointer-events-none`}>
-                                            <div className={`${isDense ? 'w-10 h-10 rounded-xl' : 'w-14 h-14 rounded-2xl'} flex items-center justify-center text-white text-xl shadow-lg transition-transform bg-gradient-to-br ${theme.gradient} ${theme.shadow} group-hover:scale-110`}>
+                                            <div className={`${isDense ? 'w-10 h-10 rounded-xl' : 'w-12 h-12 rounded-[1rem]'} flex items-center justify-center text-white text-xl border shadow-inner transition-transform bg-gradient-to-br ${theme.gradient} ${theme.shadow} group-hover:scale-110`}>
                                                 {typeof DeckIcon === 'string' ? DeckIcon : <DeckIcon size={isDense ? 20 : 24}/>}
                                             </div>
+
+                                            {/* 🔥 LANGUAGE BUBBLES */}
+                                            {languages.length > 0 && (
+                                                <div className="flex flex-wrap justify-end gap-1 mr-6 mt-1">
+                                                    {languages.map((lang: string, idx: number) => (
+                                                        <span key={idx} className="px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shadow-sm">
+                                                            {lang.substring(0, 3)}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                         
                                         <h3 className={`font-black text-slate-800 dark:text-white ${isDense ? 'text-sm' : 'text-base'} leading-snug line-clamp-3 pr-4 mb-2 pointer-events-none`}>{displayTitle}</h3>
@@ -744,7 +741,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         <div className="bg-white dark:bg-slate-900 w-full rounded-t-[2.5rem] p-6 relative z-10 animate-in slide-in-from-bottom-full duration-300 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] pb-safe-6">
                             <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto mb-6" />
                             <div className="flex items-center gap-4 mb-6 px-2">
-                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm ${FOLDER_COLORS[folderColors[activeOptionsFolder] || 'indigo'].iconBg} ${FOLDER_COLORS[folderColors[activeOptionsFolder] || 'indigo'].iconColor}`}>
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm ${FOLDER_COLORS[folderColors[activeOptionsFolder] || 'indigo'].bg} ${FOLDER_COLORS[folderColors[activeOptionsFolder] || 'indigo'].iconColor}`}>
                                     <Folder size={24} fill="currentColor" />
                                 </div>
                                 <div>
