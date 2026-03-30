@@ -239,20 +239,42 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         });
     }, [cards, cardStats]);
 
-    const launchGame = (mode: 'standard' | 'quiz' | 'match' | 'tower') => {
+   const launchGame = (mode: 'standard' | 'quiz' | 'match' | 'tower') => {
         if (cards.length === 0) {
             setToastMsg("This deck has no cards.");
             return;
         }
 
         window.history.pushState({ view: 'playing' }, ''); 
-        const studySnapshot = mode === 'standard' && dueCards.length > 0 ? [...dueCards] : [...cards];
-        setSessionCards(studySnapshot);
         
+        let studySnapshot = [];
+        
+        if (mode === 'standard') {
+            // If they have due cards, prioritize the SRB matrix
+            if (dueCards.length > 0) {
+                studySnapshot = [...dueCards];
+            } else {
+                // Otherwise, they are browsing the full deck
+                studySnapshot = [...cards];
+            }
+
+            // 🔥 THE SEQUENTIAL OVERRIDE
+            // If the deck is marked as sequential, force sort it by the 'order' property
+            if (resolvedDeck?.isSequential) {
+                studySnapshot.sort((a, b) => (a.order || 0) - (b.order || 0));
+            } else if (dueCards.length === 0) {
+                // If it's NOT sequential, and we are just browsing, shuffle it to keep it fresh
+                studySnapshot.sort(() => Math.random() - 0.5);
+            }
+        } else {
+            // For Quiz and Match, we usually want random, but we can pass the whole array
+            studySnapshot = [...cards];
+        }
+
+        setSessionCards(studySnapshot);
         setActiveGame(mode);
         setInternalMode('playing');
     };
-
     const handleGameFinish = (scorePct: number) => {
         const baseMultiplier = activeGame === 'quiz' ? 10 : activeGame === 'match' ? 15 : 5;
         const earnedXP = Math.round((cards.length * baseMultiplier) * (scorePct / 100)); 
