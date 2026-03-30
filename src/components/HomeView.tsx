@@ -1,13 +1,16 @@
 // src/components/HomeView.tsx
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { 
     GraduationCap, Globe, Flame, Zap, Trophy, 
     School, Layers, Feather, Target, BookOpen, 
     Microscope, Terminal, Calculator, Palette, BookText,
-    Brain, Play, HeartPulse, Cpu, Briefcase, 
+    Check, Brain, Play, HeartPulse, Cpu, Briefcase, 
     Utensils, Globe2, Activity, ShieldAlert, MonitorPlay, 
-    FlaskConical, Plane, Music, Code
+    FlaskConical, Plane, Music, Code, Loader2
 } from 'lucide-react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db, appId } from '../config/firebase';
+import { saveDeckToCache, getDeckFromCache } from '../utils/localCache';
 import { calculateLevel } from '../utils/profileHelpers';
 import InstallPWA from './InstallPWA';
 import SpacedRepetitionView from './SpacedRepetitionView'; 
@@ -17,28 +20,17 @@ import { auth } from '../config/firebase';
 const getSubjectTheme = (subject: string = '') => {
     const str = subject.toLowerCase();
     
-    // STEM & Medical
     if (str.match(/stem|medical|anatomy|bio|health|doctor|sci|chem|phys|cell/)) return { icon: HeartPulse, gradient: 'from-emerald-400 to-teal-600', shadow: 'shadow-emerald-500/30', textColor: 'text-emerald-500 dark:text-emerald-400', bgColor: 'bg-emerald-50 dark:bg-emerald-500/10' };
-    // Technology & Logic
     if (str.match(/tech|logic|code|comp|program|software/)) return { icon: Cpu, gradient: 'from-blue-500 to-indigo-600', shadow: 'shadow-blue-500/30', textColor: 'text-blue-500 dark:text-blue-400', bgColor: 'bg-blue-50 dark:bg-blue-500/10' };
-    // Commerce & Trade
     if (str.match(/business|commerce|trade|finance|corporate/)) return { icon: Briefcase, gradient: 'from-slate-600 to-slate-800', shadow: 'shadow-slate-500/30', textColor: 'text-slate-700 dark:text-slate-300', bgColor: 'bg-slate-100 dark:bg-slate-800' };
-    // Arts & Culture
     if (str.match(/art|culture|history|design|draw|paint|color/)) return { icon: Palette, gradient: 'from-fuchsia-500 to-purple-600', shadow: 'shadow-fuchsia-500/30', textColor: 'text-fuchsia-500 dark:text-fuchsia-400', bgColor: 'bg-fuchsia-50 dark:bg-fuchsia-500/10' };
-    // Culinary & Hospitality
     if (str.match(/culinary|hospitality|food|kitchen|cook|eat/)) return { icon: Utensils, gradient: 'from-orange-400 to-rose-500', shadow: 'shadow-orange-500/30', textColor: 'text-orange-500 dark:text-orange-400', bgColor: 'bg-orange-50 dark:bg-orange-500/10' };
-    // Society & Politics
     if (str.match(/society|politics|law|ethics|government|social/)) return { icon: Globe2, gradient: 'from-cyan-500 to-blue-500', shadow: 'shadow-cyan-500/30', textColor: 'text-cyan-500 dark:text-cyan-400', bgColor: 'bg-cyan-50 dark:bg-cyan-500/10' };
-    // Linguistics & Phonetics
     if (str.match(/linguistics|phonetics|grammar|syntax|verb|read|english|vocab|word|lit/)) return { icon: BookOpen, gradient: 'from-violet-500 to-indigo-500', shadow: 'shadow-violet-500/30', textColor: 'text-violet-500 dark:text-violet-400', bgColor: 'bg-violet-50 dark:bg-violet-500/10' };
-    // Daily Survival
     if (str.match(/survival|emergency|navigate|travel|place|city|country/)) return { icon: Plane, gradient: 'from-rose-400 to-red-600', shadow: 'shadow-rose-500/30', textColor: 'text-rose-500 dark:text-rose-400', bgColor: 'bg-rose-50 dark:bg-rose-500/10' };
-    // Media & Entertainment
     if (str.match(/media|entertainment|movie|game|music|play|audio|song|sound/)) return { icon: MonitorPlay, gradient: 'from-pink-500 to-rose-400', shadow: 'shadow-pink-500/30', textColor: 'text-pink-500 dark:text-pink-400', bgColor: 'bg-pink-50 dark:bg-pink-500/10' };
-    // Math specific
     if (str.match(/math|calc|num|algebra|geometry/)) return { icon: Calculator, gradient: 'from-rose-500 to-pink-600', shadow: 'shadow-rose-500/30', textColor: 'text-rose-500 dark:text-rose-400', bgColor: 'bg-rose-50 dark:bg-rose-500/10' };
     
-    // Default
     return { icon: Layers, gradient: 'from-indigo-400 to-indigo-600', shadow: 'shadow-indigo-500/30', textColor: 'text-indigo-500 dark:text-indigo-400', bgColor: 'bg-indigo-50 dark:bg-indigo-500/10' };
 };
 
@@ -46,6 +38,8 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
   const [launchDailyReview, setLaunchDailyReview] = useState(false);
+  const [isCompilingQueue, setIsCompilingQueue] = useState(false);
+  const [compiledQueue, setCompiledQueue] = useState<any>(null);
 
   const xp = userData?.xp || 0;
   const streak = userData?.streak || 0;
@@ -74,25 +68,84 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
   const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const hoursRemaining = Math.max(1, Math.floor((tomorrow.getTime() - now.getTime()) / (1000 * 60 * 60)));
 
+  // 🔥 ASYNC COMPILER: Fetches actual cards from DB/Cache before launching
+  const handleLaunchGlobalQueue = async () => {
+      setIsCompilingQueue(true);
+      
+      try {
+          // 1. Find all decks that the user legally owns and hasn't archived
+          const activeDecks = Object.entries(allDecks || {}).filter(([key, deck]: any) => {
+              const isCustom = key === 'custom';
+              const isAuthor = deck.authorId === user?.uid || deck.ownerId === user?.uid;
+              const isUnlocked = userData?.unlocks?.[key] || (Array.isArray(userData?.unlocks) && userData.unlocks.includes(key)) || (Array.isArray(userData?.inventory) && userData.inventory.includes(key));
+              const hasPrefs = !!userData?.deckPrefs?.[key]; 
+              
+              const inMyVault = isCustom || isAuthor || isUnlocked || hasPrefs;
+              if (!inMyVault) return false;
+              
+              const isArchived = userData?.deckPrefs?.[key]?.archived || false;
+              return !isArchived;
+          }).map(([_, deck]) => deck);
+
+          if (activeDecks.length === 0) {
+              setIsCompilingQueue(false);
+              return;
+          }
+
+          // 2. Fetch the cards for those decks
+          const allPromises = activeDecks.map(async (deck: any) => {
+              if (deck.id === 'custom') return deck.cards || [];
+              
+              const cachedData = await getDeckFromCache(deck.id);
+              if (cachedData && cachedData.updatedAt >= (deck.updatedAt || 0)) {
+                  // Tag the cards with their parent deckId so SRB knows where to save stats
+                  return cachedData.cards.map((c:any) => ({...c, deckId: deck.id})); 
+              }
+
+              const cardsRef = collection(db, 'artifacts', appId, 'decks', deck.id, 'cards');
+              const snap = await getDocs(cardsRef);
+              const loadedCards = snap.docs.map(doc => ({...doc.data(), deckId: deck.id}));
+              
+              await saveDeckToCache(deck.id, loadedCards, deck.updatedAt || 0);
+              return loadedCards;
+          });
+
+          const allResults = await Promise.all(allPromises);
+          const allCards = allResults.flat();
+
+          if (allCards.length === 0) {
+              setIsCompilingQueue(false);
+              return;
+          }
+
+          // 3. Mount the Master Deck
+          const masterDeck = {
+              id: 'global_review',
+              title: 'Daily Review',
+              cards: allCards.sort(() => Math.random() - 0.5) 
+          };
+
+          setCompiledQueue(masterDeck);
+          setLaunchDailyReview(true);
+
+      } catch (err) {
+          console.error("Failed to compile Global Queue:", err);
+      } finally {
+          setIsCompilingQueue(false);
+      }
+  };
+
   // 🔥 GLOBAL REVIEW: IF ACTIVATED, TAKEOVER THE SCREEN
-  if (launchDailyReview) {
-      const activeDecks = Object.entries(allDecks || {}).filter(([key, deck]) => {
-          const isArchived = userData?.deckPrefs?.[key]?.archived || false;
-          return !isArchived;
-      }).map(([_, deck]) => deck);
-
-      const masterDeck = {
-          id: 'global_review',
-          title: 'Daily Review',
-          cards: activeDecks.flatMap((deck: any) => deck.cards || [])
-      };
-
+  if (launchDailyReview && compiledQueue) {
       return (
           <div className="fixed inset-0 z-[9999] bg-slate-950 p-4 md:p-8 animate-in slide-in-from-bottom-8 duration-500">
               <SpacedRepetitionView 
-                  deck={masterDeck} 
-                  userId={auth.currentUser?.uid} 
-                  onExit={() => setLaunchDailyReview(false)} 
+                  deck={compiledQueue} 
+                  userId={user?.uid} 
+                  onExit={() => {
+                      setLaunchDailyReview(false);
+                      setCompiledQueue(null);
+                  }} 
               />
           </div>
       );
@@ -219,7 +272,8 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
 
                        {/* RIGHT CARD: GLOBAL QUEUE / SPATIAL REPETITION */}
                        <button 
-                          onClick={() => setLaunchDailyReview(true)}
+                          onClick={handleLaunchGlobalQueue}
+                          disabled={isCompilingQueue}
                           className="w-full h-full relative bg-gradient-to-br from-indigo-900 to-slate-900 dark:from-indigo-950 dark:to-black rounded-[1.5rem] p-4 border-2 border-indigo-500/30 shadow-md overflow-hidden group text-left transition-all active:scale-[0.98] flex flex-col justify-between"
                       >
                           <div className="absolute -right-4 -bottom-4 p-4 opacity-20 group-hover:opacity-30 transition-opacity pointer-events-none">
@@ -232,7 +286,7 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                                     <Brain size={16} className="text-indigo-300" />
                                </div>
                                <span className="flex items-center justify-center w-6 h-6 bg-white/10 text-white rounded-full shadow-sm group-hover:scale-110 transition-transform backdrop-blur-md">
-                                    <Play size={10} className="ml-0.5" fill="currentColor" />
+                                    {isCompilingQueue ? <Loader2 size={10} className="animate-spin" /> : <Play size={10} className="ml-0.5" fill="currentColor" />}
                                </span>
                           </div>
                           
