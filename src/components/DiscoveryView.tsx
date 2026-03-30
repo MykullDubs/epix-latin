@@ -4,7 +4,7 @@ import {
     Search, Globe, BookOpen, Utensils, HeartPulse, 
     Briefcase, Plane, Palette, ChevronRight, ArrowLeft, 
     Map, Compass, Sparkles, Activity, Layers, Download, Lock,
-    MonitorPlay, Globe2, ShieldAlert, Cpu
+    MonitorPlay, Globe2, ShieldAlert, Cpu, GraduationCap
 } from 'lucide-react';
 import { Toast } from './Toast';
 
@@ -21,7 +21,7 @@ const MACRO_DOMAINS = [
     { id: 'media', title: 'Media & Entertainment', icon: MonitorPlay, gradient: 'from-pink-500 to-rose-400', text: 'text-pink-500', shadow: 'shadow-pink-500/30', desc: 'Movies, gaming, and pop culture' },
 ];
 
-export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userData }: any) {
+export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userData, activeOrg }: any) {
     // 1. NAVIGATION STATE
     const [domainPath, setDomainPath] = useState<string[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -29,6 +29,11 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
     const [toastMsg, setToastMsg] = useState<string | null>(null);
 
     const globalDecks = useMemo(() => Object.values(networkDecks), [networkDecks]);
+    
+    // UI Metadata
+    const themeColor = activeOrg?.themeColor || '#4f46e5'; 
+    const themeName = activeOrg?.name || 'Magister';
+    const targetLang = userData?.targetLanguage || "English";
 
     // 🔥 2. THE DYNAMIC REDUCER ENGINE
     const { currentFolders, currentDecks } = useMemo(() => {
@@ -112,19 +117,39 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
             <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors relative">
                 {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
                 
-                <div className="px-6 pt-safe-8 pb-4 shrink-0 bg-white/80 dark:bg-slate-950/80 backdrop-blur-2xl border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30">
+                {/* 🔥 SYNCED GLOBAL HEADER */}
+                <header className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm transition-colors duration-300">
+                    <div className="flex items-center gap-3">
+                        {activeOrg?.logoUrl ? (
+                            <img src={activeOrg.logoUrl} alt={`${themeName} Logo`} className="w-8 h-8 object-contain rounded-md" />
+                        ) : (
+                            <div className="text-white p-1.5 rounded-lg shadow-sm" style={{ backgroundColor: themeColor }} aria-hidden="true">
+                                <GraduationCap size={18} strokeWidth={3}/>
+                            </div>
+                        )}
+                        <span className="font-black tracking-tighter text-lg truncate max-w-[150px]" style={{ color: themeColor }}>
+                            Radar
+                        </span>
+                    </div>
+                    <div className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 shrink-0 transition-colors duration-300" aria-label={`Target Language: ${targetLang}`}>
+                        <Globe size={14} className="text-slate-400 dark:text-slate-500" aria-hidden="true"/>
+                        <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide">{targetLang}</span>
+                    </div>
+                </header>
+
+                <div className="px-6 pt-6 pb-2 shrink-0">
                     <div className="flex justify-between items-end mb-4">
                         <div>
-                            <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter italic pr-2">RADAR</h1>
-                            <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] flex items-center gap-1.5 mt-1"><Map size={12}/> Global Lexicon</p>
+                            <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight">Global Lexicon</h2>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-1.5 mt-1"><Map size={12}/> Content Network</p>
                         </div>
-                        <div className="bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3 py-1.5 rounded-xl font-black text-sm flex items-center gap-1.5 shadow-sm border border-amber-200 dark:border-amber-500/20">
+                        <div className="bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3 py-1.5 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-sm border border-amber-200 dark:border-amber-500/20">
                             <Sparkles size={14}/> {userData?.flux || 0} Flux
                         </div>
                     </div>
                     
-                    <div className="relative group mt-2">
-                        <div className="absolute inset-0 bg-indigo-500/10 rounded-[2rem] blur-xl group-focus-within:bg-indigo-500/30 transition-all duration-500 pointer-events-none" />
+                    <div className="relative group mt-4">
+                        <div className="absolute inset-0 bg-indigo-500/5 rounded-[2rem] blur-lg group-focus-within:bg-indigo-500/20 transition-all duration-500 pointer-events-none" />
                         <div className="relative flex items-center">
                             <Search className="absolute left-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={20}/>
                             <input 
