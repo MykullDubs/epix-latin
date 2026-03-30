@@ -5,11 +5,12 @@ import {
     Briefcase, Plane, Palette, ChevronRight, ArrowLeft, 
     Map, Compass, Sparkles, Activity, Layers, Download, Lock,
     MonitorPlay, Globe2, ShieldAlert, Cpu, GraduationCap,
-    Clock, SignalHigh, PlayCircle, FileText, CheckCircle2, Zap, HelpCircle, X
+    Clock, SignalHigh, PlayCircle, FileText, CheckCircle2, Zap,
+    HelpCircle, X 
 } from 'lucide-react';
 import { Toast } from './Toast';
 
-// 🔥 EXPANDED ONTOLOGY LEVEL 1
+// 🔥 MACRO DOMAINS
 const MACRO_DOMAINS = [
     { id: 'stem', title: 'STEM & Medical', icon: HeartPulse, gradient: 'from-emerald-400 to-teal-600', text: 'text-emerald-500', shadow: 'shadow-emerald-500/30', desc: 'Anatomy, biology, and healthcare' },
     { id: 'tech', title: 'Technology & Logic', icon: Cpu, gradient: 'from-blue-500 to-indigo-600', text: 'text-blue-500', shadow: 'shadow-blue-500/30', desc: 'Software, AI, and engineering' },
@@ -22,7 +23,6 @@ const MACRO_DOMAINS = [
     { id: 'media', title: 'Media & Entertainment', icon: MonitorPlay, gradient: 'from-pink-500 to-rose-400', text: 'text-pink-500', shadow: 'shadow-pink-500/30', desc: 'Movies, gaming, and pop culture' },
 ];
 
-// 🔥 MOCK ELECTIVES (Macro-Courses)
 const MOCK_COURSES = [
     {
         id: 'course_kitchen_span',
@@ -65,9 +65,17 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
     const [searchQuery, setSearchQuery] = useState('');
     const [touchStartCoords, setTouchStartCoords] = useState<{x: number, y: number} | null>(null);
     const [toastMsg, setToastMsg] = useState<string | null>(null);
-    
-    // 🔥 Course Preview State
     const [previewCourse, setPreviewCourse] = useState<any | null>(null);
+    
+    // 🔥 LIVE COUNTER FOR THE FRONTIER
+    const [scholarsCount, setScholarsCount] = useState(1204);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setScholarsCount(prev => prev + (Math.random() > 0.5 ? 1 : -1));
+        }, 5000);
+        return () => clearInterval(interval);
+    }, []);
 
     const globalDecks = useMemo(() => Object.values(networkDecks), [networkDecks]);
     
@@ -75,23 +83,19 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
     const themeName = activeOrg?.name || 'Magister';
     const targetLang = userData?.targetLanguage || "English";
 
-    // Dynamic Reducer Engine (Now includes Courses)
     const { currentFolders, currentDecks, currentCourses } = useMemo(() => {
         const folders = new Set<string>();
         const decks: any[] = [];
         const courses: any[] = [];
 
-        // Parse Decks
         globalDecks.forEach((deck: any) => {
             const path = deck.domainPath || [];
             const matchesPath = domainPath.every((p, i) => path[i] === p);
             if (!matchesPath) return; 
-
             if (path.length > domainPath.length) folders.add(path[domainPath.length]);
             else decks.push(deck);
         });
 
-        // Parse Courses
         MOCK_COURSES.forEach((course: any) => {
             const path = course.domainPath || [];
             const matchesPath = domainPath.every((p, i) => path[i] === p);
@@ -147,7 +151,6 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
         setTouchStartCoords(null);
     };
 
-    // --- RENDER: LEVEL 0 (THE RADAR) ---
     if (domainPath.length === 0) {
         return (
             <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors relative">
@@ -196,21 +199,69 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar pb-32">
-                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Sparkles size={14} className="text-amber-500"/> The Frontier</h4>
+                <div className="flex-1 overflow-y-auto p-6 space-y-10 custom-scrollbar pb-32">
+                    
+                    {/* 🔥 THE JUICED FRONTIER */}
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        <div className="flex justify-between items-center mb-4 ml-1">
+                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <Sparkles size={14} className="text-amber-500 animate-pulse"/> The Frontier
+                            </h4>
+                            <div className="flex items-center gap-2 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20">
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                                <span className="text-[8px] font-black text-emerald-500 uppercase tracking-tighter">Live Sector</span>
+                            </div>
+                        </div>
+
                         <button 
                             onClick={() => handleNavigateIn('Linguistics & Phonetics')}
-                            className="w-full bg-gradient-to-br from-slate-900 to-indigo-950 dark:from-indigo-900 dark:to-slate-950 p-6 rounded-[2.5rem] text-left shadow-2xl shadow-indigo-900/20 group active:scale-[0.98] transition-all relative overflow-hidden border border-indigo-500/30"
+                            className="w-full relative overflow-hidden rounded-[2.5rem] p-[2px] active:scale-[0.98] transition-all group"
                         >
-                            <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-500/30 blur-3xl rounded-full group-hover:bg-indigo-400/40 transition-colors" />
-                            <div className="bg-white/10 backdrop-blur-md w-14 h-14 rounded-2xl flex items-center justify-center text-indigo-300 mb-4 border border-white/10 group-hover:scale-110 transition-transform shadow-inner">
-                                <BookOpen size={28} />
-                            </div>
-                            <h3 className="font-black text-white text-2xl leading-tight mb-2 relative z-10">Future Ethics & Tech</h3>
-                            <p className="text-indigo-200 text-sm font-bold opacity-90 line-clamp-2 relative z-10">Advanced C1 grammar, debate logic, and the vocabulary of AI disruption.</p>
-                            <div className="absolute bottom-6 right-6 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-1">
-                                Discover <ChevronRight size={12}/>
+                            {/* Animated Border Shimmer (Requires Tailwind Config Extension) */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 bg-[length:200%_100%] animate-[shimmer_8s_linear_infinite] opacity-40 group-hover:opacity-100 transition-opacity" />
+                            
+                            <div className="relative bg-slate-950 p-6 rounded-[2.4rem] text-left flex flex-col h-full overflow-hidden">
+                                {/* Holographic Glows */}
+                                <div className="absolute -top-20 -right-20 w-64 h-64 bg-indigo-600/20 blur-[80px] rounded-full pointer-events-none" />
+                                <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-purple-600/10 blur-[80px] rounded-full pointer-events-none" />
+
+                                <div className="flex justify-between items-start mb-8 relative z-10">
+                                    <div className="bg-white/5 backdrop-blur-xl w-14 h-14 rounded-2xl flex items-center justify-center text-indigo-300 border border-white/10 group-hover:scale-110 transition-transform shadow-2xl shadow-indigo-500/20">
+                                        <BookOpen size={28} strokeWidth={2.5} />
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="block text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Active Scholars</span>
+                                        <span className="text-xl font-black text-white tabular-nums tracking-tight">
+                                            {scholarsCount.toLocaleString()} <span className="text-[10px] text-slate-500 ml-0.5 italic lowercase">syncing...</span>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="relative z-10">
+                                    <h3 className="font-black text-white text-2xl md:text-3xl leading-tight mb-2 tracking-tight group-hover:text-indigo-300 transition-colors">
+                                        Future Ethics & Tech
+                                    </h3>
+                                    <p className="text-slate-400 text-sm font-medium line-clamp-2 max-w-[90%] leading-relaxed mb-8">
+                                        Decrypt the vocabulary of AI disruption and master the grammar of high-stakes technological debate.
+                                    </p>
+                                    
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex gap-2">
+                                            <div className="bg-white/5 px-3 py-1.5 rounded-xl border border-white/10 flex items-center gap-1.5 backdrop-blur-sm">
+                                                <SignalHigh size={12} className="text-indigo-400" />
+                                                <span className="text-[9px] font-black text-white uppercase tracking-tighter">Tier IV</span>
+                                            </div>
+                                            <div className="bg-white/5 px-3 py-1.5 rounded-xl border border-white/10 flex items-center gap-1.5 backdrop-blur-sm">
+                                                <Zap size={12} className="text-amber-400 fill-amber-400" />
+                                                <span className="text-[9px] font-black text-white uppercase tracking-tighter">+500 Flux</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-1 text-[10px] font-black text-white uppercase tracking-widest opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300">
+                                            Initiate <ChevronRight size={14}/>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </button>
                     </div>
@@ -221,7 +272,6 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                             {MACRO_DOMAINS.map((domain) => {
                                 const Icon = domain.icon;
                                 const hasContent = globalDecks.some((d: any) => d.domainPath?.[0] === domain.title) || MOCK_COURSES.some(c => c.domainPath?.[0] === domain.title);
-                                
                                 return (
                                     <button 
                                         key={domain.id}
@@ -253,7 +303,6 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
         >
             {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
 
-            {/* HEADER */}
             <div className="px-6 pt-safe-8 pb-6 shrink-0 bg-white/80 dark:bg-slate-950/80 backdrop-blur-2xl border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 shadow-sm">
                 <button onClick={() => window.history.back()} className="flex items-center text-slate-400 hover:text-indigo-600 mb-6 text-xs font-black uppercase tracking-widest bg-white dark:bg-slate-900 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm active:scale-95 transition-all">
                     <ArrowLeft size={14} className="mr-2"/> Back
@@ -280,7 +329,6 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
 
             <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar pb-32">
                 
-                {/* 🔥 FEATURED ELECTIVES CAROUSEL */}
                 {currentCourses.length > 0 && (
                     <section className="animate-in slide-in-from-bottom-4 duration-500">
                         <div className="flex justify-between items-end mb-4 ml-1">
@@ -290,15 +338,13 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                         </div>
                         
                         <div className="flex gap-4 overflow-x-auto hide-scrollbar snap-x pb-2 -mx-6" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                            <div className="w-2 shrink-0" aria-hidden="true" /> {/* Left Edge Spacer */}
-
+                            <div className="w-6 shrink-0" /> 
                             {currentCourses.map((course: any) => (
                                 <button 
                                     key={course.id}
                                     onClick={() => handleOpenCourse(course)}
                                     className="snap-start shrink-0 w-[300px] text-left bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 transition-all duration-300 flex flex-col active:scale-[0.98] shadow-sm hover:-translate-y-1 hover:shadow-xl hover:border-indigo-200 dark:hover:border-indigo-500/50 group overflow-hidden"
                                 >
-                                    {/* Cinematic Header Block */}
                                     <div className={`w-full h-24 bg-gradient-to-br ${course.gradient} p-4 flex justify-between items-start relative`}>
                                         <div className="absolute inset-0 bg-black/10 mix-blend-overlay pointer-events-none" />
                                         <div className="bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white border border-white/20 shadow-sm relative z-10">
@@ -308,11 +354,9 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                                             <Clock size={12} /> {course.duration}
                                         </div>
                                     </div>
-                                    
                                     <div className="p-6 flex flex-col flex-1">
                                         <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 leading-tight line-clamp-2 mb-2">{course.title}</h3>
                                         <p className="text-xs font-bold text-slate-400 line-clamp-2 mb-6">{course.description}</p>
-                                        
                                         <div className="mt-auto flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
                                             <div className="flex items-center gap-3 text-slate-400">
                                                 <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest">
@@ -329,12 +373,11 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                                     </div>
                                 </button>
                             ))}
-                            <div className="w-2 shrink-0" aria-hidden="true" /> {/* Right Edge Spacer */}
+                            <div className="w-6 shrink-0" />
                         </div>
                     </section>
                 )}
                 
-                {/* EXISTING PATHWAYS */}
                 {currentFolders.length > 0 && (
                     <div>
                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Map size={14}/> Pathways</h4>
@@ -346,7 +389,7 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                                     className="w-full bg-white dark:bg-slate-900 p-5 rounded-[2rem] border-2 border-slate-100 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all text-left shadow-sm flex items-center justify-between group active:scale-[0.98]"
                                 >
                                     <div className="flex items-center gap-4">
-                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-slate-50 dark:bg-slate-800 text-slate-500 group-hover:text-indigo-500 group-hover:bg-indigo-50 dark:group-hover:bg-indigo-500/20 transition-colors`}>
+                                        <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-slate-50 dark:bg-slate-800 text-slate-500 group-hover:text-indigo-500 group-hover:bg-indigo-50 dark:group-hover:bg-indigo-500/20 transition-colors">
                                             <BookOpen size={18}/>
                                         </div>
                                         <h3 className="font-black text-slate-800 dark:text-white text-lg leading-tight">{folderName}</h3>
@@ -358,7 +401,6 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                     </div>
                 )}
 
-                {/* EXISTING MODULES */}
                 {currentDecks.length > 0 && (
                     <div>
                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Layers size={14}/> Base Modules</h4>
@@ -366,7 +408,6 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                             {currentDecks.map((deck) => {
                                 const isUnlocked = userData?.unlocks?.[deck.id];
                                 const cardCount = deck.stats?.cardCount || deck.cards?.length || 0;
-
                                 return (
                                     <div key={deck.id} className="bg-white dark:bg-slate-900 rounded-[2rem] border-2 border-slate-100 dark:border-slate-800 p-6 flex flex-col justify-between shadow-sm relative overflow-hidden group hover:border-indigo-200 dark:hover:border-indigo-500/30 transition-colors">
                                         <div className="flex justify-between items-start mb-4">
@@ -383,11 +424,9 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                                                 </span>
                                             )}
                                         </div>
-
                                         <div>
                                             <h3 className="font-black text-xl text-slate-900 dark:text-white leading-tight mb-2 line-clamp-2">{deck.title}</h3>
                                             <p className="text-xs font-bold text-slate-400 mb-6 line-clamp-2">{deck.description || `Premium vocabulary and grammar targets mapped to this specific domain.`}</p>
-                                            
                                             <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800 flex gap-2">
                                                 <button 
                                                     onClick={() => {
@@ -398,7 +437,7 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                                                             setToastMsg(`Paywall Triggered: This module costs ${deck.price} Flux.`);
                                                         }
                                                     }}
-                                                    className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2 ${isUnlocked || !deck.price ? 'bg-slate-900 dark:bg-indigo-600 text-white shadow-md hover:bg-slate-800 dark:hover:bg-indigo-500' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'}`}
+                                                    className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2 ${isUnlocked || !deck.price ? 'bg-slate-900 dark:bg-indigo-600 text-white shadow-md hover:bg-slate-800 dark:hover:bg-indigo-500' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-slate-200'}`}
                                                 >
                                                     {isUnlocked || !deck.price ? <><Download size={14}/> Download</> : <><Lock size={14}/> Unlock</>}
                                                 </button>
@@ -412,20 +451,15 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                 )}
             </div>
 
-            {/* 🔥 THE SYLLABUS BOTTOM SHEET MODAL */}
             {previewCourse && (
                 <div className="fixed inset-0 z-[6000] flex flex-col justify-end">
                     <div className="absolute inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm transition-opacity animate-in fade-in duration-300" onClick={() => window.history.back()} />
-                    
                     <div className="bg-white dark:bg-slate-950 w-full h-[85vh] rounded-t-[2.5rem] shadow-2xl relative z-10 animate-in slide-in-from-bottom-full duration-300 overflow-hidden flex flex-col border-t border-slate-200 dark:border-slate-800">
-                        
-                        {/* Modal Header / Cover Image */}
                         <div className={`shrink-0 w-full h-32 bg-gradient-to-br ${previewCourse.gradient} relative flex items-end p-6`}>
                             <button onClick={() => window.history.back()} className="absolute top-6 right-6 p-2.5 bg-black/20 hover:bg-black/40 backdrop-blur-md rounded-full text-white transition-colors active:scale-95">
                                 <X size={20} strokeWidth={3} />
                             </button>
                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
-                            
                             <div className="relative z-10 flex gap-2 w-full">
                                 <span className="bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-white border border-white/20 shadow-sm flex items-center gap-1.5">
                                     <SignalHigh size={12} /> {previewCourse.difficulty}
@@ -436,14 +470,11 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                             </div>
                         </div>
 
-                        {/* Scrolling Content */}
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8 pb-32">
                             <div>
                                 <h2 className="text-3xl font-black text-slate-900 dark:text-white leading-tight mb-3">{previewCourse.title}</h2>
                                 <p className="text-sm font-bold text-slate-500 dark:text-slate-400 leading-relaxed">{previewCourse.description}</p>
                             </div>
-
-                            {/* What's Included */}
                             <div>
                                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Course Contents</h4>
                                 <div className="grid grid-cols-3 gap-3">
@@ -471,7 +502,6 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                                 </div>
                             </div>
 
-                            {/* Syllabus Path */}
                             <div>
                                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Syllabus Path</h4>
                                 <div className="space-y-3 relative before:absolute before:inset-y-4 before:left-[27px] before:w-0.5 before:bg-slate-200 dark:before:bg-slate-800">
@@ -494,13 +524,11 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                             </div>
                         </div>
 
-                        {/* Sticky Footer CTA */}
                         <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white to-transparent dark:from-slate-950 dark:via-slate-950 pb-safe-6 pt-12 border-t border-slate-100 dark:border-slate-800">
                             <button 
                                 onClick={() => {
                                     if ((userData?.flux || 0) >= previewCourse.price) {
                                         setToastMsg("Purchasing infrastructure in development!");
-                                        // In prod: deduct flux, inject course into Active Subjects, dismiss modal
                                     } else {
                                         setToastMsg("Insufficient Flux balance.");
                                     }
