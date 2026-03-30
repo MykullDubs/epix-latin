@@ -109,24 +109,30 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const [dragOverGapId, setDragOverGapId] = useState<string | null>(null); 
     const [dragOverFolderCatch, setDragOverFolderCatch] = useState<string | null>(null); 
     
-    // 🔥 FIXED OPTIMISTIC SYNC: Now purely depends on DB payload, ignoring drag states so it doesn't snap back!
     useEffect(() => {
-        setLocalFolders(userData?.studyFolders || []);
-    }, [userData?.studyFolders]);
+        if (!draggedItem) {
+            setLocalFolders(userData?.studyFolders || []);
+        }
+    }, [userData?.studyFolders, draggedItem]);
 
     useEffect(() => {
-        const order = userData?.deckOrder || [];
-        const sorted = [...filteredDecks].sort((a, b) => {
-            const aIdx = order.indexOf(a[0]);
-            const bIdx = order.indexOf(b[0]);
-            if (aIdx === -1 && bIdx === -1) return 0;
-            if (aIdx === -1) return 1;
-            if (bIdx === -1) return -1;
-            return aIdx - bIdx;
-        });
-        setLocalDecks(sorted);
-    }, [filteredDecks, userData?.deckOrder]);
+        if (!draggedItem) {
+            const order = userData?.deckOrder || [];
+            const sorted = [...filteredDecks].sort((a, b) => {
+                const aIdx = order.indexOf(a[0]);
+                const bIdx = order.indexOf(b[0]);
+                if (aIdx === -1 && bIdx === -1) return 0;
+                if (aIdx === -1) return 1;
+                if (bIdx === -1) return -1;
+                return aIdx - bIdx;
+            });
+            setLocalDecks(sorted);
+        }
+    }, [filteredDecks, userData?.deckOrder, draggedItem]);
 
+    // 🔥 HIGH-DENSITY ENGINE: Calculate if we need 3 columns
+    const displayItemCount = (deckFilter === 'all' ? localFolders.length : 0) + localDecks.length;
+    const isDense = displayItemCount > 6;
 
     const handleBack = () => {
         if (activeOptionsDeck) { setActiveOptionsDeck(null); return; }
@@ -459,12 +465,12 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     ref={scrollContainerRef} 
                     onTouchStart={handleLibrarySwipeStart}
                     onTouchEnd={handleLibrarySwipeEnd}
-                    className="flex-1 overflow-y-auto p-6 space-y-5 pb-28 relative z-10 custom-scrollbar overscroll-y-contain h-full"
+                    className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 pb-28 relative z-10 custom-scrollbar overscroll-y-contain h-full"
                 >
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className={`grid ${isDense ? 'grid-cols-3 gap-3' : 'grid-cols-2 md:grid-cols-3 gap-4'}`}>
                         
                         {localFolders.includes(deckFilter) && (
-                            <div className="col-span-full animate-in fade-in duration-300 mb-2 mt-2">
+                            <div className="col-span-full animate-in fade-in duration-300 mb-2 mt-2 px-2">
                                 <button onClick={() => window.history.back()} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-500 transition-colors w-fit bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 active:scale-95">
                                     <ArrowLeft size={14} /> Back to Library
                                 </button>
@@ -511,7 +517,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                     className={`relative group transition-all duration-300 h-full ${
                                         isDragged ? 'opacity-40 scale-95 z-0' : 'z-10'
                                     } ${
-                                        isGap ? 'translate-x-3 scale-[0.95] opacity-75 border-indigo-300 dark:border-indigo-700' : ''
+                                        isGap ? 'translate-x-4 scale-[0.90] opacity-60 border-indigo-300 dark:border-indigo-700' : ''
                                     } ${
                                         isCatchingDeck ? 'scale-105 ring-4 ring-indigo-500 shadow-xl' : ''
                                     }`}
@@ -563,15 +569,14 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                             window.history.pushState({ view: 'folder' }, '');
                                             setDeckFilter(folderName);
                                         }} 
-                                        className={`w-full ${theme.bg} rounded-[2rem] p-5 border-4 ${theme.border} transition-all text-left flex flex-col h-full relative cursor-grab active:cursor-grabbing ${!isGap && !isCatchingDeck ? 'hover:-translate-y-1 shadow-sm hover:shadow-xl' : ''}`}
+                                        className={`w-full ${theme.bg} rounded-[2rem] ${isDense ? 'p-4 sm:p-5' : 'p-5'} border-4 ${theme.border} transition-all text-left flex flex-col h-full relative cursor-grab active:cursor-grabbing ${!isGap && !isCatchingDeck ? 'hover:-translate-y-1 shadow-sm hover:shadow-xl' : ''}`}
                                     >
                                         <div className="flex justify-between items-start mb-4 pointer-events-none">
-                                            <div className={`w-12 h-12 ${theme.iconBg} ${theme.iconColor} rounded-[1rem] flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform`}>
-                                                <Folder size={24} fill="currentColor" />
+                                            <div className={`${isDense ? 'w-10 h-10' : 'w-12 h-12'} ${theme.iconBg} ${theme.iconColor} rounded-[1rem] flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform`}>
+                                                <Folder size={isDense ? 20 : 24} fill="currentColor" className={isDragTarget ? 'animate-bounce' : ''} />
                                             </div>
                                         </div>
-                                        {/* 🔥 UPDATED FONT SIZE */}
-                                        <h3 className={`font-black ${theme.text} text-base leading-snug line-clamp-3 pr-4 mb-auto pointer-events-none`}>{folderName}</h3>
+                                        <h3 className={`font-black ${theme.text} ${isDense ? 'text-sm' : 'text-base'} leading-snug line-clamp-3 pr-4 mb-auto pointer-events-none`}>{folderName}</h3>
                                         <div className="mt-3 pointer-events-none">
                                             <span className={`text-[9px] uppercase font-black tracking-widest ${theme.badge} px-2.5 py-1 rounded-md shadow-sm`}>
                                                 {itemCount} Decks
@@ -585,7 +590,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                             window.history.pushState({ view: 'modal' }, '');
                                             setActiveOptionsFolder(folderName);
                                         }}
-                                        className={`absolute top-3 right-3 p-2 rounded-full ${theme.iconColor} hover:bg-white/50 transition-colors active:bg-white/80 z-20`}
+                                        className={`absolute ${isDense ? 'top-3 right-2' : 'top-3 right-3'} p-2 rounded-full ${theme.iconColor} hover:bg-white/50 transition-colors active:bg-white/80 z-20`}
                                         aria-label="Folder Options"
                                     >
                                         <MoreVertical size={20} />
@@ -616,7 +621,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                     className={`relative group transition-all duration-300 h-full pt-3 ${
                                         isDragged ? 'opacity-40 scale-95 z-0' : 'z-10'
                                     } ${
-                                        isGap ? 'scale-95 translate-x-3 opacity-60 border-indigo-300 dark:border-indigo-700' : ''
+                                        isGap ? 'scale-[0.90] translate-x-6 opacity-50 blur-[1px] border-indigo-300 dark:border-indigo-700' : ''
                                     }`}
                                     draggable={true}
                                     onDragStart={(e) => {
@@ -663,16 +668,15 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                             onSelectDeck(key); 
                                             setInternalMode('menu'); 
                                         }} 
-                                        className={`w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] p-5 border-2 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all text-left shadow-sm relative z-10 flex flex-col cursor-grab active:cursor-grabbing ${!isGap ? 'group-hover:-translate-y-1' : ''}`}
+                                        className={`w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] ${isDense ? 'p-4 sm:p-5' : 'p-5'} border-2 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all text-left shadow-sm relative z-10 flex flex-col cursor-grab active:cursor-grabbing ${!isGap ? 'group-hover:-translate-y-1' : ''}`}
                                     > 
-                                        <div className="flex justify-between items-start mb-4 pointer-events-none">
-                                            <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center text-xl border shadow-inner transition-transform ${theme.bg} ${theme.color} ${theme.border}`}>
-                                                {typeof DeckIcon === 'string' ? DeckIcon : <DeckIcon size={24}/>}
+                                        <div className={`flex justify-between items-start ${isDense ? 'mb-3' : 'mb-4'} pointer-events-none`}>
+                                            <div className={`${isDense ? 'w-10 h-10 rounded-xl' : 'w-12 h-12 rounded-[1rem]'} flex items-center justify-center text-xl border shadow-inner transition-transform ${theme.bg} ${theme.color} ${theme.border}`}>
+                                                {typeof DeckIcon === 'string' ? DeckIcon : <DeckIcon size={isDense ? 20 : 24}/>}
                                             </div>
                                         </div>
                                         
-                                        {/* 🔥 UPDATED FONT SIZE */}
-                                        <h3 className="font-black text-slate-800 dark:text-white text-base leading-snug line-clamp-3 pr-6 mb-2 pointer-events-none">{displayTitle}</h3>
+                                        <h3 className={`font-black text-slate-800 dark:text-white ${isDense ? 'text-sm' : 'text-base'} leading-snug line-clamp-3 pr-4 mb-2 pointer-events-none`}>{displayTitle}</h3>
                                         
                                         <div className="mt-auto pt-1 flex flex-col gap-2 pointer-events-none">
                                             <div className="flex items-center gap-2">
@@ -690,7 +694,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                             setActiveOptionsDeck(deck);
                                             setMenuView('main'); 
                                         }}
-                                        className="absolute top-4 right-2 p-2 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors z-20"
+                                        className={`absolute ${isDense ? 'top-3 right-1' : 'top-4 right-2'} p-2 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors z-20`}
                                         aria-label="Deck Options"
                                     >
                                         <MoreVertical size={20} />
