@@ -4,24 +4,42 @@ import {
     GraduationCap, Globe, Flame, Zap, Trophy, 
     School, Layers, Feather, Target, BookOpen, 
     Microscope, Terminal, Calculator, Palette, BookText,
-    Check, Brain, Play
+    Check, Brain, Play, HeartPulse, Cpu, Briefcase, 
+    Utensils, Globe2, Activity, ShieldAlert, MonitorPlay, 
+    FlaskConical, Plane, Music, Code
 } from 'lucide-react';
 import { calculateLevel } from '../utils/profileHelpers';
 import InstallPWA from './InstallPWA';
 import SpacedRepetitionView from './SpacedRepetitionView'; 
 import { auth } from '../config/firebase'; 
 
-// --- UPGRADED THEME HELPER (Now with Dark Mode variants) ---
-const getSubjectTheme = (subject: string) => {
-    const sub = subject?.toLowerCase() || '';
-    if (sub.includes('math')) return { icon: Calculator, color: 'text-rose-500 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-500/10', border: 'border-rose-100 dark:border-rose-500/20', hover: 'hover:border-rose-300 dark:hover:border-rose-500/40 hover:shadow-rose-100 dark:hover:shadow-rose-900/20' };
-    if (sub.includes('science') || sub.includes('bio') || sub.includes('phys')) return { icon: Microscope, color: 'text-emerald-500 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-100 dark:border-emerald-500/20', hover: 'hover:border-emerald-300 dark:hover:border-emerald-500/40 hover:shadow-emerald-100 dark:hover:shadow-emerald-900/20' };
-    if (sub.includes('social') || sub.includes('history')) return { icon: BookText, color: 'text-amber-500 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-500/10', border: 'border-amber-100 dark:border-amber-500/20', hover: 'hover:border-amber-300 dark:hover:border-amber-500/40 hover:shadow-amber-100 dark:hover:shadow-amber-900/20' };
-    if (sub.includes('read') || sub.includes('english') || sub.includes('lit')) return { icon: BookOpen, color: 'text-cyan-500 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-500/10', border: 'border-cyan-100 dark:border-cyan-500/20', hover: 'hover:border-cyan-300 dark:hover:border-cyan-500/40 hover:shadow-cyan-100 dark:hover:shadow-cyan-900/20' };
-    if (sub.includes('code') || sub.includes('comp') || sub.includes('tech')) return { icon: Terminal, color: 'text-slate-800 dark:text-slate-300', bg: 'bg-slate-200 dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-700', hover: 'hover:border-slate-400 dark:hover:border-slate-600 hover:shadow-slate-200 dark:hover:shadow-slate-900/40' };
-    if (sub.includes('art') || sub.includes('design')) return { icon: Palette, color: 'text-fuchsia-500 dark:text-fuchsia-400', bg: 'bg-fuchsia-50 dark:bg-fuchsia-500/10', border: 'border-fuchsia-100 dark:border-fuchsia-500/20', hover: 'hover:border-fuchsia-300 dark:hover:border-fuchsia-500/40 hover:shadow-fuchsia-100 dark:hover:shadow-fuchsia-900/20' };
+// 🔥 UNIFIED DISCOVERY THEMES (Juiced with Gradients, Text Colors, and Shadow Glows)
+const getSubjectTheme = (subject: string = '') => {
+    const str = subject.toLowerCase();
     
-    return { icon: Globe, color: 'text-indigo-500 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-500/10', border: 'border-indigo-100 dark:border-indigo-500/20', hover: 'hover:border-indigo-300 dark:hover:border-indigo-500/40 hover:shadow-indigo-100 dark:hover:shadow-indigo-900/20' };
+    // STEM & Medical
+    if (str.match(/stem|medical|anatomy|bio|health|doctor|sci|chem|phys|cell/)) return { icon: HeartPulse, gradient: 'from-emerald-400 to-teal-600', shadow: 'shadow-emerald-500/30', textColor: 'text-emerald-500 dark:text-emerald-400', bgColor: 'bg-emerald-50 dark:bg-emerald-500/10' };
+    // Technology & Logic
+    if (str.match(/tech|logic|code|comp|program|software/)) return { icon: Cpu, gradient: 'from-blue-500 to-indigo-600', shadow: 'shadow-blue-500/30', textColor: 'text-blue-500 dark:text-blue-400', bgColor: 'bg-blue-50 dark:bg-blue-500/10' };
+    // Commerce & Trade
+    if (str.match(/business|commerce|trade|finance|corporate/)) return { icon: Briefcase, gradient: 'from-slate-600 to-slate-800', shadow: 'shadow-slate-500/30', textColor: 'text-slate-700 dark:text-slate-300', bgColor: 'bg-slate-100 dark:bg-slate-800' };
+    // Arts & Culture
+    if (str.match(/art|culture|history|design|draw|paint|color/)) return { icon: Palette, gradient: 'from-fuchsia-500 to-purple-600', shadow: 'shadow-fuchsia-500/30', textColor: 'text-fuchsia-500 dark:text-fuchsia-400', bgColor: 'bg-fuchsia-50 dark:bg-fuchsia-500/10' };
+    // Culinary & Hospitality
+    if (str.match(/culinary|hospitality|food|kitchen|cook|eat/)) return { icon: Utensils, gradient: 'from-orange-400 to-rose-500', shadow: 'shadow-orange-500/30', textColor: 'text-orange-500 dark:text-orange-400', bgColor: 'bg-orange-50 dark:bg-orange-500/10' };
+    // Society & Politics
+    if (str.match(/society|politics|law|ethics|government|social/)) return { icon: Globe2, gradient: 'from-cyan-500 to-blue-500', shadow: 'shadow-cyan-500/30', textColor: 'text-cyan-500 dark:text-cyan-400', bgColor: 'bg-cyan-50 dark:bg-cyan-500/10' };
+    // Linguistics & Phonetics
+    if (str.match(/linguistics|phonetics|grammar|syntax|verb|read|english|vocab|word|lit/)) return { icon: BookOpen, gradient: 'from-violet-500 to-indigo-500', shadow: 'shadow-violet-500/30', textColor: 'text-violet-500 dark:text-violet-400', bgColor: 'bg-violet-50 dark:bg-violet-500/10' };
+    // Daily Survival
+    if (str.match(/survival|emergency|navigate|travel|place|city|country/)) return { icon: Plane, gradient: 'from-rose-400 to-red-600', shadow: 'shadow-rose-500/30', textColor: 'text-rose-500 dark:text-rose-400', bgColor: 'bg-rose-50 dark:bg-rose-500/10' };
+    // Media & Entertainment
+    if (str.match(/media|entertainment|movie|game|music|play|audio|song|sound/)) return { icon: MonitorPlay, gradient: 'from-pink-500 to-rose-400', shadow: 'shadow-pink-500/30', textColor: 'text-pink-500 dark:text-pink-400', bgColor: 'bg-pink-50 dark:bg-pink-500/10' };
+    // Math specific
+    if (str.match(/math|calc|num|algebra|geometry/)) return { icon: Calculator, gradient: 'from-rose-500 to-pink-600', shadow: 'shadow-rose-500/30', textColor: 'text-rose-500 dark:text-rose-400', bgColor: 'bg-rose-50 dark:bg-rose-500/10' };
+    
+    // Default
+    return { icon: Layers, gradient: 'from-indigo-400 to-indigo-600', shadow: 'shadow-indigo-500/30', textColor: 'text-indigo-500 dark:text-indigo-400', bgColor: 'bg-indigo-50 dark:bg-indigo-500/10' };
 };
 
 export default function HomeView({ setActiveTab, classes, curriculums = [], onSelectClass, userData, user, activeOrg, allDecks }: any) {
@@ -284,10 +302,10 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                                 <button 
                                     key={cls.id} 
                                     onClick={() => onSelectClass(cls)}
-                                    className={`snap-start min-w-[280px] text-left bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-2 transition-all duration-300 flex flex-col active:scale-[0.98] shadow-sm hover:-translate-y-1 ${theme.border} ${theme.hover} group`}
+                                    className="snap-start min-w-[280px] text-left bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 transition-all duration-300 flex flex-col active:scale-[0.98] shadow-sm hover:-translate-y-1 hover:shadow-xl hover:border-indigo-200 dark:hover:border-indigo-500/50 group"
                                 >
                                     <div className="flex justify-between items-start mb-4 w-full">
-                                        <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${theme.bg} ${theme.color}`}>
+                                        <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${theme.bgColor} ${theme.textColor}`}>
                                             {effectiveSubject}
                                         </div>
                                         <div className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-slate-800 dark:bg-slate-950 text-white dark:text-slate-300 shadow-sm border border-transparent dark:border-slate-800">
@@ -296,7 +314,7 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                                     </div>
                                     
                                     <div className="flex items-center gap-4 mb-8 mt-2">
-                                        <div className={`w-12 h-12 rounded-[1rem] flex items-center justify-center shadow-inner dark:shadow-none transition-colors duration-500 shrink-0 ${theme.bg} ${theme.color} group-hover:bg-opacity-80`}>
+                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg transition-transform duration-500 shrink-0 bg-gradient-to-br ${theme.gradient} ${theme.shadow} group-hover:scale-110`}>
                                             <Icon size={24} strokeWidth={2.5} aria-hidden="true" />
                                         </div>
                                         <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 leading-tight line-clamp-2">
@@ -307,12 +325,12 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                                     <div className="w-full mt-auto pt-5 border-t border-slate-50 dark:border-slate-800/60">
                                         <div className="flex justify-between items-center mb-2">
                                             <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Year Progress</span>
-                                            <span className={`text-xs font-black ${theme.color}`}>{progress}%</span>
+                                            <span className={`text-xs font-black ${theme.textColor}`}>{progress}%</span>
                                         </div>
                                         <div className="h-2.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                                             <div 
-                                                className={`h-full transition-all duration-1000 ${theme.bg.replace('bg-', 'bg-').replace('50', '500').replace('dark:bg-','').replace('/10','')}`} 
-                                                style={{ width: `${progress}%`, backgroundColor: 'currentColor' }} 
+                                                className={`h-full transition-all duration-1000 bg-gradient-to-r ${theme.gradient}`} 
+                                                style={{ width: `${progress}%` }} 
                                             />
                                         </div>
                                     </div>
