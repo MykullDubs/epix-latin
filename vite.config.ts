@@ -1,15 +1,13 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
-import tailwindcss from 'tailwindcss'
-import autoprefixer from 'autoprefixer'
 
 export default defineConfig({
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      injectRegister: 'auto', 
+      injectRegister: 'auto', // 🔥 Let Vite handle the HTML injection!
       includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png'], 
       manifest: {
         name: 'Magister OS',
@@ -38,7 +36,7 @@ export default defineConfig({
             src: 'icon-512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'maskable' 
+            purpose: 'maskable' // 🔥 Apple/Android require a dedicated maskable declaration
           }
         ],
         widgets: [
@@ -58,13 +56,4 @@ export default defineConfig({
       }
     })
   ],
-  // 🔥 THE HARDWIRE: Force Vite to run Tailwind and read your config
-  css: {
-    postcss: {
-      plugins: [
-        tailwindcss(),
-        autoprefixer(),
-      ],
-    },
-  },
 })
