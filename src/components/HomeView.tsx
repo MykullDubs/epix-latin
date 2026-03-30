@@ -6,14 +6,15 @@ import {
     Microscope, Terminal, Calculator, Palette, BookText,
     Check, Brain, Play, HeartPulse, Cpu, Briefcase, 
     Utensils, Globe2, Activity, ShieldAlert, MonitorPlay, 
-    FlaskConical, Plane, Music, Code, Loader2
+    FlaskConical, Plane, Music, Code, Loader2, X
 } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db, appId } from '../config/firebase';
 import { saveDeckToCache, getDeckFromCache } from '../utils/localCache';
 import { calculateLevel } from '../utils/profileHelpers';
 import InstallPWA from './InstallPWA';
-import SpacedRepetitionView from './SpacedRepetitionView'; 
+import { StudyModePlayer } from './StudyEngines'; 
+import { Toast } from './Toast';
 import { auth } from '../config/firebase'; 
 
 // 🔥 UNIFIED DISCOVERY THEMES (Juiced with Gradients, Text Colors, and Shadow Glows)
@@ -40,6 +41,8 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
   const [launchDailyReview, setLaunchDailyReview] = useState(false);
   const [isCompilingQueue, setIsCompilingQueue] = useState(false);
   const [compiledQueue, setCompiledQueue] = useState<any>(null);
+  const [compiledStats, setCompiledStats] = useState<Record<string, any>>({});
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const xp = userData?.xp || 0;
   const streak = userData?.streak || 0;
@@ -68,12 +71,12 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
   const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const hoursRemaining = Math.max(1, Math.floor((tomorrow.getTime() - now.getTime()) / (1000 * 60 * 60)));
 
-  // 🔥 ASYNC COMPILER: Fetches actual cards from DB/Cache before launching
+  // 🔥 ASYNC COMPILER: Fetches actual cards and true stats from DB/Cache
   const handleLaunchGlobalQueue = async () => {
       setIsCompilingQueue(true);
       
       try {
-          // 1. Find all decks that the user legally owns and hasn't archived
+          // 1. Locate all eligible decks
           const activeDecks = Object.entries(allDecks || {}).filter(([key, deck]: any) => {
               const isCustom = key === 'custom';
               const isAuthor = deck.authorId === user?.uid || deck.ownerId === user?.uid;
@@ -85,75 +88,119 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
               
               const isArchived = userData?.deckPrefs?.[key]?.archived || false;
               return !isArchived;
-          }).map(([_, deck]) => deck);
+          }).map(([key, deck]: any) => ({ ...deck, id: key }));
 
           if (activeDecks.length === 0) {
+              setToastMsg("You have no active decks in your library.");
               setIsCompilingQueue(false);
               return;
           }
 
-          // 2. Fetch the cards for those decks
+          // 2. Multi-fetch the cards AND their stats
           const allPromises = activeDecks.map(async (deck: any) => {
-              if (deck.id === 'custom') return deck.cards || [];
-              
-              const cachedData = await getDeckFromCache(deck.id);
-              if (cachedData && cachedData.updatedAt >= (deck.updatedAt || 0)) {
-                  // Tag the cards with their parent deckId so SRB knows where to save stats
-                  return cachedData.cards.map((c:any) => ({...c, deckId: deck.id})); 
+              let loadedCards: any[] = [];
+              if (deck.id === 'custom') {
+                  loadedCards = deck.cards || [];
+              } else {
+                  const cachedData = await getDeckFromCache(deck.id);
+                  if (cachedData && cachedData.updatedAt >= (deck.updatedAt || 0)) {
+                      loadedCards = cachedData.cards;
+                  } else {
+                      const cardsRef = collection(db, 'artifacts', appId, 'decks', deck.id, 'cards');
+                      const snap = await getDocs(cardsRef);
+                      loadedCards = snap.docs.map(doc => doc.data());
+                      await saveDeckToCache(deck.id, loadedCards, deck.updatedAt || 0);
+                  }
               }
-
-              const cardsRef = collection(db, 'artifacts', appId, 'decks', deck.id, 'cards');
-              const snap = await getDocs(cardsRef);
-              const loadedCards = snap.docs.map(doc => ({...doc.data(), deckId: deck.id}));
               
-              await saveDeckToCache(deck.id, loadedCards, deck.updatedAt || 0);
-              return loadedCards;
+              // Tag cards with deckId so the StudyModePlayer routes the stats correctly!
+              loadedCards = loadedCards.map(c => ({...c, deckId: deck.id}));
+
+              const statsRef = collection(db, 'artifacts', appId, 'users', user?.uid, 'deck_progress', deck.id, 'card_stats');
+              const statsSnap = await getDocs(statsRef);
+              const stats = statsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+              return { cards: loadedCards, stats };
           });
 
-          const allResults = await Promise.all(allPromises);
-          const allCards = allResults.flat();
+          const results = await Promise.all(allPromises);
+          
+          let allDueCards: any[] = [];
+          const globalStatsMap: Record<string, any> = {};
 
-          if (allCards.length === 0) {
+          // 3. Calculate Due Status across all decks
+          results.forEach(({ cards, stats }) => {
+              const deckStatsMap: Record<string, any> = {};
+              stats.forEach((s: any) => { 
+                  deckStatsMap[s.id] = s; 
+                  globalStatsMap[s.id] = s;
+              });
+
+              const due = cards.filter((c: any) => {
+                  const stat = deckStatsMap[c.id];
+                  return !stat?.nextReviewDate || stat.nextReviewDate <= Date.now();
+              });
+              
+              allDueCards = [...allDueCards, ...due];
+          });
+
+          if (allDueCards.length === 0) {
+              setToastMsg("Matrix is optimal! No targets due for review.");
               setIsCompilingQueue(false);
               return;
           }
 
-          // 3. Mount the Master Deck
-          const masterDeck = {
-              id: 'global_review',
-              title: 'Daily Review',
-              cards: allCards.sort(() => Math.random() - 0.5) 
-          };
+          // 4. Shuffle and cap at 40 cards so the review doesn't take 2 hours
+          allDueCards.sort(() => Math.random() - 0.5);
+          const dailyCap = allDueCards.slice(0, 40); 
 
-          setCompiledQueue(masterDeck);
+          setCompiledQueue(dailyCap);
+          setCompiledStats(globalStatsMap);
           setLaunchDailyReview(true);
 
       } catch (err) {
           console.error("Failed to compile Global Queue:", err);
+          setToastMsg("System error compiling queue.");
       } finally {
           setIsCompilingQueue(false);
       }
   };
 
-  // 🔥 GLOBAL REVIEW: IF ACTIVATED, TAKEOVER THE SCREEN
+  // 🔥 NEW GLOBAL REVIEW INTERFACE
   if (launchDailyReview && compiledQueue) {
       return (
-          <div className="fixed inset-0 z-[9999] bg-slate-950 p-4 md:p-8 animate-in slide-in-from-bottom-8 duration-500">
-              <SpacedRepetitionView 
-                  deck={compiledQueue} 
-                  userId={user?.uid} 
-                  onExit={() => {
-                      setLaunchDailyReview(false);
-                      setCompiledQueue(null);
-                  }} 
-              />
+          <div className="fixed inset-0 z-[9999] bg-slate-950 animate-in slide-in-from-bottom-8 duration-500 flex flex-col">
+              <div className="px-4 py-4 bg-slate-900 border-b border-slate-800 flex justify-between items-center shrink-0">
+                  <button onClick={() => { setLaunchDailyReview(false); setCompiledQueue(null); }} className="p-3 bg-slate-800 rounded-full text-slate-400 hover:text-rose-500 transition-colors">
+                      <X size={20} strokeWidth={3}/>
+                  </button>
+                  <div className="flex flex-col items-center">
+                      <span className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-0.5">Global Queue</span>
+                      <span className="text-sm font-black text-white line-clamp-1">Spaced Repetition</span>
+                  </div>
+                  <div className="w-11"></div>
+              </div>
+              <div className="flex-1 overflow-hidden relative">
+                  <StudyModePlayer 
+                      deckCards={compiledQueue} 
+                      initialSrbData={compiledStats} 
+                      user={user} 
+                      userData={userData} 
+                      onFinish={() => {
+                          setLaunchDailyReview(false);
+                          setCompiledQueue(null);
+                          setToastMsg("Global Review Complete! Matrix updated.");
+                      }} 
+                  />
+              </div>
           </div>
       );
   }
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 font-sans transition-colors duration-300">
-        
+    <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 font-sans transition-colors duration-300 relative">
+        {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
+
         {/* 1. DYNAMIC APP BAR */}
         <header className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm transition-colors duration-300">
             <div className="flex items-center gap-3">
