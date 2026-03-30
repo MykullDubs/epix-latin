@@ -43,8 +43,8 @@ export default function StorefrontView({ userData, activeOrg, onPurchase, onEqui
     const [selectedItem, setSelectedItem] = useState<any | null>(null);
     const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-    // Safely fallback if userData isn't fully hydrated yet
-    const fluxBalance = userData?.flux || 0;
+    // Safely check all possible spots where Flux/Coins might be stored based on hydration
+    const fluxBalance = userData?.coins || userData?.profile?.main?.coins || userData?.flux || 0;
     const inventory = userData?.inventory || [];
     const equipped = userData?.equipped || {};
 
@@ -53,6 +53,7 @@ export default function StorefrontView({ userData, activeOrg, onPurchase, onEqui
     const themeName = activeOrg?.name || 'Magister';
     const targetLang = userData?.targetLanguage || "English";
 
+    // 🔥 WIRED UP TRANSACTION HANDLER
     const handleBuy = async () => {
         if (!selectedItem) return;
         
@@ -62,9 +63,15 @@ export default function StorefrontView({ userData, activeOrg, onPurchase, onEqui
             return;
         }
 
-        // Trigger the callback passed from App.tsx to update Firebase
-        await onPurchase(selectedItem.id, selectedItem.price, activeTab);
-        setToastMsg(`Acquired: ${selectedItem.name}!`);
+        // Trigger the Universal Engine
+        const result = await onPurchase(selectedItem.id, selectedItem.price, activeTab);
+        
+        if (result?.success) {
+            setToastMsg(`Acquired: ${selectedItem.name}!`);
+        } else {
+            setToastMsg(result?.msg || "Transaction failed.");
+        }
+        
         setSelectedItem(null);
     };
 
