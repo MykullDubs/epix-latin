@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { doc, setDoc, updateDoc } from 'firebase/firestore'; 
 import { db, appId } from './config/firebase';   
 import { useMagisterData } from './hooks/useMagisterData';
-import { GLOBAL_CURRICULUMS } from './constants/curriculums'; // 🔥 FIXED TYPO HERE
+import { GLOBAL_CURRICULUMS } from './constants/curriculums'; 
 
 // Sub-component Imports
 import AuthView from './components/AuthView';
@@ -24,7 +24,7 @@ import LiveVocabProjector from './components/LiveVocabProjector';
 import LiveConnectFourProjector from './components/LiveConnectFourProjector';
 import LiveSlipstreamProjector from './components/LiveSlipstreamProjector';
 import CelebrationScreen from './components/CelebrationScreen';
-import HoloAvatar from './components/HoloAvatar'; // 🔥 OS-Level Avatar Injection
+import HoloAvatar from './components/HoloAvatar'; 
 
 // 🔥 DYNAMIC OS THEME ENGINE
 const OS_THEMES: Record<string, string> = {
@@ -82,6 +82,22 @@ export default function App() {
 
   // Determine active background theme based on equipped cosmetics
   const activeOSTheme = OS_THEMES[userData?.equipped?.themes] || OS_THEMES.default;
+  const activeThemeId = userData?.equipped?.themes || 'default';
+
+  // 🔥 THE ROOT INJECTOR: Blankets the app in the equipped theme
+  useEffect(() => {
+      const root = document.documentElement;
+      
+      // 1. Strip any previously equipped themes
+      root.classList.remove('theme-hacker', 'theme-synth');
+      
+      // 2. Inject the newly equipped theme class into the HTML tag
+      if (activeThemeId === 'theme_hacker') {
+          root.classList.add('theme-hacker');
+      } else if (activeThemeId === 'theme_synth') {
+          root.classList.add('theme-synth');
+      }
+  }, [activeThemeId]);
 
   const handleEquipCosmetic = async (itemId: string, category: string) => {
       if (!user || !userData) return;
@@ -219,7 +235,7 @@ export default function App() {
   useEffect(() => {
     if (!isHydrated.current) return;
 
-    const params = new URLSearchParams(window.location.search);
+    const params = newSearchParams(window.location.search);
     params.set('view', currentView);
     params.set('tab', activeTab);
     
