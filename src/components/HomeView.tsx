@@ -257,16 +257,13 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
 
               {/* 🔥 3. ACTION CENTER CAROUSEL */}
               <section className="animate-in slide-in-from-bottom-4 transition-all duration-500">
-                  <div className="flex justify-between items-end mb-3 ml-1">
+                  <div className="mb-3 ml-1">
                       <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
                           <Activity size={16} className="text-indigo-500" /> Action Center
                       </h3>
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                          Resets in {hoursRemaining}h
-                      </span>
                   </div>
 
-                  {/* STRICT MATH SPACERS APPLIED HERE (w-3 + gap-3 = 24px) */}
+                  {/* STRICT MATH SPACERS APPLIED HERE (w-3 + gap-3 = 24px left margin) */}
                   <div className="flex gap-3 overflow-x-auto hide-scrollbar snap-x pb-2 -mx-6" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                       
                       <div className="w-3 shrink-0" aria-hidden="true" /> {/* Left Edge Spacer */}
@@ -378,7 +375,7 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                         </button>
                     </div>
                     
-                    {/* STRICT MATH SPACERS APPLIED HERE (w-2 + gap-4 = 24px) */}
+                    {/* STRICT MATH SPACERS APPLIED HERE (w-2 + gap-4 = 24px left margin) */}
                     <div className="flex gap-4 overflow-x-auto pb-8 -mx-6 hide-scrollbar snap-x pt-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                         
                         <div className="w-2 shrink-0" aria-hidden="true" /> {/* Left Edge Spacer */}
