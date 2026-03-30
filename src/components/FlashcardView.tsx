@@ -572,8 +572,8 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                         className={`w-full ${theme.bg} rounded-[2rem] ${isDense ? 'p-4 sm:p-5' : 'p-5'} border-4 ${theme.border} transition-all text-left flex flex-col h-full relative cursor-grab active:cursor-grabbing ${!isGap && !isCatchingDeck ? 'hover:-translate-y-1 shadow-sm hover:shadow-xl' : ''}`}
                                     >
                                         <div className="flex justify-between items-start mb-4 pointer-events-none">
-                                            <div className={`${isDense ? 'w-10 h-10' : 'w-12 h-12'} ${theme.iconBg} ${theme.iconColor} rounded-[1rem] flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform`}>
-                                                <Folder size={isDense ? 20 : 24} fill="currentColor" className={isDragTarget ? 'animate-bounce' : ''} />
+                                            <div className={`${isDense ? 'w-10 h-10 rounded-xl' : 'w-12 h-12 rounded-[1rem]'} flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform ${theme.iconBg} ${theme.iconColor}`}>
+                                                <Folder size={isDense ? 20 : 24} fill="currentColor" className={isCatchingDeck ? 'animate-bounce' : ''} />
                                             </div>
                                         </div>
                                         <h3 className={`font-black ${theme.text} ${isDense ? 'text-sm' : 'text-base'} leading-snug line-clamp-3 pr-4 mb-auto pointer-events-none`}>{folderName}</h3>
