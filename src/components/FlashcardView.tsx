@@ -4,7 +4,8 @@ import {
     ArrowLeft, X, Library, Layers, HelpCircle, Puzzle, Flame, 
     Filter, ChevronRight, Archive, Plus, Loader2,
     MoreVertical, FolderPlus, Trash2, Folder, FolderOpen, Edit3, Infinity,
-    Calculator, FlaskConical, Palette, Utensils, Plane, HeartPulse, Activity, BookText, Code, BrainCircuit, Music, CheckCircle2
+    HeartPulse, Cpu, Briefcase, Palette, Utensils, Globe2, Activity, ShieldAlert, MonitorPlay,
+    BrainCircuit, CheckCircle2
 } from 'lucide-react';
 import { Toast } from './Toast'; 
 import { collection, getDocs } from 'firebase/firestore';
@@ -24,19 +25,31 @@ const FOLDER_COLORS: Record<string, any> = {
     fuchsia: { bg: 'bg-fuchsia-50 dark:bg-fuchsia-900/20', border: 'border-fuchsia-100 dark:border-fuchsia-500/30', text: 'text-fuchsia-900 dark:text-fuchsia-100', iconBg: 'bg-white dark:bg-fuchsia-500/30', iconColor: 'text-fuchsia-600 dark:text-fuchsia-400', badge: 'bg-white/60 dark:bg-black/20 text-fuchsia-600 dark:text-fuchsia-300', hex: 'bg-fuchsia-500' }
 };
 
+// 🔥 UNIFIED DISCOVERY THEMES
 const getDeckTheme = (title: string = '') => {
     const str = title.toLowerCase();
-    if (str.match(/math|calc|num|algebra|geometry/)) return { icon: Calculator, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'border-blue-100 dark:border-blue-500/20' };
-    if (str.match(/sci|bio|chem|phys|cell/)) return { icon: FlaskConical, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-100 dark:border-emerald-500/20' };
-    if (str.match(/art|color|draw|paint/)) return { icon: Palette, color: 'text-fuchsia-500', bg: 'bg-fuchsia-50 dark:bg-fuchsia-500/10', border: 'border-fuchsia-100 dark:border-fuchsia-500/20' };
-    if (str.match(/food|eat|cook|kitchen/)) return { icon: Utensils, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-500/10', border: 'border-orange-100 dark:border-orange-500/20' };
-    if (str.match(/music|song|audio|sound/)) return { icon: Music, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-500/10', border: 'border-rose-100 dark:border-rose-500/20' };
-    if (str.match(/travel|place|city|country/)) return { icon: Plane, color: 'text-sky-500', bg: 'bg-sky-50 dark:bg-sky-500/10', border: 'border-sky-100 dark:border-sky-500/20' };
-    if (str.match(/verb|action|do/)) return { icon: Activity, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-500/10', border: 'border-red-100 dark:border-red-500/20' };
-    if (str.match(/body|health|med|doctor/)) return { icon: HeartPulse, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-500/10', border: 'border-rose-100 dark:border-rose-500/20' };
-    if (str.match(/read|lit|book|vocab|word/)) return { icon: BookText, color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-500/10', border: 'border-indigo-100 dark:border-indigo-500/20' };
-    if (str.match(/code|tech|comp|program/)) return { icon: Code, color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-200 dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-700' };
-    return { icon: Layers, color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-500/10', border: 'border-indigo-100 dark:border-indigo-500/20' };
+    
+    // STEM & Medical
+    if (str.match(/stem|medical|anatomy|bio|health|doctor|sci/)) return { icon: HeartPulse, color: 'text-emerald-500 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-100 dark:border-emerald-500/20' };
+    // Technology & Logic
+    if (str.match(/tech|logic|code|comp|program|software/)) return { icon: Cpu, color: 'text-blue-500 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'border-blue-100 dark:border-blue-500/20' };
+    // Commerce & Trade
+    if (str.match(/business|commerce|trade|finance|corporate/)) return { icon: Briefcase, color: 'text-slate-700 dark:text-slate-300', bg: 'bg-slate-200 dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-700' };
+    // Arts & Culture
+    if (str.match(/art|culture|history|design|draw/)) return { icon: Palette, color: 'text-fuchsia-500 dark:text-fuchsia-400', bg: 'bg-fuchsia-50 dark:bg-fuchsia-500/10', border: 'border-fuchsia-100 dark:border-fuchsia-500/20' };
+    // Culinary & Hospitality
+    if (str.match(/culinary|hospitality|food|kitchen|cook|eat/)) return { icon: Utensils, color: 'text-orange-500 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-500/10', border: 'border-orange-100 dark:border-orange-500/20' };
+    // Society & Politics
+    if (str.match(/society|politics|law|ethics|government/)) return { icon: Globe2, color: 'text-cyan-500 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-500/10', border: 'border-cyan-100 dark:border-cyan-500/20' };
+    // Linguistics & Phonetics
+    if (str.match(/linguistics|phonetics|grammar|syntax|verb|read|english|vocab|word/)) return { icon: Activity, color: 'text-violet-500 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-500/10', border: 'border-violet-100 dark:border-violet-500/20' };
+    // Daily Survival
+    if (str.match(/survival|emergency|navigate|travel|place/)) return { icon: ShieldAlert, color: 'text-rose-500 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-500/10', border: 'border-rose-100 dark:border-rose-500/20' };
+    // Media & Entertainment
+    if (str.match(/media|entertainment|movie|game|music|play/)) return { icon: MonitorPlay, color: 'text-pink-500 dark:text-pink-400', bg: 'bg-pink-50 dark:bg-pink-500/10', border: 'border-pink-100 dark:border-pink-500/20' };
+    
+    // Default 
+    return { icon: Layers, color: 'text-indigo-500 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-500/10', border: 'border-indigo-100 dark:border-indigo-500/20' };
 };
 
 export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity, userData, onSaveCard, onToggleStar, onToggleArchive, onCreateFolder, onAssignToFolder, onHideDeck, onUpdateFolder, onDeleteFolder, onReorderFolders, onReorderDecks, user }: any) {
@@ -109,7 +122,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const [dragOverGapId, setDragOverGapId] = useState<string | null>(null); 
     const [dragOverFolderCatch, setDragOverFolderCatch] = useState<string | null>(null); 
     
-    // 🔥 FIXED OPTIMISTIC SYNC: Now purely depends on DB payload, ignoring drag states!
     useEffect(() => {
         setLocalFolders(userData?.studyFolders || []);
     }, [userData?.studyFolders]);
