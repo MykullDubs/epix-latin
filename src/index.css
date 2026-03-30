@@ -15,7 +15,7 @@
     --theme-primary-950: 30 27 75;
   }
 
-  html.theme-hacker {
+  .theme-hacker {
     --theme-primary-50: 236 253 245;
     --theme-primary-100: 209 250 229;
     --theme-primary-200: 167 243 208;
@@ -27,7 +27,7 @@
     --theme-primary-950: 2 44 34;
   }
 
-  html.theme-synth {
+  .theme-synth {
     --theme-primary-50: 253 244 255;
     --theme-primary-100: 250 232 255;
     --theme-primary-200: 245 208 254;
