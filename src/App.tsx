@@ -97,36 +97,53 @@ export default function App() {
   const activeOSTheme = OS_THEMES[userData?.equipped?.themes] || OS_THEMES.default;
   const activeThemeId = userData?.equipped?.themes || 'default';
 
-  // 🔥 THE ROOT INJECTOR: Blankets the app in the equipped theme
+ // 🔥 THE HARMONIZED ROOT INJECTOR
   useEffect(() => {
       const root = document.documentElement;
       
-      // 1. Strip any previously equipped themes
-      root.classList.remove('theme-hacker', 'theme-synth');
+      // 1. Convert classes to an array so we can iterate safely
+      const currentClasses = Array.from(root.classList);
       
-      // 2. Inject the newly equipped theme class into the HTML tag
-      if (activeThemeId === 'theme_hacker') {
-          root.classList.add('theme-hacker');
-      } else if (activeThemeId === 'theme_synth') {
-          root.classList.add('theme-synth');
+      // 2. Remove ONLY classes that start with "theme-" 
+      // This leaves the "dark" class (Day/Night) completely alone!
+      currentClasses.forEach(cls => {
+          if (cls.startsWith('theme-')) {
+              root.classList.remove(cls);
+          }
+      });
+      
+      // 3. Inject the newly equipped theme class (if it's not default)
+      if (activeThemeId && activeThemeId !== 'default') {
+          // Normalizes theme_hacker -> theme-hacker to match CSS
+          const cssClass = activeThemeId.replace('_', '-');
+          root.classList.add(cssClass);
       }
   }, [activeThemeId]);
 
-  const handleEquipCosmetic = async (itemId: string, category: string) => {
+const handleEquipCosmetic = async (itemId: string, category: string) => {
       if (!user || !userData) return;
       
       const newEquipped = { ...(userData.equipped || {}), [category]: itemId };
       
       try {
-          const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
-          await updateDoc(userRef, {
+          // 🔥 TARGET THE CORRECT DOC: profile/main
+          // This is the doc useMagisterData is actually listening to for UI updates!
+          const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main');
+          await updateDoc(profileRef, {
               equipped: newEquipped
           });
+          
+          // Redundant sync to root for safety
+          const rootRef = doc(db, 'artifacts', appId, 'users', user.uid);
+          await updateDoc(rootRef, {
+              equipped: newEquipped,
+              'profile.main.equipped': newEquipped
+          }).catch(() => {});
+          
       } catch (err) {
           console.error("Equip protocol failed:", err);
       }
   };
-
   // 🔥 FOLDER & DECK REORDERING ENGINES
   const handleReorderFolders = async (newOrder: string[]) => {
       if (!user?.uid) return;
