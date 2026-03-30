@@ -6,7 +6,7 @@ import {
     Microscope, Terminal, Calculator, Palette, BookText,
     Check, Brain, Play, HeartPulse, Cpu, Briefcase, 
     Utensils, Globe2, Activity, ShieldAlert, MonitorPlay, 
-    FlaskConical, Plane, Music, Code, Loader2, X, Plus
+    FlaskConical, Plane, Music, Code, Loader2, X, Plus, GripVertical
 } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db, appId } from '../config/firebase';
@@ -34,7 +34,8 @@ const getSubjectTheme = (subject: string = '') => {
     return { icon: Layers, gradient: 'from-indigo-400 to-indigo-600', shadow: 'shadow-indigo-500/30', textColor: 'text-indigo-500 dark:text-indigo-400', bgColor: 'bg-indigo-50 dark:bg-indigo-500/10' };
 };
 
-export default function HomeView({ setActiveTab, classes, curriculums = [], onSelectClass, userData, user, activeOrg, allDecks, setBuilderConfig, setInternalMode }: any) {
+// 🔥 WIRED UP onReorderClasses PROP
+export default function HomeView({ setActiveTab, classes, curriculums = [], onSelectClass, onReorderClasses, userData, user, activeOrg, allDecks, setBuilderConfig, setInternalMode }: any) {
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
   const [launchDailyReview, setLaunchDailyReview] = useState(false);
@@ -42,6 +43,48 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
   const [compiledQueue, setCompiledQueue] = useState<any>(null);
   const [compiledStats, setCompiledStats] = useState<Record<string, any>>({});
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  // 🔥 LOCAL DRAG AND DROP STATE
+  const [localClasses, setLocalClasses] = useState<any[]>([]);
+  const dragItem = useRef<number | null>(null);
+  const dragOverItem = useRef<number | null>(null);
+
+  // Sync local classes when the prop updates
+  useEffect(() => {
+      setLocalClasses(classes || []);
+  }, [classes]);
+
+  const handleDragStart = (e: React.DragEvent<HTMLButtonElement>, position: number) => {
+      dragItem.current = position;
+      e.currentTarget.style.opacity = '0.5';
+      e.currentTarget.style.transform = 'scale(0.95)';
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLButtonElement>, position: number) => {
+      dragOverItem.current = position;
+      
+      // Live Array Swap
+      if (dragItem.current !== null && dragItem.current !== position) {
+          const newClasses = [...localClasses];
+          const draggedItemContent = newClasses[dragItem.current];
+          newClasses.splice(dragItem.current, 1);
+          newClasses.splice(dragOverItem.current, 0, draggedItemContent);
+          dragItem.current = position;
+          setLocalClasses(newClasses);
+      }
+  };
+
+  const handleDragEnd = (e: React.DragEvent<HTMLButtonElement>) => {
+      e.currentTarget.style.opacity = '1';
+      e.currentTarget.style.transform = 'scale(1)';
+      dragItem.current = null;
+      dragOverItem.current = null;
+      
+      // Ping the database if the parent component provided a save function
+      if (onReorderClasses) {
+          onReorderClasses(localClasses.map((c: any) => c.id));
+      }
+  };
 
   const xp = userData?.xp || 0;
   const streak = userData?.streak || 0;
@@ -66,7 +109,6 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
   const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const hoursRemaining = Math.max(1, Math.floor((tomorrow.getTime() - now.getTime()) / (1000 * 60 * 60)));
 
-  // 🔥 ASYNC COMPILER: Fetches actual cards and true stats from DB/Cache
   const handleLaunchGlobalQueue = async () => {
       setIsCompilingQueue(true);
       
@@ -362,11 +404,13 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                   </div>
               </section>
 
-              {/* 4. ACTIVE SUBJECTS SECTION */}
-              {classes && classes.length > 0 ? (
+              {/* 4. ACTIVE SUBJECTS SECTION (NOW DRAGGABLE) */}
+              {localClasses && localClasses.length > 0 ? (
                 <section className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
                     <div className="flex justify-between items-end mb-4 ml-1">
-                        <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider">Active Subjects</h3>
+                        <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                            Active Subjects
+                        </h3>
                         <button 
                             onClick={() => setActiveTab('classes')} 
                             className="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-sm"
@@ -375,12 +419,11 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                         </button>
                     </div>
                     
-                    {/* STRICT MATH SPACERS APPLIED HERE (w-2 + gap-4 = 24px left margin) */}
                     <div className="flex gap-4 overflow-x-auto pb-8 -mx-6 hide-scrollbar snap-x pt-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                         
                         <div className="w-2 shrink-0" aria-hidden="true" /> {/* Left Edge Spacer */}
 
-                        {classes.map((cls: any) => { 
+                        {localClasses.map((cls: any, index: number) => { 
                             const primaryCurriculum = curriculums?.find((c: any) => cls.assignedCurriculums?.includes(c.id));
                             const effectiveSubject = cls.subject || primaryCurriculum?.subject || 'General Studies';
                             const effectiveGrade = cls.grade || cls.level || primaryCurriculum?.grade || primaryCurriculum?.level || 'All Grades';
@@ -392,21 +435,33 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                             return ( 
                                 <button 
                                     key={cls.id} 
+                                    draggable
+                                    onDragStart={(e) => handleDragStart(e, index)}
+                                    onDragEnter={(e) => handleDragEnter(e, index)}
+                                    onDragEnd={handleDragEnd}
+                                    onDragOver={(e) => e.preventDefault()}
                                     onClick={() => onSelectClass(cls)}
-                                    className="snap-start shrink-0 w-[280px] text-left bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 transition-all duration-300 flex flex-col active:scale-[0.98] shadow-sm hover:-translate-y-1 hover:shadow-xl hover:border-indigo-200 dark:hover:border-indigo-500/50 group"
+                                    className="snap-start shrink-0 w-[280px] text-left bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 transition-all duration-300 flex flex-col active:scale-[0.98] shadow-sm hover:-translate-y-1 hover:shadow-xl hover:border-indigo-200 dark:hover:border-indigo-500/50 group cursor-grab active:cursor-grabbing"
                                 >
                                     <div className="flex justify-between items-start mb-4 w-full">
                                         <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${theme.bgColor} ${theme.textColor}`}>
                                             {effectiveSubject}
                                         </div>
                                         
-                                        {/* 🔥 THE "SOLO" BADGE LOGIC */}
-                                        <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm border ${
-                                            cls.type === 'solo' 
-                                            ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' 
-                                            : 'bg-slate-800 dark:bg-slate-950 text-white dark:text-slate-300 border-transparent dark:border-slate-800'
-                                        }`}>
-                                            {cls.type === 'solo' ? 'Solo' : effectiveGrade}
+                                        <div className="flex items-center gap-2">
+                                            {/* 🔥 THE "SOLO" BADGE LOGIC */}
+                                            <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm border ${
+                                                cls.type === 'solo' 
+                                                ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' 
+                                                : 'bg-slate-800 dark:bg-slate-950 text-white dark:text-slate-300 border-transparent dark:border-slate-800'
+                                            }`}>
+                                                {cls.type === 'solo' ? 'Solo' : effectiveGrade}
+                                            </div>
+                                            
+                                            {/* Drag Indicator Icon */}
+                                            <div className="text-slate-300 dark:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <GripVertical size={14} />
+                                            </div>
                                         </div>
                                     </div>
                                     
