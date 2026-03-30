@@ -687,10 +687,10 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                             onSelectDeck(key); 
                                             setInternalMode('menu'); 
                                         }} 
-                                        className={`w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] ${isDense ? 'p-4 sm:p-5' : 'p-5'} border-2 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all text-left shadow-sm relative z-10 flex flex-col cursor-grab active:cursor-grabbing ${!isGap ? 'group-hover:-translate-y-1' : ''}`}
+                                        className={`w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] ${isDense ? 'p-4 sm:p-5' : 'p-5'} border-2 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all text-left shadow-sm relative z-10 flex flex-col cursor-grab active:cursor-grabbing ${!isGap ? 'group-hover:-translate-y-1 hover:shadow-xl hover:border-indigo-200 dark:hover:border-indigo-500/50' : ''}`}
                                     > 
                                         <div className={`flex justify-between items-start ${isDense ? 'mb-3' : 'mb-4'} pointer-events-none`}>
-                                            <div className={`${isDense ? 'w-10 h-10 rounded-xl' : 'w-12 h-12 rounded-[1rem]'} flex items-center justify-center text-white text-xl border shadow-inner transition-transform bg-gradient-to-br ${theme.gradient} ${theme.shadow} group-hover:scale-110`}>
+                                            <div className={`${isDense ? 'w-10 h-10 rounded-xl' : 'w-14 h-14 rounded-2xl'} flex items-center justify-center text-white text-xl shadow-lg transition-transform bg-gradient-to-br ${theme.gradient} ${theme.shadow} group-hover:scale-110`}>
                                                 {typeof DeckIcon === 'string' ? DeckIcon : <DeckIcon size={isDense ? 20 : 24}/>}
                                             </div>
 
@@ -741,7 +741,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         <div className="bg-white dark:bg-slate-900 w-full rounded-t-[2.5rem] p-6 relative z-10 animate-in slide-in-from-bottom-full duration-300 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] pb-safe-6">
                             <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto mb-6" />
                             <div className="flex items-center gap-4 mb-6 px-2">
-                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm ${FOLDER_COLORS[folderColors[activeOptionsFolder] || 'indigo'].bg} ${FOLDER_COLORS[folderColors[activeOptionsFolder] || 'indigo'].iconColor}`}>
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm ${FOLDER_COLORS[folderColors[activeOptionsFolder] || 'indigo'].iconBg} ${FOLDER_COLORS[folderColors[activeOptionsFolder] || 'indigo'].iconColor}`}>
                                     <Folder size={24} fill="currentColor" />
                                 </div>
                                 <div>
