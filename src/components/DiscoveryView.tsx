@@ -60,7 +60,8 @@ const MOCK_COURSES = [
     }
 ];
 
-export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userData, activeOrg }: any) {
+// 🔥 WIRED UP onPurchase PROP
+export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, onPurchase, userData, activeOrg }: any) {
     const [domainPath, setDomainPath] = useState<string[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [touchStartCoords, setTouchStartCoords] = useState<{x: number, y: number} | null>(null);
@@ -180,7 +181,7 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-1.5 mt-1"><Map size={12}/> Content Network</p>
                         </div>
                         <div className="bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3 py-1.5 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-sm border border-amber-200 dark:border-amber-500/20">
-                            <Sparkles size={14}/> {userData?.flux || 0} Flux
+                            <Sparkles size={14}/> {userData?.flux || userData?.coins || 0} Flux
                         </div>
                     </div>
                     
@@ -338,7 +339,7 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                         </div>
                         
                         <div className="flex gap-4 overflow-x-auto hide-scrollbar snap-x pb-2 -mx-6" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                            <div className="w-6 shrink-0" /> 
+                            <div className="w-2 shrink-0" aria-hidden="true" /> 
                             {currentCourses.map((course: any) => (
                                 <button 
                                     key={course.id}
@@ -373,7 +374,7 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                                     </div>
                                 </button>
                             ))}
-                            <div className="w-6 shrink-0" />
+                            <div className="w-2 shrink-0" aria-hidden="true" /> 
                         </div>
                     </section>
                 )}
@@ -524,11 +525,25 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, userD
                             </div>
                         </div>
 
+                        {/* 🔥 WIRED CTA BUTTON */}
                         <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white to-transparent dark:from-slate-950 dark:via-slate-950 pb-safe-6 pt-12 border-t border-slate-100 dark:border-slate-800">
                             <button 
-                                onClick={() => {
-                                    if ((userData?.flux || 0) >= previewCourse.price) {
-                                        setToastMsg("Purchasing infrastructure in development!");
+                                onClick={async () => {
+                                    const currentFlux = userData?.coins || userData?.profile?.main?.coins || userData?.flux || 0;
+                                    if (currentFlux >= previewCourse.price) {
+                                        const result = await onPurchase(
+                                            previewCourse.id, 
+                                            previewCourse.price, 
+                                            'course', 
+                                            { title: previewCourse.title, subject: previewCourse.domainPath[0] }
+                                        );
+                                        
+                                        if (result?.success) {
+                                            setToastMsg(result.msg);
+                                            setPreviewCourse(null);
+                                        } else {
+                                            setToastMsg(result?.msg || "Transaction failed.");
+                                        }
                                     } else {
                                         setToastMsg("Insufficient Flux balance.");
                                     }
