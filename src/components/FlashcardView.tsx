@@ -592,7 +592,8 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                                 <Folder size={isDense ? 20 : 24} fill="currentColor" className={isCatchingDeck ? 'animate-bounce' : ''} />
                                             </div>
                                         </div>
-                                        <h3 className={`font-black ${theme.text} ${isDense ? 'text-sm' : 'text-base'} leading-snug line-clamp-3 pr-4 mb-auto pointer-events-none`}>{folderName}</h3>
+                                        {/* 🔥 FIXED FOLDER TITLE COLOR */}
+                                        <h3 className={`font-black text-slate-800 dark:text-white ${isDense ? 'text-sm' : 'text-base'} leading-snug line-clamp-3 pr-4 mb-auto pointer-events-none`}>{folderName}</h3>
                                         <div className="mt-3 pointer-events-none">
                                             <span className={`text-[9px] uppercase font-black tracking-widest ${theme.badge} px-2.5 py-1 rounded-md shadow-sm`}>
                                                 {itemCount} Decks
@@ -628,7 +629,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             const DeckIcon = deck.icon || theme.icon;
                             const cardCount = deck.id === 'custom' ? (deck.cards?.length || 0) : (deck.stats?.cardCount || 0);
                             
-                            // 🔥 GRAB THE LANGUAGES (Fallback to empty array if none)
                             const languages = deck.languages || [];
                             
                             const isDragged = draggedItem?.id === key;
@@ -689,14 +689,14 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                         }} 
                                         className={`w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] ${isDense ? 'p-4 sm:p-5' : 'p-5'} border-2 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all text-left shadow-sm relative z-10 flex flex-col cursor-grab active:cursor-grabbing ${!isGap ? 'group-hover:-translate-y-1 hover:shadow-xl hover:border-indigo-200 dark:hover:border-indigo-500/50' : ''}`}
                                     > 
-                                        <div className={`flex justify-between items-start ${isDense ? 'mb-3' : 'mb-4'} pointer-events-none`}>
-                                            <div className={`${isDense ? 'w-10 h-10 rounded-xl' : 'w-14 h-14 rounded-2xl'} flex items-center justify-center text-white text-xl shadow-lg transition-transform bg-gradient-to-br ${theme.gradient} ${theme.shadow} group-hover:scale-110`}>
+                                        {/* 🔥 LANGUAGE BUBBLES MOVED NEXT TO ICON */}
+                                        <div className={`flex items-start gap-3 ${isDense ? 'mb-3' : 'mb-4'} pointer-events-none w-full pr-8`}>
+                                            <div className={`${isDense ? 'w-10 h-10 rounded-xl' : 'w-12 h-12 rounded-[1rem]'} shrink-0 flex items-center justify-center text-white text-xl border shadow-inner transition-transform bg-gradient-to-br ${theme.gradient} ${theme.shadow} group-hover:scale-110`}>
                                                 {typeof DeckIcon === 'string' ? DeckIcon : <DeckIcon size={isDense ? 20 : 24}/>}
                                             </div>
 
-                                            {/* 🔥 LANGUAGE BUBBLES */}
-                                            {languages.length > 0 && (
-                                                <div className="flex flex-wrap justify-end gap-1 mr-6 mt-1">
+                                            {languages && languages.length > 0 && (
+                                                <div className="flex flex-wrap gap-1 mt-0.5">
                                                     {languages.map((lang: string, idx: number) => (
                                                         <span key={idx} className="px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shadow-sm">
                                                             {lang.substring(0, 3)}
