@@ -235,7 +235,8 @@ export default function App() {
   useEffect(() => {
     if (!isHydrated.current) return;
 
-    const params = newSearchParams(window.location.search);
+    // 🔥 FIXED TYPO HERE
+    const params = new URLSearchParams(window.location.search);
     params.set('view', currentView);
     params.set('tab', activeTab);
     
@@ -542,6 +543,7 @@ export default function App() {
                 classes={combinedClasses} 
                 curriculums={allCurriculums} 
                 onSelectClass={setActiveStudentClass} 
+                onReorderClasses={actions.reorderClasses} // 🔥 WIRED UP HERE
                 userData={userData} 
                 user={user}
                 activeOrg={activeOrg} 
