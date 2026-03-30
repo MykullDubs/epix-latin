@@ -2,6 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  /* Default Magister Theme (Indigo) */
+  :root {
+    --theme-primary-50: 238 242 255;
+    --theme-primary-100: 224 231 255;
+    --theme-primary-200: 199 210 254;
+    --theme-primary-300: 165 180 252;
+    --theme-primary-400: 129 140 248;
+    --theme-primary-500: 99 102 241;
+    --theme-primary-600: 79 70 229;
+    --theme-primary-900: 49 46 129;
+    --theme-primary-950: 30 27 75;
+  }
+
+  /* Terminal Green (Emerald) */
+  .theme-hacker {
+    --theme-primary-50: 236 253 245;
+    --theme-primary-100: 209 250 229;
+    --theme-primary-200: 167 243 208;
+    --theme-primary-300: 110 231 183;
+    --theme-primary-400: 52 211 153;
+    --theme-primary-500: 16 185 129;
+    --theme-primary-600: 5 150 105;
+    --theme-primary-900: 6 78 59;
+    --theme-primary-950: 2 44 34;
+  }
+
+  /* Miami Nights (Fuchsia) */
+  .theme-synth {
+    --theme-primary-50: 253 244 255;
+    --theme-primary-100: 250 232 255;
+    --theme-primary-200: 245 208 254;
+    --theme-primary-300: 240 171 252;
+    --theme-primary-400: 232 121 249;
+    --theme-primary-500: 217 70 239;
+    --theme-primary-600: 192 38 211;
+    --theme-primary-900: 112 26 117;
+    --theme-primary-950: 74 4 78;
+  }
+}
+
 /* THE HOLY RESET */
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
