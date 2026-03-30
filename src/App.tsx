@@ -95,35 +95,15 @@ export default function App() {
 
   // Determine active background theme based on equipped cosmetics
   const activeOSTheme = OS_THEMES[userData?.equipped?.themes] || OS_THEMES.default;
-const activeThemeId = userData?.equipped?.themes || 'default';
+  const activeThemeId = userData?.equipped?.themes || 'default';
 
-  useEffect(() => {
-      const root = document.documentElement;
-      
-      // Clear previous theme classes
-      root.classList.remove('theme-hacker', 'theme-synth');
-      
-      // Inject the newly equipped theme
-      if (activeThemeId !== 'default') {
-          // Normalizes 'theme_hacker' to 'theme-hacker' to match our CSS
-          const cssClass = activeThemeId.replace('_', '-'); 
-          root.classList.add(cssClass);
-      }
-
-      // 🔥 FORCE REPAINT: This ensures the browser re-evaluates the CSS variables
-      root.style.display = 'none';
-      root.offsetHeight; // trigger reflow
-      root.style.display = '';
-  }, [activeThemeId]);
-
-const handleEquipCosmetic = async (itemId: string, category: string) => {
+  const handleEquipCosmetic = async (itemId: string, category: string) => {
       if (!user || !userData) return;
       
       const newEquipped = { ...(userData.equipped || {}), [category]: itemId };
       
       try {
           // 🔥 TARGET THE CORRECT DOC: profile/main
-          // This is the doc useMagisterData is actually listening to for UI updates!
           const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main');
           await updateDoc(profileRef, {
               equipped: newEquipped
@@ -140,6 +120,7 @@ const handleEquipCosmetic = async (itemId: string, category: string) => {
           console.error("Equip protocol failed:", err);
       }
   };
+
   // 🔥 FOLDER & DECK REORDERING ENGINES
   const handleReorderFolders = async (newOrder: string[]) => {
       if (!user?.uid) return;
@@ -454,133 +435,139 @@ const handleEquipCosmetic = async (itemId: string, category: string) => {
   }
 
   // 8. STUDENT MOBILE APP
-  return (
-    <div className={`${activeOSTheme} min-h-[100dvh] w-full flex flex-col items-center relative overflow-hidden transition-colors duration-700`}>
-      
-      {/* 🔥 JUICE: Floating Command Center Button features the user's avatar! */}
-      {userData?.role !== 'student' && (
-        <button 
-            onClick={() => setCurrentView(userData?.role === 'instructor' ? 'instructor' : 'admin')} 
-            className="fixed top-6 right-6 z-[1000] bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-3 rounded-full font-black text-[10px] tracking-widest uppercase shadow-[0_10px_30px_rgba(0,0,0,0.3)] transition-all hover:scale-105 active:scale-95 group overflow-hidden border border-white/10 dark:border-slate-900/10 flex items-center gap-3"
-        >
-          <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-[150%] group-hover:animate-[shimmer_1.5s_infinite]" />
-          <HoloAvatar student={userData} size="sm" className="w-6 h-6 shadow-none ring-1 ring-white/20" />
-          <span className="relative z-10">
-            {userData?.role === 'instructor' ? 'Magister Command' : 'Command Center'}
-          </span>
-        </button>
-      )}
+  
+  // 🔥 Generate the pure CSS class for the wrapper (turns theme_hacker into theme-hacker)
+  const themeClass = activeThemeId !== 'default' ? activeThemeId.replace('_', '-') : '';
 
-      {/* The OS Device Wrapper */}
-      <div className={`w-full ${activeOSTheme} max-w-md h-[100dvh] shadow-[0_0_50px_rgba(0,0,0,0.15)] dark:shadow-[0_0_50px_rgba(0,0,0,0.4)] relative flex flex-col overflow-hidden transition-colors duration-700 ring-1 ring-slate-900/5 dark:ring-white/5`}>
+  return (
+    <div className={themeClass}> {/* 🔥 THE THEME WRAPPER */}
+      <div className={`${activeOSTheme} min-h-[100dvh] w-full flex flex-col items-center relative overflow-hidden transition-colors duration-700`}>
         
-        {/* Tab Transition Wrapper using Key triggers */}
-        <div key={activeTab + (activeLesson?.id || '')} className="flex-1 overflow-hidden relative animate-in fade-in zoom-in-[0.98] duration-300 ease-out">
+        {/* 🔥 JUICE: Floating Command Center Button features the user's avatar! */}
+        {userData?.role !== 'student' && (
+          <button 
+              onClick={() => setCurrentView(userData?.role === 'instructor' ? 'instructor' : 'admin')} 
+              className="fixed top-6 right-6 z-[1000] bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-3 rounded-full font-black text-[10px] tracking-widest uppercase shadow-[0_10px_30px_rgba(0,0,0,0.3)] transition-all hover:scale-105 active:scale-95 group overflow-hidden border border-white/10 dark:border-slate-900/10 flex items-center gap-3"
+          >
+            <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-[150%] group-hover:animate-[shimmer_1.5s_infinite]" />
+            <HoloAvatar student={userData} size="sm" className="w-6 h-6 shadow-none ring-1 ring-white/20" />
+            <span className="relative z-10">
+              {userData?.role === 'instructor' ? 'Magister Command' : 'Command Center'}
+            </span>
+          </button>
+        )}
+
+        {/* The OS Device Wrapper */}
+        <div className={`w-full ${activeOSTheme} max-w-md h-[100dvh] shadow-[0_0_50px_rgba(0,0,0,0.15)] dark:shadow-[0_0_50px_rgba(0,0,0,0.4)] relative flex flex-col overflow-hidden transition-colors duration-700 ring-1 ring-slate-900/5 dark:ring-white/5`}>
           
-          {celebrationData ? (
-             <CelebrationScreen 
-                data={celebrationData} 
-                userData={userData} 
-                onComplete={() => {
-                    setCelebrationData(null);
-                    setActiveLesson(null); 
-                }} 
-             />
-          ) : activeLesson ? (
-            activeLesson.type === 'exam' || activeLesson.type === 'test' ? (
-              <ExamPlayerView 
-                exam={activeLesson} 
-                onFinish={(id:any, score:any, title:any, res:any) => { 
-                    actions.logActivity(id, score, title, { scoreDetail: res }); 
-                    setCelebrationData({ xp: score, title: title }); 
-                }} 
+          {/* Tab Transition Wrapper using Key triggers */}
+          <div key={activeTab + (activeLesson?.id || '')} className="flex-1 overflow-hidden relative animate-in fade-in zoom-in-[0.98] duration-300 ease-out">
+            
+            {celebrationData ? (
+               <CelebrationScreen 
+                  data={celebrationData} 
+                  userData={userData} 
+                  onComplete={() => {
+                      setCelebrationData(null);
+                      setActiveLesson(null); 
+                  }} 
+               />
+            ) : activeLesson ? (
+              activeLesson.type === 'exam' || activeLesson.type === 'test' ? (
+                <ExamPlayerView 
+                  exam={activeLesson} 
+                  onFinish={(id:any, score:any, title:any, res:any) => { 
+                      actions.logActivity(id, score, title, { scoreDetail: res }); 
+                      setCelebrationData({ xp: score, title: title }); 
+                  }} 
+                />
+              ) : (
+                <LessonView 
+                  lesson={activeLesson} 
+                  onFinish={() => { 
+                      actions.logActivity(activeLesson.id, 50, activeLesson.title, { mode: 'lesson' }); 
+                      setCelebrationData({ xp: 50, title: activeLesson.title }); 
+                  }} 
+                />
+              )
+            ) : activeStudentClass ? (
+              <StudentClassView 
+                  classData={activeStudentClass} 
+                  lessons={allLessons} 
+                  curriculums={allCurriculums}
+                  onBack={() => setActiveStudentClass(null)} 
+                  onSelectLesson={setActiveLesson} 
+                  setActiveTab={setActiveTab} 
+                  setSelectedLessonId={(lessonId: string) => setActivePresentation({ lessonId, classId: activeStudentClass.id })} 
+                  userData={userData} 
+                  ExamPlayerView={ExamPlayerView} 
+                  onLogActivity={actions.logActivity}
               />
+            ) : activeTab === 'discovery' ? (
+              <DiscoveryView 
+                  networkDecks={networkDecks} 
+                  userData={userData} 
+                  activeOrg={activeOrg} 
+                  onPurchase={actions.purchaseItem} 
+                  onDownloadDeck={async (deck: any) => { 
+                      // Automatically buy/unlock the standard deck using the universal engine
+                      await actions.purchaseItem(deck.id, deck.price || 0, 'deck');
+                      
+                      if (actions.assignDeckToFolder) {
+                          actions.assignDeckToFolder(deck.id, null);
+                      }
+                      setActiveDeckKey(deck.id);
+                      setActiveTab('flashcards');
+                  }} 
+              />
+            ) : activeTab === 'store' ? (
+              <StorefrontView 
+                  userData={userData} 
+                  activeOrg={activeOrg} 
+                  onPurchase={actions.purchaseItem} 
+                  onEquip={handleEquipCosmetic} 
+              />
+            ) : activeTab === 'flashcards' ? (
+              <FlashcardView 
+                  allDecks={allDecks} 
+                  selectedDeckKey={activeDeckKey} 
+                  onSelectDeck={(key:any) => { setActiveDeckKey(key); if(!key) setActiveTab('home'); }} 
+                  onLogActivity={actions.logActivity} 
+                  onSaveCard={actions.saveCard} 
+                  userData={userData} 
+                  user={user} 
+                  activeOrg={activeOrg}
+                  onToggleStar={actions.toggleCardStar} 
+                  onToggleArchive={actions.toggleDeckArchive} 
+                  onCreateFolder={actions.createStudyFolder}
+                  onAssignToFolder={actions.assignDeckToFolder}
+                  onHideDeck={actions.hideDeck}
+                  onUpdateFolder={actions.updateStudyFolder}
+                  onDeleteFolder={actions.deleteStudyFolder}
+                  onReorderFolders={handleReorderFolders} 
+                  onReorderDecks={handleReorderDecks}
+              />
+            ) : activeTab === 'profile' ? (
+              <ProfileView user={user} userData={userData} />
             ) : (
-              <LessonView 
-                lesson={activeLesson} 
-                onFinish={() => { 
-                    actions.logActivity(activeLesson.id, 50, activeLesson.title, { mode: 'lesson' }); 
-                    setCelebrationData({ xp: 50, title: activeLesson.title }); 
-                }} 
+              <HomeView 
+                  classes={combinedClasses} 
+                  curriculums={allCurriculums} 
+                  onSelectClass={setActiveStudentClass} 
+                  onReorderClasses={(actions as any).reorderClasses} // 🔥 TS ERROR BYPASSED HERE
+                  userData={userData} 
+                  user={user}
+                  activeOrg={activeOrg} 
+                  setActiveTab={setActiveTab} 
+                  allDecks={allDecks} 
               />
-            )
-          ) : activeStudentClass ? (
-            <StudentClassView 
-                classData={activeStudentClass} 
-                lessons={allLessons} 
-                curriculums={allCurriculums}
-                onBack={() => setActiveStudentClass(null)} 
-                onSelectLesson={setActiveLesson} 
-                setActiveTab={setActiveTab} 
-                setSelectedLessonId={(lessonId: string) => setActivePresentation({ lessonId, classId: activeStudentClass.id })} 
-                userData={userData} 
-                ExamPlayerView={ExamPlayerView} 
-                onLogActivity={actions.logActivity}
-            />
-          ) : activeTab === 'discovery' ? (
-            <DiscoveryView 
-                networkDecks={networkDecks} 
-                userData={userData} 
-                activeOrg={activeOrg} 
-                onPurchase={actions.purchaseItem} 
-                onDownloadDeck={async (deck: any) => { 
-                    // Automatically buy/unlock the standard deck using the universal engine
-                    await actions.purchaseItem(deck.id, deck.price || 0, 'deck');
-                    
-                    if (actions.assignDeckToFolder) {
-                        actions.assignDeckToFolder(deck.id, null);
-                    }
-                    setActiveDeckKey(deck.id);
-                    setActiveTab('flashcards');
-                }} 
-            />
-          ) : activeTab === 'store' ? (
-            <StorefrontView 
-                userData={userData} 
-                activeOrg={activeOrg} 
-                onPurchase={actions.purchaseItem} 
-                onEquip={handleEquipCosmetic} 
-            />
-          ) : activeTab === 'flashcards' ? (
-            <FlashcardView 
-                allDecks={allDecks} 
-                selectedDeckKey={activeDeckKey} 
-                onSelectDeck={(key:any) => { setActiveDeckKey(key); if(!key) setActiveTab('home'); }} 
-                onLogActivity={actions.logActivity} 
-                onSaveCard={actions.saveCard} 
-                userData={userData} 
-                user={user} 
-                activeOrg={activeOrg}
-                onToggleStar={actions.toggleCardStar} 
-                onToggleArchive={actions.toggleDeckArchive} 
-                onCreateFolder={actions.createStudyFolder}
-                onAssignToFolder={actions.assignDeckToFolder}
-                onHideDeck={actions.hideDeck}
-                onUpdateFolder={actions.updateStudyFolder}
-                onDeleteFolder={actions.deleteStudyFolder}
-                onReorderFolders={handleReorderFolders} 
-                onReorderDecks={handleReorderDecks}
-            />
-          ) : activeTab === 'profile' ? (
-            <ProfileView user={user} userData={userData} />
-          ) : (
-            <HomeView 
-                classes={combinedClasses} 
-                curriculums={allCurriculums} 
-                onSelectClass={setActiveStudentClass} 
-                onReorderClasses={(actions as any).reorderClasses} // 🔥 TS ERROR BYPASSED HERE
-                userData={userData} 
-                user={user}
-                activeOrg={activeOrg} 
-                setActiveTab={setActiveTab} 
-                allDecks={allDecks} 
-            />
+            )}
+          </div>
+          
+          {!activeLesson && !activeStudentClass && !celebrationData && (
+            <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} activeOrg={activeOrg} userData={userData} />
           )}
         </div>
-        
-        {!activeLesson && !activeStudentClass && !celebrationData && (
-          <StudentNavBar activeTab={activeTab} setActiveTab={setActiveTab} activeOrg={activeOrg} userData={userData} />
-        )}
       </div>
     </div>
   );
