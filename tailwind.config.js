@@ -1,5 +1,5 @@
 /** @type {import('tailwindcss').Config} */
-export default {
+module.exports = {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -7,7 +7,6 @@ export default {
   theme: {
     extend: {
       colors: {
-        // 🔥 THE INTERCEPT: We hijack 'indigo' and route it to our CSS variables
         indigo: {
           50: 'rgb(var(--theme-primary-50) / <alpha-value>)',
           100: 'rgb(var(--theme-primary-100) / <alpha-value>)',
