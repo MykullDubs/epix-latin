@@ -27,9 +27,13 @@ import CelebrationScreen from './components/CelebrationScreen';
 import HoloAvatar from './components/HoloAvatar'; 
 
 // 🔥 DYNAMIC OS THEME ENGINE
+// 🔥 DYNAMIC OS THEME ENGINE
+// Because our CSS intercepts 'slate', we just use slate everywhere!
+// The wrapper class (.theme-hacker, .theme-synth, etc.) changes the actual colors natively.
 const OS_THEMES: Record<string, string> = {
-    theme_hacker: 'bg-emerald-50 dark:bg-emerald-950',
-    theme_synth: 'bg-fuchsia-50 dark:bg-fuchsia-950',
+    theme_hacker: 'bg-slate-50 dark:bg-slate-950',
+    theme_synth: 'bg-slate-50 dark:bg-slate-950',
+    theme_vapor: 'bg-slate-50 dark:bg-slate-950',
     default: 'bg-slate-50 dark:bg-slate-950'
 };
 
