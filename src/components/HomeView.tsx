@@ -265,8 +265,9 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                       </h3>
                   </div>
 
-                  {/* NOTE: Swapped custom-scrollbar for hide-scrollbar */}
-                  <div className="flex gap-3 overflow-x-auto hide-scrollbar snap-x pb-2 -mx-6 px-6" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                  {/* 🔥 ADDED INVISIBLE SPACERS TO PREVENT BORDER COLLISION ON SWIPE */}
+                  <div className="flex gap-3 overflow-x-auto hide-scrollbar snap-x pb-2 -mx-6" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                      <div className="w-3 shrink-0" /> {/* Left Spacer */}
                       
                       {/* CARD 1: COMBINED DAILY TARGETS */}
                       <div className="snap-start shrink-0 w-[150px] h-32 relative bg-gradient-to-br from-emerald-400 to-teal-600 rounded-[1.5rem] p-4 shadow-lg shadow-emerald-500/20 overflow-hidden flex flex-col justify-between border border-emerald-400/50">
@@ -357,7 +358,8 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                               <p className="text-[9px] font-black uppercase tracking-widest text-fuchsia-200">Create Content</p>
                           </div>
                       </button>
-
+                      
+                      <div className="w-3 shrink-0" /> {/* Right Spacer */}
                   </div>
               </section>
 
@@ -374,7 +376,10 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                         </button>
                     </div>
                     
-                    <div className="flex gap-4 overflow-x-auto pb-8 -mx-6 px-6 hide-scrollbar snap-x pt-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                    {/* 🔥 ADDED INVISIBLE SPACERS TO PREVENT BORDER COLLISION ON SWIPE */}
+                    <div className="flex gap-4 overflow-x-auto pb-8 -mx-6 hide-scrollbar snap-x pt-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                        <div className="w-2 shrink-0" /> {/* Left Spacer */}
+
                         {classes.map((cls: any) => { 
                             const primaryCurriculum = curriculums?.find((c: any) => cls.assignedCurriculums?.includes(c.id));
                             const effectiveSubject = cls.subject || primaryCurriculum?.subject || 'General Studies';
@@ -388,7 +393,7 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                                 <button 
                                     key={cls.id} 
                                     onClick={() => onSelectClass(cls)}
-                                    className="snap-start min-w-[280px] text-left bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 transition-all duration-300 flex flex-col active:scale-[0.98] shadow-sm hover:-translate-y-1 hover:shadow-xl hover:border-indigo-200 dark:hover:border-indigo-500/50 group"
+                                    className="snap-start shrink-0 w-[280px] text-left bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 transition-all duration-300 flex flex-col active:scale-[0.98] shadow-sm hover:-translate-y-1 hover:shadow-xl hover:border-indigo-200 dark:hover:border-indigo-500/50 group"
                                 >
                                     <div className="flex justify-between items-start mb-4 w-full">
                                         <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${theme.bgColor} ${theme.textColor}`}>
@@ -423,6 +428,8 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                                 </button>
                             ); 
                         })}
+
+                        <div className="w-2 shrink-0" /> {/* Right Spacer */}
                     </div>
                 </section>
               ) : (
