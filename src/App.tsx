@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { doc, setDoc, updateDoc } from 'firebase/firestore'; 
 import { db, appId } from './config/firebase';   
 import { useMagisterData } from './hooks/useMagisterData';
-import { GLOBAL_CURRICULUMS } from './constants/curriculums';
+import { GLOBAL_CURRICULums } from './constants/curriculums';
 
 // Sub-component Imports
 import AuthView from './components/AuthView';
@@ -74,14 +74,14 @@ export default function App() {
       return publicDecks;
   }, [allDecks]);
 
+  // 🔥 MERGE LIVE COHORTS WITH SOLO ELECTIVES
+  const combinedClasses = useMemo(() => {
+      const soloCourses = userData?.enrolledClasses || userData?.profile?.main?.enrolledClasses || [];
+      return [...enrolledClasses, ...soloCourses];
+  }, [enrolledClasses, userData]);
+
   // Determine active background theme based on equipped cosmetics
   const activeOSTheme = OS_THEMES[userData?.equipped?.themes] || OS_THEMES.default;
-
-  // ==========================================================================
-  //  THE FLUX ECONOMY (Equipment Handler)
-  // ==========================================================================
-  
-  // Note: Purchase Logic was moved securely into useMagisterData.ts (actions.purchaseItem)
 
   const handleEquipCosmetic = async (itemId: string, category: string) => {
       if (!user || !userData) return;
@@ -200,8 +200,8 @@ export default function App() {
     if (params.get('deckId')) setActiveDeckKey(params.get('deckId'));
 
     const urlClassId = params.get('classId');
-    if (urlClassId && enrolledClasses.length > 0) {
-      const foundClass = enrolledClasses.find((c: any) => c.id === urlClassId);
+    if (urlClassId && combinedClasses.length > 0) {
+      const foundClass = combinedClasses.find((c: any) => c.id === urlClassId);
       if (foundClass) setActiveStudentClass(foundClass);
     }
 
@@ -211,10 +211,10 @@ export default function App() {
       if (foundLesson) setActiveLesson(foundLesson);
     }
 
-    if (enrolledClasses.length > 0 || allLessons.length > 0) {
+    if (combinedClasses.length > 0 || allLessons.length > 0) {
         isHydrated.current = true;
     }
-  }, [authChecked, enrolledClasses, allLessons, user]);
+  }, [authChecked, combinedClasses, allLessons, user]);
 
   useEffect(() => {
     if (!isHydrated.current) return;
@@ -248,7 +248,7 @@ export default function App() {
       setActiveDeckKey(params.get('deckId'));
 
       const classId = params.get('classId');
-      setActiveStudentClass(classId ? enrolledClasses.find((c: any) => c.id === classId) || null : null);
+      setActiveStudentClass(classId ? combinedClasses.find((c: any) => c.id === classId) || null : null);
 
       const lessonId = params.get('lessonId');
       setActiveLesson(lessonId ? allLessons.find((l: any) => l.id === lessonId) || null : null);
@@ -256,7 +256,7 @@ export default function App() {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [enrolledClasses, allLessons]);
+  }, [combinedClasses, allLessons]);
 
   if (!authChecked) {
       return (
@@ -523,7 +523,7 @@ export default function App() {
             <ProfileView user={user} userData={userData} />
           ) : (
             <HomeView 
-                classes={enrolledClasses} 
+                classes={combinedClasses} // 🔥 NOW INCLUDES PURCHASED COURSES!
                 curriculums={allCurriculums} 
                 onSelectClass={setActiveStudentClass} 
                 userData={userData} 
