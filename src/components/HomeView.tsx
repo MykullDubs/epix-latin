@@ -399,8 +399,14 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                                         <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${theme.bgColor} ${theme.textColor}`}>
                                             {effectiveSubject}
                                         </div>
-                                        <div className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-slate-800 dark:bg-slate-950 text-white dark:text-slate-300 shadow-sm border border-transparent dark:border-slate-800">
-                                            {effectiveGrade}
+                                        
+                                        {/* 🔥 THE "SOLO" BADGE LOGIC */}
+                                        <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm border ${
+                                            cls.type === 'solo' 
+                                            ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' 
+                                            : 'bg-slate-800 dark:bg-slate-950 text-white dark:text-slate-300 border-transparent dark:border-slate-800'
+                                        }`}>
+                                            {cls.type === 'solo' ? 'Solo' : effectiveGrade}
                                         </div>
                                     </div>
                                     
