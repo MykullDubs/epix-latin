@@ -49,10 +49,6 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
   const targetLang = userData?.targetLanguage || "English";
   const { level, progressPct, xpToNext } = calculateLevel(xp);
 
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
-  const firstName = userData?.name?.split(' ')[0] || "Scholar";
-
   const themeColor = activeOrg?.themeColor || '#4f46e5'; 
   const themeName = activeOrg?.name || 'Magister';
 
@@ -223,29 +219,31 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
 
         <main ref={scrollViewportRef} className="flex-1 overflow-y-auto custom-scrollbar pb-32 focus:outline-none" tabIndex={-1}>
             
-            {/* 2. HERO SECTION */}
-            <section className="bg-white dark:bg-slate-900 pt-6 pb-8 px-6 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 dark:border-slate-800 relative z-10 transition-colors duration-300">
-                <div className="mb-8">
-                    <h1 className="text-3xl font-medium text-slate-400 dark:text-slate-500 tracking-tight">{greeting},</h1>
-                    <h2 className="text-4xl font-black text-slate-800 dark:text-slate-100 tracking-tight">{firstName}.</h2>
-                </div>
-
-                {/* STATS BENTO */}
-                <div className="grid grid-cols-3 gap-3">
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700/50 flex flex-col items-center justify-center shadow-inner dark:shadow-none transition-colors duration-300">
-                        <Flame size={20} aria-hidden="true" className={`mb-1 ${streak > 0 && isToday ? 'text-orange-500 fill-orange-500' : 'text-slate-300 dark:text-slate-600'}`}/>
-                        <span className={`text-lg font-black ${streak > 0 && isToday ? '' : 'text-slate-400 dark:text-slate-500'}`} style={streak > 0 && isToday ? { color: themeColor } : {}}>{streak}</span>
-                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center">Day Streak</span>
+            {/* 2. HERO SECTION (Now Ultra Compact & Styled like Discovery Nodes) */}
+            <section className="bg-white dark:bg-slate-900 pt-6 pb-6 px-6 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 dark:border-slate-800 relative z-10 transition-colors duration-300">
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="flex flex-col items-center gap-3">
+                        <div className={`w-full max-w-[100px] aspect-square rounded-[1.5rem] flex flex-col items-center justify-center text-white shadow-lg transition-transform ${streak > 0 && isToday ? 'bg-gradient-to-br from-orange-400 to-rose-500 shadow-orange-500/30 hover:scale-105' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 shadow-none'}`}>
+                            <Flame size={24} aria-hidden="true" className={`mb-1.5 ${streak > 0 && isToday ? 'fill-white' : ''}`}/>
+                            <span className="text-2xl font-black leading-none tracking-tight">{streak}</span>
+                        </div>
+                        <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Day Streak</span>
                     </div>
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700/50 flex flex-col items-center justify-center shadow-inner dark:shadow-none transition-colors duration-300">
-                        <Zap size={20} aria-hidden="true" className="text-yellow-500 mb-1 fill-yellow-500"/>
-                        <span className="text-lg font-black" style={{ color: themeColor }}>{xp}</span>
-                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center">Total XP</span>
+                    
+                    <div className="flex flex-col items-center gap-3">
+                        <div className="w-full max-w-[100px] aspect-square rounded-[1.5rem] flex flex-col items-center justify-center text-white shadow-lg transition-transform bg-gradient-to-br from-amber-400 to-orange-500 shadow-amber-500/30 hover:scale-105">
+                            <Zap size={24} aria-hidden="true" className="mb-1.5 fill-white"/>
+                            <span className="text-2xl font-black leading-none tracking-tight">{xp}</span>
+                        </div>
+                        <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Total XP</span>
                     </div>
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700/50 flex flex-col items-center justify-center shadow-inner dark:shadow-none transition-colors duration-300">
-                        <Trophy size={20} aria-hidden="true" className="text-emerald-500 mb-1 fill-emerald-500"/>
-                        <span className="text-lg font-black" style={{ color: themeColor }}>{level}</span>
-                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center">Level</span>
+                    
+                    <div className="flex flex-col items-center gap-3">
+                        <div className="w-full max-w-[100px] aspect-square rounded-[1.5rem] flex flex-col items-center justify-center text-white shadow-lg transition-transform bg-gradient-to-br from-emerald-400 to-teal-600 shadow-emerald-500/30 hover:scale-105">
+                            <Trophy size={24} aria-hidden="true" className="mb-1.5 fill-white"/>
+                            <span className="text-2xl font-black leading-none tracking-tight">{level}</span>
+                        </div>
+                        <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Level</span>
                     </div>
                 </div>
 
@@ -257,7 +255,7 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                             style={{ width: `${progressPct}%`, backgroundColor: themeColor }}
                         />
                     </div>
-                    <span className="text-xs font-black text-slate-400 dark:text-slate-500 whitespace-nowrap uppercase tracking-widest">
+                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 whitespace-nowrap uppercase tracking-widest">
                         {xpToNext} XP to Level Up
                     </span>
                 </div>
