@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
     ArrowLeft, X, Library, Layers, HelpCircle, Puzzle, Flame, 
-    Filter, ChevronRight, Archive, Plus, Loader2,
+    Filter, ChevronRight, Archive, Plus, Loader2, GraduationCap, Globe,
     MoreVertical, FolderPlus, Trash2, Folder, FolderOpen, Edit3, Infinity,
     HeartPulse, Cpu, Briefcase, Palette, Utensils, Globe2, Activity, ShieldAlert, MonitorPlay,
     Calculator, FlaskConical, Plane, BookText, Code, BrainCircuit, Music, CheckCircle2
@@ -44,7 +44,8 @@ const getDeckTheme = (title: string = '') => {
     return { icon: Layers, gradient: 'from-indigo-400 to-indigo-600', shadow: 'shadow-indigo-500/30' };
 };
 
-export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity, userData, onSaveCard, onToggleStar, onToggleArchive, onCreateFolder, onAssignToFolder, onHideDeck, onUpdateFolder, onDeleteFolder, onReorderFolders, onReorderDecks, user }: any) {
+// 🔥 Added `activeOrg` to destructured props!
+export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity, userData, onSaveCard, onToggleStar, onToggleArchive, onCreateFolder, onAssignToFolder, onHideDeck, onUpdateFolder, onDeleteFolder, onReorderFolders, onReorderDecks, user, activeOrg }: any) {
     const [internalMode, setInternalMode] = useState<'library' | 'menu' | 'playing' | 'create'>('library');
     const [activeGame, setActiveGame] = useState<'standard' | 'quiz' | 'match' | 'tower'>('standard');
     
@@ -76,6 +77,11 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
     const customFolders: string[] = userData?.studyFolders || [];
     const folderColors: Record<string, string> = userData?.folderColors || {};
+    
+    // UI Metadata
+    const themeColor = activeOrg?.themeColor || '#4f46e5'; 
+    const themeName = activeOrg?.name || 'Magister';
+    const targetLang = userData?.targetLanguage || "English";
 
     const filteredDecks = useMemo(() => {
         return Object.entries(allDecks).filter(([key, deck]: any) => {
@@ -422,23 +428,26 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     />
                 )}
 
-                <div className="sticky top-0 z-30 w-full flex flex-col shrink-0">
-                    <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl px-6 py-5 flex justify-between items-center pt-safe">
+                <div className="sticky top-0 z-30 w-full flex flex-col shrink-0 shadow-sm">
+                    {/* 🔥 SYNCED GLOBAL HEADER */}
+                    <header className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex justify-between items-center transition-colors duration-300 pt-safe">
                         <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-orange-400 to-rose-500 text-white p-2.5 rounded-xl shadow-md shadow-orange-500/20"><Library size={22} strokeWidth={3}/></div>
-                            <span className="font-black text-slate-800 dark:text-white text-2xl uppercase tracking-tighter">Study Hub</span>
+                            {activeOrg?.logoUrl ? (
+                                <img src={activeOrg.logoUrl} alt={`${themeName} Logo`} className="w-8 h-8 object-contain rounded-md" />
+                            ) : (
+                                <div className="text-white p-1.5 rounded-lg shadow-sm" style={{ backgroundColor: themeColor }} aria-hidden="true">
+                                    <GraduationCap size={18} strokeWidth={3}/>
+                                </div>
+                            )}
+                            <span className="font-black tracking-tighter text-lg truncate max-w-[150px]" style={{ color: themeColor }}>
+                                Study Hub
+                            </span>
                         </div>
-                        <button 
-                            onClick={() => {
-                                window.history.pushState({ view: 'create' }, ''); 
-                                setBuilderConfig({ type: 'new_deck', folder: null });
-                                setInternalMode('create');
-                            }} 
-                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-indigo-500/30 active:scale-95 transition-all"
-                        >
-                            <Plus size={16} strokeWidth={3} /> New Deck
-                        </button>
-                    </div>
+                        <div className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 shrink-0 transition-colors duration-300" aria-label={`Target Language: ${targetLang}`}>
+                            <Globe size={14} className="text-slate-400 dark:text-slate-500" aria-hidden="true"/>
+                            <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide">{targetLang}</span>
+                        </div>
+                    </header>
 
                     <div ref={filterBarRef} className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center gap-2 overflow-x-auto custom-scrollbar overscroll-x-contain scroll-smooth">
                         <Filter size={16} className="text-slate-400 mr-2 shrink-0" />
@@ -481,8 +490,25 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     ref={scrollContainerRef} 
                     onTouchStart={handleLibrarySwipeStart}
                     onTouchEnd={handleLibrarySwipeEnd}
-                    className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 pb-28 relative z-10 custom-scrollbar overscroll-y-contain h-full"
+                    className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 relative z-10 custom-scrollbar overscroll-y-contain h-full"
                 >
+                    <div className="flex justify-between items-end mb-6 pl-1">
+                        <div>
+                            <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight">My Vault</h2>
+                            <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] flex items-center gap-1.5 mt-1"><Library size={12}/> Memory Network</p>
+                        </div>
+                        <button 
+                            onClick={() => {
+                                window.history.pushState({ view: 'create' }, ''); 
+                                setBuilderConfig({ type: 'new_deck', folder: null });
+                                setInternalMode('create');
+                            }} 
+                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-indigo-500/30 active:scale-95 transition-all"
+                        >
+                            <Plus size={16} strokeWidth={3} /> New Deck
+                        </button>
+                    </div>
+
                     <div className={`grid ${isDense ? 'grid-cols-3 gap-3' : 'grid-cols-2 md:grid-cols-3 gap-4'}`}>
                         
                         {localFolders.includes(deckFilter) && (
@@ -592,7 +618,6 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                                 <Folder size={isDense ? 20 : 24} fill="currentColor" className={isCatchingDeck ? 'animate-bounce' : ''} />
                                             </div>
                                         </div>
-                                        {/* 🔥 FIXED FOLDER TITLE COLOR */}
                                         <h3 className={`font-black text-slate-800 dark:text-white ${isDense ? 'text-sm' : 'text-base'} leading-snug line-clamp-3 pr-4 mb-auto pointer-events-none`}>{folderName}</h3>
                                         <div className="mt-3 pointer-events-none">
                                             <span className={`text-[9px] uppercase font-black tracking-widest ${theme.badge} px-2.5 py-1 rounded-md shadow-sm`}>
@@ -689,16 +714,16 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                         }} 
                                         className={`w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] ${isDense ? 'p-4 sm:p-5' : 'p-5'} border-2 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all text-left shadow-sm relative z-10 flex flex-col cursor-grab active:cursor-grabbing ${!isGap ? 'group-hover:-translate-y-1 hover:shadow-xl hover:border-indigo-200 dark:hover:border-indigo-500/50' : ''}`}
                                     > 
-                                        {/* 🔥 LANGUAGE BUBBLES MOVED NEXT TO ICON */}
-                                        <div className={`flex items-start gap-3 ${isDense ? 'mb-3' : 'mb-4'} pointer-events-none w-full pr-8`}>
+                                        {/* 🔥 FIXED LANGUAGE BUBBLES */}
+                                        <div className={`flex items-start gap-2 ${isDense ? 'mb-3' : 'mb-4'} pointer-events-none w-full pr-6`}>
                                             <div className={`${isDense ? 'w-10 h-10 rounded-xl' : 'w-12 h-12 rounded-[1rem]'} shrink-0 flex items-center justify-center text-white text-xl border shadow-inner transition-transform bg-gradient-to-br ${theme.gradient} ${theme.shadow} group-hover:scale-110`}>
                                                 {typeof DeckIcon === 'string' ? DeckIcon : <DeckIcon size={isDense ? 20 : 24}/>}
                                             </div>
 
                                             {languages && languages.length > 0 && (
-                                                <div className="flex flex-wrap gap-1 mt-0.5">
+                                                <div className="flex flex-wrap gap-1 mt-1">
                                                     {languages.map((lang: string, idx: number) => (
-                                                        <span key={idx} className="px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shadow-sm">
+                                                        <span key={idx} className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shadow-sm">
                                                             {lang.substring(0, 3)}
                                                         </span>
                                                     ))}
@@ -895,38 +920,56 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
 
     if (internalMode === 'menu') {
         const displayMenuTitle = deckTitle.includes('(Omni-Mode)') ? deckTitle.replace(' (Omni-Mode)', '') : deckTitle;
+        const theme = getDeckTheme(displayMenuTitle);
+        const DeckIcon = resolvedDeck?.icon || theme.icon;
         
         return (
             <div 
                 onTouchStart={handleSwipeStart}
                 onTouchEnd={handleMenuSwipeEnd}
-                className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 relative overflow-hidden transition-colors"
+                className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors animate-in slide-in-from-right-8 duration-300 pb-safe relative"
             >
-                <div className="px-6 pt-8 pb-4">
-                    <button onClick={() => window.history.back()} className="flex items-center text-slate-400 dark:text-slate-500 hover:text-indigo-600 mb-6 text-xs font-black uppercase tracking-widest transition-colors bg-white dark:bg-slate-800 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm w-fit active:scale-95">
-                        <ArrowLeft size={16} className="mr-2"/> Back
+                <div className="px-6 pt-safe-8 pb-6 shrink-0 bg-white/80 dark:bg-slate-950/80 backdrop-blur-2xl border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 shadow-sm">
+                    <button onClick={() => window.history.back()} className="flex items-center text-slate-400 hover:text-indigo-600 mb-6 text-xs font-black uppercase tracking-widest bg-white dark:bg-slate-900 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm active:scale-95 transition-all">
+                        <ArrowLeft size={14} className="mr-2"/> Back
                     </button>
                     
-                    <div className="flex justify-between items-start mb-2">
-                        <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter">{displayMenuTitle}</h1>
-                        {!omniDeck && (
-                            <button 
-                                onClick={() => {
-                                    window.history.pushState({ view: 'create' }, '');
-                                    setBuilderConfig({ type: 'add_card', deck: resolvedDeck });
-                                    setInternalMode('create');
-                                }} 
-                                className="bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 p-3 rounded-2xl shadow-sm border border-indigo-100 dark:border-indigo-500/30 active:scale-95 transition-all"
-                            >
-                                <Plus size={20} strokeWidth={3} />
-                            </button>
-                        )}
+                    <div className="flex items-center gap-4 mb-2">
+                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg bg-gradient-to-br ${theme.gradient} ${theme.shadow}`}>
+                            {typeof DeckIcon === 'string' ? DeckIcon : <DeckIcon size={28}/>}
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                            <div className="flex items-center gap-1.5 mb-1 overflow-x-auto custom-scrollbar hide-scrollbar whitespace-nowrap">
+                                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 shrink-0">Vault</span>
+                                <ChevronRight size={10} className="text-slate-300 shrink-0" />
+                                <span className="text-[9px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 shrink-0 truncate">
+                                    {displayMenuTitle}
+                                </span>
+                            </div>
+                            <div className="flex items-start justify-between gap-2">
+                                <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight truncate">{displayMenuTitle}</h1>
+                                {!omniDeck && (
+                                    <button 
+                                        onClick={() => {
+                                            window.history.pushState({ view: 'create' }, '');
+                                            setBuilderConfig({ type: 'add_card', deck: resolvedDeck });
+                                            setInternalMode('create');
+                                        }} 
+                                        className="bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 p-2.5 rounded-xl shadow-sm border border-indigo-100 dark:border-indigo-500/30 active:scale-95 transition-all shrink-0"
+                                    >
+                                        <Plus size={20} strokeWidth={3} />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                    
-                    <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-lg flex items-center gap-2 w-fit mt-3 transition-colors ${
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-24">
+                    <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl flex items-center gap-2 w-fit mb-2 transition-colors ${
                         isFetchingCards ? 'bg-slate-100 dark:bg-slate-800 text-slate-400' :
-                        dueCards.length === 0 ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500' : 
-                        'bg-rose-50 dark:bg-rose-500/10 text-rose-500'
+                        dueCards.length === 0 ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 border border-emerald-100 dark:border-emerald-500/20' : 
+                        'bg-rose-50 dark:bg-rose-500/10 text-rose-500 border border-rose-100 dark:border-rose-500/20'
                     }`}>
                         {isFetchingCards ? (
                             <><Loader2 size={12} className="animate-spin" /> Calculating Matrix...</>
@@ -936,11 +979,9 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             <><BrainCircuit size={12} className="animate-pulse" /> {dueCards.length} Due for Review • {cards.length} Total</>
                         )}
                     </span>
-                </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-24">
                     {isFetchingCards ? (
-                        <div className="h-full flex flex-col items-center justify-center opacity-40">
+                        <div className="h-full flex flex-col items-center justify-center opacity-40 py-12">
                             <Loader2 size={48} className="animate-spin mb-4 text-indigo-500" />
                             <p className="font-black uppercase tracking-widest text-slate-500 text-xs">Decrypting Cards...</p>
                         </div>
