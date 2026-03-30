@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { doc, setDoc, updateDoc } from 'firebase/firestore'; 
 import { db, appId } from './config/firebase';   
 import { useMagisterData } from './hooks/useMagisterData';
-import { GLOBAL_CURRICULums } from './constants/curriculums';
+import { GLOBAL_CURRICULUMS } from './constants/curriculums'; // 🔥 FIXED TYPO HERE
 
 // Sub-component Imports
 import AuthView from './components/AuthView';
@@ -479,8 +479,8 @@ export default function App() {
             <DiscoveryView 
                 networkDecks={networkDecks} 
                 userData={userData} 
-                activeOrg={activeOrg} // 🔥 WIRED UP
-                onPurchase={actions.purchaseItem} // 🔥 WIRED UP
+                activeOrg={activeOrg} 
+                onPurchase={actions.purchaseItem} 
                 onDownloadDeck={async (deck: any) => { 
                     // Automatically buy/unlock the standard deck using the universal engine
                     await actions.purchaseItem(deck.id, deck.price || 0, 'deck');
@@ -495,8 +495,8 @@ export default function App() {
           ) : activeTab === 'store' ? (
             <StorefrontView 
                 userData={userData} 
-                activeOrg={activeOrg} // 🔥 WIRED UP
-                onPurchase={actions.purchaseItem} // 🔥 WIRED UP
+                activeOrg={activeOrg} 
+                onPurchase={actions.purchaseItem} 
                 onEquip={handleEquipCosmetic} 
             />
           ) : activeTab === 'flashcards' ? (
@@ -523,7 +523,7 @@ export default function App() {
             <ProfileView user={user} userData={userData} />
           ) : (
             <HomeView 
-                classes={combinedClasses} // 🔥 NOW INCLUDES PURCHASED COURSES!
+                classes={combinedClasses} 
                 curriculums={allCurriculums} 
                 onSelectClass={setActiveStudentClass} 
                 userData={userData} 
