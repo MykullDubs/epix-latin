@@ -109,28 +109,24 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     const [dragOverGapId, setDragOverGapId] = useState<string | null>(null); 
     const [dragOverFolderCatch, setDragOverFolderCatch] = useState<string | null>(null); 
     
+    // 🔥 FIXED OPTIMISTIC SYNC: Now purely depends on DB payload, ignoring drag states!
     useEffect(() => {
-        if (!draggedItem) {
-            setLocalFolders(userData?.studyFolders || []);
-        }
-    }, [userData?.studyFolders, draggedItem]);
+        setLocalFolders(userData?.studyFolders || []);
+    }, [userData?.studyFolders]);
 
     useEffect(() => {
-        if (!draggedItem) {
-            const order = userData?.deckOrder || [];
-            const sorted = [...filteredDecks].sort((a, b) => {
-                const aIdx = order.indexOf(a[0]);
-                const bIdx = order.indexOf(b[0]);
-                if (aIdx === -1 && bIdx === -1) return 0;
-                if (aIdx === -1) return 1;
-                if (bIdx === -1) return -1;
-                return aIdx - bIdx;
-            });
-            setLocalDecks(sorted);
-        }
-    }, [filteredDecks, userData?.deckOrder, draggedItem]);
+        const order = userData?.deckOrder || [];
+        const sorted = [...filteredDecks].sort((a, b) => {
+            const aIdx = order.indexOf(a[0]);
+            const bIdx = order.indexOf(b[0]);
+            if (aIdx === -1 && bIdx === -1) return 0;
+            if (aIdx === -1) return 1;
+            if (bIdx === -1) return -1;
+            return aIdx - bIdx;
+        });
+        setLocalDecks(sorted);
+    }, [filteredDecks, userData?.deckOrder]);
 
-    // 🔥 HIGH-DENSITY ENGINE: Calculate if we need 3 columns
     const displayItemCount = (deckFilter === 'all' ? localFolders.length : 0) + localDecks.length;
     const isDense = displayItemCount > 6;
 
