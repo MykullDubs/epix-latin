@@ -395,7 +395,7 @@ export default function BuilderHub({
                     </>
                 )}
 
-                {mode !== 'exam' && mode !== 'curriculum' && (
+                {mode !== 'exam' && (
                     <button 
                         onClick={handleCommit}
                         className={`absolute -bottom-6 left-1/2 -translate-x-1/2 text-white px-10 py-5 rounded-[2rem] font-black text-[10px] uppercase tracking-[0.3em] shadow-2xl md:hidden flex items-center gap-3 active:scale-90 transition-all ${mode === 'arcade' ? 'bg-amber-500 shadow-amber-500/40' : 'bg-indigo-600 shadow-indigo-500/40'}`}
