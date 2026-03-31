@@ -524,13 +524,26 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
         );
 
       // --- STANDARD BLOCKS ---
-      case 'text':
+      
+      // 🔥 FALLBACK SAFETY RENDERER: Catch all reading formats
+      case 'read':
+      case 'info':
+      case 'content':
+      case 'paragraph':
+      case 'text': {
+        const title = block.title || block.content?.title;
+        const textBody = typeof block.content === 'string' 
+            ? block.content 
+            : (block.content?.text || block.text || "Missing text data.");
+
         return (
           <div key={blockKey} className="py-6 animate-in fade-in slide-in-from-bottom-3 duration-700">
-            {block.title && <span className="inline-block px-3 py-1 rounded-lg bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em] mb-4">{block.title}</span>}
-            <p className="text-2xl md:text-3xl font-bold text-slate-700 leading-snug tracking-tight">{block.content}</p>
+            {title && <span className="inline-block px-3 py-1 rounded-lg bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em] mb-4">{title}</span>}
+            <div className="text-2xl md:text-3xl font-bold text-slate-700 leading-snug tracking-tight whitespace-pre-wrap">{textBody}</div>
           </div>
         );
+      }
+      
       case 'essay':
         return (
           <div key={blockKey} className="py-4 space-y-6 animate-in fade-in">
