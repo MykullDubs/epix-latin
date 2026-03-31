@@ -799,7 +799,6 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, 
 // ============================================================================
 //  MAIN STUDENT CLASS VIEW (ENTRY POINT)
 // ============================================================================
-// 🔥 ADDED 'allDecks' TO DESTRUCTURED PROPS
 export default function StudentClassView({ 
     classData, lessons = [], curriculums = [], allDecks = {}, onBack, 
     onSelectLesson, userData, setActiveTab, setSelectedLessonId, ExamPlayerView, onLogActivity 
@@ -860,7 +859,7 @@ export default function StudentClassView({
   const rawAssignments = Array.isArray(classData?.assignments) ? classData.assignments : [];
   const rawCurriculums = Array.isArray(classData?.assignedCurriculums) ? classData.assignedCurriculums : [];
   
-  // 🔥 DUAL-LOOKUP ENGINE: Checks Lessons, then checks allDecks
+  // DUAL-LOOKUP ENGINE: Checks Lessons, then checks allDecks
   const populatedAssignments = rawAssignments.map((assignment: any) => {
       if (typeof assignment !== 'string') return assignment;
       let node = lessons.find((l: any) => l.id === assignment);
@@ -872,7 +871,7 @@ export default function StudentClassView({
               id: deck.id,
               title: deck.title || deck.name,
               contentType: 'deck',
-              type: 'deck', // Triggers the deck icon renderer
+              type: 'deck', 
               blocks: [{ type: 'deck', title: deck.title || deck.name, items: deck.cards || [] }]
           };
       }
@@ -883,6 +882,15 @@ export default function StudentClassView({
   const standaloneLessons = populatedAssignments.filter((a: any) => !(a.contentType === 'exam' || a.contentType === 'test') && !assignedCurriculums.some((c: any) => c.lessonIds?.includes(a.id)));
   const examList = populatedAssignments.filter((a: any) => a.contentType === 'exam' || a.contentType === 'test');
 
+  // 🔥 NEW MATH ENGINE: Calculate real progress for the header
+  const allClassNodeIds = Array.from(new Set([
+      ...populatedAssignments.map((a:any) => a.id),
+      ...assignedCurriculums.flatMap((c:any) => c.lessonIds || [])
+  ]));
+  const totalNodesCount = allClassNodeIds.length;
+  const completedClassNodes = allClassNodeIds.filter(id => completedItems.includes(id)).length;
+  const overallProgress = totalNodesCount > 0 ? Math.round((completedClassNodes / totalNodesCount) * 100) : 0;
+
   const isImmersiveLiveMode = activeSubTab === 'live' && liveSession;
 
   if (isImmersiveLiveMode) {
@@ -890,7 +898,6 @@ export default function StudentClassView({
           <div className="fixed inset-0 z-[9999] bg-black flex flex-col animate-in slide-in-from-bottom-8 duration-500 font-sans">
               <button onClick={() => setActiveSubTab('lessons')} className="absolute top-6 left-6 z-50 p-2 text-slate-500 hover:text-white rounded-full bg-slate-900 border border-slate-800"><X size={20} /></button>
               
-              {/* 🔥 LIVE ARENA ROUTING HUB */}
               <div className="flex-1 w-full h-full p-4 md:p-8 pt-20">
                   {liveSession.type === 'slipstream' ? (
                       <StudentSlipstreamView 
@@ -926,8 +933,8 @@ export default function StudentClassView({
   return (
     <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden animate-in fade-in duration-500 font-sans relative transition-colors duration-300">
       
-      {/* 🔥 THE CLEAN, SOLID HEADER */}
-      <header className={`shrink-0 z-10 relative shadow-xl transition-all duration-500 ease-in-out overflow-hidden ${theme.bg} ${isScrolled ? 'rounded-b-3xl p-5 md:p-6' : 'rounded-b-[3rem] p-6 md:p-10 pt-10 md:pt-16'}`}>
+      {/* 🔥 THE NEW, SMARTER HEADER */}
+      <header className={`shrink-0 z-10 relative shadow-xl transition-all duration-500 ease-in-out overflow-hidden ${theme.bg} ${isScrolled ? 'rounded-b-[2rem] p-5' : 'rounded-b-[3rem] p-6 md:p-10 pt-10 md:pt-14'}`}>
         <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
         
         {/* Top Bar: Always Visible */}
@@ -942,40 +949,67 @@ export default function StudentClassView({
         </div>
 
         {/* The Collapsible Banner Content */}
-        <div className={`relative z-10 transition-all duration-500 ease-in-out origin-top ${isScrolled ? 'max-h-0 opacity-0 scale-95' : 'max-h-[500px] opacity-100 scale-100 mt-6'}`}>
-            <span className="inline-block px-3 py-1.5 bg-black/20 text-white rounded-xl text-[10px] font-black uppercase tracking-widest mb-3 backdrop-blur-md border border-white/10 shadow-inner">
-                {classData?.grade || 'General'} • {classData?.subject || 'Subject'}
-            </span>
-            <h2 className="text-4xl md:text-5xl font-black text-white leading-tight mb-2 tracking-tighter drop-shadow-sm">
-                {classData.name}
-            </h2>
-            <div className="flex items-center gap-2 mt-4">
-                <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
-                <p className="text-white/90 font-bold text-sm md:text-base line-clamp-1">
-                    {classData.description || "Your learning adventure starts here."}
-                </p>
+        <div className={`relative z-10 transition-all duration-500 ease-in-out origin-top ${isScrolled ? 'max-h-0 opacity-0 scale-95 pointer-events-none' : 'max-h-[500px] opacity-100 scale-100 mt-6'}`}>
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                
+                <div className="flex-1 max-w-2xl">
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                        <span className="px-3 py-1.5 bg-black/20 text-white rounded-xl text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/10 shadow-inner">
+                            {classData?.grade || 'General'}
+                        </span>
+                        <span className="px-3 py-1.5 bg-white/20 text-white rounded-xl text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/10 shadow-sm">
+                            {classData?.subject || 'Subject'}
+                        </span>
+                    </div>
+                    
+                    <h2 className="text-3xl md:text-4xl font-black text-white leading-tight mb-3 tracking-tighter drop-shadow-sm">
+                        {classData.name}
+                    </h2>
+                    
+                    {/* Description breathes freely! */}
+                    <p className="text-white/90 font-medium text-sm md:text-base leading-relaxed line-clamp-3 md:line-clamp-4">
+                        {classData.description || "Your learning adventure starts here."}
+                    </p>
+                </div>
+
+                {/* The Utility / Stats Box */}
+                <div className="bg-black/20 backdrop-blur-md border border-white/10 rounded-[1.5rem] p-4 md:p-5 flex gap-4 md:gap-6 shrink-0 shadow-inner mt-4 md:mt-0 w-full md:w-auto justify-center">
+                    <div className="flex flex-col items-center">
+                        <span className="text-white/60 text-[9px] font-black uppercase tracking-widest mb-1">Modules</span>
+                        <span className="text-white font-black text-2xl leading-none">{totalNodesCount}</span>
+                    </div>
+                    <div className="w-px bg-white/10" />
+                    <div className="flex flex-col items-center">
+                        <span className="text-white/60 text-[9px] font-black uppercase tracking-widest mb-1">Completion</span>
+                        <div className="flex items-baseline gap-1">
+                            <span className="text-emerald-400 font-black text-2xl leading-none">{overallProgress}</span>
+                            <span className="text-emerald-400/60 font-bold text-xs">%</span>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
       </header>
 
-      {/* 🔥 MAIN CONTENT AREA */}
+      {/* MAIN CONTENT AREA */}
       <main className="flex-1 overflow-y-auto custom-scrollbar relative px-2 md:px-6 pb-48 z-20 pt-6" onScroll={handleScroll}>
 
         {liveSession && activeSubTab !== 'live' && (
             <div className="px-4 mb-8 animate-in slide-in-from-top-4 fade-in duration-500">
-                <button onClick={() => setActiveSubTab('live')} className="w-full bg-slate-900 dark:bg-black rounded-[2rem] p-1 shadow-2xl shadow-indigo-500/20 relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-white opacity-5 animate-pulse" />
-                    <div className="relative bg-slate-800/50 dark:bg-slate-950 rounded-[1.8rem] p-4 flex items-center justify-between border border-slate-700/50 dark:border-slate-800 backdrop-blur-xl">
+                <button onClick={() => setActiveSubTab('live')} className="w-full bg-slate-900 dark:bg-black rounded-[2rem] p-1 shadow-[0_0_40px_rgba(99,102,241,0.3)] relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-indigo-500/20 animate-pulse" />
+                    <div className="relative bg-slate-800/50 dark:bg-slate-950 rounded-[1.8rem] p-4 flex items-center justify-between border border-indigo-500/30 dark:border-indigo-500/50 backdrop-blur-xl">
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-white dark:bg-indigo-500/20 rounded-full flex items-center justify-center animate-bounce-slow border border-white/20">
+                            <div className="w-12 h-12 bg-white dark:bg-indigo-500/20 rounded-full flex items-center justify-center animate-bounce-slow border border-white/20 shadow-lg shadow-indigo-500/50">
                                 <Zap size={24} className="text-indigo-600 dark:text-indigo-400" fill="currentColor" />
                             </div>
                             <div className="text-left">
                                 <h4 className="text-white font-black text-lg tracking-widest uppercase">LIVE PROTOCOL ACTIVE!</h4>
-                                <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Join the classroom engage now</p>
+                                <p className="text-indigo-300 font-bold text-[10px] uppercase tracking-widest">Join the classroom engage now</p>
                             </div>
                         </div>
-                        <div className="w-10 h-10 bg-slate-700 dark:bg-slate-900 rounded-full flex items-center justify-center text-white border border-white/10 group-hover:bg-indigo-500 transition-colors">
+                        <div className="w-10 h-10 bg-indigo-600 dark:bg-indigo-500 rounded-full flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform">
                             <ChevronRight size={20} strokeWidth={3} />
                         </div>
                     </div>
@@ -988,7 +1022,6 @@ export default function StudentClassView({
              {assignedCurriculums.length > 0 ? (
                  <section className="space-y-8 mb-10 max-w-xl mx-auto">
                      {assignedCurriculums.map((curr: any) => (
-                         // 🔥 ADDED allDecks to CurriculumPathway
                          <CurriculumPathway key={curr.id} curr={curr} lessons={lessons} allDecks={allDecks} completedItems={completedItems} isExpanded={!!expandedRoadmaps[curr.id]} onToggle={() => toggleRoadmap(curr.id)} onSelectLesson={onSelectLesson} theme={theme} />
                      ))}
                  </section>
@@ -1025,7 +1058,7 @@ export default function StudentClassView({
 
       {/* 🔥 THE SENSUAL BOTTOM NAV: Deep glassmorphism */}
       <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-[550px] z-[100] px-2">
-          <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl p-2 rounded-full shadow-2xl border border-white/40 dark:border-white/10 flex items-center justify-between gap-1 transition-colors duration-300">
+          <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl p-2 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-white/40 dark:border-white/10 flex items-center justify-between gap-1 transition-colors duration-300 ring-1 ring-white/20 dark:ring-white/5">
             {[
               { id: 'lessons', label: 'Roadmap', icon: <BookOpen size={18} /> },
               { id: 'leaderboard', label: 'Rankings', icon: <Trophy size={18} /> },
@@ -1035,7 +1068,7 @@ export default function StudentClassView({
             ].map((tab) => {
               const isActive = activeSubTab === tab.id;
               return (
-                <button key={tab.id} onClick={() => setActiveSubTab(tab.id as any)} className={`flex flex-1 items-center justify-center gap-2 py-3.5 px-4 rounded-full transition-all duration-300 ${isActive ? 'bg-indigo-600 dark:bg-indigo-500 text-white shadow-[0_0_20px_rgba(99,102,241,0.4)] scale-105' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5'}`}>
+                <button key={tab.id} onClick={() => setActiveSubTab(tab.id as any)} className={`flex flex-1 items-center justify-center gap-2 py-3.5 px-4 rounded-full transition-all duration-300 ${isActive ? 'bg-indigo-600 dark:bg-indigo-500 text-white shadow-[0_0_20px_rgba(99,102,241,0.6)] scale-105 ring-2 ring-indigo-400/50' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5'}`}>
                   {tab.icon}
                   {isActive && <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap animate-in slide-in-from-left-2">{tab.label}</span>}
                 </button>
