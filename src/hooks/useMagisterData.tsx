@@ -18,7 +18,7 @@ export function useMagisterData() {
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [instructorClasses, setInstructorClasses] = useState<any[]>([]); 
   
-  // 🔥 NEW: State for all published classes on the global radar
+  // 🔥 State for all published classes on the global radar
   const [allClasses, setAllClasses] = useState<any[]>([]);
   
   const [customCurriculums, setCustomCurriculums] = useState<any[]>([]);
@@ -77,10 +77,12 @@ export function useMagisterData() {
         setInstructorClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
-      // 🔥 FIXED: Now uses collectionGroup to bypass security rules and find all published classes globally!
-      const qAllClasses = query(collectionGroup(db, 'classes'), where('isPublished', '==', true));
-      const unsubAllClasses = onSnapshot(qAllClasses, (snap) => {
-        setAllClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      // 🔥 THE FIX: Bypasses the strict Firebase Index requirement by filtering in-memory!
+      const unsubAllClasses = onSnapshot(collectionGroup(db, 'classes'), (snap) => {
+        const published = snap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter((c: any) => c.isPublished === true);
+        setAllClasses(published);
       });
 
       const unsubPublished = onSnapshot(collection(db, 'artifacts', appId, 'decks'), (snap) => {
@@ -114,7 +116,7 @@ export function useMagisterData() {
           unsubAuth(); unsubProfile(); unsubLessons(); unsubCards(); 
           unsubClasses(); unsubInstructorClasses(); unsubPublished(); 
           unsubCurriculums(); unsubLogs(); unsubCardPrefs(); unsubDeckPrefs();
-          unsubAllClasses(); // 🔥 Cleanup the new listener
+          unsubAllClasses(); 
       };
     }
     return () => unsubAuth();
@@ -269,7 +271,7 @@ export function useMagisterData() {
                 id: itemId,
                 title: extraData.title || "New Course",
                 subject: extraData.subject || "Elective",
-                type: 'solo', // 🔥 This triggers the unique "Solo" badge on HomeView
+                type: 'solo', 
                 progressPct: 0,
                 unlockedAt: Date.now()
             };
@@ -623,6 +625,6 @@ export function useMagisterData() {
     customCurriculums, 
     activityLogs, 
     actions,
-    allClasses // 🔥 NOW FULLY OPERATIONAL AND EXPORTED TO THE APP
+    allClasses 
   };
 }
