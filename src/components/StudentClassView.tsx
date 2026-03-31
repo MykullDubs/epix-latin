@@ -397,16 +397,32 @@ const SHAPE_THEMES = [
     { color: 'bg-slate-800 hover:bg-slate-900 active:bg-black', shadow: 'shadow-[0_8px_0_rgb(15,23,42)]', icon: X }
 ];
 
-const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogActivity, userData }: any) => {
+const LiveTriviaRemote = ({ liveSession, lessons, allDecks, studentEmail, classId, onLogActivity, userData }: any) => {
     const [showForge, setShowForge] = useState(false);
 
-    const activeLesson = lessons.find((l: any) => l.id === liveSession?.lessonId);
+    // DUAL LOOKUP ENGINE FOR LIVE REMOTE
+    const activeLesson = useMemo(() => {
+        if (!liveSession?.lessonId) return null;
+        let node = lessons.find((l: any) => l.id === liveSession.lessonId);
+        if (node) return node;
+
+        let deck = allDecks?.[liveSession.lessonId] || Object.values(allDecks || {}).find((d: any) => d.id === liveSession.lessonId);
+        if (deck) {
+            return {
+                id: deck.id,
+                title: deck.title || deck.name,
+                blocks: [{ type: 'deck', cards: deck.cards || [] }]
+            };
+        }
+        return null;
+    }, [lessons, allDecks, liveSession?.lessonId]);
+
     const pages = useMemo(() => {
         if (!activeLesson?.blocks) return [];
         const grouped: any[] = [];
         let buffer: any[] = [];
         activeLesson.blocks.forEach((b: any) => {
-            if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game'].includes(b.type)) {
+            if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'deck'].includes(b.type)) {
                 if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
                 grouped.push({ type: 'interact', blocks: [b] });
                 buffer = [];
@@ -433,9 +449,10 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogAc
     const pointsThisRound = liveSession?.roundPoints?.[safeEmail] || 0;
     const [xpLogged, setXpLogged] = useState(false);
 
+    // 🔥 FIXED: REMOVED "waiting" LOCKOUT SO LATE STUDENTS CAN JOIN
     useEffect(() => {
         if (!classId || !studentEmail || !liveSession) return;
-        if (liveSession.quizState === 'waiting' && !liveSession.joined?.[safeEmail]) {
+        if (!liveSession.joined?.[safeEmail]) {
             const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
             updateDoc(sessionRef, { 
                 [`joined.${safeEmail}`]: {
@@ -445,7 +462,7 @@ const LiveTriviaRemote = ({ liveSession, lessons, studentEmail, classId, onLogAc
                 } 
             }).catch(e => console.log("Could not ping lobby arrival:", e));
         }
-    }, [classId, studentEmail, liveSession?.quizState, liveSession?.joined, safeEmail, userData]);
+    }, [classId, studentEmail, liveSession?.joined, safeEmail, userData]);
 
     useEffect(() => {
         if (isFinished && !xpLogged && xpEarned > 0) {
@@ -618,9 +635,10 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, 
     const iHaveUnlockedDrop = myAnswer === currentQ?.correctId;
     const [xpLogged, setXpLogged] = useState(false);
 
+    // 🔥 FIXED: REMOVED "waiting" LOCKOUT SO LATE STUDENTS CAN JOIN
     useEffect(() => {
         if (!classId || !studentEmail || !liveSession) return;
-        if (liveSession.quizState === 'waiting' && !liveSession.joined?.[safeEmail]) {
+        if (!liveSession.joined?.[safeEmail]) {
             const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
             updateDoc(sessionRef, { 
                 [`joined.${safeEmail}`]: {
@@ -630,7 +648,7 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, 
                 }
             }).catch(e => console.log("Could not ping lobby arrival:", e));
         }
-    }, [classId, studentEmail, liveSession?.quizState, liveSession?.joined, safeEmail, userData]);
+    }, [classId, studentEmail, liveSession?.joined, safeEmail, userData]);
 
     useEffect(() => {
         if (isFinished && liveSession?.winningTeam === myTeam && !xpLogged) {
@@ -830,29 +848,40 @@ export default function StudentClassView({
     });
   }, [classData, userData]);
 
+  // 🔥 STABLE LIVE SESSION LISTENER
   useEffect(() => {
     if (!classData?.id) return;
     const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classData.id);
-    return onSnapshot(sessionRef, async (docSnap) => {
+    const unsubSession = onSnapshot(sessionRef, async (docSnap) => {
         if (docSnap.exists()) {
-            const sessionData = docSnap.data();
-            setLiveSession(sessionData);
-            
-            if (sessionData.type === 'slipstream' && sessionData.lessonId) {
-                const deckQuery = query(collection(db, 'artifacts', appId, 'published_decks'), where('id', '==', sessionData.lessonId));
-                onSnapshot(deckQuery, (snap) => {
-                   if (!snap.empty) {
-                       setActiveDeck(snap.docs[0].data());
-                   }
-                });
-            }
+            setLiveSession(docSnap.data());
         } else {
             setLiveSession(null);
             setActiveDeck(null);
-            if (activeSubTab === 'live') setActiveSubTab('lessons');
         }
     });
-  }, [classData.id, activeSubTab]);
+    return () => unsubSession();
+  }, [classData?.id]);
+
+  // 🔥 STABLE SLIPSTREAM DECK LISTENER
+  useEffect(() => {
+      if (liveSession?.type === 'slipstream' && liveSession?.lessonId) {
+          const deckQuery = query(collection(db, 'artifacts', appId, 'decks'), where('id', '==', liveSession.lessonId));
+          const unsubDeck = onSnapshot(deckQuery, (snap) => {
+              if (!snap.empty) {
+                  setActiveDeck(snap.docs[0].data());
+              }
+          });
+          return () => unsubDeck();
+      }
+  }, [liveSession?.type, liveSession?.lessonId]);
+
+  // 🔥 AUTO-EXIT LIVE TAB IF SESSION DIES
+  useEffect(() => {
+      if (!liveSession && activeSubTab === 'live') {
+          setActiveSubTab('lessons');
+      }
+  }, [liveSession, activeSubTab]);
 
   const toggleRoadmap = (currId: string) => setExpandedRoadmaps(prev => ({ ...prev, [currId]: !prev[currId] }));
 
@@ -882,7 +911,6 @@ export default function StudentClassView({
   const standaloneLessons = populatedAssignments.filter((a: any) => !(a.contentType === 'exam' || a.contentType === 'test') && !assignedCurriculums.some((c: any) => c.lessonIds?.includes(a.id)));
   const examList = populatedAssignments.filter((a: any) => a.contentType === 'exam' || a.contentType === 'test');
 
-  // 🔥 NEW MATH ENGINE: Calculate real progress for the header
   const allClassNodeIds = Array.from(new Set([
       ...populatedAssignments.map((a:any) => a.id),
       ...assignedCurriculums.flatMap((c:any) => c.lessonIds || [])
@@ -919,6 +947,7 @@ export default function StudentClassView({
                     <LiveTriviaRemote 
                         liveSession={liveSession} 
                         lessons={lessons} 
+                        allDecks={allDecks} // 🔥 Passed allDecks here too just in case!
                         classId={classData.id} 
                         studentEmail={userData?.email || auth?.currentUser?.email} 
                         onLogActivity={onLogActivity}
@@ -933,11 +962,10 @@ export default function StudentClassView({
   return (
     <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden animate-in fade-in duration-500 font-sans relative transition-colors duration-300">
       
-      {/* 🔥 THE NEW, SMARTER HEADER */}
+      {/* THE SMARTER HEADER */}
       <header className={`shrink-0 z-10 relative shadow-xl transition-all duration-500 ease-in-out overflow-hidden ${theme.bg} ${isScrolled ? 'rounded-b-[2rem] p-5' : 'rounded-b-[3rem] p-6 md:p-10 pt-10 md:pt-14'}`}>
         <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
         
-        {/* Top Bar: Always Visible */}
         <div className="flex items-center justify-between relative z-20">
             <button onClick={onBack} className="flex items-center gap-2 text-white/90 hover:text-white transition-colors text-xs font-black uppercase tracking-widest active:scale-95">
                 <ArrowLeft size={16} /> BACK TO HUB
@@ -948,8 +976,7 @@ export default function StudentClassView({
             </span>
         </div>
 
-        {/* The Collapsible Banner Content */}
-        <div className={`relative z-10 transition-all duration-500 ease-in-out origin-top ${isScrolled ? 'max-h-0 opacity-0 scale-95 pointer-events-none' : 'max-h-[500px] opacity-100 scale-100 mt-6'}`}>
+        <div className={`relative z-10 transition-all duration-500 ease-in-out origin-top ${isScrolled ? 'max-h-0 opacity-0 scale-95 hidden' : 'max-h-[500px] opacity-100 scale-100 mt-6'}`}>
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 
                 <div className="flex-1 max-w-2xl">
@@ -966,14 +993,12 @@ export default function StudentClassView({
                         {classData.name}
                     </h2>
                     
-                    {/* Description breathes freely! */}
                     <p className="text-white/90 font-medium text-sm md:text-base leading-relaxed line-clamp-3 md:line-clamp-4">
                         {classData.description || "Your learning adventure starts here."}
                     </p>
                 </div>
 
-                {/* The Utility / Stats Box */}
-                <div className="bg-black/20 backdrop-blur-md border border-white/10 rounded-[1.5rem] p-4 md:p-5 flex gap-4 md:gap-6 shrink-0 shadow-inner mt-4 md:mt-0 w-full md:w-auto justify-center">
+                <div className="bg-black/15 backdrop-blur-md border border-white/10 rounded-[1.5rem] p-5 flex gap-6 shrink-0 shadow-inner mt-2 md:mt-0">
                     <div className="flex flex-col items-center">
                         <span className="text-white/60 text-[9px] font-black uppercase tracking-widest mb-1">Modules</span>
                         <span className="text-white font-black text-2xl leading-none">{totalNodesCount}</span>
@@ -1056,7 +1081,7 @@ export default function StudentClassView({
         {activeSubTab === 'grades' && <StudentGradebook classData={classData} user={userData} />}
       </main>
 
-      {/* 🔥 THE SENSUAL BOTTOM NAV: Deep glassmorphism */}
+      {/* THE SENSUAL BOTTOM NAV */}
       <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-[550px] z-[100] px-2">
           <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl p-2 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-white/40 dark:border-white/10 flex items-center justify-between gap-1 transition-colors duration-300 ring-1 ring-white/20 dark:ring-white/5">
             {[
@@ -1080,9 +1105,8 @@ export default function StudentClassView({
   );
 }
 
-// 🔥 UPDATED CURRICULUM PATHWAY: Added allDecks to the Dual-Lookup Engine
+// 🔥 UPDATED CURRICULUM PATHWAY
 const CurriculumPathway = ({ curr, lessons, allDecks = {}, completedItems, isExpanded, onToggle, onSelectLesson, theme }: any) => {
-    // Dual lookup checks lessons first, then falls back to creating a Mock Lesson out of a Deck
     const currLessons = (curr.lessonIds || []).map((id: string) => {
         let node = lessons.find((l: any) => l.id === id);
         if (node) return node;
@@ -1093,7 +1117,7 @@ const CurriculumPathway = ({ curr, lessons, allDecks = {}, completedItems, isExp
                 id: deck.id,
                 title: deck.title || deck.name,
                 contentType: 'deck',
-                type: 'deck', // Used for icon logic
+                type: 'deck',
                 blocks: [{ type: 'deck', title: deck.title || deck.name, items: deck.cards || [] }]
             };
         }
@@ -1108,8 +1132,6 @@ const CurriculumPathway = ({ curr, lessons, allDecks = {}, completedItems, isExp
     
     return (
         <article className="bg-transparent relative pb-8">
-            
-            {/* The Header Pill */}
             <button className="w-full text-left bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 md:p-8 rounded-[3rem] border border-white/40 dark:border-slate-800 shadow-xl relative overflow-hidden group transition-colors duration-300" onClick={onToggle}>
                 <div className="absolute inset-0 opacity-5 transition-opacity group-hover:opacity-10" style={{ backgroundColor: headerAccent }} />
                 <div className="absolute right-0 top-0 w-32 h-full bg-gradient-to-l to-transparent pointer-events-none opacity-20" style={{ backgroundImage: `linear-gradient(to left, ${headerAccent}, transparent)` }} />
@@ -1124,7 +1146,6 @@ const CurriculumPathway = ({ curr, lessons, allDecks = {}, completedItems, isExp
                     </div>
                 </div>
                 
-                {/* Sleek mastery bar */}
                 <div className="flex items-center gap-4 relative z-10">
                     <div className="h-3 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden relative shadow-inner dark:shadow-none flex-1 p-0.5 transition-colors duration-300">
                         <div className="h-full rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(255,255,255,0.5)]" style={{ width: `${progressPercent}%`, backgroundColor: headerAccent }} />
@@ -1133,12 +1154,10 @@ const CurriculumPathway = ({ curr, lessons, allDecks = {}, completedItems, isExp
                 </div>
             </button>
 
-            {/* The Spine / Nodes */}
             <div className={`overflow-hidden transition-all duration-700 ${isExpanded ? 'max-h-[5000px] opacity-100 mt-4' : 'max-h-0 opacity-0 pointer-events-none'}`}>
                 <div className="pt-8 pb-12 px-1 sm:px-4 relative transition-colors duration-300">
                     <div className="relative max-w-sm mx-auto w-full">
                         
-                        {/* The Glowing Nerve */}
                         <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-1 bg-slate-200 dark:bg-slate-800/60 rounded-full z-0 transition-colors duration-300" />
                         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 rounded-full transition-all duration-1000 z-0 shadow-[0_0_15px_rgba(99,102,241,0.5)]" style={{ height: `${currLessons.length > 1 ? (normalizedActiveIndex / (currLessons.length - 1)) * 100 : 100}%`, backgroundColor: headerAccent }} />
                         
@@ -1151,8 +1170,6 @@ const CurriculumPathway = ({ curr, lessons, allDecks = {}, completedItems, isExp
 
                                 return (
                                     <div key={item.id} className={`relative flex w-full items-center min-h-[90px] ${isLocked ? 'opacity-50 grayscale-[50%]' : ''}`}>
-                                        
-                                        {/* Left Side Label */}
                                         <div className={`w-1/2 flex justify-end pr-10 sm:pr-14 z-10 ${!isLeft ? 'invisible' : ''}`}>
                                             <div className={`bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-4 rounded-3xl shadow-lg border border-white/40 dark:border-slate-700 w-full max-w-[160px] text-right transition-all duration-300 ${isCurrent ? 'scale-105 shadow-xl' : 'hover:scale-[1.02]'} ${isLocked ? 'pointer-events-none' : 'cursor-pointer'}`} onClick={() => !isLocked && onSelectLesson(item)}>
                                                 <span className={`text-[9px] font-black uppercase mb-1 block tracking-widest ${isCurrent ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>
@@ -1162,10 +1179,8 @@ const CurriculumPathway = ({ curr, lessons, allDecks = {}, completedItems, isExp
                                             </div>
                                         </div>
                                         
-                                        {/* Center Node: The Heartbeat with Multi-Icons */}
                                         <div className={`absolute left-1/2 top-1/2 -translate-y-1/2 z-20 ${isLeft ? '-translate-x-[30%]' : '-translate-x-[70%]'}`}>
                                             <button disabled={isLocked} onClick={() => onSelectLesson(item)} className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center border-4 transition-all duration-500 ${isCompleted ? 'bg-indigo-500 border-indigo-200 dark:border-indigo-900 text-white shadow-lg shadow-indigo-500/20' : isCurrent ? `bg-slate-900 text-white scale-110 shadow-[0_0_30px_rgba(99,102,241,0.6)]` : 'bg-slate-100 dark:bg-slate-900 border-white dark:border-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'}`} style={{ ...(isCurrent && item.type !== 'quiz' && item.contentType !== 'exam' && item.contentType !== 'test' ? { borderColor: headerAccent } : {}) }}>
-                                                {/* THE ICON LOGIC */}
                                                 {isCompleted ? (
                                                     <CheckCircle2 size={24} strokeWidth={3} />
                                                 ) : isLocked ? (
@@ -1178,7 +1193,6 @@ const CurriculumPathway = ({ curr, lessons, allDecks = {}, completedItems, isExp
                                                     <Play size={24} className="ml-1" fill={isCurrent ? "currentColor" : "none"} />
                                                 )}
                                                 
-                                                {/* The Pulse Effect */}
                                                 {isCurrent && (
                                                     <>
                                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-20" style={{ backgroundColor: headerAccent }}></span>
@@ -1188,7 +1202,6 @@ const CurriculumPathway = ({ curr, lessons, allDecks = {}, completedItems, isExp
                                             </button>
                                         </div>
                                         
-                                        {/* Right Side Label */}
                                         <div className={`w-1/2 flex justify-start pl-10 sm:pl-14 z-10 ${isLeft ? 'invisible' : ''}`}>
                                             <div className={`bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-4 rounded-3xl shadow-lg border border-white/40 dark:border-slate-700 w-full max-w-[160px] text-left transition-all duration-300 ${isCurrent ? 'scale-105 shadow-xl' : 'hover:scale-[1.02]'} ${isLocked ? 'pointer-events-none' : 'cursor-pointer'}`} onClick={() => !isLocked && onSelectLesson(item)}>
                                                 <span className={`text-[9px] font-black uppercase mb-1 block tracking-widest ${isCurrent ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>
