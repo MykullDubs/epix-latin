@@ -799,8 +799,9 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, 
 // ============================================================================
 //  MAIN STUDENT CLASS VIEW (ENTRY POINT)
 // ============================================================================
+// 🔥 ADDED 'allDecks' TO DESTRUCTURED PROPS
 export default function StudentClassView({ 
-    classData, lessons = [], curriculums = [], onBack, 
+    classData, lessons = [], curriculums = [], allDecks = {}, onBack, 
     onSelectLesson, userData, setActiveTab, setSelectedLessonId, ExamPlayerView, onLogActivity 
 }: any) {
   const [activeSubTab, setActiveSubTab] = useState<'lessons' | 'leaderboard' | 'exams' | 'forum' | 'grades' | 'live'>('lessons');
@@ -858,7 +859,26 @@ export default function StudentClassView({
 
   const rawAssignments = Array.isArray(classData?.assignments) ? classData.assignments : [];
   const rawCurriculums = Array.isArray(classData?.assignedCurriculums) ? classData.assignedCurriculums : [];
-  const populatedAssignments = rawAssignments.map((assignment: any) => typeof assignment === 'string' ? lessons.find((l: any) => l.id === assignment) : assignment).filter(Boolean);
+  
+  // 🔥 DUAL-LOOKUP ENGINE: Checks Lessons, then checks allDecks
+  const populatedAssignments = rawAssignments.map((assignment: any) => {
+      if (typeof assignment !== 'string') return assignment;
+      let node = lessons.find((l: any) => l.id === assignment);
+      if (node) return node;
+      
+      let deck = allDecks?.[assignment] || Object.values(allDecks || {}).find((d: any) => d.id === assignment);
+      if (deck) {
+          return {
+              id: deck.id,
+              title: deck.title || deck.name,
+              contentType: 'deck',
+              type: 'deck', // Triggers the deck icon renderer
+              blocks: [{ type: 'deck', title: deck.title || deck.name, items: deck.cards || [] }]
+          };
+      }
+      return null;
+  }).filter(Boolean);
+
   const assignedCurriculums = rawCurriculums.map((id: string) => curriculums.find((c: any) => c.id === id)).filter(Boolean);
   const standaloneLessons = populatedAssignments.filter((a: any) => !(a.contentType === 'exam' || a.contentType === 'test') && !assignedCurriculums.some((c: any) => c.lessonIds?.includes(a.id)));
   const examList = populatedAssignments.filter((a: any) => a.contentType === 'exam' || a.contentType === 'test');
@@ -968,7 +988,8 @@ export default function StudentClassView({
              {assignedCurriculums.length > 0 ? (
                  <section className="space-y-8 mb-10 max-w-xl mx-auto">
                      {assignedCurriculums.map((curr: any) => (
-                         <CurriculumPathway key={curr.id} curr={curr} lessons={lessons} completedItems={completedItems} isExpanded={!!expandedRoadmaps[curr.id]} onToggle={() => toggleRoadmap(curr.id)} onSelectLesson={onSelectLesson} theme={theme} />
+                         // 🔥 ADDED allDecks to CurriculumPathway
+                         <CurriculumPathway key={curr.id} curr={curr} lessons={lessons} allDecks={allDecks} completedItems={completedItems} isExpanded={!!expandedRoadmaps[curr.id]} onToggle={() => toggleRoadmap(curr.id)} onSelectLesson={onSelectLesson} theme={theme} />
                      ))}
                  </section>
              ) : (
@@ -1026,9 +1047,26 @@ export default function StudentClassView({
   );
 }
 
-// 🔥 UPDATED CURRICULUM PATHWAY: The Seductive Timeline with Correct Icons
-const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle, onSelectLesson, theme }: any) => {
-    const currLessons = (curr.lessonIds || []).map((id: string) => lessons.find((l: any) => l.id === id)).filter(Boolean);
+// 🔥 UPDATED CURRICULUM PATHWAY: Added allDecks to the Dual-Lookup Engine
+const CurriculumPathway = ({ curr, lessons, allDecks = {}, completedItems, isExpanded, onToggle, onSelectLesson, theme }: any) => {
+    // Dual lookup checks lessons first, then falls back to creating a Mock Lesson out of a Deck
+    const currLessons = (curr.lessonIds || []).map((id: string) => {
+        let node = lessons.find((l: any) => l.id === id);
+        if (node) return node;
+        
+        let deck = allDecks?.[id] || Object.values(allDecks || {}).find((d: any) => d.id === id);
+        if (deck) {
+            return {
+                id: deck.id,
+                title: deck.title || deck.name,
+                contentType: 'deck',
+                type: 'deck', // Used for icon logic
+                blocks: [{ type: 'deck', title: deck.title || deck.name, items: deck.cards || [] }]
+            };
+        }
+        return null;
+    }).filter(Boolean);
+
     const completedCountInCurr = currLessons.filter((l: any) => completedItems.includes(l.id)).length;
     const progressPercent = currLessons.length > 0 ? Math.round((completedCountInCurr / currLessons.length) * 100) : 0;
     const activeNodeIndex = currLessons.findIndex((l: any) => !completedItems.includes(l.id));
@@ -1141,7 +1179,7 @@ const StandaloneAssignmentCard = ({ item, isCompleted, onSelectLesson, theme }: 
     <button className={`w-full text-left p-5 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl rounded-[2.5rem] flex items-center gap-5 transition-all group overflow-hidden relative ${isCompleted ? 'border border-emerald-200 dark:border-emerald-500/20 opacity-70' : `border border-white/40 dark:border-slate-800 shadow-xl hover:shadow-2xl hover:scale-[1.02]`}`} onClick={() => onSelectLesson(item)}>
         <div className={`absolute top-0 right-0 w-32 h-full bg-gradient-to-l to-transparent opacity-10 pointer-events-none ${isCompleted ? 'from-emerald-500' : theme.bg.replace('bg-', 'from-')}`} />
         <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center border border-white/20 shadow-lg transition-colors shrink-0 ${isCompleted ? 'bg-emerald-500 text-white' : `${theme.bg} text-white`}`}>
-            {isCompleted ? <CheckCircle2 size={24} strokeWidth={3} /> : item.type === 'arcade_game' ? <Gamepad2 size={24} /> : <Play size={24} className="ml-1" fill="currentColor" />}
+            {isCompleted ? <CheckCircle2 size={24} strokeWidth={3} /> : item.type === 'arcade_game' ? <Gamepad2 size={24} /> : item.type === 'deck' ? <Layers size={24} /> : <Play size={24} className="ml-1" fill="currentColor" />}
         </div>
         <div className="flex-1 pr-2 relative z-10">
             <span className={`text-[9px] font-black uppercase mb-1 block tracking-widest ${isCompleted ? 'text-emerald-500 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
