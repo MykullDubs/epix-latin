@@ -24,7 +24,7 @@ const MACRO_DOMAINS = [
 ];
 
 // 🔥 UPDATED PROPS: Now accepts networkClasses from Firebase!
-export default function DiscoveryView({ networkDecks = {}, networkClasses = [], onDownloadDeck, onPurchase, userData, activeOrg }: any) {
+export default function DiscoveryView({ networkDecks = {}, networkClasses = [], onDownloadDeck, onPurchase, onOpenClass, userData, activeOrg }: any) {
     const [domainPath, setDomainPath] = useState<string[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [touchStartCoords, setTouchStartCoords] = useState<{x: number, y: number} | null>(null);
@@ -532,8 +532,12 @@ export default function DiscoveryView({ networkDecks = {}, networkClasses = [], 
                                         );
                                         
                                         if (result?.success) {
-                                            setToastMsg(result.msg);
-                                            setPreviewCourse(null);
+                                            setToastMsg("Curriculum Decrypted! Routing to Dashboard...");
+                                            // 🔥 Wait exactly 1 second for the dopamine to hit, then route!
+                                            setTimeout(() => {
+                                                setPreviewCourse(null);
+                                                if (onOpenClass) onOpenClass();
+                                            }, 1000);
                                         } else {
                                             setToastMsg(result?.msg || "Transaction failed.");
                                         }
