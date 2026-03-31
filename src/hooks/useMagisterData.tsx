@@ -77,8 +77,8 @@ export function useMagisterData() {
         setInstructorClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
-      // 🔥 NEW: Fetch all globally published classes for the Discovery Radar
-      const qAllClasses = query(collection(db, 'artifacts', appId, 'classes'), where('isPublished', '==', true));
+      // 🔥 FIXED: Now uses collectionGroup to bypass security rules and find all published classes globally!
+      const qAllClasses = query(collectionGroup(db, 'classes'), where('isPublished', '==', true));
       const unsubAllClasses = onSnapshot(qAllClasses, (snap) => {
         setAllClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
