@@ -23,7 +23,6 @@ const MACRO_DOMAINS = [
     { id: 'media', title: 'Media & Entertainment', icon: MonitorPlay, gradient: 'from-pink-500 to-rose-400', text: 'text-pink-500', shadow: 'shadow-pink-500/30', desc: 'Movies, gaming, and pop culture' },
 ];
 
-// 🔥 UPDATED PROPS: Now accepts networkClasses from Firebase!
 export default function DiscoveryView({ networkDecks = {}, networkClasses = [], onDownloadDeck, onPurchase, onOpenClass, userData, activeOrg }: any) {
     const [domainPath, setDomainPath] = useState<string[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -532,11 +531,12 @@ export default function DiscoveryView({ networkDecks = {}, networkClasses = [], 
                                         );
                                         
                                         if (result?.success) {
-                                            setToastMsg("Curriculum Decrypted! Routing to Dashboard...");
+                                            setToastMsg("Curriculum Decrypted! Routing to Classroom...");
                                             // 🔥 Wait exactly 1 second for the dopamine to hit, then route!
                                             setTimeout(() => {
+                                                const courseToOpen = previewCourse;
                                                 setPreviewCourse(null);
-                                                if (onOpenClass) onOpenClass();
+                                                if (onOpenClass) onOpenClass(courseToOpen);
                                             }, 1000);
                                         } else {
                                             setToastMsg(result?.msg || "Transaction failed.");
