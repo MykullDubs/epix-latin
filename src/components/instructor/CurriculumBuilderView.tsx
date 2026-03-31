@@ -6,14 +6,18 @@ import {
     PlayCircle, Lock, ChevronUp, CheckCircle2, Zap
 } from 'lucide-react';
 import { writeBatch, doc } from 'firebase/firestore';
-import { auth, db, appId } from '../../config/firebase'; // 🔥 auth imported for secure routing
+import { auth, db, appId } from '../../config/firebase'; 
 import { Toast } from '../Toast';
 
-export default function CurriculumBuilderView({ onSaveCurriculum, availableLessons = [] }: any) {
+// 🔥 ADDED PROPS: classes and curriculums so we can pull existing data
+export default function CurriculumBuilderView({ onSaveCurriculum, availableLessons = [], classes = [], curriculums = [] }: any) {
     const [activeTab, setActiveTab] = useState<'build' | 'preview'>('build');
     const [showJsonModal, setShowJsonModal] = useState(false);
     const [jsonText, setJsonText] = useState("");
     const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+    // 🔥 STATE: Tracks if we are editing an existing class
+    const [selectedClassId, setSelectedClassId] = useState<string>('');
 
     const [formData, setFormData] = useState({
         title: '',
@@ -32,6 +36,63 @@ export default function CurriculumBuilderView({ onSaveCurriculum, availableLesso
 
     const handleChange = (e: any) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    // 🔥 ENGINE: Load Existing Class into Builder
+    const handleSelectClass = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const cid = e.target.value;
+        setSelectedClassId(cid);
+
+        if (!cid) {
+            // Reset to a blank slate
+            setFormData({ title: '', description: '', level: 'Beginner', themeColor: '#4f46e5', coverImage: '', grade: 'Pathway' });
+            setTimeline([]);
+            setImportedPayload(null);
+            return;
+        }
+
+        const cls = classes.find((c: any) => c.id === cid);
+        if (cls) {
+            setFormData({
+                title: cls.name || cls.title || '',
+                description: cls.description || '',
+                level: cls.grade || cls.level || 'Beginner',
+                themeColor: cls.themeColor || '#4f46e5',
+                coverImage: cls.coverImage || '',
+                grade: cls.grade || 'Pathway'
+            });
+
+            // Locate the attached curriculum
+            const currId = cls.assignedCurriculums?.[0];
+            const curr = curriculums.find((c: any) => c.id === currId);
+
+            // Rebuild Timeline Sequence
+            let newTimeline: any[] = [];
+            const nodeIds = curr?.lessonIds || cls.assignments || [];
+            
+            nodeIds.forEach((id: string) => {
+                const existingNode = availableLessons.find((l: any) => l.id === id);
+                if (existingNode) {
+                    newTimeline.push(existingNode);
+                } else {
+                    // Fallback placeholder if node data isn't in availableLessons
+                    let inferredType = 'lesson';
+                    if (id.includes('quiz') || id.includes('exam')) inferredType = 'quiz';
+                    if (id.includes('deck')) inferredType = 'deck';
+                    newTimeline.push({ id, title: `Node Data Encrypted (${id})`, type: inferredType });
+                }
+            });
+
+            setTimeline(newTimeline);
+
+            // 🔥 Mock the imported payload so the deploy engine overwrites the existing IDs
+            setImportedPayload({
+                class: { ...cls },
+                curriculum: curr ? { ...curr } : null
+            });
+            
+            setToastMsg(`Loaded "${cls.name}" into Architect.`);
+        }
     };
 
     const addToTimeline = (lesson: any) => {
@@ -70,7 +131,8 @@ export default function CurriculumBuilderView({ onSaveCurriculum, availableLesso
             }
             
             const data = JSON.parse(cleanText);
-            setImportedPayload(data); // Save for deployment
+            setImportedPayload(data); 
+            setSelectedClassId(''); // Unhook from any existing class
             
             // Handle the "Master Payload" structure where everything is nested
             const classData = data.class || data;
@@ -144,6 +206,7 @@ export default function CurriculumBuilderView({ onSaveCurriculum, availableLesso
 
         try {
             const batch = writeBatch(db);
+            // Will re-use the exact ID if editing, otherwise generates a new one
             const classId = importedPayload?.class?.id || `class_${Date.now()}`;
             const currId = importedPayload?.curriculum?.id || `curr_${Date.now()}`;
 
@@ -152,9 +215,10 @@ export default function CurriculumBuilderView({ onSaveCurriculum, availableLesso
             batch.set(currRef, {
                 ...formData,
                 id: currId,
-                instructorId: uid, // 🔥 Required for security rules
+                instructorId: uid, 
                 lessonIds: timeline.map(l => l.id),
-                createdAt: Date.now()
+                updatedAt: Date.now(),
+                ...(importedPayload?.curriculum?.createdAt ? { createdAt: importedPayload.curriculum.createdAt } : { createdAt: Date.now() })
             }, { merge: true });
 
             // 2. Deploy the Class Wrapper (To instructor subcollection)
@@ -162,7 +226,7 @@ export default function CurriculumBuilderView({ onSaveCurriculum, availableLesso
             batch.set(classRef, {
                 ...(importedPayload?.class || {}),
                 id: classId,
-                instructorId: uid, // 🔥 Required for security rules
+                instructorId: uid, 
                 name: formData.title,
                 description: formData.description,
                 subject: importedPayload?.class?.subject || 'General',
@@ -171,18 +235,17 @@ export default function CurriculumBuilderView({ onSaveCurriculum, availableLesso
                 assignedCurriculums: [currId],
                 assignments: timeline.map(l => l.id),
                 isPublished: true, 
-                createdAt: Date.now()
+                updatedAt: Date.now(),
+                ...(importedPayload?.class?.createdAt ? { createdAt: importedPayload.class.createdAt } : { createdAt: Date.now() })
             }, { merge: true });
 
-            // 3. Deploy all individual Nodes securely
+            // 3. Deploy all individual Nodes securely (Only triggers on fresh JSON payload injects)
             if (importedPayload?.content_nodes) {
                 importedPayload.content_nodes.forEach((node: any) => {
                     if (node.type === 'deck') {
-                        // Decks live in the global pool but require authorId
                         const nodeRef = doc(db, 'artifacts', appId, 'decks', node.id);
                         batch.set(nodeRef, { ...node, authorId: uid, isPublished: true, visibility: 'public' }, { merge: true });
                     } else {
-                        // Lessons/Exams live in the instructor subcollection
                         const nodeRef = doc(db, 'artifacts', appId, 'users', uid, 'custom_lessons', node.id);
                         batch.set(nodeRef, { ...node, instructorId: uid, isPublished: true }, { merge: true });
                     }
@@ -191,10 +254,11 @@ export default function CurriculumBuilderView({ onSaveCurriculum, availableLesso
 
             await batch.commit();
             
-            setToastMsg("Master Payload Deployed to the Global Radar! 🚀");
-            setFormData({ title: '', description: '', level: 'Beginner', themeColor: '#4f46e5', coverImage: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&q=80&w=1000', grade: 'Pathway' });
+            setToastMsg(selectedClassId ? "Pathway Successfully Updated! ♻️" : "Master Payload Deployed to the Global Radar! 🚀");
+            setFormData({ title: '', description: '', level: 'Beginner', themeColor: '#4f46e5', coverImage: '', grade: 'Pathway' });
             setTimeline([]);
             setImportedPayload(null);
+            setSelectedClassId('');
             setActiveTab('build');
         } catch (e) {
             console.error("Deploy Error:", e);
@@ -216,19 +280,49 @@ export default function CurriculumBuilderView({ onSaveCurriculum, availableLesso
             {/* Header & Controls */}
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center">
+                    <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center shrink-0">
                         <Map size={20} />
                     </div>
                     <div>
-                        <h2 className="font-black text-slate-800 dark:text-white uppercase tracking-widest text-sm">Pathway Architect</h2>
-                        <p className="text-[10px] font-bold text-slate-400">{timeline.length} Nodes Configured</p>
+                        <div className="flex items-center gap-3">
+                            <h2 className="font-black text-slate-800 dark:text-white uppercase tracking-widest text-sm">Pathway Architect</h2>
+                            
+                            {/* 🔥 THE NEW EDIT SELECTOR */}
+                            {classes?.length > 0 && (
+                                <select 
+                                    value={selectedClassId} 
+                                    onChange={handleSelectClass}
+                                    className="bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg outline-none cursor-pointer border border-transparent focus:border-indigo-500 transition-all hidden sm:block"
+                                >
+                                    <option value="">+ CREATE NEW</option>
+                                    {classes.map((c: any) => (
+                                        <option key={c.id} value={c.id}>EDIT: {c.name || c.title}</option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-400 mt-0.5">{timeline.length} Nodes Configured</p>
                     </div>
                 </div>
                 
                 <div className="flex items-center gap-3 w-full md:w-auto">
+                    {/* Mobile Only: Edit Dropdown */}
+                    {classes?.length > 0 && (
+                        <select 
+                            value={selectedClassId} 
+                            onChange={handleSelectClass}
+                            className="flex-1 px-3 py-2 bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest rounded-lg outline-none cursor-pointer sm:hidden"
+                        >
+                            <option value="">+ NEW</option>
+                            {classes.map((c: any) => (
+                                <option key={c.id} value={c.id}>{c.name || c.title}</option>
+                            ))}
+                        </select>
+                    )}
+
                     <button 
                         onClick={() => setShowJsonModal(true)}
-                        className="flex-1 md:flex-none px-4 py-2 bg-slate-900 dark:bg-slate-800 text-white font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-slate-800 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-2"
+                        className="px-4 py-2 bg-slate-900 dark:bg-slate-800 text-white font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-slate-800 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-2"
                     >
                         <Code size={14} /> Import Payload
                     </button>
@@ -358,7 +452,7 @@ export default function CurriculumBuilderView({ onSaveCurriculum, availableLesso
                         onClick={handleSubmit} 
                         className="w-full text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3 bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/30"
                     >
-                        <Save size={20}/> Publish Pathway Sequence
+                        <Save size={20}/> {selectedClassId ? "Update Pathway Sequence" : "Publish Pathway Sequence"}
                     </button>
                 </div>
             ) : (
