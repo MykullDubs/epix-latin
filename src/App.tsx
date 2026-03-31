@@ -521,13 +521,28 @@ export default function App() {
                       // 🔥 Instantly route the user into their newly decrypted course
                       setActiveStudentClass(courseObj);
                   }}
-                  onDownloadDeck={async (deck: any) => { 
-                      await actions.purchaseItem(deck.id, deck.price || 0, 'deck');
-                      if (actions.assignDeckToFolder) {
-                          actions.assignDeckToFolder(deck.id, null);
+                  onDownloadDeck={async (item: any) => { 
+                      // 1. Determine if this is a standalone deck or a full course
+                      const isCourse = !!item.assignedCurriculums;
+                      const category = isCourse ? 'course' : 'deck';
+
+                      // 2. Run the universal purchase engine
+                      const result = await actions.purchaseItem(item.id, item.price || 0, category, {
+                          title: item.title || item.name,
+                          subject: item.subject || (item.domainPath ? item.domainPath[0] : 'General')
+                      });
+                      
+                      if (result.success) {
+                          if (isCourse) {
+                              // If it's a course, take them to the Home tab to see their new tile
+                              setActiveTab('home');
+                          } else {
+                              // If it's just a deck, take them to their flashcards
+                              if (actions.assignDeckToFolder) actions.assignDeckToFolder(item.id, null);
+                              setActiveDeckKey(item.id);
+                              setActiveTab('flashcards');
+                          }
                       }
-                      setActiveDeckKey(deck.id);
-                      setActiveTab('flashcards');
                   }} 
               />
             ) : activeTab === 'store' ? (
