@@ -83,8 +83,19 @@ export default function App() {
       // 🔥 ENRICHMENT ENGINE: Map the lightweight solo courses to their full data from the global radar
       const enrichedSoloCourses = soloCourses.map((solo: any) => {
           const fullData = allClasses?.find(c => c.id === solo.id);
-          // Combine the full data with the student's personal progress data
-          return fullData ? { ...fullData, type: 'solo', progressPct: solo.progressPct || 0, unlockedAt: solo.unlockedAt } : solo;
+          
+          if (fullData) {
+              // Combine the full data with the student's personal progress data
+              return { ...fullData, type: 'solo', progressPct: solo.progressPct || 0, unlockedAt: solo.unlockedAt };
+          }
+          
+          // 🔥 ROBUST FALLBACK: Even if network delays hide fullData, force a tile to render on HomeView
+          return {
+              ...solo,
+              name: solo.title || solo.name || "Decrypting Course...",
+              themeColor: "#4f46e5", 
+              type: 'solo'
+          };
       });
 
       const merged = [...enrolledClasses, ...enrichedSoloCourses];
@@ -518,33 +529,20 @@ export default function App() {
                   activeOrg={activeOrg} 
                   onPurchase={actions.purchaseItem} 
                   onOpenClass={(courseObj: any) => {
-                      // 🔥 The magic portal directly to the StudentClassView
+                      // 🔥 Clear active items and route directly to StudentClassView via Home
                       setActiveDeckKey(null);
                       setActiveLesson(null);
                       setActiveTab('home');
                       setActiveStudentClass(courseObj);
                   }}
-                  onDownloadDeck={async (item: any) => { 
-                      // 1. Determine if this is a standalone deck or a full course
-                      const isCourse = !!item.assignedCurriculums;
-                      const category = isCourse ? 'course' : 'deck';
-
-                      // 2. Run the universal purchase engine
-                      const result = await actions.purchaseItem(item.id, item.price || 0, category, {
-                          title: item.title || item.name,
-                          subject: item.subject || (item.domainPath ? item.domainPath[0] : 'General')
-                      });
-                      
-                      if (result.success) {
-                          if (isCourse) {
-                              setActiveTab('home');
-                              setActiveStudentClass(item);
-                          } else {
-                              if (actions.assignDeckToFolder) actions.assignDeckToFolder(item.id, null);
-                              setActiveDeckKey(item.id);
-                              setActiveTab('flashcards');
-                          }
+                  onDownloadDeck={async (deck: any) => { 
+                      // 🔥 Decks stay as decks, and route to FlashcardView
+                      await actions.purchaseItem(deck.id, deck.price || 0, 'deck');
+                      if (actions.assignDeckToFolder) {
+                          actions.assignDeckToFolder(deck.id, null);
                       }
+                      setActiveDeckKey(deck.id);
+                      setActiveTab('flashcards');
                   }} 
               />
             ) : activeTab === 'store' ? (
