@@ -9,16 +9,17 @@ export default {
       colors: {
         // 🔥 THE REAL INTERCEPT
         indigo: {
-          50: 'rgb(var(--theme-primary-50) / <alpha-value>)',
-          100: 'rgb(var(--theme-primary-100) / <alpha-value>)',
-          200: 'rgb(var(--theme-primary-200) / <alpha-value>)',
-          300: 'rgb(var(--theme-primary-300) / <alpha-value>)',
-          400: 'rgb(var(--theme-primary-400) / <alpha-value>)',
-          500: 'rgb(var(--theme-primary-500) / <alpha-value>)',
-          600: 'rgb(var(--theme-primary-600) / <alpha-value>)',
-          900: 'rgb(var(--theme-primary-900) / <alpha-value>)',
-          950: 'rgb(var(--theme-primary-950) / <alpha-value>)',
-        }
+           50: '#f0f4fe',
+          100: '#dee7fc',
+          200: '#c4d6fa',
+          300: '#9abaf6',
+          400: '#6495ed', // Exact Cornflower Blue
+          500: '#4875e5',
+          600: '#345ad6',
+          700: '#2a46bb',
+          800: '#263a98',
+          900: '#233479',
+          950: '#1a234a',        }
       },
       keyframes: {
         shimmer: {
