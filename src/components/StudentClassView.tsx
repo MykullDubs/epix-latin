@@ -11,7 +11,8 @@ import {
     Lock, Play, ChevronRight, Monitor, FileText, ChevronDown, 
     ChevronUp, Trophy, Zap, Flame, Plus, User, Heart,
     Mic, Square, Volume2, Loader2, Shield, Map, Gamepad2,
-    Triangle, Circle, XCircle, X, ArrowDownCircle, Settings, Sparkles
+    Triangle, Circle, XCircle, X, ArrowDownCircle, Settings, Sparkles,
+    Layers, HelpCircle, PlayCircle
 } from 'lucide-react';
 
 import StudentGradebook from './StudentGradebook';
@@ -905,42 +906,40 @@ export default function StudentClassView({
   return (
     <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden animate-in fade-in duration-500 font-sans relative transition-colors duration-300">
       
-      {/* 🔥 THE TEMPTRESS HERO HEADER: Deep glassmorphism and ambient glow */}
-      <header className={`shrink-0 z-10 relative transition-all duration-500 ease-in-out overflow-hidden bg-transparent ${isScrolled ? 'p-5 md:p-6' : 'p-6 md:p-10 pt-10 md:pt-16'}`}>
-        
-        {/* Ambient Glows behind the header */}
-        <div className={`absolute top-0 right-0 w-[500px] h-[500px] rounded-full blur-[100px] -mr-32 -mt-32 pointer-events-none opacity-40 dark:opacity-20 ${theme.bg}`} />
-        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-white/60 dark:from-slate-900/80 to-transparent pointer-events-none z-0" />
+      {/* 🔥 THE CLEAN, SOLID HEADER */}
+      <header className={`shrink-0 z-10 relative shadow-xl transition-all duration-500 ease-in-out overflow-hidden ${theme.bg} ${isScrolled ? 'rounded-b-3xl p-5 md:p-6' : 'rounded-b-[3rem] p-6 md:p-10 pt-10 md:pt-16'}`}>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
         
         {/* Top Bar: Always Visible */}
         <div className="flex items-center justify-between relative z-20">
-            <button onClick={onBack} className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors text-xs font-black uppercase tracking-widest active:scale-95 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 dark:border-slate-800 shadow-sm">
-                <ArrowLeft size={16} /> Return to Hub
+            <button onClick={onBack} className="flex items-center gap-2 text-white/90 hover:text-white transition-colors text-xs font-black uppercase tracking-widest active:scale-95">
+                <ArrowLeft size={16} /> BACK TO HUB
             </button>
 
-            <span className={`text-slate-800 dark:text-white font-black text-xs uppercase tracking-widest truncate max-w-[150px] md:max-w-xs transition-all duration-500 ${isScrolled ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 pointer-events-none'}`}>
+            <span className={`text-white font-black text-xs uppercase tracking-widest truncate max-w-[150px] md:max-w-xs transition-all duration-500 ${isScrolled ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 pointer-events-none'}`}>
                 {classData.name}
             </span>
         </div>
 
         {/* The Collapsible Banner Content */}
-        <div className={`relative z-10 transition-all duration-500 ease-in-out origin-top ${isScrolled ? 'max-h-0 opacity-0 scale-95' : 'max-h-[500px] opacity-100 scale-100 mt-8'}`}>
-            <div className={`inline-flex items-center gap-2 px-3 py-1 ${theme.light} ${theme.color} text-[9px] font-black uppercase tracking-widest rounded-full border ${theme.border} mb-4 shadow-sm`}>
-                <Sparkles size={10} /> {assignedCurriculums.length} Modules Await
-            </div>
-            
-            <h2 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white leading-tight mb-3 tracking-tighter drop-shadow-sm">
+        <div className={`relative z-10 transition-all duration-500 ease-in-out origin-top ${isScrolled ? 'max-h-0 opacity-0 scale-95' : 'max-h-[500px] opacity-100 scale-100 mt-6'}`}>
+            <span className="inline-block px-3 py-1.5 bg-black/20 text-white rounded-xl text-[10px] font-black uppercase tracking-widest mb-3 backdrop-blur-md border border-white/10 shadow-inner">
+                {classData?.grade || 'General'} • {classData?.subject || 'Subject'}
+            </span>
+            <h2 className="text-4xl md:text-5xl font-black text-white leading-tight mb-2 tracking-tighter drop-shadow-sm">
                 {classData.name}
             </h2>
-            
-            <p className="text-slate-600 dark:text-slate-300 font-bold text-sm md:text-base line-clamp-2 max-w-[90%] leading-relaxed">
-                {classData.description || "Unlock the secrets of this curriculum. Master the nodes, expand your mind, and claim your rewards."}
-            </p>
+            <div className="flex items-center gap-2 mt-4">
+                <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
+                <p className="text-white/90 font-bold text-sm md:text-base line-clamp-1">
+                    {classData.description || "Your learning adventure starts here."}
+                </p>
+            </div>
         </div>
       </header>
 
       {/* 🔥 MAIN CONTENT AREA */}
-      <main className="flex-1 overflow-y-auto custom-scrollbar relative px-2 md:px-6 pb-48 z-20" onScroll={handleScroll}>
+      <main className="flex-1 overflow-y-auto custom-scrollbar relative px-2 md:px-6 pb-48 z-20 pt-6" onScroll={handleScroll}>
 
         {liveSession && activeSubTab !== 'live' && (
             <div className="px-4 mb-8 animate-in slide-in-from-top-4 fade-in duration-500">
@@ -1027,7 +1026,7 @@ export default function StudentClassView({
   );
 }
 
-// 🔥 UPDATED CURRICULUM PATHWAY: The Seductive Timeline
+// 🔥 UPDATED CURRICULUM PATHWAY: The Seductive Timeline with Correct Icons
 const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle, onSelectLesson, theme }: any) => {
     const currLessons = (curr.lessonIds || []).map((id: string) => lessons.find((l: any) => l.id === id)).filter(Boolean);
     const completedCountInCurr = currLessons.filter((l: any) => completedItems.includes(l.id)).length;
@@ -1077,7 +1076,6 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
                                 const isCompleted = completedItems.includes(item.id);
                                 const isCurrent = index === normalizedActiveIndex;
                                 const isLocked = index > normalizedActiveIndex;
-                                const isExam = item.contentType === 'exam' || item.contentType === 'test';
                                 const isLeft = index % 2 === 0;
 
                                 return (
@@ -1086,15 +1084,28 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
                                         {/* Left Side Label */}
                                         <div className={`w-1/2 flex justify-end pr-10 sm:pr-14 z-10 ${!isLeft ? 'invisible' : ''}`}>
                                             <div className={`bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-4 rounded-3xl shadow-lg border border-white/40 dark:border-slate-700 w-full max-w-[160px] text-right transition-all duration-300 ${isCurrent ? 'scale-105 shadow-xl' : 'hover:scale-[1.02]'} ${isLocked ? 'pointer-events-none' : 'cursor-pointer'}`} onClick={() => !isLocked && onSelectLesson(item)}>
-                                                <span className={`text-[9px] font-black uppercase mb-1 block tracking-widest ${isCurrent ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>{isExam ? 'Checkpoint' : `Module 0${index + 1}`}</span>
+                                                <span className={`text-[9px] font-black uppercase mb-1 block tracking-widest ${isCurrent ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                                                    {item.contentType === 'exam' || item.contentType === 'test' ? 'Checkpoint' : `Module 0${index + 1}`}
+                                                </span>
                                                 <h4 className="font-black text-xs sm:text-sm text-slate-800 dark:text-slate-100 leading-tight">{item.title}</h4>
                                             </div>
                                         </div>
                                         
-                                        {/* Center Node: The Heartbeat */}
+                                        {/* Center Node: The Heartbeat with Multi-Icons */}
                                         <div className={`absolute left-1/2 top-1/2 -translate-y-1/2 z-20 ${isLeft ? '-translate-x-[30%]' : '-translate-x-[70%]'}`}>
-                                            <button disabled={isLocked} onClick={() => onSelectLesson(item)} className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center border-4 transition-all duration-500 ${isCompleted ? 'bg-indigo-500 border-indigo-200 dark:border-indigo-900 text-white shadow-lg shadow-indigo-500/20' : isCurrent ? `bg-slate-900 text-white scale-110 shadow-[0_0_30px_rgba(99,102,241,0.6)]` : 'bg-slate-100 dark:bg-slate-900 border-white dark:border-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'}`} style={{ ...(isCurrent && !isExam ? { borderColor: headerAccent } : {}) }}>
-                                                {isCompleted ? <CheckCircle2 size={24} strokeWidth={3} /> : isLocked ? <Lock size={20} /> : isExam ? <Trophy size={24} fill={isCurrent ? "currentColor" : "none"} /> : <Play size={24} className="ml-1" fill={isCurrent ? "currentColor" : "none"} />}
+                                            <button disabled={isLocked} onClick={() => onSelectLesson(item)} className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center border-4 transition-all duration-500 ${isCompleted ? 'bg-indigo-500 border-indigo-200 dark:border-indigo-900 text-white shadow-lg shadow-indigo-500/20' : isCurrent ? `bg-slate-900 text-white scale-110 shadow-[0_0_30px_rgba(99,102,241,0.6)]` : 'bg-slate-100 dark:bg-slate-900 border-white dark:border-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'}`} style={{ ...(isCurrent && item.type !== 'quiz' && item.contentType !== 'exam' && item.contentType !== 'test' ? { borderColor: headerAccent } : {}) }}>
+                                                {/* THE ICON LOGIC */}
+                                                {isCompleted ? (
+                                                    <CheckCircle2 size={24} strokeWidth={3} />
+                                                ) : isLocked ? (
+                                                    <Lock size={20} />
+                                                ) : item.type === 'deck' ? (
+                                                    <Layers size={22} className={isCurrent ? "animate-pulse" : ""} />
+                                                ) : item.type === 'quiz' || item.contentType === 'exam' || item.contentType === 'test' ? (
+                                                    <HelpCircle size={24} />
+                                                ) : (
+                                                    <Play size={24} className="ml-1" fill={isCurrent ? "currentColor" : "none"} />
+                                                )}
                                                 
                                                 {/* The Pulse Effect */}
                                                 {isCurrent && (
@@ -1109,7 +1120,9 @@ const CurriculumPathway = ({ curr, lessons, completedItems, isExpanded, onToggle
                                         {/* Right Side Label */}
                                         <div className={`w-1/2 flex justify-start pl-10 sm:pl-14 z-10 ${isLeft ? 'invisible' : ''}`}>
                                             <div className={`bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-4 rounded-3xl shadow-lg border border-white/40 dark:border-slate-700 w-full max-w-[160px] text-left transition-all duration-300 ${isCurrent ? 'scale-105 shadow-xl' : 'hover:scale-[1.02]'} ${isLocked ? 'pointer-events-none' : 'cursor-pointer'}`} onClick={() => !isLocked && onSelectLesson(item)}>
-                                                <span className={`text-[9px] font-black uppercase mb-1 block tracking-widest ${isCurrent ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>{isExam ? 'Checkpoint' : `Module 0${index + 1}`}</span>
+                                                <span className={`text-[9px] font-black uppercase mb-1 block tracking-widest ${isCurrent ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                                                    {item.contentType === 'exam' || item.contentType === 'test' ? 'Checkpoint' : `Module 0${index + 1}`}
+                                                </span>
                                                 <h4 className="font-black text-xs sm:text-sm text-slate-800 dark:text-slate-100 leading-tight">{item.title}</h4>
                                             </div>
                                         </div>
