@@ -65,7 +65,6 @@ export default function DiscoveryView({ networkDecks = {}, networkClasses = [], 
             const path = course.domainPath || [course.subject] || [];
             const matchesPath = domainPath.every((p, i) => path[i] === p);
             
-            // Check if it belongs in this sector
             if (matchesPath && path.length >= domainPath.length) courses.push(course);
         });
 
@@ -125,10 +124,6 @@ export default function DiscoveryView({ networkDecks = {}, networkClasses = [], 
         return (
             <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors relative overflow-hidden">
                 {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
-                
-                {/* 🔥 THE RADAR AMBIENCE */}
-                <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-[conic-gradient(var(--tw-gradient-stops))] from-indigo-500/5 via-slate-950 to-indigo-500/5 rounded-full pointer-events-none opacity-60 dark:opacity-40 animate-spin-slow z-0" />
-                <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-indigo-500/10 via-transparent to-transparent pointer-events-none z-0" />
                 
                 <header className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl border-b border-white/20 dark:border-slate-800 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm transition-colors duration-300">
                     <div className="flex items-center gap-3">
@@ -191,14 +186,9 @@ export default function DiscoveryView({ networkDecks = {}, networkClasses = [], 
                             onClick={() => handleNavigateIn('Linguistics & Phonetics')}
                             className="w-full relative overflow-hidden rounded-[2.5rem] p-[2px] active:scale-[0.98] transition-all group shadow-2xl"
                         >
-                            {/* Animated Border Shimmer */}
                             <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-500 bg-[length:200%_100%] animate-[shimmer_8s_linear_infinite] opacity-60 group-hover:opacity-100 transition-opacity" />
                             
                             <div className="relative bg-white/90 dark:bg-slate-950/90 backdrop-blur-3xl p-6 rounded-[2.4rem] text-left flex flex-col h-full overflow-hidden">
-                                {/* Holographic Glows */}
-                                <div className="absolute -top-20 -right-20 w-64 h-64 bg-indigo-600/20 blur-[80px] rounded-full pointer-events-none group-hover:bg-indigo-600/40 transition-colors duration-700" />
-                                <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-purple-600/10 blur-[80px] rounded-full pointer-events-none" />
-
                                 <div className="flex justify-between items-start mb-8 relative z-10">
                                     <div className="bg-slate-100/50 dark:bg-white/5 backdrop-blur-xl w-14 h-14 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-300 border border-white/40 dark:border-white/10 group-hover:scale-110 transition-transform shadow-lg shadow-indigo-500/20">
                                         <BookOpen size={28} strokeWidth={2.5} />
@@ -279,9 +269,6 @@ export default function DiscoveryView({ networkDecks = {}, networkClasses = [], 
             className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors animate-in slide-in-from-right-8 duration-300 pb-safe relative overflow-hidden"
         >
             {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
-            
-            {/* Ambient Backgrounds for Nested View */}
-            <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none -mt-20 -mr-20 z-0" />
 
             <div className="px-6 pt-safe-8 pb-6 shrink-0 bg-white/70 dark:bg-slate-950/70 backdrop-blur-2xl border-b border-white/20 dark:border-slate-800 sticky top-0 z-30 shadow-sm">
                 <button onClick={() => window.history.back()} className="flex items-center text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 mb-6 text-xs font-black uppercase tracking-widest bg-white/50 dark:bg-slate-900/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/40 dark:border-slate-700 shadow-sm active:scale-95 transition-all">
@@ -326,7 +313,6 @@ export default function DiscoveryView({ networkDecks = {}, networkClasses = [], 
                                 >
                                     <div className={`w-full h-28 bg-gradient-to-br ${course.gradient || course.themeColor || 'from-indigo-500 to-cyan-500'} p-4 flex justify-between items-start relative overflow-hidden`} style={course.themeColor ? { background: `linear-gradient(135deg, ${course.themeColor}, #000)` } : {}}>
                                         <div className="absolute inset-0 bg-black/10 mix-blend-overlay pointer-events-none" />
-                                        {/* Internal Glow for depth */}
                                         <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-white/20 blur-2xl rounded-full pointer-events-none" />
                                         
                                         <div className="bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white border border-white/20 shadow-sm relative z-10">
@@ -384,7 +370,7 @@ export default function DiscoveryView({ networkDecks = {}, networkClasses = [], 
 
                 {currentDecks.length > 0 && (
                     <div className="animate-in slide-in-from-bottom-8 duration-500">
-                        <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4 ml-2 flex items-center gap-2"><Layers size={14}/> Data Crystals</h4>
+                        <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4 ml-2 flex items-center gap-2"><Layers size={14}/> Study Decks</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {currentDecks.map((deck) => {
                                 const isUnlocked = userData?.unlocks?.[deck.id];
@@ -443,8 +429,6 @@ export default function DiscoveryView({ networkDecks = {}, networkClasses = [], 
                         {/* Deep Modal Hero */}
                         <div className={`shrink-0 w-full h-40 bg-gradient-to-br ${previewCourse.gradient || 'from-indigo-500 to-cyan-500'} relative flex items-end p-6 md:p-8 overflow-hidden`} style={previewCourse.themeColor ? { background: `linear-gradient(135deg, ${previewCourse.themeColor}, #000)` } : {}}>
                             <div className="absolute inset-0 bg-black/20 mix-blend-overlay pointer-events-none" />
-                            <div className="absolute -top-20 -right-20 w-64 h-64 bg-white/20 blur-3xl rounded-full pointer-events-none" />
-                            
                             <button onClick={() => window.history.back()} className="absolute top-6 right-6 p-2.5 bg-black/20 hover:bg-black/40 backdrop-blur-md border border-white/10 rounded-full text-white transition-all active:scale-95 z-20">
                                 <X size={20} strokeWidth={3} />
                             </button>
@@ -517,27 +501,26 @@ export default function DiscoveryView({ networkDecks = {}, networkClasses = [], 
                             )}
                         </div>
 
-                        {/* 🔥 Seductive CTA Button overlay */}
+                        {/* 🔥 Synchronous, Bulletproof Route Button */}
                         <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white/90 to-transparent dark:from-slate-950 dark:via-slate-950/90 pb-safe-6 pt-16 z-20">
                             <button 
                                 onClick={async () => {
+                                    // Capture the specific course payload immediately to prevent state closure staleness
+                                    const targetCourse = { ...previewCourse };
                                     const currentFlux = userData?.coins || userData?.profile?.main?.coins || userData?.flux || 0;
-                                    if (currentFlux >= (previewCourse.price || 0)) {
+                                    
+                                    if (currentFlux >= (targetCourse.price || 0)) {
                                         const result = await onPurchase(
-                                            previewCourse.id, 
-                                            previewCourse.price || 0, 
+                                            targetCourse.id, 
+                                            targetCourse.price || 0, 
                                             'course', 
-                                            { title: previewCourse.title || previewCourse.name, subject: previewCourse.domainPath?.[0] || 'General' }
+                                            { title: targetCourse.title || targetCourse.name, subject: targetCourse.domainPath?.[0] || 'General' }
                                         );
                                         
                                         if (result?.success) {
-                                            setToastMsg("Curriculum Decrypted! Routing to Classroom...");
-                                            // 🔥 Wait exactly 1 second for the dopamine to hit, then route!
-                                            setTimeout(() => {
-                                                const courseToOpen = previewCourse;
-                                                setPreviewCourse(null);
-                                                if (onOpenClass) onOpenClass(courseToOpen);
-                                            }, 1000);
+                                            // Ensure the exact object is passed to trigger StudentClassView instantly
+                                            setPreviewCourse(null);
+                                            if (onOpenClass) onOpenClass(targetCourse);
                                         } else {
                                             setToastMsg(result?.msg || "Transaction failed.");
                                         }
