@@ -27,7 +27,6 @@ import CelebrationScreen from './components/CelebrationScreen';
 import HoloAvatar from './components/HoloAvatar'; 
 
 // 🔥 DYNAMIC OS THEME ENGINE
-// 🔥 DYNAMIC OS THEME ENGINE
 // Because our CSS intercepts 'slate', we just use slate everywhere!
 // The wrapper class (.theme-hacker, .theme-synth, etc.) changes the actual colors natively.
 const OS_THEMES: Record<string, string> = {
@@ -41,7 +40,8 @@ export default function App() {
   const { 
     user, userData, authChecked, activeOrg, allLessons, 
     enrolledClasses, instructorClasses, allDecks, 
-    customCurriculums, activityLogs, actions 
+    customCurriculums, activityLogs, actions,
+    allClasses // 🔥 ADDED: Pulling live classes from the hook
   } = useMagisterData();
   
   // Navigation State
@@ -509,6 +509,7 @@ export default function App() {
               />
             ) : activeTab === 'discovery' ? (
               <DiscoveryView 
+                  networkClasses={allClasses || []} // 🔥 FED LIVE CLASSES TO RADAR
                   networkDecks={networkDecks} 
                   userData={userData} 
                   activeOrg={activeOrg} 
