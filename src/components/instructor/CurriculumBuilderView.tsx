@@ -55,49 +55,76 @@ export default function CurriculumBuilderView({ onSaveCurriculum, availableLesso
         setTimeline(newTimeline);
     };
 
-    // 🔥 THE GEM IMPORTER ENGINE
+    // 🔥 THE BULLETPROOF GEM IMPORTER ENGINE
     const handleImportJSON = () => {
         try {
-            const data = JSON.parse(jsonText);
+            let cleanText = jsonText.trim();
+            // Automatically strip markdown formatting if the user pasted the ```json ticks
+            if (cleanText.startsWith('```')) {
+                cleanText = cleanText.replace(/^```(json)?\n?/, '').replace(/\n?```$/, '');
+            }
             
-            // Extract Metadata (Handles both Curriculum objects and Master Class objects)
+            const data = JSON.parse(cleanText);
+            
+            // Handle the "Master Payload" structure where everything is nested
+            const classData = data.class || data;
+            const curriculumData = data.curriculum || data;
+            
+            // Extract Metadata
             const newMeta = { ...formData };
-            if (data.title || data.name) newMeta.title = data.title || data.name;
-            if (data.description) newMeta.description = data.description;
-            if (data.themeColor) newMeta.themeColor = data.themeColor;
-            if (data.grade || data.level) newMeta.level = data.grade || data.level;
+            if (classData.title) newMeta.title = classData.title;
+            else if (classData.name) newMeta.title = classData.name;
+            
+            if (classData.description) newMeta.description = classData.description;
+            if (classData.themeColor) newMeta.themeColor = classData.themeColor;
+            if (classData.grade) newMeta.level = classData.grade;
+            else if (classData.level) newMeta.level = classData.level;
             
             setFormData(newMeta);
 
             // Extract Timeline
             let newTimeline: any[] = [];
             
-            // If the Gem provided a detailed syllabus array
-            if (data.syllabus && Array.isArray(data.syllabus)) {
+            // STRATEGY 1: We have content_nodes and a curriculum map (BEST - Exact Chronological Order)
+            if (Array.isArray(data.content_nodes) && Array.isArray(curriculumData.lessonIds)) {
+                newTimeline = curriculumData.lessonIds.map((id: string) => {
+                    const node = data.content_nodes.find((n: any) => n.id === id);
+                    if (node) {
+                        return { id: node.id, title: node.title, type: node.type || 'lesson', contentType: node.contentType };
+                    }
+                    return { id, title: `Node: ${id}`, type: 'lesson' };
+                });
+            }
+            // STRATEGY 2: We just have content_nodes (Fallback)
+            else if (Array.isArray(data.content_nodes)) {
+                newTimeline = data.content_nodes.map((item: any) => ({
+                    id: item.id, title: item.title, type: item.type || 'lesson', contentType: item.contentType
+                }));
+            }
+            // STRATEGY 3: Gem gave us a flat syllabus array
+            else if (Array.isArray(data.syllabus)) {
                 newTimeline = data.syllabus.map((item: any, idx: number) => ({
-                    id: item.id || `imported_node_${idx}`,
-                    title: item.title || 'Untitled Node',
-                    type: item.type || 'lesson',
-                    contentType: item.contentType || (item.type === 'quiz' ? 'exam' : 'lesson')
+                    id: item.id || `node_${idx}`, title: item.title, type: item.type || 'lesson', contentType: item.contentType
                 }));
             } 
-            // If the Gem provided an array of string IDs (lessonIds)
-            else if (data.lessonIds && Array.isArray(data.lessonIds)) {
-                newTimeline = data.lessonIds.map((id: string) => {
-                    const existing = availableLessons.find((l: any) => l.id === id);
-                    return existing || { id, title: `Node: ${id}`, type: 'lesson' };
+            // STRATEGY 4: Gem just gave us string IDs
+            else if (Array.isArray(curriculumData.lessonIds)) {
+                newTimeline = curriculumData.lessonIds.map((id: string) => {
+                    const existing = availableLessons?.find((l: any) => l.id === id);
+                    let inferredType = 'lesson';
+                    if (id.includes('quiz') || id.includes('exam')) inferredType = 'quiz';
+                    if (id.includes('deck')) inferredType = 'deck';
+                    return existing || { id, title: `Node: ${id}`, type: inferredType };
                 });
             }
 
-            if (newTimeline.length > 0) {
-                setTimeline(newTimeline);
-            }
-
-            setToastMsg("Payload Decrypted & Injected! ⚡");
+            setTimeline(newTimeline);
+            setToastMsg(`Payload Decrypted! Enlisted ${newTimeline.length} Nodes. ⚡`);
             setShowJsonModal(false);
             setJsonText("");
         } catch (e) {
-            setToastMsg("Encryption Error: Invalid JSON Payload.");
+            console.error("Import Error:", e);
+            setToastMsg("Encryption Error: Invalid JSON or corrupted payload.");
         }
     };
 
