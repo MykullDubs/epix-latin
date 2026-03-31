@@ -138,6 +138,7 @@ export default function BuilderHub({
   onPublishDeck,       
   instructorClasses,    
   lessons, 
+  curriculums, // 🔥 ADDED: Receive curriculums prop from InstructorDashboard
   initialMode, 
   onClearMode 
 }: any) {
@@ -244,7 +245,7 @@ export default function BuilderHub({
       {/* WORKSPACE */}
       <div className="flex-1 flex overflow-hidden relative">
         
-{/* LEFT PANE: EDITOR */}
+        {/* LEFT PANE: EDITOR */}
         {/* 🔥 UPGRADED: Swapped custom-scrollbar for native hidden scroll utilities */}
         <div className={`h-full overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] transition-all duration-500 ease-in-out ${
           viewMode === 'edit' ? 'w-full md:w-1/2 opacity-100' : 'hidden md:block md:w-1/2 opacity-50 grayscale-[50%]'
@@ -278,7 +279,7 @@ export default function BuilderHub({
                     onUpdateCard={onUpdateCard} 
                     onDeleteCard={onDeleteCard} 
                     availableDecks={allDecks} 
-                    onPublishDeck={onPublishDeck}           
+                    onPublishDeck={onPublishDeck}            
                     instructorClasses={instructorClasses}   
                 />
               )}
@@ -309,11 +310,14 @@ export default function BuilderHub({
                 />
               )}
 
+              {/* 🔥 THE FIX: Wire up the instructorClasses and curriculums props! */}
               {mode === 'curriculum' && (
                 <div className="-mx-2 md:-mx-8">
                    <CurriculumBuilderView 
                       availableLessons={lessons} 
                       onSaveCurriculum={onSaveCurriculum} 
+                      classes={instructorClasses} // PASS DOWN
+                      curriculums={curriculums}   // PASS DOWN
                    />
                 </div>
               )}
