@@ -1,163 +1,139 @@
 // src/components/instructor/LiveSetupModal.tsx
 import React, { useState } from 'react';
-import { X, Zap, LayoutGrid, Play, Users, BookOpen, Shield, Gauge } from 'lucide-react'; // 🔥 Added Gauge for Slipstream
+import { X, Users, Layers, Zap, Gamepad2, Shield, Rocket, Target, Activity } from 'lucide-react';
 
-export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = [], onDeploy }: any) {
-    // 🔥 Added 'slipstream' to the allowed modes
-    const [selectedMode, setSelectedMode] = useState<'trivia' | 'connect_four' | 'slipstream' | null>(null);
-    const [selectedContent, setSelectedContent] = useState<string>('');
-    const [selectedClass, setSelectedClass] = useState<string>('');
+export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = {}, onDeploy }: any) {
+    const [selectedClassId, setSelectedClassId] = useState('');
+    const [selectedMode, setSelectedMode] = useState<'trivia' | 'connect_four' | 'slipstream'>('trivia');
+    const [selectedDeckId, setSelectedDeckId] = useState('');
 
     if (!isOpen) return null;
 
-    const handleDeploy = () => {
-        if (!selectedMode || !selectedContent || !selectedClass) return;
-        onDeploy({
-            mode: selectedMode,
-            contentId: selectedContent,
-            classId: selectedClass
+    // 🔥 Filter the dictionary into an array, ignoring the placeholder "custom" deck
+    const availableDecks = Object.values(decks || {}).filter((d: any) => d.id && d.id !== 'custom');
+
+    const handleLaunch = () => {
+        if (!selectedClassId) return alert("Commander, you must select a Target Cohort to deploy.");
+        if (!selectedDeckId) return alert("You must select a Data Crystal (Study Deck) to power the arena's questions.");
+        
+        // 🔥 This EXACT payload structure is what InstructorDashboard is waiting for
+        onDeploy({ 
+            mode: selectedMode, 
+            classId: selectedClassId, 
+            contentId: selectedDeckId 
         });
-        // Reset state for next time
-        setSelectedMode(null);
-        setSelectedContent('');
-        setSelectedClass('');
     };
 
-    const isReady = selectedMode && selectedContent && selectedClass;
-
     return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6">
-            {/* Backdrop */}
-            <div 
-                className="absolute inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-md transition-opacity animate-in fade-in duration-300"
-                onClick={onClose}
-            />
-
-            {/* Modal Container */}
-            <div className="relative w-full max-w-4xl bg-white dark:bg-slate-950 rounded-[3rem] shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-300 font-sans">
+            <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={onClose} />
+            
+            <div className="bg-slate-900 border-2 border-indigo-500/30 w-full max-w-3xl rounded-[3rem] shadow-[0_0_50px_rgba(99,102,241,0.2)] relative z-10 flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
                 
                 {/* Header */}
-                <div className="shrink-0 p-6 md:p-8 border-b border-slate-100 dark:border-slate-800/60 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center shadow-inner dark:shadow-none">
-                            <Play size={20} fill="currentColor" />
+                <div className="p-8 border-b border-slate-800 bg-slate-950/50 flex justify-between items-center relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-transparent pointer-events-none" />
+                    <div className="flex items-center gap-4 relative z-10">
+                        <div className="w-14 h-14 bg-indigo-500/20 text-indigo-400 rounded-2xl flex items-center justify-center shadow-inner border border-indigo-500/30">
+                            <Rocket size={28} />
                         </div>
                         <div>
-                            <h2 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tighter">Deploy Live Arena</h2>
-                            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Configure Multiplayer Protocol</p>
+                            <h2 className="text-2xl font-black text-white uppercase tracking-widest leading-none">Arena Deployment</h2>
+                            <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.3em] mt-1">Initialize Live Protocol</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-3 bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 rounded-full shadow-sm dark:shadow-none border border-slate-100 dark:border-slate-700 transition-colors">
-                        <X size={20} strokeWidth={3} />
+                    <button onClick={onClose} className="p-3 text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-full transition-all relative z-10">
+                        <X size={24} strokeWidth={2.5} />
                     </button>
                 </div>
 
-                {/* Body (Scrollable) */}
-                <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8 custom-scrollbar">
+                <div className="p-8 flex-1 overflow-y-auto custom-scrollbar space-y-8">
                     
-                    {/* STEP 1: Game Mode */}
-                    <section>
-                        <h3 className="text-xs font-black text-slate-800 dark:text-slate-300 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-slate-800 dark:bg-slate-700 text-white flex items-center justify-center text-[10px]">1</span> 
-                            Select Protocol
+                    {/* Step 1: Mode Selection */}
+                    <div className="space-y-4">
+                        <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                            <Gamepad2 size={16} /> 1. Select Arena Protocol
                         </h3>
-                        {/* 🔥 Grid updated to 3 columns to fit the new mode */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <button 
                                 onClick={() => setSelectedMode('trivia')}
-                                className={`p-6 rounded-[2rem] border-4 text-left transition-all active:scale-[0.98] ${selectedMode === 'trivia' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 shadow-lg shadow-emerald-500/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-emerald-200 dark:hover:border-emerald-500/50'}`}
+                                className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center text-center gap-3 ${selectedMode === 'trivia' ? 'bg-indigo-600/20 border-indigo-500 text-indigo-400 shadow-[inset_0_0_20px_rgba(99,102,241,0.2)]' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-600'}`}
                             >
-                                <Zap size={32} className={`mb-4 ${selectedMode === 'trivia' ? 'text-emerald-500' : 'text-slate-300 dark:text-slate-600'}`} fill={selectedMode === 'trivia' ? "currentColor" : "none"} />
-                                <h4 className={`text-xl font-black mb-1 ${selectedMode === 'trivia' ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-white'}`}>Speed Trivia</h4>
-                                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Fast-paced, individual multiple-choice arena. Highest accuracy and speed wins.</p>
+                                <Zap size={32} className={selectedMode === 'trivia' ? 'text-indigo-400' : 'text-slate-600'} />
+                                <span className="font-black uppercase tracking-widest text-sm">Vocab Battle</span>
                             </button>
-
                             <button 
                                 onClick={() => setSelectedMode('connect_four')}
-                                className={`p-6 rounded-[2rem] border-4 text-left transition-all active:scale-[0.98] ${selectedMode === 'connect_four' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 shadow-lg shadow-indigo-500/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-200 dark:hover:border-indigo-500/50'}`}
+                                className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center text-center gap-3 ${selectedMode === 'connect_four' ? 'bg-rose-600/20 border-rose-500 text-rose-400 shadow-[inset_0_0_20px_rgba(244,63,94,0.2)]' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-600'}`}
                             >
-                                <LayoutGrid size={32} className={`mb-4 ${selectedMode === 'connect_four' ? 'text-indigo-500' : 'text-slate-300 dark:text-slate-600'}`} />
-                                <h4 className={`text-xl font-black mb-1 ${selectedMode === 'connect_four' ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-800 dark:text-white'}`}>Squad Strike</h4>
-                                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Team-based tactical Connect Four. Answer correctly to unlock tactical drops.</p>
+                                <Target size={32} className={selectedMode === 'connect_four' ? 'text-rose-400' : 'text-slate-600'} />
+                                <span className="font-black uppercase tracking-widest text-sm">Squad Strike</span>
                             </button>
-
-                            {/* 🔥 NEW SLIPSTREAM BUTTON */}
                             <button 
                                 onClick={() => setSelectedMode('slipstream')}
-                                className={`p-6 rounded-[2rem] border-4 text-left transition-all active:scale-[0.98] ${selectedMode === 'slipstream' ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-500/10 shadow-lg shadow-cyan-500/20' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-cyan-200 dark:hover:border-cyan-500/50'}`}
+                                className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center text-center gap-3 ${selectedMode === 'slipstream' ? 'bg-emerald-600/20 border-emerald-500 text-emerald-400 shadow-[inset_0_0_20px_rgba(16,185,129,0.2)]' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-600'}`}
                             >
-                                <Gauge size={32} className={`mb-4 ${selectedMode === 'slipstream' ? 'text-cyan-500' : 'text-slate-300 dark:text-slate-600'}`} />
-                                <h4 className={`text-xl font-black mb-1 ${selectedMode === 'slipstream' ? 'text-cyan-700 dark:text-cyan-400' : 'text-slate-800 dark:text-white'}`}>Slipstream</h4>
-                                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Self-paced cyber race. Students pull the deck locally and race to the finish line.</p>
+                                <Activity size={32} className={selectedMode === 'slipstream' ? 'text-emerald-400' : 'text-slate-600'} />
+                                <span className="font-black uppercase tracking-widest text-sm">Slipstream</span>
                             </button>
                         </div>
-                    </section>
-
-                    {/* STEP 2 & 3: Configuration */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-                        <section>
-                            <h3 className="text-xs font-black text-slate-800 dark:text-slate-300 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                <span className="w-5 h-5 rounded-full bg-slate-800 dark:bg-slate-700 text-white flex items-center justify-center text-[10px]">2</span> 
-                                Target Content
-                            </h3>
-                            <div className="relative">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                                    <BookOpen size={18} />
-                                </div>
-                                <select 
-                                    value={selectedContent}
-                                    onChange={(e) => setSelectedContent(e.target.value)}
-                                    className="w-full bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 text-slate-800 dark:text-white font-bold rounded-2xl pl-12 pr-4 py-4 outline-none focus:border-indigo-500 dark:focus:border-indigo-500 transition-colors appearance-none cursor-pointer shadow-sm"
-                                >
-                                    <option value="" disabled>Select a Deck...</option>
-                                    {Object.entries(decks).map(([id, deck]: any) => (
-                                        <option key={id} value={id}>{deck.title}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </section>
-
-                        <section>
-                            <h3 className="text-xs font-black text-slate-800 dark:text-slate-300 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                <span className="w-5 h-5 rounded-full bg-slate-800 dark:bg-slate-700 text-white flex items-center justify-center text-[10px]">3</span> 
-                                Target Cohort
-                            </h3>
-                            <div className="relative">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                                    <Shield size={18} />
-                                </div>
-                                <select 
-                                    value={selectedClass}
-                                    onChange={(e) => setSelectedClass(e.target.value)}
-                                    className="w-full bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 text-slate-800 dark:text-white font-bold rounded-2xl pl-12 pr-4 py-4 outline-none focus:border-indigo-500 dark:focus:border-indigo-500 transition-colors appearance-none cursor-pointer shadow-sm"
-                                >
-                                    <option value="" disabled>Select a Class...</option>
-                                    {classes.map((c: any) => (
-                                        <option key={c.id} value={c.id}>{c.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </section>
                     </div>
 
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* Step 2: Cohort */}
+                        <div className="space-y-4">
+                            <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                <Users size={16} /> 2. Target Cohort
+                            </h3>
+                            <div className="space-y-2">
+                                {classes.length === 0 ? (
+                                    <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-slate-500 text-sm font-bold text-center">No cohorts found.</div>
+                                ) : (
+                                    classes.map((c: any) => (
+                                        <button 
+                                            key={c.id} onClick={() => setSelectedClassId(c.id)}
+                                            className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between text-left ${selectedClassId === c.id ? 'bg-indigo-600/20 border-indigo-500 shadow-sm' : 'bg-slate-950 border-slate-800 hover:border-slate-700'}`}
+                                        >
+                                            <span className={`font-black text-sm uppercase tracking-widest ${selectedClassId === c.id ? 'text-indigo-400' : 'text-slate-300'}`}>{c.name}</span>
+                                            {selectedClassId === c.id && <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />}
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Step 3: Ammo (Deck) */}
+                        <div className="space-y-4">
+                            <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                <Layers size={16} /> 3. Data Crystal (Ammo)
+                            </h3>
+                            <div className="space-y-2 max-h-[250px] overflow-y-auto custom-scrollbar pr-2">
+                                {availableDecks.length === 0 ? (
+                                    <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-slate-500 text-sm font-bold text-center">No decks available.</div>
+                                ) : (
+                                    availableDecks.map((d: any) => (
+                                        <button 
+                                            key={d.id} onClick={() => setSelectedDeckId(d.id)}
+                                            className={`w-full p-4 rounded-2xl border-2 transition-all flex flex-col text-left ${selectedDeckId === d.id ? 'bg-amber-500/10 border-amber-500 shadow-sm' : 'bg-slate-950 border-slate-800 hover:border-slate-700'}`}
+                                        >
+                                            <span className={`font-black text-sm leading-tight mb-1 ${selectedDeckId === d.id ? 'text-amber-400' : 'text-slate-300'}`}>{d.title || d.name || 'Untitled Deck'}</span>
+                                            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">{d.cards?.length || d.stats?.cardCount || 0} Targets</span>
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Footer / Action */}
-                <div className="shrink-0 p-6 md:p-8 border-t border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/50 flex justify-end">
+                <div className="p-8 bg-slate-950/50 border-t border-slate-800 shrink-0">
                     <button 
-                        onClick={handleDeploy}
-                        disabled={!isReady}
-                        className={`flex items-center gap-3 px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all active:scale-95 ${
-                            isReady 
-                            ? 'bg-indigo-600 dark:bg-indigo-500 text-white shadow-xl shadow-indigo-500/30 hover:bg-indigo-700 dark:hover:bg-indigo-400' 
-                            : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'
-                        }`}
+                        onClick={handleLaunch}
+                        className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[1.5rem] font-black text-lg uppercase tracking-widest shadow-[0_0_30px_rgba(99,102,241,0.4)] active:scale-95 transition-all flex items-center justify-center gap-3"
                     >
-                        <Zap size={18} fill={isReady ? "currentColor" : "none"} />
-                        Initialize Protocol
+                        <Shield size={24} /> Authorize Deployment
                     </button>
                 </div>
-
             </div>
         </div>
     );
