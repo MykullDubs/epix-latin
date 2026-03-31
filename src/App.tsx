@@ -513,6 +513,7 @@ export default function App() {
                   classData={activeStudentClass} 
                   lessons={allLessons} 
                   curriculums={allCurriculums}
+                  allDecks={allDecks}
                   onBack={() => setActiveStudentClass(null)} 
                   onSelectLesson={setActiveLesson} 
                   setActiveTab={setActiveTab} 
