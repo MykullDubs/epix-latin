@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Layers, BookOpen, FileText, Gamepad2, X, Edit3, Eye, Zap, Map, 
-  Wrench, Search, Loader2, Volume2, AlertCircle // 🔥 Added Tool Icons
+  Wrench, Search, Loader2, Volume2, AlertCircle 
 } from 'lucide-react';
 import { JuicyToast } from '../Toast';
 import CardBuilderView from './CardBuilderView';
@@ -138,7 +138,7 @@ export default function BuilderHub({
   onPublishDeck,       
   instructorClasses,    
   lessons, 
-  curriculums, // 🔥 ADDED: Receive curriculums prop from InstructorDashboard
+  curriculums, 
   initialMode, 
   onClearMode 
 }: any) {
@@ -147,7 +147,6 @@ export default function BuilderHub({
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   
-  // 🔥 STATE FOR THE NEW PHONETIC ENGINE
   const [isToolsOpen, setIsToolsOpen] = useState(false);
 
   useEffect(() => { if (initialMode) setMode(initialMode); }, [initialMode]);
@@ -191,29 +190,31 @@ export default function BuilderHub({
           </div>
         </div>
 
-        {/* Mobile View Toggles */}
-        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl md:hidden border border-slate-200 dark:border-slate-700">
-          <button 
-            onClick={() => setViewMode('edit')}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-              viewMode === 'edit' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-md' : 'text-slate-400 dark:text-slate-500'
-            }`}
-          >
-            <Edit3 size={14} /> Edit
-          </button>
-          <button 
-            onClick={() => setViewMode('preview')}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-              viewMode === 'preview' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-md' : 'text-slate-400 dark:text-slate-500'
-            }`}
-          >
-            <Eye size={14} /> Preview
-          </button>
-        </div>
+        {/* Mobile View Toggles (Hidden when in Curriculum Mode) */}
+        {mode !== 'curriculum' && (
+          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl md:hidden border border-slate-200 dark:border-slate-700">
+            <button 
+              onClick={() => setViewMode('edit')}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                viewMode === 'edit' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-md' : 'text-slate-400 dark:text-slate-500'
+              }`}
+            >
+              <Edit3 size={14} /> Edit
+            </button>
+            <button 
+              onClick={() => setViewMode('preview')}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                viewMode === 'preview' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-md' : 'text-slate-400 dark:text-slate-500'
+              }`}
+            >
+              <Eye size={14} /> Preview
+            </button>
+          </div>
+        )}
 
         <div className="flex items-center gap-3">
           
-          {/* 🔥 THE NEW TOOLS BUTTON */}
+          {/* THE NEW TOOLS BUTTON */}
           <button 
              onClick={() => setIsToolsOpen(!isToolsOpen)}
              className={`p-3 rounded-2xl transition-all border ${isToolsOpen ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/30' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 hover:text-indigo-500 dark:hover:text-indigo-400 hover:border-indigo-200 dark:hover:border-indigo-500/50'}`}
@@ -228,6 +229,18 @@ export default function BuilderHub({
             </button>
           )}
           
+          {/* Desktop View Toggles (Hidden when in Curriculum Mode) */}
+          {mode !== 'curriculum' && (
+            <div className="hidden md:flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl shrink-0 mr-4">
+                <button onClick={() => setViewMode('edit')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${viewMode === 'edit' ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                    <Edit3 size={14} /> Edit
+                </button>
+                <button onClick={() => setViewMode('preview')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${viewMode === 'preview' ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                    <Eye size={14} /> Preview
+                </button>
+            </div>
+          )}
+
           {mode !== 'exam' && mode !== 'curriculum' && (
             <button 
                onClick={handleCommit}
@@ -246,11 +259,13 @@ export default function BuilderHub({
       <div className="flex-1 flex overflow-hidden relative">
         
         {/* LEFT PANE: EDITOR */}
-        {/* 🔥 UPGRADED: Swapped custom-scrollbar for native hidden scroll utilities */}
         <div className={`h-full overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] transition-all duration-500 ease-in-out ${
-          viewMode === 'edit' ? 'w-full md:w-1/2 opacity-100' : 'hidden md:block md:w-1/2 opacity-50 grayscale-[50%]'
+          // 🔥 IF CURRICULUM MODE: Force full width. ELSE: respect the preview toggle.
+          mode === 'curriculum' 
+            ? 'w-full opacity-100' 
+            : (viewMode === 'edit' ? 'w-full md:w-1/2 opacity-100' : 'hidden md:block md:w-1/2 opacity-50 grayscale-[50%]')
         }`}>
-          <div className="p-6 md:p-12 max-w-2xl mx-auto pb-40">
+          <div className={`p-6 md:p-12 mx-auto pb-40 transition-all duration-500 ${mode === 'curriculum' ? 'max-w-5xl' : 'max-w-2xl'}`}>
             
             {/* The Mode Selector */}
             <div className="mb-10 flex flex-wrap bg-slate-200/50 dark:bg-slate-800/50 p-1.5 rounded-[2rem] w-fit mx-auto md:mx-0 gap-1 border border-slate-200 dark:border-slate-800">
@@ -310,14 +325,13 @@ export default function BuilderHub({
                 />
               )}
 
-              {/* 🔥 THE FIX: Wire up the instructorClasses and curriculums props! */}
               {mode === 'curriculum' && (
                 <div className="-mx-2 md:-mx-8">
                    <CurriculumBuilderView 
                       availableLessons={lessons} 
                       onSaveCurriculum={onSaveCurriculum} 
-                      classes={instructorClasses} // PASS DOWN
-                      curriculums={curriculums}   // PASS DOWN
+                      classes={instructorClasses} 
+                      curriculums={curriculums}   
                    />
                 </div>
               )}
@@ -325,90 +339,86 @@ export default function BuilderHub({
           </div>
         </div>
 
-        {/* RIGHT PANE: LIVE PREVIEW */}
-        <div className={`h-full bg-slate-100 dark:bg-slate-950/50 border-l border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center p-6 md:p-12 transition-all duration-500 ${
-          viewMode === 'preview' ? 'flex w-full md:w-1/2' : 'hidden md:flex md:w-1/2'
-        }`}>
-          <div className="relative w-full h-full max-w-sm max-h-[750px] group flex flex-col items-center justify-center">
-            
-            {mode === 'exam' && (
-                <div className="w-full max-w-xs aspect-[9/16] bg-white dark:bg-slate-900 border-4 border-dashed border-slate-200 dark:border-slate-800 rounded-[3rem] shadow-sm flex flex-col items-center justify-center p-8 text-center animate-in zoom-in-95 duration-500">
-                    <FileText size={64} className="text-slate-200 dark:text-slate-700 mb-6" />
-                    <h3 className="text-lg font-black text-slate-800 dark:text-white mb-2">Exam Preview</h3>
-                    <p className="text-sm font-bold text-slate-400 dark:text-slate-500">Assessments are rendered dynamically in the student's isolated testing environment.</p>
-                </div>
-            )}
+        {/* RIGHT PANE: LIVE PREVIEW (Hidden in Curriculum Mode) */}
+        {mode !== 'curriculum' && (
+            <div className={`h-full bg-slate-100 dark:bg-slate-950/50 border-l border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center p-6 md:p-12 transition-all duration-500 ${
+              viewMode === 'preview' ? 'flex w-full md:w-1/2' : 'hidden md:flex md:w-1/2'
+            }`}>
+              <div className="relative w-full h-full max-w-sm max-h-[750px] group flex flex-col items-center justify-center">
+                
+                {mode === 'exam' && (
+                    <div className="w-full max-w-xs aspect-[9/16] bg-white dark:bg-slate-900 border-4 border-dashed border-slate-200 dark:border-slate-800 rounded-[3rem] shadow-sm flex flex-col items-center justify-center p-8 text-center animate-in zoom-in-95 duration-500">
+                        <FileText size={64} className="text-slate-200 dark:text-slate-700 mb-6" />
+                        <h3 className="text-lg font-black text-slate-800 dark:text-white mb-2">Exam Preview</h3>
+                        <p className="text-sm font-bold text-slate-400 dark:text-slate-500">Assessments are rendered dynamically in the student's isolated testing environment.</p>
+                    </div>
+                )}
 
-            {mode === 'curriculum' && (
-                <div className="w-full max-w-xs aspect-[9/16] bg-white dark:bg-slate-900 border-4 border-dashed border-cyan-200 dark:border-cyan-900/50 rounded-[3rem] shadow-sm flex flex-col items-center justify-center p-8 text-center animate-in zoom-in-95 duration-500">
-                    <Map size={64} className="text-cyan-200 dark:text-cyan-900/50 mb-6" />
-                    <h3 className="text-lg font-black text-cyan-900 dark:text-cyan-400 mb-2">Pathway Preview</h3>
-                    <p className="text-sm font-bold text-cyan-700/60 dark:text-cyan-500/60">Curriculums are beautifully rendered as a continuous journey in the global vault.</p>
-                </div>
-            )}
-
-            {mode === 'arcade' && (
-                <div className="w-full h-full bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border-[12px] border-slate-900 dark:border-black animate-in zoom-in-95 duration-500 relative">
-                    <div className="absolute inset-0 bg-amber-500/10 z-0" />
-                    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative z-10">
-                        <div className="w-24 h-24 bg-amber-100 dark:bg-amber-500/20 text-amber-500 rounded-[2.5rem] flex items-center justify-center mb-6 shadow-inner dark:shadow-none border border-amber-200 dark:border-amber-500/30 rotate-12">
-                            <Gamepad2 size={48} />
-                        </div>
-                        <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-2 leading-tight">
-                            {lessonData.title || "Untitled Game"}
-                        </h3>
-                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest bg-white/80 dark:bg-slate-950/80 px-4 py-2 rounded-full mb-8 border border-slate-100 dark:border-slate-800">
-                            Template: {lessonData.gameTemplate?.replace('-', ' ') || 'None'}
-                        </p>
-                        
-                        <div className="w-full bg-white/80 dark:bg-slate-950/80 backdrop-blur-md rounded-2xl p-6 border border-slate-100 dark:border-slate-800 text-left space-y-4">
-                            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
-                                <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Mode</span>
-                                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{lessonData.mode === 'pvc' ? 'vs CPU' : 'Pass & Play'}</span>
+                {mode === 'arcade' && (
+                    <div className="w-full h-full bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border-[12px] border-slate-900 dark:border-black animate-in zoom-in-95 duration-500 relative">
+                        <div className="absolute inset-0 bg-amber-500/10 z-0" />
+                        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative z-10">
+                            <div className="w-24 h-24 bg-amber-100 dark:bg-amber-500/20 text-amber-500 rounded-[2.5rem] flex items-center justify-center mb-6 shadow-inner dark:shadow-none border border-amber-200 dark:border-amber-500/30 rotate-12">
+                                <Gamepad2 size={48} />
                             </div>
-                            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
-                                <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Win Goal</span>
-                                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{lessonData.targetScore || 3} Points</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Vocab Ammo</span>
-                                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{lessonData.deckIds?.length || 0} Decks</span>
+                            <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-2 leading-tight">
+                                {lessonData.title || "Untitled Game"}
+                            </h3>
+                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest bg-white/80 dark:bg-slate-950/80 px-4 py-2 rounded-full mb-8 border border-slate-100 dark:border-slate-800">
+                                Template: {lessonData.gameTemplate?.replace('-', ' ') || 'None'}
+                            </p>
+                            
+                            <div className="w-full bg-white/80 dark:bg-slate-950/80 backdrop-blur-md rounded-2xl p-6 border border-slate-100 dark:border-slate-800 text-left space-y-4">
+                                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
+                                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Mode</span>
+                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{lessonData.mode === 'pvc' ? 'vs CPU' : 'Pass & Play'}</span>
+                                </div>
+                                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
+                                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Win Goal</span>
+                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{lessonData.targetScore || 3} Points</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Vocab Ammo</span>
+                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{lessonData.deckIds?.length || 0} Decks</span>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {(mode === 'lesson' || mode === 'card') && (
-                <>
-                    <div className="absolute -inset-4 bg-gradient-to-tr from-indigo-500/10 to-emerald-500/10 blur-2xl rounded-[4rem] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                    <div className="relative h-full w-full animate-in zoom-in-95 duration-500 shadow-2xl rounded-[3rem] border-[12px] border-slate-900 dark:border-black overflow-hidden">
-                      <LivePreview data={lessonData} />
-                    </div>
-                </>
-            )}
+                {(mode === 'lesson' || mode === 'card') && (
+                    <>
+                        <div className="absolute -inset-4 bg-gradient-to-tr from-indigo-500/10 to-emerald-500/10 blur-2xl rounded-[4rem] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                        <div className="relative h-full w-full animate-in zoom-in-95 duration-500 shadow-2xl rounded-[3rem] border-[12px] border-slate-900 dark:border-black overflow-hidden">
+                          <LivePreview data={lessonData} />
+                        </div>
+                    </>
+                )}
 
-            {mode !== 'exam' && mode !== 'curriculum' && (
-                <button 
-                    onClick={handleCommit}
-                    className={`absolute -bottom-6 left-1/2 -translate-x-1/2 text-white px-10 py-5 rounded-[2rem] font-black text-[10px] uppercase tracking-[0.3em] shadow-2xl md:hidden flex items-center gap-3 active:scale-90 transition-all ${mode === 'arcade' ? 'bg-amber-500 shadow-amber-500/40' : 'bg-indigo-600 shadow-indigo-500/40'}`}
-                >
-                    <Zap size={16} className={mode === 'arcade' ? 'text-white' : 'text-indigo-200'} /> Commit to Library
-                </button>
-            )}
+                {mode !== 'exam' && mode !== 'curriculum' && (
+                    <button 
+                        onClick={handleCommit}
+                        className={`absolute -bottom-6 left-1/2 -translate-x-1/2 text-white px-10 py-5 rounded-[2rem] font-black text-[10px] uppercase tracking-[0.3em] shadow-2xl md:hidden flex items-center gap-3 active:scale-90 transition-all ${mode === 'arcade' ? 'bg-amber-500 shadow-amber-500/40' : 'bg-indigo-600 shadow-indigo-500/40'}`}
+                    >
+                        <Zap size={16} className={mode === 'arcade' ? 'text-white' : 'text-indigo-200'} /> Commit to Library
+                    </button>
+                )}
+              </div>
+            </div>
+        )}
+      </div>
+
+      {/* MOBILE/TABLET FOOTER (Hidden in Curriculum Mode) */}
+      {mode !== 'curriculum' && (
+          <div className={`md:hidden fixed bottom-10 left-1/2 -translate-x-1/2 z-50 transition-all duration-500 ${
+            viewMode === 'edit' ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'
+          }`}>
+            <div className="bg-slate-900/90 dark:bg-slate-800/90 backdrop-blur-xl border border-slate-700 px-8 py-4 rounded-full shadow-2xl flex items-center gap-4">
+              <div className={`w-2 h-2 rounded-full animate-pulse ${activeModeConfig.color.replace('text-', 'bg-')}`} />
+              <p className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Editing: {mode}</p>
+            </div>
           </div>
-        </div>
-      </div>
-
-      {/* MOBILE/TABLET FOOTER */}
-      <div className={`md:hidden fixed bottom-10 left-1/2 -translate-x-1/2 z-50 transition-all duration-500 ${
-        viewMode === 'edit' ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'
-      }`}>
-        <div className="bg-slate-900/90 dark:bg-slate-800/90 backdrop-blur-xl border border-slate-700 px-8 py-4 rounded-full shadow-2xl flex items-center gap-4">
-          <div className={`w-2 h-2 rounded-full animate-pulse ${activeModeConfig.color.replace('text-', 'bg-')}`} />
-          <p className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Editing: {mode}</p>
-        </div>
-      </div>
+      )}
     </div> 
   );
 }
