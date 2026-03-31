@@ -23,76 +23,8 @@ const MACRO_DOMAINS = [
     { id: 'media', title: 'Media & Entertainment', icon: MonitorPlay, gradient: 'from-pink-500 to-rose-400', text: 'text-pink-500', shadow: 'shadow-pink-500/30', desc: 'Movies, gaming, and pop culture' },
 ];
 
-const MOCK_COURSES = [
-    {
-        id: 'course_kitchen_span',
-        title: 'KitchenComm: Advanced Line Spanish',
-        description: 'Master the chaotic, high-speed vocabulary required to run a quick-service kitchen line without translation delays.',
-        domainPath: ['Culinary & Hospitality'],
-        difficulty: 'B2 Intermediate',
-        duration: '4 Hours',
-        price: 2500,
-        features: { decks: 4, quizzes: 8, audio: true },
-        gradient: 'from-orange-500 to-rose-600',
-        syllabus: [
-            { title: 'Station Prep & Ingredients', type: 'deck' },
-            { title: 'The Heat of the Rush (Audio Quiz)', type: 'quiz' },
-            { title: 'Allergies & Cross-Contamination', type: 'deck' },
-            { title: 'Line Cook Commands: Speed Test', type: 'match' }
-        ]
-    },
-    {
-        id: 'course_esl_pitch',
-        title: 'The Silicon Pitch: ESL for Founders',
-        description: 'Drop the textbook English. Learn the exact phrasing, pacing, and idioms used by startup founders to raise capital.',
-        domainPath: ['Linguistics & Phonetics'],
-        difficulty: 'C1 Advanced',
-        duration: '6 Hours',
-        price: 4000,
-        features: { decks: 5, quizzes: 10, audio: true },
-        gradient: 'from-indigo-500 to-purple-600',
-        syllabus: [
-            { title: 'Deconstructing the Elevator Pitch', type: 'deck' },
-            { title: 'Financial Metrics & Burn Rate', type: 'deck' },
-            { title: 'Handling Q&A (Simulated Pressure)', type: 'quiz' },
-            { title: 'The Closing Ask', type: 'deck' }
-        ]
-    },
-    {
-        id: 'course_us_civic_architecture',
-        title: 'American Civic Architecture',
-        description: 'Decode the structural framework of the United States. Analyze the balance of power, the mechanics of representative democracy, and the mathematics of the Electoral College.',
-        domainPath: ['Society & Politics'],
-        difficulty: 'B1 Intermediate',
-        duration: '8 Hours',
-        price: 3000,
-        features: { decks: 4, quizzes: 4, lessons: 4 },
-        gradient: 'from-cyan-500 to-blue-600', 
-        syllabus: [
-            // Phase 1: The Foundation
-            { title: 'The Democratic Republic (Theory)', type: 'lesson' },
-            { title: 'Lexicon of the Republic', type: 'deck' },
-            { title: 'Foundation Diagnostics', type: 'quiz' },
-            
-            // Phase 2: The Power Split
-            { title: 'The Three Pillars: Exec, Leg, Jud', type: 'lesson' },
-            { title: 'Branches & Powers Data-Nodes', type: 'deck' },
-            { title: 'Checks & Balances Simulator', type: 'quiz' },
-            
-            // Phase 3: The Voting Algorithm
-            { title: 'The Electoral College Matrix', type: 'lesson' },
-            { title: 'Electoral Terminology & Mechanics', type: 'deck' },
-            { title: 'Electoral Mathematics Audit', type: 'quiz' },
-
-            // Phase 4: State vs Federal
-            { title: 'Federalism: The Dual-Layer System', type: 'lesson' },
-            { title: 'Jurisdictions & State Rights', type: 'deck' },
-            { title: 'Final System Architecture Exam', type: 'quiz' }
-        ]
-    }
-];
-
-export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, onPurchase, userData, activeOrg }: any) {
+// 🔥 UPDATED PROPS: Now accepts networkClasses from Firebase!
+export default function DiscoveryView({ networkDecks = {}, networkClasses = [], onDownloadDeck, onPurchase, userData, activeOrg }: any) {
     const [domainPath, setDomainPath] = useState<string[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [touchStartCoords, setTouchStartCoords] = useState<{x: number, y: number} | null>(null);
@@ -115,6 +47,7 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, onPur
     const themeName = activeOrg?.name || 'Magister';
     const targetLang = userData?.targetLanguage || "English";
 
+    // 🔥 DYNAMIC FILTER ENGINE
     const { currentFolders, currentDecks, currentCourses } = useMemo(() => {
         const folders = new Set<string>();
         const decks: any[] = [];
@@ -128,10 +61,13 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, onPur
             else decks.push(deck);
         });
 
-        MOCK_COURSES.forEach((course: any) => {
-            const path = course.domainPath || [];
+        // 🔥 Reads directly from Firebase published classes!
+        networkClasses.forEach((course: any) => {
+            const path = course.domainPath || [course.subject] || [];
             const matchesPath = domainPath.every((p, i) => path[i] === p);
-            if (matchesPath && path.length === domainPath.length) courses.push(course);
+            
+            // Check if it belongs in this sector
+            if (matchesPath && path.length >= domainPath.length) courses.push(course);
         });
 
         return { 
@@ -139,7 +75,7 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, onPur
             currentDecks: decks.sort((a, b) => b.updatedAt - a.updatedAt),
             currentCourses: courses
         };
-    }, [globalDecks, domainPath]);
+    }, [globalDecks, networkClasses, domainPath]);
 
     const rootDomainName = domainPath[0];
     const rootMacroConfig = MACRO_DOMAINS.find(m => m.title === rootDomainName);
@@ -310,7 +246,7 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, onPur
                         <div className="grid grid-cols-2 gap-4">
                             {MACRO_DOMAINS.map((domain) => {
                                 const Icon = domain.icon;
-                                const hasContent = globalDecks.some((d: any) => d.domainPath?.[0] === domain.title) || MOCK_COURSES.some(c => c.domainPath?.[0] === domain.title);
+                                const hasContent = globalDecks.some((d: any) => d.domainPath?.[0] === domain.title) || networkClasses.some((c: any) => c.domainPath?.[0] === domain.title || c.subject === domain.title);
                                 return (
                                     <button 
                                         key={domain.id}
@@ -389,32 +325,32 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, onPur
                                     onClick={() => handleOpenCourse(course)}
                                     className="snap-start shrink-0 w-[300px] text-left bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl rounded-[2.5rem] border border-white/50 dark:border-slate-800 transition-all duration-300 flex flex-col active:scale-[0.98] shadow-lg hover:-translate-y-1 hover:shadow-2xl hover:shadow-indigo-500/10 hover:border-indigo-300 dark:hover:border-indigo-500/50 group overflow-hidden"
                                 >
-                                    <div className={`w-full h-28 bg-gradient-to-br ${course.gradient} p-4 flex justify-between items-start relative overflow-hidden`}>
+                                    <div className={`w-full h-28 bg-gradient-to-br ${course.gradient || course.themeColor || 'from-indigo-500 to-cyan-500'} p-4 flex justify-between items-start relative overflow-hidden`} style={course.themeColor ? { background: `linear-gradient(135deg, ${course.themeColor}, #000)` } : {}}>
                                         <div className="absolute inset-0 bg-black/10 mix-blend-overlay pointer-events-none" />
                                         {/* Internal Glow for depth */}
                                         <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-white/20 blur-2xl rounded-full pointer-events-none" />
                                         
                                         <div className="bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white border border-white/20 shadow-sm relative z-10">
-                                            {course.difficulty}
+                                            {course.difficulty || course.grade || 'Module'}
                                         </div>
                                         <div className="bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white border border-white/20 shadow-sm flex items-center gap-1.5 relative z-10">
-                                            <Clock size={12} /> {course.duration}
+                                            <Clock size={12} /> {course.duration || 'Flexible'}
                                         </div>
                                     </div>
                                     <div className="p-6 flex flex-col flex-1">
-                                        <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 leading-tight line-clamp-2 mb-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{course.title}</h3>
+                                        <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 leading-tight line-clamp-2 mb-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{course.title || course.name}</h3>
                                         <p className="text-xs font-bold text-slate-500 dark:text-slate-400 line-clamp-2 mb-6">{course.description}</p>
                                         <div className="mt-auto flex items-center justify-between pt-4 border-t border-slate-200/50 dark:border-slate-800/50">
                                             <div className="flex items-center gap-3 text-slate-400 dark:text-slate-500">
                                                 <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest">
-                                                    <Layers size={12}/> {course.features.decks}
+                                                    <Layers size={12}/> {course.features?.decks || 0}
                                                 </div>
                                                 <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest">
-                                                    <HelpCircle size={12}/> {course.features.quizzes}
+                                                    <HelpCircle size={12}/> {course.features?.quizzes || 0}
                                                 </div>
                                             </div>
                                             <div className="bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1 shadow-sm border border-amber-200 dark:border-amber-500/20 group-hover:scale-105 transition-transform">
-                                                <Lock size={10} /> {course.price} Flux
+                                                <Lock size={10} /> {course.price || 0} Flux
                                             </div>
                                         </div>
                                     </div>
@@ -506,7 +442,7 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, onPur
                     
                     <div className="bg-white/90 dark:bg-slate-950/90 backdrop-blur-3xl w-full h-[85vh] rounded-t-[2.5rem] shadow-2xl relative z-10 animate-in slide-in-from-bottom-full duration-500 overflow-hidden flex flex-col border-t border-white/20 dark:border-slate-800">
                         {/* Deep Modal Hero */}
-                        <div className={`shrink-0 w-full h-40 bg-gradient-to-br ${previewCourse.gradient} relative flex items-end p-6 md:p-8 overflow-hidden`}>
+                        <div className={`shrink-0 w-full h-40 bg-gradient-to-br ${previewCourse.gradient || 'from-indigo-500 to-cyan-500'} relative flex items-end p-6 md:p-8 overflow-hidden`} style={previewCourse.themeColor ? { background: `linear-gradient(135deg, ${previewCourse.themeColor}, #000)` } : {}}>
                             <div className="absolute inset-0 bg-black/20 mix-blend-overlay pointer-events-none" />
                             <div className="absolute -top-20 -right-20 w-64 h-64 bg-white/20 blur-3xl rounded-full pointer-events-none" />
                             
@@ -517,17 +453,17 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, onPur
                             
                             <div className="relative z-10 flex gap-2 w-full mt-auto">
                                 <span className="bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white border border-white/20 shadow-sm flex items-center gap-1.5">
-                                    <SignalHigh size={12} /> {previewCourse.difficulty}
+                                    <SignalHigh size={12} /> {previewCourse.difficulty || previewCourse.grade || 'Module'}
                                 </span>
                                 <span className="bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white border border-white/20 shadow-sm flex items-center gap-1.5">
-                                    <Clock size={12} /> {previewCourse.duration}
+                                    <Clock size={12} /> {previewCourse.duration || 'Flexible'}
                                 </span>
                             </div>
                         </div>
 
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-8 space-y-10 pb-32">
                             <div>
-                                <h2 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white leading-tight mb-4 tracking-tighter drop-shadow-sm">{previewCourse.title}</h2>
+                                <h2 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white leading-tight mb-4 tracking-tighter drop-shadow-sm">{previewCourse.title || previewCourse.name}</h2>
                                 <p className="text-sm font-bold text-slate-600 dark:text-slate-300 leading-relaxed">{previewCourse.description}</p>
                             </div>
                             
@@ -537,14 +473,14 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, onPur
                                     <div className="bg-slate-100/50 dark:bg-slate-900/50 backdrop-blur-sm border border-slate-200/50 dark:border-slate-800 p-4 rounded-2xl flex flex-col items-center justify-center text-center gap-2 shadow-inner">
                                         <Layers size={24} className="text-indigo-500" />
                                         <div>
-                                            <span className="block text-xl font-black text-slate-800 dark:text-white leading-none mb-1">{previewCourse.features.decks}</span>
+                                            <span className="block text-xl font-black text-slate-800 dark:text-white leading-none mb-1">{previewCourse.features?.decks || 0}</span>
                                             <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Nodes</span>
                                         </div>
                                     </div>
                                     <div className="bg-slate-100/50 dark:bg-slate-900/50 backdrop-blur-sm border border-slate-200/50 dark:border-slate-800 p-4 rounded-2xl flex flex-col items-center justify-center text-center gap-2 shadow-inner">
                                         <HelpCircle size={24} className="text-emerald-500" />
                                         <div>
-                                            <span className="block text-xl font-black text-slate-800 dark:text-white leading-none mb-1">{previewCourse.features.quizzes}</span>
+                                            <span className="block text-xl font-black text-slate-800 dark:text-white leading-none mb-1">{previewCourse.features?.quizzes || 0}</span>
                                             <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Sims</span>
                                         </div>
                                     </div>
@@ -558,26 +494,28 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, onPur
                                 </div>
                             </div>
 
-                            <div>
-                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Map size={14}/> Syllabus Path</h4>
-                                <div className="space-y-4 relative before:absolute before:inset-y-4 before:left-[27px] before:w-1 before:bg-gradient-to-b before:from-indigo-500/50 before:to-transparent before:rounded-full">
-                                    {previewCourse.syllabus.map((node: any, idx: number) => {
-                                        const Icon = node.type === 'deck' ? Layers : node.type === 'quiz' ? HelpCircle : PlayCircle;
-                                        return (
-                                            <div key={idx} className="relative flex items-center gap-5 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md p-5 rounded-[2rem] border border-white/50 dark:border-slate-800 shadow-lg z-10 transition-transform hover:-translate-y-1">
-                                                <div className="w-14 h-14 rounded-[1.2rem] bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 shrink-0 border border-white dark:border-slate-700 shadow-inner">
-                                                    <Icon size={24} />
+                            {previewCourse.syllabus && (
+                                <div>
+                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Map size={14}/> Syllabus Path</h4>
+                                    <div className="space-y-4 relative before:absolute before:inset-y-4 before:left-[27px] before:w-1 before:bg-gradient-to-b before:from-indigo-500/50 before:to-transparent before:rounded-full">
+                                        {previewCourse.syllabus.map((node: any, idx: number) => {
+                                            const Icon = node.type === 'deck' ? Layers : node.type === 'quiz' ? HelpCircle : PlayCircle;
+                                            return (
+                                                <div key={idx} className="relative flex items-center gap-5 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md p-5 rounded-[2rem] border border-white/50 dark:border-slate-800 shadow-lg z-10 transition-transform hover:-translate-y-1">
+                                                    <div className="w-14 h-14 rounded-[1.2rem] bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 shrink-0 border border-white dark:border-slate-700 shadow-inner">
+                                                        <Icon size={24} />
+                                                    </div>
+                                                    <div className="flex-1 pr-4">
+                                                        <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 block mb-1">{node.type}</span>
+                                                        <h5 className="font-black text-sm text-slate-800 dark:text-slate-100 leading-tight">{node.title}</h5>
+                                                    </div>
+                                                    <Lock size={18} className="text-slate-300 dark:text-slate-600 shrink-0" />
                                                 </div>
-                                                <div className="flex-1 pr-4">
-                                                    <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 block mb-1">{node.type}</span>
-                                                    <h5 className="font-black text-sm text-slate-800 dark:text-slate-100 leading-tight">{node.title}</h5>
-                                                </div>
-                                                <Lock size={18} className="text-slate-300 dark:text-slate-600 shrink-0" />
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
 
                         {/* 🔥 Seductive CTA Button overlay */}
@@ -585,12 +523,12 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, onPur
                             <button 
                                 onClick={async () => {
                                     const currentFlux = userData?.coins || userData?.profile?.main?.coins || userData?.flux || 0;
-                                    if (currentFlux >= previewCourse.price) {
+                                    if (currentFlux >= (previewCourse.price || 0)) {
                                         const result = await onPurchase(
                                             previewCourse.id, 
-                                            previewCourse.price, 
+                                            previewCourse.price || 0, 
                                             'course', 
-                                            { title: previewCourse.title, subject: previewCourse.domainPath[0] }
+                                            { title: previewCourse.title || previewCourse.name, subject: previewCourse.domainPath?.[0] || 'General' }
                                         );
                                         
                                         if (result?.success) {
@@ -606,7 +544,7 @@ export default function DiscoveryView({ networkDecks = {}, onDownloadDeck, onPur
                                 className="w-full py-5 rounded-[1.5rem] bg-indigo-600 text-white font-black text-xs md:text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-[0_0_30px_rgba(99,102,241,0.5)] hover:bg-indigo-500 hover:shadow-[0_0_40px_rgba(99,102,241,0.7)] active:scale-95 transition-all group overflow-hidden relative"
                             >
                                 <div className="absolute inset-0 bg-white/20 w-full h-full -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
-                                <Lock size={18} /> Unlock Access ({previewCourse.price} <Zap size={14} className="fill-current text-amber-400" />)
+                                <Lock size={18} /> Unlock Access ({previewCourse.price || 0} <Zap size={14} className="fill-current text-amber-400" />)
                             </button>
                         </div>
                     </div>
