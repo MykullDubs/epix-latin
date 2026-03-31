@@ -510,7 +510,7 @@ export default function App() {
                   ExamPlayerView={ExamPlayerView} 
                   onLogActivity={actions.logActivity}
               />
-            ) : activeTab === 'discovery' ? (
+          ) : activeTab === 'discovery' ? (
               <DiscoveryView 
                   networkClasses={allClasses || []} 
                   networkDecks={networkDecks} 
@@ -518,7 +518,8 @@ export default function App() {
                   activeOrg={activeOrg} 
                   onPurchase={actions.purchaseItem} 
                   onOpenClass={(courseObj: any) => {
-                      // 🔥 Instantly route the user into their newly decrypted course
+                      // 🔥 EXPLICITLY set the tab to Home so the router doesn't collide
+                      setActiveTab('home');
                       setActiveStudentClass(courseObj);
                   }}
                   onDownloadDeck={async (item: any) => { 
@@ -534,8 +535,9 @@ export default function App() {
                       
                       if (result.success) {
                           if (isCourse) {
-                              // If it's a course, take them to the Home tab to see their new tile
+                              // 🔥 Route to Home AND instantly open the class if they assimilated from the grid
                               setActiveTab('home');
+                              setActiveStudentClass(item);
                           } else {
                               // If it's just a deck, take them to their flashcards
                               if (actions.assignDeckToFolder) actions.assignDeckToFolder(item.id, null);
