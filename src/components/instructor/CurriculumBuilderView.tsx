@@ -5,6 +5,8 @@ import {
     Gamepad2, Layers, Code, Eye, Settings2, HelpCircle, 
     PlayCircle, Lock, ChevronUp, CheckCircle2, Zap
 } from 'lucide-react';
+import { writeBatch, doc } from 'firebase/firestore';
+import { db, appId } from '../../config/firebase';
 import { Toast } from '../Toast';
 
 export default function CurriculumBuilderView({ onSaveCurriculum, availableLessons = [] }: any) {
@@ -24,6 +26,9 @@ export default function CurriculumBuilderView({ onSaveCurriculum, availableLesso
     
     // This holds the exact sequence of lesson objects
     const [timeline, setTimeline] = useState<any[]>([]);
+    
+    // Holds the raw imported payload so we can push it to Firebase
+    const [importedPayload, setImportedPayload] = useState<any>(null);
 
     const handleChange = (e: any) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -65,6 +70,7 @@ export default function CurriculumBuilderView({ onSaveCurriculum, availableLesso
             }
             
             const data = JSON.parse(cleanText);
+            setImportedPayload(data); // Save for deployment
             
             // Handle the "Master Payload" structure where everything is nested
             const classData = data.class || data;
@@ -128,23 +134,61 @@ export default function CurriculumBuilderView({ onSaveCurriculum, availableLesso
         }
     };
 
+    // 🔥 THE BATCH DEPLOYMENT ENGINE
     const handleSubmit = async () => {
         if (!formData.title) return alert("Please give your pathway a title.");
         if (timeline.length === 0) return alert("Please add at least one module to the timeline.");
 
-        const payload = {
-            ...formData,
-            id: `curriculum_${Date.now()}`,
-            lessonIds: timeline.map(l => l.id), 
-            createdAt: Date.now()
-        };
+        try {
+            const batch = writeBatch(db);
+            const classId = importedPayload?.class?.id || `class_${Date.now()}`;
+            const currId = importedPayload?.curriculum?.id || `curr_${Date.now()}`;
 
-        await onSaveCurriculum(payload);
-        setToastMsg("Curriculum Pathway Forged Successfully! 🗺️");
-        
-        setFormData({ title: '', description: '', level: 'Beginner', themeColor: '#4f46e5', coverImage: '', grade: 'Pathway' });
-        setTimeline([]);
-        setActiveTab('build');
+            // 1. Deploy the Curriculum Spine
+            const currRef = doc(db, 'artifacts', appId, 'curriculums', currId);
+            batch.set(currRef, {
+                ...formData,
+                id: currId,
+                lessonIds: timeline.map(l => l.id),
+                createdAt: Date.now()
+            }, { merge: true });
+
+            // 2. Deploy the Class Wrapper (This puts it on the Radar!)
+            const classRef = doc(db, 'artifacts', appId, 'classes', classId);
+            batch.set(classRef, {
+                ...(importedPayload?.class || {}),
+                id: classId,
+                name: formData.title,
+                description: formData.description,
+                subject: importedPayload?.class?.subject || 'General',
+                domainPath: importedPayload?.class?.domainPath || [importedPayload?.class?.subject || 'General'],
+                themeColor: formData.themeColor,
+                assignedCurriculums: [currId],
+                assignments: timeline.map(l => l.id),
+                isPublished: true, 
+                createdAt: Date.now()
+            }, { merge: true });
+
+            // 3. Deploy all individual Nodes (Lessons, Decks, Exams)
+            if (importedPayload?.content_nodes) {
+                importedPayload.content_nodes.forEach((node: any) => {
+                    const collectionName = node.type === 'deck' ? 'published_decks' : 'lessons';
+                    const nodeRef = doc(db, 'artifacts', appId, collectionName, node.id);
+                    batch.set(nodeRef, { ...node, isPublished: true }, { merge: true });
+                });
+            }
+
+            await batch.commit();
+            
+            setToastMsg("Master Payload Deployed to the Global Radar! 🚀");
+            setFormData({ title: '', description: '', level: 'Beginner', themeColor: '#4f46e5', coverImage: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&q=80&w=1000', grade: 'Pathway' });
+            setTimeline([]);
+            setImportedPayload(null);
+            setActiveTab('build');
+        } catch (e) {
+            console.error("Deploy Error:", e);
+            setToastMsg("Deployment failed. Check database connection.");
+        }
     };
 
     const getIconForType = (type: string) => {
