@@ -27,8 +27,6 @@ import CelebrationScreen from './components/CelebrationScreen';
 import HoloAvatar from './components/HoloAvatar'; 
 
 // 🔥 DYNAMIC OS THEME ENGINE
-// Because our CSS intercepts 'slate', we just use slate everywhere!
-// The wrapper class (.theme-hacker, .theme-synth, etc.) changes the actual colors natively.
 const OS_THEMES: Record<string, string> = {
     theme_hacker: 'bg-slate-50 dark:bg-slate-950',
     theme_synth: 'bg-slate-50 dark:bg-slate-950',
@@ -41,7 +39,7 @@ export default function App() {
     user, userData, authChecked, activeOrg, allLessons, 
     enrolledClasses, instructorClasses, allDecks, 
     customCurriculums, activityLogs, actions,
-    allClasses // 🔥 ADDED: Pulling live classes from the hook
+    allClasses // 🔥 The live radar classes
   } = useMagisterData();
   
   // Navigation State
@@ -81,7 +79,15 @@ export default function App() {
   // 🔥 MERGE LIVE COHORTS WITH SOLO ELECTIVES & APPLY SAVED ORDER
   const combinedClasses = useMemo(() => {
       const soloCourses = userData?.enrolledClasses || userData?.profile?.main?.enrolledClasses || [];
-      const merged = [...enrolledClasses, ...soloCourses];
+      
+      // 🔥 ENRICHMENT ENGINE: Map the lightweight solo courses to their full data from the global radar
+      const enrichedSoloCourses = soloCourses.map((solo: any) => {
+          const fullData = allClasses?.find(c => c.id === solo.id);
+          // Combine the full data with the student's personal progress data
+          return fullData ? { ...fullData, type: 'solo', progressPct: solo.progressPct || 0, unlockedAt: solo.unlockedAt } : solo;
+      });
+
+      const merged = [...enrolledClasses, ...enrichedSoloCourses];
       
       const savedOrder = userData?.classOrder;
       if (savedOrder && savedOrder.length > 0) {
@@ -95,7 +101,7 @@ export default function App() {
       }
       
       return merged;
-  }, [enrolledClasses, userData]);
+  }, [enrolledClasses, userData, allClasses]);
 
   // Determine active background theme based on equipped cosmetics
   const activeOSTheme = OS_THEMES[userData?.equipped?.themes] || OS_THEMES.default;
@@ -107,13 +113,11 @@ export default function App() {
       const newEquipped = { ...(userData.equipped || {}), [category]: itemId };
       
       try {
-          // 🔥 TARGET THE CORRECT DOC: profile/main
           const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main');
           await updateDoc(profileRef, {
               equipped: newEquipped
           });
           
-          // Redundant sync to root for safety
           const rootRef = doc(db, 'artifacts', appId, 'users', user.uid);
           await updateDoc(rootRef, {
               equipped: newEquipped,
@@ -125,7 +129,6 @@ export default function App() {
       }
   };
 
-  // 🔥 FOLDER & DECK REORDERING ENGINES
   const handleReorderFolders = async (newOrder: string[]) => {
       if (!user?.uid) return;
       try {
@@ -509,15 +512,17 @@ export default function App() {
               />
             ) : activeTab === 'discovery' ? (
               <DiscoveryView 
-                  networkClasses={allClasses || []} // 🔥 FED LIVE CLASSES TO RADAR
+                  networkClasses={allClasses || []} 
                   networkDecks={networkDecks} 
                   userData={userData} 
                   activeOrg={activeOrg} 
                   onPurchase={actions.purchaseItem} 
+                  onOpenClass={(courseObj: any) => {
+                      // 🔥 Instantly route the user into their newly decrypted course
+                      setActiveStudentClass(courseObj);
+                  }}
                   onDownloadDeck={async (deck: any) => { 
-                      // Automatically buy/unlock the standard deck using the universal engine
                       await actions.purchaseItem(deck.id, deck.price || 0, 'deck');
-                      
                       if (actions.assignDeckToFolder) {
                           actions.assignDeckToFolder(deck.id, null);
                       }
@@ -559,7 +564,7 @@ export default function App() {
                   classes={combinedClasses} 
                   curriculums={allCurriculums} 
                   onSelectClass={setActiveStudentClass} 
-                  onReorderClasses={(actions as any).reorderClasses} // 🔥 TS ERROR BYPASSED HERE
+                  onReorderClasses={(actions as any).reorderClasses}
                   userData={userData} 
                   user={user}
                   activeOrg={activeOrg} 
