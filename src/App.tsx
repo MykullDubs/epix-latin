@@ -518,7 +518,9 @@ export default function App() {
                   activeOrg={activeOrg} 
                   onPurchase={actions.purchaseItem} 
                   onOpenClass={(courseObj: any) => {
-                      // 🔥 EXPLICITLY set the tab to Home so the router doesn't collide
+                      // 🔥 The magic portal directly to the StudentClassView
+                      setActiveDeckKey(null);
+                      setActiveLesson(null);
                       setActiveTab('home');
                       setActiveStudentClass(courseObj);
                   }}
@@ -535,11 +537,9 @@ export default function App() {
                       
                       if (result.success) {
                           if (isCourse) {
-                              // 🔥 Route to Home AND instantly open the class if they assimilated from the grid
                               setActiveTab('home');
                               setActiveStudentClass(item);
                           } else {
-                              // If it's just a deck, take them to their flashcards
                               if (actions.assignDeckToFolder) actions.assignDeckToFolder(item.id, null);
                               setActiveDeckKey(item.id);
                               setActiveTab('flashcards');
