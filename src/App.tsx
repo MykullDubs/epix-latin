@@ -519,8 +519,10 @@ export default function App() {
                   onPurchase={actions.purchaseItem} 
                   onOpenClass={(courseObj: any) => {
                       // 🔥 EXPLICITLY set the tab to Home so the router doesn't collide
+                    setActiveStudentClass(null);
+                      setActiveLesson(null);
+                      setActiveDeckKey(null);
                       setActiveTab('home');
-                      setActiveStudentClass(courseObj);
                   }}
                   onDownloadDeck={async (item: any) => { 
                       // 1. Determine if this is a standalone deck or a full course
