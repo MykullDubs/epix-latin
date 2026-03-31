@@ -5,7 +5,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { 
   doc, onSnapshot, collection, addDoc, setDoc, updateDoc, 
   deleteDoc, query, where, collectionGroup, increment, arrayUnion, arrayRemove,
-  orderBy, limit, getDoc, writeBatch // 🔥 INJECTED writeBatch
+  orderBy, limit, getDoc, writeBatch 
 } from "firebase/firestore";
 
 export function useMagisterData() {
@@ -17,6 +17,9 @@ export function useMagisterData() {
   const [allAppLessons, setAllAppLessons] = useState<any[]>([]);
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [instructorClasses, setInstructorClasses] = useState<any[]>([]); 
+  
+  // 🔥 NEW: State for all published classes on the global radar
+  const [allClasses, setAllClasses] = useState<any[]>([]);
   
   const [customCurriculums, setCustomCurriculums] = useState<any[]>([]);
   
@@ -74,6 +77,12 @@ export function useMagisterData() {
         setInstructorClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
+      // 🔥 NEW: Fetch all globally published classes for the Discovery Radar
+      const qAllClasses = query(collection(db, 'artifacts', appId, 'classes'), where('isPublished', '==', true));
+      const unsubAllClasses = onSnapshot(qAllClasses, (snap) => {
+        setAllClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+
       const unsubPublished = onSnapshot(collection(db, 'artifacts', appId, 'decks'), (snap) => {
         setPublishedDecks(snap.docs.map(d => d.data()));
       });
@@ -105,6 +114,7 @@ export function useMagisterData() {
           unsubAuth(); unsubProfile(); unsubLessons(); unsubCards(); 
           unsubClasses(); unsubInstructorClasses(); unsubPublished(); 
           unsubCurriculums(); unsubLogs(); unsubCardPrefs(); unsubDeckPrefs();
+          unsubAllClasses(); // 🔥 Cleanup the new listener
       };
     }
     return () => unsubAuth();
@@ -595,7 +605,7 @@ export function useMagisterData() {
         ...userData,
         cardPrefs,
         deckPrefs,
-        classOrder: userData.classOrder || userData?.profile?.main?.classOrder || [], // 🔥 EXPOSE SAVED ORDER
+        classOrder: userData.classOrder || userData?.profile?.main?.classOrder || [], 
         studyFolders: userData.studyFolders || userData?.profile?.main?.studyFolders || [],
         folderColors: userData.folderColors || userData?.profile?.main?.folderColors || {}
     };
@@ -612,6 +622,7 @@ export function useMagisterData() {
     allDecks, 
     customCurriculums, 
     activityLogs, 
-    actions 
+    actions,
+    allClasses // 🔥 NOW FULLY OPERATIONAL AND EXPORTED TO THE APP
   };
 }
