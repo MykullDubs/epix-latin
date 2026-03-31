@@ -57,6 +57,38 @@ const MOCK_COURSES = [
             { title: 'Handling Q&A (Simulated Pressure)', type: 'quiz' },
             { title: 'The Closing Ask', type: 'deck' }
         ]
+    },
+    {
+        id: 'course_us_civic_architecture',
+        title: 'American Civic Architecture',
+        description: 'Decode the structural framework of the United States. Analyze the balance of power, the mechanics of representative democracy, and the mathematics of the Electoral College.',
+        domainPath: ['Society & Politics'],
+        difficulty: 'B1 Intermediate',
+        duration: '8 Hours',
+        price: 3000,
+        features: { decks: 4, quizzes: 4, lessons: 4 },
+        gradient: 'from-cyan-500 to-blue-600', 
+        syllabus: [
+            // Phase 1: The Foundation
+            { title: 'The Democratic Republic (Theory)', type: 'lesson' },
+            { title: 'Lexicon of the Republic', type: 'deck' },
+            { title: 'Foundation Diagnostics', type: 'quiz' },
+            
+            // Phase 2: The Power Split
+            { title: 'The Three Pillars: Exec, Leg, Jud', type: 'lesson' },
+            { title: 'Branches & Powers Data-Nodes', type: 'deck' },
+            { title: 'Checks & Balances Simulator', type: 'quiz' },
+            
+            // Phase 3: The Voting Algorithm
+            { title: 'The Electoral College Matrix', type: 'lesson' },
+            { title: 'Electoral Terminology & Mechanics', type: 'deck' },
+            { title: 'Electoral Mathematics Audit', type: 'quiz' },
+
+            // Phase 4: State vs Federal
+            { title: 'Federalism: The Dual-Layer System', type: 'lesson' },
+            { title: 'Jurisdictions & State Rights', type: 'deck' },
+            { title: 'Final System Architecture Exam', type: 'quiz' }
+        ]
     }
 ];
 
