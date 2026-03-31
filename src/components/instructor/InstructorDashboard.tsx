@@ -198,13 +198,14 @@ export default function InstructorDashboard({
                <BuilderHub 
                  onSaveLesson={onSaveLesson} 
                  onSaveCard={onSaveCard} 
-                 onUpdateCard={onUpdateCard} // 🔥 WIRED UP
-                 onDeleteCard={onDeleteCard} // 🔥 WIRED UP
+                 onUpdateCard={onUpdateCard} 
+                 onDeleteCard={onDeleteCard} 
                  onSaveCurriculum={onSaveCurriculum} 
                  lessons={lessons} 
                  allDecks={allDecks} 
                  onPublishDeck={onPublishDeck} 
                  instructorClasses={userData?.classes || []}
+                 curriculums={curriculums} // 🔥 PASS IT DOWN HERE!
                />
              </div>
            )}
