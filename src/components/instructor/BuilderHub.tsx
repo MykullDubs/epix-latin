@@ -241,7 +241,7 @@ export default function BuilderHub({
             </div>
           )}
 
-          {mode !== 'exam' && mode !== 'curriculum' && (
+          {mode !== 'exam' && (
             <button 
                onClick={handleCommit}
                className={`hidden sm:flex text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all ${mode === 'arcade' ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/30' : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/30'}`}
