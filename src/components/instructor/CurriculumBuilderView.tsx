@@ -6,7 +6,7 @@ import {
     PlayCircle, Lock, ChevronUp, CheckCircle2, Zap
 } from 'lucide-react';
 import { writeBatch, doc } from 'firebase/firestore';
-import { db, appId } from '../../config/firebase';
+import { auth, db, appId } from '../../config/firebase'; // 🔥 auth imported for secure routing
 import { Toast } from '../Toast';
 
 export default function CurriculumBuilderView({ onSaveCurriculum, availableLessons = [] }: any) {
@@ -134,30 +134,35 @@ export default function CurriculumBuilderView({ onSaveCurriculum, availableLesso
         }
     };
 
-    // 🔥 THE BATCH DEPLOYMENT ENGINE
+    // 🔥 THE SECURE BATCH DEPLOYMENT ENGINE
     const handleSubmit = async () => {
         if (!formData.title) return alert("Please give your pathway a title.");
         if (timeline.length === 0) return alert("Please add at least one module to the timeline.");
+        
+        const uid = auth.currentUser?.uid;
+        if (!uid) return alert("Authentication error. Please log in again.");
 
         try {
             const batch = writeBatch(db);
             const classId = importedPayload?.class?.id || `class_${Date.now()}`;
             const currId = importedPayload?.curriculum?.id || `curr_${Date.now()}`;
 
-            // 1. Deploy the Curriculum Spine
-            const currRef = doc(db, 'artifacts', appId, 'curriculums', currId);
+            // 1. Deploy the Curriculum Spine (To instructor subcollection)
+            const currRef = doc(db, 'artifacts', appId, 'users', uid, 'custom_curriculums', currId);
             batch.set(currRef, {
                 ...formData,
                 id: currId,
+                instructorId: uid, // 🔥 Required for security rules
                 lessonIds: timeline.map(l => l.id),
                 createdAt: Date.now()
             }, { merge: true });
 
-            // 2. Deploy the Class Wrapper (This puts it on the Radar!)
-            const classRef = doc(db, 'artifacts', appId, 'classes', classId);
+            // 2. Deploy the Class Wrapper (To instructor subcollection)
+            const classRef = doc(db, 'artifacts', appId, 'users', uid, 'classes', classId);
             batch.set(classRef, {
                 ...(importedPayload?.class || {}),
                 id: classId,
+                instructorId: uid, // 🔥 Required for security rules
                 name: formData.title,
                 description: formData.description,
                 subject: importedPayload?.class?.subject || 'General',
@@ -169,12 +174,18 @@ export default function CurriculumBuilderView({ onSaveCurriculum, availableLesso
                 createdAt: Date.now()
             }, { merge: true });
 
-            // 3. Deploy all individual Nodes (Lessons, Decks, Exams)
+            // 3. Deploy all individual Nodes securely
             if (importedPayload?.content_nodes) {
                 importedPayload.content_nodes.forEach((node: any) => {
-                    const collectionName = node.type === 'deck' ? 'published_decks' : 'lessons';
-                    const nodeRef = doc(db, 'artifacts', appId, collectionName, node.id);
-                    batch.set(nodeRef, { ...node, isPublished: true }, { merge: true });
+                    if (node.type === 'deck') {
+                        // Decks live in the global pool but require authorId
+                        const nodeRef = doc(db, 'artifacts', appId, 'decks', node.id);
+                        batch.set(nodeRef, { ...node, authorId: uid, isPublished: true, visibility: 'public' }, { merge: true });
+                    } else {
+                        // Lessons/Exams live in the instructor subcollection
+                        const nodeRef = doc(db, 'artifacts', appId, 'users', uid, 'custom_lessons', node.id);
+                        batch.set(nodeRef, { ...node, instructorId: uid, isPublished: true }, { merge: true });
+                    }
                 });
             }
 
@@ -187,7 +198,7 @@ export default function CurriculumBuilderView({ onSaveCurriculum, availableLesso
             setActiveTab('build');
         } catch (e) {
             console.error("Deploy Error:", e);
-            setToastMsg("Deployment failed. Check database connection.");
+            setToastMsg("Deployment failed. Check database permissions.");
         }
     };
 
