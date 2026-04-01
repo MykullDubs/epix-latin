@@ -1,39 +1,181 @@
 // src/App.tsx
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { doc, setDoc, updateDoc } from 'firebase/firestore'; 
-import { db, appId } from './config/firebase';   
+import React, { useState } from 'react';
 import { useMagisterData } from './hooks/useMagisterData';
-import { GLOBAL_CURRICULUMS } from './constants/curriculums'; 
 
-// Sub-component Imports
+// Core Views
 import AuthView from './components/AuthView';
-import MarketingSite from './components/MarketingSite';
 import HomeView from './components/HomeView';
 import DiscoveryView from './components/DiscoveryView';
-import FlashcardView from './components/FlashcardView';
 import ProfileView from './components/ProfileView';
 import StorefrontView from './components/StorefrontView'; 
+
+// Learning & Class Views
+import StudentClassView from './components/StudentClassView';
+import LessonView from './components/LessonView';
+import ExamPlayerView from './components/ExamPlayerView';
+import StudentNavBar from './components/StudentNavBar';
+
+// Instructor & Admin Views
 import InstructorDashboard from './components/instructor/InstructorDashboard';
 import AdminDashboardView from './components/admin/AdminDashboardView';
-import StudentClassView from './components/StudentClassView';
-import StudentNavBar from './components/StudentNavBar';
-import ExamPlayerView from './components/ExamPlayerView';
-import LessonView from './components/LessonView';
-import ClassView from './components/ClassView'; 
+
+// Live Projector Views
 import LiveVocabProjector from './components/LiveVocabProjector'; 
 import LiveConnectFourProjector from './components/LiveConnectFourProjector';
 import LiveSlipstreamProjector from './components/LiveSlipstreamProjector';
-import CelebrationScreen from './components/CelebrationScreen';
-import HoloAvatar from './components/HoloAvatar'; 
 
 // 🔥 DYNAMIC OS THEME ENGINE
 const OS_THEMES: Record<string, string> = {
-    theme_hacker: 'bg-slate-50 dark:bg-slate-950',
-    theme_synth: 'bg-slate-50 dark:bg-slate-950',
-    theme_vapor: 'bg-slate-50 dark:bg-slate-950',
-    default: 'bg-slate-50 dark:bg-slate-950'
+    // Injecting heavy background colors and matching text colors to completely override the default styling
+    theme_hacker: 'bg-emerald-950 text-emerald-500 selection:bg-emerald-500/30',
+    theme_synth: 'bg-fuchsia-950 text-cyan-400 selection:bg-cyan-400/30',
+    theme_vapor: 'bg-violet-950 text-fuchsia-400 selection:bg-fuchsia-400/30',
+    default: 'bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100'
 };
 
+export default function App() {
+    // 1. Pull in global data and actions
+    const { 
+        user, userData, authLoading, 
+        lessons, curriculums, classes, decks,
+        actions 
+    } = useMagisterData();
+
+    // 2. Main Routing State (Student)
+    const [activeTab, setActiveTab] = useState<'home' | 'discovery' | 'profile' | 'store'>('home');
+    const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
+    const [activePresentation, setActivePresentation] = useState<any>(null);
+
+    // 3. Main Routing State (Instructor Live Projectors)
+    const [activeProjector, setActiveProjector] = useState<any>(null);
+
+    // 🔥 THE GLOBAL THEME LISTENER
+    // Constantly listens to the user's equipped theme. Defaults to 'default' if none is equipped.
+    const equippedThemeId = userData?.equipped?.themes || 'default';
+    const activeThemeClass = OS_THEMES[equippedThemeId] || OS_THEMES.default;
+
+    // --- BOOT SEQUENCE & AUTHENTICATION ---
+    if (authLoading) {
+        return (
+            <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-950 text-indigo-500 font-mono">
+                <div className="animate-pulse space-y-4 text-center">
+                    <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                    <p className="text-xs font-black tracking-[0.5em] uppercase">Booting Magister OS...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!user || !userData) {
+        return <AuthView />; 
+    }
+
+    // --- ADMIN ROUTING ---
+    if (userData.role === 'admin') {
+        return <AdminDashboardView />;
+    }
+
+    // --- INSTRUCTOR ROUTING ---
+    if (userData.role === 'instructor') {
+        // If the instructor launched a live game, hijack the screen with the massive Projector UI
+        if (activeProjector) {
+            const projectorProps = {
+                deck: decks[activeProjector.contentId] || decks.custom, // Fallback safely
+                classId: activeProjector.classId,
+                activeClass: classes.find((c: any) => c.id === activeProjector.classId),
+                onExit: () => setActiveProjector(null)
+            };
+
+            if (activeProjector.mode === 'trivia') return <LiveVocabProjector {...projectorProps} />;
+            if (activeProjector.mode === 'connect_four') return <LiveConnectFourProjector {...projectorProps} />;
+            if (activeProjector.mode === 'slipstream') return <LiveSlipstreamProjector {...projectorProps} />;
+        }
+
+        // Default Instructor View
+        return (
+            <InstructorDashboard 
+                userData={userData}
+                onLaunchProjector={setActiveProjector} // Passes the setup config up to App.tsx
+            />
+        );
+    }
+
+    // --- STUDENT ROUTING ---
+    return (
+        // 🔥 THE MASTER WRAPPER
+        // Applies the activeThemeClass right here. The duration-700 makes the colors crossfade smoothly.
+        <div className={`h-screen w-screen overflow-hidden flex flex-col transition-colors duration-700 font-sans ${activeThemeClass}`}>
+            
+            {activeTab === 'store' ? (
+                <StorefrontView 
+                    userData={userData} 
+                    onBack={() => setActiveTab('home')} 
+                />
+            ) : activePresentation ? (
+                <LessonView 
+                    lessonId={activePresentation.id} 
+                    classId={activeStudentClass?.id}
+                    lessons={lessons}
+                    allDecks={decks} 
+                    onBack={() => setActivePresentation(null)} 
+                    onComplete={() => {
+                        actions.logActivity(activePresentation.id, 100, 'Lesson Completion');
+                        setActivePresentation(null);
+                    }}
+                />
+            ) : activeStudentClass ? (
+                <StudentClassView 
+                    classData={activeStudentClass} 
+                    lessons={lessons} 
+                    curriculums={curriculums}
+                    allDecks={decks}
+                    userData={userData}
+                    onBack={() => setActiveStudentClass(null)} 
+                    onSelectLesson={setActivePresentation} 
+                    setActiveTab={setActiveTab} 
+                    ExamPlayerView={ExamPlayerView} 
+                    onLogActivity={actions.logActivity}
+                />
+            ) : (
+                <div className="flex-1 overflow-y-auto custom-scrollbar relative z-10 pb-24">
+                    {activeTab === 'home' && (
+                        <HomeView 
+                            userData={userData}
+                            classes={classes}
+                            onSelectClass={setActiveStudentClass}
+                            onNavigateStore={() => setActiveTab('store')} 
+                        />
+                    )}
+                    {activeTab === 'discovery' && (
+                        <DiscoveryView 
+                            userData={userData} 
+                            classes={classes}
+                            onSelectClass={setActiveStudentClass} 
+                        />
+                    )}
+                    {activeTab === 'profile' && (
+                        <ProfileView 
+                            userData={userData} 
+                            classes={classes}
+                            onNavigateStore={() => setActiveTab('store')}
+                        />
+                    )}
+                </div>
+            )}
+
+            {/* 🔥 BOTTOM NAVIGATION */}
+            {/* Only show the nav bar if the student is browsing the main tabs, NOT in a class, lesson, or store */}
+            {!activeStudentClass && !activePresentation && activeTab !== 'store' && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-sm z-50 px-4">
+                    <StudentNavBar 
+                        activeTab={activeTab} 
+                        setActiveTab={setActiveTab} 
+                    />
+                </div>
+            )}
+        </div>
+    );
+}
 export default function App() {
   const { 
     user, userData, authChecked, activeOrg, allLessons, 
