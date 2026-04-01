@@ -1,28 +1,30 @@
 // src/App.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { doc, setDoc, updateDoc } from 'firebase/firestore'; 
+import { db, appId } from './config/firebase';   
 import { useMagisterData } from './hooks/useMagisterData';
+import { GLOBAL_CURRICULUMS } from './constants/curriculums'; 
 
-// Core Views
+// Sub-component Imports
 import AuthView from './components/AuthView';
+import MarketingSite from './components/MarketingSite';
 import HomeView from './components/HomeView';
 import DiscoveryView from './components/DiscoveryView';
+import FlashcardView from './components/FlashcardView';
 import ProfileView from './components/ProfileView';
 import StorefrontView from './components/StorefrontView'; 
-
-// Learning & Class Views
-import StudentClassView from './components/StudentClassView';
-import LessonView from './components/LessonView';
-import ExamPlayerView from './components/ExamPlayerView';
-import StudentNavBar from './components/StudentNavBar';
-
-// Instructor & Admin Views
 import InstructorDashboard from './components/instructor/InstructorDashboard';
 import AdminDashboardView from './components/admin/AdminDashboardView';
-
-// Live Projector Views
+import StudentClassView from './components/StudentClassView';
+import StudentNavBar from './components/StudentNavBar';
+import ExamPlayerView from './components/ExamPlayerView';
+import LessonView from './components/LessonView';
+import ClassView from './components/ClassView'; 
 import LiveVocabProjector from './components/LiveVocabProjector'; 
 import LiveConnectFourProjector from './components/LiveConnectFourProjector';
 import LiveSlipstreamProjector from './components/LiveSlipstreamProjector';
+import CelebrationScreen from './components/CelebrationScreen';
+import HoloAvatar from './components/HoloAvatar'; 
 
 // 🔥 DYNAMIC OS THEME ENGINE
 const OS_THEMES: Record<string, string> = {
@@ -34,154 +36,11 @@ const OS_THEMES: Record<string, string> = {
 };
 
 export default function App() {
-    // 1. Pull in global data and actions
-    const { 
-        user, userData, authLoading, 
-        lessons, curriculums, classes, decks,
-        actions 
-    } = useMagisterData();
-
-    // 2. Main Routing State (Student)
-    const [activeTab, setActiveTab] = useState<'home' | 'discovery' | 'profile' | 'store'>('home');
-    const [activeStudentClass, setActiveStudentClass] = useState<any>(null);
-    const [activePresentation, setActivePresentation] = useState<any>(null);
-
-    // 3. Main Routing State (Instructor Live Projectors)
-    const [activeProjector, setActiveProjector] = useState<any>(null);
-
-    // 🔥 THE GLOBAL THEME LISTENER
-    // Constantly listens to the user's equipped theme. Defaults to 'default' if none is equipped.
-    const equippedThemeId = userData?.equipped?.themes || 'default';
-    const activeThemeClass = OS_THEMES[equippedThemeId] || OS_THEMES.default;
-
-    // --- BOOT SEQUENCE & AUTHENTICATION ---
-    if (authLoading) {
-        return (
-            <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-950 text-indigo-500 font-mono">
-                <div className="animate-pulse space-y-4 text-center">
-                    <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
-                    <p className="text-xs font-black tracking-[0.5em] uppercase">Booting Magister OS...</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (!user || !userData) {
-        return <AuthView />; 
-    }
-
-    // --- ADMIN ROUTING ---
-    if (userData.role === 'admin') {
-        return <AdminDashboardView />;
-    }
-
-    // --- INSTRUCTOR ROUTING ---
-    if (userData.role === 'instructor') {
-        // If the instructor launched a live game, hijack the screen with the massive Projector UI
-        if (activeProjector) {
-            const projectorProps = {
-                deck: decks[activeProjector.contentId] || decks.custom, // Fallback safely
-                classId: activeProjector.classId,
-                activeClass: classes.find((c: any) => c.id === activeProjector.classId),
-                onExit: () => setActiveProjector(null)
-            };
-
-            if (activeProjector.mode === 'trivia') return <LiveVocabProjector {...projectorProps} />;
-            if (activeProjector.mode === 'connect_four') return <LiveConnectFourProjector {...projectorProps} />;
-            if (activeProjector.mode === 'slipstream') return <LiveSlipstreamProjector {...projectorProps} />;
-        }
-
-        // Default Instructor View
-        return (
-            <InstructorDashboard 
-                userData={userData}
-                onLaunchProjector={setActiveProjector} // Passes the setup config up to App.tsx
-            />
-        );
-    }
-
-    // --- STUDENT ROUTING ---
-    return (
-        // 🔥 THE MASTER WRAPPER
-        // Applies the activeThemeClass right here. The duration-700 makes the colors crossfade smoothly.
-        <div className={`h-screen w-screen overflow-hidden flex flex-col transition-colors duration-700 font-sans ${activeThemeClass}`}>
-            
-            {activeTab === 'store' ? (
-                <StorefrontView 
-                    userData={userData} 
-                    onBack={() => setActiveTab('home')} 
-                />
-            ) : activePresentation ? (
-                <LessonView 
-                    lessonId={activePresentation.id} 
-                    classId={activeStudentClass?.id}
-                    lessons={lessons}
-                    allDecks={decks} 
-                    onBack={() => setActivePresentation(null)} 
-                    onComplete={() => {
-                        actions.logActivity(activePresentation.id, 100, 'Lesson Completion');
-                        setActivePresentation(null);
-                    }}
-                />
-            ) : activeStudentClass ? (
-                <StudentClassView 
-                    classData={activeStudentClass} 
-                    lessons={lessons} 
-                    curriculums={curriculums}
-                    allDecks={decks}
-                    userData={userData}
-                    onBack={() => setActiveStudentClass(null)} 
-                    onSelectLesson={setActivePresentation} 
-                    setActiveTab={setActiveTab} 
-                    ExamPlayerView={ExamPlayerView} 
-                    onLogActivity={actions.logActivity}
-                />
-            ) : (
-                <div className="flex-1 overflow-y-auto custom-scrollbar relative z-10 pb-24">
-                    {activeTab === 'home' && (
-                        <HomeView 
-                            userData={userData}
-                            classes={classes}
-                            onSelectClass={setActiveStudentClass}
-                            onNavigateStore={() => setActiveTab('store')} 
-                        />
-                    )}
-                    {activeTab === 'discovery' && (
-                        <DiscoveryView 
-                            userData={userData} 
-                            classes={classes}
-                            onSelectClass={setActiveStudentClass} 
-                        />
-                    )}
-                    {activeTab === 'profile' && (
-                        <ProfileView 
-                            userData={userData} 
-                            classes={classes}
-                            onNavigateStore={() => setActiveTab('store')}
-                        />
-                    )}
-                </div>
-            )}
-
-            {/* 🔥 BOTTOM NAVIGATION */}
-            {/* Only show the nav bar if the student is browsing the main tabs, NOT in a class, lesson, or store */}
-            {!activeStudentClass && !activePresentation && activeTab !== 'store' && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-sm z-50 px-4">
-                    <StudentNavBar 
-                        activeTab={activeTab} 
-                        setActiveTab={setActiveTab} 
-                    />
-                </div>
-            )}
-        </div>
-    );
-}
-export default function App() {
   const { 
     user, userData, authChecked, activeOrg, allLessons, 
     enrolledClasses, instructorClasses, allDecks, 
     customCurriculums, activityLogs, actions,
-    allClasses // 🔥 The live radar classes
+    allClasses 
   } = useMagisterData();
   
   // Navigation State
@@ -222,16 +81,11 @@ export default function App() {
   const combinedClasses = useMemo(() => {
       const soloCourses = userData?.enrolledClasses || userData?.profile?.main?.enrolledClasses || [];
       
-      // 🔥 ENRICHMENT ENGINE: Map the lightweight solo courses to their full data from the global radar
       const enrichedSoloCourses = soloCourses.map((solo: any) => {
           const fullData = allClasses?.find(c => c.id === solo.id);
-          
           if (fullData) {
-              // Combine the full data with the student's personal progress data
               return { ...fullData, type: 'solo', progressPct: solo.progressPct || 0, unlockedAt: solo.unlockedAt };
           }
-          
-          // 🔥 ROBUST FALLBACK: Even if network delays hide fullData, force a tile to render on HomeView
           return {
               ...solo,
               name: solo.title || solo.name || "Decrypting Course...",
@@ -256,27 +110,20 @@ export default function App() {
       return merged;
   }, [enrolledClasses, userData, allClasses]);
 
-  // Determine active background theme based on equipped cosmetics
-  const activeOSTheme = OS_THEMES[userData?.equipped?.themes] || OS_THEMES.default;
-  const activeThemeId = userData?.equipped?.themes || 'default';
+  // 🔥 THE GLOBAL THEME LISTENER
+  const equippedThemeId = userData?.equipped?.themes || 'default';
+  const activeThemeClass = OS_THEMES[equippedThemeId] || OS_THEMES.default;
+  const themeClassModifier = equippedThemeId !== 'default' ? equippedThemeId.replace('_', '-') : '';
 
   const handleEquipCosmetic = async (itemId: string, category: string) => {
       if (!user || !userData) return;
-      
       const newEquipped = { ...(userData.equipped || {}), [category]: itemId };
-      
       try {
           const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main');
-          await updateDoc(profileRef, {
-              equipped: newEquipped
-          });
+          await updateDoc(profileRef, { equipped: newEquipped });
           
           const rootRef = doc(db, 'artifacts', appId, 'users', user.uid);
-          await updateDoc(rootRef, {
-              equipped: newEquipped,
-              'profile.main.equipped': newEquipped
-          }).catch(() => {});
-          
+          await updateDoc(rootRef, { equipped: newEquipped, 'profile.main.equipped': newEquipped }).catch(() => {});
       } catch (err) {
           console.error("Equip protocol failed:", err);
       }
@@ -284,22 +131,14 @@ export default function App() {
 
   const handleReorderFolders = async (newOrder: string[]) => {
       if (!user?.uid) return;
-      try {
-          const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
-          await setDoc(userRef, { studyFolders: newOrder }, { merge: true });
-      } catch (err) {
-          console.error("Failed to sync folder order to the network:", err);
-      }
+      try { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), { studyFolders: newOrder }, { merge: true }); } 
+      catch (err) { console.error("Failed to sync folder order to the network:", err); }
   };
 
   const handleReorderDecks = async (newOrder: string[]) => {
       if (!user?.uid) return;
-      try {
-          const userRef = doc(db, 'artifacts', appId, 'users', user.uid);
-          await setDoc(userRef, { deckOrder: newOrder }, { merge: true });
-      } catch (err) {
-          console.error("Failed to sync deck order to the network:", err);
-      }
+      try { await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), { deckOrder: newOrder }, { merge: true }); } 
+      catch (err) { console.error("Failed to sync deck order to the network:", err); }
   };
 
   // ==========================================================================
@@ -308,57 +147,25 @@ export default function App() {
   const handleStartVocabGame = async (deckId: string, classId: string) => {
       try {
           const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
-          await setDoc(sessionRef, {
-              type: 'trivia',
-              lessonId: deckId, 
-              quizState: 'waiting',
-              currentBlockIndex: 0,
-              joined: {},
-              answers: {},
-              scores: {},
-              timestamp: Date.now()
-          });
+          await setDoc(sessionRef, { type: 'trivia', lessonId: deckId, quizState: 'waiting', currentBlockIndex: 0, joined: {}, answers: {}, scores: {}, timestamp: Date.now() });
           setActiveVocabGame({ deckId, classId });
-      } catch (error) {
-          console.error("Failed to launch Live Arena:", error);
-      }
+      } catch (error) { console.error("Failed to launch Live Arena:", error); }
   };
 
   const handleStartConnectFour = async (deckId: string, classId: string) => {
       try {
           const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
-          await setDoc(sessionRef, {
-              type: 'connect_four',
-              lessonId: deckId, 
-              quizState: 'waiting',
-              currentTurn: 1, 
-              grid: Array(7).fill([]),
-              teams: {},
-              joined: {},
-              answers: {},
-              timestamp: Date.now()
-          });
+          await setDoc(sessionRef, { type: 'connect_four', lessonId: deckId, quizState: 'waiting', currentTurn: 1, grid: Array(7).fill([]), teams: {}, joined: {}, answers: {}, timestamp: Date.now() });
           setActiveConnectFour({ deckId, classId });
-      } catch (error) {
-          console.error("Failed to launch Squad Strike:", error);
-      }
+      } catch (error) { console.error("Failed to launch Squad Strike:", error); }
   };
 
   const handleStartSlipstream = async (deckId: string, classId: string) => {
       try {
           const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
-          await setDoc(sessionRef, {
-              type: 'slipstream',
-              lessonId: deckId, 
-              quizState: 'waiting',
-              joined: {},
-              progress: {},
-              timestamp: Date.now()
-          });
+          await setDoc(sessionRef, { type: 'slipstream', lessonId: deckId, quizState: 'waiting', joined: {}, progress: {}, timestamp: Date.now() });
           setActiveSlipstream({ deckId, classId });
-      } catch (error) {
-          console.error("Failed to launch Slipstream Run:", error);
-      }
+      } catch (error) { console.error("Failed to launch Slipstream Run:", error); }
   };
 
   // ==========================================================================
@@ -368,7 +175,6 @@ export default function App() {
 
   useEffect(() => {
     if (!authChecked || isHydrated.current) return;
-
     const params = new URLSearchParams(window.location.search);
     
     if (params.get('action') === 'signup' && !user) {
@@ -401,31 +207,24 @@ export default function App() {
 
   useEffect(() => {
     if (!isHydrated.current) return;
-
     const params = new URLSearchParams(window.location.search);
     params.set('view', currentView);
     params.set('tab', activeTab);
     
     if (activeStudentClass) params.set('classId', activeStudentClass.id);
     else params.delete('classId');
-
     if (activeLesson) params.set('lessonId', activeLesson.id);
     else params.delete('lessonId');
-
     if (activeDeckKey) params.set('deckId', activeDeckKey);
     else params.delete('deckId');
 
     const newUrl = `${window.location.pathname}?${params.toString()}`;
-
-    if (window.location.search !== `?${params.toString()}`) {
-      window.history.pushState({}, '', newUrl);
-    }
+    if (window.location.search !== `?${params.toString()}`) window.history.pushState({}, '', newUrl);
   }, [currentView, activeTab, activeStudentClass, activeLesson, activeDeckKey]);
 
   useEffect(() => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
-      
       setCurrentView((params.get('view') as any) || 'student');
       setActiveTab(params.get('tab') || 'home');
       setActiveDeckKey(params.get('deckId'));
@@ -436,27 +235,25 @@ export default function App() {
       const lessonId = params.get('lessonId');
       setActiveLesson(lessonId ? allLessons.find((l: any) => l.id === lessonId) || null : null);
     };
-
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [combinedClasses, allLessons]);
 
+  // --- BOOT SEQUENCE & AUTHENTICATION ---
   if (!authChecked) {
       return (
-          <div className={`${activeOSTheme} h-screen flex flex-col items-center justify-center transition-colors duration-700`}>
-              <div className="relative">
-                  <div className="absolute inset-0 bg-indigo-500 blur-xl opacity-40 animate-pulse" />
-                  <div className="w-16 h-16 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin relative z-10" />
+          <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-950 text-indigo-500 font-mono">
+              <div className="animate-pulse space-y-4 text-center">
+                  <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                  <p className="text-xs font-black tracking-[0.5em] uppercase">Booting Magister OS...</p>
               </div>
-              <p className="mt-8 text-xs font-black uppercase tracking-[0.3em] text-indigo-500/80 animate-pulse">Initializing OS</p>
           </div>
       );
   }
 
-  // 1. PUBLIC / AUTH GATES
   if (!user) {
     return showAuth ? (
-      <div className={`relative min-h-screen ${activeOSTheme} transition-colors duration-500`}>
+      <div className={`relative min-h-screen transition-colors duration-500 ${activeThemeClass}`}>
          <button onClick={() => setShowAuth(false)} className="absolute top-6 left-6 z-50 text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold text-sm transition-colors">← Regresar</button>
          <AuthView />
       </div>
@@ -473,80 +270,46 @@ export default function App() {
           <button onClick={() => setActivePresentation(null)} className="bg-black/20 text-white px-6 py-2 rounded-full font-black text-xs hover:bg-rose-600 transition-colors">Terminar Clase</button>
         </div>
         <div className="flex-1 bg-white">
-          <ClassView 
-            lesson={lesson} 
-            classId={activePresentation.classId} 
-            userData={userData} 
-            activeOrg={activeOrg} 
-            onExit={() => setActivePresentation(null)}
-          />
+          <ClassView lesson={lesson} classId={activePresentation.classId} userData={userData} activeOrg={activeOrg} onExit={() => setActivePresentation(null)} />
         </div>
       </div>
     );
   }
 
-  // 3. PROJECTOR MODE (Live Vocab Game)
   if (activeVocabGame) {
     const deck = allDecks[activeVocabGame.deckId] || allDecks.custom;
     const activeClassForVocab = instructorClasses.find(c => c.id === activeVocabGame.classId) || enrolledClasses.find(c => c.id === activeVocabGame.classId);
-
     return (
       <div className="fixed inset-0 z-[5000] bg-black flex flex-col">
-        <div className="h-16 px-6 flex justify-between items-center border-b border-white/10" style={{ backgroundColor: activeOrg?.themeColor || '#4f46e5' }}>
-          <span className="font-black text-white uppercase tracking-widest">{activeOrg?.name || 'Magister'} | VOCABULARY PROTOCOL</span>
-          <button onClick={() => setActiveVocabGame(null)} className="bg-white/10 text-white px-6 py-2 rounded-full font-black text-xs hover:bg-rose-600 transition-colors">Abort Run</button>
-        </div>
-        <div className="flex-1 bg-black relative">
-          <LiveVocabProjector 
-             deck={deck} 
-             classId={activeVocabGame.classId} 
-             activeClass={activeClassForVocab} 
-             activeOrg={activeOrg} 
-             onExit={() => setActiveVocabGame(null)} 
-          />
-        </div>
+        <LiveVocabProjector deck={deck} classId={activeVocabGame.classId} activeClass={activeClassForVocab} activeOrg={activeOrg} onExit={() => setActiveVocabGame(null)} />
       </div>
     );
   }
 
-  // 4. PROJECTOR MODE (Live Connect 4 Battle)
   if (activeConnectFour) {
     const deck = allDecks[activeConnectFour.deckId] || allDecks.custom;
     const activeClassForC4 = instructorClasses.find(c => c.id === activeConnectFour.classId) || enrolledClasses.find(c => c.id === activeConnectFour.classId);
-
     return (
       <div className="fixed inset-0 z-[5000] bg-black flex flex-col">
-        <LiveConnectFourProjector 
-             deck={deck} 
-             classId={activeConnectFour.classId} 
-             activeClass={activeClassForC4} 
-             onExit={() => setActiveConnectFour(null)} 
-          />
+        <LiveConnectFourProjector deck={deck} classId={activeConnectFour.classId} activeClass={activeClassForC4} onExit={() => setActiveConnectFour(null)} />
       </div>
     );
   }
 
-  // 5. PROJECTOR MODE (Slipstream Run)
   if (activeSlipstream) {
     const deck = allDecks[activeSlipstream.deckId] || allDecks.custom;
     const activeClassForSlipstream = instructorClasses.find(c => c.id === activeSlipstream.classId) || enrolledClasses.find(c => c.id === activeSlipstream.classId);
-
     return (
       <div className="fixed inset-0 z-[5000] bg-black flex flex-col">
-        <LiveSlipstreamProjector 
-             deck={deck} 
-             classId={activeSlipstream.classId} 
-             activeClass={activeClassForSlipstream} 
-             onExit={() => setActiveSlipstream(null)} 
-          />
+        <LiveSlipstreamProjector deck={deck} classId={activeSlipstream.classId} activeClass={activeClassForSlipstream} onExit={() => setActiveSlipstream(null)} />
       </div>
     );
   }
 
-  // 6. ADMIN VIEW
+  // 3. ADMIN VIEW
   if (currentView === 'admin' && (userData?.role === 'admin' || userData?.role === 'org_admin')) {
     return (
-        <div className={`h-screen w-full relative ${activeOSTheme} transition-colors duration-500`}>
+        <div className={`h-screen w-full relative transition-colors duration-500 ${activeThemeClass}`}>
             <AdminDashboardView user={{...user, ...userData}} activeOrg={activeOrg} onSwitchView={() => setCurrentView('student')} />
             <button 
                 onClick={() => setCurrentView('student')}
@@ -559,7 +322,7 @@ export default function App() {
     );
   }
 
-  // 7. INSTRUCTOR VIEW
+  // 4. INSTRUCTOR VIEW
   if (currentView === 'instructor' && userData?.role !== 'student') {
     return (
       <InstructorDashboard 
@@ -594,16 +357,12 @@ export default function App() {
     );
   }
 
-  // 8. STUDENT MOBILE APP
-  
-  // 🔥 Generate the pure CSS class for the wrapper (turns theme_hacker into theme-hacker)
-  const themeClass = activeThemeId !== 'default' ? activeThemeId.replace('_', '-') : '';
-
+  // 5. STUDENT MOBILE APP
   return (
-    <div className={themeClass}> {/* 🔥 THE THEME WRAPPER */}
-      <div className={`${activeOSTheme} min-h-[100dvh] w-full flex flex-col items-center relative overflow-hidden transition-colors duration-700`}>
+    <div className={themeClassModifier}>
+      <div className={`min-h-[100dvh] w-full flex flex-col items-center relative overflow-hidden transition-colors duration-700 ${activeThemeClass}`}>
         
-        {/* 🔥 JUICE: Floating Command Center Button features the user's avatar! */}
+        {/* Floating Command Center Button features the user's avatar! */}
         {userData?.role !== 'student' && (
           <button 
               onClick={() => setCurrentView(userData?.role === 'instructor' ? 'instructor' : 'admin')} 
@@ -618,117 +377,29 @@ export default function App() {
         )}
 
         {/* The OS Device Wrapper */}
-        <div className={`w-full ${activeOSTheme} max-w-md h-[100dvh] shadow-[0_0_50px_rgba(0,0,0,0.15)] dark:shadow-[0_0_50px_rgba(0,0,0,0.4)] relative flex flex-col overflow-hidden transition-colors duration-700 ring-1 ring-slate-900/5 dark:ring-white/5`}>
+        <div className={`w-full max-w-md h-[100dvh] shadow-[0_0_50px_rgba(0,0,0,0.15)] dark:shadow-[0_0_50px_rgba(0,0,0,0.4)] relative flex flex-col overflow-hidden transition-colors duration-700 ring-1 ring-slate-900/5 dark:ring-white/5 ${activeThemeClass}`}>
           
-          {/* Tab Transition Wrapper using Key triggers */}
           <div key={activeTab + (activeLesson?.id || '')} className="flex-1 overflow-hidden relative animate-in fade-in zoom-in-[0.98] duration-300 ease-out">
-            
             {celebrationData ? (
-               <CelebrationScreen 
-                  data={celebrationData} 
-                  userData={userData} 
-                  onComplete={() => {
-                      setCelebrationData(null);
-                      setActiveLesson(null); 
-                  }} 
-               />
+               <CelebrationScreen data={celebrationData} userData={userData} onComplete={() => { setCelebrationData(null); setActiveLesson(null); }} />
             ) : activeLesson ? (
               activeLesson.type === 'exam' || activeLesson.type === 'test' ? (
-                <ExamPlayerView 
-                  exam={activeLesson} 
-                  onFinish={(id:any, score:any, title:any, res:any) => { 
-                      actions.logActivity(id, score, title, { scoreDetail: res }); 
-                      setCelebrationData({ xp: score, title: title }); 
-                  }} 
-                />
+                <ExamPlayerView exam={activeLesson} onFinish={(id:any, score:any, title:any, res:any) => { actions.logActivity(id, score, title, { scoreDetail: res }); setCelebrationData({ xp: score, title: title }); }} />
               ) : (
-                <LessonView 
-                  lesson={activeLesson} 
-                  onFinish={() => { 
-                      actions.logActivity(activeLesson.id, 50, activeLesson.title, { mode: 'lesson' }); 
-                      setCelebrationData({ xp: 50, title: activeLesson.title }); 
-                  }} 
-                />
+                <LessonView lesson={activeLesson} onFinish={() => { actions.logActivity(activeLesson.id, 50, activeLesson.title, { mode: 'lesson' }); setCelebrationData({ xp: 50, title: activeLesson.title }); }} />
               )
             ) : activeStudentClass ? (
-              <StudentClassView 
-                  classData={activeStudentClass} 
-                  lessons={allLessons} 
-                  curriculums={allCurriculums}
-                  allDecks={allDecks}
-                  onBack={() => setActiveStudentClass(null)} 
-                  onSelectLesson={setActiveLesson} 
-                  setActiveTab={setActiveTab} 
-                  setSelectedLessonId={(lessonId: string) => setActivePresentation({ lessonId, classId: activeStudentClass.id })} 
-                  userData={userData} 
-                  ExamPlayerView={ExamPlayerView} 
-                  onLogActivity={actions.logActivity}
-              />
+              <StudentClassView classData={activeStudentClass} lessons={allLessons} curriculums={allCurriculums} allDecks={allDecks} onBack={() => setActiveStudentClass(null)} onSelectLesson={setActiveLesson} setActiveTab={setActiveTab} setSelectedLessonId={(lessonId: string) => setActivePresentation({ lessonId, classId: activeStudentClass.id })} userData={userData} ExamPlayerView={ExamPlayerView} onLogActivity={actions.logActivity} />
             ) : activeTab === 'discovery' ? (
-              <DiscoveryView 
-                  networkClasses={allClasses || []} 
-                  networkDecks={networkDecks} 
-                  userData={userData} 
-                  activeOrg={activeOrg} 
-                  onPurchase={actions.purchaseItem} 
-                  onOpenClass={(courseObj: any) => {
-                      // 🔥 Instantly drop underlying routing to Home and pop StudentClassView on top!
-                      setActiveDeckKey(null);
-                      setActiveLesson(null);
-                      setActiveTab('home');
-                      setActiveStudentClass(courseObj);
-                  }}
-                  onDownloadDeck={async (deck: any) => { 
-                      // 🔥 Route standalone decks right into the Study Hub (Flashcards tab)
-                      await actions.purchaseItem(deck.id, deck.price || 0, 'deck');
-                      if (actions.assignDeckToFolder) {
-                          actions.assignDeckToFolder(deck.id, null);
-                      }
-                      setActiveDeckKey(deck.id);
-                      setActiveTab('flashcards');
-                  }} 
-              />
+              <DiscoveryView networkClasses={allClasses || []} networkDecks={networkDecks} userData={userData} activeOrg={activeOrg} onPurchase={actions.purchaseItem} onOpenClass={(courseObj: any) => { setActiveDeckKey(null); setActiveLesson(null); setActiveTab('home'); setActiveStudentClass(courseObj); }} onDownloadDeck={async (deck: any) => { await actions.purchaseItem(deck.id, deck.price || 0, 'deck'); if (actions.assignDeckToFolder) actions.assignDeckToFolder(deck.id, null); setActiveDeckKey(deck.id); setActiveTab('flashcards'); }} />
             ) : activeTab === 'store' ? (
-              <StorefrontView 
-                  userData={userData} 
-                  activeOrg={activeOrg} 
-                  onPurchase={actions.purchaseItem} 
-                  onEquip={handleEquipCosmetic} 
-              />
+              <StorefrontView userData={userData} activeOrg={activeOrg} onPurchase={actions.purchaseItem} onEquip={handleEquipCosmetic} />
             ) : activeTab === 'flashcards' ? (
-              <FlashcardView 
-                  allDecks={allDecks} 
-                  selectedDeckKey={activeDeckKey} 
-                  onSelectDeck={(key:any) => { setActiveDeckKey(key); if(!key) setActiveTab('home'); }} 
-                  onLogActivity={actions.logActivity} 
-                  onSaveCard={actions.saveCard} 
-                  userData={userData} 
-                  user={user} 
-                  activeOrg={activeOrg}
-                  onToggleStar={actions.toggleCardStar} 
-                  onToggleArchive={actions.toggleDeckArchive} 
-                  onCreateFolder={actions.createStudyFolder}
-                  onAssignToFolder={actions.assignDeckToFolder}
-                  onHideDeck={actions.hideDeck}
-                  onUpdateFolder={actions.updateStudyFolder}
-                  onDeleteFolder={actions.deleteStudyFolder}
-                  onReorderFolders={handleReorderFolders} 
-                  onReorderDecks={handleReorderDecks}
-              />
+              <FlashcardView allDecks={allDecks} selectedDeckKey={activeDeckKey} onSelectDeck={(key:any) => { setActiveDeckKey(key); if(!key) setActiveTab('home'); }} onLogActivity={actions.logActivity} onSaveCard={actions.saveCard} userData={userData} user={user} activeOrg={activeOrg} onToggleStar={actions.toggleCardStar} onToggleArchive={actions.toggleDeckArchive} onCreateFolder={actions.createStudyFolder} onAssignToFolder={actions.assignDeckToFolder} onHideDeck={actions.hideDeck} onUpdateFolder={actions.updateStudyFolder} onDeleteFolder={actions.deleteStudyFolder} onReorderFolders={handleReorderFolders} onReorderDecks={handleReorderDecks} />
             ) : activeTab === 'profile' ? (
               <ProfileView user={user} userData={userData} />
             ) : (
-              <HomeView 
-                  classes={combinedClasses} 
-                  curriculums={allCurriculums} 
-                  onSelectClass={setActiveStudentClass} 
-                  onReorderClasses={(actions as any).reorderClasses}
-                  userData={userData} 
-                  user={user}
-                  activeOrg={activeOrg} 
-                  setActiveTab={setActiveTab} 
-                  allDecks={allDecks} 
-              />
+              <HomeView classes={combinedClasses} curriculums={allCurriculums} onSelectClass={setActiveStudentClass} onReorderClasses={(actions as any).reorderClasses} userData={userData} user={user} activeOrg={activeOrg} setActiveTab={setActiveTab} allDecks={allDecks} />
             )}
           </div>
           
