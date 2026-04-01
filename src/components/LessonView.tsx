@@ -162,30 +162,53 @@ const FillBlankBlockRenderer = ({ block }: any) => {
     const isComplete = filledBlanks.every(slot => slot !== null);
 
     return (
-        <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-100 shadow-sm my-6">
-            <div className="flex items-center gap-3 mb-8">
-                <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shadow-inner">
-                    <Edit3 size={20} />
+        <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-100 shadow-sm my-6 relative flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shadow-inner shrink-0">
+                        <Edit3 size={20} />
+                    </div>
+                    <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Vocabulary Drill</h3>
                 </div>
-                <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Vocabulary Drill</h3>
             </div>
 
-            <div className="text-xl font-medium text-slate-700 leading-loose flex flex-wrap items-center gap-y-4 mb-10">
+            {/* 🔥 THE FIX: STICKY TOP WORD BANK */}
+            {/* This keeps the words instantly accessible while the student reads the paragraph */}
+            <div className="sticky top-4 z-30 mb-8 -mx-2 px-2">
+                <div className="bg-white/80 backdrop-blur-2xl rounded-2xl p-4 border border-slate-200/50 shadow-[0_10px_30px_rgba(0,0,0,0.08)] flex flex-wrap gap-2 min-h-[60px] justify-center items-center transition-all duration-300">
+                    {wordBank.length === 0 && !isChecked ? (
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <CheckCircle2 size={16} className="text-emerald-500" /> All words placed
+                        </span>
+                    ) : (
+                        wordBank.map((word, idx) => (
+                            <button 
+                                key={`bank-${idx}`} onClick={() => handleBankClick(word)} disabled={isChecked}
+                                className="px-4 py-2.5 bg-white border-2 border-slate-200 text-slate-700 font-black rounded-xl shadow-sm hover:border-indigo-400 hover:text-indigo-600 transition-all disabled:opacity-50 active:scale-95 text-sm md:text-base"
+                            >
+                                {word}
+                            </button>
+                        ))
+                    )}
+                </div>
+            </div>
+
+            <div className="text-xl md:text-2xl font-medium text-slate-700 leading-relaxed md:leading-loose flex flex-wrap items-center gap-y-5 mb-6">
                 {textParts.map((part: string, i: number) => {
                     const isLast = i === textParts.length - 1;
                     const filledWord = filledBlanks[i];
                     
-                    let blankStyle = "min-w-[80px] h-10 border-b-4 border-slate-200 mx-2 flex items-center justify-center px-4 cursor-pointer transition-all";
-                    if (filledWord) blankStyle = "min-w-[80px] h-10 bg-indigo-100 text-indigo-700 font-bold rounded-xl mx-2 flex items-center justify-center px-4 cursor-pointer shadow-sm hover:bg-rose-100 hover:text-rose-600 transition-all active:scale-95";
+                    let blankStyle = "min-w-[100px] h-12 border-b-4 border-slate-200 mx-2 flex items-center justify-center px-4 cursor-pointer transition-all";
+                    if (filledWord) blankStyle = "min-w-[100px] h-12 bg-indigo-100 text-indigo-700 font-bold rounded-xl mx-2 flex items-center justify-center px-4 cursor-pointer shadow-sm hover:bg-rose-100 hover:text-rose-600 transition-all active:scale-95";
                     
                     if (isChecked && filledWord) {
                         const isCorrect = filledWord === correctAnswers[i];
-                        blankStyle = `min-w-[80px] h-10 font-bold rounded-xl mx-2 flex items-center justify-center px-4 shadow-sm text-white ${isCorrect ? 'bg-emerald-500' : 'bg-rose-500'}`;
+                        blankStyle = `min-w-[100px] h-12 font-bold rounded-xl mx-2 flex items-center justify-center px-4 shadow-sm text-white ${isCorrect ? 'bg-emerald-500 border-emerald-500' : 'bg-rose-500 border-rose-500'}`;
                     }
 
                     return (
                         <React.Fragment key={i}>
-                            <span className="leading-none">{part}</span>
+                            <span className="py-2">{part}</span>
                             {!isLast && (
                                 <div onClick={() => handleBlankClick(filledWord, i)} className={blankStyle}>
                                     {filledWord || ""}
@@ -196,21 +219,12 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                 })}
             </div>
 
-            <div className="bg-slate-50 rounded-2xl p-6 border-2 border-slate-100 flex flex-wrap gap-3 min-h-[48px]">
-                {wordBank.map((word, idx) => (
-                    <button 
-                        key={`bank-${idx}`} onClick={() => handleBankClick(word)} disabled={isChecked}
-                        className="px-5 py-2.5 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl shadow-sm hover:border-indigo-300 transition-all disabled:opacity-50"
-                    >
-                        {word}
-                    </button>
-                ))}
-            </div>
-
             {isComplete && !isChecked && (
-                <button onClick={() => setIsChecked(true)} className="mt-6 w-full py-4 bg-emerald-500 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 shadow-lg shadow-emerald-100 active:scale-95 transition-all">
-                    Check Answers
-                </button>
+                <div className="mt-4 pt-6 border-t border-slate-100 animate-in slide-in-from-bottom-2">
+                    <button onClick={() => setIsChecked(true)} className="w-full py-5 bg-emerald-500 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-emerald-600 shadow-xl shadow-emerald-500/20 active:scale-95 transition-all">
+                        Check Answers
+                    </button>
+                </div>
             )}
         </div>
     );
@@ -323,19 +337,33 @@ const TapSortBlockRenderer = ({ block }: any) => {
     };
 
     return (
-        <div className="bg-amber-50 p-6 md:p-8 rounded-[3rem] border-4 border-amber-100 my-8 shadow-sm">
-            <div className="flex items-center justify-center gap-3 mb-8"><MousePointerClick className="text-amber-500" size={24} /><h3 className="text-2xl font-black text-amber-900 text-center">{block.title || 'Sort the Items!'}</h3></div>
-            <div className="flex flex-wrap justify-center gap-4 mb-10 min-h-[80px]">
-                {items.length === 0 && <p className="text-amber-400 font-bold italic my-auto">All sorted! Great job!</p>}
-                {items.map((item) => (
-                    <button key={item.id} onClick={() => setSelectedItem(selectedItem?.id === item.id ? null : item)} className={`px-6 py-4 rounded-[1.5rem] font-black text-lg transition-all duration-300 shadow-md ${selectedItem?.id === item.id ? 'bg-indigo-600 text-white scale-110 -translate-y-2 ring-4 ring-indigo-200' : 'bg-white text-slate-700 hover:scale-105'}`}>{item.emoji} {item.label}</button>
-                ))}
+        <div className="bg-amber-50 p-6 md:p-8 rounded-[3rem] border-4 border-amber-100 my-8 shadow-sm relative flex flex-col">
+            <div className="flex items-center justify-center gap-3 mb-6">
+                <MousePointerClick className="text-amber-500" size={24} />
+                <h3 className="text-2xl font-black text-amber-900 text-center">{block.title || 'Sort the Items!'}</h3>
             </div>
+            
+            {/* 🔥 THE FIX: STICKY TOP ITEM BANK */}
+            <div className="sticky top-4 z-30 mb-10 -mx-2 px-2">
+                <div className="bg-white/90 backdrop-blur-2xl rounded-[2rem] p-4 border border-slate-200/50 shadow-[0_10px_30px_rgba(0,0,0,0.08)] flex flex-wrap justify-center gap-3 min-h-[80px] transition-all duration-300">
+                    {items.length === 0 && <p className="text-amber-500 font-bold uppercase tracking-widest my-auto flex items-center gap-2"><CheckCircle2 size={16}/> All sorted!</p>}
+                    {items.map((item) => (
+                        <button 
+                            key={item.id} 
+                            onClick={() => setSelectedItem(selectedItem?.id === item.id ? null : item)} 
+                            className={`px-5 py-3 rounded-2xl font-black text-lg transition-all duration-300 shadow-md ${selectedItem?.id === item.id ? 'bg-indigo-600 text-white scale-110 -translate-y-1 ring-4 ring-indigo-200' : 'bg-white text-slate-700 hover:scale-105 active:scale-95'}`}
+                        >
+                            {item.emoji} {item.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
                 {(block.categories || []).map((cat: string) => (
                     <button key={cat} onClick={() => handleBucketClick(cat)} className={`p-6 rounded-[2rem] border-4 transition-colors flex flex-col items-center gap-4 ${selectedItem ? 'border-indigo-400 bg-indigo-50 animate-pulse cursor-pointer' : 'border-amber-200 bg-amber-100/50 cursor-default'}`}>
                         <h4 className="font-black text-amber-900 text-xl text-center leading-tight">{cat}</h4>
-                        <div className="flex flex-wrap justify-center gap-2">{placed[cat]?.map(item => (<div key={item.id} className="px-3 py-1 bg-white rounded-xl text-sm font-black shadow-sm flex items-center gap-1">{item.emoji} <span className="hidden md:inline">{item.label}</span></div>))}</div>
+                        <div className="flex flex-wrap justify-center gap-2">{placed[cat]?.map(item => (<div key={item.id} className="px-3 py-1.5 bg-white rounded-xl text-sm font-black shadow-sm flex items-center gap-1">{item.emoji} <span className="hidden md:inline">{item.label}</span></div>))}</div>
                     </button>
                 ))}
             </div>
