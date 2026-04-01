@@ -5,7 +5,7 @@ import { db } from '../config/firebase';
 import { 
   HelpCircle, CheckCircle2, X, Edit3, MessageSquare, 
   MessageCircle, ArrowLeft, ArrowRight, Info, Zap, BookOpen,
-  Play, Square, Search, MousePointerClick, Palette, Eraser, Volume2, Gamepad2, AlertTriangle
+  Play, Square, Search, MousePointerClick, Palette, Eraser, Volume2, AlertTriangle
 } from 'lucide-react';
 
 export interface LessonViewProps {
@@ -17,7 +17,7 @@ export interface LessonViewProps {
 }
 
 // ============================================================================
-//  INTERACTIVE RENDERERS (Armored)
+//  INTERACTIVE RENDERERS (Indestructible)
 // ============================================================================
 
 const QuizBlockRenderer = ({ block }: any) => {
@@ -25,7 +25,7 @@ const QuizBlockRenderer = ({ block }: any) => {
     const [isSubmitted, setIsSubmitted] = useState(false);
 
     const data = block?.content || block?.data || block || {};
-    const question = String(data.question || "Missing Question Data");
+    const question = typeof data.question === 'string' ? data.question : String(data.question || "Missing Question Data");
     
     let options = data.options || [];
     if (!Array.isArray(options)) options = [];
@@ -108,7 +108,7 @@ const QuizBlockRenderer = ({ block }: any) => {
 
 const FillBlankBlockRenderer = ({ block }: any) => {
     const data = block?.content || block?.data || block || {};
-    const rawText = String(data.text || "Missing text [here].");
+    const rawText = typeof data.text === 'string' ? data.text : "Missing text [here].";
     
     const { textParts, correctAnswers } = useMemo(() => {
         const parts = rawText.split(/\[.*?\]/g);
@@ -117,33 +117,40 @@ const FillBlankBlockRenderer = ({ block }: any) => {
         return { textParts: parts, correctAnswers: answers };
     }, [rawText]);
 
-    const distractorsString = JSON.stringify(data.options || data.distractors || []);
+    // 🔥 THE FIX: Stringify arrays to prevent React reference-loop crashes
+    const distractorsJson = JSON.stringify(data.options || data.distractors || []);
 
     const distractors = useMemo(() => {
         let rawOptions = [];
-        try { rawOptions = JSON.parse(distractorsString); } catch (e) {}
+        try { rawOptions = JSON.parse(distractorsJson); } catch (e) {}
         if (!Array.isArray(rawOptions)) rawOptions = typeof rawOptions === 'string' ? [rawOptions] : [];
         return rawOptions.map((opt: any) => {
             if (typeof opt === 'string' || typeof opt === 'number') return String(opt);
             if (opt && typeof opt === 'object') return String(opt.text || opt.label || opt.value || "");
             return "";
         }).filter(Boolean);
-    }, [distractorsString]);
+    }, [distractorsJson]);
 
-    const [wordBank, setWordBank] = useState<{id: string, word: string}[]>([]);
-    const [filledBlanks, setFilledBlanks] = useState<({id: string, word: string} | null)[]>([]);
+    const initialWordBank = useMemo(() => {
+        return [...correctAnswers, ...distractors]
+            .map((w, i) => ({ id: `word_${i}_${w}`, word: w }))
+            .sort(() => Math.random() - 0.5);
+    }, [correctAnswers, distractors]);
+
+    const [wordBank, setWordBank] = useState<{id: string, word: string}[]>(initialWordBank);
+    const [filledBlanks, setFilledBlanks] = useState<({id: string, word: string} | null)[]>(Array(correctAnswers.length).fill(null));
     const [isChecked, setIsChecked] = useState(false);
 
+    // Resync safely only if the core data structure changes
     useEffect(() => {
-        const allWords = [...correctAnswers, ...distractors].map((w, i) => ({ id: `word_${i}_${w}`, word: w }));
-        setWordBank(allWords.sort(() => Math.random() - 0.5));
+        setWordBank(initialWordBank);
         setFilledBlanks(Array(correctAnswers.length).fill(null));
         setIsChecked(false);
-    }, [correctAnswers.join(','), distractors.join(',')]);
+    }, [initialWordBank, correctAnswers.length]);
 
     const handleBankClick = (item: {id: string, word: string}) => {
         if (isChecked) return;
-        const firstEmptyIdx = filledBlanks.indexOf(null);
+        const firstEmptyIdx = filledBlanks.indexOf(null); 
         if (firstEmptyIdx !== -1) {
             const newFilled = [...filledBlanks];
             newFilled[firstEmptyIdx] = item;
@@ -233,8 +240,8 @@ const FillBlankBlockRenderer = ({ block }: any) => {
 
 const ScenarioBlockRenderer = ({ block }: any) => {
     const [selectedOpt, setSelectedOpt] = useState<string | null>(null);
-    const title = String(block.title || block?.content?.title || block?.data?.title || "Real-World Scenario");
-    const context = String(block.context || block?.content?.context || block?.data?.context || "Scenario context goes here...");
+    const title = typeof block.title === 'string' ? block.title : (typeof block?.content?.title === 'string' ? block.content.title : "Real-World Scenario");
+    const context = typeof block.context === 'string' ? block.context : (typeof block?.content?.context === 'string' ? block.content.context : "Scenario context goes here...");
     
     let options = block.options || block?.content?.options || block?.data?.options || [];
     if (!Array.isArray(options)) options = [];
@@ -324,27 +331,41 @@ const ImageHotspotBlockRenderer = ({ block }: any) => {
 };
 
 const TapSortBlockRenderer = ({ block }: any) => {
-    // 🔥 SAFETY: Coerce all items into safe object formats immediately
-    const rawItems = Array.isArray(block.items) ? block.items : [];
-    const normalizedItems = rawItems.map((item: any, idx: number) => {
-        if (typeof item === 'string' || typeof item === 'number') return { id: `item_${idx}`, label: String(item), emoji: '🔹' };
-        return { 
-            id: String(item?.id || `item_${idx}`), 
-            label: String(item?.label || item?.text || ''), 
-            emoji: String(item?.emoji || '🔹')
-        };
-    });
+    const itemsJson = JSON.stringify(block.items || []);
+    const catsJson = JSON.stringify(block.categories || []);
+
+    const normalizedItems = useMemo(() => {
+        let rawItems = [];
+        try { rawItems = JSON.parse(itemsJson); } catch (e) {}
+        if (!Array.isArray(rawItems)) rawItems = [];
+        return rawItems.map((item: any, idx: number) => {
+            if (typeof item === 'string' || typeof item === 'number') return { id: `item_${idx}`, label: String(item), emoji: '🔹' };
+            return { 
+                id: String(item?.id || `item_${idx}`), 
+                label: String(item?.label || item?.text || ''), 
+                emoji: String(item?.emoji || '🔹')
+            };
+        });
+    }, [itemsJson]);
+
+    const parsedCategories = useMemo(() => {
+        let cats = [];
+        try { cats = JSON.parse(catsJson); } catch (e) {}
+        if (!Array.isArray(cats)) cats = [];
+        return cats;
+    }, [catsJson]);
 
     const [items, setItems] = useState<any[]>(normalizedItems);
     const [placed, setPlaced] = useState<Record<string, any[]>>({});
     const [selectedItem, setSelectedItem] = useState<any>(null);
 
     useEffect(() => {
+        setItems(normalizedItems);
         const init: any = {};
-        const categories = Array.isArray(block.categories) ? block.categories : [];
-        categories.forEach((c: any) => init[String(c)] = []);
+        parsedCategories.forEach((c: any) => init[String(c)] = []);
         setPlaced(init);
-    }, [block.categories]);
+        setSelectedItem(null);
+    }, [normalizedItems, parsedCategories]);
 
     const handleBucketClick = (category: string) => {
         if (selectedItem) {
@@ -377,7 +398,7 @@ const TapSortBlockRenderer = ({ block }: any) => {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-                {(Array.isArray(block.categories) ? block.categories : []).map((catObj: any) => {
+                {parsedCategories.map((catObj: any) => {
                     const cat = String(catObj);
                     return (
                         <button key={cat} onClick={() => handleBucketClick(cat)} className={`p-6 rounded-[2rem] border-4 transition-colors flex flex-col items-center gap-4 ${selectedItem ? 'border-indigo-400 bg-indigo-50 animate-pulse cursor-pointer' : 'border-amber-200 bg-amber-100/50 cursor-default'}`}>
@@ -448,7 +469,6 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
   const scrollTimeout = useRef<any>(null); 
 
   const pages = useMemo(() => {
-    // 🔥 SAFETY: Ensure lesson blocks is genuinely an array before attempting to iterate
     if (!lesson || !Array.isArray(lesson.blocks)) return [];
     
     const grouped: any[] = [];
@@ -578,7 +598,7 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
       case 'content':
       case 'paragraph':
       case 'text': {
-        const title = block.title || block.content?.title;
+        const title = typeof block.title === 'string' ? block.title : (typeof block.content?.title === 'string' ? block.content.title : null);
         const textBody = typeof block.content === 'string' 
             ? block.content 
             : (typeof block.content?.text === 'string' ? block.content.text : (typeof block.text === 'string' ? block.text : ""));
@@ -603,7 +623,7 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
         );
       case 'dialogue':
         return (
-          <div key={blockKey} className="py-6 space-y-6">{(Array.isArray(block.lines) ? block.lines : []).map((line: any, j: number) => (<div key={j} className={`flex items-end gap-3 ${line.side === 'right' ? 'flex-row-reverse' : ''}`}><div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-black text-white shrink-0 shadow-md ${line.side === 'right' ? 'bg-indigo-500' : 'bg-slate-300'}`}>{String(line?.speaker?.charAt(0)?.toUpperCase() || '?')}</div><div className={`max-w-[85%] p-5 rounded-[2rem] text-base font-medium leading-relaxed ${line.side === 'right' ? 'bg-indigo-50 text-indigo-900 border border-indigo-100 rounded-br-none' : 'bg-white border border-slate-100 text-slate-700 rounded-bl-none shadow-sm'}`}>{String(line.text || '')}{line.translation && <p className={`text-xs mt-3 italic opacity-70 font-bold border-t pt-3 ${line.side === 'right' ? 'border-indigo-200' : 'border-slate-100'}`}>{String(line.translation)}</p>}</div></div>))}</div>
+          <div key={blockKey} className="py-6 space-y-6">{(Array.isArray(block.lines) ? block.lines : []).map((line: any, j: number) => (<div key={j} className={`flex items-end gap-3 ${line.side === 'right' ? 'flex-row-reverse' : ''}`}><div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-black text-white shrink-0 shadow-md ${line.side === 'right' ? 'bg-indigo-500' : 'bg-slate-300'}`}>{typeof line?.speaker === 'string' && line.speaker.trim().length > 0 ? line.speaker.trim()[0].toUpperCase() : '?'}</div><div className={`max-w-[85%] p-5 rounded-[2rem] text-base font-medium leading-relaxed ${line.side === 'right' ? 'bg-indigo-50 text-indigo-900 border border-indigo-100 rounded-br-none' : 'bg-white border border-slate-100 text-slate-700 rounded-bl-none shadow-sm'}`}>{String(line.text || '')}{typeof line.translation === 'string' && line.translation && <p className={`text-xs mt-3 italic opacity-70 font-bold border-t pt-3 ${line.side === 'right' ? 'border-indigo-200' : 'border-slate-100'}`}>{String(line.translation)}</p>}</div></div>))}</div>
         );
       case 'vocab-list':
         return (
@@ -611,7 +631,7 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
         );
       case 'image':
         return (
-          <div key={blockKey} className="py-8 animate-in fade-in"><div className="rounded-[2.5rem] overflow-hidden shadow-md border border-slate-100"><img src={String(block.url || '')} alt="Lesson visual" className="w-full h-auto object-cover max-h-80" /></div>{block.caption && <p className="text-xs font-bold text-slate-400 text-center mt-4 px-4 uppercase tracking-widest">{String(block.caption)}</p>}</div>
+          <div key={blockKey} className="py-8 animate-in fade-in"><div className="rounded-[2.5rem] overflow-hidden shadow-md border border-slate-100"><img src={String(block.url || '')} alt="Lesson visual" className="w-full h-auto object-cover max-h-80" /></div>{typeof block.caption === 'string' && block.caption && <p className="text-xs font-bold text-slate-400 text-center mt-4 px-4 uppercase tracking-widest">{block.caption}</p>}</div>
         );
       case 'discussion':
         return (
@@ -643,7 +663,6 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
       );
   }
 
-  // Safety fallback if activePageIdx gets out of bounds
   const safePageIdx = Math.min(activePageIdx, pages.length - 1);
   const activePage = pages[safePageIdx];
 
