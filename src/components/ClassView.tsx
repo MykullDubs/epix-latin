@@ -1,6 +1,6 @@
 // src/components/ClassView.tsx
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { doc, setDoc } from 'firebase/firestore'; 
+import { doc, onSnapshot, setDoc } from 'firebase/firestore'; 
 import { db } from '../config/firebase';
 import { useLiveClass } from '../hooks/useLiveClass';
 import { 
@@ -63,7 +63,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
     
     lesson.blocks.forEach((b: any) => {
       const type = String(b?.type || '');
-      // 🛡️ MOBILE SAFE: indexOf instead of includes
       if (interactables.indexOf(type) !== -1) {
         if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
         grouped.push({ type: 'interact', blocks: [b] });
@@ -232,6 +231,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                           {blockType === 'game' && block.gameType === 'connect-three' && <GameBlock block={block} lessonVocab={lessonVocab} />}
                           {blockType === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
                           {blockType === 'fill-blank' && <FillBlankBlock block={block} liveState={liveState} />}
+                          {blockType === 'drag-drop' && <TapSortBlockRenderer block={block} />}
                       </>
                     )}
                   </div>
@@ -405,11 +405,10 @@ const ScenarioBlock = ({ block, liveState }: { block: any, liveState: any }) => 
   );
 };
 
-// 🔥 TITANIUM ARMORED FILL BLANK WITH STICKY WORD BANK HUD
+// 🔥 TITANIUM ARMORED FILL BLANK WITH BOTTOM-STICKY COMPACT WORD BANK
 const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) => {
   const rawText = String(block.text || "Missing text [here].");
 
-  // 🛡️ MOBILE SAFE REGEX: Avoids .matchAll() crashes
   const { textParts, correctAnswers } = useMemo(() => {
         const parts = rawText.split(/\[.*?\]/g);
         const answers: string[] = [];
@@ -434,44 +433,19 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
     return allWords.sort(() => 0.5 - Math.random());
   }, [correctAnswers, distractors]);
 
-  // Safely extract the live array of answers coming from students' phones
   const liveAnswers = Array.isArray(liveState?.answers) ? liveState.answers : [];
 
   return (
-    <div className="w-full max-w-6xl mx-auto bg-white p-12 md:p-16 rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 relative">
-      <h3 className="text-[4vh] font-bold text-slate-800 mb-12 flex items-center justify-center gap-4">
+    <div className="w-full max-w-6xl mx-auto bg-white p-12 md:p-16 rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 relative flex flex-col">
+      
+      {/* HEADER */}
+      <h3 className="text-[4vh] font-bold text-slate-800 mb-8 flex items-center justify-center gap-4">
         <span className="bg-indigo-100 text-indigo-600 p-4 rounded-2xl" aria-hidden="true"><Puzzle size={40}/></span>
         {String(block.question || "Fill in the blanks")}
       </h3>
-      
-      {/* 🔥 THE FIX: Sticky Word Bank HUD for Projector */}
-      {!liveState?.submitted && (
-        <div className="sticky top-4 z-40 mb-12 -mx-4 px-4">
-            <div className="bg-white/90 backdrop-blur-2xl rounded-[2.5rem] p-6 border-4 border-slate-200/50 shadow-2xl flex flex-wrap gap-4 justify-center items-center">
-              <span className="text-[2.5vh] font-black text-slate-400 uppercase tracking-widest mr-4">Word Bank:</span>
-              {shuffledWords.map((word: string, i: number) => {
-                
-                // 🛡️ MOBILE SAFE CHECK: Replaced .includes()
-                let isUsed = false;
-                for(let a=0; a < liveAnswers.length; a++) {
-                    const ans = liveAnswers[a];
-                    const textVal = typeof ans === 'string' ? ans : (ans?.word || '');
-                    if (textVal === word) {
-                        isUsed = true; break;
-                    }
-                }
 
-                return (
-                  <span key={i} className={`px-8 py-4 rounded-2xl border-4 text-[3.5vh] font-bold transition-all duration-300 ${isUsed ? 'bg-slate-50 border-slate-100 text-slate-300 scale-95 opacity-50' : 'bg-slate-100 border-slate-200 text-slate-700 shadow-md'}`}>
-                    {word}
-                  </span>
-                );
-              })}
-            </div>
-        </div>
-      )}
-
-      <div className="text-[6vh] font-medium leading-loose text-slate-700 flex flex-wrap items-center gap-y-6 justify-center text-center relative z-10">
+      {/* TEXT CONTENT (Scrolls Normally) */}
+      <div className="text-[4.5vh] md:text-[5vh] font-medium leading-loose text-slate-700 flex flex-wrap items-center gap-y-6 justify-center text-center relative z-10 mb-12">
         {textParts.map((part: string, idx: number) => {
           const isLast = idx === textParts.length - 1;
           const filledItem = liveAnswers[idx];
@@ -488,7 +462,7 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
             <React.Fragment key={`part_${idx}`}>
                 <span className="mx-2">{String(part)}</span>
                 {!isLast && (
-                    <span className={`min-w-[150px] h-20 px-8 mx-3 rounded-2xl border-4 flex items-center justify-center text-[4vh] font-bold transition-all duration-300 ${style}`}>
+                    <span className={`min-w-[120px] h-16 px-6 mx-3 rounded-2xl border-4 flex items-center justify-center text-[3.5vh] font-bold transition-all duration-300 ${style}`}>
                     {filledWord || "?"}
                     </span>
                 )}
@@ -496,6 +470,96 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
           );
         })}
       </div>
+      
+      {/* 🔥 THE FIX: Bottom-Sticky Compact Word Bank */}
+      {!liveState?.submitted && (
+        <div className="sticky bottom-24 z-40 mt-auto -mx-4 px-4">
+            <div className="bg-white/95 backdrop-blur-2xl rounded-[2.5rem] p-4 md:p-6 border-4 border-slate-200/50 shadow-2xl flex flex-col gap-3 max-h-[30vh]">
+              <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest shrink-0 text-center">Word Bank</span>
+              <div className="flex flex-wrap gap-3 justify-center items-start overflow-y-auto custom-scrollbar pb-2">
+                  {shuffledWords.map((word: string, i: number) => {
+                    let isUsed = false;
+                    for(let a=0; a < liveAnswers.length; a++) {
+                        const ans = liveAnswers[a];
+                        const textVal = typeof ans === 'string' ? ans : (ans?.word || '');
+                        if (textVal === word) {
+                            isUsed = true; break;
+                        }
+                    }
+
+                    return (
+                      <span key={i} className={`px-5 py-2.5 rounded-xl border-2 text-[2.5vh] font-bold transition-all duration-300 ${isUsed ? 'bg-slate-50 border-slate-100 text-slate-300 scale-95 opacity-50' : 'bg-slate-100 border-slate-200 text-slate-700 shadow-md'}`}>
+                        {word}
+                      </span>
+                    );
+                  })}
+              </div>
+            </div>
+        </div>
+      )}
     </div>
   );
+};
+
+// 7. TAP SORT BLOCK (Armored with Sticky HUD)
+const TapSortBlockRenderer = ({ block }: any) => {
+    const itemsJson = JSON.stringify(block.items || []);
+    const catsJson = JSON.stringify(block.categories || []);
+
+    const normalizedItems = useMemo(() => {
+        let rawItems = [];
+        try { rawItems = JSON.parse(itemsJson); } catch (e) {}
+        if (!Array.isArray(rawItems)) rawItems = [];
+        return rawItems.map((item: any, idx: number) => {
+            if (typeof item === 'string' || typeof item === 'number') return { id: `item_${idx}`, label: String(item), emoji: '🔹' };
+            return { 
+                id: String(item?.id || `item_${idx}`), 
+                label: String(item?.label || item?.text || ''), 
+                emoji: String(item?.emoji || '🔹')
+            };
+        });
+    }, [itemsJson]);
+
+    const parsedCategories = useMemo(() => {
+        let cats = [];
+        try { cats = JSON.parse(catsJson); } catch (e) {}
+        if (!Array.isArray(cats)) cats = [];
+        return cats.map(c => String(c));
+    }, [catsJson]);
+
+    return (
+        <div className="w-full max-w-6xl mx-auto bg-white p-12 md:p-16 rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 relative flex flex-col">
+            <h3 className="text-[4vh] font-bold text-slate-800 mb-12 flex items-center justify-center gap-4">
+                <span className="bg-indigo-100 text-indigo-600 p-4 rounded-2xl" aria-hidden="true"><MousePointerClick size={40}/></span>
+                {String(block.title || 'Sort the Items!')}
+            </h3>
+
+            {/* Bottom-Sticky Item Bank */}
+            <div className="sticky bottom-24 z-40 mt-auto -mx-4 px-4 mb-12">
+                <div className="bg-white/95 backdrop-blur-2xl rounded-[2.5rem] p-4 md:p-6 border-4 border-slate-200/50 shadow-2xl flex flex-col gap-3 max-h-[30vh]">
+                   <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest shrink-0 text-center">Items</span>
+                   <div className="flex flex-wrap justify-center gap-3 overflow-y-auto custom-scrollbar pb-2">
+                        {normalizedItems.length === 0 && <p className="text-amber-500 font-bold uppercase tracking-widest my-auto flex items-center gap-2"><CheckCircle2 size={16}/> All sorted!</p>}
+                        {normalizedItems.map((item) => (
+                            <span key={item.id} className="px-5 py-2.5 bg-slate-100 border-2 border-slate-200 text-slate-700 font-bold rounded-xl shadow-md text-[2.5vh]">
+                                {item.emoji} {item.label}
+                            </span>
+                        ))}
+                   </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                {parsedCategories.map((cat: string) => (
+                    <div key={cat} className="p-8 rounded-[3rem] border-4 border-amber-200 bg-amber-50 flex flex-col items-center gap-6">
+                        <h4 className="font-black text-amber-900 text-[4vh] text-center leading-tight">{cat}</h4>
+                        <div className="flex flex-wrap justify-center gap-3">
+                           {/* Empty placeholder for projector view */}
+                           <span className="text-amber-400/50 text-[3vh] font-bold uppercase tracking-widest">Drop Zone</span>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
 };
