@@ -364,7 +364,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                           {blockType === 'game' && block.gameType === 'connect-three' && <GameBlock block={block} lessonVocab={lessonVocab} />}
                           {blockType === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
                           {blockType === 'fill-blank' && <FillBlankBlock block={block} liveState={liveState} />}
-                          {blockType === 'drag-drop' && <TapSortBlock block={block} liveState={liveState} />}
+                          {blockType === 'drag-drop' && <TapSortBlock block={block} />}
                       </>
                     )}
                   </div>
@@ -555,16 +555,20 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
     return allWords.sort(() => 0.5 - Math.random());
   }, [correctAnswers, distractors]);
 
+  const initialWordBank = useMemo(() => {
+    return shuffledWords.map((w, i) => ({ id: `word_${i}_${w}`, word: w }));
+  }, [shuffledWords]);
+
   // RESTORED INTERACTIVE STATE
-  const [wordBank, setWordBank] = useState<WordItem[]>(shuffledWords.map((w, i) => ({ id: `word_${i}_${w}`, word: w })));
+  const [wordBank, setWordBank] = useState<WordItem[]>(initialWordBank);
   const [filledBlanks, setFilledBlanks] = useState<(WordItem | null)[]>(Array(correctAnswers.length).fill(null));
   const [isChecked, setIsChecked] = useState(false);
 
   useEffect(() => {
-      setWordBank(shuffledWords.map((w, i) => ({ id: `word_${i}_${w}`, word: w })));
+      setWordBank(initialWordBank);
       setFilledBlanks(Array(correctAnswers.length).fill(null));
       setIsChecked(false);
-  }, [shuffledWords, correctAnswers.length]);
+  }, [initialWordBank, correctAnswers.length]);
 
   const handleBankClick = (item: WordItem) => {
       if (isChecked) return;
@@ -679,7 +683,7 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
 
 type SortItem = { id: string; label: string; emoji: string };
 
-const TapSortBlock = ({ block, liveState }: { block: any, liveState?: any }) => {
+const TapSortBlock = ({ block }: { block: any }) => {
     const itemsJson = JSON.stringify(block.items || []);
     const catsJson = JSON.stringify(block.categories || []);
 
