@@ -1,11 +1,13 @@
 // src/components/ClassView.tsx
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore'; 
+import { doc, setDoc } from 'firebase/firestore'; 
 import { db } from '../config/firebase';
 import { useLiveClass } from '../hooks/useLiveClass';
-import { MessageSquare, MessageCircle, Gamepad2, CheckCircle2, X, Puzzle, ChevronLeft, ChevronRight, Zap, Users, Clock, EyeOff, HelpCircle, Layers } from 'lucide-react';
+import { 
+    MessageSquare, MessageCircle, Gamepad2, CheckCircle2, X, Puzzle, 
+    ChevronLeft, ChevronRight, Zap, Users, Clock, EyeOff, HelpCircle, Layers 
+} from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
-// import ClassForum from './ClassForum'; // Ensure this exists
 
 // ============================================================================
 //  CLASS VIEW (The Projector / Big Screen Mode with Keyboard Nav)
@@ -27,7 +29,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const lessonVocab = useMemo(() => {
     if (!lesson?.blocks) return [];
     return lesson.blocks
-      .filter((b: any) => b.type === 'vocab-list')
+      .filter((b: any) => String(b.type) === 'vocab-list')
       .flatMap((b: any) => b.items || []);
   }, [lesson]);
 
@@ -57,10 +59,12 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
     const grouped: any[] = [];
     let buffer: any[] = [];
     
+    const interactables = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game'];
+    
     lesson.blocks.forEach((b: any) => {
       const type = String(b?.type || '');
-      // Isolate interactive blocks so they get their own full-screen page
-      if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game'].indexOf(type) !== -1) {
+      // 🛡️ MOBILE SAFE: indexOf instead of includes
+      if (interactables.indexOf(type) !== -1) {
         if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
         grouped.push({ type: 'interact', blocks: [b] });
         buffer = [];
@@ -279,7 +283,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 }
 
 // ============================================================================
-//  INTERNAL BLOCK RENDERERS (Mobile-Safe & Armored)
+//  INTERNAL BLOCK RENDERERS (Cinematic & Armored)
 // ============================================================================
 
 const TextBlock = ({ block }: { block: any }) => (
@@ -401,10 +405,11 @@ const ScenarioBlock = ({ block, liveState }: { block: any, liveState: any }) => 
   );
 };
 
-// 🔥 TITANIUM ARMORED FILL BLANK WITH STICKY WORD BANK
+// 🔥 TITANIUM ARMORED FILL BLANK WITH STICKY WORD BANK HUD
 const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) => {
   const rawText = String(block.text || "Missing text [here].");
 
+  // 🛡️ MOBILE SAFE REGEX: Avoids .matchAll() crashes
   const { textParts, correctAnswers } = useMemo(() => {
         const parts = rawText.split(/\[.*?\]/g);
         const answers: string[] = [];
@@ -429,30 +434,35 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
     return allWords.sort(() => 0.5 - Math.random());
   }, [correctAnswers, distractors]);
 
-  // Safely extract the live array of answers
+  // Safely extract the live array of answers coming from students' phones
   const liveAnswers = Array.isArray(liveState?.answers) ? liveState.answers : [];
 
   return (
     <div className="w-full max-w-6xl mx-auto bg-white p-12 md:p-16 rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 relative">
-      <h3 className="text-[4vh] font-bold text-slate-800 mb-8 flex items-center justify-center gap-4">
+      <h3 className="text-[4vh] font-bold text-slate-800 mb-12 flex items-center justify-center gap-4">
         <span className="bg-indigo-100 text-indigo-600 p-4 rounded-2xl" aria-hidden="true"><Puzzle size={40}/></span>
         {String(block.question || "Fill in the blanks")}
       </h3>
       
-      {/* 🔥 THE FIX: Sticky Word Bank at the Top! */}
+      {/* 🔥 THE FIX: Sticky Word Bank HUD for Projector */}
       {!liveState?.submitted && (
         <div className="sticky top-4 z-40 mb-12 -mx-4 px-4">
-            <div className="bg-white/90 backdrop-blur-2xl rounded-[2rem] p-6 border-4 border-slate-200/50 shadow-xl flex flex-wrap gap-4 justify-center items-center">
-              <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest mr-4">Word Bank:</span>
+            <div className="bg-white/90 backdrop-blur-2xl rounded-[2.5rem] p-6 border-4 border-slate-200/50 shadow-2xl flex flex-wrap gap-4 justify-center items-center">
+              <span className="text-[2.5vh] font-black text-slate-400 uppercase tracking-widest mr-4">Word Bank:</span>
               {shuffledWords.map((word: string, i: number) => {
+                
+                // 🛡️ MOBILE SAFE CHECK: Replaced .includes()
                 let isUsed = false;
                 for(let a=0; a < liveAnswers.length; a++) {
-                    if (liveAnswers[a]?.word === word) {
+                    const ans = liveAnswers[a];
+                    const textVal = typeof ans === 'string' ? ans : (ans?.word || '');
+                    if (textVal === word) {
                         isUsed = true; break;
                     }
                 }
+
                 return (
-                  <span key={i} className={`px-6 py-3 rounded-2xl border-4 text-[3vh] font-bold transition-all duration-300 ${isUsed ? 'bg-slate-50 border-slate-100 text-slate-300 scale-95' : 'bg-slate-100 border-slate-200 text-slate-600 shadow-md'}`}>
+                  <span key={i} className={`px-8 py-4 rounded-2xl border-4 text-[3.5vh] font-bold transition-all duration-300 ${isUsed ? 'bg-slate-50 border-slate-100 text-slate-300 scale-95 opacity-50' : 'bg-slate-100 border-slate-200 text-slate-700 shadow-md'}`}>
                     {word}
                   </span>
                 );
@@ -465,7 +475,7 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
         {textParts.map((part: string, idx: number) => {
           const isLast = idx === textParts.length - 1;
           const filledItem = liveAnswers[idx];
-          const filledWord = filledItem?.word;
+          const filledWord = typeof filledItem === 'string' ? filledItem : (filledItem?.word || null);
           const isChecking = liveState?.submitted;
           const isRight = filledWord === correctAnswers[idx];
 
