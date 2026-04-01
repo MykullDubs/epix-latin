@@ -18,9 +18,9 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
     const [isAutoPilot, setIsAutoPilot] = useState(false);
     const [isFinished, setIsFinished] = useState(false); 
     
-    // 🔥 NEW OS FEATURE: Quick-Join QR State
+    // 🔥 NEW OS FEATURE: Quick-Join QR State points to /live/
     const [showQR, setShowQR] = useState(false);
-    const joinUrl = `${window.location.origin}/join/${classId}`;
+    const joinUrl = `${window.location.origin}/live/${classId}`;
 
     // 🔥 PRE-GAME COUNTDOWN ENGINE
     const [preGameCountdown, setPreGameCountdown] = useState<number | null>(null);
