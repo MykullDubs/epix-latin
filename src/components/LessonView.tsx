@@ -204,7 +204,7 @@ const FillBlankBlockRenderer = ({ block }: any) => {
 
     const initialWordBank = useMemo(() => {
         return [...correctAnswers, ...distractors]
-            .map((w: string, i: number) => ({ id: `word_${i}_${w}`, word: w }))
+            .map((w, i) => ({ id: `word_${i}_${w}`, word: w }))
             .sort(() => Math.random() - 0.5);
     }, [correctAnswers, distractors]);
 
@@ -225,7 +225,7 @@ const FillBlankBlockRenderer = ({ block }: any) => {
             const newFilled = [...filledBlanks];
             newFilled[firstEmptyIdx] = item;
             setFilledBlanks(newFilled);
-            setWordBank(wordBank.filter((w: WordItem) => w.id !== item.id));
+            setWordBank(wordBank.filter(w => w.id !== item.id));
         }
     };
 
@@ -254,22 +254,26 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                 <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Vocabulary Drill</h3>
             </div>
 
+            {/* 🔥 THE FIX: Height Constrained Word Bank with Internal Scrolling */}
             <div className="sticky top-2 z-30 mb-6 -mx-2 px-2">
-                <div className="bg-white/90 backdrop-blur-xl rounded-2xl p-3 md:p-4 border border-slate-200/50 shadow-md flex flex-wrap gap-2 min-h-[60px] justify-center items-center transition-all duration-300">
-                    {wordBank.length === 0 && !isChecked ? (
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                            <CheckCircle2 size={16} className="text-emerald-500" /> All placed
-                        </span>
-                    ) : (
-                        wordBank.map((item: WordItem) => (
-                            <button 
-                                key={item.id} onClick={() => handleBankClick(item)} disabled={isChecked}
-                                className="px-3 py-2 md:px-4 md:py-2.5 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl shadow-sm hover:border-indigo-400 hover:text-indigo-600 transition-all disabled:opacity-50 active:scale-95 text-sm"
-                            >
-                                {item.word}
-                            </button>
-                        ))
-                    )}
+                <div className="bg-white/95 backdrop-blur-xl rounded-2xl p-3 md:p-4 border border-slate-200/50 shadow-[0_10px_30px_rgba(0,0,0,0.1)] flex flex-col gap-2 max-h-[25vh] transition-all duration-300">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center shrink-0 mb-1">Word Bank</span>
+                    <div className="flex flex-wrap gap-2 justify-center items-start overflow-y-auto custom-scrollbar w-full pb-2">
+                        {wordBank.length === 0 && !isChecked ? (
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 m-auto">
+                                <CheckCircle2 size={16} className="text-emerald-500" /> All placed
+                            </span>
+                        ) : (
+                            wordBank.map((item) => (
+                                <button 
+                                    key={item.id} onClick={() => handleBankClick(item)} disabled={isChecked}
+                                    className="px-3 py-2 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl shadow-sm hover:border-indigo-400 hover:text-indigo-600 transition-all disabled:opacity-50 active:scale-95 text-sm"
+                                >
+                                    {item.word}
+                                </button>
+                            ))
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -423,18 +427,22 @@ const TapSortBlockRenderer = ({ block }: any) => {
                 <h3 className="text-xl md:text-2xl font-black text-amber-900 text-center">{String(block.title || 'Sort the Items!')}</h3>
             </div>
             
+            {/* 🔥 THE FIX: Height Constrained Item Bank with Internal Scrolling */}
             <div className="sticky top-2 z-30 mb-8 -mx-2 px-2">
-                <div className="bg-white/90 backdrop-blur-2xl rounded-[2rem] p-3 md:p-4 border border-slate-200/50 shadow-md flex flex-wrap justify-center gap-2 min-h-[80px] transition-all duration-300">
-                    {items.length === 0 && <p className="text-amber-500 font-bold uppercase tracking-widest my-auto flex items-center gap-2"><CheckCircle2 size={16}/> All sorted!</p>}
-                    {items.map((item: SortItem) => (
-                        <button 
-                            key={item.id} 
-                            onClick={() => setSelectedItem(selectedItem?.id === item.id ? null : item)} 
-                            className={`px-4 py-2 rounded-2xl font-black text-sm md:text-base transition-all duration-300 shadow-md ${selectedItem?.id === item.id ? 'bg-indigo-600 text-white scale-110 -translate-y-1 ring-4 ring-indigo-200' : 'bg-white text-slate-700 hover:scale-105 active:scale-95'}`}
-                        >
-                            {item.emoji} {item.label}
-                        </button>
-                    ))}
+                <div className="bg-white/95 backdrop-blur-xl rounded-2xl p-3 md:p-4 border border-slate-200/50 shadow-[0_10px_30px_rgba(0,0,0,0.1)] flex flex-col gap-2 max-h-[30vh] transition-all duration-300">
+                    <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest text-center shrink-0 mb-1">Items to Sort</span>
+                    <div className="flex flex-wrap justify-center gap-2 overflow-y-auto custom-scrollbar w-full pb-2">
+                        {items.length === 0 && <p className="text-amber-500 font-bold uppercase tracking-widest m-auto flex items-center gap-2"><CheckCircle2 size={16}/> All sorted!</p>}
+                        {items.map((item: SortItem) => (
+                            <button 
+                                key={item.id} 
+                                onClick={() => setSelectedItem(selectedItem?.id === item.id ? null : item)} 
+                                className={`px-4 py-2 rounded-2xl font-black text-sm md:text-base transition-all duration-300 shadow-md ${selectedItem?.id === item.id ? 'bg-indigo-600 text-white scale-110 -translate-y-1 ring-4 ring-indigo-200' : 'bg-white text-slate-700 hover:scale-105 active:scale-95'}`}
+                            >
+                                {item.emoji} {item.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -644,8 +652,8 @@ const GameBlockRenderer = ({ block }: any) => (
         <h3 className="text-2xl font-black text-slate-800">{String(block.title || "Vocabulary Battle")}</h3>
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Game Active on Projector</p>
       </div>
-      <div className="w-full h-64 bg-slate-900 rounded-[2.5rem] border-4 border-slate-800 flex flex-col items-center justify-center text-white shadow-xl">
-        <Gamepad2 size={48} className="text-indigo-500 mb-4 animate-bounce" />
+      <div className="w-full h-64 bg-slate-900 rounded-[2.5rem] border-4 border-slate-800 flex flex-col items-center justify-center text-white shadow-xl animate-pulse">
+        <Gamepad2 size={48} className="text-indigo-500 mb-4" />
         <p className="font-black tracking-widest uppercase text-sm text-slate-400">Look at the Smartboard</p>
       </div>
     </div>
@@ -666,7 +674,6 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
     const grouped: any[] = [];
     let buffer: any[] = [];
     
-    // 🔥 ALL VALID BLOCK TYPES REGISTERED HERE
     const allowedTypes = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'code', 'formula', 'timeline', 'audio-story', 'image-hotspot', 'drag-drop', 'drawing'];
     
     lesson.blocks.forEach((b: any) => {
@@ -756,15 +763,12 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
     const blockType = String(block.type || '');
 
     switch (blockType) {
-      // 🔥 RESTORED RENDERERS
       case 'image': return <ImageBlockRenderer block={block} key={blockKey} />;
       case 'callout': return <CalloutBlockRenderer block={block} key={blockKey} />;
       case 'dialogue': return <DialogueBlockRenderer block={block} key={blockKey} />;
       case 'vocab-list': return <VocabListBlockRenderer block={block} key={blockKey} />;
       case 'discussion': return <DiscussionBlockRenderer block={block} key={blockKey} />;
       case 'game': return <GameBlockRenderer block={block} key={blockKey} />;
-
-      // Existing Renderers
       case 'drag-drop': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><TapSortBlockRenderer block={block} /></div>;
       case 'code':
         return (
