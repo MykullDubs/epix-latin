@@ -30,29 +30,35 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const [timeLeft, setTimeLeft] = useState(300);
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerPos, setTimerPos] = useState({ x: 50, y: 50 });
-  const isDragging = useRef(false);
-  const dragOffset = useRef({ x: 0, y: 0 });
+  const isDraggingTimer = useRef(false);
+  const timerDragOffset = useRef({ x: 0, y: 0 });
 
   // 🔥 OS FEATURE: Spotlight & Annotation Marker
   const [isSpotlight, setIsSpotlight] = useState(false);
   const [mousePos, setMousePos] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
   const [isAnnotating, setIsAnnotating] = useState(false);
   
-  // 🎨 NEW: Advanced Annotation Tools & Text Engine
+  // 🎨 NEW: Advanced Moveable/Resizable Annotation Palette
   const [markerColor, setMarkerColor] = useState('#ef4444');
   const [markerSize, setMarkerSize] = useState(6);
   const [markerStyle, setMarkerStyle] = useState<'pen' | 'highlighter' | 'text'>('pen');
+  
+  const [toolbarPos, setToolbarPos] = useState({ x: 0, y: 0 });
+  const [toolbarScale, setToolbarScale] = useState(1);
+  const isDraggingToolbar = useRef(false);
+  const isResizingToolbar = useRef(false);
+  const toolbarDragOffset = useRef({ x: 0, y: 0 });
+  const toolbarStartData = useRef({ y: 0, scale: 1 });
   
   const [slideTexts, setSlideTexts] = useState<{id: number, x: number, y: number, text: string, color: string, size: number}[]>([]);
   const [boardTexts, setBoardTexts] = useState<{id: number, x: number, y: number, text: string, color: string, size: number}[]>([]);
   const [activeText, setActiveText] = useState<{x: number, y: number, text: string} | null>(null);
 
-  // Refs for State-Safe Routing (Prevents Race Conditions)
   const activeTextRef = useRef(activeText);
   const markerColorRef = useRef(markerColor);
   const markerSizeRef = useRef(markerSize);
   const showWhiteboardRef = useRef(showWhiteboard);
-  const inputRef = useRef<HTMLInputElement>(null); // To handle auto-focus
+  const inputRef = useRef<HTMLInputElement>(null); 
   
   useEffect(() => { activeTextRef.current = activeText; }, [activeText]);
   useEffect(() => { markerColorRef.current = markerColor; }, [markerColor]);
@@ -76,11 +82,13 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       .flatMap((b: any) => b.items || []);
   }, [lesson]);
 
+  // Main Classroom Clock & Initial Placements
   useEffect(() => {
       if (!lesson?.id) return;
       startLiveClass(lesson.id);
       const timer = setInterval(() => setElapsedTime(prev => prev + 1), 1000);
       setTimerPos({ x: window.innerWidth - 350, y: 50 }); 
+      setToolbarPos({ x: window.innerWidth - 120, y: 80 }); // Default top-right position
       return () => { clearInterval(timer); endLiveClass(); };
   }, [lesson?.id]);
 
@@ -94,16 +102,25 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       return () => clearInterval(interval);
   }, [timerRunning, timeLeft]);
 
-  const startDrag = (e: React.MouseEvent) => {
-      isDragging.current = true;
-      dragOffset.current = { x: e.clientX - timerPos.x, y: e.clientY - timerPos.y };
-  };
-
+  // GLOBAL MOUSE MOVEMENT HANDLER (Handles Timer, Toolbar, and Spotlight)
   useEffect(() => {
       const handleMouseMove = (e: MouseEvent) => {
-          if (isDragging.current) {
-              setTimerPos({ x: e.clientX - dragOffset.current.x, y: e.clientY - dragOffset.current.y });
+          // Timer Dragging
+          if (isDraggingTimer.current) {
+              setTimerPos({ x: e.clientX - timerDragOffset.current.x, y: e.clientY - timerDragOffset.current.y });
           }
+          // Toolbar Dragging
+          if (isDraggingToolbar.current) {
+              setToolbarPos({ x: e.clientX - toolbarDragOffset.current.x, y: e.clientY - toolbarDragOffset.current.y });
+          }
+          // Toolbar Resizing
+          if (isResizingToolbar.current) {
+              const dy = e.clientY - toolbarStartData.current.y;
+              // Sensitivity: dragging 100px changes scale by 0.5
+              const newScale = Math.max(0.6, Math.min(2.2, toolbarStartData.current.scale + (dy * 0.005)));
+              setToolbarScale(newScale);
+          }
+          // Spotlight Tracking
           if (isSpotlight) {
               if (classViewRef.current) {
                   const rect = classViewRef.current.getBoundingClientRect();
@@ -113,7 +130,12 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
               }
           }
       };
-      const handleMouseUp = () => { isDragging.current = false; };
+
+      const handleMouseUp = () => { 
+          isDraggingTimer.current = false; 
+          isDraggingToolbar.current = false;
+          isResizingToolbar.current = false;
+      };
       
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
@@ -123,6 +145,22 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           window.removeEventListener('mouseup', handleMouseUp);
       };
   }, [isSpotlight]);
+
+  const startTimerDrag = (e: React.MouseEvent) => {
+      isDraggingTimer.current = true;
+      timerDragOffset.current = { x: e.clientX - timerPos.x, y: e.clientY - timerPos.y };
+  };
+
+  const startToolbarDrag = (e: React.MouseEvent) => {
+      isDraggingToolbar.current = true;
+      toolbarDragOffset.current = { x: e.clientX - toolbarPos.x, y: e.clientY - toolbarPos.y };
+  };
+
+  const startToolbarResize = (e: React.MouseEvent) => {
+      e.stopPropagation(); // Prevent drag from starting
+      isResizingToolbar.current = true;
+      toolbarStartData.current = { y: e.clientY, scale: toolbarScale };
+  };
 
   const getRelativeCoords = (clientX: number, clientY: number) => {
       if (!classViewRef.current) return { x: clientX, y: clientY };
@@ -181,7 +219,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       if (markerStyle === 'text') {
           forceSaveText(); 
           setActiveText({ x: coords.x, y: coords.y, text: '' });
-          // Ensure input gains focus as soon as it mounts
           setTimeout(() => inputRef.current?.focus(), 50);
           return;
       }
@@ -343,10 +380,9 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         ref={classViewRef}
         className="w-full flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500 relative"
         style={{ height: 'calc(100dvh - 4rem)' }}
-        onContextMenu={handleRightClick}
+        onContextMenu={handleRightClick} 
     >
       {/* 🔥 OS OVERLAYS & TOOLS */}
-      
       <div className={`absolute inset-0 bg-black z-[9000] flex items-center justify-center transition-opacity duration-700 pointer-events-none ${isBlanked ? 'opacity-100' : 'opacity-0'}`}>
           <EyeOff size={64} className="text-white/10" />
       </div>
@@ -358,17 +394,9 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           />
       )}
 
-      {/* 1. SLIDE ANNOTATION LAYER (Static over slides) */}
-      <div className="absolute inset-0 z-[8400] pointer-events-none overflow-hidden">
-          <canvas ref={slideCanvasRef} className="absolute inset-0 w-full h-full" />
-          {slideTexts.map(t => (
-              <div key={t.id} style={{ position: 'absolute', left: t.x, top: t.y, color: t.color, fontSize: `${t.size * 6}px`, fontWeight: 'bold', transform: 'translateY(-50%)', whiteSpace: 'nowrap' }}>{t.text}</div>
-          ))}
-      </div>
-
-      {/* 2. WHITEBOARD SCRATCHPAD LAYER (Rolls up and down) */}
+      {/* Instant Scratchpad (Whiteboard Background) */}
       <div 
-          className={`absolute inset-0 z-[8550] transition-transform duration-500 ease-in-out pointer-events-none overflow-hidden ${showWhiteboard ? 'translate-y-0' : '-translate-y-full'}`}
+          className={`absolute inset-0 z-[8550] transition-transform duration-500 ease-in-out pointer-events-none ${showWhiteboard ? 'translate-y-0' : '-translate-y-full'}`}
           style={{ backgroundColor: '#f8fafc', backgroundImage: 'radial-gradient(#cbd5e1 2px, transparent 2px)', backgroundSize: '40px 40px' }}
       >
           <canvas ref={boardCanvasRef} className="absolute inset-0 w-full h-full" />
@@ -377,7 +405,15 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           ))}
       </div>
 
-      {/* 3. INVISIBLE GLASS ROUTER PANE (Catches clicks, draws ink) */}
+      {/* 1. SLIDE ANNOTATION LAYER (Static over slides) */}
+      <div className="absolute inset-0 z-[8400] pointer-events-none overflow-hidden">
+          <canvas ref={slideCanvasRef} className="absolute inset-0 w-full h-full" />
+          {slideTexts.map(t => (
+              <div key={t.id} style={{ position: 'absolute', left: t.x, top: t.y, color: t.color, fontSize: `${t.size * 6}px`, fontWeight: 'bold', transform: 'translateY(-50%)', whiteSpace: 'nowrap' }}>{t.text}</div>
+          ))}
+      </div>
+
+      {/* INVISIBLE GLASS ROUTER PANE */}
       <div
           onMouseDown={startAnnotation}
           onMouseMove={drawAnnotation}
@@ -385,14 +421,13 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           onMouseLeave={stopAnnotation}
           className={`absolute inset-0 z-[8600] ${isAnnotating ? (markerStyle === 'text' ? 'pointer-events-auto cursor-text' : 'pointer-events-auto cursor-crosshair') : 'pointer-events-none'}`}
       >
-          {/* Active text input lives here temporarily so it is interactive */}
           {activeText && (
               <input 
                   ref={inputRef}
                   value={activeText.text}
                   onChange={e => setActiveText({...activeText, text: e.target.value})}
                   onKeyDown={e => { if (e.key === 'Enter') forceSaveText(); }}
-                  onMouseDown={e => e.stopPropagation()} // 🔥 Prevents canvas click from deleting the input
+                  onMouseDown={e => e.stopPropagation()} 
                   className="pointer-events-auto shadow-2xl" 
                   style={{ 
                       position: 'absolute', left: activeText.x, top: activeText.y, color: markerColor, 
@@ -404,11 +439,24 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           )}
       </div>
 
-      {/* 🎨 ADVANCED FLOATING PALETTE */}
+      {/* 🎨 ADVANCED FLOATING PALETTE (Movable & Resizable) */}
       {isAnnotating && (
-          <div className="absolute top-12 right-8 z-[8700] flex flex-col gap-4 animate-in fade-in slide-in-from-right-8 pointer-events-auto items-end" onMouseDown={(e) => e.stopPropagation()}>
-              <div className="bg-slate-900/95 backdrop-blur-2xl p-4 rounded-[2.5rem] shadow-2xl border-4 border-slate-700 flex flex-col gap-6 w-20 items-center">
+          <div 
+              className="absolute z-[8700] flex flex-col items-center pointer-events-auto animate-in fade-in zoom-in-95 duration-200"
+              style={{ left: toolbarPos.x, top: toolbarPos.y, transform: `scale(${toolbarScale})`, transformOrigin: 'top left' }}
+              onMouseDown={(e) => e.stopPropagation()}
+          >
+              <div className="bg-slate-900/95 backdrop-blur-2xl p-4 pt-1 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-4 border-slate-700 flex flex-col gap-5 w-20 items-center relative overflow-hidden">
                   
+                  {/* The Move Drag Handle */}
+                  <div 
+                      className="w-full h-8 cursor-grab active:cursor-grabbing flex justify-center items-center opacity-50 hover:opacity-100 transition-opacity bg-slate-800/50 rounded-t-[2rem] -mt-1 mb-1"
+                      onMouseDown={startToolbarDrag}
+                      title="Drag to move"
+                  >
+                      <div className="w-8 h-1.5 bg-slate-400 rounded-full" />
+                  </div>
+
                   <div className="flex flex-col gap-2 bg-slate-800/80 p-2 rounded-3xl w-full items-center border border-slate-700">
                       <button onClick={() => { setMarkerStyle('pen'); forceSaveText(); }} className={`p-3 rounded-2xl transition-all ${markerStyle === 'pen' ? 'bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.6)]' : 'text-slate-400 hover:text-white'}`}>
                           <PenTool size={24} />
@@ -440,9 +488,18 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                       ))}
                   </div>
                   
-                  <button onClick={clearAnnotations} title="Clear Ink & Text" className="bg-slate-800 hover:bg-rose-500 text-slate-400 hover:text-white p-4 rounded-2xl transition-all w-full flex items-center justify-center">
+                  <button onClick={clearAnnotations} title="Clear Ink & Text" className="bg-slate-800 hover:bg-rose-500 text-slate-400 hover:text-white p-4 rounded-2xl transition-all w-full flex items-center justify-center mb-4">
                       <Eraser size={24} />
                   </button>
+
+                  {/* The Scale Resize Handle */}
+                  <div 
+                      className="absolute bottom-0 right-0 w-10 h-10 cursor-nwse-resize flex items-end justify-end p-2 opacity-50 hover:opacity-100 bg-slate-800/30 rounded-tl-full"
+                      onMouseDown={startToolbarResize}
+                      title="Drag to resize"
+                  >
+                      <div className="w-3 h-3 border-b-2 border-r-2 border-slate-400 rounded-br-[2px] mb-1 mr-1" />
+                  </div>
               </div>
           </div>
       )}
@@ -501,11 +558,9 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
               <button onClick={() => { setIsAnnotating(p => !p); setIsSpotlight(false); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left ${isAnnotating ? 'bg-rose-600 text-white border-rose-500' : 'bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white border-slate-700 hover:border-rose-500'}`}>
                   <PenTool size={20} /> <span className="flex-1">Digital Marker</span> <span className="text-rose-500/50 text-xs font-black">A</span>
               </button>
-              
               <button onClick={() => { setShowWhiteboard(p => !p); setIsAnnotating(true); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left ${showWhiteboard ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white border-slate-700 hover:border-blue-500'}`}>
                   <Presentation size={20} /> <span className="flex-1">Whiteboard</span> <span className="text-blue-500/50 text-xs font-black">C</span>
               </button>
-
               <button onClick={() => { setIsSpotlight(p => !p); setIsAnnotating(false); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left ${isSpotlight ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white border-slate-700 hover:border-emerald-500'}`}>
                   <Crosshair size={20} /> <span className="flex-1">Spotlight</span> <span className="text-emerald-500/50 text-xs font-black">S</span>
               </button>
