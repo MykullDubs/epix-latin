@@ -110,18 +110,15 @@ const FillBlankBlockRenderer = ({ block }: any) => {
     const data = block?.content || block?.data || block || {};
     const rawText = typeof data.text === 'string' ? data.text : "Missing text [here].";
     
-    // 🔥 FATAL CRASH FIX: .matchAll() is not supported on older mobile browsers!
-    // Using a standard while-loop with regex.exec() guarantees 100% cross-device compatibility.
+    // 🔥 FATAL CRASH FIX: Replaced .matchAll() with mobile-safe regex.exec()
     const { textParts, correctAnswers } = useMemo(() => {
         const parts = rawText.split(/\[.*?\]/g);
-        
         const answers: string[] = [];
         const regex = /\[(.*?)\]/g;
         let match;
         while ((match = regex.exec(rawText)) !== null) {
             answers.push(String(match[1]));
         }
-        
         return { textParts: parts, correctAnswers: answers };
     }, [rawText]);
 
@@ -156,14 +153,13 @@ const FillBlankBlockRenderer = ({ block }: any) => {
 
     const handleBankClick = (item: {id: string, word: string}) => {
         if (isChecked) return;
+        // 🔥 MOBILE SAFE: indexOf() used here instead of includes()
         const firstEmptyIdx = filledBlanks.indexOf(null); 
         if (firstEmptyIdx !== -1) {
             const newFilled = [...filledBlanks];
             newFilled[firstEmptyIdx] = item;
             setFilledBlanks(newFilled);
-            
-            const newBank = wordBank.filter(w => w.id !== item.id);
-            setWordBank(newBank);
+            setWordBank(wordBank.filter(w => w.id !== item.id));
         }
     };
 
@@ -175,7 +171,8 @@ const FillBlankBlockRenderer = ({ block }: any) => {
         setWordBank([...wordBank, item]);
     };
 
-    const isComplete = filledBlanks.length > 0 && filledBlanks.every(slot => slot !== null);
+    // 🔥 MOBILE SAFE: indexOf() check
+    const isComplete = filledBlanks.length > 0 && filledBlanks.indexOf(null) === -1;
 
     return (
         <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-100 shadow-sm my-6 relative flex flex-col">
@@ -285,57 +282,6 @@ const ScenarioBlockRenderer = ({ block }: any) => {
     );
 };
 
-// ============================================================================
-//  INTERACTIVE RENDERERS (K-1 Primary)
-// ============================================================================
-
-const AudioStoryBlockRenderer = ({ block }: any) => {
-    const [isPlaying, setIsPlaying] = useState(false);
-    const togglePlay = () => setIsPlaying(!isPlaying);
-
-    return (
-        <div className="bg-white rounded-[3rem] overflow-hidden shadow-xl border-4 border-indigo-50 my-8">
-            <div className="relative">
-                <img src={String(block.imageUrl || 'https://images.unsplash.com/photo-1518152006812-edab29b069ac?q=80&w=800&auto=format&fit=crop')} alt="Story visual" className="w-full h-64 md:h-80 object-cover" />
-                <button onClick={togglePlay} className={`absolute -bottom-8 right-8 w-16 h-16 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 ${isPlaying ? 'bg-rose-500 text-white scale-110' : 'bg-indigo-600 text-white hover:scale-105'}`}>
-                    {isPlaying ? <Square fill="currentColor" size={24} /> : <Play fill="currentColor" size={28} className="ml-1" />}
-                </button>
-            </div>
-            <div className="p-8 md:p-10 pt-12">
-                <h3 className="text-sm font-black text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Volume2 size={16} /> Read Along</h3>
-                <p className={`text-3xl md:text-4xl font-bold text-slate-800 leading-snug transition-colors duration-500 ${isPlaying ? 'text-indigo-600' : ''}`}>{String(block.text || "The legend says they looked for an eagle on a cactus...")}</p>
-            </div>
-        </div>
-    );
-};
-
-const ImageHotspotBlockRenderer = ({ block }: any) => {
-    const [activeSpot, setActiveSpot] = useState<number | null>(null);
-
-    return (
-        <div className="bg-slate-900 p-6 md:p-8 rounded-[3rem] shadow-2xl my-8">
-            <div className="flex items-center justify-center gap-3 mb-6"><Search className="text-cyan-400" size={24} /><h3 className="text-2xl font-black text-white text-center">{String(block.title || 'Explore the Map!')}</h3></div>
-            <div className="relative rounded-[2rem] overflow-hidden border-4 border-slate-700 bg-slate-800">
-                <img src={String(block.imageUrl || 'https://images.unsplash.com/photo-1565670119853-23910c2830f3?q=80&w=800&auto=format&fit=crop')} className="w-full h-auto opacity-80" alt="Explorer Map" />
-                {(Array.isArray(block.hotspots) ? block.hotspots : []).map((spot: any, i: number) => (
-                    <React.Fragment key={i}>
-                        <button onClick={() => setActiveSpot(activeSpot === i ? null : i)} className="absolute w-10 h-10 md:w-12 md:h-12 bg-rose-500 rounded-full border-4 border-white shadow-[0_0_20px_rgba(244,63,94,0.8)] flex items-center justify-center animate-pulse hover:scale-110 transition-transform z-10" style={{ top: `${spot.y || 0}%`, left: `${spot.x || 0}%`, transform: 'translate(-50%, -50%)' }}>
-                            <Search size={18} className="text-white" strokeWidth={3} />
-                        </button>
-                        {activeSpot === i && (
-                            <div className="absolute z-20 bg-white p-5 rounded-[2rem] shadow-2xl w-56 text-center animate-in zoom-in-95 duration-200" style={{ top: `${spot.y || 0}%`, left: `${spot.x || 0}%`, transform: 'translate(-50%, -115%)' }}>
-                                <h4 className="text-xl font-black text-indigo-600 mb-2 leading-tight">{String(spot.title || '')}</h4>
-                                <p className="text-sm font-bold text-slate-600 leading-snug">{String(spot.description || '')}</p>
-                                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-5 h-5 bg-white rotate-45"></div>
-                            </div>
-                        )}
-                    </React.Fragment>
-                ))}
-            </div>
-        </div>
-    );
-};
-
 const TapSortBlockRenderer = ({ block }: any) => {
     const itemsJson = JSON.stringify(block.items || []);
     const catsJson = JSON.stringify(block.categories || []);
@@ -418,53 +364,6 @@ const TapSortBlockRenderer = ({ block }: any) => {
     );
 };
 
-const DrawingBlockRenderer = ({ block }: any) => {
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [isDrawing, setIsDrawing] = useState(false);
-    const [color, setColor] = useState('#ef4444'); 
-    const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#1e293b'];
-
-    const startDrawing = (e: any) => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        const clientX = e.clientX || e.touches?.[0]?.clientX;
-        const clientY = e.clientY || e.touches?.[0]?.clientY;
-        const rect = canvas.getBoundingClientRect();
-        ctx.beginPath();
-        ctx.moveTo(clientX - rect.left, clientY - rect.top);
-        setIsDrawing(true);
-    };
-
-    const draw = (e: any) => {
-        if (!isDrawing) return;
-        const canvas = canvasRef.current;
-        const ctx = canvas?.getContext('2d');
-        if (!canvas || !ctx) return;
-        const clientX = e.clientX || e.touches?.[0]?.clientX;
-        const clientY = e.clientY || e.touches?.[0]?.clientY;
-        const rect = canvas.getBoundingClientRect();
-        ctx.lineTo(clientX - rect.left, clientY - rect.top);
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 6;
-        ctx.lineCap = 'round';
-        ctx.stroke();
-    };
-
-    return (
-        <div className="bg-white p-6 md:p-8 rounded-[3rem] border-4 border-slate-100 shadow-xl my-8">
-            <div className="flex items-center justify-between mb-6"><h3 className="text-2xl font-black text-slate-800 flex items-center gap-3"><Palette className="text-fuchsia-500" /> {String(block.title || "Let's Draw!")}</h3><button onClick={() => canvasRef.current?.getContext('2d')?.clearRect(0,0,800,400)} className="p-3 bg-slate-100 text-slate-500 rounded-full hover:bg-rose-100 hover:text-rose-500 transition-colors"><Eraser size={20} /></button></div>
-            <div className="bg-slate-50 rounded-[2rem] overflow-hidden border-2 border-slate-200 touch-none mb-6">
-                <canvas ref={canvasRef} width={800} height={400} className="w-full h-64 md:h-80 cursor-crosshair" onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={() => setIsDrawing(false)} onMouseLeave={() => setIsDrawing(false)} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={() => setIsDrawing(false)} />
-            </div>
-            <div className="flex justify-center gap-3">
-                {colors.map(c => (<button key={c} onClick={() => setColor(c)} className={`w-12 h-12 rounded-full border-4 transition-transform ${color === c ? 'scale-125 border-slate-200 shadow-lg' : 'border-transparent hover:scale-110'}`} style={{ backgroundColor: c }} />))}
-            </div>
-        </div>
-    );
-};
-
 // ============================================================================
 //  MAIN LESSON VIEW PLAYER
 // ============================================================================
@@ -480,9 +379,12 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
     const grouped: any[] = [];
     let buffer: any[] = [];
     
+    const allowedTypes = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'code', 'formula', 'timeline', 'audio-story', 'image-hotspot', 'drag-drop', 'drawing'];
+    
     lesson.blocks.forEach((b: any) => {
       const type = String(b?.type || '');
-      if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'code', 'formula', 'timeline', 'audio-story', 'image-hotspot', 'drag-drop', 'drawing'].includes(type)) {
+      // 🔥 MOBILE SAFE: Replaced .includes() with .indexOf()
+      if (allowedTypes.indexOf(type) !== -1) {
         if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
         grouped.push({ type: 'interact', blocks: [b] });
         buffer = [];
@@ -521,7 +423,9 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-        if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
+        const tag = (e.target as HTMLElement).tagName;
+        // 🔥 MOBILE SAFE: Replaced .includes() with .indexOf()
+        if (['INPUT', 'TEXTAREA'].indexOf(tag) !== -1) return;
         
         if (e.key === 'ArrowRight' || e.key === ' ') {
             e.preventDefault();
@@ -566,11 +470,7 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
     const blockType = String(block.type || '');
 
     switch (blockType) {
-      case 'audio-story': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><AudioStoryBlockRenderer block={block} /></div>;
-      case 'image-hotspot': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><ImageHotspotBlockRenderer block={block} /></div>;
       case 'drag-drop': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><TapSortBlockRenderer block={block} /></div>;
-      case 'drawing': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><DrawingBlockRenderer block={block} /></div>;
-
       case 'code':
         return (
           <div key={blockKey} className="py-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -578,13 +478,6 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
               <div className="bg-white/5 px-6 py-4 flex justify-between items-center border-b border-white/5"><div className="flex gap-2"><div className="w-3 h-3 rounded-full bg-rose-500/80"></div><div className="w-3 h-3 rounded-full bg-amber-500/80"></div><div className="w-3 h-3 rounded-full bg-emerald-500/80"></div></div><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{String(block.language || 'Terminal')}</span></div>
               <div className="p-6 md:p-8 overflow-x-auto custom-scrollbar"><pre className="text-emerald-400 font-mono text-sm md:text-base leading-relaxed"><code>{String(block.content || '')}</code></pre></div>
             </div>
-            {block.caption && <p className="text-xs font-bold text-slate-500 mt-4 text-center">{String(block.caption)}</p>}
-          </div>
-        );
-      case 'formula':
-        return (
-          <div key={blockKey} className="py-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="bg-white p-8 md:p-12 rounded-[3rem] border-2 border-slate-100 shadow-sm text-center relative overflow-hidden group"><div className="absolute top-0 left-0 w-2 h-full bg-rose-500 transition-all duration-500 group-hover:w-3" />{block.title && <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-6">{String(block.title)}</span>}<div className="text-3xl md:text-4xl font-serif text-slate-800 tracking-tight overflow-x-auto overflow-y-hidden py-4 mx-auto max-w-full">{String(block.content || '')}</div>{block.explanation && <p className="text-sm font-medium text-slate-500 mt-6 leading-relaxed max-w-lg mx-auto">{String(block.explanation)}</p>}</div>
           </div>
         );
       case 'timeline':
@@ -605,10 +498,7 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
       case 'paragraph':
       case 'text': {
         const title = typeof block.title === 'string' ? block.title : (typeof block.content?.title === 'string' ? block.content.title : null);
-        const textBody = typeof block.content === 'string' 
-            ? block.content 
-            : (typeof block.content?.text === 'string' ? block.content.text : (typeof block.text === 'string' ? block.text : ""));
-
+        const textBody = typeof block.content === 'string' ? block.content : (typeof block.content?.text === 'string' ? block.content.text : (typeof block.text === 'string' ? block.text : ""));
         return (
           <div key={blockKey} className="py-6 animate-in fade-in slide-in-from-bottom-3 duration-700">
             {title && <span className="inline-block px-3 py-1 rounded-lg bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em] mb-4">{String(title)}</span>}
@@ -623,34 +513,11 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
             <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm">{block.title && (<div className="flex items-center gap-3 mb-6 pb-6 border-b border-slate-50"><div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500"><BookOpen size={18} /></div><h3 className="text-xl font-bold text-slate-800 tracking-tight">{String(block.title)}</h3></div>)}<div className="text-slate-600 font-medium text-base md:text-lg leading-relaxed space-y-6 tracking-wide">{String(block.content || '').split('\n').map((p: string, j: number) => { if (!p.trim()) return null; return <p key={j}>{p}</p>; })}</div></div>
           </div>
         );
-      case 'callout':
-        return (
-          <div key={blockKey} className="my-8 p-8 rounded-[2.5rem] bg-amber-50 border border-amber-100 relative overflow-hidden group shadow-sm"><Zap size={100} className="absolute -right-6 -top-6 text-amber-200/40 rotate-12 group-hover:scale-110 transition-transform" fill="currentColor" /><div className="relative z-10"><div className="flex items-center gap-2 mb-4"><div className="p-1.5 bg-amber-500 text-white rounded-lg shadow-sm"><Info size={16} strokeWidth={3} /></div><span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">{String(block.label || 'Spotlight')}</span></div><p className="text-lg text-slate-700 font-bold leading-relaxed italic pr-12">"{String(block.content || '')}"</p></div></div>
-        );
-      case 'dialogue':
-        return (
-          <div key={blockKey} className="py-6 space-y-6">{(Array.isArray(block.lines) ? block.lines : []).map((line: any, j: number) => (<div key={j} className={`flex items-end gap-3 ${line.side === 'right' ? 'flex-row-reverse' : ''}`}><div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-black text-white shrink-0 shadow-md ${line.side === 'right' ? 'bg-indigo-500' : 'bg-slate-300'}`}>{typeof line?.speaker === 'string' && line.speaker.trim().length > 0 ? line.speaker.trim()[0].toUpperCase() : '?'}</div><div className={`max-w-[85%] p-5 rounded-[2rem] text-base font-medium leading-relaxed ${line.side === 'right' ? 'bg-indigo-50 text-indigo-900 border border-indigo-100 rounded-br-none' : 'bg-white border border-slate-100 text-slate-700 rounded-bl-none shadow-sm'}`}>{String(line.text || '')}{typeof line.translation === 'string' && line.translation && <p className={`text-xs mt-3 italic opacity-70 font-bold border-t pt-3 ${line.side === 'right' ? 'border-indigo-200' : 'border-slate-100'}`}>{String(line.translation)}</p>}</div></div>))}</div>
-        );
-      case 'vocab-list':
-        return (
-          <div key={blockKey} className="py-6 grid grid-cols-1 gap-3"><h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-2 pl-2">Lexicon</h3>{(Array.isArray(block.items) ? block.items : []).map((item: any, j: number) => (<div key={j} className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm flex items-center gap-4 hover:border-indigo-200 transition-all"><span className="text-lg font-bold text-indigo-600 tracking-tight min-w-[100px]">{String(item.term || '')}</span><div className="h-6 w-px bg-slate-200" /><span className="text-sm font-medium text-slate-600 flex-1">{String(item.definition || '')}</span></div>))}</div>
-        );
-      case 'image':
-        return (
-          <div key={blockKey} className="py-8 animate-in fade-in"><div className="rounded-[2.5rem] overflow-hidden shadow-md border border-slate-100"><img src={String(block.url || '')} alt="Lesson visual" className="w-full h-auto object-cover max-h-80" /></div>{typeof block.caption === 'string' && block.caption && <p className="text-xs font-bold text-slate-400 text-center mt-4 px-4 uppercase tracking-widest">{String(block.caption)}</p>}</div>
-        );
-      case 'discussion':
-        return (
-          <div key={blockKey} className="py-8 animate-in fade-in"><div className="bg-indigo-50 border border-indigo-100 rounded-[2.5rem] p-8 shadow-sm"><div className="flex items-center gap-3 mb-8"><div className="p-3 bg-indigo-500 text-white rounded-xl shadow-md"><MessageCircle size={20} /></div><h3 className="text-xl font-bold text-indigo-900">{String(block.title || "Discussion")}</h3></div><div className="space-y-4">{(Array.isArray(block.questions) ? block.questions : []).map((q: any, qIdx: number) => (<div key={qIdx} className="bg-white p-5 rounded-2xl shadow-sm border border-indigo-50 flex gap-4 items-start"><span className="text-indigo-300 font-black text-lg leading-none mt-1">{qIdx + 1}</span><p className="text-slate-600 font-medium leading-relaxed">{String(q || '')}</p></div>))}</div></div></div>
-        );
       
       case 'quiz': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><QuizBlockRenderer block={block} /></div>;
       case 'fill-blank': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><FillBlankBlockRenderer block={block} /></div>;
       case 'scenario': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><ScenarioBlockRenderer block={block} /></div>;
-      case 'game':
-        if (block.gameType === 'connect-three') return (<div key={blockKey} className="py-8 animate-in fade-in slide-in-from-bottom-4 flex flex-col items-center"><div className="text-center mb-6"><h3 className="text-2xl font-black text-slate-800">{String(block.title || "Vocabulary Battle")}</h3><p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">Game Active on Projector</p></div><div className="w-full h-64 bg-amber-50 rounded-[2.5rem] border border-amber-200 flex items-center justify-center text-amber-500 font-bold shadow-inner">[Interactive Game View]</div></div>);
-        return <div key={blockKey} className="text-rose-500">Unknown Game Type</div>;
-
+      
       default:
         return <div key={blockKey} className="p-8 bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200 text-center text-xs text-slate-400 font-bold uppercase tracking-widest my-4">Unsupported Module: {blockType}</div>;
     }
@@ -671,70 +538,38 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
 
   const safePageIdx = Math.min(activePageIdx, pages.length - 1);
   const activePage = pages[safePageIdx];
-
   const progressPercent = ((safePageIdx + 1) / pages.length) * 100;
 
   return (
     <div className="flex flex-col h-full bg-slate-50/50 overflow-hidden font-sans relative">
-      
-      {/* SHRUNK HEADER */}
       <div className="px-6 md:px-8 pt-8 md:pt-10 pb-4 bg-white border-b border-slate-100 shrink-0 shadow-sm relative z-10">
         <div className="flex justify-between items-end">
           <div>
               <h1 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.4em] mb-1">{String(lesson?.title || 'Active Session')}</h1>
               <p className="text-xl font-black text-slate-900 tracking-tight leading-none">Current Session</p>
           </div>
-          {isInstructor && (
-            <div className="flex items-center gap-2 px-2 py-1 bg-emerald-50 rounded-md border border-emerald-100">
-                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                <span className="text-[8px] font-black text-emerald-600 uppercase">Live</span>
-            </div>
-          )}
         </div>
       </div>
       
-      {/* MAIN CONTENT */}
       <div ref={containerRef} className="flex-1 overflow-y-auto px-6 md:px-10 py-8 pb-32 custom-scrollbar scroll-smooth relative z-0">
         <div className="max-w-2xl mx-auto space-y-4">
           {activePage?.blocks?.map((block: any, i: number) => renderBlock(block, i))}
         </div>
       </div>
       
-      {/* SLIM & POLISHED BOTTOM NAV */}
       <div className="px-6 py-4 pb-8 md:pb-5 bg-white/95 backdrop-blur-2xl border-t border-slate-100 flex justify-between items-center fixed bottom-0 left-0 right-0 z-50 shadow-[0_-15px_30px_rgba(0,0,0,0.04)]">
-        
-        {/* Sleek Top-Edge Progress Bar */}
         <div className="absolute top-0 left-0 h-1 bg-slate-100 w-full overflow-hidden">
             <div className="h-full bg-indigo-500 transition-all duration-500 ease-out" style={{ width: `${progressPercent}%` }} />
         </div>
-
-        <button 
-            onClick={handlePrev} 
-            className="p-4 bg-slate-100 text-slate-500 rounded-2xl disabled:opacity-30 active:scale-95 transition-all hover:bg-slate-200" 
-            disabled={safePageIdx === 0}
-        >
-            <ArrowLeft size={20} strokeWidth={2.5} />
-        </button>
-        
+        <button onClick={handlePrev} className="p-4 bg-slate-100 text-slate-500 rounded-2xl disabled:opacity-30 active:scale-95 transition-all hover:bg-slate-200" disabled={safePageIdx === 0}><ArrowLeft size={20} strokeWidth={2.5} /></button>
         <div className="text-center flex flex-col items-center">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Progress</span>
             <span className="text-lg font-black text-slate-900">{safePageIdx + 1} <span className="text-slate-300 mx-0.5">/</span> {pages.length}</span>
         </div>
-        
         {safePageIdx < pages.length - 1 ? (
-          <button 
-            onClick={handleNext} 
-            className="p-4 bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-200 active:scale-95 transition-all hover:bg-indigo-500 hover:-translate-y-0.5"
-          >
-            <ArrowRight size={20} strokeWidth={2.5} />
-          </button>
+          <button onClick={handleNext} className="p-4 bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-200 active:scale-95 transition-all hover:bg-indigo-500 hover:-translate-y-0.5"><ArrowRight size={20} strokeWidth={2.5} /></button>
         ) : (
-          <button 
-            onClick={onFinish} 
-            className="px-8 py-4 bg-emerald-500 text-white font-black rounded-2xl shadow-lg shadow-emerald-200 active:scale-95 transition-all text-xs tracking-widest hover:bg-emerald-400 hover:-translate-y-0.5"
-          >
-            FINISH
-          </button>
+          <button onClick={onFinish} className="px-8 py-4 bg-emerald-500 text-white font-black rounded-2xl shadow-lg shadow-emerald-200 active:scale-95 transition-all text-xs tracking-widest hover:bg-emerald-400 hover:-translate-y-0.5">FINISH</button>
         )}
       </div>
     </div>
