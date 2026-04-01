@@ -177,6 +177,15 @@ export default function App() {
     if (!authChecked || isHydrated.current) return;
     const params = new URLSearchParams(window.location.search);
     
+    // 🔥 NEW OS FEATURE: QR Code Route Interceptor
+    // Converts /live/123 or /join/123 into a clean ?classId=123 auto-join route so the user goes straight to the lobby
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    if ((pathParts[0] === 'join' || pathParts[0] === 'live') && pathParts[1]) {
+        params.set('classId', pathParts[1]);
+        params.set('autoJoin', 'true'); // Flag to instantly open the lobby
+        window.history.replaceState({}, '', `/?${params.toString()}`);
+    }
+
     if (params.get('action') === 'signup' && !user) {
         setShowAuth(true);
         params.delete('action');
@@ -189,9 +198,22 @@ export default function App() {
     if (params.get('deckId')) setActiveDeckKey(params.get('deckId'));
 
     const urlClassId = params.get('classId');
-    if (urlClassId && combinedClasses.length > 0) {
-      const foundClass = combinedClasses.find((c: any) => c.id === urlClassId);
-      if (foundClass) setActiveStudentClass(foundClass);
+    if (urlClassId) {
+        if (combinedClasses.length > 0) {
+            const foundClass = combinedClasses.find((c: any) => c.id === urlClassId);
+            if (foundClass) {
+                setActiveStudentClass(foundClass);
+            } else if (allClasses && allClasses.length > 0) {
+                // Fallback: If not enrolled, find in all classes and jump to discovery
+                const publicClass = allClasses.find((c: any) => c.id === urlClassId);
+                if (publicClass) {
+                    setActiveTab('discovery');
+                    // You can enhance discovery view to auto-open if needed
+                }
+            }
+        } else {
+            return; // Wait for classes to finish loading before hydrating
+        }
     }
 
     const urlLessonId = params.get('lessonId');
@@ -200,10 +222,10 @@ export default function App() {
       if (foundLesson) setActiveLesson(foundLesson);
     }
 
-    if (combinedClasses.length > 0 || allLessons.length > 0) {
+    if (combinedClasses.length > 0 || allLessons.length > 0 || allClasses?.length > 0) {
         isHydrated.current = true;
     }
-  }, [authChecked, combinedClasses, allLessons, user]);
+  }, [authChecked, combinedClasses, allLessons, user, allClasses]);
 
   useEffect(() => {
     if (!isHydrated.current) return;
