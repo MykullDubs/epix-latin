@@ -5,7 +5,7 @@ import { db } from '../config/firebase';
 import { 
   HelpCircle, CheckCircle2, X, Edit3, MessageSquare, 
   MessageCircle, ArrowLeft, ArrowRight, Info, Zap, BookOpen,
-  Play, Square, Search, MousePointerClick, Palette, Eraser, Volume2, AlertTriangle
+  Play, Square, Search, MousePointerClick, Palette, Eraser, Volume2, AlertTriangle, Gamepad2
 } from 'lucide-react';
 
 export interface LessonViewProps {
@@ -188,7 +188,6 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                 <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Vocabulary Drill</h3>
             </div>
 
-            {/* STICKY TOP WORD BANK: Mobile Optimized Spacing */}
             <div className="sticky top-2 z-30 mb-6 -mx-2 px-2">
                 <div className="bg-white/90 backdrop-blur-xl rounded-2xl p-3 md:p-4 border border-slate-200/50 shadow-md flex flex-wrap gap-2 min-h-[60px] justify-center items-center transition-all duration-300">
                     {wordBank.length === 0 && !isChecked ? (
@@ -393,10 +392,6 @@ const TapSortBlockRenderer = ({ block }: any) => {
     );
 };
 
-// ============================================================================
-//  NEW RENDERERS: AUDIO STORY & IMAGE HOTSPOT
-// ============================================================================
-
 const AudioStoryBlockRenderer = ({ block }: any) => {
     const [isPlaying, setIsPlaying] = useState(false);
     const togglePlay = () => setIsPlaying(!isPlaying);
@@ -411,7 +406,7 @@ const AudioStoryBlockRenderer = ({ block }: any) => {
             </div>
             <div className="p-8 md:p-10 pt-12">
                 <h3 className="text-sm font-black text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Volume2 size={16} /> Read Along</h3>
-                <p className={`text-3xl md:text-4xl font-bold text-slate-800 leading-snug transition-colors duration-500 ${isPlaying ? 'text-indigo-600' : ''}`}>{String(block.text || "The legend says they looked for an eagle on a cactus...")}</p>
+                <p className={`text-2xl md:text-4xl font-bold text-slate-800 leading-snug transition-colors duration-500 ${isPlaying ? 'text-indigo-600' : ''}`}>{String(block.text || "The legend says they looked for an eagle on a cactus...")}</p>
             </div>
         </div>
     );
@@ -422,7 +417,7 @@ const ImageHotspotBlockRenderer = ({ block }: any) => {
 
     return (
         <div className="bg-slate-900 p-6 md:p-8 rounded-[3rem] shadow-2xl my-8">
-            <div className="flex items-center justify-center gap-3 mb-6"><Search className="text-cyan-400" size={24} /><h3 className="text-2xl font-black text-white text-center">{String(block.title || 'Explore the Map!')}</h3></div>
+            <div className="flex items-center justify-center gap-3 mb-6"><Search className="text-cyan-400" size={24} /><h3 className="text-xl md:text-2xl font-black text-white text-center">{String(block.title || 'Explore the Map!')}</h3></div>
             <div className="relative rounded-[2rem] overflow-hidden border-4 border-slate-700 bg-slate-800">
                 <img src={String(block.imageUrl || 'https://images.unsplash.com/photo-1565670119853-23910c2830f3?q=80&w=800&auto=format&fit=crop')} className="w-full h-auto opacity-80" alt="Explorer Map" />
                 {(Array.isArray(block.hotspots) ? block.hotspots : []).map((spot: any, i: number) => (
@@ -464,7 +459,6 @@ const DrawingBlockRenderer = ({ block }: any) => {
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
-        
         const { x, y } = getCoordinates(e, canvas);
         ctx.beginPath();
         ctx.moveTo(x, y);
@@ -474,11 +468,9 @@ const DrawingBlockRenderer = ({ block }: any) => {
     const draw = (e: any) => {
         if (!isDrawing) return;
         if (e.cancelable) e.preventDefault();
-        
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext('2d');
         if (!canvas || !ctx) return;
-        
         const { x, y } = getCoordinates(e, canvas);
         ctx.lineTo(x, y);
         ctx.strokeStyle = color;
@@ -521,6 +513,91 @@ const DrawingBlockRenderer = ({ block }: any) => {
     );
 };
 
+const ImageBlockRenderer = ({ block }: any) => (
+    <div className="py-8 animate-in fade-in">
+      <div className="rounded-[2.5rem] overflow-hidden shadow-md border border-slate-100">
+        <img src={String(block.url || block.imageUrl || '')} alt="Lesson visual" className="w-full h-auto object-cover max-h-80" />
+      </div>
+      {block.caption && <p className="text-xs font-bold text-slate-400 text-center mt-4 px-4 uppercase tracking-widest">{String(block.caption)}</p>}
+    </div>
+);
+
+const CalloutBlockRenderer = ({ block }: any) => (
+    <div className="my-8 p-6 md:p-8 rounded-[2.5rem] bg-amber-50 border border-amber-100 relative overflow-hidden group shadow-sm">
+      <Zap size={100} className="absolute -right-6 -top-6 text-amber-200/40 rotate-12 group-hover:scale-110 transition-transform" fill="currentColor" />
+      <div className="relative z-10">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="p-1.5 bg-amber-500 text-white rounded-lg shadow-sm"><Info size={16} strokeWidth={3} /></div>
+          <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">{String(block.label || block.title || 'Spotlight')}</span>
+        </div>
+        <p className="text-base md:text-lg text-slate-700 font-bold leading-relaxed italic pr-6 md:pr-12">"{String(block.content || block.text || '')}"</p>
+      </div>
+    </div>
+);
+
+const DialogueBlockRenderer = ({ block }: any) => (
+    <div className="py-6 space-y-6">
+      {(Array.isArray(block.lines) ? block.lines : []).map((line: any, j: number) => {
+        const isRight = String(line.side) === 'right';
+        return (
+        <div key={j} className={`flex items-end gap-3 ${isRight ? 'flex-row-reverse' : ''}`}>
+          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-black text-white shrink-0 shadow-md ${isRight ? 'bg-indigo-500' : 'bg-slate-300'}`}>
+            {typeof line.speaker === 'string' && line.speaker.length > 0 ? line.speaker[0].toUpperCase() : '?'}
+          </div>
+          <div className={`max-w-[85%] p-4 md:p-5 rounded-[2rem] text-sm md:text-base font-medium leading-relaxed ${isRight ? 'bg-indigo-50 text-indigo-900 border border-indigo-100 rounded-br-none' : 'bg-white border border-slate-100 text-slate-700 rounded-bl-none shadow-sm'}`}>
+            {String(line.text || '')}
+            {line.translation && <p className={`text-xs mt-3 italic opacity-70 font-bold border-t pt-3 ${isRight ? 'border-indigo-200' : 'border-slate-100'}`}>{String(line.translation)}</p>}
+          </div>
+        </div>
+      )})}
+    </div>
+);
+
+const VocabListBlockRenderer = ({ block }: any) => (
+    <div className="py-6 grid grid-cols-1 gap-3">
+      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-2 pl-2">Lexicon</h3>
+      {(Array.isArray(block.items) ? block.items : []).map((item: any, j: number) => (
+        <div key={j} className="bg-white p-4 md:p-5 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center gap-2 md:gap-4 hover:border-indigo-200 transition-all">
+          <span className="text-lg font-bold text-indigo-600 tracking-tight md:min-w-[100px]">{String(item.term || '')}</span>
+          <div className="hidden md:block h-6 w-px bg-slate-200" />
+          <span className="text-sm font-medium text-slate-600 flex-1">{String(item.definition || '')}</span>
+        </div>
+      ))}
+    </div>
+);
+
+const DiscussionBlockRenderer = ({ block }: any) => (
+    <div className="py-8 animate-in fade-in">
+      <div className="bg-indigo-50 border border-indigo-100 rounded-[2.5rem] p-6 md:p-8 shadow-sm">
+        <div className="flex items-center gap-3 mb-6 md:mb-8">
+          <div className="p-3 bg-indigo-500 text-white rounded-xl shadow-md shrink-0"><MessageCircle size={20} /></div>
+          <h3 className="text-lg md:text-xl font-bold text-indigo-900">{String(block.title || "Discussion")}</h3>
+        </div>
+        <div className="space-y-4">
+          {(Array.isArray(block.questions) ? block.questions : []).map((q: any, qIdx: number) => (
+            <div key={qIdx} className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-indigo-50 flex gap-3 md:gap-4 items-start">
+              <span className="text-indigo-300 font-black text-lg leading-none mt-1">{qIdx + 1}</span>
+              <p className="text-sm md:text-base text-slate-600 font-medium leading-relaxed">{String(q || '')}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+);
+
+const GameBlockRenderer = ({ block }: any) => (
+    <div className="py-8 animate-in fade-in slide-in-from-bottom-4 flex flex-col items-center">
+      <div className="text-center mb-6">
+        <h3 className="text-2xl font-black text-slate-800">{String(block.title || "Vocabulary Battle")}</h3>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Game Active on Projector</p>
+      </div>
+      <div className="w-full h-64 bg-slate-900 rounded-[2.5rem] border-4 border-slate-800 flex flex-col items-center justify-center text-white shadow-xl">
+        <Gamepad2 size={48} className="text-indigo-500 mb-4 animate-bounce" />
+        <p className="font-black tracking-widest uppercase text-sm text-slate-400">Look at the Smartboard</p>
+      </div>
+    </div>
+);
+
 // ============================================================================
 //  MAIN LESSON VIEW PLAYER
 // ============================================================================
@@ -536,6 +613,7 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
     const grouped: any[] = [];
     let buffer: any[] = [];
     
+    // 🔥 ALL VALID BLOCK TYPES REGISTERED HERE
     const allowedTypes = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'code', 'formula', 'timeline', 'audio-story', 'image-hotspot', 'drag-drop', 'drawing'];
     
     lesson.blocks.forEach((b: any) => {
@@ -625,11 +703,16 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
     const blockType = String(block.type || '');
 
     switch (blockType) {
-      case 'drag-drop': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><TapSortBlockRenderer block={block} /></div>;
-      case 'audio-story': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><AudioStoryBlockRenderer block={block} /></div>;
-      case 'image-hotspot': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><ImageHotspotBlockRenderer block={block} /></div>;
-      case 'drawing': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><DrawingBlockRenderer block={block} /></div>;
+      // 🔥 RESTORED RENDERERS
+      case 'image': return <ImageBlockRenderer block={block} key={blockKey} />;
+      case 'callout': return <CalloutBlockRenderer block={block} key={blockKey} />;
+      case 'dialogue': return <DialogueBlockRenderer block={block} key={blockKey} />;
+      case 'vocab-list': return <VocabListBlockRenderer block={block} key={blockKey} />;
+      case 'discussion': return <DiscussionBlockRenderer block={block} key={blockKey} />;
+      case 'game': return <GameBlockRenderer block={block} key={blockKey} />;
 
+      // Existing Renderers
+      case 'drag-drop': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><TapSortBlockRenderer block={block} /></div>;
       case 'code':
         return (
           <div key={blockKey} className="py-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -688,6 +771,9 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
       case 'quiz': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><QuizBlockRenderer block={block} /></div>;
       case 'fill-blank': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><FillBlankBlockRenderer block={block} /></div>;
       case 'scenario': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><ScenarioBlockRenderer block={block} /></div>;
+      case 'drawing': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><DrawingBlockRenderer block={block} /></div>;
+      case 'image-hotspot': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><ImageHotspotBlockRenderer block={block} /></div>;
+      case 'audio-story': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><AudioStoryBlockRenderer block={block} /></div>;
 
       default:
         return <div key={blockKey} className="p-8 bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200 text-center text-xs text-slate-400 font-bold uppercase tracking-widest my-4">Unsupported Module: {blockType}</div>;
