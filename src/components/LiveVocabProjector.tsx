@@ -1,6 +1,7 @@
 // src/components/LiveVocabProjector.tsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLiveClass } from '../hooks/useLiveClass';
+import { useArenaAudio } from '../hooks/useArenaAudio'; // 🔥 IMPORTED AUDIO ENGINE
 import { 
     Users, Timer, Zap, ArrowRight, X, Trophy, CheckCircle2, 
     Settings, Hand, Crown, Activity, Target, Shield, Flame, Loader2 
@@ -11,6 +12,7 @@ import HoloAvatar from './HoloAvatar';
 
 export default function LiveVocabProjector({ deck, classId, activeClass, onExit }: any) {
     const { liveState, startLiveClass, endLiveClass, changeSlide, triggerQuiz } = useLiveClass(classId, true);
+    const audio = useArenaAudio(); // 🔥 INITIALIZE AUDIO ENGINE
     
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isAutoPilot, setIsAutoPilot] = useState(false);
@@ -105,17 +107,24 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
         }
     }, [liveState?.answers, liveState?.joined, isAutoPilot, liveState?.quizState, preGameCountdown]);
 
-    // Timer Ticker
+    // 🔥 AUDIO: Timer Ticker
     useEffect(() => {
         if (!isAutoPilot || isFinished || isBooting || timeLeft <= 0 || preGameCountdown !== null) return;
-        const timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
+        const timer = setInterval(() => {
+            setTimeLeft((prev) => {
+                const nextTime = prev - 1;
+                if (nextTime > 0) audio.playTick(nextTime <= 5); // Urgent tick under 5s
+                return nextTime;
+            });
+        }, 1000);
         return () => clearInterval(timer);
-    }, [isAutoPilot, isFinished, isBooting, timeLeft, preGameCountdown]);
+    }, [isAutoPilot, isFinished, isBooting, timeLeft, preGameCountdown, audio]);
 
-    // Pre-game Countdown Ticker
+    // 🔥 AUDIO: Pre-game Countdown Ticker
     useEffect(() => {
         if (preGameCountdown === null) return;
         if (preGameCountdown > 0) {
+            audio.playCountdown(); // BWWAAAAH
             const timer = setTimeout(() => setPreGameCountdown(preGameCountdown - 1), 1000);
             return () => clearTimeout(timer);
         } else {
@@ -123,7 +132,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
             executeStartRun();
             setPreGameCountdown(null);
         }
-    }, [preGameCountdown]);
+    }, [preGameCountdown, audio]);
 
     // Phase Switcher
     useEffect(() => {
@@ -138,6 +147,8 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
     }, [timeLeft, isAutoPilot, isFinished, preGameCountdown]); 
 
     const handleReveal = async () => {
+        audio.playReveal(); // 🔥 AUDIO: Triumphant Chord
+        
         const freshestLiveState = liveStateRef.current;
         const freshestIndex = currentIndexRef.current;
         const currentQ = quizQuestions[freshestIndex];
@@ -169,6 +180,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
     const handleNext = () => {
         const freshestIndex = currentIndexRef.current;
         if (freshestIndex < quizQuestions.length - 1) {
+            audio.playStart(); // 🔥 AUDIO: Next Question Chime
             const nextIdx = freshestIndex + 1;
             setCurrentIndex(nextIdx);
             setTimeLeft(gameSettings.qTime);
@@ -183,19 +195,22 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                 roundPoints: {} 
             });
         } else {
+            audio.playReveal(); // 🔥 AUDIO: Final Victory Chord
             setIsFinished(true);
             updateDoc(doc(db, 'artifacts', appId, 'live_sessions', classId), { quizState: 'finished', finalScores: scoresRef.current });
         }
     };
 
-    // 🔥 Trigger the countdown, not the actual start
+    // Trigger the countdown, not the actual start
     const startRun = (auto: boolean) => {
+        audio.initCtx(); // 🔥 Wakes up the browser's AudioContext
         setIsAutoPilot(auto);
-        setPreGameCountdown(3); // Start the 3-2-1 hype
+        setPreGameCountdown(3); 
     };
 
-    // 🔥 The actual database execution once countdown hits 0
+    // The actual database execution once countdown hits 0
     const executeStartRun = async () => {
+        audio.playStart(); // 🔥 AUDIO: Game Start Chime
         setTimeLeft(gameSettings.qTime);
         setCurrentIndex(0);
         const qPayload = { ...quizQuestions[0], startTime: Date.now(), timeLimit: gameSettings.qTime * 1000 };
@@ -516,7 +531,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
 
                 {/* 3. RIGHT RAIL: Live Standings */}
                 <div className="col-span-3 bg-slate-900/40 border-2 border-slate-800/80 rounded-[3rem] p-8 flex flex-col backdrop-blur-xl relative overflow-hidden shadow-2xl">
-                    <h2 className="text-[10px] font-black uppercase tracking-[0.4em] mb-8 opacity-50 flex items-center gap-3">
+                    <h2 className="text-[10px] font-black uppercase tracking-[0.4em] mb-6 opacity-50 flex items-center gap-3">
                         <Trophy size={18} className="text-yellow-500" /> Live Standings
                     </h2>
                     <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
