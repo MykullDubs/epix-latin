@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { 
     ShoppingBag, Zap, Sparkles, Paintbrush, CircleUser, 
-    Tag, Check, Lock, AlertCircle, X, GraduationCap, Globe,
+    Tag, Lock, AlertCircle, X, GraduationCap, Globe,
     ShoppingCart, CheckCircle2, RotateCcw, Shield
 } from 'lucide-react';
 import { Toast } from './Toast';
@@ -47,7 +47,6 @@ const CATEGORY_TABS = [
     { id: 'themes', label: 'OS Themes', icon: <Paintbrush size={16} /> },
 ];
 
-// 🔥 UPDATED PROPS: We now correctly intercept onPurchase and onEquip from App.tsx
 export default function StorefrontView({ userData, onPurchase, onEquip, onBack }: any) {
     const [activeTab, setActiveTab] = useState('avatars');
     const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -57,7 +56,6 @@ export default function StorefrontView({ userData, onPurchase, onEquip, onBack }
     const inventory = userData?.inventory || [];
     const equipped = userData?.equipped || {};
 
-    // 🔥 THE ECONOMY ENGINE (Routed through global actions)
     const handleBuy = async (item: any, category: string) => {
         if (fluxBalance < item.price) {
             setToastMsg("Insufficient Flux! Complete more modules to earn currency.");
@@ -65,7 +63,6 @@ export default function StorefrontView({ userData, onPurchase, onEquip, onBack }
         }
 
         setIsProcessing(true);
-        // Call the bulletproof purchase engine from useMagisterData
         const result = await onPurchase(item.id, item.price, category);
         
         if (result?.success) {
@@ -76,7 +73,6 @@ export default function StorefrontView({ userData, onPurchase, onEquip, onBack }
         setIsProcessing(false);
     };
 
-    // 🔥 THE EQUIP ENGINE (Routed through global actions)
     const handleEquip = async (item: any, category: string) => {
         setIsProcessing(true);
         await onEquip(item.id, category);
@@ -84,7 +80,6 @@ export default function StorefrontView({ userData, onPurchase, onEquip, onBack }
         setIsProcessing(false);
     };
 
-    // 🔥 THE UNEQUIP ENGINE (Passes null to clear the field)
     const handleUnequip = async (category: string) => {
         setIsProcessing(true);
         await onEquip(null, category); 
@@ -117,7 +112,6 @@ export default function StorefrontView({ userData, onPurchase, onEquip, onBack }
                         <p className="text-slate-500 dark:text-slate-400 font-bold text-sm">Trade your hard-earned Flux for OS upgrades.</p>
                     </div>
 
-                    {/* Massive Flux Balance Display */}
                     <div className="bg-slate-900 dark:bg-black rounded-[2rem] p-6 border-4 border-slate-800 flex items-center gap-6 shadow-2xl shrink-0">
                         <div className="w-14 h-14 bg-amber-500/20 rounded-full flex items-center justify-center">
                             <Zap size={28} className="text-amber-400" fill="currentColor" />
@@ -153,7 +147,6 @@ export default function StorefrontView({ userData, onPurchase, onEquip, onBack }
             <main className="flex-1 overflow-y-auto px-6 md:px-10 pb-32 custom-scrollbar">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
                     {STORE_CATALOG[activeTab].map((item: any) => {
-                        // 🔥 Smart Ownership Check (Accommodates both legacy dictionary and flat arrays)
                         const isOwned = Array.isArray(inventory) 
                             ? inventory.includes(item.id) 
                             : (inventory[activeTab] || []).includes(item.id);
@@ -163,7 +156,6 @@ export default function StorefrontView({ userData, onPurchase, onEquip, onBack }
                         return (
                             <div key={item.id} className="bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 p-6 flex flex-col shadow-sm hover:shadow-xl transition-all duration-300 group">
                                 
-                                {/* Rarity Badge */}
                                 <div className="flex justify-between items-start mb-6">
                                     <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.2em] border ${RARITY_COLORS[item.rarity]}`}>
                                         {item.rarity}
@@ -175,7 +167,6 @@ export default function StorefrontView({ userData, onPurchase, onEquip, onBack }
                                     )}
                                 </div>
 
-                                {/* Visual Preview Mockup */}
                                 <div className="w-full h-32 bg-slate-50 dark:bg-slate-950 rounded-3xl mb-6 flex items-center justify-center border border-slate-100 dark:border-slate-800 relative overflow-hidden group-hover:scale-[1.02] transition-transform">
                                     {activeTab === 'themes' ? (
                                         <div className="w-full h-full flex">
@@ -186,16 +177,21 @@ export default function StorefrontView({ userData, onPurchase, onEquip, onBack }
                                         <div className={`w-16 h-16 rounded-full border-4 border-slate-800 bg-slate-900 ${item.css}`} />
                                     ) : activeTab === 'titles' ? (
                                         <span className="font-black text-slate-800 dark:text-white text-lg tracking-widest">{item.name}</span>
+                                    ) : activeTab === 'avatars' ? (
+                                        // 🔥 THE FIX: The Avatars are back!
+                                        <img 
+                                            src={`https://api.dicebear.com/9.x/bottts/svg?seed=${item.seed}&backgroundColor=transparent`} 
+                                            alt={item.name} 
+                                            className="w-24 h-24 object-contain drop-shadow-md group-hover:scale-110 transition-transform" 
+                                        />
                                     ) : (
                                         <CircleUser size={48} className="text-slate-300 dark:text-slate-700" />
                                     )}
                                 </div>
 
-                                {/* Text Content */}
                                 <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight mb-2 leading-none">{item.name}</h3>
                                 <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-8 leading-relaxed line-clamp-2">{item.description}</p>
 
-                                {/* 🔥 THE SMART BUTTON ENGINE */}
                                 <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800">
                                     {!isOwned ? (
                                         <button 
@@ -219,18 +215,15 @@ export default function StorefrontView({ userData, onPurchase, onEquip, onBack }
                                             onClick={() => handleUnequip(activeTab)}
                                             className="w-full py-4 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-2 border-emerald-200 dark:border-emerald-500/30 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-200 dark:hover:border-rose-500/30 group flex items-center justify-center gap-2"
                                         >
-                                            {/* Normal State: Active */}
                                             <span className="flex items-center gap-2 group-hover:hidden">
                                                 <CheckCircle2 size={16} /> Active
                                             </span>
-                                            {/* Hover State: Unequip */}
                                             <span className="hidden items-center gap-2 group-hover:flex">
                                                 <RotateCcw size={16} /> Unequip
                                             </span>
                                         </button>
                                     )}
                                 </div>
-
                             </div>
                         );
                     })}
