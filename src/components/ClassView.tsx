@@ -5,7 +5,7 @@ import { db } from '../config/firebase';
 import { useLiveClass } from '../hooks/useLiveClass';
 import { 
     MessageSquare, MessageCircle, Gamepad2, CheckCircle2, X, Puzzle, 
-    ChevronLeft, ChevronRight, Zap, Users, Clock, EyeOff, HelpCircle, Layers 
+    ChevronLeft, ChevronRight, Zap, Users, Clock, EyeOff, HelpCircle, Layers, MousePointerClick 
 } from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
 
