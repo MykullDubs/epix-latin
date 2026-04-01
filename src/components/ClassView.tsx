@@ -5,7 +5,7 @@ import { db } from '../config/firebase';
 import { useLiveClass } from '../hooks/useLiveClass';
 import { 
     MessageSquare, MessageCircle, Gamepad2, CheckCircle2, X, Puzzle, 
-    ChevronLeft, ChevronRight, Zap, Users, Clock, EyeOff, HelpCircle, Layers, MousePointerClick
+    ChevronLeft, ChevronRight, Zap, Users, Clock, EyeOff, HelpCircle, Layers, MousePointerClick, QrCode
 } from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
 
@@ -16,9 +16,10 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const [activePageIdx, setActivePageIdx] = useState(0);
   const [showForum, setShowForum] = useState(false);
   
-  // 🔥 OS FEATURE: Presentation Telemetry & Focus Mode
+  // 🔥 OS FEATURE: Presentation Telemetry & Overlays
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isBlanked, setIsBlanked] = useState(false);
+  const [showQR, setShowQR] = useState(false); // NEW: QR Code Overlay State
   
   const stageRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -110,6 +111,12 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           } else if (e.key.toLowerCase() === 'b') {
               e.preventDefault();
               setIsBlanked(prev => !prev);
+          } else if (e.key.toLowerCase() === 'q') {
+              // 🔥 NEW OS FEATURE: Press 'Q' to toggle QR Code
+              e.preventDefault();
+              setShowQR(prev => !prev);
+          } else if (e.key === 'Escape') {
+              setShowQR(false);
           }
       };
       
@@ -120,17 +127,53 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const activePage = pages[activePageIdx];
   if (!lesson || !activePage) return null;
 
+  // Dynamically build the join URL based on where the app is currently hosted
+  const joinUrl = `${window.location.origin}/join/${classId}`;
+
   return (
     <div 
         className="w-full flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500 relative"
         style={{ height: 'calc(100dvh - 4rem)' }}
     >
+      {/* 🔥 OS FEATURE: The Blackout Overlay */}
       <div className={`absolute inset-0 bg-black z-[9000] flex items-center justify-center transition-opacity duration-700 pointer-events-none ${isBlanked ? 'opacity-100' : 'opacity-0'}`}>
           <EyeOff size={64} className="text-white/10" />
       </div>
 
+      {/* 🔥 NEW OS FEATURE: Quick-Join QR Overlay */}
+      {showQR && (
+          <div className="absolute inset-0 z-[9999] bg-slate-900/90 backdrop-blur-2xl flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-300">
+              <button 
+                  onClick={() => setShowQR(false)} 
+                  className="absolute top-12 right-12 p-6 bg-white/10 hover:bg-rose-500 rounded-full text-white transition-all hover:scale-110 active:scale-95"
+              >
+                  <X size={40} strokeWidth={3} />
+              </button>
+              
+              <h2 className="text-[6vh] font-black text-white uppercase tracking-widest mb-4">Join Live Session</h2>
+              <p className="text-[3vh] text-indigo-300 font-bold tracking-widest uppercase mb-16">Scan to sync your device</p>
+              
+              <div className="p-10 bg-white rounded-[3rem] shadow-[0_0_100px_rgba(99,102,241,0.4)] animate-in slide-in-from-bottom-8">
+                  {/* Using a reliable free API to render the QR code on the fly */}
+                  <img 
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(joinUrl)}&margin=10`} 
+                      alt="Join QR" 
+                      className="w-[40vh] h-[40vh] object-contain" 
+                  />
+              </div>
+              
+              <div className="mt-16 text-center">
+                  <p className="text-[2vh] font-bold text-slate-400 uppercase tracking-[0.4em] mb-4">Or enter room code</p>
+                  <div className="text-[8vh] font-black text-indigo-400 tracking-[0.2em] leading-none bg-indigo-500/10 py-6 px-12 rounded-[2rem] border-2 border-indigo-500/20">
+                      {String(classId || '').substring(0,6).toUpperCase()}
+                  </div>
+              </div>
+          </div>
+      )}
+
       <main className="flex-1 flex overflow-hidden relative group/canvas bg-slate-50 text-slate-900">
         
+        {/* MOUSE NAVIGATION CONTROLS */}
         {activePageIdx > 0 && (
             <button 
                 onClick={handlePrev} 
@@ -149,6 +192,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
             </button>
         )}
 
+        {/* SECURE SCROLL CONTAINER */}
         <div ref={stageRef} className={`flex-1 overflow-y-auto w-full relative transition-all duration-500 ${showForum ? 'mr-[450px]' : ''} scroll-smooth`}>
           <div className="flex flex-col min-h-full w-full items-center px-16 py-12 lg:px-32">
             <div className="w-full max-w-7xl space-y-24 my-auto">
@@ -215,8 +259,8 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                           {blockType === 'discussion' && <DiscussionBlock block={block} />}
                           {blockType === 'game' && block.gameType === 'connect-three' && <GameBlock block={block} lessonVocab={lessonVocab} />}
                           {blockType === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
-                          {blockType === 'fill-blank' && <FillBlankBlock block={block} />}
-                          {blockType === 'drag-drop' && <TapSortBlock block={block} />}
+                          {blockType === 'fill-blank' && <FillBlankBlock block={block} liveState={liveState} />}
+                          {blockType === 'drag-drop' && <TapSortBlock block={block} liveState={liveState} />}
                       </>
                     )}
                   </div>
@@ -234,6 +278,15 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
               <span className="flex items-center gap-2 font-mono text-lg font-bold text-slate-500">
                   <Clock size={18} /> {formatTime(elapsedTime)}
               </span>
+              
+              {/* 🔥 NEW OS FEATURE: Footer QR Toggle Button */}
+              <div className="h-6 w-px bg-slate-800 mx-2" />
+              <button 
+                  onClick={() => setShowQR(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white rounded-lg transition-all text-xs font-black uppercase tracking-widest shadow-sm active:scale-95 border border-slate-700 hover:border-indigo-500"
+              >
+                  <QrCode size={16} /> QR Join (Q)
+              </button>
           </div>
           
           <div className="flex items-center gap-6">
@@ -373,10 +426,9 @@ const ScenarioBlock = ({ block, liveState }: { block: any, liveState: any }) => 
   );
 };
 
-// 🔥 FULLY INTERACTIVE DOCKED HUD: FILL BLANK BLOCK
 type WordItem = { id: string; word: string };
 
-const FillBlankBlock = ({ block }: { block: any }) => {
+const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) => {
   const rawText = String(block.text || "Missing text [here].");
 
   const { textParts, correctAnswers } = useMemo(() => {
@@ -404,7 +456,6 @@ const FillBlankBlock = ({ block }: { block: any }) => {
         .sort(() => Math.random() - 0.5);
   }, [correctAnswers, distractors]);
 
-  // RESTORED INTERACTIVE STATE
   const [wordBank, setWordBank] = useState<WordItem[]>(initialWordBank);
   const [filledBlanks, setFilledBlanks] = useState<(WordItem | null)[]>(Array(correctAnswers.length).fill(null));
   const [isChecked, setIsChecked] = useState(false);
@@ -439,8 +490,6 @@ const FillBlankBlock = ({ block }: { block: any }) => {
 
   return (
     <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col relative overflow-visible">
-      
-      {/* HEADER */}
       <div className="p-12 md:p-16 pb-8">
           <h3 className="text-[4vh] font-bold text-slate-800 flex items-center justify-center gap-4">
             <span className="bg-indigo-100 text-indigo-600 p-4 rounded-2xl" aria-hidden="true"><Puzzle size={40}/></span>
@@ -448,7 +497,6 @@ const FillBlankBlock = ({ block }: { block: any }) => {
           </h3>
       </div>
 
-      {/* 🔥 THE FIX: Top-Sticky Compact Word Bank locked to 25vh */}
       {!isChecked && (
         <div className="sticky top-4 z-50 -mx-4 px-4 mb-12">
             <div className="bg-white/95 backdrop-blur-2xl rounded-[2.5rem] p-6 border-4 border-slate-200/50 shadow-[0_10px_40px_rgba(0,0,0,0.08)] flex flex-col items-center gap-4 max-h-[25vh] transition-all duration-300">
@@ -473,7 +521,6 @@ const FillBlankBlock = ({ block }: { block: any }) => {
         </div>
       )}
 
-      {/* TEXT CONTENT (Interactive Blanks) */}
       <div className="px-12 md:px-16 pb-16 flex-1">
           <div className="text-[4.5vh] md:text-[5vh] font-medium leading-loose text-slate-700 flex flex-wrap items-center gap-y-8 justify-center text-center">
             {textParts.map((part: string, idx: number) => {
@@ -530,7 +577,6 @@ const FillBlankBlock = ({ block }: { block: any }) => {
   );
 };
 
-// 🔥 FULLY INTERACTIVE DOCKED HUD: TAP SORT BLOCK
 type SortItem = { id: string; label: string; emoji: string };
 
 const TapSortBlock = ({ block }: { block: any }) => {
@@ -558,7 +604,6 @@ const TapSortBlock = ({ block }: { block: any }) => {
         return cats.map((c: any) => String(c));
     }, [catsJson]);
 
-    // RESTORED INTERACTIVE STATE
     const [items, setItems] = useState<SortItem[]>(normalizedItems);
     const [placed, setPlaced] = useState<Record<string, SortItem[]>>({});
     const [selectedItem, setSelectedItem] = useState<SortItem | null>(null);
@@ -588,7 +633,6 @@ const TapSortBlock = ({ block }: { block: any }) => {
                 </h3>
             </div>
 
-            {/* 🔥 THE FIX: Top-Sticky Item Bank locked to 25vh */}
             <div className="sticky top-4 z-50 -mx-4 px-4 mb-12">
                <div className="bg-white/95 backdrop-blur-2xl rounded-[2.5rem] p-6 border-4 border-slate-200/50 shadow-[0_10px_40px_rgba(0,0,0,0.08)] flex flex-col items-center gap-3 max-h-[25vh] transition-all duration-300">
                    <span className="text-[2vh] font-black text-amber-500 uppercase tracking-widest text-center shrink-0">Items to Sort</span>
