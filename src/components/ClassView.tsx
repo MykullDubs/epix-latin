@@ -1,6 +1,6 @@
 // src/components/ClassView.tsx
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore'; 
+import { doc, setDoc } from 'firebase/firestore'; 
 import { db } from '../config/firebase';
 import { useLiveClass } from '../hooks/useLiveClass';
 import { 
@@ -215,8 +215,8 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                           {blockType === 'discussion' && <DiscussionBlock block={block} />}
                           {blockType === 'game' && block.gameType === 'connect-three' && <GameBlock block={block} lessonVocab={lessonVocab} />}
                           {blockType === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
-                          {blockType === 'fill-blank' && <FillBlankBlock block={block} liveState={liveState} />}
-                          {blockType === 'drag-drop' && <TapSortBlock block={block} liveState={liveState} />}
+                          {blockType === 'fill-blank' && <FillBlankBlock block={block} />}
+                          {blockType === 'drag-drop' && <TapSortBlock block={block} />}
                       </>
                     )}
                   </div>
@@ -225,6 +225,13 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
             </div>
           </div>
         </div>
+
+        {showForum && (
+          <aside className="absolute right-0 top-0 bottom-0 w-[450px] bg-slate-50 border-l border-slate-200 p-8 z-10 animate-in slide-in-from-right shadow-2xl">
+             <h3 className="text-2xl font-black mb-6 flex items-center gap-2"><MessageSquare className="text-indigo-600" aria-hidden="true"/> FORUM</h3>
+             {classId ? <p className="text-slate-400">Forum Component Here</p> : <p className="text-slate-400">Class chat unavailable.</p>}
+          </aside>
+        )}
       </main>
 
       <footer className="h-20 bg-slate-900 border-t border-slate-800 flex items-center justify-between px-12 shrink-0 relative z-20">
@@ -373,8 +380,10 @@ const ScenarioBlock = ({ block, liveState }: { block: any, liveState: any }) => 
   );
 };
 
-// 🔥 PERFECTLY STICKY BOTTOM DOCK: FILL BLANK BLOCK
-const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) => {
+// 🔥 FULLY INTERACTIVE DOCKED HUD: FILL BLANK BLOCK
+type WordItem = { id: string; word: string };
+
+const FillBlankBlock = ({ block }: { block: any }) => {
   const rawText = String(block.text || "Missing text [here].");
 
   const { textParts, correctAnswers } = useMemo(() => {
@@ -396,16 +405,47 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
         return rawOptions.map((opt: any) => String(opt)).filter(Boolean);
   }, [distractorsJson]);
 
-  const shuffledWords = useMemo(() => {
-    const allWords = [...correctAnswers, ...distractors];
-    return allWords.sort(() => 0.5 - Math.random());
+  const initialWordBank = useMemo(() => {
+    return [...correctAnswers, ...distractors]
+        .map((w, i) => ({ id: `word_${i}_${w}`, word: w }))
+        .sort(() => Math.random() - 0.5);
   }, [correctAnswers, distractors]);
 
-  const liveAnswers = Array.isArray(liveState?.answers) ? liveState.answers : [];
+  // RESTORED INTERACTIVE STATE
+  const [wordBank, setWordBank] = useState<WordItem[]>(initialWordBank);
+  const [filledBlanks, setFilledBlanks] = useState<(WordItem | null)[]>(Array(correctAnswers.length).fill(null));
+  const [isChecked, setIsChecked] = useState(false);
+
+  useEffect(() => {
+      setWordBank(initialWordBank);
+      setFilledBlanks(Array(correctAnswers.length).fill(null));
+      setIsChecked(false);
+  }, [initialWordBank, correctAnswers.length]);
+
+  const handleBankClick = (item: WordItem) => {
+      if (isChecked) return;
+      const firstEmptyIdx = filledBlanks.indexOf(null); 
+      if (firstEmptyIdx !== -1) {
+          const newFilled = [...filledBlanks];
+          newFilled[firstEmptyIdx] = item;
+          setFilledBlanks(newFilled);
+          setWordBank(wordBank.filter(w => w.id !== item.id));
+      }
+  };
+
+  const handleBlankClick = (item: WordItem | null, idx: number) => {
+      if (isChecked || !item) return;
+      const newFilled = [...filledBlanks];
+      newFilled[idx] = null; 
+      setFilledBlanks(newFilled);
+      setWordBank([...wordBank, item]);
+  };
+
+  const isComplete = filledBlanks.length > 0 && filledBlanks.indexOf(null) === -1;
+  const isEntirelyCorrect = isChecked && filledBlanks.every((item, i) => item?.word === correctAnswers[i]);
 
   return (
-    // Removed `overflow-hidden` so `sticky` will work perfectly!
-    <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col relative">
+    <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col overflow-hidden">
       
       {/* HEADER */}
       <div className="p-12 md:p-16 pb-8">
@@ -415,57 +455,79 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
           </h3>
       </div>
 
-      {/* TEXT CONTENT */}
-      <div className="px-12 md:px-16 pb-24 flex-1">
+      {/* TEXT CONTENT (Interactive Blanks) */}
+      <div className="px-12 md:px-16 pb-12 flex-1">
           <div className="text-[4.5vh] md:text-[5vh] font-medium leading-loose text-slate-700 flex flex-wrap items-center gap-y-8 justify-center text-center">
             {textParts.map((part: string, idx: number) => {
               const isLast = idx === textParts.length - 1;
-              const filledItem = liveAnswers[idx];
-              const filledWord = typeof filledItem === 'string' ? filledItem : (filledItem?.word || null);
-              const isChecking = liveState?.submitted;
+              const filledItem = filledBlanks[idx];
+              const filledWord = filledItem?.word;
               const isRight = filledWord === correctAnswers[idx];
 
               let style = "border-dashed border-slate-300 bg-slate-50 text-slate-400";
-              if (filledWord && !isChecking) style = "border-solid border-indigo-400 bg-indigo-100 text-indigo-700 shadow-lg scale-110 -translate-y-2";
-              if (isChecking && isRight) style = "border-solid border-emerald-500 bg-emerald-100 text-emerald-700 shadow-lg";
-              if (isChecking && !isRight) style = "border-solid border-rose-500 bg-rose-100 text-rose-700 shadow-lg";
+              if (filledItem && !isChecked) style = "border-solid border-indigo-400 bg-indigo-100 text-indigo-700 shadow-lg scale-110 -translate-y-2 cursor-pointer hover:bg-rose-100 hover:border-rose-400 hover:text-rose-600";
+              if (isChecked && isRight) style = "border-solid border-emerald-500 bg-emerald-100 text-emerald-700 shadow-lg";
+              if (isChecked && !isRight) style = "border-solid border-rose-500 bg-rose-100 text-rose-700 shadow-lg cursor-pointer";
 
               return (
                 <React.Fragment key={`part_${idx}`}>
                     <span className="mx-2 py-2">{String(part)}</span>
                     {!isLast && (
-                        <span className={`min-w-[120px] h-16 px-6 mx-3 rounded-2xl border-4 flex items-center justify-center text-[3.5vh] font-bold transition-all duration-300 ${style}`}>
-                        {filledWord || "?"}
-                        </span>
+                        <button onClick={() => handleBlankClick(filledItem, idx)} disabled={isChecked} className={`min-w-[120px] h-16 px-6 mx-3 rounded-2xl border-4 flex items-center justify-center text-[3.5vh] font-bold transition-all duration-300 ${style}`}>
+                            {filledWord || " "}
+                        </button>
                     )}
                 </React.Fragment>
               );
             })}
           </div>
+          
+          {isComplete && !isChecked && (
+              <div className="mt-12 flex justify-center animate-in slide-in-from-bottom-4">
+                  <button onClick={() => setIsChecked(true)} className="px-12 py-6 bg-slate-900 text-white rounded-2xl font-black text-[3vh] uppercase tracking-widest shadow-xl hover:bg-indigo-600 transition-all hover:-translate-y-1">
+                      Check Answers
+                  </button>
+              </div>
+          )}
+          
+          {isChecked && (
+              <div className="mt-12 flex justify-center animate-in zoom-in-95">
+                  {isEntirelyCorrect ? (
+                      <div className="px-12 py-6 bg-emerald-50 text-emerald-700 border-4 border-emerald-200 rounded-2xl font-black text-[3vh] uppercase tracking-widest flex items-center gap-3">
+                          <CheckCircle2 size={32}/> Perfectly Placed!
+                      </div>
+                  ) : (
+                      <button onClick={() => { 
+                          setFilledBlanks(Array(correctAnswers.length).fill(null)); 
+                          setWordBank(initialWordBank); 
+                          setIsChecked(false); 
+                      }} className="px-12 py-6 bg-rose-50 text-rose-600 border-4 border-rose-200 rounded-2xl font-black text-[3vh] uppercase tracking-widest shadow-sm hover:bg-rose-100 active:scale-95 transition-all">
+                          Try Again
+                      </button>
+                  )}
+              </div>
+          )}
       </div>
       
-      {/* THE COMPACT WORD BANK DOCK - STICKY TO VIEWPORT BOTTOM */}
-      {!liveState?.submitted && (
-        <div className="sticky bottom-0 z-50 w-full mt-auto rounded-b-[3.5rem]">
-            <div className="bg-slate-50/95 backdrop-blur-xl border-t-4 border-slate-200 p-8 md:p-10 max-h-[35vh] flex flex-col items-center rounded-b-[3.5rem] shadow-[0_-20px_40px_rgba(0,0,0,0.05)]">
-                <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest text-center mb-6 shrink-0">Word Bank Options</span>
-                <div className="flex flex-wrap gap-4 justify-center items-start overflow-y-auto custom-scrollbar w-full pb-4">
-                  {shuffledWords.map((word: string, i: number) => {
-                    let isUsed = false;
-                    for(let a=0; a < liveAnswers.length; a++) {
-                        const ans = liveAnswers[a];
-                        const textVal = typeof ans === 'string' ? ans : (ans?.word || '');
-                        if (textVal === word) {
-                            isUsed = true; break;
-                        }
-                    }
-                    return (
-                      <span key={i} className={`px-5 py-2.5 rounded-xl border-2 text-[2.5vh] font-bold transition-all duration-300 ${isUsed ? 'bg-slate-100 border-slate-200 text-slate-300 scale-95 opacity-50' : 'bg-white border-slate-300 text-slate-700 shadow-sm'}`}>
-                        {word}
-                      </span>
-                    );
-                  })}
-                </div>
+      {/* THE COMPACT WORD BANK DOCK */}
+      {!isChecked && (
+        <div className="bg-slate-50 border-t-4 border-slate-100 p-8 max-h-[35vh] flex flex-col items-center">
+            <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest text-center mb-6 shrink-0">Word Bank Options</span>
+            <div className="flex flex-wrap gap-4 justify-center items-start overflow-y-auto custom-scrollbar w-full pb-2">
+              {wordBank.length === 0 ? (
+                  <span className="text-[2.5vh] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <CheckCircle2 size={24} className="text-emerald-500" /> All placed
+                  </span>
+              ) : (
+                  wordBank.map((item) => (
+                      <button 
+                          key={item.id} onClick={() => handleBankClick(item)} disabled={isChecked}
+                          className="px-6 py-3 rounded-xl border-4 text-[2.5vh] font-bold transition-all duration-300 bg-white border-slate-200 text-slate-700 shadow-sm hover:border-indigo-400 hover:text-indigo-600 hover:-translate-y-1 active:scale-95"
+                      >
+                          {item.word}
+                      </button>
+                  ))
+              )}
             </div>
         </div>
       )}
@@ -473,8 +535,10 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
   );
 };
 
-// 🔥 DOCKED HUD: TAP SORT BLOCK
-const TapSortBlock = ({ block }: { block: any, liveState: any }) => {
+// 🔥 FULLY INTERACTIVE DOCKED HUD: TAP SORT BLOCK
+type SortItem = { id: string; label: string; emoji: string };
+
+const TapSortBlock = ({ block }: { block: any }) => {
     const itemsJson = JSON.stringify(block.items || []);
     const catsJson = JSON.stringify(block.categories || []);
 
@@ -496,12 +560,32 @@ const TapSortBlock = ({ block }: { block: any, liveState: any }) => {
         let cats = [];
         try { cats = JSON.parse(catsJson); } catch (e) {}
         if (!Array.isArray(cats)) cats = [];
-        return cats.map(c => String(c));
+        return cats.map((c: any) => String(c));
     }, [catsJson]);
 
+    // RESTORED INTERACTIVE STATE
+    const [items, setItems] = useState<SortItem[]>(normalizedItems);
+    const [placed, setPlaced] = useState<Record<string, SortItem[]>>({});
+    const [selectedItem, setSelectedItem] = useState<SortItem | null>(null);
+
+    useEffect(() => {
+        setItems(normalizedItems);
+        const init: Record<string, SortItem[]> = {};
+        parsedCategories.forEach((c: string) => { init[c] = []; });
+        setPlaced(init);
+        setSelectedItem(null);
+    }, [normalizedItems, parsedCategories]);
+
+    const handleBucketClick = (category: string) => {
+        if (selectedItem) {
+            setPlaced(prev => ({...prev, [category]: [...(prev[category] || []), selectedItem]}));
+            setItems(items.filter(i => i.id !== selectedItem.id));
+            setSelectedItem(null);
+        }
+    };
+
     return (
-        // Removed `overflow-hidden` so sticky will work perfectly
-        <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col relative">
+        <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col overflow-hidden">
             <div className="p-12 md:p-16 pb-8">
                 <h3 className="text-[4vh] font-bold text-slate-800 flex items-center justify-center gap-4">
                     <span className="bg-amber-100 text-amber-600 p-4 rounded-2xl"><MousePointerClick size={40}/></span>
@@ -509,27 +593,40 @@ const TapSortBlock = ({ block }: { block: any, liveState: any }) => {
                 </h3>
             </div>
 
-            <div className="px-12 md:px-16 pb-24 grid grid-cols-1 sm:grid-cols-2 gap-10 flex-1">
+            <div className="px-12 md:px-16 pb-16 grid grid-cols-1 sm:grid-cols-2 gap-10 flex-1">
                 {parsedCategories.map((cat: string) => (
-                    <div key={cat} className="p-8 rounded-[3rem] border-4 border-amber-200 bg-amber-50 flex flex-col items-center gap-6">
+                    <button 
+                        key={cat} 
+                        onClick={() => handleBucketClick(cat)} 
+                        className={`p-8 rounded-[3rem] border-4 transition-colors duration-300 flex flex-col items-center gap-6 ${selectedItem ? 'border-indigo-400 bg-indigo-50 animate-pulse cursor-pointer shadow-xl' : 'border-amber-200 bg-amber-50 cursor-default'}`}
+                    >
                         <h4 className="font-black text-amber-900 text-[4vh] text-center leading-tight">{cat}</h4>
-                        <span className="text-amber-400/50 text-[3vh] font-bold uppercase tracking-widest mt-4">Drop Zone</span>
-                    </div>
+                        <div className="flex flex-wrap justify-center gap-3">
+                            {placed[cat]?.length === 0 && <span className="text-amber-400/50 text-[3vh] font-bold uppercase tracking-widest mt-4">Drop Zone</span>}
+                            {placed[cat]?.map(item => (
+                                <div key={item.id} className="px-5 py-2.5 bg-white rounded-xl text-[2.5vh] font-black shadow-sm border-2 border-amber-100 flex items-center gap-2">
+                                    {item.emoji} <span>{item.label}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </button>
                 ))}
             </div>
 
-            {/* BOTTOM DOCKED ITEM BANK - NOW STICKY */}
-            <div className="sticky bottom-0 z-50 w-full mt-auto rounded-b-[3.5rem]">
-               <div className="bg-amber-50/95 backdrop-blur-xl border-t-4 border-amber-200 p-8 md:p-10 max-h-[35vh] flex flex-col items-center rounded-b-[3.5rem] shadow-[0_-20px_40px_rgba(0,0,0,0.05)]">
-                   <span className="text-[2vh] font-black text-amber-500 uppercase tracking-widest text-center mb-6 shrink-0">Items to Sort</span>
-                   <div className="flex flex-wrap justify-center gap-4 overflow-y-auto custom-scrollbar w-full pb-4">
-                        {normalizedItems.length === 0 && <p className="text-amber-500 font-bold uppercase tracking-widest my-auto flex items-center gap-2"><CheckCircle2 size={16}/> All sorted!</p>}
-                        {normalizedItems.map((item) => (
-                            <span key={item.id} className="px-5 py-2.5 bg-white border-2 border-amber-200 text-slate-700 font-bold rounded-xl shadow-md text-[2.5vh]">
-                                {item.emoji} {item.label}
-                            </span>
-                        ))}
-                   </div>
+            {/* BOTTOM DOCKED ITEM BANK */}
+            <div className="bg-amber-50 border-t-4 border-amber-100 p-8 max-h-[35vh] flex flex-col items-center">
+               <span className="text-[2vh] font-black text-amber-500 uppercase tracking-widest text-center mb-6 shrink-0">Items to Sort</span>
+               <div className="flex flex-wrap justify-center gap-4 overflow-y-auto custom-scrollbar w-full pb-2">
+                    {items.length === 0 && <p className="text-amber-500 font-bold uppercase tracking-widest my-auto flex items-center gap-2"><CheckCircle2 size={24}/> All sorted!</p>}
+                    {items.map((item) => (
+                        <button 
+                            key={item.id} 
+                            onClick={() => setSelectedItem(selectedItem?.id === item.id ? null : item)} 
+                            className={`px-6 py-3 rounded-2xl font-black text-[2.5vh] transition-all duration-300 shadow-md border-4 ${selectedItem?.id === item.id ? 'bg-indigo-600 text-white scale-110 -translate-y-1 border-indigo-400' : 'bg-white text-slate-700 hover:scale-105 active:scale-95 border-slate-200 hover:border-amber-300'}`}
+                        >
+                            {item.emoji} {item.label}
+                        </button>
+                    ))}
                </div>
             </div>
         </div>
