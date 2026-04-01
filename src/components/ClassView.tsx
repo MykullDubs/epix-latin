@@ -131,7 +131,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           <EyeOff size={64} className="text-white/10" />
       </div>
 
-      <main className="flex-1 flex overflow-hidden relative group/canvas bg-white text-slate-900">
+      <main className="flex-1 flex overflow-hidden relative group/canvas bg-slate-50 text-slate-900">
         
         {/* MOUSE NAVIGATION CONTROLS */}
         {activePageIdx > 0 && (
@@ -285,6 +285,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 const TextBlock = ({ block }: { block: any }) => (
   <div className="text-center py-12 max-w-6xl mx-auto">
     {block.title && <h3 className="text-[3vh] font-black text-indigo-500 uppercase tracking-widest mb-8">{String(block.title)}</h3>}
+    {/* Cinematic Typography */}
     <p className="text-[6vh] font-black text-slate-800 leading-[1.1] tracking-tight">{String(block.content || '')}</p>
   </div>
 );
@@ -292,6 +293,7 @@ const TextBlock = ({ block }: { block: any }) => (
 const EssayBlock = ({ block }: { block: any }) => (
   <div className="w-full max-w-7xl mx-auto py-12">
     <h1 className="text-[8vh] font-black text-slate-900 leading-none mb-16 text-center">{String(block.title || '')}</h1>
+    {/* 🔥 OS FEATURE: Newspaper multi-column layout for easy projector reading */}
     <div className="columns-1 xl:columns-2 gap-20 space-y-[4vh]">
         {String(block.content || '').split('\n\n').map((para: string, pIdx: number) => (
           <p key={pIdx} className="text-[3.5vh] leading-[1.7] text-slate-700 font-serif text-justify first-letter:text-[7vh] first-letter:font-black first-letter:text-indigo-600 first-letter:float-left first-letter:mr-3 break-inside-avoid">{para.trim()}</p>
@@ -303,6 +305,7 @@ const EssayBlock = ({ block }: { block: any }) => (
 const ImageBlock = ({ block }: { block: any }) => (
   <figure className="w-full flex flex-col items-center py-12">
     <div className="relative group overflow-hidden rounded-[3rem] shadow-2xl border-8 border-slate-50">
+        {/* Subtle cinematic zoom on load */}
         <img src={String(block.url || '')} alt="presentation slide" className="max-h-[65vh] object-cover animate-in zoom-in-105 duration-[20s]" />
     </div>
     {block.caption && <figcaption className="text-[3vh] text-slate-500 font-bold mt-8 text-center max-w-4xl">{String(block.caption)}</figcaption>}
@@ -337,6 +340,7 @@ const DialogueBlock = ({ block }: { block: any }) => (
 const VocabListBlock = ({ block }: { block: any }) => (
   <div className="grid grid-cols-2 gap-10 py-12">
     {(Array.isArray(block.items) ? block.items : []).map((item: any, j: number) => (
+      // 🔥 OS FEATURE: Glassmorphism layout
       <div key={j} className="bg-gradient-to-br from-slate-50 to-slate-100 p-12 rounded-[3rem] border border-white shadow-xl text-left relative overflow-hidden group">
         <div className="absolute -right-12 -top-12 opacity-5 text-indigo-900 rotate-12 group-hover:scale-110 transition-transform duration-700">
             <Layers size={200} />
@@ -397,7 +401,7 @@ const ScenarioBlock = ({ block, liveState }: { block: any, liveState: any }) => 
   );
 };
 
-// 🔥 TITANIUM ARMORED FILL BLANK FOR PROJECTOR
+// 🔥 TITANIUM ARMORED FILL BLANK WITH STICKY WORD BANK
 const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) => {
   const rawText = String(block.text || "Missing text [here].");
 
@@ -429,13 +433,35 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
   const liveAnswers = Array.isArray(liveState?.answers) ? liveState.answers : [];
 
   return (
-    <div className="w-full max-w-6xl mx-auto bg-white p-16 rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12">
-      <h3 className="text-[4vh] font-bold text-slate-800 mb-12 flex items-center justify-center gap-4">
+    <div className="w-full max-w-6xl mx-auto bg-white p-12 md:p-16 rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 relative">
+      <h3 className="text-[4vh] font-bold text-slate-800 mb-8 flex items-center justify-center gap-4">
         <span className="bg-indigo-100 text-indigo-600 p-4 rounded-2xl" aria-hidden="true"><Puzzle size={40}/></span>
         {String(block.question || "Fill in the blanks")}
       </h3>
       
-      <div className="text-[6vh] font-medium leading-loose text-slate-700 flex flex-wrap items-center gap-y-6 justify-center text-center">
+      {/* 🔥 THE FIX: Sticky Word Bank at the Top! */}
+      {!liveState?.submitted && (
+        <div className="sticky top-4 z-40 mb-12 -mx-4 px-4">
+            <div className="bg-white/90 backdrop-blur-2xl rounded-[2rem] p-6 border-4 border-slate-200/50 shadow-xl flex flex-wrap gap-4 justify-center items-center">
+              <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest mr-4">Word Bank:</span>
+              {shuffledWords.map((word: string, i: number) => {
+                let isUsed = false;
+                for(let a=0; a < liveAnswers.length; a++) {
+                    if (liveAnswers[a]?.word === word) {
+                        isUsed = true; break;
+                    }
+                }
+                return (
+                  <span key={i} className={`px-6 py-3 rounded-2xl border-4 text-[3vh] font-bold transition-all duration-300 ${isUsed ? 'bg-slate-50 border-slate-100 text-slate-300 scale-95' : 'bg-slate-100 border-slate-200 text-slate-600 shadow-md'}`}>
+                    {word}
+                  </span>
+                );
+              })}
+            </div>
+        </div>
+      )}
+
+      <div className="text-[6vh] font-medium leading-loose text-slate-700 flex flex-wrap items-center gap-y-6 justify-center text-center relative z-10">
         {textParts.map((part: string, idx: number) => {
           const isLast = idx === textParts.length - 1;
           const filledItem = liveAnswers[idx];
@@ -460,26 +486,6 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
           );
         })}
       </div>
-      
-      {!liveState?.submitted && (
-        <div className="mt-16 flex flex-wrap gap-4 justify-center">
-          {shuffledWords.map((word: string, i: number) => {
-            // Mobile safe check to see if the word is currently in an answer slot
-            let isUsed = false;
-            for(let a=0; a < liveAnswers.length; a++) {
-                if (liveAnswers[a]?.word === word) {
-                    isUsed = true; break;
-                }
-            }
-            
-            return (
-              <span key={i} className={`px-6 py-3 rounded-xl border-2 text-[3vh] font-bold transition-all duration-300 ${isUsed ? 'bg-slate-50 border-slate-100 text-slate-300 scale-95' : 'bg-slate-100 border-slate-200 text-slate-500 shadow-sm'}`}>
-                {word}
-              </span>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 };
