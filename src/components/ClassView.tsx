@@ -33,33 +33,40 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const isDraggingTimer = useRef(false);
   const timerDragOffset = useRef({ x: 0, y: 0 });
 
-  // 🔥 OS FEATURE: Spotlight
+  // 🔥 OS FEATURE: Moveable Main Tools Drawer
+  const [mainToolsPos, setMainToolsPos] = useState({ x: 0, y: 0 });
+  const [mainToolsScale, setMainToolsScale] = useState(1);
+  const isDraggingMainTools = useRef(false);
+  const isResizingMainTools = useRef(false);
+  const mainToolsDragOffset = useRef({ x: 0, y: 0 });
+  const mainToolsStartData = useRef({ y: 0, scale: 1 });
+
+  // 🔥 OS FEATURE: Spotlight & Annotation Marker
   const [isSpotlight, setIsSpotlight] = useState(false);
   const [mousePos, setMousePos] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
-  
-  // 🎨 NEW: Moveable, Resizable, Dual-Layer Annotation Engine
   const [isAnnotating, setIsAnnotating] = useState(false);
+  
+  // 🎨 NEW: Advanced Moveable/Resizable Annotation Palette
   const [markerColor, setMarkerColor] = useState('#ef4444');
   const [markerSize, setMarkerSize] = useState(6);
   const [markerStyle, setMarkerStyle] = useState<'pen' | 'highlighter' | 'text'>('pen');
   
-  const [toolbarPos, setToolbarPos] = useState({ x: window.innerWidth - 120, y: 80 });
+  const [toolbarPos, setToolbarPos] = useState({ x: 0, y: 0 });
   const [toolbarScale, setToolbarScale] = useState(1);
   const isDraggingToolbar = useRef(false);
   const isResizingToolbar = useRef(false);
   const toolbarDragOffset = useRef({ x: 0, y: 0 });
   const toolbarStartData = useRef({ y: 0, scale: 1 });
-
+  
   const [slideTexts, setSlideTexts] = useState<{id: number, x: number, y: number, text: string, color: string, size: number}[]>([]);
   const [boardTexts, setBoardTexts] = useState<{id: number, x: number, y: number, text: string, color: string, size: number}[]>([]);
   const [activeText, setActiveText] = useState<{x: number, y: number, text: string} | null>(null);
 
-  // Refs for State-Safe Routing (Prevents Race Conditions)
   const activeTextRef = useRef(activeText);
   const markerColorRef = useRef(markerColor);
   const markerSizeRef = useRef(markerSize);
   const showWhiteboardRef = useRef(showWhiteboard);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null); 
   
   useEffect(() => { activeTextRef.current = activeText; }, [activeText]);
   useEffect(() => { markerColorRef.current = markerColor; }, [markerColor]);
@@ -83,13 +90,14 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       .flatMap((b: any) => b.items || []);
   }, [lesson]);
 
-  // Main Classroom Clock
+  // Main Classroom Clock & Initial Placements
   useEffect(() => {
       if (!lesson?.id) return;
       startLiveClass(lesson.id);
       const timer = setInterval(() => setElapsedTime(prev => prev + 1), 1000);
       setTimerPos({ x: window.innerWidth - 350, y: 50 }); 
-      setToolbarPos({ x: window.innerWidth - 120, y: 80 });
+      setToolbarPos({ x: window.innerWidth - 120, y: 80 }); // Default marker palette position
+      setMainToolsPos({ x: window.innerWidth - 340, y: window.innerHeight - 580 }); // Default main tools position
       return () => { clearInterval(timer); endLiveClass(); };
   }, [lesson?.id]);
 
@@ -103,7 +111,61 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       return () => clearInterval(interval);
   }, [timerRunning, timeLeft]);
 
-  // 🔥 DRAGGING ENGINE (Timer, Toolbar, Spotlight)
+  // GLOBAL MOUSE MOVEMENT HANDLER (Timer, Palettes, Tools, Spotlight)
+  useEffect(() => {
+      const handleMouseMove = (e: MouseEvent) => {
+          // Timer Dragging
+          if (isDraggingTimer.current) {
+              setTimerPos({ x: e.clientX - timerDragOffset.current.x, y: e.clientY - timerDragOffset.current.y });
+          }
+          // Marker Palette Dragging
+          if (isDraggingToolbar.current) {
+              setToolbarPos({ x: e.clientX - toolbarDragOffset.current.x, y: e.clientY - toolbarDragOffset.current.y });
+          }
+          // Marker Palette Resizing
+          if (isResizingToolbar.current) {
+              const dy = e.clientY - toolbarStartData.current.y;
+              const newScale = Math.max(0.6, Math.min(2.2, toolbarStartData.current.scale + (dy * 0.005)));
+              setToolbarScale(newScale);
+          }
+          // Main Tools Dragging
+          if (isDraggingMainTools.current) {
+              setMainToolsPos({ x: e.clientX - mainToolsDragOffset.current.x, y: e.clientY - mainToolsDragOffset.current.y });
+          }
+          // Main Tools Resizing
+          if (isResizingMainTools.current) {
+              const dy = e.clientY - mainToolsStartData.current.y;
+              const newScale = Math.max(0.6, Math.min(2.2, mainToolsStartData.current.scale + (dy * 0.005)));
+              setMainToolsScale(newScale);
+          }
+          // Spotlight Tracking
+          if (isSpotlight) {
+              if (classViewRef.current) {
+                  const rect = classViewRef.current.getBoundingClientRect();
+                  setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+              } else {
+                  setMousePos({ x: e.clientX, y: e.clientY });
+              }
+          }
+      };
+
+      const handleMouseUp = () => { 
+          isDraggingTimer.current = false; 
+          isDraggingToolbar.current = false;
+          isResizingToolbar.current = false;
+          isDraggingMainTools.current = false;
+          isResizingMainTools.current = false;
+      };
+      
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      
+      return () => {
+          window.removeEventListener('mousemove', handleMouseMove);
+          window.removeEventListener('mouseup', handleMouseUp);
+      };
+  }, [isSpotlight]);
+
   const startTimerDrag = (e: React.MouseEvent) => {
       isDraggingTimer.current = true;
       timerDragOffset.current = { x: e.clientX - timerPos.x, y: e.clientY - timerPos.y };
@@ -120,42 +182,16 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       toolbarStartData.current = { y: e.clientY, scale: toolbarScale };
   };
 
-  useEffect(() => {
-      const handleMouseMove = (e: MouseEvent) => {
-          if (isDraggingTimer.current) {
-              setTimerPos({ x: e.clientX - timerDragOffset.current.x, y: e.clientY - timerDragOffset.current.y });
-          }
-          if (isDraggingToolbar.current) {
-              setToolbarPos({ x: e.clientX - toolbarDragOffset.current.x, y: e.clientY - toolbarDragOffset.current.y });
-          }
-          if (isResizingToolbar.current) {
-              const dy = e.clientY - toolbarStartData.current.y;
-              const newScale = Math.max(0.6, Math.min(2.2, toolbarStartData.current.scale + (dy * 0.005)));
-              setToolbarScale(newScale);
-          }
-          if (isSpotlight) {
-              if (classViewRef.current) {
-                  const rect = classViewRef.current.getBoundingClientRect();
-                  setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-              } else {
-                  setMousePos({ x: e.clientX, y: e.clientY });
-              }
-          }
-      };
-      const handleMouseUp = () => { 
-          isDraggingTimer.current = false; 
-          isDraggingToolbar.current = false;
-          isResizingToolbar.current = false;
-      };
-      
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-      
-      return () => {
-          window.removeEventListener('mousemove', handleMouseMove);
-          window.removeEventListener('mouseup', handleMouseUp);
-      };
-  }, [isSpotlight]);
+  const startMainToolsDrag = (e: React.MouseEvent) => {
+      isDraggingMainTools.current = true;
+      mainToolsDragOffset.current = { x: e.clientX - mainToolsPos.x, y: e.clientY - mainToolsPos.y };
+  };
+
+  const startMainToolsResize = (e: React.MouseEvent) => {
+      e.stopPropagation(); 
+      isResizingMainTools.current = true;
+      mainToolsStartData.current = { y: e.clientY, scale: mainToolsScale };
+  };
 
   const getRelativeCoords = (clientX: number, clientY: number) => {
       if (!classViewRef.current) return { x: clientX, y: clientY };
@@ -163,7 +199,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       return { x: clientX - rect.left, y: clientY - rect.top };
   };
 
-  // Dual-Layer Canvas Initialization
   useEffect(() => {
       const resizeCanvas = () => {
           if (classViewRef.current) {
@@ -321,7 +356,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
           const tag = (e.target as HTMLElement).tagName;
-          if (['INPUT', 'TEXTAREA'].indexOf(tag) !== -1 && e.key !== 'Escape') return; // Safe Typing
+          if (['INPUT', 'TEXTAREA'].indexOf(tag) !== -1 && e.key !== 'Escape') return; 
           
           if (e.key === 'ArrowRight' || e.key === ' ') { 
               e.preventDefault(); handleNext();
@@ -390,17 +425,9 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           />
       )}
 
-      {/* 1. SLIDE ANNOTATION LAYER (Static over slides) */}
-      <div className="absolute inset-0 z-[8400] pointer-events-none overflow-hidden">
-          <canvas ref={slideCanvasRef} className="absolute inset-0 w-full h-full" />
-          {slideTexts.map(t => (
-              <div key={t.id} style={{ position: 'absolute', left: t.x, top: t.y, color: t.color, fontSize: `${t.size * 6}px`, fontWeight: 'bold', transform: 'translateY(-50%)', whiteSpace: 'nowrap' }}>{t.text}</div>
-          ))}
-      </div>
-
-      {/* 2. WHITEBOARD SCRATCHPAD LAYER (Rolls up and down) */}
+      {/* Instant Scratchpad (Whiteboard Background) */}
       <div 
-          className={`absolute inset-0 z-[8550] transition-transform duration-500 ease-in-out pointer-events-none overflow-hidden ${showWhiteboard ? 'translate-y-0' : '-translate-y-full'}`}
+          className={`absolute inset-0 z-[8550] transition-transform duration-500 ease-in-out pointer-events-none ${showWhiteboard ? 'translate-y-0' : '-translate-y-full'}`}
           style={{ backgroundColor: '#f8fafc', backgroundImage: 'radial-gradient(#cbd5e1 2px, transparent 2px)', backgroundSize: '40px 40px' }}
       >
           <canvas ref={boardCanvasRef} className="absolute inset-0 w-full h-full" />
@@ -409,7 +436,15 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           ))}
       </div>
 
-      {/* 3. INVISIBLE GLASS ROUTER PANE (Catches clicks, draws ink) */}
+      {/* 1. SLIDE ANNOTATION LAYER (Static over slides) */}
+      <div className="absolute inset-0 z-[8400] pointer-events-none overflow-hidden">
+          <canvas ref={slideCanvasRef} className="absolute inset-0 w-full h-full" />
+          {slideTexts.map(t => (
+              <div key={t.id} style={{ position: 'absolute', left: t.x, top: t.y, color: t.color, fontSize: `${t.size * 6}px`, fontWeight: 'bold', transform: 'translateY(-50%)', whiteSpace: 'nowrap' }}>{t.text}</div>
+          ))}
+      </div>
+
+      {/* INVISIBLE GLASS ROUTER PANE */}
       <div
           onMouseDown={startAnnotation}
           onMouseMove={drawAnnotation}
@@ -435,14 +470,14 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           )}
       </div>
 
-      {/* 🎨 ADVANCED FLOATING PALETTE */}
+      {/* 🎨 ADVANCED FLOATING PALETTE (Movable & Resizable) */}
       {isAnnotating && (
           <div 
               className="absolute z-[8700] flex flex-col items-center pointer-events-auto animate-in fade-in zoom-in-95 duration-200"
               style={{ left: toolbarPos.x, top: toolbarPos.y, transform: `scale(${toolbarScale})`, transformOrigin: 'top left' }}
               onMouseDown={(e) => e.stopPropagation()}
           >
-              <div className="bg-slate-900/95 backdrop-blur-2xl p-4 pt-1 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-4 border-slate-700 flex flex-col gap-5 w-20 items-center relative overflow-hidden">
+              <div className="bg-slate-900/95 backdrop-blur-2xl p-4 pt-1 rounded-[2.5rem] shadow-[0_30px_60px_rgba(0,0,0,0.5)] border-4 border-slate-700 flex flex-col gap-5 w-20 items-center relative overflow-hidden">
                   
                   {/* The Move Drag Handle */}
                   <div 
@@ -453,7 +488,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                       <div className="w-8 h-1.5 bg-slate-400 rounded-full" />
                   </div>
 
-                  {/* Tool Toggle */}
                   <div className="flex flex-col gap-2 bg-slate-800/80 p-2 rounded-3xl w-full items-center border border-slate-700">
                       <button onClick={() => { setMarkerStyle('pen'); forceSaveText(); }} className={`p-3 rounded-2xl transition-all ${markerStyle === 'pen' ? 'bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.6)]' : 'text-slate-400 hover:text-white'}`}>
                           <PenTool size={24} />
@@ -466,7 +500,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                       </button>
                   </div>
 
-                  {/* Colors */}
                   <div className="flex flex-col gap-3">
                       {['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#a855f7', '#ffffff', '#0f172a'].map(c => (
                           <button 
@@ -478,7 +511,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                       ))}
                   </div>
 
-                  {/* Sizes */}
                   <div className="flex flex-col items-center gap-3 bg-slate-800/80 p-2 rounded-3xl w-full border border-slate-700">
                       {[4, 8, 14].map(s => (
                           <button key={s} onClick={() => { setMarkerSize(s); if(activeText) setActiveText({...activeText}); }} className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-colors ${markerSize === s ? 'bg-slate-700' : 'hover:bg-slate-700/50'}`}>
@@ -487,19 +519,72 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                       ))}
                   </div>
                   
-                  {/* Clear button */}
                   <button onClick={clearAnnotations} title="Clear Ink & Text" className="bg-slate-800 hover:bg-rose-500 text-slate-400 hover:text-white p-4 rounded-2xl transition-all w-full flex items-center justify-center mb-4">
                       <Eraser size={24} />
                   </button>
 
                   {/* The Scale Resize Handle */}
                   <div 
-                      className="absolute bottom-0 right-0 w-10 h-10 cursor-nwse-resize flex items-end justify-end p-2 opacity-50 hover:opacity-100 bg-slate-800/30 rounded-tl-full"
+                      className="absolute bottom-0 right-0 w-10 h-10 cursor-nwse-resize flex items-end justify-end p-2 opacity-50 hover:opacity-100 bg-slate-800/30 rounded-tl-[2rem] z-20"
                       onMouseDown={startToolbarResize}
                       title="Drag to resize"
                   >
                       <div className="w-3 h-3 border-b-2 border-r-2 border-slate-400 rounded-br-[2px] mb-1 mr-1" />
                   </div>
+              </div>
+          </div>
+      )}
+
+      {/* 🔥 THE NEW MAIN TOOLS OS WINDOW (Movable & Resizable) */}
+      {showTools && (
+          <div 
+              className="absolute z-[8900] bg-slate-900/95 backdrop-blur-2xl border-4 border-slate-700 rounded-[2.5rem] p-6 pt-10 pb-8 shadow-[0_40px_80px_rgba(0,0,0,0.6)] flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200 w-72 pointer-events-auto overflow-hidden"
+              style={{ left: mainToolsPos.x, top: mainToolsPos.y, transform: `scale(${mainToolsScale})`, transformOrigin: 'top left' }}
+              onMouseDown={(e) => e.stopPropagation()} // Keeps it from triggering the marker canvas underneath
+          >
+              {/* Drag Handle Top */}
+              <div 
+                  className="absolute top-0 left-0 right-0 h-10 cursor-grab active:cursor-grabbing flex justify-center items-center opacity-50 hover:opacity-100 transition-opacity bg-slate-800/50"
+                  onMouseDown={startMainToolsDrag}
+                  title="Drag to move"
+              >
+                  <div className="w-16 h-1.5 bg-slate-400 rounded-full" />
+              </div>
+
+              <div className="flex items-center justify-between mb-2 px-2 relative z-10">
+                  <span className="text-[12px] font-black text-slate-400 uppercase tracking-widest">Smartboard Tools</span>
+                  <button onClick={() => setShowTools(false)} className="text-slate-500 hover:text-white transition-colors"><X size={20} strokeWidth={3} /></button>
+              </div>
+
+              <button onClick={() => { setShowQR(true); setShowTools(false); }} className="flex items-center gap-4 px-6 py-4 bg-slate-800 hover:bg-indigo-600 text-white rounded-2xl transition-all font-bold shadow-sm active:scale-95 border border-slate-700 hover:border-indigo-500 text-left relative z-10">
+                  <QrCode size={20} /> <span className="flex-1">QR Code Menu</span> <span className="text-slate-500 text-xs font-black">Q</span>
+              </button>
+              <button onClick={() => { setShowTimer(p => !p); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left relative z-10 ${showTimer ? 'bg-amber-600 text-white border-amber-500' : 'bg-slate-800 hover:bg-amber-600 text-slate-300 hover:text-white border-slate-700 hover:border-amber-500'}`}>
+                  <Hourglass size={20} /> <span className="flex-1">Focus Timer</span> <span className="text-amber-500/50 text-xs font-black">T</span>
+              </button>
+              <button onClick={() => { setIsAnnotating(p => !p); setIsSpotlight(false); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left relative z-10 ${isAnnotating ? 'bg-rose-600 text-white border-rose-500' : 'bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white border-slate-700 hover:border-rose-500'}`}>
+                  <PenTool size={20} /> <span className="flex-1">Digital Tools</span> <span className="text-rose-500/50 text-xs font-black">A</span>
+              </button>
+              
+              <button onClick={() => { setShowWhiteboard(p => !p); setIsAnnotating(true); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left relative z-10 ${showWhiteboard ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white border-slate-700 hover:border-blue-500'}`}>
+                  <Presentation size={20} /> <span className="flex-1">Whiteboard</span> <span className="text-blue-500/50 text-xs font-black">C</span>
+              </button>
+
+              <button onClick={() => { setIsSpotlight(p => !p); setIsAnnotating(false); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left relative z-10 ${isSpotlight ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white border-slate-700 hover:border-emerald-500'}`}>
+                  <Crosshair size={20} /> <span className="flex-1">Spotlight</span> <span className="text-emerald-500/50 text-xs font-black">S</span>
+              </button>
+              <div className="h-px w-full bg-slate-700 my-1 relative z-10" />
+              <button onClick={() => setIsBlanked(p => !p)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left relative z-10 ${isBlanked ? 'bg-white text-black border-slate-200' : 'bg-slate-950 text-slate-400 hover:bg-black hover:text-white border-slate-800'}`}>
+                  <EyeOff size={20} /> <span className="flex-1">{isBlanked ? 'Restore Screen' : 'Blackout Screen'}</span> <span className="text-slate-600 text-xs font-black">B</span>
+              </button>
+
+              {/* Resize Handle Bottom Right */}
+              <div 
+                  className="absolute bottom-0 right-0 w-12 h-12 cursor-nwse-resize flex items-end justify-end p-3 opacity-50 hover:opacity-100 bg-slate-800/30 rounded-tl-[2rem] z-20"
+                  onMouseDown={startMainToolsResize}
+                  title="Drag to resize"
+              >
+                  <div className="w-4 h-4 border-b-2 border-r-2 border-slate-400 rounded-br-[2px] mb-1 mr-1" />
               </div>
           </div>
       )}
@@ -539,37 +624,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                       </button>
                   </div>
               </div>
-          </div>
-      )}
-
-      {/* 🔥 THE TOOLS DRAWER */}
-      {showTools && (
-          <div className="absolute right-8 bottom-28 z-[8900] bg-slate-900/95 backdrop-blur-2xl border-4 border-slate-700 rounded-[2.5rem] p-6 shadow-2xl flex flex-col gap-3 animate-in slide-in-from-bottom-10 fade-in w-72 pointer-events-auto">
-              <div className="flex items-center justify-between mb-2 px-2">
-                  <span className="text-[12px] font-black text-slate-400 uppercase tracking-widest">Smartboard Tools</span>
-                  <button onClick={() => setShowTools(false)} className="text-slate-500 hover:text-white transition-colors"><X size={20} strokeWidth={3} /></button>
-              </div>
-              <button onClick={() => { setShowQR(true); setShowTools(false); }} className="flex items-center gap-4 px-6 py-4 bg-slate-800 hover:bg-indigo-600 text-white rounded-2xl transition-all font-bold shadow-sm active:scale-95 border border-slate-700 hover:border-indigo-500 text-left">
-                  <QrCode size={20} /> <span className="flex-1">QR Code Menu</span> <span className="text-slate-500 text-xs font-black">Q</span>
-              </button>
-              <button onClick={() => { setShowTimer(p => !p); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left ${showTimer ? 'bg-amber-600 text-white border-amber-500' : 'bg-slate-800 hover:bg-amber-600 text-slate-300 hover:text-white border-slate-700 hover:border-amber-500'}`}>
-                  <Hourglass size={20} /> <span className="flex-1">Focus Timer</span> <span className="text-amber-500/50 text-xs font-black">T</span>
-              </button>
-              <button onClick={() => { setIsAnnotating(p => !p); setIsSpotlight(false); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left ${isAnnotating ? 'bg-rose-600 text-white border-rose-500' : 'bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white border-slate-700 hover:border-rose-500'}`}>
-                  <PenTool size={20} /> <span className="flex-1">Digital Marker</span> <span className="text-rose-500/50 text-xs font-black">A</span>
-              </button>
-              
-              <button onClick={() => { setShowWhiteboard(p => !p); setIsAnnotating(true); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left ${showWhiteboard ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white border-slate-700 hover:border-blue-500'}`}>
-                  <Presentation size={20} /> <span className="flex-1">Whiteboard</span> <span className="text-blue-500/50 text-xs font-black">C</span>
-              </button>
-
-              <button onClick={() => { setIsSpotlight(p => !p); setIsAnnotating(false); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left ${isSpotlight ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white border-slate-700 hover:border-emerald-500'}`}>
-                  <Crosshair size={20} /> <span className="flex-1">Spotlight</span> <span className="text-emerald-500/50 text-xs font-black">S</span>
-              </button>
-              <div className="h-px w-full bg-slate-700 my-1" />
-              <button onClick={() => setIsBlanked(p => !p)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left ${isBlanked ? 'bg-white text-black border-slate-200' : 'bg-slate-950 text-slate-400 hover:bg-black hover:text-white border-slate-800'}`}>
-                  <EyeOff size={20} /> <span className="flex-1">{isBlanked ? 'Restore Screen' : 'Blackout Screen'}</span> <span className="text-slate-600 text-xs font-black">B</span>
-              </button>
           </div>
       )}
 
@@ -661,7 +715,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
               
               <div className="h-6 w-px bg-slate-800 mx-2" />
               
-              {/* 🔥 NEW OS FEATURE: Consolidated Tools Drawer Toggle */}
               <button 
                   onClick={() => setShowTools(prev => !prev)} 
                   className={`flex items-center gap-2 px-6 py-3 rounded-xl transition-all text-sm font-black uppercase tracking-widest shadow-sm active:scale-95 border ${showTools || isAnnotating || isSpotlight || showTimer || isBlanked || showWhiteboard ? 'bg-indigo-600 text-white border-indigo-500 shadow-[0_0_20px_rgba(79,70,229,0.5)]' : 'bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white border-slate-700 hover:border-indigo-500'}`}
