@@ -45,19 +45,34 @@ export function useMagisterData() {
 
     if (user?.uid) {
       
-      // 🔥 THE FIX: DUAL-MERGE LISTENER
-      // Listens to both the root document and the profile document so no legacy data is lost.
+      // 🔥 THE SMART DUAL-MERGE LISTENER
       let rootData: any = {};
       let profileData: any = {};
 
       const syncMergedData = () => {
-          // Profile data overwrites root data if there are duplicates
+          // 1. Base merge
           const merged = { ...rootData, ...profileData };
           
-          // Fallback: Ensure legacy 'flux' is always recognized as 'coins'
-          if (merged.flux !== undefined && merged.coins === undefined) {
-              merged.coins = merged.flux;
-          }
+          // 2. PROTECT WEALTH: Take the highest possible balance across all legacy and new fields
+          const rootFlux = rootData.flux || 0;
+          const rootCoins = rootData.coins || 0;
+          const profCoins = profileData.coins || 0;
+          const profFlux = profileData.flux || 0;
+          
+          merged.coins = Math.max(rootFlux, rootCoins, profCoins, profFlux);
+          merged.flux = merged.coins; // Keep them synced in memory so old components don't break
+
+          // 3. PROTECT INVENTORY: Combine arrays and remove duplicates, so `[]` doesn't overwrite your purchases
+          const rootInv = rootData.inventory || [];
+          const profInv = profileData.inventory || [];
+          merged.inventory = Array.from(new Set([...rootInv, ...profInv]));
+
+          // 4. PROTECT SOLO CLASSES: Combine enrolled solo classes
+          const rootClasses = rootData.enrolledClasses || [];
+          const profClasses = profileData.enrolledClasses || [];
+          const classMap = new Map();
+          [...rootClasses, ...profClasses].forEach(c => classMap.set(c.id, c));
+          merged.enrolledClasses = Array.from(classMap.values());
           
           setUserData(merged);
       };
@@ -289,11 +304,11 @@ export function useMagisterData() {
         batch.update(userRef, balanceUpdate);
         batch.update(rootUserRef, { 'profile.main.coins': increment(-price) });
         // Update legacy flux to prevent desync
-        batch.update(rootUserRef, { flux: increment(-price) });
+        batch.update(rootUserRef, { flux: increment(-price), coins: increment(-price) });
 
         // 2. Update Inventory
         batch.update(userRef, { inventory: arrayUnion(itemId) });
-        batch.update(rootUserRef, { 'profile.main.inventory': arrayUnion(itemId) });
+        batch.update(rootUserRef, { 'profile.main.inventory': arrayUnion(itemId), inventory: arrayUnion(itemId) });
 
         // 3. Logic for Elective Courses (Solo Study)
         if (category === 'course' && extraData) {
@@ -307,7 +322,7 @@ export function useMagisterData() {
             };
             
             batch.update(userRef, { enrolledClasses: arrayUnion(newClass) });
-            batch.update(rootUserRef, { 'profile.main.enrolledClasses': arrayUnion(newClass) });
+            batch.update(rootUserRef, { 'profile.main.enrolledClasses': arrayUnion(newClass), enrolledClasses: arrayUnion(newClass) });
         }
 
         // 4. Log the Transaction
