@@ -44,9 +44,37 @@ export function useMagisterData() {
     });
 
     if (user?.uid) {
+      
+      // 🔥 THE FIX: DUAL-MERGE LISTENER
+      // Listens to both the root document and the profile document so no legacy data is lost.
+      let rootData: any = {};
+      let profileData: any = {};
+
+      const syncMergedData = () => {
+          // Profile data overwrites root data if there are duplicates
+          const merged = { ...rootData, ...profileData };
+          
+          // Fallback: Ensure legacy 'flux' is always recognized as 'coins'
+          if (merged.flux !== undefined && merged.coins === undefined) {
+              merged.coins = merged.flux;
+          }
+          
+          setUserData(merged);
+      };
+
+      const unsubRootUser = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid), (snap) => {
+          if (snap.exists()) {
+              rootData = snap.data();
+              syncMergedData();
+          }
+      });
+
       const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
-        if (snap.exists()) setUserData(snap.data());
-        setAuthChecked(true);
+          if (snap.exists()) {
+              profileData = snap.data();
+              syncMergedData();
+          }
+          setAuthChecked(true);
       });
 
       const unsubLessons = onSnapshot(collectionGroup(db, 'custom_lessons'), (snap) => {
@@ -77,7 +105,7 @@ export function useMagisterData() {
         setInstructorClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
-      // 🔥 THE FIX: Bypasses the strict Firebase Index requirement by filtering in-memory!
+      // Bypasses the strict Firebase Index requirement by filtering in-memory
       const unsubAllClasses = onSnapshot(collectionGroup(db, 'classes'), (snap) => {
         const published = snap.docs
             .map(d => ({ id: d.id, ...d.data() }))
@@ -113,7 +141,7 @@ export function useMagisterData() {
       });
 
       return () => { 
-          unsubAuth(); unsubProfile(); unsubLessons(); unsubCards(); 
+          unsubAuth(); unsubRootUser(); unsubProfile(); unsubLessons(); unsubCards(); 
           unsubClasses(); unsubInstructorClasses(); unsubPublished(); 
           unsubCurriculums(); unsubLogs(); unsubCardPrefs(); unsubDeckPrefs();
           unsubAllClasses(); 
@@ -245,7 +273,7 @@ export function useMagisterData() {
     purchaseItem: async (itemId: string, price: number, category: string, extraData?: any) => {
         if (!user || !user.uid) return { success: false, msg: "Auth session expired." };
         
-        // Grab the current Flux balance
+        // Grab the current Flux balance (checking both new and legacy states)
         const currentFlux = userData?.coins || userData?.profile?.main?.coins || userData?.flux || 0; 
         
         if (currentFlux < price) {
@@ -260,6 +288,8 @@ export function useMagisterData() {
         const balanceUpdate = { coins: increment(-price) };
         batch.update(userRef, balanceUpdate);
         batch.update(rootUserRef, { 'profile.main.coins': increment(-price) });
+        // Update legacy flux to prevent desync
+        batch.update(rootUserRef, { flux: increment(-price) });
 
         // 2. Update Inventory
         batch.update(userRef, { inventory: arrayUnion(itemId) });
@@ -303,14 +333,12 @@ export function useMagisterData() {
     
     // STANDARD CLASS/CONTENT MANAGEMENT
     
-    // 🔥 NEW: SAVE CLASS DRAG & DROP ORDER
     reorderClasses: async (newOrder: string[]) => {
       if (!user) return;
       try {
           await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
               classOrder: newOrder
           });
-          // Redundant root sync
           await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid), {
               'profile.main.classOrder': newOrder
           }).catch(() => {});
@@ -585,11 +613,13 @@ export function useMagisterData() {
               lastActivityDate: todayStr
             }).catch(e => console.log("Subcollection update skipped", e));
 
+            // Legacy sync
             await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid), {
               'profile.main.xp': increment(xp), 
               'profile.main.coins': increment(earnedFlux), 
               'profile.main.streak': newStreak, 
-              'xp': increment(xp)
+              'xp': increment(xp),
+              'flux': increment(earnedFlux)
             }).catch(e => console.log("Parent doc update skipped", e));
           }
       } catch (err) {
