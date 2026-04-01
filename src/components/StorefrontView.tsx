@@ -1,7 +1,5 @@
 // src/components/StorefrontView.tsx
 import React, { useState } from 'react';
-import { doc, updateDoc, arrayUnion, deleteField, increment } from 'firebase/firestore';
-import { auth, db, appId } from '../config/firebase';
 import { 
     ShoppingBag, Zap, Sparkles, Paintbrush, CircleUser, 
     Tag, Check, Lock, AlertCircle, X, GraduationCap, Globe,
@@ -31,6 +29,7 @@ const STORE_CATALOG: any = {
     themes: [
         { id: 'theme_hacker', name: 'Terminal Green', description: 'Classic hacker aesthetic for the OS.', price: 1000, rarity: 'epic', colors: ['bg-emerald-950', 'bg-emerald-500'] },
         { id: 'theme_synth', name: 'Synthwave', description: 'Miami nights, 1984.', price: 1000, rarity: 'epic', colors: ['bg-fuchsia-900', 'bg-cyan-400'] },
+        { id: 'theme_vapor', name: 'Vaporwave', description: 'Neon soaked cyber-dreams.', price: 1000, rarity: 'epic', colors: ['bg-violet-950', 'bg-fuchsia-400'] },
     ]
 };
 
@@ -48,68 +47,48 @@ const CATEGORY_TABS = [
     { id: 'themes', label: 'OS Themes', icon: <Paintbrush size={16} /> },
 ];
 
-export default function StorefrontView({ userData, onBack }: any) {
+// 🔥 UPDATED PROPS: We now correctly intercept onPurchase and onEquip from App.tsx
+export default function StorefrontView({ userData, onPurchase, onEquip, onBack }: any) {
     const [activeTab, setActiveTab] = useState('avatars');
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
 
-    const fluxBalance = userData?.flux || 0;
-    const inventory = userData?.inventory || {};
+    const fluxBalance = userData?.coins || userData?.flux || 0;
+    const inventory = userData?.inventory || [];
     const equipped = userData?.equipped || {};
 
-    // 🔥 THE ECONOMY ENGINE
+    // 🔥 THE ECONOMY ENGINE (Routed through global actions)
     const handleBuy = async (item: any, category: string) => {
-        if (!auth.currentUser?.uid) return;
         if (fluxBalance < item.price) {
             setToastMsg("Insufficient Flux! Complete more modules to earn currency.");
             return;
         }
 
         setIsProcessing(true);
-        try {
-            const userRef = doc(db, 'artifacts', appId, 'users', auth.currentUser.uid);
-            await updateDoc(userRef, {
-                flux: increment(-item.price),
-                [`inventory.${category}`]: arrayUnion(item.id)
-            });
+        // Call the bulletproof purchase engine from useMagisterData
+        const result = await onPurchase(item.id, item.price, category);
+        
+        if (result?.success) {
             setToastMsg(`Successfully acquired ${item.name}! 💎`);
-        } catch (err) {
-            console.error("Transaction failed:", err);
-            setToastMsg("Transaction failed. Secure your connection and try again.");
+        } else {
+            setToastMsg(result?.msg || "Transaction failed. Secure your connection and try again.");
         }
         setIsProcessing(false);
     };
 
-    // 🔥 THE EQUIP ENGINE
+    // 🔥 THE EQUIP ENGINE (Routed through global actions)
     const handleEquip = async (item: any, category: string) => {
-        if (!auth.currentUser?.uid) return;
         setIsProcessing(true);
-        try {
-            const userRef = doc(db, 'artifacts', appId, 'users', auth.currentUser.uid);
-            // Notice we use the category name directly (e.g., equipped.avatars, equipped.themes)
-            await updateDoc(userRef, {
-                [`equipped.${category}`]: item.id
-            });
-            setToastMsg(`Equipped ${item.name}! ✨`);
-        } catch (err) {
-            console.error("Equip failed:", err);
-        }
+        await onEquip(item.id, category);
+        setToastMsg(`Equipped ${item.name}! ✨`);
         setIsProcessing(false);
     };
 
-    // 🔥 THE UNEQUIP ENGINE (Using deleteField!)
+    // 🔥 THE UNEQUIP ENGINE (Passes null to clear the field)
     const handleUnequip = async (category: string) => {
-        if (!auth.currentUser?.uid) return;
         setIsProcessing(true);
-        try {
-            const userRef = doc(db, 'artifacts', appId, 'users', auth.currentUser.uid);
-            await updateDoc(userRef, {
-                [`equipped.${category}`]: deleteField()
-            });
-            setToastMsg(`Unequipped item. OS restored to default.`);
-        } catch (err) {
-            console.error("Unequip failed:", err);
-        }
+        await onEquip(null, category); 
+        setToastMsg(`Unequipped item. OS restored to default.`);
         setIsProcessing(false);
     };
 
@@ -174,9 +153,11 @@ export default function StorefrontView({ userData, onBack }: any) {
             <main className="flex-1 overflow-y-auto px-6 md:px-10 pb-32 custom-scrollbar">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
                     {STORE_CATALOG[activeTab].map((item: any) => {
-                        // 1. Check Ownership & Equip Status
-                        const categoryItems = inventory[activeTab] || [];
-                        const isOwned = categoryItems.includes(item.id);
+                        // 🔥 Smart Ownership Check (Accommodates both legacy dictionary and flat arrays)
+                        const isOwned = Array.isArray(inventory) 
+                            ? inventory.includes(item.id) 
+                            : (inventory[activeTab] || []).includes(item.id);
+                            
                         const isEquipped = equipped[activeTab] === item.id;
                         
                         return (
