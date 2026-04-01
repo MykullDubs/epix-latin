@@ -33,12 +33,12 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const isDragging = useRef(false);
   const dragOffset = useRef({ x: 0, y: 0 });
 
-  // 🔥 OS FEATURE: Spotlight
+  // 🔥 OS FEATURE: Spotlight & Annotation Marker
   const [isSpotlight, setIsSpotlight] = useState(false);
   const [mousePos, setMousePos] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
-  
-  // 🎨 NEW: Dual-Layer Annotation Engine
   const [isAnnotating, setIsAnnotating] = useState(false);
+  
+  // 🎨 NEW: Advanced Annotation Tools & Text Engine
   const [markerColor, setMarkerColor] = useState('#ef4444');
   const [markerSize, setMarkerSize] = useState(6);
   const [markerStyle, setMarkerStyle] = useState<'pen' | 'highlighter' | 'text'>('pen');
@@ -52,6 +52,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const markerColorRef = useRef(markerColor);
   const markerSizeRef = useRef(markerSize);
   const showWhiteboardRef = useRef(showWhiteboard);
+  const inputRef = useRef<HTMLInputElement>(null); // To handle auto-focus
   
   useEffect(() => { activeTextRef.current = activeText; }, [activeText]);
   useEffect(() => { markerColorRef.current = markerColor; }, [markerColor]);
@@ -129,7 +130,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       return { x: clientX - rect.left, y: clientY - rect.top };
   };
 
-  // 🔥 Dual-Layer Canvas Initialization
   useEffect(() => {
       const resizeCanvas = () => {
           if (classViewRef.current) {
@@ -162,7 +162,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       }
   };
 
-  // 🔥 STATE-SAFE TEXT SAVER (Routes text to the correct layer automatically)
   const forceSaveText = useCallback(() => {
       const curr = activeTextRef.current;
       if (curr && curr.text.trim().length > 0) {
@@ -176,13 +175,14 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       setActiveText(null);
   }, []);
 
-  // 🔥 INK DELEGATOR (Routes ink to the correct canvas automatically)
   const startAnnotation = (e: React.MouseEvent) => {
       const coords = getRelativeCoords(e.clientX, e.clientY);
       
       if (markerStyle === 'text') {
           forceSaveText(); 
           setActiveText({ x: coords.x, y: coords.y, text: '' });
+          // Ensure input gains focus as soon as it mounts
+          setTimeout(() => inputRef.current?.focus(), 50);
           return;
       }
 
@@ -371,7 +371,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           className={`absolute inset-0 z-[8550] transition-transform duration-500 ease-in-out pointer-events-none overflow-hidden ${showWhiteboard ? 'translate-y-0' : '-translate-y-full'}`}
           style={{ backgroundColor: '#f8fafc', backgroundImage: 'radial-gradient(#cbd5e1 2px, transparent 2px)', backgroundSize: '40px 40px' }}
       >
-          {/* Note how these roll up *with* the whiteboard container perfectly! */}
           <canvas ref={boardCanvasRef} className="absolute inset-0 w-full h-full" />
           {boardTexts.map(t => (
               <div key={t.id} style={{ position: 'absolute', left: t.x, top: t.y, color: t.color, fontSize: `${t.size * 6}px`, fontWeight: 'bold', transform: 'translateY(-50%)', whiteSpace: 'nowrap' }}>{t.text}</div>
@@ -386,15 +385,15 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           onMouseLeave={stopAnnotation}
           className={`absolute inset-0 z-[8600] ${isAnnotating ? (markerStyle === 'text' ? 'pointer-events-auto cursor-text' : 'pointer-events-auto cursor-crosshair') : 'pointer-events-none'}`}
       >
-          {/* Active text input lives here temporarily so it doesn't move */}
+          {/* Active text input lives here temporarily so it is interactive */}
           {activeText && (
               <input 
-                  autoFocus
+                  ref={inputRef}
                   value={activeText.text}
                   onChange={e => setActiveText({...activeText, text: e.target.value})}
                   onKeyDown={e => { if (e.key === 'Enter') forceSaveText(); }}
-                  onBlur={forceSaveText}
-                  className="pointer-events-auto" 
+                  onMouseDown={e => e.stopPropagation()} // 🔥 Prevents canvas click from deleting the input
+                  className="pointer-events-auto shadow-2xl" 
                   style={{ 
                       position: 'absolute', left: activeText.x, top: activeText.y, color: markerColor, 
                       fontSize: `${markerSize * 6}px`, fontWeight: 'bold', background: 'transparent', 
