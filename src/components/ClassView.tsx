@@ -23,7 +23,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const [isBlanked, setIsBlanked] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [showTools, setShowTools] = useState(false);
-  const [showWhiteboard, setShowWhiteboard] = useState(false); // NEW: Instant Scratchpad
+  const [showWhiteboard, setShowWhiteboard] = useState(false);
   
   // 🔥 OS FEATURE: Moveable Draggable Timer
   const [showTimer, setShowTimer] = useState(false);
@@ -157,12 +157,12 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       const coords = getRelativeCoords(e.clientX, e.clientY);
       
       if (markerStyle === 'text') {
-          saveActiveText(); // Save previous text if clicking away
+          saveActiveText(); 
           setActiveText({ x: coords.x, y: coords.y, text: '' });
           return;
       }
 
-      saveActiveText(); // Clicking with pen closes any open text box
+      saveActiveText(); 
       isDrawingAnnotation.current = true;
       const ctx = canvasRef.current?.getContext('2d');
       if (ctx) {
@@ -283,10 +283,9 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
               setIsSpotlight(prev => { if (!prev) setIsAnnotating(false); return !prev; });
               setShowTools(false);
           } else if (e.key.toLowerCase() === 'c') {
-              // 🔥 NEW: Toggle Whiteboard
               e.preventDefault(); 
               setShowWhiteboard(prev => {
-                  if (!prev) setIsAnnotating(true); // Auto-turn on marker when opening board
+                  if (!prev) setIsAnnotating(true); 
                   return !prev;
               });
               setShowTools(false);
@@ -326,10 +325,14 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           />
       )}
 
-      {/* 🔥 NEW FEATURE: Instant Scratchpad (Whiteboard Background) */}
+      {/* 🔥 THE FIX: Solid White Background for Scratchpad */}
       <div 
-          className={`absolute inset-0 z-[8550] bg-slate-50 transition-transform duration-500 ease-in-out pointer-events-none ${showWhiteboard ? 'translate-y-0' : '-translate-y-full'}`}
-          style={{ background: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '40px 40px' }}
+          className={`absolute inset-0 z-[8550] transition-transform duration-500 ease-in-out pointer-events-none ${showWhiteboard ? 'translate-y-0' : '-translate-y-full'}`}
+          style={{ 
+              backgroundColor: '#f8fafc', // Solid slate-50 base
+              backgroundImage: 'radial-gradient(#cbd5e1 2px, transparent 2px)', // Dot grid
+              backgroundSize: '40px 40px' 
+          }}
       />
 
       {/* The Annotation Drawing Layer (Ink) */}
@@ -339,11 +342,11 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           onMouseMove={drawAnnotation}
           onMouseUp={stopAnnotation}
           onMouseLeave={stopAnnotation}
-          className={`absolute inset-0 z-[8600] fixed ${isAnnotating ? (markerStyle === 'text' ? 'pointer-events-auto cursor-text' : 'pointer-events-auto cursor-crosshair') : 'pointer-events-none'}`}
+          className={`absolute inset-0 z-[8600] ${isAnnotating ? (markerStyle === 'text' ? 'pointer-events-auto cursor-text' : 'pointer-events-auto cursor-crosshair') : 'pointer-events-none'}`}
       />
 
-      {/* 🔥 The Text Layer (Floating Input & Saved Text) */}
-      <div className={`absolute inset-0 z-[8650] ${isAnnotating ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+      {/* 🔥 THE FIX: Text Layer is pointer-events-none so it doesn't block the canvas! */}
+      <div className="absolute inset-0 z-[8650] pointer-events-none">
           {texts.map(t => (
               <div 
                   key={t.id} 
@@ -358,7 +361,10 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                   value={activeText.text}
                   onChange={e => setActiveText({...activeText, text: e.target.value})}
                   onBlur={saveActiveText}
-                  onKeyDown={e => e.key === 'Enter' && saveActiveText()}
+                  onKeyDown={e => {
+                      if (e.key === 'Enter') saveActiveText();
+                  }}
+                  className="pointer-events-auto" // Re-enable clicks ONLY for the input box
                   style={{ position: 'absolute', left: activeText.x, top: activeText.y, color: markerColor, fontSize: `${markerSize * 6}px`, fontWeight: 'bold', background: 'transparent', outline: 'none', border: 'none', transform: 'translateY(-50%)', minWidth: '300px' }}
               />
           )}
@@ -454,7 +460,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
       {/* 🔥 THE TOOLS DRAWER */}
       {showTools && (
-          <div className="absolute right-8 bottom-28 z-[8800] bg-slate-900/95 backdrop-blur-2xl border-4 border-slate-700 rounded-[2.5rem] p-6 shadow-2xl flex flex-col gap-3 animate-in slide-in-from-bottom-10 fade-in w-72 pointer-events-auto">
+          <div className="absolute right-8 bottom-28 z-[8900] bg-slate-900/95 backdrop-blur-2xl border-4 border-slate-700 rounded-[2.5rem] p-6 shadow-2xl flex flex-col gap-3 animate-in slide-in-from-bottom-10 fade-in w-72 pointer-events-auto">
               <div className="flex items-center justify-between mb-2 px-2">
                   <span className="text-[12px] font-black text-slate-400 uppercase tracking-widest">Smartboard Tools</span>
                   <button onClick={() => setShowTools(false)} className="text-slate-500 hover:text-white transition-colors"><X size={20} strokeWidth={3} /></button>
@@ -469,7 +475,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                   <PenTool size={20} /> <span className="flex-1">Digital Marker</span> <span className="text-rose-500/50 text-xs font-black">A</span>
               </button>
               
-              {/* 🔥 NEW FEATURE: Toggle Whiteboard from Drawer */}
               <button onClick={() => { setShowWhiteboard(p => !p); setIsAnnotating(true); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left ${showWhiteboard ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white border-slate-700 hover:border-blue-500'}`}>
                   <Presentation size={20} /> <span className="flex-1">Whiteboard</span> <span className="text-blue-500/50 text-xs font-black">C</span>
               </button>
@@ -485,7 +490,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       )}
 
       {/* CORE PRESENTATION LAYER */}
-      <main className="flex-1 flex overflow-hidden relative group/canvas bg-slate-50 text-slate-900">
+      <main className="flex-1 flex overflow-hidden relative group/canvas bg-slate-50 text-slate-900 z-0">
         
         {activePageIdx > 0 && (
             <button onClick={handlePrev} className="absolute left-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/5 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 shadow-lg"><ChevronLeft size={48} /></button>
@@ -564,7 +569,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         )}
       </main>
 
-      <footer className="h-20 bg-slate-900 border-t border-slate-800 flex items-center justify-between px-12 shrink-0 relative z-20">
+      <footer className="h-20 bg-slate-900 border-t border-slate-800 flex items-center justify-between px-12 shrink-0 relative z-[8800]">
           <div className="flex items-center gap-8">
               <h2 className="text-xl font-black text-slate-400 uppercase tracking-widest">{String(lesson?.title || '')}</h2>
               <div className="h-6 w-px bg-slate-800" />
