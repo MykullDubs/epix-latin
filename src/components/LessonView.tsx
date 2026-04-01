@@ -5,7 +5,7 @@ import { db } from '../config/firebase';
 import { 
   HelpCircle, CheckCircle2, X, Edit3, MessageSquare, 
   MessageCircle, ArrowLeft, ArrowRight, Info, Zap, BookOpen,
-  Play, Square, Search, MousePointerClick, Palette, Eraser, Volume2, AlertTriangle
+  Play, Square, Search, MousePointerClick, Palette, Eraser, Volume2, AlertTriangle, Gamepad2
 } from 'lucide-react';
 
 export interface LessonViewProps {
@@ -170,13 +170,6 @@ const FillBlankBlockRenderer = ({ block }: any) => {
     const isComplete = filledBlanks.length > 0 && filledBlanks.indexOf(null) === -1;
 
     const checkAnswers = () => {
-        let allMatch = true;
-        for (let i = 0; i < filledBlanks.length; i++) {
-            if (filledBlanks[i]?.word !== correctAnswers[i]) {
-                allMatch = false;
-                break;
-            }
-        }
         setIsChecked(true); 
     };
 
@@ -191,7 +184,6 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                 <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Vocabulary Drill</h3>
             </div>
 
-            {/* STICKY TOP WORD BANK: Mobile Optimized Spacing */}
             <div className="sticky top-2 z-30 mb-6 -mx-2 px-2">
                 <div className="bg-white/90 backdrop-blur-xl rounded-2xl p-3 md:p-4 border border-slate-200/50 shadow-md flex flex-wrap gap-2 min-h-[60px] justify-center items-center transition-all duration-300">
                     {wordBank.length === 0 && !isChecked ? (
@@ -396,6 +388,53 @@ const TapSortBlockRenderer = ({ block }: any) => {
     );
 };
 
+const AudioStoryBlockRenderer = ({ block }: any) => {
+    const [isPlaying, setIsPlaying] = useState(false);
+    const togglePlay = () => setIsPlaying(!isPlaying);
+
+    return (
+        <div className="bg-white rounded-[3rem] overflow-hidden shadow-xl border-4 border-indigo-50 my-8">
+            <div className="relative">
+                <img src={String(block.imageUrl || 'https://images.unsplash.com/photo-1518152006812-edab29b069ac?q=80&w=800&auto=format&fit=crop')} alt="Story visual" className="w-full h-64 md:h-80 object-cover" />
+                <button onClick={togglePlay} className={`absolute -bottom-8 right-8 w-16 h-16 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 ${isPlaying ? 'bg-rose-500 text-white scale-110' : 'bg-indigo-600 text-white hover:scale-105'}`}>
+                    {isPlaying ? <Square fill="currentColor" size={24} /> : <Play fill="currentColor" size={28} className="ml-1" />}
+                </button>
+            </div>
+            <div className="p-8 md:p-10 pt-12">
+                <h3 className="text-sm font-black text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Volume2 size={16} /> Read Along</h3>
+                <p className={`text-3xl md:text-4xl font-bold text-slate-800 leading-snug transition-colors duration-500 ${isPlaying ? 'text-indigo-600' : ''}`}>{String(block.text || "The legend says they looked for an eagle on a cactus...")}</p>
+            </div>
+        </div>
+    );
+};
+
+const ImageHotspotBlockRenderer = ({ block }: any) => {
+    const [activeSpot, setActiveSpot] = useState<number | null>(null);
+
+    return (
+        <div className="bg-slate-900 p-6 md:p-8 rounded-[3rem] shadow-2xl my-8">
+            <div className="flex items-center justify-center gap-3 mb-6"><Search className="text-cyan-400" size={24} /><h3 className="text-2xl font-black text-white text-center">{String(block.title || 'Explore the Map!')}</h3></div>
+            <div className="relative rounded-[2rem] overflow-hidden border-4 border-slate-700 bg-slate-800">
+                <img src={String(block.imageUrl || 'https://images.unsplash.com/photo-1565670119853-23910c2830f3?q=80&w=800&auto=format&fit=crop')} className="w-full h-auto opacity-80" alt="Explorer Map" />
+                {(Array.isArray(block.hotspots) ? block.hotspots : []).map((spot: any, i: number) => (
+                    <React.Fragment key={i}>
+                        <button onClick={() => setActiveSpot(activeSpot === i ? null : i)} className="absolute w-10 h-10 md:w-12 md:h-12 bg-rose-500 rounded-full border-4 border-white shadow-[0_0_20px_rgba(244,63,94,0.8)] flex items-center justify-center animate-pulse hover:scale-110 transition-transform z-10" style={{ top: `${spot.y || 0}%`, left: `${spot.x || 0}%`, transform: 'translate(-50%, -50%)' }}>
+                            <Search size={18} className="text-white" strokeWidth={3} />
+                        </button>
+                        {activeSpot === i && (
+                            <div className="absolute z-20 bg-white p-5 rounded-[2rem] shadow-2xl w-56 text-center animate-in zoom-in-95 duration-200" style={{ top: `${spot.y || 0}%`, left: `${spot.x || 0}%`, transform: 'translate(-50%, -115%)' }}>
+                                <h4 className="text-xl font-black text-indigo-600 mb-2 leading-tight">{String(spot.title || '')}</h4>
+                                <p className="text-sm font-bold text-slate-600 leading-snug">{String(spot.description || '')}</p>
+                                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-5 h-5 bg-white rotate-45"></div>
+                            </div>
+                        )}
+                    </React.Fragment>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 const DrawingBlockRenderer = ({ block }: any) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
@@ -404,27 +443,18 @@ const DrawingBlockRenderer = ({ block }: any) => {
 
     const getCoordinates = (e: any, canvas: HTMLCanvasElement) => {
         const rect = canvas.getBoundingClientRect();
-        // Handle touch events explicitly for mobile
         if (e.touches && e.touches.length > 0) {
-            return {
-                x: e.touches[0].clientX - rect.left,
-                y: e.touches[0].clientY - rect.top
-            };
+            return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
         }
-        return {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top
-        };
+        return { x: e.clientX - rect.left, y: e.clientY - rect.top };
     };
 
     const startDrawing = (e: any) => {
-        // Prevent pull-to-refresh on mobile when touching the canvas
         if (e.cancelable) e.preventDefault(); 
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
-        
         const { x, y } = getCoordinates(e, canvas);
         ctx.beginPath();
         ctx.moveTo(x, y);
@@ -434,11 +464,9 @@ const DrawingBlockRenderer = ({ block }: any) => {
     const draw = (e: any) => {
         if (!isDrawing) return;
         if (e.cancelable) e.preventDefault();
-        
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext('2d');
         if (!canvas || !ctx) return;
-        
         const { x, y } = getCoordinates(e, canvas);
         ctx.lineTo(x, y);
         ctx.strokeStyle = color;
@@ -458,20 +486,12 @@ const DrawingBlockRenderer = ({ block }: any) => {
                     <Eraser size={20} />
                 </button>
             </div>
-            {/* 🔥 MOBILE SAFE: touch-none forces Safari to ignore scroll gestures here */}
             <div className="bg-slate-50 rounded-[2rem] overflow-hidden border-2 border-slate-200 touch-none mb-6 select-none" style={{ touchAction: 'none' }}>
                 <canvas 
-                    ref={canvasRef} 
-                    width={800} 
-                    height={400} 
+                    ref={canvasRef} width={800} height={400} 
                     className="w-full h-[50vh] md:h-80 cursor-crosshair touch-none" 
-                    onMouseDown={startDrawing} 
-                    onMouseMove={draw} 
-                    onMouseUp={() => setIsDrawing(false)} 
-                    onMouseLeave={() => setIsDrawing(false)} 
-                    onTouchStart={startDrawing} 
-                    onTouchMove={draw} 
-                    onTouchEnd={() => setIsDrawing(false)} 
+                    onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={() => setIsDrawing(false)} onMouseLeave={() => setIsDrawing(false)} 
+                    onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={() => setIsDrawing(false)} 
                     style={{ touchAction: 'none' }}
                 />
             </div>
@@ -672,7 +692,6 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
   const progressPercent = ((safePageIdx + 1) / pages.length) * 100;
 
   return (
-    // 🔥 MOBILE SAFE: Dynamic viewport height ensures the bottom navigation bar is never hidden by Safari's address bar
     <div className="flex flex-col min-h-[100dvh] h-[100dvh] bg-slate-50/50 overflow-hidden font-sans relative">
       <div className="px-5 md:px-8 pt-8 md:pt-10 pb-4 bg-white border-b border-slate-100 shrink-0 shadow-sm relative z-10">
         <div className="flex justify-between items-end">
@@ -695,7 +714,6 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
         </div>
       </div>
       
-      {/* 🔥 MOBILE SAFE: Added safe-area bottom padding to prevent overlap with iOS home indicator */}
       <div className="px-5 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] md:pb-5 bg-white/95 backdrop-blur-2xl border-t border-slate-100 flex justify-between items-center fixed bottom-0 left-0 right-0 z-50 shadow-[0_-15px_30px_rgba(0,0,0,0.04)]">
         <div className="absolute top-0 left-0 h-1 bg-slate-100 w-full overflow-hidden">
             <div className="h-full bg-indigo-500 transition-all duration-500 ease-out" style={{ width: `${progressPercent}%` }} />
