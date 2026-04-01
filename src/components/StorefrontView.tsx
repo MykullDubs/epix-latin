@@ -1,15 +1,18 @@
 // src/components/StorefrontView.tsx
 import React, { useState } from 'react';
+import { doc, updateDoc, arrayUnion, deleteField, increment } from 'firebase/firestore';
+import { auth, db, appId } from '../config/firebase';
 import { 
     ShoppingBag, Zap, Sparkles, Paintbrush, CircleUser, 
-    Tag, Check, Lock, AlertCircle, X, GraduationCap, Globe 
+    Tag, Check, Lock, AlertCircle, X, GraduationCap, Globe,
+    ShoppingCart, CheckCircle2, RotateCcw, Shield
 } from 'lucide-react';
 import { Toast } from './Toast';
 
 // ============================================================================
-//  MOCK CATALOG (Move this to Firebase later, or keep it hardcoded for speed)
+//  MOCK CATALOG
 // ============================================================================
-const STORE_CATALOG = {
+const STORE_CATALOG: any = {
     avatars: [
         { id: 'av_cyberpup', name: 'Cyber-Pup', description: 'A good boy on the mainframe.', price: 500, rarity: 'rare', seed: 'cyberpup' },
         { id: 'av_ninja', name: 'Neon Ninja', description: 'Silent, deadly, highly educated.', price: 800, rarity: 'epic', seed: 'ninja' },
@@ -33,216 +36,225 @@ const STORE_CATALOG = {
 
 const RARITY_COLORS: any = {
     common: 'text-slate-500 bg-slate-100 border-slate-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400',
-    rare: 'text-indigo-600 bg-indigo-50 border-indigo-200 dark:bg-indigo-900/30 dark:border-indigo-700/50 dark:text-indigo-400',
+    rare: 'text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-700/50 dark:text-blue-400',
     epic: 'text-fuchsia-600 bg-fuchsia-50 border-fuchsia-200 dark:bg-fuchsia-900/30 dark:border-fuchsia-700/50 dark:text-fuchsia-400',
-    legendary: 'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-900/30 dark:border-amber-700/50 dark:text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
+    legendary: 'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-900/30 dark:border-amber-700/50 dark:text-amber-400',
 };
 
-export default function StorefrontView({ userData, activeOrg, onPurchase, onEquip }: any) {
-    const [activeTab, setActiveTab] = useState<'avatars' | 'auras' | 'titles' | 'themes'>('avatars');
-    const [selectedItem, setSelectedItem] = useState<any | null>(null);
-    const [toastMsg, setToastMsg] = useState<string | null>(null);
+const CATEGORY_TABS = [
+    { id: 'avatars', label: 'Avatars', icon: <CircleUser size={16} /> },
+    { id: 'auras', label: 'Auras', icon: <Sparkles size={16} /> },
+    { id: 'titles', label: 'Titles', icon: <Tag size={16} /> },
+    { id: 'themes', label: 'OS Themes', icon: <Paintbrush size={16} /> },
+];
 
-    // Safely check all possible spots where Flux/Coins might be stored based on hydration
-    const fluxBalance = userData?.coins || userData?.profile?.main?.coins || userData?.flux || 0;
-    const inventory = userData?.inventory || [];
+export default function StorefrontView({ userData, onBack }: any) {
+    const [activeTab, setActiveTab] = useState('avatars');
+    const [toastMsg, setToastMsg] = useState<string | null>(null);
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    const fluxBalance = userData?.flux || 0;
+    const inventory = userData?.inventory || {};
     const equipped = userData?.equipped || {};
 
-    // UI Metadata
-    const themeColor = activeOrg?.themeColor || '#4f46e5'; 
-    const themeName = activeOrg?.name || 'Magister';
-    const targetLang = userData?.targetLanguage || "English";
-
-    // 🔥 WIRED UP TRANSACTION HANDLER
-    const handleBuy = async () => {
-        if (!selectedItem) return;
-        
-        if (fluxBalance < selectedItem.price) {
-            setToastMsg("Insufficient Flux.");
-            setSelectedItem(null);
+    // 🔥 THE ECONOMY ENGINE
+    const handleBuy = async (item: any, category: string) => {
+        if (!auth.currentUser?.uid) return;
+        if (fluxBalance < item.price) {
+            setToastMsg("Insufficient Flux! Complete more modules to earn currency.");
             return;
         }
 
-        // Trigger the Universal Engine
-        const result = await onPurchase(selectedItem.id, selectedItem.price, activeTab);
-        
-        if (result?.success) {
-            setToastMsg(`Acquired: ${selectedItem.name}!`);
-        } else {
-            setToastMsg(result?.msg || "Transaction failed.");
+        setIsProcessing(true);
+        try {
+            const userRef = doc(db, 'artifacts', appId, 'users', auth.currentUser.uid);
+            await updateDoc(userRef, {
+                flux: increment(-item.price),
+                [`inventory.${category}`]: arrayUnion(item.id)
+            });
+            setToastMsg(`Successfully acquired ${item.name}! 💎`);
+        } catch (err) {
+            console.error("Transaction failed:", err);
+            setToastMsg("Transaction failed. Secure your connection and try again.");
         }
-        
-        setSelectedItem(null);
+        setIsProcessing(false);
     };
 
-    const handleEquipClick = (item: any) => {
-        onEquip(item.id, activeTab);
-        setToastMsg(`Equipped: ${item.name}`);
-        
-        // Ensure immediate refresh of the App.tsx state by forcing a tiny re-render delay
-        setTimeout(() => {
-            window.dispatchEvent(new Event('resize')); 
-        }, 50);
+    // 🔥 THE EQUIP ENGINE
+    const handleEquip = async (item: any, category: string) => {
+        if (!auth.currentUser?.uid) return;
+        setIsProcessing(true);
+        try {
+            const userRef = doc(db, 'artifacts', appId, 'users', auth.currentUser.uid);
+            // Notice we use the category name directly (e.g., equipped.avatars, equipped.themes)
+            await updateDoc(userRef, {
+                [`equipped.${category}`]: item.id
+            });
+            setToastMsg(`Equipped ${item.name}! ✨`);
+        } catch (err) {
+            console.error("Equip failed:", err);
+        }
+        setIsProcessing(false);
     };
 
-    const renderItemCard = (item: any) => {
-        const isOwned = inventory.includes(item.id);
-        const isEquipped = equipped[activeTab] === item.id;
-        const canAfford = fluxBalance >= item.price;
-
-        return (
-            <div key={item.id} className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 border-2 border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col relative overflow-hidden group">
-                
-                {/* Rarity Badge */}
-                <div className={`absolute top-4 left-4 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${RARITY_COLORS[item.rarity]}`}>
-                    {item.rarity}
-                </div>
-
-                {/* Equipped Badge */}
-                {isEquipped && (
-                    <div className="absolute top-4 right-4 bg-emerald-500 text-white px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-1 shadow-md z-20">
-                        <Check size={12} strokeWidth={3} /> Active
-                    </div>
-                )}
-
-                {/* Item Preview */}
-                <div className="w-full aspect-square rounded-2xl bg-slate-50 dark:bg-slate-800/50 mt-8 mb-6 flex items-center justify-center relative border border-slate-100 dark:border-slate-700/50">
-                    {activeTab === 'avatars' && (
-                        <img src={`https://api.dicebear.com/7.x/bottts/svg?seed=${item.seed}&backgroundColor=transparent`} alt="Avatar" className="w-3/4 h-3/4 object-contain drop-shadow-md group-hover:scale-110 transition-transform duration-500" />
-                    )}
-                    {activeTab === 'auras' && (
-                        <div className={`w-20 h-20 rounded-full ring-8 ${item.css} group-hover:scale-110 transition-transform duration-500`} />
-                    )}
-                    {activeTab === 'titles' && (
-                        <span className={`text-xl font-black italic text-center px-4 ${RARITY_COLORS[item.rarity].split(' ')[0]}`}>{item.name}</span>
-                    )}
-                    {activeTab === 'themes' && (
-                        <div className="flex gap-2 group-hover:scale-110 transition-transform duration-500">
-                            <div className={`w-8 h-16 rounded-full ${item.colors[0]} shadow-inner`} />
-                            <div className={`w-8 h-16 rounded-full ${item.colors[1]} shadow-inner`} />
-                        </div>
-                    )}
-                </div>
-
-                {/* Item Info */}
-                <h3 className="font-black text-slate-900 dark:text-white text-lg leading-tight mb-2">{item.name}</h3>
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-6 flex-1">{item.description}</p>
-
-                {/* Action Button */}
-                {isOwned ? (
-                    <button 
-                        onClick={() => handleEquipClick(item)}
-                        disabled={isEquipped}
-                        className={`w-full py-3.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 ${isEquipped ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed' : 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/30'}`}
-                    >
-                        {isEquipped ? 'Equipped' : 'Equip Data'}
-                    </button>
-                ) : (
-                    <button 
-                        onClick={() => setSelectedItem(item)}
-                        className={`w-full py-3.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 ${canAfford ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:scale-[1.02] shadow-lg' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'}`}
-                    >
-                        {canAfford ? <Lock size={14} /> : <AlertCircle size={14} />}
-                        {item.price} Flux
-                    </button>
-                )}
-            </div>
-        );
+    // 🔥 THE UNEQUIP ENGINE (Using deleteField!)
+    const handleUnequip = async (category: string) => {
+        if (!auth.currentUser?.uid) return;
+        setIsProcessing(true);
+        try {
+            const userRef = doc(db, 'artifacts', appId, 'users', auth.currentUser.uid);
+            await updateDoc(userRef, {
+                [`equipped.${category}`]: deleteField()
+            });
+            setToastMsg(`Unequipped item. OS restored to default.`);
+        } catch (err) {
+            console.error("Unequip failed:", err);
+        }
+        setIsProcessing(false);
     };
 
     return (
-        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors relative">
+        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 font-sans overflow-hidden animate-in fade-in duration-500">
             {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
 
-            {/* 🔥 SYNCED GLOBAL HEADER */}
-            <header className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm transition-colors duration-300">
-                <div className="flex items-center gap-3">
-                    {activeOrg?.logoUrl ? (
-                        <img src={activeOrg.logoUrl} alt={`${themeName} Logo`} className="w-8 h-8 object-contain rounded-md" />
-                    ) : (
-                        <div className="text-white p-1.5 rounded-lg shadow-sm" style={{ backgroundColor: themeColor }} aria-hidden="true">
-                            <GraduationCap size={18} strokeWidth={3}/>
-                        </div>
-                    )}
-                    <span className="font-black tracking-tighter text-lg truncate max-w-[150px]" style={{ color: themeColor }}>
-                        Store
-                    </span>
+            {/* HEADER */}
+            <header className="px-6 py-8 md:p-10 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0 relative overflow-hidden z-20">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[100px] pointer-events-none" />
+                
+                <div className="flex items-center justify-between relative z-10 mb-8">
+                    <button onClick={onBack} className="flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors text-xs font-black uppercase tracking-widest active:scale-95">
+                        <X size={16} /> Exit Store
+                    </button>
                 </div>
-                <div className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 shrink-0 transition-colors duration-300" aria-label={`Target Language: ${targetLang}`}>
-                    <Globe size={14} className="text-slate-400 dark:text-slate-500" aria-hidden="true"/>
-                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide">{targetLang}</span>
+
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 relative z-10">
+                    <div>
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="w-10 h-10 bg-amber-500/20 text-amber-500 rounded-xl flex items-center justify-center">
+                                <ShoppingBag size={20} />
+                            </div>
+                            <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">The Exchange</h1>
+                        </div>
+                        <p className="text-slate-500 dark:text-slate-400 font-bold text-sm">Trade your hard-earned Flux for OS upgrades.</p>
+                    </div>
+
+                    {/* Massive Flux Balance Display */}
+                    <div className="bg-slate-900 dark:bg-black rounded-[2rem] p-6 border-4 border-slate-800 flex items-center gap-6 shadow-2xl shrink-0">
+                        <div className="w-14 h-14 bg-amber-500/20 rounded-full flex items-center justify-center">
+                            <Zap size={28} className="text-amber-400" fill="currentColor" />
+                        </div>
+                        <div>
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] block mb-1">Available Balance</span>
+                            <span className="text-4xl font-black text-white tabular-nums tracking-tighter">{fluxBalance.toLocaleString()}</span>
+                        </div>
+                    </div>
                 </div>
             </header>
 
-            {/* PAGE HEADER */}
-            <div className="px-6 pt-6 pb-2 shrink-0">
-                <div className="flex justify-between items-end mb-4">
-                    <div>
-                        <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight">Flux Exchange</h2>
-                        <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] flex items-center gap-1.5 mt-1"><ShoppingBag size={12}/> Digital Black Market</p>
-                    </div>
-                    <div className="bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3 py-1.5 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-sm border border-amber-200 dark:border-amber-500/20">
-                        <Zap size={14} className="fill-amber-500" /> {fluxBalance.toLocaleString()} Flux
-                    </div>
-                </div>
-            </div>
-
-            {/* TABS FILTER */}
-            <div className="border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center gap-3 overflow-x-auto custom-scrollbar overscroll-x-contain shrink-0">
-                {[
-                    { id: 'avatars', icon: CircleUser, label: 'Avatars' },
-                    { id: 'auras', icon: Sparkles, label: 'Auras' },
-                    { id: 'titles', icon: Tag, label: 'Titles' },
-                    { id: 'themes', icon: Paintbrush, label: 'Themes' },
-                ].map((tab: any) => (
-                    <button 
-                        key={tab.id} 
-                        onClick={() => setActiveTab(tab.id as any)} 
-                        className={`shrink-0 px-5 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 ${activeTab === tab.id ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
-                    >
-                        <tab.icon size={14} /> {tab.label}
-                    </button>
-                ))}
-            </div>
-
-            {/* CATALOG GRID */}
-            <div className="flex-1 overflow-y-auto p-6 pb-32 custom-scrollbar">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
-                    {STORE_CATALOG[activeTab].map(renderItemCard)}
-                </div>
-            </div>
-
-            {/* PURCHASE CONFIRMATION MODAL */}
-            {selectedItem && (
-                <div className="fixed inset-0 z-[6000] flex items-center justify-center p-6">
-                    <div className="absolute inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-md transition-opacity animate-in fade-in duration-300" onClick={() => setSelectedItem(null)} />
-                    
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 relative z-10 animate-in zoom-in-95 duration-300 overflow-hidden flex flex-col p-8">
-                        <button onClick={() => setSelectedItem(null)} className="absolute top-6 right-6 p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-full text-slate-400 transition-colors">
-                            <X size={20} strokeWidth={3} />
+            {/* TAB NAVIGATION */}
+            <div className="px-6 md:px-10 pt-6 pb-2 shrink-0 z-10 relative">
+                <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-4">
+                    {CATEGORY_TABS.map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex items-center gap-2 px-6 py-3 rounded-full text-xs font-black uppercase tracking-widest transition-all shrink-0 ${
+                                activeTab === tab.id 
+                                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-md' 
+                                    : 'bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-slate-300 dark:hover:border-slate-700'
+                            }`}
+                        >
+                            {tab.icon} {tab.label}
                         </button>
-
-                        <div className="w-16 h-16 bg-amber-100 dark:bg-amber-500/20 text-amber-500 rounded-2xl flex items-center justify-center mb-6 shadow-inner mx-auto">
-                            <Lock size={32} strokeWidth={2.5} />
-                        </div>
-
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white text-center mb-2 leading-tight">Acquire {selectedItem.name}?</h2>
-                        <p className="text-slate-500 dark:text-slate-400 text-center font-bold text-sm mb-8 px-4">
-                            This will permanently decrypt this asset and add it to your inventory.
-                        </p>
-
-                        <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 flex justify-between items-center mb-8 border border-slate-200 dark:border-slate-700">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Cost</span>
-                            <span className="text-xl font-black text-amber-500 flex items-center gap-1.5"><Zap size={18} fill="currentColor"/> {selectedItem.price}</span>
-                        </div>
-
-                        <div className="flex gap-3">
-                            <button onClick={() => setSelectedItem(null)} className="flex-1 px-4 py-4 rounded-xl font-black text-slate-500 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 transition-colors active:scale-95 uppercase text-[10px] tracking-widest">Cancel</button>
-                            <button onClick={handleBuy} className="flex-[2] px-4 py-4 rounded-xl font-black text-white bg-slate-900 dark:bg-white dark:text-slate-900 active:scale-95 transition-all shadow-lg uppercase text-[10px] tracking-widest">Confirm Purchase</button>
-                        </div>
-                    </div>
+                    ))}
                 </div>
-            )}
+            </div>
+
+            {/* MAIN CATALOG GRID */}
+            <main className="flex-1 overflow-y-auto px-6 md:px-10 pb-32 custom-scrollbar">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
+                    {STORE_CATALOG[activeTab].map((item: any) => {
+                        // 1. Check Ownership & Equip Status
+                        const categoryItems = inventory[activeTab] || [];
+                        const isOwned = categoryItems.includes(item.id);
+                        const isEquipped = equipped[activeTab] === item.id;
+                        
+                        return (
+                            <div key={item.id} className="bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 p-6 flex flex-col shadow-sm hover:shadow-xl transition-all duration-300 group">
+                                
+                                {/* Rarity Badge */}
+                                <div className="flex justify-between items-start mb-6">
+                                    <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.2em] border ${RARITY_COLORS[item.rarity]}`}>
+                                        {item.rarity}
+                                    </span>
+                                    {isOwned && (
+                                        <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+                                            <Shield size={14} />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Visual Preview Mockup */}
+                                <div className="w-full h-32 bg-slate-50 dark:bg-slate-950 rounded-3xl mb-6 flex items-center justify-center border border-slate-100 dark:border-slate-800 relative overflow-hidden group-hover:scale-[1.02] transition-transform">
+                                    {activeTab === 'themes' ? (
+                                        <div className="w-full h-full flex">
+                                            <div className={`w-1/2 h-full ${item.colors[0]}`} />
+                                            <div className={`w-1/2 h-full ${item.colors[1]}`} />
+                                        </div>
+                                    ) : activeTab === 'auras' ? (
+                                        <div className={`w-16 h-16 rounded-full border-4 border-slate-800 bg-slate-900 ${item.css}`} />
+                                    ) : activeTab === 'titles' ? (
+                                        <span className="font-black text-slate-800 dark:text-white text-lg tracking-widest">{item.name}</span>
+                                    ) : (
+                                        <CircleUser size={48} className="text-slate-300 dark:text-slate-700" />
+                                    )}
+                                </div>
+
+                                {/* Text Content */}
+                                <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight mb-2 leading-none">{item.name}</h3>
+                                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-8 leading-relaxed line-clamp-2">{item.description}</p>
+
+                                {/* 🔥 THE SMART BUTTON ENGINE */}
+                                <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800">
+                                    {!isOwned ? (
+                                        <button 
+                                            disabled={isProcessing || fluxBalance < item.price}
+                                            onClick={() => handleBuy(item, activeTab)}
+                                            className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-300 disabled:dark:bg-slate-800 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
+                                        >
+                                            <ShoppingCart size={16} /> Buy — {item.price} Flux
+                                        </button>
+                                    ) : !isEquipped ? (
+                                        <button 
+                                            disabled={isProcessing}
+                                            onClick={() => handleEquip(item, activeTab)}
+                                            className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-md hover:bg-slate-800 dark:hover:bg-slate-200 transition-all active:scale-95 flex items-center justify-center gap-2"
+                                        >
+                                            <Sparkles size={16} /> Equip
+                                        </button>
+                                    ) : (
+                                        <button 
+                                            disabled={isProcessing}
+                                            onClick={() => handleUnequip(activeTab)}
+                                            className="w-full py-4 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-2 border-emerald-200 dark:border-emerald-500/30 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-200 dark:hover:border-rose-500/30 group flex items-center justify-center gap-2"
+                                        >
+                                            {/* Normal State: Active */}
+                                            <span className="flex items-center gap-2 group-hover:hidden">
+                                                <CheckCircle2 size={16} /> Active
+                                            </span>
+                                            {/* Hover State: Unequip */}
+                                            <span className="hidden items-center gap-2 group-hover:flex">
+                                                <RotateCcw size={16} /> Unequip
+                                            </span>
+                                        </button>
+                                    )}
+                                </div>
+
+                            </div>
+                        );
+                    })}
+                </div>
+            </main>
         </div>
     );
 }
