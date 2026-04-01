@@ -106,6 +106,7 @@ const QuizBlockRenderer = ({ block }: any) => {
     );
 };
 
+// 🔥 MOBILE FLIPPABLE FLASHCARD DECK (3D CSS FIXED)
 const VocabListBlockRenderer = ({ block }: any) => {
     const [index, setIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
@@ -131,19 +132,27 @@ const VocabListBlockRenderer = ({ block }: any) => {
                 <h3 className="text-xs font-black text-indigo-400 uppercase tracking-widest">{String(block.title || 'Lexicon')}</h3>
             </div>
 
-            <div className="w-full perspective-1000">
+            <div className="w-full" style={{ perspective: '1000px' }}>
                 <div 
                     onClick={() => setIsFlipped(!isFlipped)}
-                    className="relative w-full h-80 md:h-96 cursor-pointer transition-all duration-500 transform-style-3d" 
-                    style={{ transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
+                    className="relative w-full h-80 md:h-96 cursor-pointer transition-transform duration-500" 
+                    style={{ transformStyle: 'preserve-3d', WebkitTransformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
                 >
-                    <div className="absolute inset-0 bg-white rounded-[2.5rem] shadow-lg border-4 border-slate-100 flex flex-col items-center justify-center p-8 text-center backface-hidden">
+                    {/* FRONT OF CARD (TERM) */}
+                    <div 
+                        className="absolute inset-0 bg-white rounded-[2.5rem] shadow-lg border-4 border-slate-100 flex flex-col items-center justify-center p-8 text-center"
+                        style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+                    >
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest absolute top-6">Term {index + 1} of {items.length}</span>
                         <h3 className="text-3xl md:text-4xl font-black text-indigo-600 leading-tight">{String(currentCard.term || '')}</h3>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest absolute bottom-6 animate-pulse bg-slate-50 px-4 py-2 rounded-full border border-slate-200">Tap to Flip</p>
                     </div>
 
-                    <div className="absolute inset-0 bg-indigo-600 rounded-[2.5rem] shadow-xl border-4 border-indigo-500 flex flex-col items-center justify-center p-8 text-white text-center backface-hidden" style={{ transform: 'rotateY(180deg)' }}>
+                    {/* BACK OF CARD (DEFINITION) */}
+                    <div 
+                        className="absolute inset-0 bg-indigo-600 rounded-[2.5rem] shadow-xl border-4 border-indigo-500 flex flex-col items-center justify-center p-8 text-white text-center" 
+                        style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+                    >
                         <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest absolute top-6">Definition</span>
                         <div className="overflow-y-auto custom-scrollbar w-full pt-4 pb-8">
                             <p className="text-lg md:text-xl font-medium leading-relaxed">{String(currentCard.definition || '')}</p>
@@ -153,6 +162,7 @@ const VocabListBlockRenderer = ({ block }: any) => {
                 </div>
             </div>
 
+            {/* DECK NAVIGATION */}
             <div className="flex justify-between items-center mt-8 px-2">
                 <button onClick={() => handleNav(-1)} className="p-4 bg-white rounded-2xl shadow-sm border-2 border-slate-100 text-slate-500 hover:text-indigo-600 hover:border-indigo-100 active:scale-95 transition-all">
                     <ArrowLeft size={20} strokeWidth={2.5} />
@@ -254,9 +264,8 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                 <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Vocabulary Drill</h3>
             </div>
 
-            {/* 🔥 THE FIX: Height Constrained Word Bank with Internal Scrolling */}
-            <div className="sticky top-2 z-30 mb-6 -mx-2 px-2">
-                <div className="bg-white/95 backdrop-blur-xl rounded-2xl p-3 md:p-4 border border-slate-200/50 shadow-[0_10px_30px_rgba(0,0,0,0.1)] flex flex-col gap-2 max-h-[25vh] transition-all duration-300">
+            <div className="sticky top-4 z-30 mb-6 -mx-2 px-2">
+                <div className="bg-white/90 backdrop-blur-xl rounded-2xl p-3 md:p-4 border border-slate-200/50 shadow-[0_10px_30px_rgba(0,0,0,0.1)] flex flex-col gap-2 max-h-[25vh] transition-all duration-300">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center shrink-0 mb-1">Word Bank</span>
                     <div className="flex flex-wrap gap-2 justify-center items-start overflow-y-auto custom-scrollbar w-full pb-2">
                         {wordBank.length === 0 && !isChecked ? (
@@ -427,9 +436,8 @@ const TapSortBlockRenderer = ({ block }: any) => {
                 <h3 className="text-xl md:text-2xl font-black text-amber-900 text-center">{String(block.title || 'Sort the Items!')}</h3>
             </div>
             
-            {/* 🔥 THE FIX: Height Constrained Item Bank with Internal Scrolling */}
             <div className="sticky top-2 z-30 mb-8 -mx-2 px-2">
-                <div className="bg-white/95 backdrop-blur-xl rounded-2xl p-3 md:p-4 border border-slate-200/50 shadow-[0_10px_30px_rgba(0,0,0,0.1)] flex flex-col gap-2 max-h-[30vh] transition-all duration-300">
+                <div className="bg-white/90 backdrop-blur-2xl rounded-[2rem] p-3 md:p-4 border border-slate-200/50 shadow-[0_10px_30px_rgba(0,0,0,0.1)] flex flex-col gap-2 max-h-[30vh] transition-all duration-300">
                     <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest text-center shrink-0 mb-1">Items to Sort</span>
                     <div className="flex flex-wrap justify-center gap-2 overflow-y-auto custom-scrollbar w-full pb-2">
                         {items.length === 0 && <p className="text-amber-500 font-bold uppercase tracking-widest m-auto flex items-center gap-2"><CheckCircle2 size={16}/> All sorted!</p>}
@@ -674,6 +682,7 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
     const grouped: any[] = [];
     let buffer: any[] = [];
     
+    // 🔥 ALL VALID BLOCK TYPES REGISTERED HERE
     const allowedTypes = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'code', 'formula', 'timeline', 'audio-story', 'image-hotspot', 'drag-drop', 'drawing'];
     
     lesson.blocks.forEach((b: any) => {
@@ -769,6 +778,7 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
       case 'vocab-list': return <VocabListBlockRenderer block={block} key={blockKey} />;
       case 'discussion': return <DiscussionBlockRenderer block={block} key={blockKey} />;
       case 'game': return <GameBlockRenderer block={block} key={blockKey} />;
+
       case 'drag-drop': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><TapSortBlockRenderer block={block} /></div>;
       case 'code':
         return (
