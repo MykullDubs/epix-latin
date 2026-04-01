@@ -25,13 +25,15 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const { liveState, startLiveClass, endLiveClass, changeSlide, triggerQuiz } = useLiveClass(classId, true);
 
   const lessonVocab = useMemo(() => {
-    return lesson?.blocks
-      ?.filter((b: any) => b.type === 'vocab-list')
-      ?.flatMap((b: any) => b.items) || [];
+    if (!lesson?.blocks) return [];
+    return lesson.blocks
+      .filter((b: any) => b.type === 'vocab-list')
+      .flatMap((b: any) => b.items || []);
   }, [lesson]);
 
   // When the projector starts, broadcast to the room & start the clock!
   useEffect(() => {
+      if (!lesson?.id) return;
       startLiveClass(lesson.id);
       
       const timer = setInterval(() => {
@@ -42,7 +44,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           clearInterval(timer);
           endLiveClass(); 
       };
-  }, [lesson.id]);
+  }, [lesson?.id]);
 
   const formatTime = (seconds: number) => {
       const m = Math.floor(seconds / 60);
@@ -51,17 +53,20 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   };
 
   const pages = useMemo(() => {
-    if (!lesson?.blocks) return [];
+    if (!lesson?.blocks || !Array.isArray(lesson.blocks)) return [];
     const grouped: any[] = [];
     let buffer: any[] = [];
+    
     lesson.blocks.forEach((b: any) => {
+      const type = String(b?.type || '');
       // Isolate interactive blocks so they get their own full-screen page
-      if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game'].includes(b.type)) {
+      if (['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game'].indexOf(type) !== -1) {
         if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
         grouped.push({ type: 'interact', blocks: [b] });
         buffer = [];
       } else { buffer.push(b); }
     });
+    
     if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
     return grouped;
   }, [lesson]);
@@ -89,7 +94,8 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
-          if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
+          const tag = (e.target as HTMLElement).tagName;
+          if (['INPUT', 'TEXTAREA'].indexOf(tag) !== -1) return;
           
           if (e.key === 'ArrowRight' || e.key === ' ') { 
               e.preventDefault(); handleNext();
@@ -112,7 +118,8 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleNext, handlePrev]);
 
-  if (!lesson || !pages[activePageIdx]) return null;
+  const activePage = pages[activePageIdx];
+  if (!lesson || !activePage) return null;
 
   return (
     <div 
@@ -153,8 +160,10 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           <div className="flex flex-col min-h-full w-full items-center px-16 py-12 lg:px-32">
             
             <div className="w-full max-w-7xl space-y-24 my-auto">
-              {pages[activePageIdx].blocks.map((block: any, i: number) => {
-                const isQuiz = block.type === 'quiz';
+              {activePage.blocks.map((block: any, i: number) => {
+                if (!block) return null;
+                const blockType = String(block.type || '');
+                const isQuiz = blockType === 'quiz';
                 const answerCount = Object.keys(liveState?.answers || {}).length;
 
                 return (
@@ -167,7 +176,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                           
                           <div className="relative z-10">
                               <span className="text-[2vh] font-black text-indigo-400 uppercase tracking-widest block mb-6">Class Question</span>
-                              <h2 className="text-[5vh] md:text-[6vh] font-black mb-12 leading-tight">{block.content?.question || block.question}</h2>
+                              <h2 className="text-[5vh] md:text-[6vh] font-black mb-12 leading-tight">{String(block.content?.question || block.question || '')}</h2>
                               
                               {liveState?.quizState === 'waiting' && (
                                   <button 
@@ -201,7 +210,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                                           <CheckCircle2 size={48} /> Correct Answer Displayed!
                                       </div>
                                       <div className="bg-emerald-500 text-white p-8 rounded-[2rem] shadow-xl text-[4vh] font-bold border-4 border-emerald-400 min-w-[50%]">
-                                          {block.content?.options?.find((o:any) => o.id === block.content.correctId)?.text || "Answer Revealed on Devices"}
+                                          {String(block.content?.options?.find((o:any) => String(o.id) === String(block.content?.correctId))?.text || "Answer Revealed on Devices")}
                                       </div>
                                   </div>
                               )}
@@ -210,15 +219,15 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                     ) : (
                       /* STANDARD BLOCKS */
                       <>
-                          {block.type === 'text' && <TextBlock block={block} />}
-                          {block.type === 'essay' && <EssayBlock block={block} />}
-                          {block.type === 'image' && <ImageBlock block={block} />}
-                          {block.type === 'dialogue' && <DialogueBlock block={block} />}
-                          {block.type === 'vocab-list' && <VocabListBlock block={block} />}
-                          {block.type === 'discussion' && <DiscussionBlock block={block} />}
-                          {block.type === 'game' && block.gameType === 'connect-three' && <GameBlock block={block} lessonVocab={lessonVocab} />}
-                          {block.type === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
-                          {block.type === 'fill-blank' && <FillBlankBlock block={block} liveState={liveState} />}
+                          {blockType === 'text' && <TextBlock block={block} />}
+                          {blockType === 'essay' && <EssayBlock block={block} />}
+                          {blockType === 'image' && <ImageBlock block={block} />}
+                          {blockType === 'dialogue' && <DialogueBlock block={block} />}
+                          {blockType === 'vocab-list' && <VocabListBlock block={block} />}
+                          {blockType === 'discussion' && <DiscussionBlock block={block} />}
+                          {blockType === 'game' && block.gameType === 'connect-three' && <GameBlock block={block} lessonVocab={lessonVocab} />}
+                          {blockType === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
+                          {blockType === 'fill-blank' && <FillBlankBlock block={block} liveState={liveState} />}
                       </>
                     )}
                   </div>
@@ -240,7 +249,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       {/* FOOTER PROGRESS INDICATOR & HUD */}
       <footer className="h-20 bg-slate-900 border-t border-slate-800 flex items-center justify-between px-12 shrink-0 relative z-20">
           <div className="flex items-center gap-8">
-              <h2 className="text-xl font-black text-slate-400 uppercase tracking-widest">{lesson.title}</h2>
+              <h2 className="text-xl font-black text-slate-400 uppercase tracking-widest">{String(lesson?.title || '')}</h2>
               <div className="h-6 w-px bg-slate-800" />
               {/* 🔥 OS FEATURE: Telemetry Clock */}
               <span className="flex items-center gap-2 font-mono text-lg font-bold text-slate-500">
@@ -270,23 +279,21 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 }
 
 // ============================================================================
-//  INTERNAL BLOCK RENDERERS (Cinematic Upgrades)
+//  INTERNAL BLOCK RENDERERS (Mobile-Safe & Armored)
 // ============================================================================
 
 const TextBlock = ({ block }: { block: any }) => (
   <div className="text-center py-12 max-w-6xl mx-auto">
-    {block.title && <h3 className="text-[3vh] font-black text-indigo-500 uppercase tracking-widest mb-8">{block.title}</h3>}
-    {/* Cinematic Typography */}
-    <p className="text-[6vh] font-black text-slate-800 leading-[1.1] tracking-tight">{block.content}</p>
+    {block.title && <h3 className="text-[3vh] font-black text-indigo-500 uppercase tracking-widest mb-8">{String(block.title)}</h3>}
+    <p className="text-[6vh] font-black text-slate-800 leading-[1.1] tracking-tight">{String(block.content || '')}</p>
   </div>
 );
 
 const EssayBlock = ({ block }: { block: any }) => (
   <div className="w-full max-w-7xl mx-auto py-12">
-    <h1 className="text-[8vh] font-black text-slate-900 leading-none mb-16 text-center">{block.title}</h1>
-    {/* 🔥 OS FEATURE: Newspaper multi-column layout for easy projector reading */}
+    <h1 className="text-[8vh] font-black text-slate-900 leading-none mb-16 text-center">{String(block.title || '')}</h1>
     <div className="columns-1 xl:columns-2 gap-20 space-y-[4vh]">
-        {block.content?.split('\n\n').map((para: string, pIdx: number) => (
+        {String(block.content || '').split('\n\n').map((para: string, pIdx: number) => (
           <p key={pIdx} className="text-[3.5vh] leading-[1.7] text-slate-700 font-serif text-justify first-letter:text-[7vh] first-letter:font-black first-letter:text-indigo-600 first-letter:float-left first-letter:mr-3 break-inside-avoid">{para.trim()}</p>
         ))}
     </div>
@@ -296,46 +303,46 @@ const EssayBlock = ({ block }: { block: any }) => (
 const ImageBlock = ({ block }: { block: any }) => (
   <figure className="w-full flex flex-col items-center py-12">
     <div className="relative group overflow-hidden rounded-[3rem] shadow-2xl border-8 border-slate-50">
-        {/* Subtle cinematic zoom on load */}
-        <img src={block.url} alt="presentation slide" className="max-h-[65vh] object-cover animate-in zoom-in-105 duration-[20s]" />
+        <img src={String(block.url || '')} alt="presentation slide" className="max-h-[65vh] object-cover animate-in zoom-in-105 duration-[20s]" />
     </div>
-    {block.caption && <figcaption className="text-[3vh] text-slate-500 font-bold mt-8 text-center max-w-4xl">{block.caption}</figcaption>}
+    {block.caption && <figcaption className="text-[3vh] text-slate-500 font-bold mt-8 text-center max-w-4xl">{String(block.caption)}</figcaption>}
   </figure>
 );
 
 const DialogueBlock = ({ block }: { block: any }) => (
   <div className="w-full max-w-5xl mx-auto space-y-12 py-12">
-    {block.lines?.map((line: any, j: number) => (
-      // 🔥 OS FEATURE: Staggered animation entrance like an actual chat loading
+    {(Array.isArray(block.lines) ? block.lines : []).map((line: any, j: number) => {
+      const sideRight = String(line.side) === 'right';
+      const speakerInitial = typeof line.speaker === 'string' && line.speaker.trim().length > 0 ? line.speaker.trim()[0].toUpperCase() : '?';
+      return (
       <div 
         key={j} 
-        className={`flex items-end gap-6 animate-in slide-in-from-bottom-8 fade-in fill-mode-both ${line.side === 'right' ? 'flex-row-reverse' : ''}`}
+        className={`flex items-end gap-6 animate-in slide-in-from-bottom-8 fade-in fill-mode-both ${sideRight ? 'flex-row-reverse' : ''}`}
         style={{ animationDelay: `${j * 300}ms`, animationDuration: '600ms' }}
       >
-        <div className={`w-20 h-20 rounded-full flex items-center justify-center text-[3vh] font-black text-white shrink-0 shadow-2xl ${line.side === 'right' ? 'bg-indigo-600' : 'bg-slate-800'}`}>
-          {line.speaker?.[0].toUpperCase()}
+        <div className={`w-20 h-20 rounded-full flex items-center justify-center text-[3vh] font-black text-white shrink-0 shadow-2xl ${sideRight ? 'bg-indigo-600' : 'bg-slate-800'}`}>
+          {speakerInitial}
         </div>
-        <div className={`max-w-[80%] p-10 rounded-[3rem] shadow-lg text-[4vh] font-medium leading-relaxed ${line.side === 'right' ? 'bg-indigo-500 text-white rounded-br-none' : 'bg-white border-4 border-slate-100 text-slate-800 rounded-bl-none'}`}>
-          {line.text}
+        <div className={`max-w-[80%] p-10 rounded-[3rem] shadow-lg text-[4vh] font-medium leading-relaxed ${sideRight ? 'bg-indigo-500 text-white rounded-br-none' : 'bg-white border-4 border-slate-100 text-slate-800 rounded-bl-none'}`}>
+          {String(line.text || '')}
           {line.translation && (
-            <p className={`text-[2.5vh] mt-6 italic opacity-80 font-bold border-t pt-4 ${line.side === 'right' ? 'border-indigo-400' : 'border-slate-200'}`}>{line.translation}</p>
+            <p className={`text-[2.5vh] mt-6 italic opacity-80 font-bold border-t pt-4 ${sideRight ? 'border-indigo-400' : 'border-slate-200'}`}>{String(line.translation)}</p>
           )}
         </div>
       </div>
-    ))}
+    )})}
   </div>
 );
 
 const VocabListBlock = ({ block }: { block: any }) => (
   <div className="grid grid-cols-2 gap-10 py-12">
-    {block.items.map((item: any, j: number) => (
-      // 🔥 OS FEATURE: Glassmorphism layout
+    {(Array.isArray(block.items) ? block.items : []).map((item: any, j: number) => (
       <div key={j} className="bg-gradient-to-br from-slate-50 to-slate-100 p-12 rounded-[3rem] border border-white shadow-xl text-left relative overflow-hidden group">
         <div className="absolute -right-12 -top-12 opacity-5 text-indigo-900 rotate-12 group-hover:scale-110 transition-transform duration-700">
             <Layers size={200} />
         </div>
-        <p className="text-[5vh] font-black text-indigo-600 mb-4 relative z-10">{item.term}</p>
-        <p className="text-[3vh] text-slate-600 font-medium leading-relaxed relative z-10">{item.definition}</p>
+        <p className="text-[5vh] font-black text-indigo-600 mb-4 relative z-10">{String(item.term || '')}</p>
+        <p className="text-[3vh] text-slate-600 font-medium leading-relaxed relative z-10">{String(item.definition || '')}</p>
       </div>
     ))}
   </div>
@@ -345,13 +352,13 @@ const DiscussionBlock = ({ block }: { block: any }) => (
   <div className="w-full max-w-6xl mx-auto bg-indigo-50 rounded-[4rem] p-16 border-8 border-indigo-100 shadow-2xl my-12">
     <div className="flex items-center gap-6 mb-16 justify-center">
       <div className="p-6 bg-indigo-600 text-white rounded-3xl shadow-xl animate-bounce" style={{ animationDuration: '3s' }} aria-hidden="true"><MessageCircle size={48} /></div>
-      <h3 className="text-[5vh] font-black text-indigo-900">{block.title || "Let's Discuss"}</h3>
+      <h3 className="text-[5vh] font-black text-indigo-900">{String(block.title || "Let's Discuss")}</h3>
     </div>
     <div className="space-y-8">
-      {(block.questions || []).map((q: string, j: number) => (
+      {(Array.isArray(block.questions) ? block.questions : []).map((q: any, j: number) => (
         <div key={j} className="bg-white p-10 rounded-[2.5rem] shadow-md border-4 border-indigo-50 flex gap-8 items-start hover:-translate-y-2 transition-transform duration-300">
           <span className="text-[5vh] font-black text-indigo-200 leading-none">{j + 1}</span>
-          <p className="text-[4vh] font-bold text-slate-800 leading-tight">{q}</p>
+          <p className="text-[4vh] font-bold text-slate-800 leading-tight">{String(q || '')}</p>
         </div>
       ))}
     </div>
@@ -364,7 +371,7 @@ const GameBlock = ({ block, lessonVocab }: { block: any, lessonVocab: any }) => 
       <div className="inline-flex items-center justify-center p-6 bg-indigo-50 text-indigo-600 rounded-3xl mb-8 shadow-inner" aria-hidden="true">
         <Gamepad2 size={64} />
       </div>
-      <h3 className="text-[6vh] font-black text-slate-800 leading-none">{block.title || "Vocabulary Battle"}</h3>
+      <h3 className="text-[6vh] font-black text-slate-800 leading-none">{String(block.title || "Vocabulary Battle")}</h3>
       <p className="text-[3vh] font-bold text-slate-400 uppercase tracking-[0.4em] mt-4">Local Multiplayer Mode</p>
     </div>
     <div className="scale-[1.2] origin-top mt-8 w-full flex justify-center pointer-events-auto">
@@ -375,14 +382,14 @@ const GameBlock = ({ block, lessonVocab }: { block: any, lessonVocab: any }) => 
 
 const ScenarioBlock = ({ block, liveState }: { block: any, liveState: any }) => {
   const activeNodeId = liveState?.currentNodeId || block.nodes?.[0]?.id;
-  const currentNode = block.nodes?.find((n:any) => n.id === activeNodeId) || block.nodes?.[0];
+  const currentNode = Array.isArray(block.nodes) ? block.nodes.find((n:any) => String(n.id) === String(activeNodeId)) || block.nodes[0] : null;
   const bgColors: any = { neutral: 'bg-emerald-900 border-emerald-500', success: 'bg-indigo-900 border-indigo-500', failure: 'bg-rose-900 border-rose-500' };
   const style = bgColors[currentNode?.color || 'neutral'];
 
   return (
     <div className={`w-full max-w-5xl mx-auto rounded-[4rem] p-16 text-white shadow-2xl border-8 text-center transition-colors duration-500 my-12 ${style}`}>
-      <span className="text-[2vh] font-black uppercase tracking-widest block mb-8 opacity-70">Interactive Scenario • {currentNode?.speaker || 'Character'}</span>
-      <h3 className="text-[5vh] font-serif italic mb-12 leading-tight">"{currentNode?.text}"</h3>
+      <span className="text-[2vh] font-black uppercase tracking-widest block mb-8 opacity-70">Interactive Scenario • {String(currentNode?.speaker || 'Character')}</span>
+      <h3 className="text-[5vh] font-serif italic mb-12 leading-tight">"{String(currentNode?.text || '')}"</h3>
       <div className="inline-block px-8 py-4 bg-black/20 rounded-full border-2 border-white/20 backdrop-blur-md animate-pulse">
         <p className="text-[3vh] font-bold text-white">Look at your device to make a choice!</p>
       </div>
@@ -390,27 +397,51 @@ const ScenarioBlock = ({ block, liveState }: { block: any, liveState: any }) => 
   );
 };
 
+// 🔥 TITANIUM ARMORED FILL BLANK FOR PROJECTOR
 const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) => {
+  const rawText = String(block.text || "Missing text [here].");
+
+  const { textParts, correctAnswers } = useMemo(() => {
+        const parts = rawText.split(/\[.*?\]/g);
+        const answers: string[] = [];
+        const regex = /\[(.*?)\]/g;
+        let match;
+        while ((match = regex.exec(rawText)) !== null) {
+            answers.push(String(match[1]));
+        }
+        return { textParts: parts, correctAnswers: answers };
+  }, [rawText]);
+
+  const distractorsJson = JSON.stringify(block.distractors || []);
+  const distractors = useMemo(() => {
+        let rawOptions = [];
+        try { rawOptions = JSON.parse(distractorsJson); } catch (e) {}
+        if (!Array.isArray(rawOptions)) rawOptions = typeof rawOptions === 'string' ? [rawOptions] : [];
+        return rawOptions.map((opt: any) => String(opt)).filter(Boolean);
+  }, [distractorsJson]);
+
   const shuffledWords = useMemo(() => {
-    const extractedWords = block.text?.match(/\[(.*?)\]/g)?.map((s:string) => s.replace(/\[|\]/g, '')) || [];
-    const allWords = block.distractors ? [...block.distractors, ...extractedWords] : extractedWords;
+    const allWords = [...correctAnswers, ...distractors];
     return allWords.sort(() => 0.5 - Math.random());
-  }, [block]);
+  }, [correctAnswers, distractors]);
+
+  // Safely extract the live array of answers
+  const liveAnswers = Array.isArray(liveState?.answers) ? liveState.answers : [];
 
   return (
     <div className="w-full max-w-6xl mx-auto bg-white p-16 rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12">
-      <h3 className="text-[4vh] font-bold text-slate-800 mb-12 flex items-center gap-4">
+      <h3 className="text-[4vh] font-bold text-slate-800 mb-12 flex items-center justify-center gap-4">
         <span className="bg-indigo-100 text-indigo-600 p-4 rounded-2xl" aria-hidden="true"><Puzzle size={40}/></span>
-        {block.question}
+        {String(block.question || "Fill in the blanks")}
       </h3>
+      
       <div className="text-[6vh] font-medium leading-loose text-slate-700 flex flex-wrap items-center gap-y-6 justify-center text-center">
-        {block.text?.split(/\[(.*?)\]/g).map((part: string, idx: number) => {
-          if (idx % 2 === 0) return <span key={idx} className="mx-2">{part}</span>;
-          
-          const blankIdx = Math.floor(idx / 2);
-          const filledWord = liveState?.answers?.[blankIdx];
+        {textParts.map((part: string, idx: number) => {
+          const isLast = idx === textParts.length - 1;
+          const filledItem = liveAnswers[idx];
+          const filledWord = filledItem?.word;
           const isChecking = liveState?.submitted;
-          const isRight = filledWord === part;
+          const isRight = filledWord === correctAnswers[idx];
 
           let style = "border-dashed border-slate-300 bg-slate-50 text-slate-400";
           if (filledWord && !isChecking) style = "border-solid border-indigo-400 bg-indigo-100 text-indigo-700 shadow-lg scale-110 -translate-y-2";
@@ -418,9 +449,14 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
           if (isChecking && !isRight) style = "border-solid border-rose-500 bg-rose-100 text-rose-700 shadow-lg";
 
           return (
-            <span key={idx} className={`min-w-[150px] h-20 px-8 mx-3 rounded-2xl border-4 flex items-center justify-center text-[4vh] font-bold transition-all duration-300 ${style}`}>
-              {filledWord || "?"}
-            </span>
+            <React.Fragment key={`part_${idx}`}>
+                <span className="mx-2">{String(part)}</span>
+                {!isLast && (
+                    <span className={`min-w-[150px] h-20 px-8 mx-3 rounded-2xl border-4 flex items-center justify-center text-[4vh] font-bold transition-all duration-300 ${style}`}>
+                    {filledWord || "?"}
+                    </span>
+                )}
+            </React.Fragment>
           );
         })}
       </div>
@@ -428,7 +464,14 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
       {!liveState?.submitted && (
         <div className="mt-16 flex flex-wrap gap-4 justify-center">
           {shuffledWords.map((word: string, i: number) => {
-            const isUsed = liveState?.answers?.includes(word);
+            // Mobile safe check to see if the word is currently in an answer slot
+            let isUsed = false;
+            for(let a=0; a < liveAnswers.length; a++) {
+                if (liveAnswers[a]?.word === word) {
+                    isUsed = true; break;
+                }
+            }
+            
             return (
               <span key={i} className={`px-6 py-3 rounded-xl border-2 text-[3vh] font-bold transition-all duration-300 ${isUsed ? 'bg-slate-50 border-slate-100 text-slate-300 scale-95' : 'bg-slate-100 border-slate-200 text-slate-500 shadow-sm'}`}>
                 {word}
