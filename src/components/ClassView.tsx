@@ -33,30 +33,34 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const isDragging = useRef(false);
   const dragOffset = useRef({ x: 0, y: 0 });
 
-  // 🔥 OS FEATURE: Spotlight & Annotation Marker
+  // 🔥 OS FEATURE: Spotlight
   const [isSpotlight, setIsSpotlight] = useState(false);
   const [mousePos, setMousePos] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
-  const [isAnnotating, setIsAnnotating] = useState(false);
   
-  // 🎨 NEW: Advanced Annotation Tools & Text Engine
+  // 🎨 NEW: Dual-Layer Annotation Engine
+  const [isAnnotating, setIsAnnotating] = useState(false);
   const [markerColor, setMarkerColor] = useState('#ef4444');
   const [markerSize, setMarkerSize] = useState(6);
   const [markerStyle, setMarkerStyle] = useState<'pen' | 'highlighter' | 'text'>('pen');
   
-  const [texts, setTexts] = useState<{id: number, x: number, y: number, text: string, color: string, size: number}[]>([]);
+  const [slideTexts, setSlideTexts] = useState<{id: number, x: number, y: number, text: string, color: string, size: number}[]>([]);
+  const [boardTexts, setBoardTexts] = useState<{id: number, x: number, y: number, text: string, color: string, size: number}[]>([]);
   const [activeText, setActiveText] = useState<{x: number, y: number, text: string} | null>(null);
 
-  // Refs for State-Safe Saves (Prevents Race Conditions)
+  // Refs for State-Safe Routing (Prevents Race Conditions)
   const activeTextRef = useRef(activeText);
   const markerColorRef = useRef(markerColor);
   const markerSizeRef = useRef(markerSize);
+  const showWhiteboardRef = useRef(showWhiteboard);
+  
   useEffect(() => { activeTextRef.current = activeText; }, [activeText]);
   useEffect(() => { markerColorRef.current = markerColor; }, [markerColor]);
   useEffect(() => { markerSizeRef.current = markerSize; }, [markerSize]);
+  useEffect(() => { showWhiteboardRef.current = showWhiteboard; }, [showWhiteboard]);
 
   const classViewRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const slideCanvasRef = useRef<HTMLCanvasElement>(null);
+  const boardCanvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawingAnnotation = useRef(false);
 
   const stageRef = useRef<HTMLDivElement>(null);
@@ -71,7 +75,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       .flatMap((b: any) => b.items || []);
   }, [lesson]);
 
-  // Main Classroom Clock
   useEffect(() => {
       if (!lesson?.id) return;
       startLiveClass(lesson.id);
@@ -80,7 +83,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       return () => { clearInterval(timer); endLiveClass(); };
   }, [lesson?.id]);
 
-  // Floating Countdown Timer Engine
   useEffect(() => {
       let interval: NodeJS.Timeout;
       if (timerRunning && timeLeft > 0) {
@@ -91,7 +93,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       return () => clearInterval(interval);
   }, [timerRunning, timeLeft]);
 
-  // Timer Dragging Logic
   const startDrag = (e: React.MouseEvent) => {
       isDragging.current = true;
       dragOffset.current = { x: e.clientX - timerPos.x, y: e.clientY - timerPos.y };
@@ -128,13 +129,19 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       return { x: clientX - rect.left, y: clientY - rect.top };
   };
 
-  // Global Annotation Canvas Engine
+  // 🔥 Dual-Layer Canvas Initialization
   useEffect(() => {
       const resizeCanvas = () => {
-          if (canvasRef.current && classViewRef.current) {
+          if (classViewRef.current) {
               const rect = classViewRef.current.getBoundingClientRect();
-              canvasRef.current.width = rect.width;
-              canvasRef.current.height = rect.height;
+              if (slideCanvasRef.current) {
+                  slideCanvasRef.current.width = rect.width;
+                  slideCanvasRef.current.height = rect.height;
+              }
+              if (boardCanvasRef.current) {
+                  boardCanvasRef.current.width = rect.width;
+                  boardCanvasRef.current.height = rect.height;
+              }
           }
       };
       window.addEventListener('resize', resizeCanvas);
@@ -155,31 +162,34 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       }
   };
 
-  // 🔥 STATE-SAFE TEXT SAVER (Solves the disappearing text race condition)
+  // 🔥 STATE-SAFE TEXT SAVER (Routes text to the correct layer automatically)
   const forceSaveText = useCallback(() => {
       const curr = activeTextRef.current;
       if (curr && curr.text.trim().length > 0) {
-          setTexts(prev => [...prev, { 
-              id: Date.now(), x: curr.x, y: curr.y, text: curr.text, 
-              color: markerColorRef.current, size: markerSizeRef.current 
-          }]);
+          const newText = { id: Date.now(), x: curr.x, y: curr.y, text: curr.text, color: markerColorRef.current, size: markerSizeRef.current };
+          if (showWhiteboardRef.current) {
+              setBoardTexts(prev => [...prev, newText]);
+          } else {
+              setSlideTexts(prev => [...prev, newText]);
+          }
       }
       setActiveText(null);
   }, []);
 
+  // 🔥 INK DELEGATOR (Routes ink to the correct canvas automatically)
   const startAnnotation = (e: React.MouseEvent) => {
       const coords = getRelativeCoords(e.clientX, e.clientY);
       
       if (markerStyle === 'text') {
           forceSaveText(); 
           setActiveText({ x: coords.x, y: coords.y, text: '' });
-          setTimeout(() => inputRef.current?.focus(), 50); // Ensures it mounts before focusing
           return;
       }
 
-      forceSaveText(); // Auto-save open text if switching to pen
+      forceSaveText(); 
       isDrawingAnnotation.current = true;
-      const ctx = canvasRef.current?.getContext('2d');
+      const targetCanvas = showWhiteboardRef.current ? boardCanvasRef.current : slideCanvasRef.current;
+      const ctx = targetCanvas?.getContext('2d');
       if (ctx) {
           applyBrushSettings(ctx);
           ctx.beginPath();
@@ -190,8 +200,9 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   };
 
   const drawAnnotation = (e: React.MouseEvent) => {
-      if (!isDrawingAnnotation.current || !canvasRef.current || markerStyle === 'text') return;
-      const ctx = canvasRef.current.getContext('2d');
+      if (!isDrawingAnnotation.current || markerStyle === 'text') return;
+      const targetCanvas = showWhiteboardRef.current ? boardCanvasRef.current : slideCanvasRef.current;
+      const ctx = targetCanvas?.getContext('2d');
       if (!ctx) return;
       const coords = getRelativeCoords(e.clientX, e.clientY);
       applyBrushSettings(ctx);
@@ -203,15 +214,21 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
   const stopAnnotation = () => {
       isDrawingAnnotation.current = false;
-      if (canvasRef.current) canvasRef.current.getContext('2d')?.beginPath();
+      const targetCanvas = showWhiteboardRef.current ? boardCanvasRef.current : slideCanvasRef.current;
+      targetCanvas?.getContext('2d')?.beginPath();
   };
 
   const clearAnnotations = () => {
-      if (canvasRef.current) {
-          const ctx = canvasRef.current.getContext('2d');
-          ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      const canvas = showWhiteboard ? boardCanvasRef.current : slideCanvasRef.current;
+      if (canvas) {
+          const ctx = canvas.getContext('2d');
+          ctx?.clearRect(0, 0, canvas.width, canvas.height);
       }
-      setTexts([]);
+      if (showWhiteboard) {
+          setBoardTexts([]);
+      } else {
+          setSlideTexts([]);
+      }
       setActiveText(null);
   };
 
@@ -271,11 +288,9 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
           const tag = (e.target as HTMLElement).tagName;
+          if (['INPUT', 'TEXTAREA'].indexOf(tag) !== -1 && e.key !== 'Escape') return; // Safe Typing
           
-          // 🔥 CRITICAL FIX: Allows Escape key to pass through even if typing
-          if (['INPUT', 'TEXTAREA'].indexOf(tag) !== -1 && e.key !== 'Escape') return;
-          
-          if (e.key === 'ArrowRight') { 
+          if (e.key === 'ArrowRight' || e.key === ' ') { 
               e.preventDefault(); handleNext();
           } else if (e.key === 'ArrowLeft') {
               e.preventDefault(); handlePrev();
@@ -328,9 +343,10 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         ref={classViewRef}
         className="w-full flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500 relative"
         style={{ height: 'calc(100dvh - 4rem)' }}
-        onContextMenu={handleRightClick} 
+        onContextMenu={handleRightClick}
     >
       {/* 🔥 OS OVERLAYS & TOOLS */}
+      
       <div className={`absolute inset-0 bg-black z-[9000] flex items-center justify-center transition-opacity duration-700 pointer-events-none ${isBlanked ? 'opacity-100' : 'opacity-0'}`}>
           <EyeOff size={64} className="text-white/10" />
       </div>
@@ -342,45 +358,48 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           />
       )}
 
-      {/* Instant Scratchpad (Whiteboard Background) */}
-      <div 
-          className={`absolute inset-0 z-[8550] transition-transform duration-500 ease-in-out pointer-events-none ${showWhiteboard ? 'translate-y-0' : '-translate-y-full'}`}
-          style={{ backgroundColor: '#f8fafc', backgroundImage: 'radial-gradient(#cbd5e1 2px, transparent 2px)', backgroundSize: '40px 40px' }}
-      />
+      {/* 1. SLIDE ANNOTATION LAYER (Static over slides) */}
+      <div className="absolute inset-0 z-[8400] pointer-events-none overflow-hidden">
+          <canvas ref={slideCanvasRef} className="absolute inset-0 w-full h-full" />
+          {slideTexts.map(t => (
+              <div key={t.id} style={{ position: 'absolute', left: t.x, top: t.y, color: t.color, fontSize: `${t.size * 6}px`, fontWeight: 'bold', transform: 'translateY(-50%)', whiteSpace: 'nowrap' }}>{t.text}</div>
+          ))}
+      </div>
 
-      {/* The Annotation Drawing Layer (Ink) */}
-      <canvas
-          ref={canvasRef}
+      {/* 2. WHITEBOARD SCRATCHPAD LAYER (Rolls up and down) */}
+      <div 
+          className={`absolute inset-0 z-[8550] transition-transform duration-500 ease-in-out pointer-events-none overflow-hidden ${showWhiteboard ? 'translate-y-0' : '-translate-y-full'}`}
+          style={{ backgroundColor: '#f8fafc', backgroundImage: 'radial-gradient(#cbd5e1 2px, transparent 2px)', backgroundSize: '40px 40px' }}
+      >
+          {/* Note how these roll up *with* the whiteboard container perfectly! */}
+          <canvas ref={boardCanvasRef} className="absolute inset-0 w-full h-full" />
+          {boardTexts.map(t => (
+              <div key={t.id} style={{ position: 'absolute', left: t.x, top: t.y, color: t.color, fontSize: `${t.size * 6}px`, fontWeight: 'bold', transform: 'translateY(-50%)', whiteSpace: 'nowrap' }}>{t.text}</div>
+          ))}
+      </div>
+
+      {/* 3. INVISIBLE GLASS ROUTER PANE (Catches clicks, draws ink) */}
+      <div
           onMouseDown={startAnnotation}
           onMouseMove={drawAnnotation}
           onMouseUp={stopAnnotation}
           onMouseLeave={stopAnnotation}
           className={`absolute inset-0 z-[8600] ${isAnnotating ? (markerStyle === 'text' ? 'pointer-events-auto cursor-text' : 'pointer-events-auto cursor-crosshair') : 'pointer-events-none'}`}
-      />
-
-      {/* 🔥 THE TEXT ENGINE LAYER */}
-      <div className="absolute inset-0 z-[8650] pointer-events-none">
-          {texts.map(t => (
-              <div 
-                  key={t.id} 
-                  style={{ position: 'absolute', left: t.x, top: t.y, color: t.color, fontSize: `${t.size * 6}px`, fontWeight: 'bold', pointerEvents: 'none', transform: 'translateY(-50%)', whiteSpace: 'nowrap' }}
-              >
-                  {t.text}
-              </div>
-          ))}
+      >
+          {/* Active text input lives here temporarily so it doesn't move */}
           {activeText && (
               <input 
-                  ref={inputRef}
+                  autoFocus
                   value={activeText.text}
                   onChange={e => setActiveText({...activeText, text: e.target.value})}
                   onKeyDown={e => { if (e.key === 'Enter') forceSaveText(); }}
-                  placeholder="Type here..."
+                  onBlur={forceSaveText}
                   className="pointer-events-auto" 
                   style={{ 
                       position: 'absolute', left: activeText.x, top: activeText.y, color: markerColor, 
                       fontSize: `${markerSize * 6}px`, fontWeight: 'bold', background: 'transparent', 
-                      outline: 'none', transform: 'translateY(-50%)', minWidth: '400px',
-                      borderBottom: `3px dashed ${markerColor}50` // Subtle guide line
+                      outline: 'none', border: 'none', borderBottom: `3px dashed ${markerColor}50`, 
+                      transform: 'translateY(-50%)', minWidth: '400px'
                   }}
               />
           )}
@@ -391,7 +410,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           <div className="absolute top-12 right-8 z-[8700] flex flex-col gap-4 animate-in fade-in slide-in-from-right-8 pointer-events-auto items-end" onMouseDown={(e) => e.stopPropagation()}>
               <div className="bg-slate-900/95 backdrop-blur-2xl p-4 rounded-[2.5rem] shadow-2xl border-4 border-slate-700 flex flex-col gap-6 w-20 items-center">
                   
-                  {/* Tool Toggle */}
                   <div className="flex flex-col gap-2 bg-slate-800/80 p-2 rounded-3xl w-full items-center border border-slate-700">
                       <button onClick={() => { setMarkerStyle('pen'); forceSaveText(); }} className={`p-3 rounded-2xl transition-all ${markerStyle === 'pen' ? 'bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.6)]' : 'text-slate-400 hover:text-white'}`}>
                           <PenTool size={24} />
@@ -399,12 +417,11 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                       <button onClick={() => { setMarkerStyle('highlighter'); forceSaveText(); }} className={`p-3 rounded-2xl transition-all ${markerStyle === 'highlighter' ? 'bg-amber-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.6)]' : 'text-slate-400 hover:text-white'}`}>
                           <Highlighter size={24} />
                       </button>
-                      <button onClick={() => setMarkerStyle('text')} className={`p-3 rounded-2xl transition-all ${markerStyle === 'text' ? 'bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.6)]' : 'text-slate-400 hover:text-white'}`}>
+                      <button onClick={() => { setMarkerStyle('text'); forceSaveText(); }} className={`p-3 rounded-2xl transition-all ${markerStyle === 'text' ? 'bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.6)]' : 'text-slate-400 hover:text-white'}`}>
                           <Type size={24} />
                       </button>
                   </div>
 
-                  {/* Colors */}
                   <div className="flex flex-col gap-3">
                       {['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#a855f7', '#ffffff', '#0f172a'].map(c => (
                           <button 
@@ -416,7 +433,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                       ))}
                   </div>
 
-                  {/* Sizes */}
                   <div className="flex flex-col items-center gap-3 bg-slate-800/80 p-2 rounded-3xl w-full border border-slate-700">
                       {[4, 8, 14].map(s => (
                           <button key={s} onClick={() => { setMarkerSize(s); if(activeText) setActiveText({...activeText}); }} className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-colors ${markerSize === s ? 'bg-slate-700' : 'hover:bg-slate-700/50'}`}>
@@ -425,7 +441,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                       ))}
                   </div>
                   
-                  {/* Clear button */}
                   <button onClick={clearAnnotations} title="Clear Ink & Text" className="bg-slate-800 hover:bg-rose-500 text-slate-400 hover:text-white p-4 rounded-2xl transition-all w-full flex items-center justify-center">
                       <Eraser size={24} />
                   </button>
@@ -590,7 +605,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
               
               <div className="h-6 w-px bg-slate-800 mx-2" />
               
-              {/* 🔥 NEW OS FEATURE: Consolidated Tools Drawer Toggle */}
               <button 
                   onClick={() => setShowTools(prev => !prev)} 
                   className={`flex items-center gap-2 px-6 py-3 rounded-xl transition-all text-sm font-black uppercase tracking-widest shadow-sm active:scale-95 border ${showTools || isAnnotating || isSpotlight || showTimer || isBlanked || showWhiteboard ? 'bg-indigo-600 text-white border-indigo-500 shadow-[0_0_20px_rgba(79,70,229,0.5)]' : 'bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white border-slate-700 hover:border-indigo-500'}`}
