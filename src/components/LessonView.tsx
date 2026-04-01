@@ -5,7 +5,7 @@ import { db } from '../config/firebase';
 import { 
   HelpCircle, CheckCircle2, X, Edit3, MessageSquare, 
   MessageCircle, ArrowLeft, ArrowRight, Info, Zap, BookOpen,
-  Play, Square, Search, MousePointerClick, Palette, Eraser, Volume2, AlertTriangle, Gamepad2
+  Play, Square, Search, MousePointerClick, Palette, Eraser, Volume2, AlertTriangle
 } from 'lucide-react';
 
 export interface LessonViewProps {
@@ -129,7 +129,11 @@ const FillBlankBlockRenderer = ({ block }: any) => {
         let rawOptions = [];
         try { rawOptions = JSON.parse(distractorsJson); } catch (e) {}
         if (!Array.isArray(rawOptions)) rawOptions = typeof rawOptions === 'string' ? [rawOptions] : [];
-        return rawOptions.map((opt: any) => String(opt)).filter(Boolean);
+        return rawOptions.map((opt: any) => {
+            if (typeof opt === 'string' || typeof opt === 'number') return String(opt);
+            if (opt && typeof opt === 'object') return String(opt.text || opt.label || opt.value || "");
+            return "";
+        }).filter(Boolean);
     }, [distractorsJson]);
 
     const initialWordBank = useMemo(() => {
@@ -184,6 +188,7 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                 <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Vocabulary Drill</h3>
             </div>
 
+            {/* STICKY TOP WORD BANK: Mobile Optimized Spacing */}
             <div className="sticky top-2 z-30 mb-6 -mx-2 px-2">
                 <div className="bg-white/90 backdrop-blur-xl rounded-2xl p-3 md:p-4 border border-slate-200/50 shadow-md flex flex-wrap gap-2 min-h-[60px] justify-center items-center transition-all duration-300">
                     {wordBank.length === 0 && !isChecked ? (
@@ -388,6 +393,10 @@ const TapSortBlockRenderer = ({ block }: any) => {
     );
 };
 
+// ============================================================================
+//  NEW RENDERERS: AUDIO STORY & IMAGE HOTSPOT
+// ============================================================================
+
 const AudioStoryBlockRenderer = ({ block }: any) => {
     const [isPlaying, setIsPlaying] = useState(false);
     const togglePlay = () => setIsPlaying(!isPlaying);
@@ -455,6 +464,7 @@ const DrawingBlockRenderer = ({ block }: any) => {
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
+        
         const { x, y } = getCoordinates(e, canvas);
         ctx.beginPath();
         ctx.moveTo(x, y);
@@ -464,9 +474,11 @@ const DrawingBlockRenderer = ({ block }: any) => {
     const draw = (e: any) => {
         if (!isDrawing) return;
         if (e.cancelable) e.preventDefault();
+        
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext('2d');
         if (!canvas || !ctx) return;
+        
         const { x, y } = getCoordinates(e, canvas);
         ctx.lineTo(x, y);
         ctx.strokeStyle = color;
@@ -488,10 +500,17 @@ const DrawingBlockRenderer = ({ block }: any) => {
             </div>
             <div className="bg-slate-50 rounded-[2rem] overflow-hidden border-2 border-slate-200 touch-none mb-6 select-none" style={{ touchAction: 'none' }}>
                 <canvas 
-                    ref={canvasRef} width={800} height={400} 
+                    ref={canvasRef} 
+                    width={800} 
+                    height={400} 
                     className="w-full h-[50vh] md:h-80 cursor-crosshair touch-none" 
-                    onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={() => setIsDrawing(false)} onMouseLeave={() => setIsDrawing(false)} 
-                    onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={() => setIsDrawing(false)} 
+                    onMouseDown={startDrawing} 
+                    onMouseMove={draw} 
+                    onMouseUp={() => setIsDrawing(false)} 
+                    onMouseLeave={() => setIsDrawing(false)} 
+                    onTouchStart={startDrawing} 
+                    onTouchMove={draw} 
+                    onTouchEnd={() => setIsDrawing(false)} 
                     style={{ touchAction: 'none' }}
                 />
             </div>
@@ -607,6 +626,10 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
 
     switch (blockType) {
       case 'drag-drop': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><TapSortBlockRenderer block={block} /></div>;
+      case 'audio-story': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><AudioStoryBlockRenderer block={block} /></div>;
+      case 'image-hotspot': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><ImageHotspotBlockRenderer block={block} /></div>;
+      case 'drawing': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><DrawingBlockRenderer block={block} /></div>;
+
       case 'code':
         return (
           <div key={blockKey} className="py-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -665,9 +688,6 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
       case 'quiz': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><QuizBlockRenderer block={block} /></div>;
       case 'fill-blank': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><FillBlankBlockRenderer block={block} /></div>;
       case 'scenario': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><ScenarioBlockRenderer block={block} /></div>;
-      case 'drawing': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><DrawingBlockRenderer block={block} /></div>;
-      case 'image-hotspot': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><ImageHotspotBlockRenderer block={block} /></div>;
-      case 'audio-story': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><AudioStoryBlockRenderer block={block} /></div>;
 
       default:
         return <div key={blockKey} className="p-8 bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200 text-center text-xs text-slate-400 font-bold uppercase tracking-widest my-4">Unsupported Module: {blockType}</div>;
