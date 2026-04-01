@@ -1,11 +1,11 @@
 // src/components/ClassView.tsx
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore'; 
+import { doc, setDoc } from 'firebase/firestore'; 
 import { db } from '../config/firebase';
 import { useLiveClass } from '../hooks/useLiveClass';
 import { 
     MessageSquare, MessageCircle, Gamepad2, CheckCircle2, X, Puzzle, 
-    ChevronLeft, ChevronRight, Zap, Users, Clock, EyeOff, HelpCircle, Layers, MousePointerClick 
+    ChevronLeft, ChevronRight, Zap, Users, Clock, EyeOff, HelpCircle, Layers, MousePointerClick
 } from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
 
@@ -23,7 +23,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const stageRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
 
-  // Initialize the Instructor Live Game Sync Engine
   const { liveState, startLiveClass, endLiveClass, changeSlide, triggerQuiz } = useLiveClass(classId, true);
 
   const lessonVocab = useMemo(() => {
@@ -33,7 +32,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       .flatMap((b: any) => b.items || []);
   }, [lesson]);
 
-  // When the projector starts, broadcast to the room & start the clock!
   useEffect(() => {
       if (!lesson?.id) return;
       startLiveClass(lesson.id);
@@ -59,7 +57,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
     const grouped: any[] = [];
     let buffer: any[] = [];
     
-    const interactables = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game'];
+    const interactables = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'drag-drop'];
     
     lesson.blocks.forEach((b: any) => {
       const type = String(b?.type || '');
@@ -85,7 +83,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const handleNext = useCallback(() => jumpToSlide(activePageIdx + 1), [activePageIdx, jumpToSlide]);
   const handlePrev = useCallback(() => jumpToSlide(activePageIdx - 1), [activePageIdx, jumpToSlide]);
 
-  // 🔥 OS FEATURE: Interactive Progress Bar Scrubber
   const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
       if (!progressBarRef.current) return;
       const rect = progressBarRef.current.getBoundingClientRect();
@@ -111,7 +108,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
               e.preventDefault();
               if (stageRef.current) stageRef.current.scrollBy({ top: -(window.innerHeight * 0.4), behavior: 'smooth' });
           } else if (e.key.toLowerCase() === 'b') {
-              // 🔥 OS FEATURE: Press 'B' to blackout the screen
               e.preventDefault();
               setIsBlanked(prev => !prev);
           }
@@ -129,39 +125,32 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         className="w-full flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500 relative"
         style={{ height: 'calc(100dvh - 4rem)' }}
     >
-      {/* 🔥 OS FEATURE: The Blackout Overlay */}
       <div className={`absolute inset-0 bg-black z-[9000] flex items-center justify-center transition-opacity duration-700 pointer-events-none ${isBlanked ? 'opacity-100' : 'opacity-0'}`}>
           <EyeOff size={64} className="text-white/10" />
       </div>
 
       <main className="flex-1 flex overflow-hidden relative group/canvas bg-slate-50 text-slate-900">
         
-        {/* MOUSE NAVIGATION CONTROLS */}
         {activePageIdx > 0 && (
             <button 
                 onClick={handlePrev} 
-                aria-label="Previous Slide"
-                className="absolute left-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/5 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 focus:outline-none shadow-lg"
+                className="absolute left-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/5 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 shadow-lg"
             >
-                <ChevronLeft size={48} aria-hidden="true" />
+                <ChevronLeft size={48} />
             </button>
         )}
         
         {activePageIdx < pages.length - 1 && (
             <button 
                 onClick={handleNext} 
-                aria-label="Next Slide"
-                className="absolute right-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/5 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 focus:outline-none shadow-lg"
+                className="absolute right-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/5 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 shadow-lg"
             >
-                <ChevronRight size={48} aria-hidden="true" />
+                <ChevronRight size={48} />
             </button>
         )}
 
-        {/* SECURE SCROLL CONTAINER */}
         <div ref={stageRef} className={`flex-1 overflow-y-auto w-full relative transition-all duration-500 ${showForum ? 'mr-[450px]' : ''} scroll-smooth`}>
-          
           <div className="flex flex-col min-h-full w-full items-center px-16 py-12 lg:px-32">
-            
             <div className="w-full max-w-7xl space-y-24 my-auto">
               {activePage.blocks.map((block: any, i: number) => {
                 if (!block) return null;
@@ -171,12 +160,9 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
                 return (
                   <div key={i} className="animate-in fade-in zoom-in-95 duration-700 w-full">
-                    
                     {isQuiz ? (
                       <div className="bg-slate-900 text-white border-4 border-slate-800 rounded-[4rem] p-16 shadow-2xl text-center animate-in slide-in-from-bottom-12 duration-500 mx-auto max-w-5xl my-12 relative overflow-hidden">
-                          {/* Decorative Background Elements */}
                           <div className="absolute top-0 right-0 -mr-16 -mt-16 text-slate-800 opacity-50 rotate-12"><HelpCircle size={250} /></div>
-                          
                           <div className="relative z-10">
                               <span className="text-[2vh] font-black text-indigo-400 uppercase tracking-widest block mb-6">Class Question</span>
                               <h2 className="text-[5vh] md:text-[6vh] font-black mb-12 leading-tight">{String(block.content?.question || block.question || '')}</h2>
@@ -184,7 +170,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                               {liveState?.quizState === 'waiting' && (
                                   <button 
                                       onClick={() => triggerQuiz('active')}
-                                      className="bg-rose-500 hover:bg-rose-600 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest shadow-[0_0_40px_rgba(244,63,94,0.5)] transition-transform active:scale-95 flex items-center gap-4 mx-auto focus:outline-none focus:ring-4 focus:ring-rose-400"
+                                      className="bg-rose-500 hover:bg-rose-600 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest shadow-[0_0_40px_rgba(244,63,94,0.5)] transition-transform active:scale-95 flex items-center gap-4 mx-auto"
                                   >
                                       <Zap size={40} fill="currentColor" /> Launch Trivia Protocol
                                   </button>
@@ -200,7 +186,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                                       </div>
                                       <button 
                                           onClick={() => triggerQuiz('revealed')}
-                                          className="bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest transition-transform active:scale-95 shadow-xl mx-auto focus:outline-none focus:ring-4 focus:ring-indigo-400"
+                                          className="bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest transition-transform active:scale-95 shadow-xl mx-auto"
                                       >
                                           Reveal Correct Answer
                                       </button>
@@ -220,7 +206,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                           </div>
                       </div>
                     ) : (
-                      /* STANDARD BLOCKS */
                       <>
                           {blockType === 'text' && <TextBlock block={block} />}
                           {blockType === 'essay' && <EssayBlock block={block} />}
@@ -231,7 +216,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                           {blockType === 'game' && block.gameType === 'connect-three' && <GameBlock block={block} lessonVocab={lessonVocab} />}
                           {blockType === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
                           {blockType === 'fill-blank' && <FillBlankBlock block={block} liveState={liveState} />}
-                          {blockType === 'drag-drop' && <TapSortBlockRenderer block={block} />}
+                          {blockType === 'drag-drop' && <TapSortBlock block={block} liveState={liveState} />}
                       </>
                     )}
                   </div>
@@ -240,36 +225,23 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
             </div>
           </div>
         </div>
-
-        {/* FORUM DRAWER */}
-        {showForum && (
-          <aside className="absolute right-0 top-0 bottom-0 w-[450px] bg-slate-50 border-l border-slate-200 p-8 z-10 animate-in slide-in-from-right shadow-2xl">
-             <h3 className="text-2xl font-black mb-6 flex items-center gap-2"><MessageSquare className="text-indigo-600" aria-hidden="true"/> FORUM</h3>
-             {classId ? <p className="text-slate-400">Forum Component Here</p> : <p className="text-slate-400">Class chat unavailable.</p>}
-          </aside>
-        )}
       </main>
 
-      {/* FOOTER PROGRESS INDICATOR & HUD */}
       <footer className="h-20 bg-slate-900 border-t border-slate-800 flex items-center justify-between px-12 shrink-0 relative z-20">
           <div className="flex items-center gap-8">
               <h2 className="text-xl font-black text-slate-400 uppercase tracking-widest">{String(lesson?.title || '')}</h2>
               <div className="h-6 w-px bg-slate-800" />
-              {/* 🔥 OS FEATURE: Telemetry Clock */}
               <span className="flex items-center gap-2 font-mono text-lg font-bold text-slate-500">
                   <Clock size={18} /> {formatTime(elapsedTime)}
               </span>
           </div>
           
           <div className="flex items-center gap-6">
-              {/* 🔥 OS FEATURE: Interactive Scrubber */}
               <div 
                   ref={progressBarRef}
                   onClick={handleProgressBarClick}
                   className="w-64 h-3 bg-slate-800 rounded-full overflow-hidden cursor-pointer group relative"
-                  title="Click to jump to slide"
               >
-                  {/* Hover preview indicator */}
                   <div className="absolute inset-0 bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity" />
                   <div className="h-full bg-indigo-500 transition-all duration-300 relative z-10" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} />
               </div>
@@ -283,13 +255,12 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 }
 
 // ============================================================================
-//  INTERNAL BLOCK RENDERERS (Cinematic & Armored)
+//  INTERNAL BLOCK RENDERERS
 // ============================================================================
 
 const TextBlock = ({ block }: { block: any }) => (
   <div className="text-center py-12 max-w-6xl mx-auto">
     {block.title && <h3 className="text-[3vh] font-black text-indigo-500 uppercase tracking-widest mb-8">{String(block.title)}</h3>}
-    {/* Cinematic Typography */}
     <p className="text-[6vh] font-black text-slate-800 leading-[1.1] tracking-tight">{String(block.content || '')}</p>
   </div>
 );
@@ -297,7 +268,6 @@ const TextBlock = ({ block }: { block: any }) => (
 const EssayBlock = ({ block }: { block: any }) => (
   <div className="w-full max-w-7xl mx-auto py-12">
     <h1 className="text-[8vh] font-black text-slate-900 leading-none mb-16 text-center">{String(block.title || '')}</h1>
-    {/* 🔥 OS FEATURE: Newspaper multi-column layout for easy projector reading */}
     <div className="columns-1 xl:columns-2 gap-20 space-y-[4vh]">
         {String(block.content || '').split('\n\n').map((para: string, pIdx: number) => (
           <p key={pIdx} className="text-[3.5vh] leading-[1.7] text-slate-700 font-serif text-justify first-letter:text-[7vh] first-letter:font-black first-letter:text-indigo-600 first-letter:float-left first-letter:mr-3 break-inside-avoid">{para.trim()}</p>
@@ -309,7 +279,6 @@ const EssayBlock = ({ block }: { block: any }) => (
 const ImageBlock = ({ block }: { block: any }) => (
   <figure className="w-full flex flex-col items-center py-12">
     <div className="relative group overflow-hidden rounded-[3rem] shadow-2xl border-8 border-slate-50">
-        {/* Subtle cinematic zoom on load */}
         <img src={String(block.url || '')} alt="presentation slide" className="max-h-[65vh] object-cover animate-in zoom-in-105 duration-[20s]" />
     </div>
     {block.caption && <figcaption className="text-[3vh] text-slate-500 font-bold mt-8 text-center max-w-4xl">{String(block.caption)}</figcaption>}
@@ -344,7 +313,6 @@ const DialogueBlock = ({ block }: { block: any }) => (
 const VocabListBlock = ({ block }: { block: any }) => (
   <div className="grid grid-cols-2 gap-10 py-12">
     {(Array.isArray(block.items) ? block.items : []).map((item: any, j: number) => (
-      // 🔥 OS FEATURE: Glassmorphism layout
       <div key={j} className="bg-gradient-to-br from-slate-50 to-slate-100 p-12 rounded-[3rem] border border-white shadow-xl text-left relative overflow-hidden group">
         <div className="absolute -right-12 -top-12 opacity-5 text-indigo-900 rotate-12 group-hover:scale-110 transition-transform duration-700">
             <Layers size={200} />
@@ -405,7 +373,7 @@ const ScenarioBlock = ({ block, liveState }: { block: any, liveState: any }) => 
   );
 };
 
-// 🔥 TITANIUM ARMORED FILL BLANK WITH BOTTOM-STICKY COMPACT WORD BANK
+// 🔥 DOCKED HUD: FILL BLANK BLOCK
 const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) => {
   const rawText = String(block.text || "Missing text [here].");
 
@@ -436,64 +404,65 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
   const liveAnswers = Array.isArray(liveState?.answers) ? liveState.answers : [];
 
   return (
-    <div className="w-full max-w-6xl mx-auto bg-white p-12 md:p-16 rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 relative flex flex-col">
+    <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col overflow-hidden">
       
       {/* HEADER */}
-      <h3 className="text-[4vh] font-bold text-slate-800 mb-8 flex items-center justify-center gap-4">
-        <span className="bg-indigo-100 text-indigo-600 p-4 rounded-2xl" aria-hidden="true"><Puzzle size={40}/></span>
-        {String(block.question || "Fill in the blanks")}
-      </h3>
+      <div className="p-12 md:p-16 pb-8">
+          <h3 className="text-[4vh] font-bold text-slate-800 flex items-center justify-center gap-4">
+            <span className="bg-indigo-100 text-indigo-600 p-4 rounded-2xl" aria-hidden="true"><Puzzle size={40}/></span>
+            {String(block.question || "Fill in the blanks")}
+          </h3>
+      </div>
 
-      {/* TEXT CONTENT (Scrolls Normally) */}
-      <div className="text-[4.5vh] md:text-[5vh] font-medium leading-loose text-slate-700 flex flex-wrap items-center gap-y-6 justify-center text-center relative z-10 mb-12">
-        {textParts.map((part: string, idx: number) => {
-          const isLast = idx === textParts.length - 1;
-          const filledItem = liveAnswers[idx];
-          const filledWord = typeof filledItem === 'string' ? filledItem : (filledItem?.word || null);
-          const isChecking = liveState?.submitted;
-          const isRight = filledWord === correctAnswers[idx];
+      {/* TEXT CONTENT */}
+      <div className="px-12 md:px-16 pb-12 flex-1">
+          <div className="text-[4.5vh] md:text-[5vh] font-medium leading-loose text-slate-700 flex flex-wrap items-center gap-y-8 justify-center text-center">
+            {textParts.map((part: string, idx: number) => {
+              const isLast = idx === textParts.length - 1;
+              const filledItem = liveAnswers[idx];
+              const filledWord = typeof filledItem === 'string' ? filledItem : (filledItem?.word || null);
+              const isChecking = liveState?.submitted;
+              const isRight = filledWord === correctAnswers[idx];
 
-          let style = "border-dashed border-slate-300 bg-slate-50 text-slate-400";
-          if (filledWord && !isChecking) style = "border-solid border-indigo-400 bg-indigo-100 text-indigo-700 shadow-lg scale-110 -translate-y-2";
-          if (isChecking && isRight) style = "border-solid border-emerald-500 bg-emerald-100 text-emerald-700 shadow-lg";
-          if (isChecking && !isRight) style = "border-solid border-rose-500 bg-rose-100 text-rose-700 shadow-lg";
+              let style = "border-dashed border-slate-300 bg-slate-50 text-slate-400";
+              if (filledWord && !isChecking) style = "border-solid border-indigo-400 bg-indigo-100 text-indigo-700 shadow-lg scale-110 -translate-y-2";
+              if (isChecking && isRight) style = "border-solid border-emerald-500 bg-emerald-100 text-emerald-700 shadow-lg";
+              if (isChecking && !isRight) style = "border-solid border-rose-500 bg-rose-100 text-rose-700 shadow-lg";
 
-          return (
-            <React.Fragment key={`part_${idx}`}>
-                <span className="mx-2">{String(part)}</span>
-                {!isLast && (
-                    <span className={`min-w-[120px] h-16 px-6 mx-3 rounded-2xl border-4 flex items-center justify-center text-[3.5vh] font-bold transition-all duration-300 ${style}`}>
-                    {filledWord || "?"}
-                    </span>
-                )}
-            </React.Fragment>
-          );
-        })}
+              return (
+                <React.Fragment key={`part_${idx}`}>
+                    <span className="mx-2 py-2">{String(part)}</span>
+                    {!isLast && (
+                        <span className={`min-w-[120px] h-16 px-6 mx-3 rounded-2xl border-4 flex items-center justify-center text-[3.5vh] font-bold transition-all duration-300 ${style}`}>
+                        {filledWord || "?"}
+                        </span>
+                    )}
+                </React.Fragment>
+              );
+            })}
+          </div>
       </div>
       
-      {/* 🔥 THE FIX: Bottom-Sticky Compact Word Bank */}
+      {/* THE COMPACT WORD BANK DOCK */}
       {!liveState?.submitted && (
-        <div className="sticky bottom-24 z-40 mt-auto -mx-4 px-4">
-            <div className="bg-white/95 backdrop-blur-2xl rounded-[2.5rem] p-4 md:p-6 border-4 border-slate-200/50 shadow-2xl flex flex-col gap-3 max-h-[30vh]">
-              <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest shrink-0 text-center">Word Bank</span>
-              <div className="flex flex-wrap gap-3 justify-center items-start overflow-y-auto custom-scrollbar pb-2">
-                  {shuffledWords.map((word: string, i: number) => {
-                    let isUsed = false;
-                    for(let a=0; a < liveAnswers.length; a++) {
-                        const ans = liveAnswers[a];
-                        const textVal = typeof ans === 'string' ? ans : (ans?.word || '');
-                        if (textVal === word) {
-                            isUsed = true; break;
-                        }
+        <div className="bg-slate-50 border-t-4 border-slate-100 p-8 max-h-[35vh] flex flex-col items-center">
+            <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest text-center mb-6 shrink-0">Word Bank Options</span>
+            <div className="flex flex-wrap gap-4 justify-center items-start overflow-y-auto custom-scrollbar w-full pb-2">
+              {shuffledWords.map((word: string, i: number) => {
+                let isUsed = false;
+                for(let a=0; a < liveAnswers.length; a++) {
+                    const ans = liveAnswers[a];
+                    const textVal = typeof ans === 'string' ? ans : (ans?.word || '');
+                    if (textVal === word) {
+                        isUsed = true; break;
                     }
-
-                    return (
-                      <span key={i} className={`px-5 py-2.5 rounded-xl border-2 text-[2.5vh] font-bold transition-all duration-300 ${isUsed ? 'bg-slate-50 border-slate-100 text-slate-300 scale-95 opacity-50' : 'bg-slate-100 border-slate-200 text-slate-700 shadow-md'}`}>
-                        {word}
-                      </span>
-                    );
-                  })}
-              </div>
+                }
+                return (
+                  <span key={i} className={`px-5 py-2.5 rounded-xl border-2 text-[2.5vh] font-bold transition-all duration-300 ${isUsed ? 'bg-slate-100 border-slate-200 text-slate-300 scale-95 opacity-50' : 'bg-white border-slate-300 text-slate-700 shadow-sm'}`}>
+                    {word}
+                  </span>
+                );
+              })}
             </div>
         </div>
       )}
@@ -501,8 +470,8 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
   );
 };
 
-// 7. TAP SORT BLOCK (Armored with Sticky HUD)
-const TapSortBlockRenderer = ({ block }: any) => {
+// 🔥 DOCKED HUD: TAP SORT BLOCK
+const TapSortBlock = ({ block }: { block: any, liveState: any }) => {
     const itemsJson = JSON.stringify(block.items || []);
     const catsJson = JSON.stringify(block.categories || []);
 
@@ -528,37 +497,34 @@ const TapSortBlockRenderer = ({ block }: any) => {
     }, [catsJson]);
 
     return (
-        <div className="w-full max-w-6xl mx-auto bg-white p-12 md:p-16 rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 relative flex flex-col">
-            <h3 className="text-[4vh] font-bold text-slate-800 mb-12 flex items-center justify-center gap-4">
-                <span className="bg-indigo-100 text-indigo-600 p-4 rounded-2xl" aria-hidden="true"><MousePointerClick size={40}/></span>
-                {String(block.title || 'Sort the Items!')}
-            </h3>
-
-            {/* Bottom-Sticky Item Bank */}
-            <div className="sticky bottom-24 z-40 mt-auto -mx-4 px-4 mb-12">
-                <div className="bg-white/95 backdrop-blur-2xl rounded-[2.5rem] p-4 md:p-6 border-4 border-slate-200/50 shadow-2xl flex flex-col gap-3 max-h-[30vh]">
-                   <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest shrink-0 text-center">Items</span>
-                   <div className="flex flex-wrap justify-center gap-3 overflow-y-auto custom-scrollbar pb-2">
-                        {normalizedItems.length === 0 && <p className="text-amber-500 font-bold uppercase tracking-widest my-auto flex items-center gap-2"><CheckCircle2 size={16}/> All sorted!</p>}
-                        {normalizedItems.map((item) => (
-                            <span key={item.id} className="px-5 py-2.5 bg-slate-100 border-2 border-slate-200 text-slate-700 font-bold rounded-xl shadow-md text-[2.5vh]">
-                                {item.emoji} {item.label}
-                            </span>
-                        ))}
-                   </div>
-                </div>
+        <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col overflow-hidden">
+            <div className="p-12 md:p-16 pb-8">
+                <h3 className="text-[4vh] font-bold text-slate-800 flex items-center justify-center gap-4">
+                    <span className="bg-amber-100 text-amber-600 p-4 rounded-2xl"><MousePointerClick size={40}/></span>
+                    {String(block.title || 'Sort the Items!')}
+                </h3>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+            <div className="px-12 md:px-16 pb-16 grid grid-cols-1 sm:grid-cols-2 gap-10 flex-1">
                 {parsedCategories.map((cat: string) => (
                     <div key={cat} className="p-8 rounded-[3rem] border-4 border-amber-200 bg-amber-50 flex flex-col items-center gap-6">
                         <h4 className="font-black text-amber-900 text-[4vh] text-center leading-tight">{cat}</h4>
-                        <div className="flex flex-wrap justify-center gap-3">
-                           {/* Empty placeholder for projector view */}
-                           <span className="text-amber-400/50 text-[3vh] font-bold uppercase tracking-widest">Drop Zone</span>
-                        </div>
+                        <span className="text-amber-400/50 text-[3vh] font-bold uppercase tracking-widest mt-4">Drop Zone</span>
                     </div>
                 ))}
+            </div>
+
+            {/* BOTTOM DOCKED ITEM BANK */}
+            <div className="bg-amber-50 border-t-4 border-amber-100 p-8 max-h-[35vh] flex flex-col items-center">
+               <span className="text-[2vh] font-black text-amber-500 uppercase tracking-widest text-center mb-6 shrink-0">Items to Sort</span>
+               <div className="flex flex-wrap justify-center gap-4 overflow-y-auto custom-scrollbar w-full pb-2">
+                    {normalizedItems.length === 0 && <p className="text-amber-500 font-bold uppercase tracking-widest my-auto flex items-center gap-2"><CheckCircle2 size={16}/> All sorted!</p>}
+                    {normalizedItems.map((item) => (
+                        <span key={item.id} className="px-5 py-2.5 bg-white border-2 border-amber-200 text-slate-700 font-bold rounded-xl shadow-md text-[2.5vh]">
+                            {item.emoji} {item.label}
+                        </span>
+                    ))}
+               </div>
             </div>
         </div>
     );
