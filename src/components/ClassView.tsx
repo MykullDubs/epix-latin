@@ -404,7 +404,8 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const activePage = pages[activePageIdx];
   if (!lesson || !activePage) return null;
 
-  const joinUrl = `${window.location.origin}/join/${classId}`;
+  // 🔥 UPDATE: Generates the link to auto-join the live class view
+  const joinUrl = `${window.location.origin}/live/${classId}`;
 
   return (
     <div 
@@ -477,7 +478,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
               style={{ left: toolbarPos.x, top: toolbarPos.y, transform: `scale(${toolbarScale})`, transformOrigin: 'top left' }}
               onMouseDown={(e) => e.stopPropagation()}
           >
-              <div className="bg-slate-900/95 backdrop-blur-2xl p-4 pt-1 rounded-[2.5rem] shadow-[0_30px_60px_rgba(0,0,0,0.5)] border-4 border-slate-700 flex flex-col gap-5 w-20 items-center relative overflow-hidden">
+              <div className="bg-slate-900/95 backdrop-blur-2xl p-4 pt-1 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-4 border-slate-700 flex flex-col gap-5 w-20 items-center relative overflow-hidden">
                   
                   {/* The Move Drag Handle */}
                   <div 
@@ -525,7 +526,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
                   {/* The Scale Resize Handle */}
                   <div 
-                      className="absolute bottom-0 right-0 w-10 h-10 cursor-nwse-resize flex items-end justify-end p-2 opacity-50 hover:opacity-100 bg-slate-800/30 rounded-tl-[2rem] z-20"
+                      className="absolute bottom-0 right-0 w-10 h-10 cursor-nwse-resize flex items-end justify-end p-2 opacity-50 hover:opacity-100 bg-slate-800/30 rounded-tl-full z-20"
                       onMouseDown={startToolbarResize}
                       title="Drag to resize"
                   >
@@ -540,7 +541,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           <div 
               className="absolute z-[8900] bg-slate-900/95 backdrop-blur-2xl border-4 border-slate-700 rounded-[2.5rem] p-6 pt-10 pb-8 shadow-[0_40px_80px_rgba(0,0,0,0.6)] flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200 w-72 pointer-events-auto overflow-hidden"
               style={{ left: mainToolsPos.x, top: mainToolsPos.y, transform: `scale(${mainToolsScale})`, transformOrigin: 'top left' }}
-              onMouseDown={(e) => e.stopPropagation()} // Keeps it from triggering the marker canvas underneath
+              onMouseDown={(e) => e.stopPropagation()} 
           >
               {/* Drag Handle Top */}
               <div 
