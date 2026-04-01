@@ -4,7 +4,7 @@ import { useLiveClass } from '../hooks/useLiveClass';
 import { useArenaAudio } from '../hooks/useArenaAudio'; // 🔥 IMPORTED AUDIO ENGINE
 import { 
     Users, Timer, Zap, ArrowRight, X, Trophy, CheckCircle2, 
-    Settings, Hand, Crown, Activity, Target, Shield, Flame, Loader2 
+    Settings, Hand, Crown, Activity, Target, Shield, Flame, Loader2, QrCode 
 } from 'lucide-react';
 import { doc, updateDoc, collection, getDocs } from 'firebase/firestore'; 
 import { db, appId } from '../config/firebase';
@@ -18,6 +18,10 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
     const [isAutoPilot, setIsAutoPilot] = useState(false);
     const [isFinished, setIsFinished] = useState(false); 
     
+    // 🔥 NEW OS FEATURE: Quick-Join QR State
+    const [showQR, setShowQR] = useState(false);
+    const joinUrl = `${window.location.origin}/join/${classId}`;
+
     // 🔥 PRE-GAME COUNTDOWN ENGINE
     const [preGameCountdown, setPreGameCountdown] = useState<number | null>(null);
 
@@ -38,6 +42,23 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
 
     useEffect(() => { liveStateRef.current = liveState; }, [liveState]);
     useEffect(() => { currentIndexRef.current = currentIndex; }, [currentIndex]);
+
+    // Global QR Hotkey
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const tag = (e.target as HTMLElement).tagName;
+            if (['INPUT', 'TEXTAREA'].indexOf(tag) !== -1) return;
+            
+            if (e.key.toLowerCase() === 'q') {
+                e.preventDefault();
+                setShowQR(prev => !prev);
+            } else if (e.key === 'Escape') {
+                setShowQR(false);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     // 1. Minimum Boot Timer (Juice)
     useEffect(() => {
@@ -249,6 +270,25 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
         }).sort((a, b) => b.score - a.score);
     }, [liveState?.finalScores, liveState?.roundPoints, liveState?.joined, activeClass?.students]);
 
+    // 🔥 HELPER: Renders the QR Modal across any active screen
+    const renderQROverlay = () => {
+        if (!showQR) return null;
+        return (
+            <div className="absolute inset-0 z-[9999] bg-slate-900/90 backdrop-blur-2xl flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-300 pointer-events-auto text-sans">
+                <button onClick={() => setShowQR(false)} className="absolute top-12 right-12 p-6 bg-white/10 hover:bg-rose-500 rounded-full text-white transition-all hover:scale-110 active:scale-95"><X size={40} strokeWidth={3} /></button>
+                <h2 className="text-[6vh] font-black text-white uppercase tracking-widest mb-4">Join Live Lobby</h2>
+                <p className="text-[3vh] text-indigo-300 font-bold tracking-widest uppercase mb-16">Scan to enter the arena</p>
+                <div className="p-10 bg-white rounded-[3rem] shadow-[0_0_100px_rgba(99,102,241,0.4)] animate-in slide-in-from-bottom-8">
+                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(joinUrl)}&margin=10`} alt="Join QR" className="w-[40vh] h-[40vh] object-contain" />
+                </div>
+                <div className="mt-16 text-center">
+                    <p className="text-[2vh] font-bold text-slate-400 uppercase tracking-[0.4em] mb-4">Or enter room code</p>
+                    <div className="text-[8vh] font-black text-indigo-400 tracking-[0.2em] leading-none bg-indigo-500/10 py-6 px-12 rounded-[2rem] border-2 border-indigo-500/20">{String(classId || '').substring(0,6).toUpperCase()}</div>
+                </div>
+            </div>
+        );
+    };
+
     // ========================================================================
     //  RENDER: BOOT SEQUENCE
     // ========================================================================
@@ -356,6 +396,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
 
         return (
             <div className="h-full bg-black text-white flex flex-col relative overflow-hidden font-sans">
+                {renderQROverlay()}
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/30 via-black to-black pointer-events-none z-0" />
                 
                 <header className="flex items-center justify-between z-20 p-10 shrink-0">
@@ -366,6 +407,14 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
                             <p className="text-sm text-indigo-400 font-black uppercase tracking-[0.4em] flex items-center gap-2 mt-1"><Shield size={14} /> {activeClass?.name || 'Fleet'} Protocol</p>
                         </div>
                     </div>
+                    
+                    {/* 🔥 THE QR BUTTON */}
+                    <button 
+                        onClick={() => setShowQR(true)} 
+                        className="flex items-center gap-3 px-8 py-4 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-white rounded-[2rem] transition-all font-black text-lg uppercase tracking-widest border-2 border-indigo-500/30 active:scale-95 shadow-[0_0_20px_rgba(99,102,241,0.15)]"
+                    >
+                        <QrCode size={24} /> QR Code (Q)
+                    </button>
                 </header>
 
                 <main className="flex-1 grid grid-cols-12 gap-8 px-10 pb-10 z-10 overflow-hidden">
@@ -450,6 +499,7 @@ export default function LiveVocabProjector({ deck, classId, activeClass, onExit 
 
     return (
         <div className="h-full bg-black text-white font-sans flex flex-col overflow-hidden relative">
+            {renderQROverlay()}
             <div className={`absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] ${ambientGlow} via-black to-black transition-colors duration-1000 pointer-events-none`} />
             
             <div className="absolute top-0 left-0 w-full h-2 md:h-3 bg-slate-900 z-50 border-b border-white/5">
