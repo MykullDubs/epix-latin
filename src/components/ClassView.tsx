@@ -96,10 +96,11 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       };
   }, [isSpotlight]);
 
-  // Global Annotation Canvas Engine
+  // Global Annotation Canvas Engine (1:1 Precision Mapping)
   useEffect(() => {
       const resizeCanvas = () => {
           if (canvasRef.current) {
+              // Lock strictly to the window viewport for perfect 1:1 mouse mapping
               canvasRef.current.width = window.innerWidth;
               canvasRef.current.height = window.innerHeight;
           }
@@ -111,14 +112,18 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
   const startAnnotation = (e: React.MouseEvent) => {
       isDrawingAnnotation.current = true;
-      drawAnnotation(e);
+      const ctx = canvasRef.current?.getContext('2d');
+      if (ctx) {
+          ctx.beginPath();
+          ctx.moveTo(e.clientX, e.clientY);
+      }
   };
 
   const drawAnnotation = (e: React.MouseEvent) => {
       if (!isDrawingAnnotation.current || !canvasRef.current) return;
       const ctx = canvasRef.current.getContext('2d');
       if (!ctx) return;
-      ctx.lineWidth = 8;
+      ctx.lineWidth = 6;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.strokeStyle = '#ef4444'; // Bright Red Marker
@@ -137,6 +142,15 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       if (canvasRef.current) {
           const ctx = canvasRef.current.getContext('2d');
           ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      }
+  };
+
+  // 🔥 NEW OS FEATURE: Right-Click Deactivation Handler
+  const handleRightClick = (e: React.MouseEvent) => {
+      if (isAnnotating || isSpotlight) {
+          e.preventDefault(); // Stop the browser context menu from appearing
+          setIsAnnotating(false);
+          setIsSpotlight(false);
       }
   };
 
@@ -229,6 +243,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
     <div 
         className="w-full flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500 relative"
         style={{ height: 'calc(100dvh - 4rem)' }}
+        onContextMenu={handleRightClick} // 🔥 Catches Right-Clicks anywhere
     >
       {/* 🔥 OS OVERLAYS & TOOLS */}
       
@@ -250,11 +265,11 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           onMouseMove={drawAnnotation}
           onMouseUp={stopAnnotation}
           onMouseLeave={stopAnnotation}
-          className={`absolute inset-0 z-[8600] ${isAnnotating ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
+          className={`absolute inset-0 z-[8600] fixed ${isAnnotating ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
       />
 
       {isAnnotating && (
-          <div className="absolute top-8 right-8 z-[8700] flex gap-4 animate-in fade-in zoom-in-95">
+          <div className="absolute top-8 right-8 z-[8700] flex gap-4 animate-in fade-in zoom-in-95 pointer-events-auto">
                <div className="bg-slate-900/90 backdrop-blur-md text-white px-6 py-3 rounded-full font-black text-[2vh] uppercase tracking-widest flex items-center gap-3 shadow-2xl border border-slate-700">
                   <span className="w-4 h-4 rounded-full bg-rose-500 animate-pulse shadow-[0_0_15px_rgba(244,63,94,0.8)]" /> Marker Active
                </div>
@@ -265,7 +280,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       )}
 
       {showQR && (
-          <div className="absolute inset-0 z-[9999] bg-slate-900/90 backdrop-blur-2xl flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-300">
+          <div className="absolute inset-0 z-[9999] bg-slate-900/90 backdrop-blur-2xl flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-300 pointer-events-auto">
               <button onClick={() => setShowQR(false)} className="absolute top-12 right-12 p-6 bg-white/10 hover:bg-rose-500 rounded-full text-white transition-all hover:scale-110 active:scale-95"><X size={40} strokeWidth={3} /></button>
               <h2 className="text-[6vh] font-black text-white uppercase tracking-widest mb-4">Join Live Session</h2>
               <p className="text-[3vh] text-indigo-300 font-bold tracking-widest uppercase mb-16">Scan to sync your device</p>
@@ -280,7 +295,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       )}
 
       {showTimer && (
-          <div className="absolute z-[9500] bg-slate-900/90 backdrop-blur-xl border-4 border-slate-700 rounded-[2.5rem] shadow-[0_30px_60px_rgba(0,0,0,0.4)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200" style={{ left: timerPos.x, top: timerPos.y, width: 320 }}>
+          <div className="absolute z-[9500] bg-slate-900/90 backdrop-blur-xl border-4 border-slate-700 rounded-[2.5rem] shadow-[0_30px_60px_rgba(0,0,0,0.4)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 pointer-events-auto" style={{ left: timerPos.x, top: timerPos.y, width: 320 }}>
               <div className="bg-slate-800/80 p-3 cursor-grab active:cursor-grabbing flex justify-between items-center" onMouseDown={startDrag}>
                   <div className="flex items-center gap-2 text-slate-400 px-2"><Hourglass size={14} /><span className="text-[10px] font-black uppercase tracking-widest">Focus Timer</span></div>
                   <button onClick={() => setShowTimer(false)} className="text-slate-400 hover:text-rose-400 transition-colors"><X size={18} strokeWidth={3} /></button>
@@ -364,7 +379,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                           {blockType === 'game' && block.gameType === 'connect-three' && <GameBlock block={block} lessonVocab={lessonVocab} />}
                           {blockType === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
                           {blockType === 'fill-blank' && <FillBlankBlock block={block} liveState={liveState} />}
-                          {blockType === 'drag-drop' && <TapSortBlock block={block} />}
+                          {blockType === 'drag-drop' && <TapSortBlock block={block} liveState={liveState} />}
                       </>
                     )}
                   </div>
@@ -559,7 +574,6 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
     return shuffledWords.map((w, i) => ({ id: `word_${i}_${w}`, word: w }));
   }, [shuffledWords]);
 
-  // RESTORED INTERACTIVE STATE
   const [wordBank, setWordBank] = useState<WordItem[]>(initialWordBank);
   const [filledBlanks, setFilledBlanks] = useState<(WordItem | null)[]>(Array(correctAnswers.length).fill(null));
   const [isChecked, setIsChecked] = useState(false);
@@ -602,7 +616,7 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
       </div>
 
       {!isChecked && (
-        <div className="sticky top-4 z-50 -mx-4 px-4 mb-12">
+        <div className="sticky top-4 z-50 -mx-4 px-4 mb-12 pointer-events-auto">
             <div className="bg-white/95 backdrop-blur-2xl rounded-[2.5rem] p-6 border-4 border-slate-200/50 shadow-[0_10px_40px_rgba(0,0,0,0.08)] flex flex-col items-center gap-4 max-h-[25vh] transition-all duration-300">
                 <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest shrink-0 text-center">Word Bank Options</span>
                 <div className="flex flex-wrap gap-4 justify-center items-start overflow-y-auto custom-scrollbar w-full pb-2">
@@ -625,7 +639,7 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
         </div>
       )}
 
-      <div className="px-12 md:px-16 pb-16 flex-1">
+      <div className="px-12 md:px-16 pb-16 flex-1 pointer-events-auto">
           <div className="text-[4.5vh] md:text-[5vh] font-medium leading-loose text-slate-700 flex flex-wrap items-center gap-y-8 justify-center text-center">
             {textParts.map((part: string, idx: number) => {
               const isLast = idx === textParts.length - 1;
@@ -683,7 +697,7 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
 
 type SortItem = { id: string; label: string; emoji: string };
 
-const TapSortBlock = ({ block }: { block: any }) => {
+const TapSortBlock = ({ block, liveState }: { block: any, liveState?: any }) => {
     const itemsJson = JSON.stringify(block.items || []);
     const catsJson = JSON.stringify(block.categories || []);
 
@@ -729,7 +743,7 @@ const TapSortBlock = ({ block }: { block: any }) => {
     };
 
     return (
-        <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col relative overflow-visible">
+        <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col relative overflow-visible pointer-events-auto">
             <div className="p-12 md:p-16 pb-8">
                 <h3 className="text-[4vh] font-bold text-slate-800 flex items-center justify-center gap-4">
                     <span className="bg-amber-100 text-amber-600 p-4 rounded-2xl"><MousePointerClick size={40}/></span>
@@ -742,9 +756,7 @@ const TapSortBlock = ({ block }: { block: any }) => {
                    <span className="text-[2vh] font-black text-amber-500 uppercase tracking-widest text-center shrink-0">Items to Sort</span>
                    <div className="flex flex-wrap justify-center gap-4 overflow-y-auto custom-scrollbar w-full pb-2">
                         {items.length === 0 ? (
-                            <p className="text-amber-500 font-bold uppercase tracking-widest my-auto flex items-center gap-2">
-                                <CheckCircle2 size={24}/> All sorted!
-                            </p>
+                            <p className="text-amber-500 font-bold uppercase tracking-widest my-auto flex items-center gap-2"><CheckCircle2 size={24}/> All sorted!</p>
                         ) : (
                             items.map((item: SortItem) => (
                                 <button 
