@@ -18,14 +18,10 @@ export function useMagisterData() {
   const [enrolledClasses, setEnrolledClasses] = useState<any[]>([]);
   const [instructorClasses, setInstructorClasses] = useState<any[]>([]); 
   
-  // 🔥 State for all published classes on the global radar
   const [allClasses, setAllClasses] = useState<any[]>([]);
-  
   const [customCurriculums, setCustomCurriculums] = useState<any[]>([]);
-  
   const [privateDecks, setPrivateDecks] = useState<any>({ custom: { title: 'My Study Cards', cards: [] } });
   const [publishedDecks, setPublishedDecks] = useState<any[]>([]);
-
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
 
   // State for Student Preferences
@@ -45,51 +41,64 @@ export function useMagisterData() {
 
     if (user?.uid) {
       
-      // 🔥 THE SMART DUAL-MERGE LISTENER
+      // 🔥 THE SMART DUAL-MERGE LISTENER (Bulletproofed for Mobile)
       let rootData: any = {};
       let profileData: any = {};
 
       const syncMergedData = () => {
-          // 1. Base merge
           const merged = { ...rootData, ...profileData };
           
-          // 2. PROTECT WEALTH: Take the highest possible balance across all legacy and new fields
-          const rootFlux = rootData.flux || 0;
-          const rootCoins = rootData.coins || 0;
-          const profCoins = profileData.coins || 0;
-          const profFlux = profileData.flux || 0;
+          // 1. Aggressively protect wealth
+          const rootFlux = Number(rootData.flux) || 0;
+          const rootCoins = Number(rootData.coins) || 0;
+          const profCoins = Number(profileData.coins) || 0;
+          const profFlux = Number(profileData.flux) || 0;
           
           merged.coins = Math.max(rootFlux, rootCoins, profCoins, profFlux);
-          merged.flux = merged.coins; // Keep them synced in memory so old components don't break
+          merged.flux = merged.coins; 
 
-          // 3. PROTECT INVENTORY: Combine arrays and remove duplicates, so `[]` doesn't overwrite your purchases
-          const rootInv = rootData.inventory || [];
-          const profInv = profileData.inventory || [];
+          // 2. Protect Inventory Arrays safely
+          const rootInv = Array.isArray(rootData.inventory) ? rootData.inventory : [];
+          const profInv = Array.isArray(profileData.inventory) ? profileData.inventory : [];
           merged.inventory = Array.from(new Set([...rootInv, ...profInv]));
 
-          // 4. PROTECT SOLO CLASSES: Combine enrolled solo classes
-          const rootClasses = rootData.enrolledClasses || [];
-          const profClasses = profileData.enrolledClasses || [];
+          // 3. Protect Enrolled Classes
+          const rootClasses = Array.isArray(rootData.enrolledClasses) ? rootData.enrolledClasses : [];
+          const profClasses = Array.isArray(profileData.enrolledClasses) ? profileData.enrolledClasses : [];
           const classMap = new Map();
-          [...rootClasses, ...profClasses].forEach(c => classMap.set(c.id, c));
+          [...rootClasses, ...profClasses].forEach(c => {
+              if (c && c.id) classMap.set(c.id, c);
+          });
           merged.enrolledClasses = Array.from(classMap.values());
+          
+          // 4. Force core auth data so the app NEVER crashes on an empty profile
+          if (!merged.email && user?.email) merged.email = user.email;
+          if (!merged.role) merged.role = 'student';
           
           setUserData(merged);
       };
 
+      // Listen to Root Data
       const unsubRootUser = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid), (snap) => {
           if (snap.exists()) {
               rootData = snap.data();
-              syncMergedData();
           }
+          syncMergedData(); // Call unconditionally
+      }, (error) => {
+          console.error("Root sync network error:", error);
+          syncMergedData(); // Fallback on error
       });
 
+      // Listen to Profile Data
       const unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), (snap) => {
           if (snap.exists()) {
               profileData = snap.data();
-              syncMergedData();
           }
-          setAuthChecked(true);
+          syncMergedData(); // Call unconditionally
+          setAuthChecked(true); // Force OS Boot sequence to finish
+      }, (error) => {
+          console.error("Profile sync network error:", error);
+          setAuthChecked(true); // Force OS Boot sequence to finish even if mobile cache blocks it
       });
 
       const unsubLessons = onSnapshot(collectionGroup(db, 'custom_lessons'), (snap) => {
@@ -120,7 +129,6 @@ export function useMagisterData() {
         setInstructorClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
-      // Bypasses the strict Firebase Index requirement by filtering in-memory
       const unsubAllClasses = onSnapshot(collectionGroup(db, 'classes'), (snap) => {
         const published = snap.docs
             .map(d => ({ id: d.id, ...d.data() }))
@@ -142,7 +150,6 @@ export function useMagisterData() {
           setActivityLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
 
-      // Listeners for Student Deck/Card Preferences
       const unsubCardPrefs = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'card_prefs'), (snap) => {
           const prefs: Record<string, any> = {};
           snap.docs.forEach(d => { prefs[d.id] = d.data(); });
@@ -204,7 +211,6 @@ export function useMagisterData() {
   const actions = {
     logout: () => signOut(auth),
     
-    // 🔥 FOLDER MANAGEMENT
     createStudyFolder: async (folderName: string, color: string = 'indigo') => {
         if (!user) return;
         const cleanName = folderName.trim();
@@ -263,7 +269,6 @@ export function useMagisterData() {
         await setDoc(prefRef, { folder: folderName }, { merge: true });
     },
 
-    // 🔥 DECK PREFERENCES
     toggleCardStar: async (cardId: string, currentStatus: boolean) => {
         if (!user) return;
         const prefRef = doc(db, 'artifacts', appId, 'users', user.uid, 'card_prefs', cardId);
@@ -282,13 +287,9 @@ export function useMagisterData() {
         await setDoc(prefRef, { hidden: true }, { merge: true });
     },
 
-    // ========================================================================
-    // 🔥 ECONOMY VAULT (UNIVERSAL TRANSACTION ENGINE)
-    // ========================================================================
     purchaseItem: async (itemId: string, price: number, category: string, extraData?: any) => {
         if (!user || !user.uid) return { success: false, msg: "Auth session expired." };
         
-        // Grab the current Flux balance (checking both new and legacy states)
         const currentFlux = userData?.coins || userData?.profile?.main?.coins || userData?.flux || 0; 
         
         if (currentFlux < price) {
@@ -299,18 +300,14 @@ export function useMagisterData() {
         const userRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main');
         const rootUserRef = doc(db, 'artifacts', appId, 'users', user.uid);
         
-        // 1. Deduct Flux
         const balanceUpdate = { coins: increment(-price) };
         batch.update(userRef, balanceUpdate);
         batch.update(rootUserRef, { 'profile.main.coins': increment(-price) });
-        // Update legacy flux to prevent desync
         batch.update(rootUserRef, { flux: increment(-price), coins: increment(-price) });
 
-        // 2. Update Inventory
         batch.update(userRef, { inventory: arrayUnion(itemId) });
         batch.update(rootUserRef, { 'profile.main.inventory': arrayUnion(itemId), inventory: arrayUnion(itemId) });
 
-        // 3. Logic for Elective Courses (Solo Study)
         if (category === 'course' && extraData) {
             const newClass = {
                 id: itemId,
@@ -325,7 +322,6 @@ export function useMagisterData() {
             batch.update(rootUserRef, { 'profile.main.enrolledClasses': arrayUnion(newClass), enrolledClasses: arrayUnion(newClass) });
         }
 
-        // 4. Log the Transaction
         const logRef = doc(collection(db, 'artifacts', appId, 'activity_logs'));
         batch.set(logRef, {
             studentId: user.uid,
@@ -345,8 +341,6 @@ export function useMagisterData() {
             return { success: false, msg: "Network error during transaction." };
         }
     },
-    
-    // STANDARD CLASS/CONTENT MANAGEMENT
     
     reorderClasses: async (newOrder: string[]) => {
       if (!user) return;
@@ -456,10 +450,6 @@ export function useMagisterData() {
       });
     },
 
-    // ========================================================================
-    // 🔥 ENTERPRISE CONTENT MANAGEMENT (DECKS & CARDS)
-    // ========================================================================
-
     createDeck: async (deckData: any) => {
         if (!user) return;
         const deckRef = doc(collection(db, 'artifacts', appId, 'decks'));
@@ -497,8 +487,6 @@ export function useMagisterData() {
         if (!user || !deckId) return;
 
         const batch = writeBatch(db);
-        
-        // 1. Point to the specific card inside the subcollection
         const cardRef = isNewCard 
             ? doc(collection(db, 'artifacts', appId, 'decks', deckId, 'cards')) 
             : doc(db, 'artifacts', appId, 'decks', deckId, 'cards', cardData.id || `card_${Date.now()}`);
@@ -509,14 +497,11 @@ export function useMagisterData() {
             updatedAt: Date.now()
         };
 
-        // Add the card write to the batch
         batch.set(cardRef, payload, { merge: true });
 
-        // 2. Point to the Parent Deck to update the metadata
         const deckRef = doc(db, 'artifacts', appId, 'decks', deckId);
         const deckUpdates: any = { updatedAt: Date.now() };
 
-        // Only increment the total card count if this is a brand NEW card
         if (isNewCard) {
             deckUpdates['stats.cardCount'] = increment(1);
         }
@@ -524,7 +509,7 @@ export function useMagisterData() {
         batch.update(deckRef, deckUpdates);
 
         try {
-            await batch.commit(); // FIRE THE BATCH!
+            await batch.commit(); 
             return cardRef.id;
         } catch (error) {
             console.error("Batch write failed. Data integrity preserved.", error);
@@ -533,7 +518,6 @@ export function useMagisterData() {
     },
 
     updateCard: async (deckId: string, cardId: string, cardData: any) => {
-        // Reroute to the new batch logic
         return actions.saveCard(deckId, { ...cardData, id: cardId }, false);
     },
 
@@ -541,12 +525,9 @@ export function useMagisterData() {
         if (!user || !deckId || !cardId) return;
 
         const batch = writeBatch(db);
-        
-        // Queue the deletion
         const cardRef = doc(db, 'artifacts', appId, 'decks', deckId, 'cards', cardId);
         batch.delete(cardRef);
 
-        // Queue the parent count decrement
         const deckRef = doc(db, 'artifacts', appId, 'decks', deckId);
         batch.update(deckRef, {
             'stats.cardCount': increment(-1),
@@ -564,8 +545,6 @@ export function useMagisterData() {
     publishDeck: async (deckId: string, deckTitle: string, visibility: 'private' | 'restricted' | 'public', allowedClasses: string[] = []) => {
         if (!user || !deckId) return;
 
-        // In the new architecture, the cards are already safely in the subcollection.
-        // We just update the parent document to switch its state!
         const deckRef = doc(db, 'artifacts', appId, 'decks', deckId);
         
         try {
@@ -582,10 +561,6 @@ export function useMagisterData() {
             throw error;
         }
     },
-
-    // ========================================================================
-    //  TELEMETRY & LOGGING
-    // ========================================================================
 
     logActivity: async (itemId: string, xp: number, title: string, details: any = {}) => {
       if (!user || !user.uid) return;
@@ -616,7 +591,6 @@ export function useMagisterData() {
                 newStreak = 1; newDailyXp = xp; newDailyLessons = isLesson ? 1 : 0;
             }
 
-            // 🔥 ECONOMY ENGINE: Earn 1 Flux for every 5 XP (Minting)
             const earnedFlux = Math.floor(xp / 5);
 
             await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
@@ -628,7 +602,6 @@ export function useMagisterData() {
               lastActivityDate: todayStr
             }).catch(e => console.log("Subcollection update skipped", e));
 
-            // Legacy sync
             await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid), {
               'profile.main.xp': increment(xp), 
               'profile.main.coins': increment(earnedFlux), 
@@ -645,7 +618,6 @@ export function useMagisterData() {
 
   const allLessons = useMemo(() => allAppLessons, [allAppLessons]);
   
-  // 🔥 DYNAMIC USER DATA ENRICHMENT
   const enrichedUserData = useMemo(() => {
     if (!userData) return null;
     return {
