@@ -25,6 +25,7 @@ import LiveConnectFourProjector from './components/LiveConnectFourProjector';
 import LiveSlipstreamProjector from './components/LiveSlipstreamProjector';
 import CelebrationScreen from './components/CelebrationScreen';
 import HoloAvatar from './components/HoloAvatar'; 
+import InstructorHUD from './components/instructor/InstructorHUD'; // 🔥 IMPORTED HUD
 
 // 🔥 DYNAMIC OS THEME ENGINE
 const OS_THEMES: Record<string, string> = {
@@ -59,6 +60,7 @@ export default function App() {
   const [activeVocabGame, setActiveVocabGame] = useState<{deckId: string, classId: string} | null>(null);
   const [activeConnectFour, setActiveConnectFour] = useState<{deckId: string, classId: string} | null>(null);
   const [activeSlipstream, setActiveSlipstream] = useState<{deckId: string, classId: string} | null>(null);
+  const [activeHUD, setActiveHUD] = useState<{lessonId: string, classId: string} | null>(null); // 🔥 NEW: HUD State
 
   const allCurriculums = useMemo(() => {
       return [...GLOBAL_CURRICULUMS, ...(customCurriculums || [])];
@@ -298,6 +300,17 @@ export default function App() {
     );
   }
 
+  // 🔥 2.5 INSTRUCTOR HUD (The iPad Remote)
+  if (activeHUD) {
+    const lesson = allLessons.find(l => l.id === activeHUD.lessonId);
+    const activeClassForHUD = instructorClasses.find(c => c.id === activeHUD.classId);
+    return (
+      <div className="fixed inset-0 z-[5000] bg-black flex flex-col">
+        <InstructorHUD lesson={lesson} classId={activeHUD.classId} activeClass={activeClassForHUD} onExit={() => setActiveHUD(null)} />
+      </div>
+    );
+  }
+
   if (activeVocabGame) {
     const deck = allDecks[activeVocabGame.deckId] || allDecks.custom;
     const activeClassForVocab = instructorClasses.find(c => c.id === activeVocabGame.classId) || enrolledClasses.find(c => c.id === activeVocabGame.classId);
@@ -368,6 +381,7 @@ export default function App() {
         onAddStudent={actions.addStudent}
         onRemoveStudent={actions.removeStudent} 
         onStartPresentation={(lessonId: string, classId: string) => setActivePresentation({ lessonId, classId })}
+        onStartHUD={(lessonId: string, classId: string) => setActiveHUD({ lessonId, classId })} // 🔥 NEW: Connects HUD to dashboard
         onStartVocabGame={handleStartVocabGame}      
         onStartConnectFour={handleStartConnectFour} 
         onStartSlipstream={handleStartSlipstream}
