@@ -5,7 +5,8 @@ import { db } from '../config/firebase';
 import { useLiveClass } from '../hooks/useLiveClass';
 import { 
     MessageSquare, MessageCircle, Gamepad2, CheckCircle2, X, Puzzle, 
-    ChevronLeft, ChevronRight, Zap, Users, Clock, EyeOff, HelpCircle, Layers, MousePointerClick, QrCode
+    ChevronLeft, ChevronRight, Zap, Users, Clock, EyeOff, HelpCircle, 
+    Layers, MousePointerClick, QrCode, Hourglass, Play, Pause, RotateCcw, Plus, Minus
 } from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
 
@@ -19,8 +20,16 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   // 🔥 OS FEATURE: Presentation Telemetry & Overlays
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isBlanked, setIsBlanked] = useState(false);
-  const [showQR, setShowQR] = useState(false); // NEW: QR Code Overlay State
+  const [showQR, setShowQR] = useState(false);
   
+  // 🔥 OS FEATURE: Moveable Draggable Timer
+  const [showTimer, setShowTimer] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(300); // 5 minutes default
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [timerPos, setTimerPos] = useState({ x: 50, y: 50 });
+  const isDragging = useRef(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+
   const stageRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
 
@@ -33,19 +42,52 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       .flatMap((b: any) => b.items || []);
   }, [lesson]);
 
+  // Initial Placement of the timer
+  useEffect(() => {
+      setTimerPos({ x: window.innerWidth - 350, y: 50 });
+  }, []);
+
+  // Main Classroom Clock
   useEffect(() => {
       if (!lesson?.id) return;
       startLiveClass(lesson.id);
-      
-      const timer = setInterval(() => {
-          setElapsedTime(prev => prev + 1);
-      }, 1000);
-
-      return () => { 
-          clearInterval(timer);
-          endLiveClass(); 
-      };
+      const timer = setInterval(() => setElapsedTime(prev => prev + 1), 1000);
+      return () => { clearInterval(timer); endLiveClass(); };
   }, [lesson?.id]);
+
+  // Floating Countdown Timer Engine
+  useEffect(() => {
+      let interval: NodeJS.Timeout;
+      if (timerRunning && timeLeft > 0) {
+          interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+      } else if (timeLeft === 0 && timerRunning) {
+          setTimerRunning(false);
+      }
+      return () => clearInterval(interval);
+  }, [timerRunning, timeLeft]);
+
+  // Timer Dragging Logic
+  const startDrag = (e: React.MouseEvent) => {
+      isDragging.current = true;
+      dragOffset.current = { x: e.clientX - timerPos.x, y: e.clientY - timerPos.y };
+  };
+
+  useEffect(() => {
+      const handleMouseMove = (e: MouseEvent) => {
+          if (isDragging.current) {
+              setTimerPos({ x: e.clientX - dragOffset.current.x, y: e.clientY - dragOffset.current.y });
+          }
+      };
+      const handleMouseUp = () => { isDragging.current = false; };
+      if (showTimer) {
+          window.addEventListener('mousemove', handleMouseMove);
+          window.addEventListener('mouseup', handleMouseUp);
+      }
+      return () => {
+          window.removeEventListener('mousemove', handleMouseMove);
+          window.removeEventListener('mouseup', handleMouseUp);
+      };
+  }, [showTimer]);
 
   const formatTime = (seconds: number) => {
       const m = Math.floor(seconds / 60);
@@ -57,7 +99,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
     if (!lesson?.blocks || !Array.isArray(lesson.blocks)) return [];
     const grouped: any[] = [];
     let buffer: any[] = [];
-    
     const interactables = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'drag-drop'];
     
     lesson.blocks.forEach((b: any) => {
@@ -68,7 +109,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         buffer = [];
       } else { buffer.push(b); }
     });
-    
     if (buffer.length > 0) grouped.push({ type: 'read', blocks: [...buffer] });
     return grouped;
   }, [lesson]);
@@ -109,12 +149,11 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
               e.preventDefault();
               if (stageRef.current) stageRef.current.scrollBy({ top: -(window.innerHeight * 0.4), behavior: 'smooth' });
           } else if (e.key.toLowerCase() === 'b') {
-              e.preventDefault();
-              setIsBlanked(prev => !prev);
+              e.preventDefault(); setIsBlanked(prev => !prev);
           } else if (e.key.toLowerCase() === 'q') {
-              // 🔥 NEW OS FEATURE: Press 'Q' to toggle QR Code
-              e.preventDefault();
-              setShowQR(prev => !prev);
+              e.preventDefault(); setShowQR(prev => !prev);
+          } else if (e.key.toLowerCase() === 't') {
+              e.preventDefault(); setShowTimer(prev => !prev);
           } else if (e.key === 'Escape') {
               setShowQR(false);
           }
@@ -127,7 +166,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const activePage = pages[activePageIdx];
   if (!lesson || !activePage) return null;
 
-  // Dynamically build the join URL based on where the app is currently hosted
   const joinUrl = `${window.location.origin}/join/${classId}`;
 
   return (
@@ -135,37 +173,55 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         className="w-full flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500 relative"
         style={{ height: 'calc(100dvh - 4rem)' }}
     >
-      {/* 🔥 OS FEATURE: The Blackout Overlay */}
       <div className={`absolute inset-0 bg-black z-[9000] flex items-center justify-center transition-opacity duration-700 pointer-events-none ${isBlanked ? 'opacity-100' : 'opacity-0'}`}>
           <EyeOff size={64} className="text-white/10" />
       </div>
 
-      {/* 🔥 NEW OS FEATURE: Quick-Join QR Overlay */}
       {showQR && (
           <div className="absolute inset-0 z-[9999] bg-slate-900/90 backdrop-blur-2xl flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-300">
-              <button 
-                  onClick={() => setShowQR(false)} 
-                  className="absolute top-12 right-12 p-6 bg-white/10 hover:bg-rose-500 rounded-full text-white transition-all hover:scale-110 active:scale-95"
-              >
-                  <X size={40} strokeWidth={3} />
-              </button>
-              
+              <button onClick={() => setShowQR(false)} className="absolute top-12 right-12 p-6 bg-white/10 hover:bg-rose-500 rounded-full text-white transition-all hover:scale-110 active:scale-95"><X size={40} strokeWidth={3} /></button>
               <h2 className="text-[6vh] font-black text-white uppercase tracking-widest mb-4">Join Live Session</h2>
               <p className="text-[3vh] text-indigo-300 font-bold tracking-widest uppercase mb-16">Scan to sync your device</p>
-              
               <div className="p-10 bg-white rounded-[3rem] shadow-[0_0_100px_rgba(99,102,241,0.4)] animate-in slide-in-from-bottom-8">
-                  {/* Using a reliable free API to render the QR code on the fly */}
-                  <img 
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(joinUrl)}&margin=10`} 
-                      alt="Join QR" 
-                      className="w-[40vh] h-[40vh] object-contain" 
-                  />
+                  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(joinUrl)}&margin=10`} alt="Join QR" className="w-[40vh] h-[40vh] object-contain" />
               </div>
-              
               <div className="mt-16 text-center">
                   <p className="text-[2vh] font-bold text-slate-400 uppercase tracking-[0.4em] mb-4">Or enter room code</p>
-                  <div className="text-[8vh] font-black text-indigo-400 tracking-[0.2em] leading-none bg-indigo-500/10 py-6 px-12 rounded-[2rem] border-2 border-indigo-500/20">
-                      {String(classId || '').substring(0,6).toUpperCase()}
+                  <div className="text-[8vh] font-black text-indigo-400 tracking-[0.2em] leading-none bg-indigo-500/10 py-6 px-12 rounded-[2rem] border-2 border-indigo-500/20">{String(classId || '').substring(0,6).toUpperCase()}</div>
+              </div>
+          </div>
+      )}
+
+      {/* 🔥 NEW OS FEATURE: Draggable Floating HUD Timer */}
+      {showTimer && (
+          <div 
+              className="absolute z-[9500] bg-slate-900/90 backdrop-blur-xl border-4 border-slate-700 rounded-[2.5rem] shadow-[0_30px_60px_rgba(0,0,0,0.4)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+              style={{ left: timerPos.x, top: timerPos.y, width: 320 }}
+          >
+              {/* Drag Handle */}
+              <div className="bg-slate-800/80 p-3 cursor-grab active:cursor-grabbing flex justify-between items-center" onMouseDown={startDrag}>
+                  <div className="flex items-center gap-2 text-slate-400 px-2">
+                      <Hourglass size={14} />
+                      <span className="text-[10px] font-black uppercase tracking-widest">Focus Timer</span>
+                  </div>
+                  <button onClick={() => setShowTimer(false)} className="text-slate-400 hover:text-rose-400 transition-colors"><X size={18} strokeWidth={3} /></button>
+              </div>
+
+              {/* Display & Controls */}
+              <div className="p-8 flex flex-col items-center">
+                  <div className={`text-7xl font-black font-mono tracking-tighter mb-6 ${timeLeft === 0 ? 'text-rose-500 animate-pulse' : 'text-white'}`}>
+                      {formatTime(timeLeft)}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 w-full mb-4">
+                      <button onClick={() => setTimeLeft(t => Math.max(0, t - 60))} className="p-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 font-bold flex justify-center items-center gap-1 transition-all active:scale-95"><Minus size={16} /> 1m</button>
+                      <button onClick={() => setTimeLeft(t => t + 60)} className="p-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 font-bold flex justify-center items-center gap-1 transition-all active:scale-95"><Plus size={16} /> 1m</button>
+                  </div>
+                  <div className="flex gap-3 w-full">
+                      <button onClick={() => { setTimeLeft(300); setTimerRunning(false); }} className="p-4 bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 rounded-2xl text-slate-400 font-bold flex justify-center items-center transition-all active:scale-95 w-1/3"><RotateCcw size={20} /></button>
+                      <button onClick={() => setTimerRunning(!timerRunning)} className={`p-4 rounded-2xl font-black uppercase tracking-widest flex justify-center items-center gap-2 transition-all active:scale-95 w-2/3 ${timerRunning ? 'bg-amber-500 text-slate-900 hover:bg-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.4)]' : 'bg-emerald-500 text-white hover:bg-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)]'}`}>
+                          {timerRunning ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
+                          {timerRunning ? 'Pause' : 'Start'}
+                      </button>
                   </div>
               </div>
           </div>
@@ -173,26 +229,14 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
       <main className="flex-1 flex overflow-hidden relative group/canvas bg-slate-50 text-slate-900">
         
-        {/* MOUSE NAVIGATION CONTROLS */}
         {activePageIdx > 0 && (
-            <button 
-                onClick={handlePrev} 
-                className="absolute left-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/5 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 shadow-lg"
-            >
-                <ChevronLeft size={48} />
-            </button>
+            <button onClick={handlePrev} className="absolute left-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/5 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 shadow-lg"><ChevronLeft size={48} /></button>
         )}
         
         {activePageIdx < pages.length - 1 && (
-            <button 
-                onClick={handleNext} 
-                className="absolute right-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/5 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 shadow-lg"
-            >
-                <ChevronRight size={48} />
-            </button>
+            <button onClick={handleNext} className="absolute right-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/5 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 shadow-lg"><ChevronRight size={48} /></button>
         )}
 
-        {/* SECURE SCROLL CONTAINER */}
         <div ref={stageRef} className={`flex-1 overflow-y-auto w-full relative transition-all duration-500 ${showForum ? 'mr-[450px]' : ''} scroll-smooth`}>
           <div className="flex flex-col min-h-full w-full items-center px-16 py-12 lg:px-32">
             <div className="w-full max-w-7xl space-y-24 my-auto">
@@ -212,39 +256,24 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                               <h2 className="text-[5vh] md:text-[6vh] font-black mb-12 leading-tight">{String(block.content?.question || block.question || '')}</h2>
                               
                               {liveState?.quizState === 'waiting' && (
-                                  <button 
-                                      onClick={() => triggerQuiz('active')}
-                                      className="bg-rose-500 hover:bg-rose-600 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest shadow-[0_0_40px_rgba(244,63,94,0.5)] transition-transform active:scale-95 flex items-center gap-4 mx-auto"
-                                  >
-                                      <Zap size={40} fill="currentColor" /> Launch Trivia Protocol
-                                  </button>
+                                  <button onClick={() => triggerQuiz('active')} className="bg-rose-500 hover:bg-rose-600 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest shadow-[0_0_40px_rgba(244,63,94,0.5)] transition-transform active:scale-95 flex items-center gap-4 mx-auto"><Zap size={40} fill="currentColor" /> Launch Trivia Protocol</button>
                               )}
 
                               {liveState?.quizState === 'active' && (
                                   <div className="space-y-12 animate-in fade-in duration-500">
                                       <div className="flex flex-col items-center justify-center gap-4 text-[6vh] font-black text-indigo-400">
                                           <div className="flex items-center gap-6 bg-slate-800 px-10 py-6 rounded-[2rem] shadow-inner border border-slate-700">
-                                              <Users size={64} className="animate-pulse" /> 
-                                              <span>{answerCount} Students Locked In</span>
+                                              <Users size={64} className="animate-pulse" /> <span>{answerCount} Students Locked In</span>
                                           </div>
                                       </div>
-                                      <button 
-                                          onClick={() => triggerQuiz('revealed')}
-                                          className="bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest transition-transform active:scale-95 shadow-xl mx-auto"
-                                      >
-                                          Reveal Correct Answer
-                                      </button>
+                                      <button onClick={() => triggerQuiz('revealed')} className="bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest transition-transform active:scale-95 shadow-xl mx-auto">Reveal Correct Answer</button>
                                   </div>
                               )}
 
                               {liveState?.quizState === 'revealed' && (
                                   <div className="animate-in zoom-in duration-500 flex flex-col items-center">
-                                      <div className="inline-flex items-center gap-4 bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/50 px-10 py-5 rounded-[2rem] text-[4vh] font-black mb-12 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
-                                          <CheckCircle2 size={48} /> Correct Answer Displayed!
-                                      </div>
-                                      <div className="bg-emerald-500 text-white p-8 rounded-[2rem] shadow-xl text-[4vh] font-bold border-4 border-emerald-400 min-w-[50%]">
-                                          {String(block.content?.options?.find((o:any) => String(o.id) === String(block.content?.correctId))?.text || "Answer Revealed on Devices")}
-                                      </div>
+                                      <div className="inline-flex items-center gap-4 bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/50 px-10 py-5 rounded-[2rem] text-[4vh] font-black mb-12 shadow-[0_0_30px_rgba(16,185,129,0.2)]"><CheckCircle2 size={48} /> Correct Answer Displayed!</div>
+                                      <div className="bg-emerald-500 text-white p-8 rounded-[2rem] shadow-xl text-[4vh] font-bold border-4 border-emerald-400 min-w-[50%]">{String(block.content?.options?.find((o:any) => String(o.id) === String(block.content?.correctId))?.text || "Answer Revealed on Devices")}</div>
                                   </div>
                               )}
                           </div>
@@ -275,11 +304,8 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           <div className="flex items-center gap-8">
               <h2 className="text-xl font-black text-slate-400 uppercase tracking-widest">{String(lesson?.title || '')}</h2>
               <div className="h-6 w-px bg-slate-800" />
-              <span className="flex items-center gap-2 font-mono text-lg font-bold text-slate-500">
-                  <Clock size={18} /> {formatTime(elapsedTime)}
-              </span>
+              <span className="flex items-center gap-2 font-mono text-lg font-bold text-slate-500"><Clock size={18} /> {formatTime(elapsedTime)}</span>
               
-              {/* 🔥 NEW OS FEATURE: Footer QR Toggle Button */}
               <div className="h-6 w-px bg-slate-800 mx-2" />
               <button 
                   onClick={() => setShowQR(true)}
@@ -287,20 +313,20 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
               >
                   <QrCode size={16} /> QR Join (Q)
               </button>
+              <button 
+                  onClick={() => setShowTimer(prev => !prev)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-xs font-black uppercase tracking-widest shadow-sm active:scale-95 border ${showTimer ? 'bg-amber-600 text-white border-amber-500' : 'bg-slate-800 hover:bg-amber-600 text-slate-300 hover:text-white border-slate-700 hover:border-amber-500'}`}
+              >
+                  <Hourglass size={16} /> Timer (T)
+              </button>
           </div>
           
           <div className="flex items-center gap-6">
-              <div 
-                  ref={progressBarRef}
-                  onClick={handleProgressBarClick}
-                  className="w-64 h-3 bg-slate-800 rounded-full overflow-hidden cursor-pointer group relative"
-              >
+              <div ref={progressBarRef} onClick={handleProgressBarClick} className="w-64 h-3 bg-slate-800 rounded-full overflow-hidden cursor-pointer group relative">
                   <div className="absolute inset-0 bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity" />
                   <div className="h-full bg-indigo-500 transition-all duration-300 relative z-10" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} />
               </div>
-              <span className="font-black text-slate-400 tracking-widest uppercase w-32 text-right">
-                  Slide {activePageIdx + 1} of {pages.length}
-              </span>
+              <span className="font-black text-slate-400 tracking-widest uppercase w-32 text-right">Slide {activePageIdx + 1} of {pages.length}</span>
           </div>
       </footer>
     </div>
@@ -344,19 +370,11 @@ const DialogueBlock = ({ block }: { block: any }) => (
       const sideRight = String(line.side) === 'right';
       const speakerInitial = typeof line.speaker === 'string' && line.speaker.trim().length > 0 ? line.speaker.trim()[0].toUpperCase() : '?';
       return (
-      <div 
-        key={j} 
-        className={`flex items-end gap-6 animate-in slide-in-from-bottom-8 fade-in fill-mode-both ${sideRight ? 'flex-row-reverse' : ''}`}
-        style={{ animationDelay: `${j * 300}ms`, animationDuration: '600ms' }}
-      >
-        <div className={`w-20 h-20 rounded-full flex items-center justify-center text-[3vh] font-black text-white shrink-0 shadow-2xl ${sideRight ? 'bg-indigo-600' : 'bg-slate-800'}`}>
-          {speakerInitial}
-        </div>
+      <div key={j} className={`flex items-end gap-6 animate-in slide-in-from-bottom-8 fade-in fill-mode-both ${sideRight ? 'flex-row-reverse' : ''}`} style={{ animationDelay: `${j * 300}ms`, animationDuration: '600ms' }}>
+        <div className={`w-20 h-20 rounded-full flex items-center justify-center text-[3vh] font-black text-white shrink-0 shadow-2xl ${sideRight ? 'bg-indigo-600' : 'bg-slate-800'}`}>{speakerInitial}</div>
         <div className={`max-w-[80%] p-10 rounded-[3rem] shadow-lg text-[4vh] font-medium leading-relaxed ${sideRight ? 'bg-indigo-500 text-white rounded-br-none' : 'bg-white border-4 border-slate-100 text-slate-800 rounded-bl-none'}`}>
           {String(line.text || '')}
-          {line.translation && (
-            <p className={`text-[2.5vh] mt-6 italic opacity-80 font-bold border-t pt-4 ${sideRight ? 'border-indigo-400' : 'border-slate-200'}`}>{String(line.translation)}</p>
-          )}
+          {line.translation && <p className={`text-[2.5vh] mt-6 italic opacity-80 font-bold border-t pt-4 ${sideRight ? 'border-indigo-400' : 'border-slate-200'}`}>{String(line.translation)}</p>}
         </div>
       </div>
     )})}
@@ -367,9 +385,7 @@ const VocabListBlock = ({ block }: { block: any }) => (
   <div className="grid grid-cols-2 gap-10 py-12">
     {(Array.isArray(block.items) ? block.items : []).map((item: any, j: number) => (
       <div key={j} className="bg-gradient-to-br from-slate-50 to-slate-100 p-12 rounded-[3rem] border border-white shadow-xl text-left relative overflow-hidden group">
-        <div className="absolute -right-12 -top-12 opacity-5 text-indigo-900 rotate-12 group-hover:scale-110 transition-transform duration-700">
-            <Layers size={200} />
-        </div>
+        <div className="absolute -right-12 -top-12 opacity-5 text-indigo-900 rotate-12 group-hover:scale-110 transition-transform duration-700"><Layers size={200} /></div>
         <p className="text-[5vh] font-black text-indigo-600 mb-4 relative z-10">{String(item.term || '')}</p>
         <p className="text-[3vh] text-slate-600 font-medium leading-relaxed relative z-10">{String(item.definition || '')}</p>
       </div>
@@ -397,9 +413,7 @@ const DiscussionBlock = ({ block }: { block: any }) => (
 const GameBlock = ({ block, lessonVocab }: { block: any, lessonVocab: any }) => (
   <div className="w-full max-w-6xl mx-auto flex flex-col items-center py-12">
     <div className="text-center mb-12">
-      <div className="inline-flex items-center justify-center p-6 bg-indigo-50 text-indigo-600 rounded-3xl mb-8 shadow-inner" aria-hidden="true">
-        <Gamepad2 size={64} />
-      </div>
+      <div className="inline-flex items-center justify-center p-6 bg-indigo-50 text-indigo-600 rounded-3xl mb-8 shadow-inner" aria-hidden="true"><Gamepad2 size={64} /></div>
       <h3 className="text-[6vh] font-black text-slate-800 leading-none">{String(block.title || "Vocabulary Battle")}</h3>
       <p className="text-[3vh] font-bold text-slate-400 uppercase tracking-[0.4em] mt-4">Local Multiplayer Mode</p>
     </div>
@@ -450,21 +464,21 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
         return rawOptions.map((opt: any) => String(opt)).filter(Boolean);
   }, [distractorsJson]);
 
-  const initialWordBank = useMemo(() => {
-    return [...correctAnswers, ...distractors]
-        .map((w, i) => ({ id: `word_${i}_${w}`, word: w }))
-        .sort(() => Math.random() - 0.5);
+  const shuffledWords = useMemo(() => {
+    const allWords = [...correctAnswers, ...distractors];
+    return allWords.sort(() => 0.5 - Math.random());
   }, [correctAnswers, distractors]);
 
-  const [wordBank, setWordBank] = useState<WordItem[]>(initialWordBank);
+  // RESTORED INTERACTIVE STATE
+  const [wordBank, setWordBank] = useState<WordItem[]>(shuffledWords.map((w, i) => ({ id: `word_${i}_${w}`, word: w })));
   const [filledBlanks, setFilledBlanks] = useState<(WordItem | null)[]>(Array(correctAnswers.length).fill(null));
   const [isChecked, setIsChecked] = useState(false);
 
   useEffect(() => {
-      setWordBank(initialWordBank);
+      setWordBank(shuffledWords.map((w, i) => ({ id: `word_${i}_${w}`, word: w })));
       setFilledBlanks(Array(correctAnswers.length).fill(null));
       setIsChecked(false);
-  }, [initialWordBank, correctAnswers.length]);
+  }, [shuffledWords, correctAnswers.length]);
 
   const handleBankClick = (item: WordItem) => {
       if (isChecked) return;
@@ -564,7 +578,7 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
                   ) : (
                       <button onClick={() => { 
                           setFilledBlanks(Array(correctAnswers.length).fill(null)); 
-                          setWordBank(initialWordBank); 
+                          setWordBank(shuffledWords.map((w, i) => ({ id: `word_${i}_${w}`, word: w }))); 
                           setIsChecked(false); 
                       }} className="px-12 py-6 bg-rose-50 text-rose-600 border-4 border-rose-200 rounded-2xl font-black text-[3vh] uppercase tracking-widest shadow-sm hover:bg-rose-100 active:scale-95 transition-all">
                           Try Again
@@ -579,7 +593,7 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
 
 type SortItem = { id: string; label: string; emoji: string };
 
-const TapSortBlock = ({ block }: { block: any }) => {
+const TapSortBlock = ({ block, liveState }: { block: any, liveState?: any }) => {
     const itemsJson = JSON.stringify(block.items || []);
     const catsJson = JSON.stringify(block.categories || []);
 
@@ -619,7 +633,7 @@ const TapSortBlock = ({ block }: { block: any }) => {
     const handleBucketClick = (category: string) => {
         if (selectedItem) {
             setPlaced(prev => ({...prev, [category]: [...(prev[category] || []), selectedItem]}));
-            setItems(items.filter(i => i.id !== selectedItem.id));
+            setItems(items.filter((i: SortItem) => i.id !== selectedItem.id));
             setSelectedItem(null);
         }
     };
@@ -638,7 +652,7 @@ const TapSortBlock = ({ block }: { block: any }) => {
                    <span className="text-[2vh] font-black text-amber-500 uppercase tracking-widest text-center shrink-0">Items to Sort</span>
                    <div className="flex flex-wrap justify-center gap-4 overflow-y-auto custom-scrollbar w-full pb-2">
                         {items.length === 0 && <p className="text-amber-500 font-bold uppercase tracking-widest my-auto flex items-center gap-2"><CheckCircle2 size={24}/> All sorted!</p>}
-                        {items.map((item) => (
+                        {items.map((item: SortItem) => (
                             <button 
                                 key={item.id} 
                                 onClick={() => setSelectedItem(selectedItem?.id === item.id ? null : item)} 
@@ -661,7 +675,7 @@ const TapSortBlock = ({ block }: { block: any }) => {
                         <h4 className="font-black text-amber-900 text-[4vh] text-center leading-tight">{cat}</h4>
                         <div className="flex flex-wrap justify-center gap-3">
                             {placed[cat]?.length === 0 && <span className="text-amber-400/50 text-[3vh] font-bold uppercase tracking-widest mt-4">Drop Zone</span>}
-                            {placed[cat]?.map(item => (
+                            {placed[cat]?.map((item: SortItem) => (
                                 <div key={item.id} className="px-5 py-2.5 bg-white rounded-xl text-[2.5vh] font-black shadow-sm border-2 border-amber-100 flex items-center gap-2">
                                     {item.emoji} <span>{item.label}</span>
                                 </div>
