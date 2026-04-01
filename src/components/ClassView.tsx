@@ -7,7 +7,7 @@ import {
     MessageSquare, MessageCircle, Gamepad2, CheckCircle2, X, Puzzle, 
     ChevronLeft, ChevronRight, Zap, Users, Clock, EyeOff, HelpCircle, 
     Layers, MousePointerClick, QrCode, Hourglass, Play, Pause, RotateCcw, 
-    Plus, Minus, PenTool, Crosshair, Eraser
+    Plus, Minus, PenTool, Crosshair, Eraser, Wrench
 } from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
 
@@ -22,6 +22,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isBlanked, setIsBlanked] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const [showTools, setShowTools] = useState(false); // 🔥 NEW: Tools Drawer State
   
   // 🔥 OS FEATURE: Moveable Draggable Timer
   const [showTimer, setShowTimer] = useState(false);
@@ -100,7 +101,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   useEffect(() => {
       const resizeCanvas = () => {
           if (canvasRef.current) {
-              // Lock strictly to the window viewport for perfect 1:1 mouse mapping
               canvasRef.current.width = window.innerWidth;
               canvasRef.current.height = window.innerHeight;
           }
@@ -123,7 +123,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       if (!isDrawingAnnotation.current || !canvasRef.current) return;
       const ctx = canvasRef.current.getContext('2d');
       if (!ctx) return;
-      ctx.lineWidth = 6;
+      ctx.lineWidth = 8;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.strokeStyle = '#ef4444'; // Bright Red Marker
@@ -145,7 +145,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       }
   };
 
-  // 🔥 NEW OS FEATURE: Right-Click Deactivation Handler
+  // 🔥 OS FEATURE: Right-Click Deactivation Handler
   const handleRightClick = (e: React.MouseEvent) => {
       if (isAnnotating || isSpotlight) {
           e.preventDefault(); // Stop the browser context menu from appearing
@@ -216,17 +216,22 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           } else if (e.key.toLowerCase() === 'b') {
               e.preventDefault(); setIsBlanked(prev => !prev);
           } else if (e.key.toLowerCase() === 'q') {
-              e.preventDefault(); setShowQR(prev => !prev);
+              e.preventDefault(); setShowQR(prev => !prev); setShowTools(false);
           } else if (e.key.toLowerCase() === 't') {
-              e.preventDefault(); setShowTimer(prev => !prev);
+              e.preventDefault(); setShowTimer(prev => !prev); setShowTools(false);
           } else if (e.key.toLowerCase() === 'a') {
               e.preventDefault(); 
               setIsAnnotating(prev => { if (!prev) setIsSpotlight(false); return !prev; });
+              setShowTools(false);
           } else if (e.key.toLowerCase() === 's') {
               e.preventDefault(); 
               setIsSpotlight(prev => { if (!prev) setIsAnnotating(false); return !prev; });
+              setShowTools(false);
+          } else if (e.key.toLowerCase() === 'w') {
+              // 🔥 NEW OS FEATURE: Toggle Tools Drawer
+              e.preventDefault(); setShowTools(prev => !prev);
           } else if (e.key === 'Escape') {
-              setShowQR(false); setShowTimer(false); setIsSpotlight(false); setIsAnnotating(false);
+              setShowQR(false); setShowTimer(false); setIsSpotlight(false); setIsAnnotating(false); setShowTools(false);
           }
       };
       
@@ -314,6 +319,32 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                       </button>
                   </div>
               </div>
+          </div>
+      )}
+
+      {/* 🔥 THE TOOLS DRAWER */}
+      {showTools && (
+          <div className="absolute right-8 bottom-28 z-[8800] bg-slate-900/95 backdrop-blur-2xl border-4 border-slate-700 rounded-[2.5rem] p-6 shadow-2xl flex flex-col gap-3 animate-in slide-in-from-bottom-10 fade-in w-72 pointer-events-auto">
+              <div className="flex items-center justify-between mb-2 px-2">
+                  <span className="text-[12px] font-black text-slate-400 uppercase tracking-widest">Smartboard Tools</span>
+                  <button onClick={() => setShowTools(false)} className="text-slate-500 hover:text-white transition-colors"><X size={20} strokeWidth={3} /></button>
+              </div>
+              <button onClick={() => { setShowQR(true); setShowTools(false); }} className="flex items-center gap-4 px-6 py-4 bg-slate-800 hover:bg-indigo-600 text-white rounded-2xl transition-all font-bold shadow-sm active:scale-95 border border-slate-700 hover:border-indigo-500 text-left">
+                  <QrCode size={20} /> <span className="flex-1">QR Code Menu</span> <span className="text-slate-500 text-xs font-black">Q</span>
+              </button>
+              <button onClick={() => { setShowTimer(p => !p); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left ${showTimer ? 'bg-amber-600 text-white border-amber-500' : 'bg-slate-800 hover:bg-amber-600 text-slate-300 hover:text-white border-slate-700 hover:border-amber-500'}`}>
+                  <Hourglass size={20} /> <span className="flex-1">Focus Timer</span> <span className="text-amber-500/50 text-xs font-black">T</span>
+              </button>
+              <button onClick={() => { setIsAnnotating(p => !p); setIsSpotlight(false); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left ${isAnnotating ? 'bg-rose-600 text-white border-rose-500' : 'bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white border-slate-700 hover:border-rose-500'}`}>
+                  <PenTool size={20} /> <span className="flex-1">Digital Marker</span> <span className="text-rose-500/50 text-xs font-black">A</span>
+              </button>
+              <button onClick={() => { setIsSpotlight(p => !p); setIsAnnotating(false); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left ${isSpotlight ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white border-slate-700 hover:border-emerald-500'}`}>
+                  <Crosshair size={20} /> <span className="flex-1">Spotlight</span> <span className="text-emerald-500/50 text-xs font-black">S</span>
+              </button>
+              <div className="h-px w-full bg-slate-700 my-1" />
+              <button onClick={() => setIsBlanked(p => !p)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left ${isBlanked ? 'bg-white text-black border-slate-200' : 'bg-slate-950 text-slate-400 hover:bg-black hover:text-white border-slate-800'}`}>
+                  <EyeOff size={20} /> <span className="flex-1">{isBlanked ? 'Restore Screen' : 'Blackout Screen'}</span> <span className="text-slate-600 text-xs font-black">B</span>
+              </button>
           </div>
       )}
 
@@ -405,21 +436,13 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
               
               <div className="h-6 w-px bg-slate-800 mx-2" />
               
-              {/* 🔥 NEW OS FEATURE: Smartboard Tool Dock */}
-              <div className="flex gap-3">
-                  <button onClick={() => setShowQR(true)} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white rounded-lg transition-all text-xs font-black uppercase tracking-widest shadow-sm active:scale-95 border border-slate-700 hover:border-indigo-500">
-                      <QrCode size={16} /> QR (Q)
-                  </button>
-                  <button onClick={() => setShowTimer(prev => !prev)} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-xs font-black uppercase tracking-widest shadow-sm active:scale-95 border ${showTimer ? 'bg-amber-600 text-white border-amber-500' : 'bg-slate-800 hover:bg-amber-600 text-slate-300 hover:text-white border-slate-700 hover:border-amber-500'}`}>
-                      <Hourglass size={16} /> Timer (T)
-                  </button>
-                  <button onClick={() => { setIsAnnotating(prev => !prev); setIsSpotlight(false); }} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-xs font-black uppercase tracking-widest shadow-sm active:scale-95 border ${isAnnotating ? 'bg-rose-600 text-white border-rose-500' : 'bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white border-slate-700 hover:border-rose-500'}`}>
-                      <PenTool size={16} /> Marker (A)
-                  </button>
-                  <button onClick={() => { setIsSpotlight(prev => !prev); setIsAnnotating(false); }} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-xs font-black uppercase tracking-widest shadow-sm active:scale-95 border ${isSpotlight ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white border-slate-700 hover:border-emerald-500'}`}>
-                      <Crosshair size={16} /> Spot (S)
-                  </button>
-              </div>
+              {/* 🔥 NEW OS FEATURE: Consolidated Tools Drawer Toggle */}
+              <button 
+                  onClick={() => setShowTools(prev => !prev)} 
+                  className={`flex items-center gap-2 px-6 py-3 rounded-xl transition-all text-sm font-black uppercase tracking-widest shadow-sm active:scale-95 border ${showTools || isAnnotating || isSpotlight || showTimer || isBlanked ? 'bg-indigo-600 text-white border-indigo-500 shadow-[0_0_20px_rgba(79,70,229,0.5)]' : 'bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white border-slate-700 hover:border-indigo-500'}`}
+              >
+                  <Wrench size={18} /> Tools (W)
+              </button>
           </div>
           
           <div className="flex items-center gap-6">
@@ -607,7 +630,7 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
   const isEntirelyCorrect = isChecked && filledBlanks.every((item, i) => item?.word === correctAnswers[i]);
 
   return (
-    <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col relative overflow-visible">
+    <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col relative overflow-visible pointer-events-auto">
       <div className="p-12 md:p-16 pb-8">
           <h3 className="text-[4vh] font-bold text-slate-800 flex items-center justify-center gap-4">
             <span className="bg-indigo-100 text-indigo-600 p-4 rounded-2xl" aria-hidden="true"><Puzzle size={40}/></span>
@@ -616,7 +639,7 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
       </div>
 
       {!isChecked && (
-        <div className="sticky top-4 z-50 -mx-4 px-4 mb-12 pointer-events-auto">
+        <div className="sticky top-4 z-50 -mx-4 px-4 mb-12">
             <div className="bg-white/95 backdrop-blur-2xl rounded-[2.5rem] p-6 border-4 border-slate-200/50 shadow-[0_10px_40px_rgba(0,0,0,0.08)] flex flex-col items-center gap-4 max-h-[25vh] transition-all duration-300">
                 <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest shrink-0 text-center">Word Bank Options</span>
                 <div className="flex flex-wrap gap-4 justify-center items-start overflow-y-auto custom-scrollbar w-full pb-2">
@@ -639,7 +662,7 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
         </div>
       )}
 
-      <div className="px-12 md:px-16 pb-16 flex-1 pointer-events-auto">
+      <div className="px-12 md:px-16 pb-16 flex-1">
           <div className="text-[4.5vh] md:text-[5vh] font-medium leading-loose text-slate-700 flex flex-wrap items-center gap-y-8 justify-center text-center">
             {textParts.map((part: string, idx: number) => {
               const isLast = idx === textParts.length - 1;
