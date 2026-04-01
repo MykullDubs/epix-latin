@@ -5,7 +5,7 @@ import { db } from '../config/firebase';
 import { 
   HelpCircle, CheckCircle2, X, Edit3, MessageSquare, 
   MessageCircle, ArrowLeft, ArrowRight, Info, Zap, BookOpen,
-  Play, Square, Search, MousePointerClick, Palette, Eraser, Volume2, Gamepad2
+  Play, Square, Search, MousePointerClick, Palette, Eraser, Volume2, Gamepad2, AlertTriangle
 } from 'lucide-react';
 
 export interface LessonViewProps {
