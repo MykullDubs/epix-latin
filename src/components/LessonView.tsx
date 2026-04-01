@@ -17,7 +17,7 @@ export interface LessonViewProps {
 }
 
 // ============================================================================
-//  INTERACTIVE RENDERERS (Indestructible)
+//  INTERACTIVE RENDERERS (Mobile-Safe & Armored)
 // ============================================================================
 
 const QuizBlockRenderer = ({ block }: any) => {
@@ -110,14 +110,21 @@ const FillBlankBlockRenderer = ({ block }: any) => {
     const data = block?.content || block?.data || block || {};
     const rawText = typeof data.text === 'string' ? data.text : "Missing text [here].";
     
+    // 🔥 FATAL CRASH FIX: .matchAll() is not supported on older mobile browsers!
+    // Using a standard while-loop with regex.exec() guarantees 100% cross-device compatibility.
     const { textParts, correctAnswers } = useMemo(() => {
         const parts = rawText.split(/\[.*?\]/g);
-        const matches = Array.from(rawText.matchAll(/\[(.*?)\]/g));
-        const answers = matches.map((m: any) => String(m[1])); 
+        
+        const answers: string[] = [];
+        const regex = /\[(.*?)\]/g;
+        let match;
+        while ((match = regex.exec(rawText)) !== null) {
+            answers.push(String(match[1]));
+        }
+        
         return { textParts: parts, correctAnswers: answers };
     }, [rawText]);
 
-    // 🔥 THE FIX: Stringify arrays to prevent React reference-loop crashes
     const distractorsJson = JSON.stringify(data.options || data.distractors || []);
 
     const distractors = useMemo(() => {
@@ -141,7 +148,6 @@ const FillBlankBlockRenderer = ({ block }: any) => {
     const [filledBlanks, setFilledBlanks] = useState<({id: string, word: string} | null)[]>(Array(correctAnswers.length).fill(null));
     const [isChecked, setIsChecked] = useState(false);
 
-    // Resync safely only if the core data structure changes
     useEffect(() => {
         setWordBank(initialWordBank);
         setFilledBlanks(Array(correctAnswers.length).fill(null));
@@ -631,7 +637,7 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
         );
       case 'image':
         return (
-          <div key={blockKey} className="py-8 animate-in fade-in"><div className="rounded-[2.5rem] overflow-hidden shadow-md border border-slate-100"><img src={String(block.url || '')} alt="Lesson visual" className="w-full h-auto object-cover max-h-80" /></div>{typeof block.caption === 'string' && block.caption && <p className="text-xs font-bold text-slate-400 text-center mt-4 px-4 uppercase tracking-widest">{block.caption}</p>}</div>
+          <div key={blockKey} className="py-8 animate-in fade-in"><div className="rounded-[2.5rem] overflow-hidden shadow-md border border-slate-100"><img src={String(block.url || '')} alt="Lesson visual" className="w-full h-auto object-cover max-h-80" /></div>{typeof block.caption === 'string' && block.caption && <p className="text-xs font-bold text-slate-400 text-center mt-4 px-4 uppercase tracking-widest">{String(block.caption)}</p>}</div>
         );
       case 'discussion':
         return (
