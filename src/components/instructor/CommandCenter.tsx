@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { 
     Users, Zap, TrendingUp, AlertTriangle, Play, FileText, 
     Activity, ChevronRight, Shield, Target, Calendar,
-    CheckCircle2, Mail, Crosshair // 🔥 Added Mail and Crosshair icons
+    CheckCircle2, Mail, Crosshair 
 } from 'lucide-react';
 import LiveActivityFeed from './LiveActivityFeed';
 import DeploymentModal from './DeploymentModal'; 
@@ -95,10 +95,8 @@ export default function CommandCenter({
     // Handle the new Action Buttons in the Triage Panel
     const handleTriageAction = (alert: any) => {
         if (alert.actionType === 'email') {
-            // Opens the user's default email client with a pre-filled subject
             window.location.href = `mailto:${alert.targetPayload}?subject=Magister OS: Checking in regarding ${activeClass?.name}`;
         } else if (alert.actionType === 'deploy') {
-            // Opens the deployment modal so you can assign a remedial deck
             setIsDeployModalOpen(true);
         }
     };
@@ -117,7 +115,7 @@ export default function CommandCenter({
             />
 
             {/* COHORT SELECTOR HEADER */}
-            <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6 animate-in slide-in-from-top-4 duration-500">
                 <div>
                     <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter mb-2 uppercase italic">
                         Command Center
@@ -141,9 +139,45 @@ export default function CommandCenter({
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-700">
                 
-                {/* 1. TOP ROW: KPI TILES */}
+                {/* 1. TOP ROW: RAPID OPS (Full Width on Mobile, 2 Col on Desktop) */}
+                <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
+                    <button 
+                        onClick={onLaunchLive}
+                        className="w-full p-6 md:p-8 bg-gradient-to-r from-indigo-600 to-indigo-400 text-white rounded-[2rem] flex items-center justify-between group shadow-lg shadow-indigo-500/20 active:scale-[0.98] transition-all overflow-hidden relative"
+                    >
+                        <div className="absolute right-0 top-0 w-48 h-48 bg-white/10 rounded-full blur-[40px] pointer-events-none group-hover:bg-white/20 transition-colors" />
+                        <div className="flex items-center gap-4 relative z-10">
+                            <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md shadow-inner border border-white/30">
+                                <Play size={24} fill="currentColor" className="group-hover:scale-110 transition-transform" />
+                            </div>
+                            <div className="text-left">
+                                <span className="font-black text-2xl uppercase tracking-tighter block leading-none mb-1">Launch Arena</span>
+                                <span className="text-[10px] font-bold text-indigo-100 uppercase tracking-widest">Start a live protocol</span>
+                            </div>
+                        </div>
+                        <ChevronRight size={24} className="text-indigo-200 group-hover:translate-x-2 transition-transform relative z-10" />
+                    </button>
+                    
+                    <button 
+                        onClick={() => setIsDeployModalOpen(true)}
+                        className="w-full p-6 md:p-8 bg-slate-900 dark:bg-black text-white rounded-[2rem] flex items-center justify-between group shadow-xl active:scale-[0.98] transition-all border border-slate-800"
+                    >
+                        <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 bg-emerald-500/20 rounded-2xl flex items-center justify-center border border-emerald-500/30">
+                                <FileText size={24} className="text-emerald-400 group-hover:scale-110 transition-transform" />
+                            </div>
+                            <div className="text-left">
+                                <span className="font-black text-2xl uppercase tracking-tighter block leading-none mb-1">Deploy Mission</span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Assign new content</span>
+                            </div>
+                        </div>
+                        <ChevronRight size={24} className="text-slate-500 group-hover:translate-x-2 transition-transform" />
+                    </button>
+                </div>
+
+                {/* 2. MIDDLE ROW: KPI TILES */}
                 <div className="lg:col-span-3 grid grid-cols-3 gap-4">
                     <div className="bg-white dark:bg-slate-900 p-5 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center md:items-start transition-all hover:border-indigo-200 dark:hover:border-indigo-500/50 group">
                         <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><Users size={20} /></div>
@@ -164,94 +198,65 @@ export default function CommandCenter({
                     </div>
                 </div>
 
-                {/* 2. MIDDLE LEFT: ACTIONABLE TRIAGE PANEL */}
-                <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-all flex flex-col">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2">
-                            <AlertTriangle size={16} className="text-rose-500" /> Tactical Triage
-                        </h2>
-                    </div>
-                    <div className="space-y-3 flex-1 flex flex-col justify-center">
-                        {triageAlerts.length > 0 ? triageAlerts.map((alert, i) => {
-                            const ActionIcon = alert.icon;
-                            return (
-                                <div key={i} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-100 dark:border-slate-700/50 group transition-all">
-                                    <div className="flex items-center gap-4">
-                                        <div className={`w-2 h-2 rounded-full ${alert.type === 'warning' ? 'bg-rose-500 animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.8)]' : 'bg-amber-500'}`} />
-                                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{alert.text}</span>
+                {/* 3. BOTTOM ROW: TRIAGE & CHARTS */}
+                <div className="lg:col-span-2 flex flex-col gap-6">
+                    {/* ACTIONABLE TRIAGE PANEL */}
+                    <div className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-all flex flex-col h-full">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                                <AlertTriangle size={16} className="text-rose-500" /> Tactical Triage
+                            </h2>
+                        </div>
+                        <div className="space-y-3 flex-1 flex flex-col justify-center">
+                            {triageAlerts.length > 0 ? triageAlerts.map((alert, i) => {
+                                const ActionIcon = alert.icon;
+                                return (
+                                    <div key={i} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-100 dark:border-slate-700/50 group transition-all">
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-2 h-2 rounded-full shrink-0 ${alert.type === 'warning' ? 'bg-rose-500 animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.8)]' : 'bg-amber-500'}`} />
+                                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{alert.text}</span>
+                                        </div>
+                                        <button 
+                                            onClick={() => handleTriageAction(alert)}
+                                            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-200 dark:hover:border-indigo-500/50 transition-all shadow-sm active:scale-95 shrink-0"
+                                        >
+                                            <ActionIcon size={12} /> {alert.actionLabel}
+                                        </button>
                                     </div>
-                                    <button 
-                                        onClick={() => handleTriageAction(alert)}
-                                        className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-200 dark:hover:border-indigo-500/50 transition-all shadow-sm active:scale-95"
-                                    >
-                                        <ActionIcon size={12} /> {alert.actionLabel}
-                                    </button>
+                                );
+                            }) : (
+                                <div className="py-8 text-center opacity-40">
+                                    <CheckCircle2 size={40} className="mx-auto mb-4 text-emerald-500 drop-shadow-md" />
+                                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-600 dark:text-slate-400">All Systems Nominal</p>
+                                    <p className="text-xs font-medium text-slate-400 dark:text-slate-500 mt-2">No interventions required at this time.</p>
                                 </div>
-                            );
-                        }) : (
-                            <div className="py-8 text-center opacity-40">
-                                <CheckCircle2 size={40} className="mx-auto mb-4 text-emerald-500 drop-shadow-md" />
-                                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-600 dark:text-slate-400">All Systems Nominal</p>
-                                <p className="text-xs font-medium text-slate-400 dark:text-slate-500 mt-2">No interventions required at this time.</p>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
-                </div>
 
-                {/* 3. MIDDLE RIGHT: RAPID OPS */}
-                <div className="lg:col-span-1 bg-slate-900 dark:bg-black p-6 md:p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden flex flex-col justify-between border border-slate-800">
-                    <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-[60px] pointer-events-none" />
-                    <div className="relative z-10 mb-8">
-                        <h2 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2 mb-1">
-                            <Target size={16} className="text-indigo-400" /> Rapid Ops
+                    {/* VELOCITY CHART */}
+                    <div className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-all">
+                        <h2 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2 mb-8">
+                            <Activity size={16} className="text-emerald-500" /> Fleet Velocity
                         </h2>
-                    </div>
-                    <div className="relative z-10 space-y-3">
-                        <button 
-                            onClick={onLaunchLive}
-                            className="w-full p-4 bg-gradient-to-r from-indigo-600 to-indigo-400 text-white rounded-2xl flex items-center justify-between group shadow-lg shadow-indigo-500/20 active:scale-95 transition-all"
-                        >
-                            <div className="flex items-center gap-3">
-                                <Play size={20} fill="currentColor" className="group-hover:scale-110 transition-transform" />
-                                <span className="font-black text-sm uppercase tracking-widest">Launch Arena</span>
-                            </div>
-                        </button>
-                        
-                        <button 
-                            onClick={() => setIsDeployModalOpen(true)}
-                            className="w-full p-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl flex items-center justify-between group transition-all active:scale-95 border border-slate-700"
-                        >
-                            <div className="flex items-center gap-3">
-                                <FileText size={20} className="text-emerald-400" />
-                                <span className="font-black text-sm uppercase tracking-widest">Deploy Mission</span>
-                            </div>
-                            <ChevronRight size={16} className="text-slate-500 group-hover:translate-x-1 transition-transform" />
-                        </button>
+                        <div className="flex items-end justify-between h-32 gap-3 px-2">
+                            {weeklyActivity.map((d, i) => (
+                                <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group cursor-pointer relative">
+                                    <div className="absolute -top-10 bg-slate-900 dark:bg-slate-800 text-white text-[10px] font-black px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 shadow-lg border border-slate-700">
+                                        {d.xp.toLocaleString()} XP
+                                    </div>
+                                    <div className="w-full bg-slate-50 dark:bg-slate-800/50 rounded-xl relative flex items-end h-full mb-3 overflow-hidden border border-slate-100 dark:border-slate-800">
+                                        <div className="w-full bg-indigo-500 dark:bg-indigo-500/80 rounded-t-md transition-all duration-1000 group-hover:bg-indigo-400" style={{ height: d.height }} />
+                                    </div>
+                                    <span className="text-[10px] font-black uppercase text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{d.day}</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
-                {/* 4. BOTTOM LEFT: VELOCITY CHART */}
-                <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm transition-all">
-                    <h2 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2 mb-8">
-                        <Activity size={16} className="text-emerald-500" /> Fleet Velocity
-                    </h2>
-                    <div className="flex items-end justify-between h-32 gap-3 px-2">
-                        {weeklyActivity.map((d, i) => (
-                            <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group cursor-pointer relative">
-                                <div className="absolute -top-10 bg-slate-900 dark:bg-slate-800 text-white text-[10px] font-black px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 shadow-lg border border-slate-700">
-                                    {d.xp.toLocaleString()} XP
-                                </div>
-                                <div className="w-full bg-slate-50 dark:bg-slate-800/50 rounded-xl relative flex items-end h-full mb-3 overflow-hidden border border-slate-100 dark:border-slate-800">
-                                    <div className="w-full bg-indigo-500 dark:bg-indigo-500/80 rounded-t-md transition-all duration-1000 group-hover:bg-indigo-400" style={{ height: d.height }} />
-                                </div>
-                                <span className="text-[10px] font-black uppercase text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{d.day}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* 5. BOTTOM RIGHT: LIVE ACTIVITY FEED */}
-                <div className="lg:col-span-1 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col transition-all min-h-[400px]">
+                {/* 4. RIGHT COLUMN: LIVE ACTIVITY FEED */}
+                <div className="lg:col-span-1 bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col transition-all min-h-[500px]">
                     <div className="flex-1 overflow-hidden">
                         <LiveActivityFeed />
                     </div>
