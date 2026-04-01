@@ -25,7 +25,6 @@ const QuizBlockRenderer = ({ block }: any) => {
     const [isSubmitted, setIsSubmitted] = useState(false);
 
     const data = block?.content || block?.data || block || {};
-    // 🔥 SAFETY: Force string type to prevent React child rendering crashes
     const question = typeof data.question === 'string' ? data.question : String(data.question || "Missing Question Data");
     
     let options = data.options || [];
@@ -109,7 +108,6 @@ const QuizBlockRenderer = ({ block }: any) => {
 
 const FillBlankBlockRenderer = ({ block }: any) => {
     const data = block?.content || block?.data || block || {};
-    // 🔥 SAFETY: Force string conversion to completely eliminate .split() crashes
     const rawText = typeof data.text === 'string' ? data.text : "Missing text [here].";
     
     const { textParts, correctAnswers } = useMemo(() => {
@@ -119,7 +117,6 @@ const FillBlankBlockRenderer = ({ block }: any) => {
         return { textParts: parts, correctAnswers: answers };
     }, [rawText]);
 
-    // 🔥 SAFETY: Stringify distractors to prevent reference-based infinite loops
     const distractorsString = JSON.stringify(data.options || data.distractors || []);
 
     const distractors = useMemo(() => {
@@ -133,10 +130,12 @@ const FillBlankBlockRenderer = ({ block }: any) => {
     }, [distractorsString]);
 
     const [wordBank, setWordBank] = useState<{id: string, word: string}[]>([]);
-    const [filledBlanks, setFilledBlanks] = useState<{id: string, word: string} | null[]>([]);
+    
+    // 🔥 THE FIX: Parentheses around the union type so TS knows it's an array of mixed values
+    const [filledBlanks, setFilledBlanks] = useState<({id: string, word: string} | null)[]>([]);
+    
     const [isChecked, setIsChecked] = useState(false);
 
-    // 🔥 SAFETY: Initialize arrays based ONLY on stable string values
     useEffect(() => {
         const allWords = [...correctAnswers, ...distractors].map((w, i) => ({ id: `word_${i}_${w}`, word: w }));
         setWordBank(allWords.sort(() => Math.random() - 0.5));
@@ -146,7 +145,7 @@ const FillBlankBlockRenderer = ({ block }: any) => {
 
     const handleBankClick = (item: {id: string, word: string}) => {
         if (isChecked) return;
-        const firstEmptyIdx = filledBlanks.indexOf(null as any);
+        const firstEmptyIdx = filledBlanks.indexOf(null); // TS now accepts this natively
         if (firstEmptyIdx !== -1) {
             const newFilled = [...filledBlanks];
             newFilled[firstEmptyIdx] = item;
@@ -160,12 +159,12 @@ const FillBlankBlockRenderer = ({ block }: any) => {
     const handleBlankClick = (item: {id: string, word: string} | null, idx: number) => {
         if (isChecked || !item) return;
         const newFilled = [...filledBlanks];
-        newFilled[idx] = null as any;
+        newFilled[idx] = null; // TS now accepts this natively
         setFilledBlanks(newFilled);
         setWordBank([...wordBank, item]);
     };
 
-    const isComplete = filledBlanks.every(slot => slot !== null);
+    const isComplete = filledBlanks.length > 0 && filledBlanks.every(slot => slot !== null);
 
     return (
         <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-100 shadow-sm my-6 relative flex flex-col">
@@ -237,7 +236,6 @@ const FillBlankBlockRenderer = ({ block }: any) => {
 
 const ScenarioBlockRenderer = ({ block }: any) => {
     const [selectedOpt, setSelectedOpt] = useState<string | null>(null);
-    // 🔥 SAFETY: Fallbacks to prevent UI crashing on corrupted objects
     const title = typeof block.title === 'string' ? block.title : (typeof block?.content?.title === 'string' ? block.content.title : "Real-World Scenario");
     const context = typeof block.context === 'string' ? block.context : (typeof block?.content?.context === 'string' ? block.content.context : "Scenario context goes here...");
     
@@ -476,7 +474,7 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
     return () => container.removeEventListener('scroll', handleScroll);
   }, [lesson, isInstructor]);
 
-  // --- KEYBOARD NAVIGATION (Left, Right, Up, Down) ---
+  // --- KEYBOARD NAVIGATION ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
         if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
