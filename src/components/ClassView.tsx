@@ -1,6 +1,6 @@
 // src/components/ClassView.tsx
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { doc, setDoc } from 'firebase/firestore'; 
+import { doc, onSnapshot, setDoc } from 'firebase/firestore'; 
 import { db } from '../config/firebase';
 import { useLiveClass } from '../hooks/useLiveClass';
 import { 
@@ -373,7 +373,7 @@ const ScenarioBlock = ({ block, liveState }: { block: any, liveState: any }) => 
   );
 };
 
-// 🔥 DOCKED HUD: FILL BLANK BLOCK
+// 🔥 PERFECTLY STICKY BOTTOM DOCK: FILL BLANK BLOCK
 const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) => {
   const rawText = String(block.text || "Missing text [here].");
 
@@ -404,7 +404,8 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
   const liveAnswers = Array.isArray(liveState?.answers) ? liveState.answers : [];
 
   return (
-    <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col overflow-hidden">
+    // Removed `overflow-hidden` so `sticky` will work perfectly!
+    <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col relative">
       
       {/* HEADER */}
       <div className="p-12 md:p-16 pb-8">
@@ -415,7 +416,7 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
       </div>
 
       {/* TEXT CONTENT */}
-      <div className="px-12 md:px-16 pb-12 flex-1">
+      <div className="px-12 md:px-16 pb-24 flex-1">
           <div className="text-[4.5vh] md:text-[5vh] font-medium leading-loose text-slate-700 flex flex-wrap items-center gap-y-8 justify-center text-center">
             {textParts.map((part: string, idx: number) => {
               const isLast = idx === textParts.length - 1;
@@ -443,26 +444,28 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
           </div>
       </div>
       
-      {/* THE COMPACT WORD BANK DOCK */}
+      {/* THE COMPACT WORD BANK DOCK - STICKY TO VIEWPORT BOTTOM */}
       {!liveState?.submitted && (
-        <div className="bg-slate-50 border-t-4 border-slate-100 p-8 max-h-[35vh] flex flex-col items-center">
-            <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest text-center mb-6 shrink-0">Word Bank Options</span>
-            <div className="flex flex-wrap gap-4 justify-center items-start overflow-y-auto custom-scrollbar w-full pb-2">
-              {shuffledWords.map((word: string, i: number) => {
-                let isUsed = false;
-                for(let a=0; a < liveAnswers.length; a++) {
-                    const ans = liveAnswers[a];
-                    const textVal = typeof ans === 'string' ? ans : (ans?.word || '');
-                    if (textVal === word) {
-                        isUsed = true; break;
+        <div className="sticky bottom-0 z-50 w-full mt-auto rounded-b-[3.5rem]">
+            <div className="bg-slate-50/95 backdrop-blur-xl border-t-4 border-slate-200 p-8 md:p-10 max-h-[35vh] flex flex-col items-center rounded-b-[3.5rem] shadow-[0_-20px_40px_rgba(0,0,0,0.05)]">
+                <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest text-center mb-6 shrink-0">Word Bank Options</span>
+                <div className="flex flex-wrap gap-4 justify-center items-start overflow-y-auto custom-scrollbar w-full pb-4">
+                  {shuffledWords.map((word: string, i: number) => {
+                    let isUsed = false;
+                    for(let a=0; a < liveAnswers.length; a++) {
+                        const ans = liveAnswers[a];
+                        const textVal = typeof ans === 'string' ? ans : (ans?.word || '');
+                        if (textVal === word) {
+                            isUsed = true; break;
+                        }
                     }
-                }
-                return (
-                  <span key={i} className={`px-5 py-2.5 rounded-xl border-2 text-[2.5vh] font-bold transition-all duration-300 ${isUsed ? 'bg-slate-100 border-slate-200 text-slate-300 scale-95 opacity-50' : 'bg-white border-slate-300 text-slate-700 shadow-sm'}`}>
-                    {word}
-                  </span>
-                );
-              })}
+                    return (
+                      <span key={i} className={`px-5 py-2.5 rounded-xl border-2 text-[2.5vh] font-bold transition-all duration-300 ${isUsed ? 'bg-slate-100 border-slate-200 text-slate-300 scale-95 opacity-50' : 'bg-white border-slate-300 text-slate-700 shadow-sm'}`}>
+                        {word}
+                      </span>
+                    );
+                  })}
+                </div>
             </div>
         </div>
       )}
@@ -497,7 +500,8 @@ const TapSortBlock = ({ block }: { block: any, liveState: any }) => {
     }, [catsJson]);
 
     return (
-        <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col overflow-hidden">
+        // Removed `overflow-hidden` so sticky will work perfectly
+        <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col relative">
             <div className="p-12 md:p-16 pb-8">
                 <h3 className="text-[4vh] font-bold text-slate-800 flex items-center justify-center gap-4">
                     <span className="bg-amber-100 text-amber-600 p-4 rounded-2xl"><MousePointerClick size={40}/></span>
@@ -505,7 +509,7 @@ const TapSortBlock = ({ block }: { block: any, liveState: any }) => {
                 </h3>
             </div>
 
-            <div className="px-12 md:px-16 pb-16 grid grid-cols-1 sm:grid-cols-2 gap-10 flex-1">
+            <div className="px-12 md:px-16 pb-24 grid grid-cols-1 sm:grid-cols-2 gap-10 flex-1">
                 {parsedCategories.map((cat: string) => (
                     <div key={cat} className="p-8 rounded-[3rem] border-4 border-amber-200 bg-amber-50 flex flex-col items-center gap-6">
                         <h4 className="font-black text-amber-900 text-[4vh] text-center leading-tight">{cat}</h4>
@@ -514,16 +518,18 @@ const TapSortBlock = ({ block }: { block: any, liveState: any }) => {
                 ))}
             </div>
 
-            {/* BOTTOM DOCKED ITEM BANK */}
-            <div className="bg-amber-50 border-t-4 border-amber-100 p-8 max-h-[35vh] flex flex-col items-center">
-               <span className="text-[2vh] font-black text-amber-500 uppercase tracking-widest text-center mb-6 shrink-0">Items to Sort</span>
-               <div className="flex flex-wrap justify-center gap-4 overflow-y-auto custom-scrollbar w-full pb-2">
-                    {normalizedItems.length === 0 && <p className="text-amber-500 font-bold uppercase tracking-widest my-auto flex items-center gap-2"><CheckCircle2 size={16}/> All sorted!</p>}
-                    {normalizedItems.map((item) => (
-                        <span key={item.id} className="px-5 py-2.5 bg-white border-2 border-amber-200 text-slate-700 font-bold rounded-xl shadow-md text-[2.5vh]">
-                            {item.emoji} {item.label}
-                        </span>
-                    ))}
+            {/* BOTTOM DOCKED ITEM BANK - NOW STICKY */}
+            <div className="sticky bottom-0 z-50 w-full mt-auto rounded-b-[3.5rem]">
+               <div className="bg-amber-50/95 backdrop-blur-xl border-t-4 border-amber-200 p-8 md:p-10 max-h-[35vh] flex flex-col items-center rounded-b-[3.5rem] shadow-[0_-20px_40px_rgba(0,0,0,0.05)]">
+                   <span className="text-[2vh] font-black text-amber-500 uppercase tracking-widest text-center mb-6 shrink-0">Items to Sort</span>
+                   <div className="flex flex-wrap justify-center gap-4 overflow-y-auto custom-scrollbar w-full pb-4">
+                        {normalizedItems.length === 0 && <p className="text-amber-500 font-bold uppercase tracking-widest my-auto flex items-center gap-2"><CheckCircle2 size={16}/> All sorted!</p>}
+                        {normalizedItems.map((item) => (
+                            <span key={item.id} className="px-5 py-2.5 bg-white border-2 border-amber-200 text-slate-700 font-bold rounded-xl shadow-md text-[2.5vh]">
+                                {item.emoji} {item.label}
+                            </span>
+                        ))}
+                   </div>
                </div>
             </div>
         </div>
