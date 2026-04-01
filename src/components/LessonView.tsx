@@ -17,7 +17,7 @@ export interface LessonViewProps {
 }
 
 // ============================================================================
-//  INTERACTIVE RENDERERS (Mobile-Safe & Armored)
+//  INTERACTIVE RENDERERS (Strictly Typed & Armored)
 // ============================================================================
 
 const QuizBlockRenderer = ({ block }: any) => {
@@ -39,7 +39,7 @@ const QuizBlockRenderer = ({ block }: any) => {
     if (correctId === undefined) {
          if (data.correctIndex !== undefined) correctId = normalizedOptions[data.correctIndex]?.id;
          else if (data.correctAnswer) {
-             const found = normalizedOptions.find((o:any) => o.text === String(data.correctAnswer));
+             const found = normalizedOptions.find((o: any) => o.text === String(data.correctAnswer));
              correctId = found?.id;
          }
     }
@@ -106,7 +106,6 @@ const QuizBlockRenderer = ({ block }: any) => {
     );
 };
 
-// 🔥 MOBILE FLIPPABLE FLASHCARD DECK
 const VocabListBlockRenderer = ({ block }: any) => {
     const [index, setIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
@@ -138,14 +137,12 @@ const VocabListBlockRenderer = ({ block }: any) => {
                     className="relative w-full h-80 md:h-96 cursor-pointer transition-all duration-500 transform-style-3d" 
                     style={{ transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
                 >
-                    {/* FRONT OF CARD (TERM) */}
                     <div className="absolute inset-0 bg-white rounded-[2.5rem] shadow-lg border-4 border-slate-100 flex flex-col items-center justify-center p-8 text-center backface-hidden">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest absolute top-6">Term {index + 1} of {items.length}</span>
                         <h3 className="text-3xl md:text-4xl font-black text-indigo-600 leading-tight">{String(currentCard.term || '')}</h3>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest absolute bottom-6 animate-pulse bg-slate-50 px-4 py-2 rounded-full border border-slate-200">Tap to Flip</p>
                     </div>
 
-                    {/* BACK OF CARD (DEFINITION) */}
                     <div className="absolute inset-0 bg-indigo-600 rounded-[2.5rem] shadow-xl border-4 border-indigo-500 flex flex-col items-center justify-center p-8 text-white text-center backface-hidden" style={{ transform: 'rotateY(180deg)' }}>
                         <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest absolute top-6">Definition</span>
                         <div className="overflow-y-auto custom-scrollbar w-full pt-4 pb-8">
@@ -156,14 +153,13 @@ const VocabListBlockRenderer = ({ block }: any) => {
                 </div>
             </div>
 
-            {/* DECK NAVIGATION */}
             <div className="flex justify-between items-center mt-8 px-2">
                 <button onClick={() => handleNav(-1)} className="p-4 bg-white rounded-2xl shadow-sm border-2 border-slate-100 text-slate-500 hover:text-indigo-600 hover:border-indigo-100 active:scale-95 transition-all">
                     <ArrowLeft size={20} strokeWidth={2.5} />
                 </button>
                 
                 <div className="flex gap-2">
-                    {items.map((_, i) => (
+                    {items.map((_: any, i: number) => (
                         <div key={i} className={`h-2 rounded-full transition-all duration-300 ${i === index ? 'w-6 bg-indigo-600' : 'w-2 bg-slate-200'}`} />
                     ))}
                 </div>
@@ -208,7 +204,7 @@ const FillBlankBlockRenderer = ({ block }: any) => {
 
     const initialWordBank = useMemo(() => {
         return [...correctAnswers, ...distractors]
-            .map((w, i) => ({ id: `word_${i}_${w}`, word: w }))
+            .map((w: string, i: number) => ({ id: `word_${i}_${w}`, word: w }))
             .sort(() => Math.random() - 0.5);
     }, [correctAnswers, distractors]);
 
@@ -229,7 +225,7 @@ const FillBlankBlockRenderer = ({ block }: any) => {
             const newFilled = [...filledBlanks];
             newFilled[firstEmptyIdx] = item;
             setFilledBlanks(newFilled);
-            setWordBank(wordBank.filter(w => w.id !== item.id));
+            setWordBank(wordBank.filter((w: WordItem) => w.id !== item.id));
         }
     };
 
@@ -247,7 +243,7 @@ const FillBlankBlockRenderer = ({ block }: any) => {
         setIsChecked(true); 
     };
 
-    const isEntirelyCorrect = isChecked && filledBlanks.every((item, i) => item?.word === correctAnswers[i]);
+    const isEntirelyCorrect = isChecked && filledBlanks.every((item: WordItem | null, i: number) => item?.word === correctAnswers[i]);
 
     return (
         <div className="bg-white p-5 md:p-8 rounded-[2.5rem] border border-slate-100 shadow-sm my-6 relative flex flex-col">
@@ -265,7 +261,7 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                             <CheckCircle2 size={16} className="text-emerald-500" /> All placed
                         </span>
                     ) : (
-                        wordBank.map((item) => (
+                        wordBank.map((item: WordItem) => (
                             <button 
                                 key={item.id} onClick={() => handleBankClick(item)} disabled={isChecked}
                                 className="px-3 py-2 md:px-4 md:py-2.5 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl shadow-sm hover:border-indigo-400 hover:text-indigo-600 transition-all disabled:opacity-50 active:scale-95 text-sm"
@@ -397,7 +393,7 @@ const TapSortBlockRenderer = ({ block }: any) => {
         let cats = [];
         try { cats = JSON.parse(catsJson); } catch (e) {}
         if (!Array.isArray(cats)) cats = [];
-        return cats.map(c => String(c));
+        return cats.map((c: any) => String(c));
     }, [catsJson]);
 
     const [items, setItems] = useState<SortItem[]>(normalizedItems);
@@ -415,7 +411,7 @@ const TapSortBlockRenderer = ({ block }: any) => {
     const handleBucketClick = (category: string) => {
         if (selectedItem) {
             setPlaced(prev => ({...prev, [category]: [...(prev[category] || []), selectedItem]}));
-            setItems(items.filter(i => i.id !== selectedItem.id));
+            setItems(items.filter((i: SortItem) => i.id !== selectedItem.id));
             setSelectedItem(null);
         }
     };
@@ -430,7 +426,7 @@ const TapSortBlockRenderer = ({ block }: any) => {
             <div className="sticky top-2 z-30 mb-8 -mx-2 px-2">
                 <div className="bg-white/90 backdrop-blur-2xl rounded-[2rem] p-3 md:p-4 border border-slate-200/50 shadow-md flex flex-wrap justify-center gap-2 min-h-[80px] transition-all duration-300">
                     {items.length === 0 && <p className="text-amber-500 font-bold uppercase tracking-widest my-auto flex items-center gap-2"><CheckCircle2 size={16}/> All sorted!</p>}
-                    {items.map((item) => (
+                    {items.map((item: SortItem) => (
                         <button 
                             key={item.id} 
                             onClick={() => setSelectedItem(selectedItem?.id === item.id ? null : item)} 
@@ -448,7 +444,7 @@ const TapSortBlockRenderer = ({ block }: any) => {
                         <button key={cat} onClick={() => handleBucketClick(cat)} className={`p-5 rounded-[2rem] border-4 transition-colors flex flex-col items-center gap-4 ${selectedItem ? 'border-indigo-400 bg-indigo-50 animate-pulse cursor-pointer' : 'border-amber-200 bg-amber-100/50 cursor-default'}`}>
                             <h4 className="font-black text-amber-900 text-lg md:text-xl text-center leading-tight">{cat}</h4>
                             <div className="flex flex-wrap justify-center gap-2">
-                                {placed[cat]?.map(item => (
+                                {placed[cat]?.map((item: SortItem) => (
                                     <div key={item.id} className="px-3 py-1.5 bg-white rounded-xl text-sm font-black shadow-sm flex items-center gap-1">
                                         {item.emoji} <span className="inline">{item.label}</span>
                                     </div>
@@ -577,11 +573,83 @@ const DrawingBlockRenderer = ({ block }: any) => {
                 />
             </div>
             <div className="flex flex-wrap justify-center gap-2 md:gap-3">
-                {colors.map(c => (<button key={c} onClick={() => setColor(c)} className={`w-10 h-10 md:w-12 md:h-12 rounded-full border-4 transition-transform ${color === c ? 'scale-125 border-slate-200 shadow-lg' : 'border-transparent hover:scale-110'}`} style={{ backgroundColor: c }} />))}
+                {colors.map((c: string) => (<button key={c} onClick={() => setColor(c)} className={`w-10 h-10 md:w-12 md:h-12 rounded-full border-4 transition-transform ${color === c ? 'scale-125 border-slate-200 shadow-lg' : 'border-transparent hover:scale-110'}`} style={{ backgroundColor: c }} />))}
             </div>
         </div>
     );
 };
+
+const ImageBlockRenderer = ({ block }: any) => (
+    <div className="py-8 animate-in fade-in">
+      <div className="rounded-[2.5rem] overflow-hidden shadow-md border border-slate-100">
+        <img src={String(block.url || block.imageUrl || '')} alt="Lesson visual" className="w-full h-auto object-cover max-h-80" />
+      </div>
+      {block.caption && <p className="text-xs font-bold text-slate-400 text-center mt-4 px-4 uppercase tracking-widest">{String(block.caption)}</p>}
+    </div>
+);
+
+const CalloutBlockRenderer = ({ block }: any) => (
+    <div className="my-8 p-6 md:p-8 rounded-[2.5rem] bg-amber-50 border border-amber-100 relative overflow-hidden group shadow-sm">
+      <Zap size={100} className="absolute -right-6 -top-6 text-amber-200/40 rotate-12 group-hover:scale-110 transition-transform" fill="currentColor" />
+      <div className="relative z-10">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="p-1.5 bg-amber-500 text-white rounded-lg shadow-sm"><Info size={16} strokeWidth={3} /></div>
+          <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">{String(block.label || block.title || 'Spotlight')}</span>
+        </div>
+        <p className="text-base md:text-lg text-slate-700 font-bold leading-relaxed italic pr-6 md:pr-12">"{String(block.content || block.text || '')}"</p>
+      </div>
+    </div>
+);
+
+const DialogueBlockRenderer = ({ block }: any) => (
+    <div className="py-6 space-y-6">
+      {(Array.isArray(block.lines) ? block.lines : []).map((line: any, j: number) => {
+        const isRight = String(line.side) === 'right';
+        return (
+        <div key={j} className={`flex items-end gap-3 ${isRight ? 'flex-row-reverse' : ''}`}>
+          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-black text-white shrink-0 shadow-md ${isRight ? 'bg-indigo-500' : 'bg-slate-300'}`}>
+            {typeof line.speaker === 'string' && line.speaker.length > 0 ? line.speaker[0].toUpperCase() : '?'}
+          </div>
+          <div className={`max-w-[85%] p-4 md:p-5 rounded-[2rem] text-sm md:text-base font-medium leading-relaxed ${isRight ? 'bg-indigo-50 text-indigo-900 border border-indigo-100 rounded-br-none' : 'bg-white border border-slate-100 text-slate-700 rounded-bl-none shadow-sm'}`}>
+            {String(line.text || '')}
+            {line.translation && <p className={`text-xs mt-3 italic opacity-70 font-bold border-t pt-3 ${isRight ? 'border-indigo-200' : 'border-slate-100'}`}>{String(line.translation)}</p>}
+          </div>
+        </div>
+      )})}
+    </div>
+);
+
+const DiscussionBlockRenderer = ({ block }: any) => (
+    <div className="py-8 animate-in fade-in">
+      <div className="bg-indigo-50 border border-indigo-100 rounded-[2.5rem] p-6 md:p-8 shadow-sm">
+        <div className="flex items-center gap-3 mb-6 md:mb-8">
+          <div className="p-3 bg-indigo-500 text-white rounded-xl shadow-md shrink-0"><MessageCircle size={20} /></div>
+          <h3 className="text-lg md:text-xl font-bold text-indigo-900">{String(block.title || "Discussion")}</h3>
+        </div>
+        <div className="space-y-4">
+          {(Array.isArray(block.questions) ? block.questions : []).map((q: any, qIdx: number) => (
+            <div key={qIdx} className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-indigo-50 flex gap-3 md:gap-4 items-start">
+              <span className="text-indigo-300 font-black text-lg leading-none mt-1">{qIdx + 1}</span>
+              <p className="text-sm md:text-base text-slate-600 font-medium leading-relaxed">{String(q || '')}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+);
+
+const GameBlockRenderer = ({ block }: any) => (
+    <div className="py-8 animate-in fade-in slide-in-from-bottom-4 flex flex-col items-center">
+      <div className="text-center mb-6">
+        <h3 className="text-2xl font-black text-slate-800">{String(block.title || "Vocabulary Battle")}</h3>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Game Active on Projector</p>
+      </div>
+      <div className="w-full h-64 bg-slate-900 rounded-[2.5rem] border-4 border-slate-800 flex flex-col items-center justify-center text-white shadow-xl">
+        <Gamepad2 size={48} className="text-indigo-500 mb-4 animate-bounce" />
+        <p className="font-black tracking-widest uppercase text-sm text-slate-400">Look at the Smartboard</p>
+      </div>
+    </div>
+);
 
 // ============================================================================
 //  MAIN LESSON VIEW PLAYER
@@ -598,6 +666,7 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
     const grouped: any[] = [];
     let buffer: any[] = [];
     
+    // 🔥 ALL VALID BLOCK TYPES REGISTERED HERE
     const allowedTypes = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'code', 'formula', 'timeline', 'audio-story', 'image-hotspot', 'drag-drop', 'drawing'];
     
     lesson.blocks.forEach((b: any) => {
@@ -687,9 +756,15 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
     const blockType = String(block.type || '');
 
     switch (blockType) {
-      // 🔥 NEW MOBILE OPTIMIZED RENDERERS
+      // 🔥 RESTORED RENDERERS
+      case 'image': return <ImageBlockRenderer block={block} key={blockKey} />;
+      case 'callout': return <CalloutBlockRenderer block={block} key={blockKey} />;
+      case 'dialogue': return <DialogueBlockRenderer block={block} key={blockKey} />;
       case 'vocab-list': return <VocabListBlockRenderer block={block} key={blockKey} />;
+      case 'discussion': return <DiscussionBlockRenderer block={block} key={blockKey} />;
+      case 'game': return <GameBlockRenderer block={block} key={blockKey} />;
 
+      // Existing Renderers
       case 'drag-drop': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><TapSortBlockRenderer block={block} /></div>;
       case 'code':
         return (
@@ -742,84 +817,6 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
                 <div className="text-slate-600 font-medium text-base md:text-lg leading-relaxed space-y-6 tracking-wide">
                     {String(block.content || '').split('\n').map((p: string, j: number) => { if (!p.trim()) return null; return <p key={j}>{p}</p>; })}
                 </div>
-            </div>
-          </div>
-        );
-        
-      case 'image':
-        return (
-          <div key={blockKey} className="py-8 animate-in fade-in">
-            <div className="rounded-[2.5rem] overflow-hidden shadow-md border border-slate-100">
-              <img src={String(block.url || block.imageUrl || '')} alt="Lesson visual" className="w-full h-auto object-cover max-h-80" />
-            </div>
-            {block.caption && <p className="text-xs font-bold text-slate-400 text-center mt-4 px-4 uppercase tracking-widest">{String(block.caption)}</p>}
-          </div>
-        );
-
-      case 'callout':
-        return (
-          <div key={blockKey} className="my-8 p-6 md:p-8 rounded-[2.5rem] bg-amber-50 border border-amber-100 relative overflow-hidden group shadow-sm">
-            <Zap size={100} className="absolute -right-6 -top-6 text-amber-200/40 rotate-12 group-hover:scale-110 transition-transform" fill="currentColor" />
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="p-1.5 bg-amber-500 text-white rounded-lg shadow-sm"><Info size={16} strokeWidth={3} /></div>
-                <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">{String(block.label || block.title || 'Spotlight')}</span>
-              </div>
-              <p className="text-base md:text-lg text-slate-700 font-bold leading-relaxed italic pr-6 md:pr-12">"{String(block.content || block.text || '')}"</p>
-            </div>
-          </div>
-        );
-
-      case 'dialogue':
-        return (
-          <div key={blockKey} className="py-6 space-y-6">
-            {(Array.isArray(block.lines) ? block.lines : []).map((line: any, j: number) => {
-              const isRight = String(line.side) === 'right';
-              return (
-              <div key={j} className={`flex items-end gap-3 ${isRight ? 'flex-row-reverse' : ''}`}>
-                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-black text-white shrink-0 shadow-md ${isRight ? 'bg-indigo-500' : 'bg-slate-300'}`}>
-                  {typeof line.speaker === 'string' && line.speaker.length > 0 ? line.speaker[0].toUpperCase() : '?'}
-                </div>
-                <div className={`max-w-[85%] p-4 md:p-5 rounded-[2rem] text-sm md:text-base font-medium leading-relaxed ${isRight ? 'bg-indigo-50 text-indigo-900 border border-indigo-100 rounded-br-none' : 'bg-white border border-slate-100 text-slate-700 rounded-bl-none shadow-sm'}`}>
-                  {String(line.text || '')}
-                  {line.translation && <p className={`text-xs mt-3 italic opacity-70 font-bold border-t pt-3 ${isRight ? 'border-indigo-200' : 'border-slate-100'}`}>{String(line.translation)}</p>}
-                </div>
-              </div>
-            )})}
-          </div>
-        );
-
-      case 'discussion':
-        return (
-          <div key={blockKey} className="py-8 animate-in fade-in">
-            <div className="bg-indigo-50 border border-indigo-100 rounded-[2.5rem] p-6 md:p-8 shadow-sm">
-              <div className="flex items-center gap-3 mb-6 md:mb-8">
-                <div className="p-3 bg-indigo-500 text-white rounded-xl shadow-md shrink-0"><MessageCircle size={20} /></div>
-                <h3 className="text-lg md:text-xl font-bold text-indigo-900">{String(block.title || "Discussion")}</h3>
-              </div>
-              <div className="space-y-4">
-                {(Array.isArray(block.questions) ? block.questions : []).map((q: any, qIdx: number) => (
-                  <div key={qIdx} className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-indigo-50 flex gap-3 md:gap-4 items-start">
-                    <span className="text-indigo-300 font-black text-lg leading-none mt-1">{qIdx + 1}</span>
-                    <p className="text-sm md:text-base text-slate-600 font-medium leading-relaxed">{String(q || '')}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'game':
-        return (
-          <div key={blockKey} className="py-8 animate-in fade-in slide-in-from-bottom-4 flex flex-col items-center">
-            <div className="text-center mb-6">
-              <h3 className="text-2xl font-black text-slate-800">{String(block.title || "Vocabulary Battle")}</h3>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Game Active on Projector</p>
-            </div>
-            {/* 🔥 MOBILE SAFE: Focus UI for games launched on smartboard */}
-            <div className="w-full h-64 bg-slate-900 rounded-[2.5rem] border-4 border-slate-800 flex flex-col items-center justify-center text-white shadow-xl animate-pulse">
-              <Gamepad2 size={48} className="text-indigo-500 mb-4" />
-              <p className="font-black tracking-widest uppercase text-sm text-slate-400">Look at the Smartboard</p>
             </div>
           </div>
         );
