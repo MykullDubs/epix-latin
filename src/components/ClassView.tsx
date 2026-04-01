@@ -63,7 +63,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       if (!lesson?.id) return;
       startLiveClass(lesson.id);
       const timer = setInterval(() => setElapsedTime(prev => prev + 1), 1000);
-      setTimerPos({ x: window.innerWidth - 350, y: 50 }); 
+      setTimerPos({ x: window.innerWidth - 350, y: 50 }); // Initial timer placement
       return () => { clearInterval(timer); endLiveClass(); };
   }, [lesson?.id]);
 
@@ -109,10 +109,14 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       };
   }, [isSpotlight]);
 
+  // 🔥 GPS MAPPING: Translates global mouse coords into pixel-perfect local canvas coords
   const getRelativeCoords = (clientX: number, clientY: number) => {
       if (!classViewRef.current) return { x: clientX, y: clientY };
       const rect = classViewRef.current.getBoundingClientRect();
-      return { x: clientX - rect.left, y: clientY - rect.top };
+      return {
+          x: clientX - rect.left,
+          y: clientY - rect.top
+      };
   };
 
   // Global Annotation Canvas Engine
@@ -125,7 +129,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           }
       };
       window.addEventListener('resize', resizeCanvas);
-      setTimeout(resizeCanvas, 50); 
+      setTimeout(resizeCanvas, 50); // Ensures DOM paints before grabbing bounds
       return () => window.removeEventListener('resize', resizeCanvas);
   }, []);
 
@@ -180,9 +184,10 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       }
   };
 
+  // 🔥 OS FEATURE: Right-Click Deactivation Handler
   const handleRightClick = (e: React.MouseEvent) => {
       if (isAnnotating || isSpotlight) {
-          e.preventDefault(); 
+          e.preventDefault(); // Stop the browser context menu from appearing
           setIsAnnotating(false);
           setIsSpotlight(false);
       }
@@ -282,9 +287,10 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         ref={classViewRef}
         className="w-full flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500 relative"
         style={{ height: 'calc(100dvh - 4rem)' }}
-        onContextMenu={handleRightClick} 
+        onContextMenu={handleRightClick} // 🔥 Catches Right-Clicks anywhere
     >
       {/* 🔥 OS OVERLAYS & TOOLS */}
+      
       <div className={`absolute inset-0 bg-black z-[9000] flex items-center justify-center transition-opacity duration-700 pointer-events-none ${isBlanked ? 'opacity-100' : 'opacity-0'}`}>
           <EyeOff size={64} className="text-white/10" />
       </div>
@@ -306,7 +312,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           className={`absolute inset-0 z-[8600] fixed ${isAnnotating ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
       />
 
-      {/* 🎨 NEW: Advanced Smartboard Annotation Palette */}
+      {/* 🎨 ADVANCED FLOATING PALETTE */}
       {isAnnotating && (
           <div 
               className="absolute top-12 right-8 z-[8700] flex flex-col gap-4 animate-in fade-in slide-in-from-right-8 pointer-events-auto items-end"
@@ -388,6 +394,32 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                       </button>
                   </div>
               </div>
+          </div>
+      )}
+
+      {/* 🔥 THE TOOLS DRAWER */}
+      {showTools && (
+          <div className="absolute right-8 bottom-28 z-[8800] bg-slate-900/95 backdrop-blur-2xl border-4 border-slate-700 rounded-[2.5rem] p-6 shadow-2xl flex flex-col gap-3 animate-in slide-in-from-bottom-10 fade-in w-72 pointer-events-auto">
+              <div className="flex items-center justify-between mb-2 px-2">
+                  <span className="text-[12px] font-black text-slate-400 uppercase tracking-widest">Smartboard Tools</span>
+                  <button onClick={() => setShowTools(false)} className="text-slate-500 hover:text-white transition-colors"><X size={20} strokeWidth={3} /></button>
+              </div>
+              <button onClick={() => { setShowQR(true); setShowTools(false); }} className="flex items-center gap-4 px-6 py-4 bg-slate-800 hover:bg-indigo-600 text-white rounded-2xl transition-all font-bold shadow-sm active:scale-95 border border-slate-700 hover:border-indigo-500 text-left">
+                  <QrCode size={20} /> <span className="flex-1">QR Code Menu</span> <span className="text-slate-500 text-xs font-black">Q</span>
+              </button>
+              <button onClick={() => { setShowTimer(p => !p); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left ${showTimer ? 'bg-amber-600 text-white border-amber-500' : 'bg-slate-800 hover:bg-amber-600 text-slate-300 hover:text-white border-slate-700 hover:border-amber-500'}`}>
+                  <Hourglass size={20} /> <span className="flex-1">Focus Timer</span> <span className="text-amber-500/50 text-xs font-black">T</span>
+              </button>
+              <button onClick={() => { setIsAnnotating(p => !p); setIsSpotlight(false); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left ${isAnnotating ? 'bg-rose-600 text-white border-rose-500' : 'bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white border-slate-700 hover:border-rose-500'}`}>
+                  <PenTool size={20} /> <span className="flex-1">Digital Marker</span> <span className="text-rose-500/50 text-xs font-black">A</span>
+              </button>
+              <button onClick={() => { setIsSpotlight(p => !p); setIsAnnotating(false); setShowTools(false); }} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left ${isSpotlight ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white border-slate-700 hover:border-emerald-500'}`}>
+                  <Crosshair size={20} /> <span className="flex-1">Spotlight</span> <span className="text-emerald-500/50 text-xs font-black">S</span>
+              </button>
+              <div className="h-px w-full bg-slate-700 my-1" />
+              <button onClick={() => setIsBlanked(p => !p)} className={`flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold shadow-sm active:scale-95 border text-left ${isBlanked ? 'bg-white text-black border-slate-200' : 'bg-slate-950 text-slate-400 hover:bg-black hover:text-white border-slate-800'}`}>
+                  <EyeOff size={20} /> <span className="flex-1">{isBlanked ? 'Restore Screen' : 'Blackout Screen'}</span> <span className="text-slate-600 text-xs font-black">B</span>
+              </button>
           </div>
       )}
 
