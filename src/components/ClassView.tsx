@@ -225,13 +225,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
             </div>
           </div>
         </div>
-
-        {showForum && (
-          <aside className="absolute right-0 top-0 bottom-0 w-[450px] bg-slate-50 border-l border-slate-200 p-8 z-10 animate-in slide-in-from-right shadow-2xl">
-             <h3 className="text-2xl font-black mb-6 flex items-center gap-2"><MessageSquare className="text-indigo-600" aria-hidden="true"/> FORUM</h3>
-             {classId ? <p className="text-slate-400">Forum Component Here</p> : <p className="text-slate-400">Class chat unavailable.</p>}
-          </aside>
-        )}
       </main>
 
       <footer className="h-20 bg-slate-900 border-t border-slate-800 flex items-center justify-between px-12 shrink-0 relative z-20">
@@ -445,7 +438,7 @@ const FillBlankBlock = ({ block }: { block: any }) => {
   const isEntirelyCorrect = isChecked && filledBlanks.every((item, i) => item?.word === correctAnswers[i]);
 
   return (
-    <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col overflow-hidden">
+    <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col relative overflow-visible">
       
       {/* HEADER */}
       <div className="p-12 md:p-16 pb-8">
@@ -455,8 +448,33 @@ const FillBlankBlock = ({ block }: { block: any }) => {
           </h3>
       </div>
 
+      {/* 🔥 THE FIX: Top-Sticky Compact Word Bank locked to 25vh */}
+      {!isChecked && (
+        <div className="sticky top-4 z-50 -mx-4 px-4 mb-12">
+            <div className="bg-white/95 backdrop-blur-2xl rounded-[2.5rem] p-6 border-4 border-slate-200/50 shadow-[0_10px_40px_rgba(0,0,0,0.08)] flex flex-col items-center gap-4 max-h-[25vh] transition-all duration-300">
+                <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest shrink-0 text-center">Word Bank Options</span>
+                <div className="flex flex-wrap gap-4 justify-center items-start overflow-y-auto custom-scrollbar w-full pb-2">
+                  {wordBank.length === 0 ? (
+                      <span className="text-[2.5vh] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                          <CheckCircle2 size={24} className="text-emerald-500" /> All placed
+                      </span>
+                  ) : (
+                      wordBank.map((item) => (
+                          <button 
+                              key={item.id} onClick={() => handleBankClick(item)} disabled={isChecked}
+                              className="px-6 py-3 rounded-xl border-4 text-[2.5vh] font-bold transition-all duration-300 bg-white border-slate-200 text-slate-700 shadow-sm hover:border-indigo-400 hover:text-indigo-600 hover:-translate-y-1 active:scale-95"
+                          >
+                              {item.word}
+                          </button>
+                      ))
+                  )}
+                </div>
+            </div>
+        </div>
+      )}
+
       {/* TEXT CONTENT (Interactive Blanks) */}
-      <div className="px-12 md:px-16 pb-12 flex-1">
+      <div className="px-12 md:px-16 pb-16 flex-1">
           <div className="text-[4.5vh] md:text-[5vh] font-medium leading-loose text-slate-700 flex flex-wrap items-center gap-y-8 justify-center text-center">
             {textParts.map((part: string, idx: number) => {
               const isLast = idx === textParts.length - 1;
@@ -508,29 +526,6 @@ const FillBlankBlock = ({ block }: { block: any }) => {
               </div>
           )}
       </div>
-      
-      {/* THE COMPACT WORD BANK DOCK */}
-      {!isChecked && (
-        <div className="bg-slate-50 border-t-4 border-slate-100 p-8 max-h-[35vh] flex flex-col items-center">
-            <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest text-center mb-6 shrink-0">Word Bank Options</span>
-            <div className="flex flex-wrap gap-4 justify-center items-start overflow-y-auto custom-scrollbar w-full pb-2">
-              {wordBank.length === 0 ? (
-                  <span className="text-[2.5vh] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <CheckCircle2 size={24} className="text-emerald-500" /> All placed
-                  </span>
-              ) : (
-                  wordBank.map((item) => (
-                      <button 
-                          key={item.id} onClick={() => handleBankClick(item)} disabled={isChecked}
-                          className="px-6 py-3 rounded-xl border-4 text-[2.5vh] font-bold transition-all duration-300 bg-white border-slate-200 text-slate-700 shadow-sm hover:border-indigo-400 hover:text-indigo-600 hover:-translate-y-1 active:scale-95"
-                      >
-                          {item.word}
-                      </button>
-                  ))
-              )}
-            </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -585,7 +580,7 @@ const TapSortBlock = ({ block }: { block: any }) => {
     };
 
     return (
-        <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col overflow-hidden">
+        <div className="w-full max-w-7xl mx-auto bg-white rounded-[4rem] border-4 border-slate-100 shadow-2xl my-12 flex flex-col relative overflow-visible">
             <div className="p-12 md:p-16 pb-8">
                 <h3 className="text-[4vh] font-bold text-slate-800 flex items-center justify-center gap-4">
                     <span className="bg-amber-100 text-amber-600 p-4 rounded-2xl"><MousePointerClick size={40}/></span>
@@ -593,7 +588,26 @@ const TapSortBlock = ({ block }: { block: any }) => {
                 </h3>
             </div>
 
-            <div className="px-12 md:px-16 pb-16 grid grid-cols-1 sm:grid-cols-2 gap-10 flex-1">
+            {/* 🔥 THE FIX: Top-Sticky Item Bank locked to 25vh */}
+            <div className="sticky top-4 z-50 -mx-4 px-4 mb-12">
+               <div className="bg-white/95 backdrop-blur-2xl rounded-[2.5rem] p-6 border-4 border-slate-200/50 shadow-[0_10px_40px_rgba(0,0,0,0.08)] flex flex-col items-center gap-3 max-h-[25vh] transition-all duration-300">
+                   <span className="text-[2vh] font-black text-amber-500 uppercase tracking-widest text-center shrink-0">Items to Sort</span>
+                   <div className="flex flex-wrap justify-center gap-4 overflow-y-auto custom-scrollbar w-full pb-2">
+                        {items.length === 0 && <p className="text-amber-500 font-bold uppercase tracking-widest my-auto flex items-center gap-2"><CheckCircle2 size={24}/> All sorted!</p>}
+                        {items.map((item) => (
+                            <button 
+                                key={item.id} 
+                                onClick={() => setSelectedItem(selectedItem?.id === item.id ? null : item)} 
+                                className={`px-6 py-3 rounded-2xl font-black text-[2.5vh] transition-all duration-300 shadow-md border-4 ${selectedItem?.id === item.id ? 'bg-indigo-600 text-white scale-110 -translate-y-1 border-indigo-400' : 'bg-white text-slate-700 hover:scale-105 active:scale-95 border-slate-200 hover:border-amber-300'}`}
+                            >
+                                {item.emoji} {item.label}
+                            </button>
+                        ))}
+                   </div>
+               </div>
+            </div>
+
+            <div className="px-12 md:px-16 pb-24 grid grid-cols-1 sm:grid-cols-2 gap-10 flex-1">
                 {parsedCategories.map((cat: string) => (
                     <button 
                         key={cat} 
@@ -611,23 +625,6 @@ const TapSortBlock = ({ block }: { block: any }) => {
                         </div>
                     </button>
                 ))}
-            </div>
-
-            {/* BOTTOM DOCKED ITEM BANK */}
-            <div className="bg-amber-50 border-t-4 border-amber-100 p-8 max-h-[35vh] flex flex-col items-center">
-               <span className="text-[2vh] font-black text-amber-500 uppercase tracking-widest text-center mb-6 shrink-0">Items to Sort</span>
-               <div className="flex flex-wrap justify-center gap-4 overflow-y-auto custom-scrollbar w-full pb-2">
-                    {items.length === 0 && <p className="text-amber-500 font-bold uppercase tracking-widest my-auto flex items-center gap-2"><CheckCircle2 size={24}/> All sorted!</p>}
-                    {items.map((item) => (
-                        <button 
-                            key={item.id} 
-                            onClick={() => setSelectedItem(selectedItem?.id === item.id ? null : item)} 
-                            className={`px-6 py-3 rounded-2xl font-black text-[2.5vh] transition-all duration-300 shadow-md border-4 ${selectedItem?.id === item.id ? 'bg-indigo-600 text-white scale-110 -translate-y-1 border-indigo-400' : 'bg-white text-slate-700 hover:scale-105 active:scale-95 border-slate-200 hover:border-amber-300'}`}
-                        >
-                            {item.emoji} {item.label}
-                        </button>
-                    ))}
-               </div>
             </div>
         </div>
     );
