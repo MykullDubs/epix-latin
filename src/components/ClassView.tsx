@@ -46,8 +46,17 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const [texts, setTexts] = useState<{id: number, x: number, y: number, text: string, color: string, size: number}[]>([]);
   const [activeText, setActiveText] = useState<{x: number, y: number, text: string} | null>(null);
 
+  // Refs for State-Safe Saves (Prevents Race Conditions)
+  const activeTextRef = useRef(activeText);
+  const markerColorRef = useRef(markerColor);
+  const markerSizeRef = useRef(markerSize);
+  useEffect(() => { activeTextRef.current = activeText; }, [activeText]);
+  useEffect(() => { markerColorRef.current = markerColor; }, [markerColor]);
+  useEffect(() => { markerSizeRef.current = markerSize; }, [markerSize]);
+
   const classViewRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const isDrawingAnnotation = useRef(false);
 
   const stageRef = useRef<HTMLDivElement>(null);
@@ -146,23 +155,29 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       }
   };
 
-  const saveActiveText = useCallback(() => {
-      if (activeText && activeText.text.trim().length > 0) {
-          setTexts(prev => [...prev, { id: Date.now(), x: activeText.x, y: activeText.y, text: activeText.text, color: markerColor, size: markerSize }]);
+  // 🔥 STATE-SAFE TEXT SAVER (Solves the disappearing text race condition)
+  const forceSaveText = useCallback(() => {
+      const curr = activeTextRef.current;
+      if (curr && curr.text.trim().length > 0) {
+          setTexts(prev => [...prev, { 
+              id: Date.now(), x: curr.x, y: curr.y, text: curr.text, 
+              color: markerColorRef.current, size: markerSizeRef.current 
+          }]);
       }
       setActiveText(null);
-  }, [activeText, markerColor, markerSize]);
+  }, []);
 
   const startAnnotation = (e: React.MouseEvent) => {
       const coords = getRelativeCoords(e.clientX, e.clientY);
       
       if (markerStyle === 'text') {
-          saveActiveText(); 
+          forceSaveText(); 
           setActiveText({ x: coords.x, y: coords.y, text: '' });
+          setTimeout(() => inputRef.current?.focus(), 50); // Ensures it mounts before focusing
           return;
       }
 
-      saveActiveText(); 
+      forceSaveText(); // Auto-save open text if switching to pen
       isDrawingAnnotation.current = true;
       const ctx = canvasRef.current?.getContext('2d');
       if (ctx) {
@@ -205,7 +220,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           e.preventDefault(); 
           setIsAnnotating(false);
           setIsSpotlight(false);
-          saveActiveText();
+          forceSaveText();
       }
   };
 
@@ -256,9 +271,11 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
           const tag = (e.target as HTMLElement).tagName;
-          if (['INPUT', 'TEXTAREA'].indexOf(tag) !== -1) return; // Ignores hotkeys while typing text!
           
-          if (e.key === 'ArrowRight' || e.key === ' ') { 
+          // 🔥 CRITICAL FIX: Allows Escape key to pass through even if typing
+          if (['INPUT', 'TEXTAREA'].indexOf(tag) !== -1 && e.key !== 'Escape') return;
+          
+          if (e.key === 'ArrowRight') { 
               e.preventDefault(); handleNext();
           } else if (e.key === 'ArrowLeft') {
               e.preventDefault(); handlePrev();
@@ -293,12 +310,13 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
               e.preventDefault(); setShowTools(prev => !prev);
           } else if (e.key === 'Escape') {
               setShowQR(false); setShowTimer(false); setIsSpotlight(false); setIsAnnotating(false); setShowTools(false); setShowWhiteboard(false);
+              forceSaveText();
           }
       };
       
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleNext, handlePrev]);
+  }, [handleNext, handlePrev, forceSaveText]);
 
   const activePage = pages[activePageIdx];
   if (!lesson || !activePage) return null;
@@ -310,10 +328,9 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         ref={classViewRef}
         className="w-full flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500 relative"
         style={{ height: 'calc(100dvh - 4rem)' }}
-        onContextMenu={handleRightClick}
+        onContextMenu={handleRightClick} 
     >
       {/* 🔥 OS OVERLAYS & TOOLS */}
-      
       <div className={`absolute inset-0 bg-black z-[9000] flex items-center justify-center transition-opacity duration-700 pointer-events-none ${isBlanked ? 'opacity-100' : 'opacity-0'}`}>
           <EyeOff size={64} className="text-white/10" />
       </div>
@@ -325,14 +342,10 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           />
       )}
 
-      {/* 🔥 THE FIX: Solid White Background for Scratchpad */}
+      {/* Instant Scratchpad (Whiteboard Background) */}
       <div 
           className={`absolute inset-0 z-[8550] transition-transform duration-500 ease-in-out pointer-events-none ${showWhiteboard ? 'translate-y-0' : '-translate-y-full'}`}
-          style={{ 
-              backgroundColor: '#f8fafc', // Solid slate-50 base
-              backgroundImage: 'radial-gradient(#cbd5e1 2px, transparent 2px)', // Dot grid
-              backgroundSize: '40px 40px' 
-          }}
+          style={{ backgroundColor: '#f8fafc', backgroundImage: 'radial-gradient(#cbd5e1 2px, transparent 2px)', backgroundSize: '40px 40px' }}
       />
 
       {/* The Annotation Drawing Layer (Ink) */}
@@ -345,7 +358,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           className={`absolute inset-0 z-[8600] ${isAnnotating ? (markerStyle === 'text' ? 'pointer-events-auto cursor-text' : 'pointer-events-auto cursor-crosshair') : 'pointer-events-none'}`}
       />
 
-      {/* 🔥 THE FIX: Text Layer is pointer-events-none so it doesn't block the canvas! */}
+      {/* 🔥 THE TEXT ENGINE LAYER */}
       <div className="absolute inset-0 z-[8650] pointer-events-none">
           {texts.map(t => (
               <div 
@@ -357,33 +370,33 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           ))}
           {activeText && (
               <input 
-                  autoFocus
+                  ref={inputRef}
                   value={activeText.text}
                   onChange={e => setActiveText({...activeText, text: e.target.value})}
-                  onBlur={saveActiveText}
-                  onKeyDown={e => {
-                      if (e.key === 'Enter') saveActiveText();
+                  onKeyDown={e => { if (e.key === 'Enter') forceSaveText(); }}
+                  placeholder="Type here..."
+                  className="pointer-events-auto" 
+                  style={{ 
+                      position: 'absolute', left: activeText.x, top: activeText.y, color: markerColor, 
+                      fontSize: `${markerSize * 6}px`, fontWeight: 'bold', background: 'transparent', 
+                      outline: 'none', transform: 'translateY(-50%)', minWidth: '400px',
+                      borderBottom: `3px dashed ${markerColor}50` // Subtle guide line
                   }}
-                  className="pointer-events-auto" // Re-enable clicks ONLY for the input box
-                  style={{ position: 'absolute', left: activeText.x, top: activeText.y, color: markerColor, fontSize: `${markerSize * 6}px`, fontWeight: 'bold', background: 'transparent', outline: 'none', border: 'none', transform: 'translateY(-50%)', minWidth: '300px' }}
               />
           )}
       </div>
 
       {/* 🎨 ADVANCED FLOATING PALETTE */}
       {isAnnotating && (
-          <div 
-              className="absolute top-12 right-8 z-[8700] flex flex-col gap-4 animate-in fade-in slide-in-from-right-8 pointer-events-auto items-end"
-              onMouseDown={(e) => e.stopPropagation()}
-          >
+          <div className="absolute top-12 right-8 z-[8700] flex flex-col gap-4 animate-in fade-in slide-in-from-right-8 pointer-events-auto items-end" onMouseDown={(e) => e.stopPropagation()}>
               <div className="bg-slate-900/95 backdrop-blur-2xl p-4 rounded-[2.5rem] shadow-2xl border-4 border-slate-700 flex flex-col gap-6 w-20 items-center">
                   
                   {/* Tool Toggle */}
                   <div className="flex flex-col gap-2 bg-slate-800/80 p-2 rounded-3xl w-full items-center border border-slate-700">
-                      <button onClick={() => { setMarkerStyle('pen'); saveActiveText(); }} className={`p-3 rounded-2xl transition-all ${markerStyle === 'pen' ? 'bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.6)]' : 'text-slate-400 hover:text-white'}`}>
+                      <button onClick={() => { setMarkerStyle('pen'); forceSaveText(); }} className={`p-3 rounded-2xl transition-all ${markerStyle === 'pen' ? 'bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.6)]' : 'text-slate-400 hover:text-white'}`}>
                           <PenTool size={24} />
                       </button>
-                      <button onClick={() => { setMarkerStyle('highlighter'); saveActiveText(); }} className={`p-3 rounded-2xl transition-all ${markerStyle === 'highlighter' ? 'bg-amber-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.6)]' : 'text-slate-400 hover:text-white'}`}>
+                      <button onClick={() => { setMarkerStyle('highlighter'); forceSaveText(); }} className={`p-3 rounded-2xl transition-all ${markerStyle === 'highlighter' ? 'bg-amber-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.6)]' : 'text-slate-400 hover:text-white'}`}>
                           <Highlighter size={24} />
                       </button>
                       <button onClick={() => setMarkerStyle('text')} className={`p-3 rounded-2xl transition-all ${markerStyle === 'text' ? 'bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.6)]' : 'text-slate-400 hover:text-white'}`}>
