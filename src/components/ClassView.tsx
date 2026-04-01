@@ -22,7 +22,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isBlanked, setIsBlanked] = useState(false);
   const [showQR, setShowQR] = useState(false);
-  const [showTools, setShowTools] = useState(false); // 🔥 NEW: Tools Drawer State
+  const [showTools, setShowTools] = useState(false);
   
   // 🔥 OS FEATURE: Moveable Draggable Timer
   const [showTimer, setShowTimer] = useState(false);
@@ -36,6 +36,8 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const [isSpotlight, setIsSpotlight] = useState(false);
   const [mousePos, setMousePos] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
   const [isAnnotating, setIsAnnotating] = useState(false);
+  
+  const classViewRef = useRef<HTMLDivElement>(null); // NEW: Tracks the exact bounds of the projector view
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawingAnnotation = useRef(false);
 
@@ -83,7 +85,13 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
               setTimerPos({ x: e.clientX - dragOffset.current.x, y: e.clientY - dragOffset.current.y });
           }
           if (isSpotlight) {
-              setMousePos({ x: e.clientX, y: e.clientY });
+              // Map spotlight strictly to the local container
+              if (classViewRef.current) {
+                  const rect = classViewRef.current.getBoundingClientRect();
+                  setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+              } else {
+                  setMousePos({ x: e.clientX, y: e.clientY });
+              }
           }
       };
       const handleMouseUp = () => { isDragging.current = false; };
@@ -97,25 +105,37 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       };
   }, [isSpotlight]);
 
-  // Global Annotation Canvas Engine (1:1 Precision Mapping)
+  // 🔥 GPS MAPPING: Translates global mouse coords into pixel-perfect local canvas coords
+  const getRelativeCoords = (clientX: number, clientY: number) => {
+      if (!classViewRef.current) return { x: clientX, y: clientY };
+      const rect = classViewRef.current.getBoundingClientRect();
+      return {
+          x: clientX - rect.left,
+          y: clientY - rect.top
+      };
+  };
+
+  // Global Annotation Canvas Engine (Pixel Perfect)
   useEffect(() => {
       const resizeCanvas = () => {
-          if (canvasRef.current) {
-              canvasRef.current.width = window.innerWidth;
-              canvasRef.current.height = window.innerHeight;
+          if (canvasRef.current && classViewRef.current) {
+              const rect = classViewRef.current.getBoundingClientRect();
+              canvasRef.current.width = rect.width;
+              canvasRef.current.height = rect.height;
           }
       };
       window.addEventListener('resize', resizeCanvas);
-      resizeCanvas();
+      setTimeout(resizeCanvas, 50); // Ensures DOM paints before grabbing bounds
       return () => window.removeEventListener('resize', resizeCanvas);
   }, []);
 
   const startAnnotation = (e: React.MouseEvent) => {
       isDrawingAnnotation.current = true;
+      const coords = getRelativeCoords(e.clientX, e.clientY);
       const ctx = canvasRef.current?.getContext('2d');
       if (ctx) {
           ctx.beginPath();
-          ctx.moveTo(e.clientX, e.clientY);
+          ctx.moveTo(coords.x, coords.y);
       }
   };
 
@@ -123,14 +143,15 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       if (!isDrawingAnnotation.current || !canvasRef.current) return;
       const ctx = canvasRef.current.getContext('2d');
       if (!ctx) return;
-      ctx.lineWidth = 8;
+      const coords = getRelativeCoords(e.clientX, e.clientY);
+      ctx.lineWidth = 6;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.strokeStyle = '#ef4444'; // Bright Red Marker
-      ctx.lineTo(e.clientX, e.clientY);
+      ctx.lineTo(coords.x, coords.y);
       ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(e.clientX, e.clientY);
+      ctx.moveTo(coords.x, coords.y);
   };
 
   const stopAnnotation = () => {
@@ -228,7 +249,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
               setIsSpotlight(prev => { if (!prev) setIsAnnotating(false); return !prev; });
               setShowTools(false);
           } else if (e.key.toLowerCase() === 'w') {
-              // 🔥 NEW OS FEATURE: Toggle Tools Drawer
               e.preventDefault(); setShowTools(prev => !prev);
           } else if (e.key === 'Escape') {
               setShowQR(false); setShowTimer(false); setIsSpotlight(false); setIsAnnotating(false); setShowTools(false);
@@ -246,9 +266,10 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
   return (
     <div 
+        ref={classViewRef}
         className="w-full flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500 relative"
         style={{ height: 'calc(100dvh - 4rem)' }}
-        onContextMenu={handleRightClick} // 🔥 Catches Right-Clicks anywhere
+        onContextMenu={handleRightClick} // 🔥 Catches Right-Clicks to deactivate tools instantly
     >
       {/* 🔥 OS OVERLAYS & TOOLS */}
       
@@ -258,7 +279,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
       {isSpotlight && (
           <div 
-              className="absolute inset-0 z-[8500] pointer-events-none transition-opacity duration-300"
+              className="absolute inset-0 z-[8500] pointer-events-none transition-opacity duration-150"
               style={{ background: `radial-gradient(circle 150px at ${mousePos.x}px ${mousePos.y}px, transparent 0%, rgba(0,0,0,0.85) 100%)` }}
           />
       )}
@@ -270,7 +291,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           onMouseMove={drawAnnotation}
           onMouseUp={stopAnnotation}
           onMouseLeave={stopAnnotation}
-          className={`absolute inset-0 z-[8600] fixed ${isAnnotating ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
+          className={`absolute inset-0 z-[8600] ${isAnnotating ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
       />
 
       {isAnnotating && (
