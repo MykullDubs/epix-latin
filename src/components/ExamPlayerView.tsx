@@ -1,8 +1,8 @@
 // src/components/ExamPlayerView.tsx
 import React, { useState, useEffect } from 'react';
 import { 
-  FileText, Clock, CheckCircle2, AlertTriangle, 
-  Send, Check, AlignLeft 
+    FileText, Clock, CheckCircle2, AlertTriangle, 
+    Send, Check, AlignLeft 
 } from 'lucide-react';
 
 // ============================================================================
@@ -67,9 +67,10 @@ export default function ExamPlayerView({ exam, onFinish }: any) {
                 }
             } else if (q.type === 'essay') {
                 requiresManualGrading = true;
-                awarded = 0; 
+                awarded = 0; // Requires teacher input
             }
 
+            // 🔥 PRO-LMS PAYLOAD: Scaffolds the exact data the SpeedModerator needs
             details.push({ 
                 qId: q.id, 
                 type: q.type, 
@@ -78,7 +79,8 @@ export default function ExamPlayerView({ exam, onFinish }: any) {
                 studentVal: studentVal || "(No Answer)", 
                 correctVal: q.correctAnswer || null, 
                 awardedPoints: awarded, 
-                isCorrect 
+                isCorrect,
+                teacherFeedback: "" // Scaffolding for instructor comments
             });
             earnedPoints += awarded;
         });
@@ -152,10 +154,12 @@ export default function ExamPlayerView({ exam, onFinish }: any) {
                     <div className={`w-24 h-24 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-inner ${scoreDetail.status === 'pending_review' ? 'bg-amber-50 text-amber-500' : 'bg-emerald-50 text-emerald-500'}`}>
                         {scoreDetail.status === 'pending_review' ? <Clock size={48}/> : <CheckCircle2 size={48}/>}
                     </div>
-                    <h2 className="text-3xl font-black text-slate-900 mb-3">Exam Submitted</h2>
+                    <h2 className="text-3xl font-black text-slate-900 mb-3">
+                        {scoreDetail.status === 'pending_review' ? 'Under Review' : 'Exam Submitted'}
+                    </h2>
                     <p className="text-slate-500 mb-8 font-medium leading-relaxed">
                         {scoreDetail.status === 'pending_review' 
-                            ? "Your written answers have been sent to your instructor for grading." 
+                            ? "Your written answers have been sent to your instructor for grading. Your final score will be updated soon." 
                             : `You scored ${scoreDetail.score} out of ${scoreDetail.total} points.`}
                     </p>
                     <button onClick={() => onFinish(null, 0)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg hover:scale-[1.02] active:scale-95 transition-all text-sm">
