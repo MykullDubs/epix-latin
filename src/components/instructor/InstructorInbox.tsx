@@ -1,7 +1,7 @@
 // src/components/instructor/InstructorInbox.tsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { collection, query, where, onSnapshot, writeBatch, doc, addDoc, updateDoc } from 'firebase/firestore';
-import { db, appId } from '../../config/firebase';
+import { db, appId } from '../config/firebase';
 import { 
     Send, Users, User, Link as LinkIcon, MessageSquare, 
     Clock, Megaphone, Plus, ShieldAlert, CheckCheck, Zap, ChevronLeft
@@ -23,6 +23,9 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
     const [subject, setSubject] = useState('');
     const [body, setBody] = useState('');
     const [actionLink, setActionLink] = useState(''); 
+
+    // Safely extract the instructor's email to avoid undefined errors
+    const instructorEmail = user?.email || "instructor@magister.com";
 
     // 1. Listen for OUTGOING messages (Includes Broadcasts & Directs)
     useEffect(() => {
@@ -67,7 +70,7 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
             } else {
                 partnerEmail = isSelf ? msg.recipientEmail : msg.senderEmail;
                 tId = `direct_${partnerEmail}`;
-                tName = isSelf ? (msg.recipientEmail || 'Scholar') : (msg.senderName || msg.senderEmail);
+                tName = isSelf ? (msg.recipientEmail || 'Scholar') : (msg.senderName || msg.senderEmail || 'Scholar');
                 tType = 'direct';
                 partnerId = isSelf ? msg.recipientId : msg.senderId;
             }
@@ -113,7 +116,7 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
         
         setIsSending(true);
         const batch = writeBatch(db);
-        const senderName = user.displayName || user.email.split('@')[0];
+        const senderName = user.displayName || user.email?.split('@')[0] || 'Instructor';
         const timestamp = Date.now();
 
         try {
@@ -127,9 +130,17 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
                 targetClass.studentEmails.forEach((email: string) => {
                     const msgRef = doc(collection(db, 'artifacts', appId, 'messages'));
                     batch.set(msgRef, {
-                        senderId: user.uid, senderName, senderEmail: user.email,
-                        recipientEmail: email, targetCohort: targetClass.name,
-                        type: 'broadcast', subject, body, actionLink: actionLink || null, timestamp, read: false
+                        senderId: user.uid, 
+                        senderName, 
+                        senderEmail: instructorEmail,
+                        recipientEmail: email, 
+                        targetCohort: targetClass.name,
+                        type: 'broadcast', 
+                        subject, 
+                        body, 
+                        actionLink: actionLink || null, 
+                        timestamp, 
+                        read: false
                     });
                 });
                 await batch.commit();
@@ -139,9 +150,16 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
             } else {
                 const msgRef = doc(collection(db, 'artifacts', appId, 'messages'));
                 batch.set(msgRef, {
-                    senderId: user.uid, senderName, senderEmail: user.email,
+                    senderId: user.uid, 
+                    senderName, 
+                    senderEmail: instructorEmail,
                     recipientEmail: selectedTarget,
-                    type: 'direct', subject, body, actionLink: actionLink || null, timestamp, read: false
+                    type: 'direct', 
+                    subject, 
+                    body, 
+                    actionLink: actionLink || null, 
+                    timestamp, 
+                    read: false
                 });
                 await batch.commit();
                 setToastMsg(`Direct Intel sent to ${selectedTarget}! 🎯`);
@@ -164,9 +182,9 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
         try {
             await addDoc(collection(db, 'artifacts', appId, 'messages'), {
                 senderId: user.uid,
-                senderName: user.displayName || user.email.split('@')[0],
-                senderEmail: user.email,
-                recipientEmail: activeThread.partnerEmail,
+                senderName: user.displayName || instructorEmail.split('@')[0],
+                senderEmail: instructorEmail,
+                recipientEmail: activeThread.partnerEmail || 'scholar@magister.com',
                 recipientId: activeThread.partnerId || null, 
                 type: 'direct',
                 subject: `Re: Chat`,
