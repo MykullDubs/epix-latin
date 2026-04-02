@@ -83,6 +83,29 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
   const { liveState, startLiveClass, endLiveClass, changeSlide, triggerQuiz } = useLiveClass(classId, true);
 
+  // 🔥 NEW: Remote Control Scroll Receiver
+  // This listens for scroll commands dispatched from the Instructor HUD
+  useEffect(() => {
+      if (!liveState?.scrollCommand || !stageRef.current) return;
+      
+      const { direction, timestamp } = liveState.scrollCommand;
+      
+      // We use the timestamp to ensure we don't process the same scroll command twice
+      // and we only process commands that happened recently (within the last 2 seconds)
+      // to avoid weird jump-scrolling when a user first connects
+      const isFreshCommand = (Date.now() - timestamp) < 2000;
+      
+      if (isFreshCommand) {
+          const scrollAmount = window.innerHeight * 0.4; // Scroll by 40% of the screen height
+          
+          if (direction === 'down') {
+              stageRef.current.scrollBy({ top: scrollAmount, behavior: 'smooth' });
+          } else if (direction === 'up') {
+              stageRef.current.scrollBy({ top: -scrollAmount, behavior: 'smooth' });
+          }
+      }
+  }, [liveState?.scrollCommand]);
+
   const lessonVocab = useMemo(() => {
     if (!lesson?.blocks) return [];
     return lesson.blocks
