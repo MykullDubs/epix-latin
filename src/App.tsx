@@ -25,7 +25,8 @@ import LiveConnectFourProjector from './components/LiveConnectFourProjector';
 import LiveSlipstreamProjector from './components/LiveSlipstreamProjector';
 import CelebrationScreen from './components/CelebrationScreen';
 import HoloAvatar from './components/HoloAvatar'; 
-import InstructorHUD from './components/instructor/InstructorHUD'; // 🔥 IMPORTED HUD
+import InstructorHUD from './components/instructor/InstructorHUD'; 
+import StudentInbox from './components/student/StudentInbox'; // 🔥 IMPORTED INBOX
 
 // 🔥 DYNAMIC OS THEME ENGINE
 const OS_THEMES: Record<string, string> = {
@@ -60,7 +61,7 @@ export default function App() {
   const [activeVocabGame, setActiveVocabGame] = useState<{deckId: string, classId: string} | null>(null);
   const [activeConnectFour, setActiveConnectFour] = useState<{deckId: string, classId: string} | null>(null);
   const [activeSlipstream, setActiveSlipstream] = useState<{deckId: string, classId: string} | null>(null);
-  const [activeHUD, setActiveHUD] = useState<{lessonId: string, classId: string} | null>(null); // 🔥 NEW: HUD State
+  const [activeHUD, setActiveHUD] = useState<{lessonId: string, classId: string} | null>(null); 
 
   const allCurriculums = useMemo(() => {
       return [...GLOBAL_CURRICULUMS, ...(customCurriculums || [])];
@@ -180,7 +181,6 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     
     // 🔥 NEW OS FEATURE: QR Code Route Interceptor
-    // Converts /live/123 or /join/123 into a clean ?classId=123 auto-join route so the user goes straight to the lobby
     const pathParts = window.location.pathname.split('/').filter(Boolean);
     if ((pathParts[0] === 'join' || pathParts[0] === 'live') && pathParts[1]) {
         params.set('classId', pathParts[1]);
@@ -206,11 +206,9 @@ export default function App() {
             if (foundClass) {
                 setActiveStudentClass(foundClass);
             } else if (allClasses && allClasses.length > 0) {
-                // Fallback: If not enrolled, find in all classes and jump to discovery
                 const publicClass = allClasses.find((c: any) => c.id === urlClassId);
                 if (publicClass) {
                     setActiveTab('discovery');
-                    // You can enhance discovery view to auto-open if needed
                 }
             }
         } else {
@@ -248,7 +246,7 @@ export default function App() {
 
   useEffect(() => {
     const handlePopState = () => {
-      const params = new URLSearchParams(window.location.search);
+      const params = newSearchParams(window.location.search);
       setCurrentView((params.get('view') as any) || 'student');
       setActiveTab(params.get('tab') || 'home');
       setActiveDeckKey(params.get('deckId'));
@@ -434,6 +432,20 @@ export default function App() {
               <FlashcardView allDecks={allDecks} selectedDeckKey={activeDeckKey} onSelectDeck={(key:any) => { setActiveDeckKey(key); if(!key) setActiveTab('home'); }} onLogActivity={actions.logActivity} onSaveCard={actions.saveCard} userData={userData} user={user} activeOrg={activeOrg} onToggleStar={actions.toggleCardStar} onToggleArchive={actions.toggleDeckArchive} onCreateFolder={actions.createStudyFolder} onAssignToFolder={actions.assignDeckToFolder} onHideDeck={actions.hideDeck} onUpdateFolder={actions.updateStudyFolder} onDeleteFolder={actions.deleteStudyFolder} onReorderFolders={handleReorderFolders} onReorderDecks={handleReorderDecks} />
             ) : activeTab === 'profile' ? (
               <ProfileView user={user} userData={userData} />
+            ) : activeTab === 'inbox' ? (
+              // 🔥 PRO-LMS: INBOX ROUTER 
+              <StudentInbox 
+                  user={user} 
+                  onLaunchContent={(type: 'lesson' | 'deck', id: string) => {
+                      if (type === 'lesson') {
+                          const foundLesson = allLessons.find(l => l.id === id);
+                          if (foundLesson) setActiveLesson(foundLesson);
+                      } else if (type === 'deck') {
+                          setActiveDeckKey(id);
+                          setActiveTab('flashcards');
+                      }
+                  }} 
+              />
             ) : (
               <HomeView classes={combinedClasses} curriculums={allCurriculums} onSelectClass={setActiveStudentClass} onReorderClasses={(actions as any).reorderClasses} userData={userData} user={user} activeOrg={activeOrg} setActiveTab={setActiveTab} allDecks={allDecks} />
             )}
