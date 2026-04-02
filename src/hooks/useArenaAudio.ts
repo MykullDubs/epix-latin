@@ -3,6 +3,10 @@ import { useCallback, useRef } from 'react';
 
 export function useArenaAudio() {
     const audioCtxRef = useRef<AudioContext | null>(null);
+    
+    // Refs for the Background Music Sequencer
+    const bgmIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const bgmGainRef = useRef<GainNode | null>(null);
 
     // Initialize (or resume) the audio context. Browsers require a user click before audio plays!
     const initCtx = useCallback(() => {
@@ -34,6 +38,74 @@ export function useArenaAudio() {
         osc.start();
         osc.stop(ctx.currentTime + duration);
     }, [initCtx]);
+
+    // ========================================================================
+    //  BACKGROUND MUSIC ENGINE (Procedural Synthwave)
+    // ========================================================================
+    
+    // 🔊 BGM: Driving Cyberpunk Bassline Loop
+    const startBGM = useCallback(() => {
+        const ctx = initCtx();
+        
+        // Prevent multiple loops from stacking
+        if (bgmIntervalRef.current) return; 
+
+        // Create a dedicated volume knob for the music so it stays in the background
+        const masterGain = ctx.createGain();
+        masterGain.gain.value = 0.03; // Keep it low (3% volume)
+        masterGain.connect(ctx.destination);
+        bgmGainRef.current = masterGain;
+
+        // A Minor Pentatonic Sequence (A2, A2, A3, A2, C3, A2, E3, D3)
+        const sequence = [110.00, 110.00, 220.00, 110.00, 130.81, 110.00, 164.81, 146.83];
+        let step = 0;
+
+        // Step through the sequence every 140ms (High tempo!)
+        bgmIntervalRef.current = setInterval(() => {
+            const freq = sequence[step % sequence.length];
+            step++;
+
+            const osc = ctx.createOscillator();
+            const noteGain = ctx.createGain();
+            
+            osc.type = 'sawtooth'; // Gritty synth sound
+            
+            const startTime = ctx.currentTime;
+            osc.frequency.setValueAtTime(freq, startTime);
+            
+            // Plucky envelope (fast attack, quick decay)
+            noteGain.gain.setValueAtTime(0.5, startTime);
+            noteGain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.1);
+            
+            osc.connect(noteGain);
+            noteGain.connect(masterGain);
+            
+            osc.start(startTime);
+            osc.stop(startTime + 0.15);
+        }, 140); 
+    }, [initCtx]);
+
+    // 🔊 BGM: Stop and Fade Out
+    const stopBGM = useCallback(() => {
+        if (bgmIntervalRef.current) {
+            clearInterval(bgmIntervalRef.current);
+            bgmIntervalRef.current = null;
+        }
+        
+        // Smoothly fade out the music over 1 second
+        if (bgmGainRef.current) {
+            const ctx = initCtx();
+            bgmGainRef.current.gain.linearRampToValueAtTime(0.001, ctx.currentTime + 1);
+            setTimeout(() => {
+                bgmGainRef.current?.disconnect();
+                bgmGainRef.current = null;
+            }, 1000);
+        }
+    }, [initCtx]);
+
+    // ========================================================================
+    //  SOUND EFFECTS
+    // ========================================================================
 
     // 🔊 SFX: Deep, ominous inception bass drop (3... 2... 1...)
     const playCountdown = useCallback(() => {
@@ -75,5 +147,14 @@ export function useArenaAudio() {
         setTimeout(() => playTone(1760, 'sine', 0.15, 0.05), 50);
     }, [playTone]);
 
-    return { initCtx, playCountdown, playStart, playTick, playReveal, playLockIn };
+    return { 
+        initCtx, 
+        startBGM, 
+        stopBGM, 
+        playCountdown, 
+        playStart, 
+        playTick, 
+        playReveal, 
+        playLockIn 
+    };
 }
