@@ -1,165 +1,152 @@
 // src/components/instructor/LiveSetupModal.tsx
-import React, { useState } from 'react';
-import { X, Users, Layers, Zap, Gamepad2, Shield, Rocket, Target, Activity, Settings, LayoutTemplate } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+    X, Play, Users, Layers, MonitorPlay, 
+    Gamepad2, Brain, Zap, TabletSmartphone, BookOpen 
+} from 'lucide-react';
 
-export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = {}, onDeploy }: any) {
+export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = {}, lessons = [], onDeploy }: any) {
     const [selectedClassId, setSelectedClassId] = useState('');
-    const [selectedMode, setSelectedMode] = useState<'trivia' | 'connect_four' | 'slipstream' | 'hud' | 'presentation'>('trivia');
-    const [selectedDeckId, setSelectedDeckId] = useState('');
+    const [selectedMode, setSelectedMode] = useState<'hud' | 'presentation' | 'trivia' | 'connect_four' | 'slipstream' | ''>('');
+    const [selectedContentId, setSelectedContentId] = useState('');
+
+    // Reset states when modal opens/closes
+    useEffect(() => {
+        if (isOpen) {
+            setSelectedClassId('');
+            setSelectedMode('');
+            setSelectedContentId('');
+        }
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
-    // 🔥 Filter the dictionary into an array, ignoring the placeholder "custom" deck
     const availableDecks = Object.values(decks || {}).filter((d: any) => d.id && d.id !== 'custom');
+    
+    // Determine what type of payload the selected mode requires
+    const requiresLesson = selectedMode === 'hud' || selectedMode === 'presentation';
+    const requiresDeck = selectedMode === 'trivia' || selectedMode === 'connect_four' || selectedMode === 'slipstream';
 
-    const handleLaunch = () => {
-        if (!selectedClassId) return alert("Commander, you must select a Target Cohort to deploy.");
-        if (!selectedDeckId) return alert("You must select a Data Crystal (Content Payload) to power the arena.");
-        
-        // 🔥 This EXACT payload structure is what InstructorDashboard is waiting for
-        onDeploy({ 
-            mode: selectedMode, 
-            classId: selectedClassId, 
-            contentId: selectedDeckId 
+    const handleDeploy = () => {
+        if (!selectedClassId || !selectedMode || !selectedContentId) return;
+        onDeploy({
+            classId: selectedClassId,
+            mode: selectedMode,
+            contentId: selectedContentId
         });
     };
 
+    const ModeButton = ({ id, icon: Icon, label, type, colorClass }: any) => {
+        const isSelected = selectedMode === id;
+        return (
+            <button 
+                onClick={() => {
+                    setSelectedMode(id);
+                    setSelectedContentId(''); // Reset payload when mode changes
+                }}
+                className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-2 text-center ${
+                    isSelected 
+                        ? `${colorClass} shadow-lg scale-105` 
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-slate-300 dark:hover:border-slate-700'
+                }`}
+            >
+                <Icon size={24} />
+                <div>
+                    <div className="text-xs font-black uppercase tracking-widest">{label}</div>
+                    <div className="text-[9px] font-bold uppercase tracking-widest opacity-60 mt-0.5">Requires {type}</div>
+                </div>
+            </button>
+        );
+    };
+
     return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-2 md:p-4 animate-in fade-in duration-300 font-sans">
-            <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={onClose} />
-            
-            {/* 🔥 MOBILE FIX: max-h-[90dvh] ensures it never bleeds off a phone screen */}
-            <div className="bg-slate-900 border-2 border-indigo-500/30 w-full max-w-4xl max-h-[90dvh] md:max-h-[85vh] rounded-[2rem] md:rounded-[3rem] shadow-[0_0_50px_rgba(99,102,241,0.2)] relative z-10 flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 z-[9999] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
+            <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300">
                 
-                {/* Header */}
-                <div className="p-4 md:p-8 border-b border-slate-800 bg-slate-950/50 flex justify-between items-center relative overflow-hidden shrink-0">
-                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-transparent pointer-events-none" />
-                    <div className="flex items-center gap-3 md:gap-4 relative z-10">
-                        <div className="w-10 h-10 md:w-14 md:h-14 bg-indigo-500/20 text-indigo-400 rounded-xl md:rounded-2xl flex items-center justify-center shadow-inner border border-indigo-500/30 shrink-0">
-                            <Rocket size={24} className="md:w-7 md:h-7" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg md:text-2xl font-black text-white uppercase tracking-widest leading-none">Arena Deployment</h2>
-                            <p className="text-[9px] md:text-[10px] font-bold text-indigo-400 uppercase tracking-[0.3em] mt-1">Initialize Live Protocol</p>
-                        </div>
+                <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center shrink-0">
+                    <div>
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Initialize Live Session</h2>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Configure Deployment Parameters</p>
                     </div>
-                    <button onClick={onClose} className="p-2 md:p-3 text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-full transition-all relative z-10">
-                        <X size={20} className="md:w-6 md:h-6" strokeWidth={2.5} />
+                    <button onClick={onClose} className="p-2 bg-slate-200 dark:bg-slate-800 rounded-full text-slate-500 hover:text-rose-500 transition-colors active:scale-90">
+                        <X size={20} strokeWidth={3} />
                     </button>
                 </div>
 
-                {/* 🔥 MOBILE FIX: This section flexes and scrolls internally */}
-                <div className="p-4 md:p-8 flex-1 overflow-y-auto custom-scrollbar space-y-6 md:space-y-8">
+                <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-8">
                     
-                    {/* Step 1: Mode Selection */}
-                    <div className="space-y-3 md:space-y-4">
-                        <h3 className="text-[10px] md:text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                            <Gamepad2 size={16} /> 1. Select Arena Protocol
-                        </h3>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
-                            {/* Pro-LMS: Presentation Mode */}
-                            <button 
-                                onClick={() => setSelectedMode('presentation')}
-                                className={`p-4 md:p-6 rounded-2xl md:rounded-[2rem] border-2 transition-all flex flex-col items-center justify-center text-center gap-2 md:gap-3 ${selectedMode === 'presentation' ? 'bg-amber-600/20 border-amber-500 text-amber-400 shadow-[inset_0_0_20px_rgba(245,158,11,0.2)]' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-600'}`}
-                            >
-                                <LayoutTemplate size={24} className={selectedMode === 'presentation' ? 'text-amber-400' : 'text-slate-600'} />
-                                <span className="font-black uppercase tracking-widest text-[9px] md:text-[10px]">Smartboard</span>
-                            </button>
+                    {/* STEP 1: TARGET COHORT */}
+                    <div className="space-y-3">
+                        <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400">
+                            <Users size={14} /> 1. Target Cohort
+                        </label>
+                        <select 
+                            value={selectedClassId}
+                            onChange={(e) => setSelectedClassId(e.target.value)}
+                            className="w-full bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-2xl px-5 py-4 outline-none focus:border-indigo-500 transition-all"
+                        >
+                            <option value="" disabled>Select a class...</option>
+                            {classes.map((c: any) => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
+                    </div>
 
-                            {/* Pro-LMS: The Remote Control */}
-                            <button 
-                                onClick={() => setSelectedMode('hud')}
-                                className={`p-4 md:p-6 rounded-2xl md:rounded-[2rem] border-2 transition-all flex flex-col items-center justify-center text-center gap-2 md:gap-3 ${selectedMode === 'hud' ? 'bg-fuchsia-600/20 border-fuchsia-500 text-fuchsia-400 shadow-[inset_0_0_20px_rgba(192,38,211,0.2)]' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-600'}`}
-                            >
-                                <Settings size={24} className={selectedMode === 'hud' ? 'text-fuchsia-400' : 'text-slate-600'} />
-                                <span className="font-black uppercase tracking-widest text-[9px] md:text-[10px]">Teacher HUD</span>
-                            </button>
-
-                            {/* Games */}
-                            <button 
-                                onClick={() => setSelectedMode('trivia')}
-                                className={`p-4 md:p-6 rounded-2xl md:rounded-[2rem] border-2 transition-all flex flex-col items-center justify-center text-center gap-2 md:gap-3 ${selectedMode === 'trivia' ? 'bg-indigo-600/20 border-indigo-500 text-indigo-400 shadow-[inset_0_0_20px_rgba(99,102,241,0.2)]' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-600'}`}
-                            >
-                                <Zap size={24} className={selectedMode === 'trivia' ? 'text-indigo-400' : 'text-slate-600'} />
-                                <span className="font-black uppercase tracking-widest text-[9px] md:text-[10px]">Vocab Battle</span>
-                            </button>
-
-                            <button 
-                                onClick={() => setSelectedMode('connect_four')}
-                                className={`p-4 md:p-6 rounded-2xl md:rounded-[2rem] border-2 transition-all flex flex-col items-center justify-center text-center gap-2 md:gap-3 ${selectedMode === 'connect_four' ? 'bg-rose-600/20 border-rose-500 text-rose-400 shadow-[inset_0_0_20px_rgba(244,63,94,0.2)]' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-600'}`}
-                            >
-                                <Target size={24} className={selectedMode === 'connect_four' ? 'text-rose-400' : 'text-slate-600'} />
-                                <span className="font-black uppercase tracking-widest text-[9px] md:text-[10px]">Squad Strike</span>
-                            </button>
-
-                            <button 
-                                onClick={() => setSelectedMode('slipstream')}
-                                className={`p-4 md:p-6 rounded-2xl md:rounded-[2rem] border-2 transition-all flex flex-col items-center justify-center text-center gap-2 md:gap-3 col-span-2 sm:col-span-1 md:col-span-1 ${selectedMode === 'slipstream' ? 'bg-emerald-600/20 border-emerald-500 text-emerald-400 shadow-[inset_0_0_20px_rgba(16,185,129,0.2)]' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-600'}`}
-                            >
-                                <Activity size={24} className={selectedMode === 'slipstream' ? 'text-emerald-400' : 'text-slate-600'} />
-                                <span className="font-black uppercase tracking-widest text-[9px] md:text-[10px]">Slipstream</span>
-                            </button>
+                    {/* STEP 2: SESSION MODE */}
+                    <div className="space-y-3">
+                        <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400">
+                            <Zap size={14} /> 2. Operating Mode
+                        </label>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            <ModeButton id="hud" icon={TabletSmartphone} label="Instructor HUD" type="Lesson" colorClass="bg-indigo-600 border-indigo-500 text-white" />
+                            <ModeButton id="presentation" icon={MonitorPlay} label="Live Projector" type="Lesson" colorClass="bg-indigo-600 border-indigo-500 text-white" />
+                            <ModeButton id="trivia" icon={Brain} label="Arena: Trivia" type="Deck" colorClass="bg-fuchsia-600 border-fuchsia-500 text-white" />
+                            <ModeButton id="connect_four" icon={Gamepad2} label="Squad Strike" type="Deck" colorClass="bg-emerald-600 border-emerald-500 text-white" />
+                            <ModeButton id="slipstream" icon={Zap} label="Slipstream" type="Deck" colorClass="bg-amber-500 border-amber-400 text-white" />
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-                        {/* Step 2: Cohort */}
-                        <div className="space-y-3 md:space-y-4">
-                            <h3 className="text-[10px] md:text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                <Users size={16} /> 2. Target Cohort
-                            </h3>
-                            <div className="space-y-2 max-h-[25vh] md:max-h-[250px] overflow-y-auto custom-scrollbar pr-2">
-                                {classes.length === 0 ? (
-                                    <div className="p-3 md:p-4 rounded-xl md:rounded-2xl bg-slate-950 border border-slate-800 text-slate-500 text-xs md:text-sm font-bold text-center">No cohorts found.</div>
+                    {/* STEP 3: PAYLOAD (Dynamic) */}
+                    {selectedMode && (
+                        <div className="space-y-3 animate-in slide-in-from-top-4 duration-300">
+                            <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400">
+                                {requiresLesson ? <BookOpen size={14} /> : <Layers size={14} />} 
+                                3. Select {requiresLesson ? 'Lesson Payload' : 'Data Crystal (Deck)'}
+                            </label>
+                            
+                            <select 
+                                value={selectedContentId}
+                                onChange={(e) => setSelectedContentId(e.target.value)}
+                                className="w-full bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-2xl px-5 py-4 outline-none focus:border-indigo-500 transition-all"
+                            >
+                                <option value="" disabled>Select content to deploy...</option>
+                                {requiresLesson ? (
+                                    lessons.map((l: any) => <option key={l.id} value={l.id}>{l.title}</option>)
                                 ) : (
-                                    classes.map((c: any) => (
-                                        <button 
-                                            key={c.id} onClick={() => setSelectedClassId(c.id)}
-                                            className={`w-full p-3 md:p-4 rounded-xl md:rounded-2xl border-2 transition-all flex items-center justify-between text-left ${selectedClassId === c.id ? 'bg-indigo-600/20 border-indigo-500 shadow-sm' : 'bg-slate-950 border-slate-800 hover:border-slate-700'}`}
-                                        >
-                                            <span className={`font-black text-xs md:text-sm uppercase tracking-widest ${selectedClassId === c.id ? 'text-indigo-400' : 'text-slate-300'}`}>{c.name}</span>
-                                            {selectedClassId === c.id && <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-indigo-400 animate-pulse" />}
-                                        </button>
-                                    ))
+                                    availableDecks.map((d: any) => <option key={d.id} value={d.id}>{d.title || d.name}</option>)
                                 )}
-                            </div>
+                            </select>
+                            
+                            {requiresLesson && lessons.length === 0 && (
+                                <p className="text-xs text-rose-500 font-bold mt-2">No lessons available. Create one in the Studio Hub first.</p>
+                            )}
+                            {requiresDeck && availableDecks.length === 0 && (
+                                <p className="text-xs text-rose-500 font-bold mt-2">No decks available. Create one in the Studio Hub first.</p>
+                            )}
                         </div>
-
-                        {/* Step 3: Ammo (Deck / Lesson) */}
-                        <div className="space-y-3 md:space-y-4">
-                            <h3 className="text-[10px] md:text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                <Layers size={16} /> 3. Data Crystal (Content)
-                            </h3>
-                            <div className="space-y-2 max-h-[25vh] md:max-h-[250px] overflow-y-auto custom-scrollbar pr-2">
-                                {availableDecks.length === 0 ? (
-                                    <div className="p-3 md:p-4 rounded-xl md:rounded-2xl bg-slate-950 border border-slate-800 text-slate-500 text-xs md:text-sm font-bold text-center">No content available.</div>
-                                ) : (
-                                    availableDecks.map((d: any) => (
-                                        <button 
-                                            key={d.id} onClick={() => setSelectedDeckId(d.id)}
-                                            className={`w-full p-3 md:p-4 rounded-xl md:rounded-2xl border-2 transition-all flex flex-col text-left ${selectedDeckId === d.id ? 'bg-amber-500/10 border-amber-500 shadow-sm' : 'bg-slate-950 border-slate-800 hover:border-slate-700'}`}
-                                        >
-                                            <span className={`font-black text-xs md:text-sm leading-tight mb-1 truncate w-full ${selectedDeckId === d.id ? 'text-amber-400' : 'text-slate-300'}`}>{d.title || d.name || 'Untitled Content'}</span>
-                                            <span className="text-[8px] md:text-[9px] font-bold uppercase tracking-widest text-slate-500">
-                                                {d.type === 'lesson' ? 'Interactive Lesson' : `${d.cards?.length || d.stats?.cardCount || 0} Targets`}
-                                            </span>
-                                        </button>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                    )}
                 </div>
 
-                {/* Footer */}
-                <div className="p-4 md:p-8 bg-slate-950/50 border-t border-slate-800 shrink-0">
+                <div className="p-6 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 shrink-0">
                     <button 
-                        onClick={handleLaunch}
-                        className="w-full py-4 md:py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl md:rounded-[1.5rem] font-black text-sm md:text-lg uppercase tracking-widest shadow-[0_0_30px_rgba(99,102,241,0.4)] active:scale-95 transition-all flex items-center justify-center gap-2 md:gap-3"
+                        onClick={handleDeploy}
+                        disabled={!selectedClassId || !selectedMode || !selectedContentId}
+                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white rounded-2xl font-black text-lg uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 disabled:shadow-none"
                     >
-                        <Shield size={20} className="md:w-6 md:h-6" /> Authorize Deployment
+                        <Play size={20} fill="currentColor" /> Initialize Sequence
                     </button>
                 </div>
+
             </div>
         </div>
     );
