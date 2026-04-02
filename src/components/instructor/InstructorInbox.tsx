@@ -1,7 +1,7 @@
 // src/components/instructor/InstructorInbox.tsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { collection, query, where, onSnapshot, writeBatch, doc, addDoc, updateDoc } from 'firebase/firestore';
-import { db, appId } from '../config/firebase';
+import { db, appId } from '../../config/firebase';
 import { 
     Send, Users, User, Link as LinkIcon, MessageSquare, 
     Clock, Megaphone, Plus, ShieldAlert, CheckCheck, Zap, ChevronLeft
