@@ -83,21 +83,25 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
   const { liveState, startLiveClass, endLiveClass, changeSlide, triggerQuiz } = useLiveClass(classId, true);
 
-  // 🔥 NEW: Remote Control Scroll Receiver
+  // 🔥 OS FEATURE: Remote Control Slide Sync (Left/Right)
+  // This forces the projector to change slides when the HUD updates Firebase
+  useEffect(() => {
+      if (liveState?.currentBlockIndex !== undefined && liveState.currentBlockIndex !== activePageIdx) {
+          setActivePageIdx(liveState.currentBlockIndex);
+          if (stageRef.current) stageRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+  }, [liveState?.currentBlockIndex]);
+
+  // 🔥 OS FEATURE: Remote Control Scroll Receiver (Up/Down)
   // This listens for scroll commands dispatched from the Instructor HUD
   useEffect(() => {
       if (!liveState?.scrollCommand || !stageRef.current) return;
       
       const { direction, timestamp } = liveState.scrollCommand;
-      
-      // We use the timestamp to ensure we don't process the same scroll command twice
-      // and we only process commands that happened recently (within the last 2 seconds)
-      // to avoid weird jump-scrolling when a user first connects
       const isFreshCommand = (Date.now() - timestamp) < 2000;
       
       if (isFreshCommand) {
-          const scrollAmount = window.innerHeight * 0.4; // Scroll by 40% of the screen height
-          
+          const scrollAmount = window.innerHeight * 0.4; 
           if (direction === 'down') {
               stageRef.current.scrollBy({ top: scrollAmount, behavior: 'smooth' });
           } else if (direction === 'up') {
