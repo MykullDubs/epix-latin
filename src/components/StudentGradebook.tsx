@@ -15,12 +15,15 @@ function GradeDetailModal({ log, onClose }: any) {
     const { scoreDetail, itemTitle, xp } = log;
     const isExam = scoreDetail && scoreDetail.details; 
 
+    // Check if ANY question in this exam has instructor feedback
+    const hasGlobalFeedback = scoreDetail?.details?.some((q: any) => q.teacherFeedback && q.teacherFeedback.trim() !== '');
+
     return (
         <div className="fixed inset-0 z-[5000] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white dark:bg-slate-950 w-full max-w-2xl rounded-3xl shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800">
                 
                 {/* Header */}
-                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 rounded-t-3xl">
+                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 rounded-t-3xl shrink-0">
                     <div>
                         <h2 className="text-xl font-black text-slate-800 dark:text-white">{itemTitle}</h2>
                         <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider mt-1">{new Date(log.timestamp).toLocaleDateString()} • +{xp} XP</p>
@@ -36,12 +39,6 @@ function GradeDetailModal({ log, onClose }: any) {
                             {scoreDetail?.finalScorePct ?? 100}%
                         </div>
                         <div className="text-sm font-bold text-slate-400 uppercase tracking-widest">Final Score</div>
-                        {scoreDetail?.instructorFeedback && (
-                            <div className="mt-6 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 p-5 rounded-2xl max-w-md w-full text-center">
-                                <span className="text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-[0.2em] block mb-2">Instructor Feedback</span>
-                                <p className="text-indigo-900 dark:text-indigo-200 font-medium italic leading-relaxed">"{scoreDetail.instructorFeedback}"</p>
-                            </div>
-                        )}
                     </div>
 
                     {/* Question Breakdown (Only if it's an Exam) */}
@@ -79,6 +76,18 @@ function GradeDetailModal({ log, onClose }: any) {
                                                 <CheckCircle2 size={14}/> Correct Answer: {q.correctVal}
                                             </div>
                                         )}
+
+                                        {/* 🔥 PRO-LMS: PER-QUESTION FEEDBACK INJECTION */}
+                                        {q.teacherFeedback && (
+                                            <div className="mt-4 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 p-4 rounded-xl">
+                                                <span className="text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-[0.2em] flex items-center gap-1.5 mb-2">
+                                                    <MessageCircle size={12} /> Instructor Note
+                                                </span>
+                                                <p className="text-indigo-900 dark:text-indigo-200 font-medium italic leading-relaxed text-sm">
+                                                    "{q.teacherFeedback}"
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -87,7 +96,7 @@ function GradeDetailModal({ log, onClose }: any) {
                 </div>
 
                 {/* Footer */}
-                <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 rounded-b-3xl">
+                <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 rounded-b-3xl shrink-0">
                     <button onClick={onClose} className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg hover:scale-[1.01] transition-transform">Close Report</button>
                 </div>
             </div>
@@ -154,7 +163,10 @@ export default function StudentGradebook({ classData, user }: any) {
         const hasInstructorGrade = log.scoreDetail?.finalScorePct !== undefined;
         const displayLabel = hasInstructorGrade ? `${pct}%` : `${score}/${total} pts`;
 
-        return { status: 'complete', label: displayLabel, color, interactable: true, log, pct };
+        // 🔥 PRO-LMS: Check array for any feedback
+        const hasFeedback = log.scoreDetail?.details?.some((q: any) => q.teacherFeedback && q.teacherFeedback.trim() !== '');
+
+        return { status: 'complete', label: displayLabel, color, interactable: true, log, pct, hasFeedback };
     };
 
     // 🔥 DYNAMIC RPG STATS CALCULATIONS
@@ -291,7 +303,7 @@ export default function StudentGradebook({ classData, user }: any) {
                 ) : (
                     <div className="divide-y divide-slate-100 dark:divide-slate-800/50">
                         {gradedAssignments.map((assign: any) => {
-                            const { label, color, interactable, log } = getGradeStatus(assign);
+                            const { label, color, interactable, log, hasFeedback } = getGradeStatus(assign);
                             return (
                                 <button 
                                     key={assign.id} 
@@ -311,7 +323,8 @@ export default function StudentGradebook({ classData, user }: any) {
                                     <div className="flex items-center gap-4 md:ml-auto">
                                         <div className="text-right">
                                             <span className={`px-4 py-2 rounded-full text-xs font-black shadow-sm ${color}`}>{label}</span>
-                                            {log?.scoreDetail?.instructorFeedback && (
+                                            {/* 🔥 PRO-LMS: DYNAMIC FEEDBACK BADGE */}
+                                            {hasFeedback && (
                                                 <div className="flex items-center justify-end gap-1.5 mt-2 text-[10px] text-indigo-500 dark:text-indigo-400 font-black uppercase tracking-widest">
                                                     <MessageCircle size={12}/> Feedback Available
                                                 </div>
