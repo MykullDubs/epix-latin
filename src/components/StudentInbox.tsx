@@ -1,6 +1,6 @@
-// src/components/student/StudentInbox.tsx
+// src/components/StudentInbox.tsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, addDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { db, appId } from '../config/firebase';
 import { 
     MessageSquare, Zap, ChevronLeft, Send,
@@ -55,8 +55,8 @@ export default function StudentInbox({ user, onLaunchContent }: any) {
                 tType = 'broadcast';
                 partnerId = msg.senderId; // The instructor who broadcasted it
             } else {
-                tId = isSelf ? `direct_${msg.recipientId}` : `direct_${msg.senderId}`;
-                tName = isSelf ? msg.recipientName : msg.senderName;
+                tId = isSelf ? `direct_${msg.recipientId || msg.recipientEmail}` : `direct_${msg.senderId}`;
+                tName = isSelf ? (msg.recipientName || 'Instructor') : (msg.senderName || 'Instructor');
                 tType = 'direct';
                 partnerId = isSelf ? msg.recipientId : msg.senderId;
             }
@@ -116,8 +116,9 @@ export default function StudentInbox({ user, onLaunchContent }: any) {
                 senderId: studentId,
                 senderName: user?.displayName || studentEmail.split('@')[0],
                 senderEmail: studentEmail,
-                recipientId: activeThread.partnerId,
-                recipientName: activeThread.name,
+                // 🔥 FIXED: Firebase hates "undefined". This safely falls back to null.
+                recipientId: activeThread.partnerId || null, 
+                recipientName: activeThread.name || "Instructor",
                 type: 'direct',
                 subject: `Re: Chat`,
                 body: replyText.trim(),
@@ -133,7 +134,8 @@ export default function StudentInbox({ user, onLaunchContent }: any) {
     };
 
     return (
-        <div className="h-full flex flex-col md:flex-row bg-slate-50 dark:bg-slate-950 animate-in fade-in duration-500 max-w-[1400px] mx-auto w-full p-2 md:p-6 gap-4">
+        // 🔥 FIXED: Added pb-24 for mobile to lift the layout above the StudentNavBar!
+        <div className="h-full flex flex-col md:flex-row bg-slate-50 dark:bg-slate-950 animate-in fade-in duration-500 max-w-[1400px] mx-auto w-full p-2 pb-24 md:p-6 md:pb-6 gap-4">
             
             {/* LEFT PANE: Conversation List */}
             <div className={`w-full md:w-80 flex flex-col bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-xl shrink-0 transition-all ${activeThreadId ? 'hidden md:flex' : 'flex'}`}>
