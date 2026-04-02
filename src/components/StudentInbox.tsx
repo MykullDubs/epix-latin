@@ -1,7 +1,7 @@
 // src/components/student/StudentInbox.tsx
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
-import { db, appId } from '../../config/firebase';
+import { db, appId } from '../config/firebase';
 import { 
     Inbox as InboxIcon, Zap, ChevronLeft, 
     CheckCircle2, Link as LinkIcon, Clock, ShieldAlert
