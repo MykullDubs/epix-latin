@@ -1,10 +1,10 @@
 // src/components/instructor/LiveSetupModal.tsx
 import React, { useState } from 'react';
-import { X, Users, Layers, Zap, Gamepad2, Shield, Rocket, Target, Activity } from 'lucide-react';
+import { X, Users, Layers, Zap, Gamepad2, Shield, Rocket, Target, Activity, Settings, LayoutTemplate } from 'lucide-react';
 
 export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = {}, onDeploy }: any) {
     const [selectedClassId, setSelectedClassId] = useState('');
-    const [selectedMode, setSelectedMode] = useState<'trivia' | 'connect_four' | 'slipstream'>('trivia');
+    const [selectedMode, setSelectedMode] = useState<'trivia' | 'connect_four' | 'slipstream' | 'hud' | 'presentation'>('trivia');
     const [selectedDeckId, setSelectedDeckId] = useState('');
 
     if (!isOpen) return null;
@@ -14,7 +14,7 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
 
     const handleLaunch = () => {
         if (!selectedClassId) return alert("Commander, you must select a Target Cohort to deploy.");
-        if (!selectedDeckId) return alert("You must select a Data Crystal (Study Deck) to power the arena's questions.");
+        if (!selectedDeckId) return alert("You must select a Data Crystal (Content Payload) to power the arena.");
         
         // 🔥 This EXACT payload structure is what InstructorDashboard is waiting for
         onDeploy({ 
@@ -28,7 +28,7 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-300 font-sans">
             <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={onClose} />
             
-            <div className="bg-slate-900 border-2 border-indigo-500/30 w-full max-w-3xl rounded-[3rem] shadow-[0_0_50px_rgba(99,102,241,0.2)] relative z-10 flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="bg-slate-900 border-2 border-indigo-500/30 w-full max-w-4xl rounded-[3rem] shadow-[0_0_50px_rgba(99,102,241,0.2)] relative z-10 flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
                 
                 {/* Header */}
                 <div className="p-8 border-b border-slate-800 bg-slate-950/50 flex justify-between items-center relative overflow-hidden">
@@ -54,27 +54,48 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
                         <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
                             <Gamepad2 size={16} /> 1. Select Arena Protocol
                         </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                            {/* Pro-LMS: Presentation Mode */}
+                            <button 
+                                onClick={() => setSelectedMode('presentation')}
+                                className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center justify-center text-center gap-3 ${selectedMode === 'presentation' ? 'bg-amber-600/20 border-amber-500 text-amber-400 shadow-[inset_0_0_20px_rgba(245,158,11,0.2)]' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-600'}`}
+                            >
+                                <LayoutTemplate size={28} className={selectedMode === 'presentation' ? 'text-amber-400' : 'text-slate-600'} />
+                                <span className="font-black uppercase tracking-widest text-[10px]">Smartboard</span>
+                            </button>
+
+                            {/* Pro-LMS: The Remote Control */}
+                            <button 
+                                onClick={() => setSelectedMode('hud')}
+                                className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center justify-center text-center gap-3 ${selectedMode === 'hud' ? 'bg-fuchsia-600/20 border-fuchsia-500 text-fuchsia-400 shadow-[inset_0_0_20px_rgba(192,38,211,0.2)]' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-600'}`}
+                            >
+                                <Settings size={28} className={selectedMode === 'hud' ? 'text-fuchsia-400' : 'text-slate-600'} />
+                                <span className="font-black uppercase tracking-widest text-[10px]">Teacher HUD</span>
+                            </button>
+
+                            {/* Games */}
                             <button 
                                 onClick={() => setSelectedMode('trivia')}
-                                className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center text-center gap-3 ${selectedMode === 'trivia' ? 'bg-indigo-600/20 border-indigo-500 text-indigo-400 shadow-[inset_0_0_20px_rgba(99,102,241,0.2)]' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-600'}`}
+                                className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center justify-center text-center gap-3 ${selectedMode === 'trivia' ? 'bg-indigo-600/20 border-indigo-500 text-indigo-400 shadow-[inset_0_0_20px_rgba(99,102,241,0.2)]' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-600'}`}
                             >
-                                <Zap size={32} className={selectedMode === 'trivia' ? 'text-indigo-400' : 'text-slate-600'} />
-                                <span className="font-black uppercase tracking-widest text-sm">Vocab Battle</span>
+                                <Zap size={28} className={selectedMode === 'trivia' ? 'text-indigo-400' : 'text-slate-600'} />
+                                <span className="font-black uppercase tracking-widest text-[10px]">Vocab Battle</span>
                             </button>
+
                             <button 
                                 onClick={() => setSelectedMode('connect_four')}
-                                className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center text-center gap-3 ${selectedMode === 'connect_four' ? 'bg-rose-600/20 border-rose-500 text-rose-400 shadow-[inset_0_0_20px_rgba(244,63,94,0.2)]' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-600'}`}
+                                className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center justify-center text-center gap-3 ${selectedMode === 'connect_four' ? 'bg-rose-600/20 border-rose-500 text-rose-400 shadow-[inset_0_0_20px_rgba(244,63,94,0.2)]' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-600'}`}
                             >
-                                <Target size={32} className={selectedMode === 'connect_four' ? 'text-rose-400' : 'text-slate-600'} />
-                                <span className="font-black uppercase tracking-widest text-sm">Squad Strike</span>
+                                <Target size={28} className={selectedMode === 'connect_four' ? 'text-rose-400' : 'text-slate-600'} />
+                                <span className="font-black uppercase tracking-widest text-[10px]">Squad Strike</span>
                             </button>
+
                             <button 
                                 onClick={() => setSelectedMode('slipstream')}
-                                className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center text-center gap-3 ${selectedMode === 'slipstream' ? 'bg-emerald-600/20 border-emerald-500 text-emerald-400 shadow-[inset_0_0_20px_rgba(16,185,129,0.2)]' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-600'}`}
+                                className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center justify-center text-center gap-3 ${selectedMode === 'slipstream' ? 'bg-emerald-600/20 border-emerald-500 text-emerald-400 shadow-[inset_0_0_20px_rgba(16,185,129,0.2)]' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-600'}`}
                             >
-                                <Activity size={32} className={selectedMode === 'slipstream' ? 'text-emerald-400' : 'text-slate-600'} />
-                                <span className="font-black uppercase tracking-widest text-sm">Slipstream</span>
+                                <Activity size={28} className={selectedMode === 'slipstream' ? 'text-emerald-400' : 'text-slate-600'} />
+                                <span className="font-black uppercase tracking-widest text-[10px]">Slipstream</span>
                             </button>
                         </div>
                     </div>
@@ -102,22 +123,24 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
                             </div>
                         </div>
 
-                        {/* Step 3: Ammo (Deck) */}
+                        {/* Step 3: Ammo (Deck / Lesson) */}
                         <div className="space-y-4">
                             <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                <Layers size={16} /> 3. Data Crystal (Ammo)
+                                <Layers size={16} /> 3. Data Crystal (Content)
                             </h3>
                             <div className="space-y-2 max-h-[250px] overflow-y-auto custom-scrollbar pr-2">
                                 {availableDecks.length === 0 ? (
-                                    <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-slate-500 text-sm font-bold text-center">No decks available.</div>
+                                    <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-slate-500 text-sm font-bold text-center">No content available.</div>
                                 ) : (
                                     availableDecks.map((d: any) => (
                                         <button 
                                             key={d.id} onClick={() => setSelectedDeckId(d.id)}
                                             className={`w-full p-4 rounded-2xl border-2 transition-all flex flex-col text-left ${selectedDeckId === d.id ? 'bg-amber-500/10 border-amber-500 shadow-sm' : 'bg-slate-950 border-slate-800 hover:border-slate-700'}`}
                                         >
-                                            <span className={`font-black text-sm leading-tight mb-1 ${selectedDeckId === d.id ? 'text-amber-400' : 'text-slate-300'}`}>{d.title || d.name || 'Untitled Deck'}</span>
-                                            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">{d.cards?.length || d.stats?.cardCount || 0} Targets</span>
+                                            <span className={`font-black text-sm leading-tight mb-1 ${selectedDeckId === d.id ? 'text-amber-400' : 'text-slate-300'}`}>{d.title || d.name || 'Untitled Content'}</span>
+                                            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
+                                                {d.type === 'lesson' ? 'Interactive Lesson' : `${d.cards?.length || d.stats?.cardCount || 0} Targets`}
+                                            </span>
                                         </button>
                                     ))
                                 )}
