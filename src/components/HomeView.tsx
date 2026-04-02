@@ -6,15 +6,14 @@ import {
     Microscope, Terminal, Calculator, Palette, BookText,
     Check, Brain, Play, HeartPulse, Cpu, Briefcase, 
     Utensils, Globe2, Activity, ShieldAlert, MonitorPlay, 
-    FlaskConical, Plane, Music, Code, Loader2, X, Plus, GripVertical
+    FlaskConical, Plane, Music, Code, Loader2, X, Plus, GripVertical, Inbox
 } from 'lucide-react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db, appId } from '../config/firebase';
+import { collection, getDocs, query, where, onSnapshot } from 'firebase/firestore';
+import { db, appId, auth } from '../config/firebase';
 import { saveDeckToCache, getDeckFromCache } from '../utils/localCache';
 import { calculateLevel } from '../utils/profileHelpers';
 import { StudyModePlayer } from './StudyEngines'; 
 import { Toast } from './Toast';
-import { auth } from '../config/firebase'; 
 
 // 🔥 UNIFIED DISCOVERY THEMES
 const getSubjectTheme = (subject: string = '') => {
@@ -53,6 +52,21 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
   useEffect(() => {
       setLocalClasses(classes || []);
   }, [classes]);
+
+  // --- 🔥 INBOX UNREAD LISTENER ---
+  const [unreadCount, setUnreadCount] = useState(0);
+  const studentEmail = user?.email || auth?.currentUser?.email;
+
+  useEffect(() => {
+      if (!studentEmail) return;
+      const q = query(
+          collection(db, 'artifacts', appId, 'messages'),
+          where('recipientEmail', '==', studentEmail),
+          where('read', '==', false)
+      );
+      const unsub = onSnapshot(q, (snap) => setUnreadCount(snap.docs.length));
+      return () => unsub();
+  }, [studentEmail]);
 
   const handleDragStart = (e: React.DragEvent<HTMLButtonElement>, position: number) => {
       dragItem.current = position;
@@ -246,9 +260,26 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                     {themeName}
                 </span>
             </div>
-            <div className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 shrink-0 transition-colors duration-300" aria-label={`Target Language: ${targetLang}`}>
-                <Globe size={14} className="text-slate-400 dark:text-slate-500" aria-hidden="true"/>
-                <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide">{targetLang}</span>
+
+            <div className="flex items-center gap-3">
+                {/* 🔥 THE INBOX / NOTIFICATION BELL */}
+                <button 
+                    onClick={() => setActiveTab('inbox')}
+                    className="relative p-2 bg-slate-100 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all active:scale-95 text-slate-500 dark:text-slate-400 group"
+                >
+                    <Inbox size={16} className="group-hover:text-indigo-500 transition-colors" />
+                    {unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500 border-2 border-white dark:border-slate-900"></span>
+                        </span>
+                    )}
+                </button>
+
+                <div className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 shrink-0 transition-colors duration-300" aria-label={`Target Language: ${targetLang}`}>
+                    <Globe size={14} className="text-slate-400 dark:text-slate-500" aria-hidden="true"/>
+                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide">{targetLang}</span>
+                </div>
             </div>
         </header>
 
@@ -397,6 +428,34 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                           <div className="relative z-10 mt-auto">
                               <h3 className="text-sm font-black text-white leading-tight mb-0.5">Studio</h3>
                               <p className="text-[9px] font-black uppercase tracking-widest text-fuchsia-200">Create Content</p>
+                          </div>
+                      </button>
+
+                      {/* 🔥 CARD 4: THE INTEL FEED (INBOX) */}
+                      <button 
+                          onClick={() => setActiveTab('inbox')}
+                          className={`snap-start shrink-0 w-[150px] h-32 relative rounded-[1.5rem] p-4 shadow-lg overflow-hidden group text-left transition-all active:scale-[0.98] flex flex-col justify-between border ${unreadCount > 0 ? 'bg-gradient-to-br from-rose-500 to-pink-600 shadow-rose-500/30 border-rose-400/50' : 'bg-gradient-to-br from-slate-700 to-slate-900 shadow-slate-900/20 border-slate-600/50'}`}
+                      >
+                          <div className="absolute -right-4 -bottom-4 p-4 opacity-20 group-hover:opacity-30 transition-opacity pointer-events-none">
+                              <Inbox size={80} className="text-white" />
+                          </div>
+                          
+                          <div className="relative z-10 flex justify-between items-start w-full">
+                              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md shadow-inner">
+                                  <Inbox size={16} className="text-white" />
+                              </div>
+                              {unreadCount > 0 && (
+                                  <span className="flex items-center justify-center min-w-6 h-6 px-1.5 bg-white text-rose-600 font-black text-[10px] rounded-full shadow-sm group-hover:scale-110 transition-transform">
+                                      {unreadCount}
+                                  </span>
+                              )}
+                          </div>
+                          
+                          <div className="relative z-10 mt-auto">
+                              <h3 className="text-sm font-black text-white leading-tight mb-0.5">Intel Feed</h3>
+                              <p className={`text-[9px] font-black uppercase tracking-widest ${unreadCount > 0 ? 'text-rose-200' : 'text-slate-400'}`}>
+                                  {unreadCount > 0 ? 'Unread Signals' : 'Comms Inbox'}
+                              </p>
                           </div>
                       </button>
                       
