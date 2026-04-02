@@ -117,7 +117,7 @@ export default function GradebookMatrix({ classData, lessons, activityLogs }: an
 
                     <div className="flex gap-4 items-center bg-slate-800/50 p-4 rounded-3xl border border-slate-700">
                         <Settings2 size={20} className="text-slate-500 mr-2" />
-                        {categories.map(cat => (
+                        {categories.map((cat: any) => (
                             <div key={cat.id} className="flex flex-col gap-1">
                                 <label className={`text-[10px] font-black uppercase tracking-widest ${cat.color}`}>{cat.label} %</label>
                                 <input 
@@ -156,7 +156,7 @@ export default function GradebookMatrix({ classData, lessons, activityLogs }: an
                             <th className="p-6 text-center border-r border-slate-800/50 bg-slate-800/30 min-w-[120px]">
                                 <span className="text-xs font-black uppercase tracking-widest text-indigo-400">Final GPA</span>
                             </th>
-                            {gradedItems.map(item => (
+                            {gradedItems.map((item: any) => (
                                 <th key={item.id} className="p-6 min-w-[160px] border-r border-slate-800/50 hover:bg-slate-800 transition-colors group">
                                     <div className="flex flex-col gap-1">
                                         <span className={`text-[9px] font-black uppercase tracking-tighter ${categories.find(c => c.id === item.category)?.color}`}>
@@ -193,7 +193,7 @@ export default function GradebookMatrix({ classData, lessons, activityLogs }: an
                                     </div>
                                 </td>
 
-                                {gradedItems.map(item => {
+                                {gradedItems.map((item: any) => {
                                     const data = student.itemData[item.id];
                                     return (
                                         <td key={item.id} className="p-4 border-r border-slate-800/30 text-center align-middle">
