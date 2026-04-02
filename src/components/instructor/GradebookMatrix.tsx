@@ -39,16 +39,19 @@ export default function GradebookMatrix({ classData, lessons, activityLogs }: an
         });
     }, [classData, lessons]);
 
-    // 3. The Heavy-Duty Matrix Calculation Engine
+    // 3. The Heavy-Duty Matrix Calculation Engine (NOW CRASH-PROOF)
     const matrixData = useMemo(() => {
-        return students.map((studentEmail: string) => {
+        return students.map((studentObj: any) => {
+            // 🔥 FIX: Safely extract email and name whether it's a string or an object
+            const studentEmail = typeof studentObj === 'string' ? studentObj : studentObj.email;
+            const studentName = typeof studentObj === 'string' ? studentEmail.split('@')[0] : (studentObj.name || studentEmail.split('@')[0]);
+
             const studentLogs = activityLogs.filter((log: any) => log.studentEmail === studentEmail);
             
             const categoryScores: any = { exam: [], trivia: [], activity: [] };
             const itemData: any = {};
 
             gradedItems.forEach((item: any) => {
-                // Find the most recent/best log for this item
                 const itemLogs = studentLogs.filter((log: any) => log.itemId === item.id || log.itemTitle === item.title);
                 const bestLog = itemLogs.sort((a: any, b: any) => b.timestamp - a.timestamp)[0];
                 
@@ -60,16 +63,14 @@ export default function GradebookMatrix({ classData, lessons, activityLogs }: an
 
                     itemData[item.id] = { score: pct, status };
                     
-                    // Only count fully graded items toward the final GPA
                     if (status === 'graded') {
                         categoryScores[item.category].push(pct);
                     }
                 } else {
-                    itemData[item.id] = null; // Not attempted
+                    itemData[item.id] = null; 
                 }
             });
 
-            // Calculate Weighted Average
             let totalWeighted = 0;
             let totalWeightUsed = 0;
 
@@ -82,11 +83,10 @@ export default function GradebookMatrix({ classData, lessons, activityLogs }: an
             });
 
             const finalGrade = totalWeightUsed > 0 ? Math.round(totalWeighted / totalWeightUsed) : 0;
-            const name = studentEmail.split('@')[0];
 
             return {
                 email: studentEmail,
-                name,
+                name: studentName,
                 itemData,
                 finalGrade,
                 hasPending: Object.values(itemData).some((d: any) => d?.status === 'pending_review')
@@ -94,7 +94,6 @@ export default function GradebookMatrix({ classData, lessons, activityLogs }: an
         }).filter((s:any) => s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.email.toLowerCase().includes(searchQuery.toLowerCase()));
     }, [students, activityLogs, gradedItems, weights, searchQuery]);
 
-    // Color logic for individual cells
     const getHeatmapClass = (data: any) => {
         if (!data) return "bg-slate-800/20 text-slate-600";
         if (data.status === 'pending_review') return "bg-amber-500/20 text-amber-500 border-amber-500/40 animate-pulse";
@@ -105,7 +104,6 @@ export default function GradebookMatrix({ classData, lessons, activityLogs }: an
 
     return (
         <div className="flex flex-col h-full bg-slate-950 text-slate-100 font-sans overflow-hidden rounded-[3rem] border border-slate-800 shadow-2xl">
-            {/* Header: Controls & Weights */}
             <header className="p-8 border-b border-slate-800 bg-slate-900/50 backdrop-blur-xl shrink-0">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8">
                     <div>
@@ -145,7 +143,6 @@ export default function GradebookMatrix({ classData, lessons, activityLogs }: an
                 </div>
             </header>
 
-            {/* The Matrix Grid */}
             <div className="flex-1 overflow-auto custom-scrollbar relative">
                 <table className="w-full text-left border-collapse min-w-[1000px]">
                     <thead className="sticky top-0 z-40 bg-slate-900 shadow-sm">
@@ -212,7 +209,6 @@ export default function GradebookMatrix({ classData, lessons, activityLogs }: an
                     </tbody>
                 </table>
 
-                {/* Empty State */}
                 {matrixData.length === 0 && (
                     <div className="flex flex-col items-center justify-center p-32 opacity-30">
                         <AlertCircle size={64} className="mb-4" />
@@ -221,7 +217,6 @@ export default function GradebookMatrix({ classData, lessons, activityLogs }: an
                 )}
             </div>
             
-            {/* Quick Action Footer */}
             <footer className="p-5 bg-slate-900 border-t border-slate-800 flex justify-between items-center text-xs font-bold uppercase tracking-widest text-slate-500 shrink-0">
                 <div className="flex gap-6">
                     <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-emerald-500" /> Mastered (90%+)</div>
