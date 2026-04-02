@@ -391,7 +391,16 @@ export default function InstructorDashboard({
                 )}
                 
                 {activeTab === 'analytics' && <AnalyticsDashboard classes={userData?.classes} />}
-                {activeTab === 'inbox' && <InstructorInbox />}
+                
+                {/* 🔥 PRO-LMS: Fully Wired Inbox */}
+                {activeTab === 'inbox' && (
+                    <InstructorInbox 
+                        user={user} 
+                        classes={userData?.classes || []} 
+                        decks={allDecks} 
+                        lessons={lessons} 
+                    />
+                )}
              </div>
            )}
 
