@@ -246,8 +246,9 @@ export default function App() {
 
   useEffect(() => {
     const handlePopState = () => {
-      const params = newSearchParams(window.location.search);
-      const params = new URLSearchParams(window.location.search); 
+      // Just ONE perfectly typed declaration!
+      const params = new URLSearchParams(window.location.search);
+      
       setCurrentView((params.get('view') as any) || 'student');
       setActiveTab(params.get('tab') || 'home');
       setActiveDeckKey(params.get('deckId'));
@@ -258,6 +259,7 @@ export default function App() {
       const lessonId = params.get('lessonId');
       setActiveLesson(lessonId ? allLessons.find((l: any) => l.id === lessonId) || null : null);
     };
+    
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [combinedClasses, allLessons]);
