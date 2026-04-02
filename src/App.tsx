@@ -26,7 +26,7 @@ import LiveSlipstreamProjector from './components/LiveSlipstreamProjector';
 import CelebrationScreen from './components/CelebrationScreen';
 import HoloAvatar from './components/HoloAvatar'; 
 import InstructorHUD from './components/instructor/InstructorHUD'; 
-import StudentInbox from './components/student/StudentInbox'; // 🔥 IMPORTED INBOX
+import StudentInbox from './components/StudentInbox'; // 🔥 IMPORTED INBOX
 
 // 🔥 DYNAMIC OS THEME ENGINE
 const OS_THEMES: Record<string, string> = {
@@ -247,6 +247,7 @@ export default function App() {
   useEffect(() => {
     const handlePopState = () => {
       const params = newSearchParams(window.location.search);
+      const params = new URLSearchParams(window.location.search); 
       setCurrentView((params.get('view') as any) || 'student');
       setActiveTab(params.get('tab') || 'home');
       setActiveDeckKey(params.get('deckId'));
