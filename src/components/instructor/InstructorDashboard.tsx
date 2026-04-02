@@ -1,9 +1,9 @@
 // src/components/instructor/InstructorDashboard.tsx
 import React, { useState } from 'react';
 import { 
-  GraduationCap, ChevronLeft, Menu, Activity, PenTool, 
-  School, Layers, Inbox, BarChart2, Shield, User, 
-  LogOut, BookOpen, CheckCircle2, Briefcase 
+    GraduationCap, ChevronLeft, Menu, Activity, PenTool, 
+    School, Layers, Inbox, BarChart2, Shield, User, 
+    LogOut, BookOpen, CheckCircle2, Briefcase 
 } from 'lucide-react';
 
 // Import the specialized views
@@ -13,6 +13,10 @@ import InstructorInbox from './InstructorInbox';
 import { AnalyticsDashboard } from './InstructorTools';
 import CommandCenter from './CommandCenter';
 import LiveSetupModal from './LiveSetupModal'; 
+
+// 🔥 PRO-LMS: Import the new Grading Engines
+import GradebookMatrix from './GradebookMatrix';
+import InstructorGradebook from './InstructorGradebook';
 
 // ============================================================================
 //  INSTRUCTOR DASHBOARD (Main Navigation & Hub)
@@ -29,7 +33,7 @@ export default function InstructorDashboard({
   onSaveLesson, 
   onSaveCard,
   onUpdateCard,
-  onDeleteCard, // 🔥 NEW: ADDED DELETE WIRE
+  onDeleteCard,
   onAssign,            
   onRevoke,            
   onCreateClass,  
@@ -39,6 +43,7 @@ export default function InstructorDashboard({
   onAddStudent,
   onRemoveStudent,   
   onStartPresentation, 
+  onStartHUD, // 🔥 HUD Launcher
   onStartVocabGame,
   onStartConnectFour,
   onStartSlipstream, 
@@ -52,6 +57,10 @@ export default function InstructorDashboard({
   const [selectedClassId, setSelectedClassId] = useState<string>(''); 
   const [dashCohortId, setDashCohortId] = useState<string>(userData?.classes?.[0]?.id || '');
   
+  // 🔥 PRO-LMS: Gradebook States
+  const [gradebookClassId, setGradebookClassId] = useState<string>(userData?.classes?.[0]?.id || '');
+  const [gradeView, setGradeView] = useState<'matrix' | 'speedmoderator'>('matrix');
+
   // STATE FOR LIVE ARENA MODAL
   const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
 
@@ -81,8 +90,8 @@ export default function InstructorDashboard({
                 
                 {badge && !isActive && (
                     <span className="absolute top-3 right-5 flex h-2.5 w-2.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500 border border-slate-950 dark:border-slate-900"></span>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500 border border-slate-950 dark:border-slate-900"></span>
                     </span>
                 )}
             </div>
@@ -143,8 +152,9 @@ export default function InstructorDashboard({
           <NavItem id="studio" icon={<PenTool />} label="Studio Hub" />
           <NavItem id="classes" icon={<School />} label="Cohort Manager" />
           <NavItem id="vault" icon={<Layers />} label="Global Vault" />
-          <NavItem id="inbox" icon={<Inbox />} label="Grading Inbox" badge={true} />
+          <NavItem id="gradebook" icon={<BookOpen />} label="Gradebook" badge={true} />
           <NavItem id="analytics" icon={<BarChart2 />} label="Analytics" />
+          <NavItem id="inbox" icon={<Inbox />} label="Comms Inbox" />
         </nav>
 
         <div className="p-4 border-t border-slate-900 dark:border-slate-800/60 space-y-2 shrink-0 bg-slate-950/50 dark:bg-black/50">
@@ -183,6 +193,7 @@ export default function InstructorDashboard({
           </button>
         </div>
       </aside>
+
       {/* --- MAIN STAGE --- */}
       <main className="flex-1 overflow-hidden relative bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
         <div className="h-full w-full">
@@ -205,7 +216,7 @@ export default function InstructorDashboard({
                  allDecks={allDecks} 
                  onPublishDeck={onPublishDeck} 
                  instructorClasses={userData?.classes || []}
-                 curriculums={curriculums} // 🔥 PASS IT DOWN HERE!
+                 curriculums={curriculums}
                />
              </div>
            )}
@@ -315,7 +326,52 @@ export default function InstructorDashboard({
              </div>
            )}
 
-           {/* This block handles the dashboard, analytics, and inbox depending on the tab */}
+           {/* 🔥 PRO-LMS: THE GRADEBOOK HUB */}
+           {activeTab === 'gradebook' && (
+             <div className="h-full flex flex-col animate-in slide-in-from-bottom-6 duration-500">
+                <div className="flex-none p-6 md:px-8 flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl">
+                    <div className="flex bg-slate-200/50 dark:bg-slate-950 p-1 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-inner">
+                        <button onClick={() => setGradeView('matrix')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${gradeView === 'matrix' ? 'bg-white dark:bg-indigo-600 text-indigo-600 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>Performance Matrix</button>
+                        <button onClick={() => setGradeView('speedmoderator')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${gradeView === 'speedmoderator' ? 'bg-white dark:bg-indigo-600 text-indigo-600 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>SpeedModerator</button>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Target Cohort</span>
+                        <select 
+                            value={gradebookClassId}
+                            onChange={(e) => setGradebookClassId(e.target.value)}
+                            className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-xl px-6 py-3 outline-none focus:border-indigo-500 transition-all shadow-sm"
+                        >
+                            {userData?.classes?.map((c: any) => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+                
+                <div className="flex-1 overflow-hidden p-6 md:p-8 bg-slate-100 dark:bg-slate-950">
+                    {gradebookClassId ? (
+                        gradeView === 'matrix' ? (
+                            <GradebookMatrix 
+                                classData={userData?.classes?.find((c: any) => c.id === gradebookClassId)} 
+                                lessons={lessons} 
+                                activityLogs={activityLogs} 
+                            />
+                        ) : (
+                            <InstructorGradebook 
+                                classData={userData?.classes?.find((c: any) => c.id === gradebookClassId)} 
+                            />
+                        )
+                    ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-slate-400 font-bold uppercase tracking-widest opacity-50">
+                            <BookOpen size={48} className="mb-4" />
+                            Select a cohort to initialize grading engine
+                        </div>
+                    )}
+                </div>
+             </div>
+           )}
+
+           {/* Dashboard, Analytics, and Inbox */}
            {['dashboard', 'analytics', 'inbox'].includes(activeTab) && (
              <div className="h-full overflow-y-auto custom-scrollbar animate-in fade-in duration-700">
                 {activeTab === 'dashboard' && (
@@ -330,6 +386,7 @@ export default function InstructorDashboard({
                       onAssign={onAssign}
                       onLaunchLive={() => setIsLiveModalOpen(true)} 
                       setActiveTab={setActiveTab} 
+                      onStartHUD={onStartHUD} // 🔥 HUD Launcher passed down
                   />
                 )}
                 
@@ -355,6 +412,8 @@ export default function InstructorDashboard({
                            if (onStartVocabGame) onStartVocabGame(config.contentId, config.classId);
                        } else if (config.mode === 'slipstream') {
                            if (onStartSlipstream) onStartSlipstream(config.contentId, config.classId);
+                       } else if (config.mode === 'presentation') {
+                           if (onStartPresentation) onStartPresentation(config.contentId, config.classId);
                        }
                    }, 300);
                }}
