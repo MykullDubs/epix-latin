@@ -1,13 +1,13 @@
-// src/components/InstructorHUD.tsx
+// src/components/instructor/InstructorHUD.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { doc, updateDoc } from 'firebase/firestore'; 
-import { db, appId } from '../config/firebase';
-import { useLiveClass } from '../hooks/useLiveClass';
+import { db, appId } from '../../config/firebase'; // 🔥 FIXED PATH
+import { useLiveClass } from '../../hooks/useLiveClass'; // 🔥 FIXED PATH
 import { 
     ChevronLeft, ChevronRight, Zap, Eye, EyeOff, X, 
     MessageSquare, Users, ShieldAlert, CheckCircle2 
 } from 'lucide-react';
-import HoloAvatar from './HoloAvatar';
+import HoloAvatar from '../HoloAvatar'; // 🔥 FIXED PATH
 
 export default function InstructorHUD({ lesson, classId, activeClass, onExit }: any) {
     const { liveState, changeSlide, triggerQuiz } = useLiveClass(classId, false); // false = don't overwrite teacher's own presence
