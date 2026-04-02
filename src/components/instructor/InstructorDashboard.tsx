@@ -410,6 +410,7 @@ export default function InstructorDashboard({
                onClose={() => setIsLiveModalOpen(false)}
                classes={userData?.classes || []}
                decks={allDecks}
+               lessons={lessons}
                onDeploy={(config: any) => {
                    setIsLiveModalOpen(false);
                    
