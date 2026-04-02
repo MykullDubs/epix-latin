@@ -17,10 +17,13 @@ export default function InstructorGradebook({ classData }: any) {
     useEffect(() => {
         if(!classData.assignments || !classData.students) return;
         
+        // Map out just the emails for the query if students are objects
+        const studentEmails = classData.students.map((s: any) => typeof s === 'string' ? s : s.email).slice(0, 10);
+        
         const q = query(
             collection(db, 'artifacts', appId, 'activity_logs'), 
             where('type', '==', 'completion'),
-            where('studentEmail', 'in', classData.students.slice(0, 10)),
+            where('studentEmail', 'in', studentEmails),
             orderBy('timestamp', 'desc')
         );
 
@@ -149,32 +152,38 @@ export default function InstructorGradebook({ classData }: any) {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {classData.students.map((student: string) => (
-                                <tr key={student} className="hover:bg-slate-50/50 group transition-colors">
-                                    <td className="p-5 font-bold text-slate-700 text-sm sticky left-0 bg-white group-hover:bg-slate-50 border-r border-slate-100 z-10 transition-colors">
-                                        {student.split('@')[0]}
-                                        <div className="text-[9px] text-slate-300 font-medium lowercase truncate max-w-[120px]">{student}</div>
-                                    </td>
-                                    {displayedAssignments.map((a: any) => (
-                                        <td key={a.id} className="p-4 text-center align-middle border-r border-slate-50">
-                                            {getScoreCell(student, a)}
+                            {classData.students.map((studentObj: any) => {
+                                // 🔥 FIX: Extract email and name safely
+                                const studentEmail = typeof studentObj === 'string' ? studentObj : studentObj.email;
+                                const studentName = typeof studentObj === 'string' ? studentEmail.split('@')[0] : (studentObj.name || studentEmail.split('@')[0]);
+
+                                return (
+                                    <tr key={studentEmail} className="hover:bg-slate-50/50 group transition-colors">
+                                        <td className="p-5 font-bold text-slate-700 text-sm sticky left-0 bg-white group-hover:bg-slate-50 border-r border-slate-100 z-10 transition-colors">
+                                            {studentName}
+                                            <div className="text-[9px] text-slate-300 font-medium lowercase truncate max-w-[120px]">{studentEmail}</div>
                                         </td>
-                                    ))}
-                                    <td className="p-5 text-right sticky right-0 bg-white group-hover:bg-slate-50 border-l border-slate-100 z-10 transition-colors">
-                                        {(() => {
-                                            let total = 0, count = 0;
-                                            displayedAssignments.forEach((a: any) => {
-                                                const log = logs.find(l => l.studentEmail === student && (l.itemId === a.id || l.itemTitle === a.title));
-                                                if (log) {
-                                                    const p = log.scoreDetail?.finalScorePct ?? (log.scoreDetail?.total > 0 ? Math.round((log.scoreDetail.score / log.scoreDetail.total) * 100) : 0);
-                                                    total += p; count++;
-                                                }
-                                            });
-                                            return count === 0 ? <span className="text-slate-200">--</span> : <span className="font-black text-slate-900 text-sm">{Math.round(total / count)}%</span>;
-                                        })()}
-                                    </td>
-                                </tr>
-                            ))}
+                                        {displayedAssignments.map((a: any) => (
+                                            <td key={a.id} className="p-4 text-center align-middle border-r border-slate-50">
+                                                {getScoreCell(studentEmail, a)}
+                                            </td>
+                                        ))}
+                                        <td className="p-5 text-right sticky right-0 bg-white group-hover:bg-slate-50 border-l border-slate-100 z-10 transition-colors">
+                                            {(() => {
+                                                let total = 0, count = 0;
+                                                displayedAssignments.forEach((a: any) => {
+                                                    const log = logs.find(l => l.studentEmail === studentEmail && (l.itemId === a.id || l.itemTitle === a.title));
+                                                    if (log) {
+                                                        const p = log.scoreDetail?.finalScorePct ?? (log.scoreDetail?.total > 0 ? Math.round((log.scoreDetail.score / log.scoreDetail.total) * 100) : 0);
+                                                        total += p; count++;
+                                                    }
+                                                });
+                                                return count === 0 ? <span className="text-slate-200">--</span> : <span className="font-black text-slate-900 text-sm">{Math.round(total / count)}%</span>;
+                                            })()}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
