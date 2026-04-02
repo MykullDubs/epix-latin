@@ -414,6 +414,9 @@ export default function InstructorDashboard({
                            if (onStartSlipstream) onStartSlipstream(config.contentId, config.classId);
                        } else if (config.mode === 'presentation') {
                            if (onStartPresentation) onStartPresentation(config.contentId, config.classId);
+                       } else if (config.mode === 'hud') {
+                           // 🔥 NEW: Launches the iPad Remote
+                           if (onStartHUD) onStartHUD(config.contentId, config.classId);
                        }
                    }, 300);
                }}
