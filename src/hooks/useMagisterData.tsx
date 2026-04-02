@@ -562,52 +562,94 @@ export function useMagisterData() {
         }
     },
 
-    logActivity: async (itemId: string, xp: number, title: string, details: any = {}) => {
+    // 🔥 UPGRADED: The RPG Leveling Engine & Streak Multiplier
+    logActivity: async (itemId: string, baseXp: number, title: string, details: any = {}) => {
       if (!user || !user.uid) return;
       
       try {
+          const today = new Date(); const todayStr = today.toDateString();
+          const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1); const yesterdayStr = yesterday.toDateString();
+
+          // 1. SAFELY EXTRACT CURRENT STATS (Handles dual-architecture profile)
+          let currentStreak = userData?.streak || userData?.profile?.main?.streak || 0;
+          let currentDailyXp = userData?.dailyXp || userData?.profile?.main?.dailyXp || 0;
+          let currentDailyLessons = userData?.dailyLessons || userData?.profile?.main?.dailyLessons || 0;
+          const lastActivityDate = userData?.lastActivityDate || userData?.profile?.main?.lastActivityDate;
+          const currentTotalXp = userData?.xp || userData?.profile?.main?.xp || 0;
+
+          // 2. THE STREAK LOGIC
+          let newStreak = currentStreak;
+          let newDailyXp = currentDailyXp;
+          let newDailyLessons = currentDailyLessons;
+          const isLesson = details.mode === 'lesson' || !itemId.includes('explore');
+
+          if (lastActivityDate === todayStr) {
+              if (isLesson) newDailyLessons += 1;
+          } else if (lastActivityDate === yesterdayStr) {
+              newStreak += 1; 
+              newDailyXp = 0; // Reset daily caps
+              newDailyLessons = isLesson ? 1 : 0;
+          } else {
+              newStreak = 1; // Streak broken
+              newDailyXp = 0; 
+              newDailyLessons = isLesson ? 1 : 0;
+          }
+
+          // 3. THE MULTIPLIER (Bonus XP based on streak, capped at +50%)
+          const streakMultiplier = 1 + Math.min(newStreak * 0.1, 0.5);
+          const finalXp = Math.round(baseXp * streakMultiplier);
+          newDailyXp += finalXp;
+
+          // 4. THE RPG LEVELING ENGINE (500 XP per level)
+          const currentLevel = Math.floor(currentTotalXp / 500) + 1;
+          const newTotalXp = currentTotalXp + finalXp;
+          const newLevel = Math.floor(newTotalXp / 500) + 1;
+          const didLevelUp = newLevel > currentLevel;
+
+          // 5. ECONOMY DROPS
+          let earnedFlux = Math.floor(finalXp / 5);
+          if (didLevelUp) earnedFlux += 50; // HUGE bonus for hitting a new level
+
+          // Write the receipt to the database
           await addDoc(collection(db, 'artifacts', appId, 'activity_logs'), {
-            studentEmail: user.email, studentName: userData?.name || user.email.split('@')[0], studentId: user.uid,
-            type: itemId.includes('explore') ? 'explore' : 'completion', itemTitle: title, itemId: itemId, 
-            xp: xp, timestamp: Date.now(), ...details
+            studentEmail: user.email, 
+            studentName: userData?.name || user.email.split('@')[0], 
+            studentId: user.uid,
+            type: itemId.includes('explore') ? 'explore' : 'completion', 
+            itemTitle: title, 
+            itemId: itemId, 
+            xp: finalXp,         // What they actually got
+            baseXp: baseXp,      // What it was worth before multipliers
+            streakMultiplier: streakMultiplier, 
+            leveledUp: didLevelUp, // Easy flag to hook into UI celebrations later
+            timestamp: Date.now(), 
+            ...details
           });
 
-          if (xp > 0) {
-            const today = new Date(); const todayStr = today.toDateString();
-            const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1); const yesterdayStr = yesterday.toDateString();
-
-            let newStreak = userData?.streak || 0;
-            let newDailyXp = userData?.dailyXp || 0;
-            let newDailyLessons = userData?.dailyLessons || 0;
-            const lastActivityDate = userData?.lastActivityDate;
-
-            const isLesson = details.mode === 'lesson' || !itemId.includes('explore');
-
-            if (lastActivityDate === todayStr) {
-                newDailyXp += xp; if (isLesson) newDailyLessons += 1;
-            } else if (lastActivityDate === yesterdayStr) {
-                newStreak += 1; newDailyXp = xp; newDailyLessons = isLesson ? 1 : 0;
-            } else {
-                newStreak = 1; newDailyXp = xp; newDailyLessons = isLesson ? 1 : 0;
-            }
-
-            const earnedFlux = Math.floor(xp / 5);
-
-            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), {
-              xp: increment(xp), 
+          // Apply the payload to the User profile
+          if (finalXp > 0) {
+            const updatePayload = {
+              xp: increment(finalXp), 
               coins: increment(earnedFlux), 
               streak: newStreak, 
               dailyXp: newDailyXp, 
               dailyLessons: newDailyLessons, 
-              lastActivityDate: todayStr
-            }).catch(e => console.log("Subcollection update skipped", e));
+              lastActivityDate: todayStr,
+              level: newLevel 
+            };
+
+            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), updatePayload)
+              .catch(e => console.log("Subcollection update skipped", e));
 
             await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid), {
-              'profile.main.xp': increment(xp), 
+              'profile.main.xp': increment(finalXp), 
               'profile.main.coins': increment(earnedFlux), 
               'profile.main.streak': newStreak, 
-              'xp': increment(xp),
-              'flux': increment(earnedFlux)
+              'xp': increment(finalXp),
+              'flux': increment(earnedFlux),
+              'level': newLevel,
+              lastActivityDate: todayStr,
+              dailyXp: newDailyXp
             }).catch(e => console.log("Parent doc update skipped", e));
           }
       } catch (err) {
