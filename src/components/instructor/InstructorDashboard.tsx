@@ -35,6 +35,7 @@ export default function InstructorDashboard({
   onSaveCard,
   onUpdateCard,
   onDeleteCard,
+  onDeleteArtifact, // 🔥 NEW: Added delete prop
   onAssign,            
   onRevoke,            
   onCreateClass,  
@@ -64,6 +65,7 @@ export default function InstructorDashboard({
 
   // STATE FOR LIVE ARENA MODAL
   const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
+  const [preselectedContent, setPreselectedContent] = useState<{id: string, type: string} | null>(null); // 🔥 NEW: Holds Vault selection
 
   const NavItem = ({ id, icon, label, badge }: { id: string; icon: React.ReactNode; label: string; badge?: boolean }) => {
     const isActive = activeTab === id;
@@ -252,7 +254,11 @@ export default function InstructorDashboard({
                <InstructorVault 
                    decks={allDecks} 
                    lessons={lessons} 
-                   onLaunchLive={() => setIsLiveModalOpen(true)}
+                   onDeleteArtifact={onDeleteArtifact} // 🔥 WIRED UP DELETION
+                   onLaunchLive={(id: string, type: string) => {
+                       setPreselectedContent({ id, type });
+                       setIsLiveModalOpen(true);
+                   }}
                    onEditArtifact={(id: string, type: string) => {
                        // We can wire this up later to directly load an artifact into the Studio!
                        setActiveTab('studio');
@@ -321,7 +327,7 @@ export default function InstructorDashboard({
                       onAssign={onAssign}
                       onLaunchLive={() => setIsLiveModalOpen(true)} 
                       setActiveTab={setActiveTab} 
-                      onStartHUD={onStartHUD} // 🔥 HUD Launcher passed down
+                      onStartHUD={onStartHUD} 
                   />
                 )}
                 
@@ -342,12 +348,17 @@ export default function InstructorDashboard({
            {/* 🔥 LIVE ARENA MODAL */}
            <LiveSetupModal 
                isOpen={isLiveModalOpen}
-               onClose={() => setIsLiveModalOpen(false)}
+               onClose={() => {
+                   setIsLiveModalOpen(false);
+                   setPreselectedContent(null); // 🔥 NEW: Clears preselection on close
+               }}
+               preselectedContent={preselectedContent} // 🔥 NEW: Passes the Vault selection
                classes={userData?.classes || []}
                decks={allDecks}
                lessons={lessons}
                onDeploy={(config: any) => {
                    setIsLiveModalOpen(false);
+                   setPreselectedContent(null);
                    
                    // Delay the launch by a fraction of a second to allow the modal to animate out smoothly
                    setTimeout(() => {
@@ -360,7 +371,6 @@ export default function InstructorDashboard({
                        } else if (config.mode === 'presentation') {
                            if (onStartPresentation) onStartPresentation(config.contentId, config.classId);
                        } else if (config.mode === 'hud') {
-                           // 🔥 NEW: Launches the iPad Remote
                            if (onStartHUD) onStartHUD(config.contentId, config.classId);
                        }
                    }, 300);
