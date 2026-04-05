@@ -373,6 +373,8 @@ export default function App() {
         onSaveCurriculum={actions.saveCurriculum}
         onSaveCard={actions.saveCard}
         onUpdateCard={actions.updateCard}
+        onDeleteCard={actions.deleteCard} // 🔥 ADDED Delete Card
+        onDeleteArtifact={actions.deleteArtifact} // 🔥 ADDED Delete Artifact (for Vault)
         onAssign={actions.assignContent}
         onRevoke={actions.revokeContent}
         onCreateClass={actions.createClass}
@@ -382,7 +384,7 @@ export default function App() {
         onAddStudent={actions.addStudent}
         onRemoveStudent={actions.removeStudent} 
         onStartPresentation={(lessonId: string, classId: string) => setActivePresentation({ lessonId, classId })}
-        onStartHUD={(lessonId: string, classId: string) => setActiveHUD({ lessonId, classId })} // 🔥 NEW: Connects HUD to dashboard
+        onStartHUD={(lessonId: string, classId: string) => setActiveHUD({ lessonId, classId })}
         onStartVocabGame={handleStartVocabGame}      
         onStartConnectFour={handleStartConnectFour} 
         onStartSlipstream={handleStartSlipstream}
