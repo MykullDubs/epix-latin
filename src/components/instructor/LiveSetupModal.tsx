@@ -5,19 +5,25 @@ import {
     Gamepad2, Brain, Zap, TabletSmartphone, BookOpen 
 } from 'lucide-react';
 
-export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = {}, lessons = [], onDeploy }: any) {
+export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = {}, lessons = [], onDeploy, preselectedContent }: any) {
     const [selectedClassId, setSelectedClassId] = useState('');
     const [selectedMode, setSelectedMode] = useState<'hud' | 'presentation' | 'trivia' | 'connect_four' | 'slipstream' | ''>('');
     const [selectedContentId, setSelectedContentId] = useState('');
 
-    // Reset states when modal opens/closes
+    // 🔥 NEW: Auto-hydrate the modal if opened from the Vault
     useEffect(() => {
         if (isOpen) {
             setSelectedClassId('');
-            setSelectedMode('');
-            setSelectedContentId('');
+            if (preselectedContent) {
+                setSelectedContentId(preselectedContent.id);
+                // Intelligently default the mode based on what they clicked in the Vault
+                setSelectedMode(preselectedContent.type === 'lesson' ? 'presentation' : 'trivia');
+            } else {
+                setSelectedMode('');
+                setSelectedContentId('');
+            }
         }
-    }, [isOpen]);
+    }, [isOpen, preselectedContent]);
 
     if (!isOpen) return null;
 
@@ -41,8 +47,14 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
         return (
             <button 
                 onClick={() => {
+                    const newModeRequiresLesson = id === 'hud' || id === 'presentation';
+                    const currentModeRequiresLesson = selectedMode === 'hud' || selectedMode === 'presentation';
                     setSelectedMode(id);
-                    setSelectedContentId(''); // Reset payload when mode changes
+                    
+                    // 🔥 NEW: Only clear the payload if we are switching between incompatible types (e.g., Deck -> Lesson)
+                    if (newModeRequiresLesson !== currentModeRequiresLesson) {
+                        setSelectedContentId(''); 
+                    }
                 }}
                 className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-2 text-center ${
                     isSelected 
