@@ -431,7 +431,21 @@ export function useMagisterData() {
       });
     },
 
-    // 🔥 VAULT FIX: Injected updatedAt into Lesson Save
+    // 🔥 THE NEW ARTIFACT DESTROYER
+    deleteArtifact: async (id: string, type: 'lesson' | 'deck') => {
+        if (!user || !id) return;
+        try {
+            if (type === 'lesson') {
+                await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', id));
+            } else if (type === 'deck') {
+                await deleteDoc(doc(db, 'artifacts', appId, 'decks', id));
+            }
+        } catch (error) {
+            console.error(`Failed to scrub ${type}:`, error);
+            throw error;
+        }
+    },
+
     saveLesson: async (lessonData: any) => {
       if (!user) return;
       const lessonId = lessonData.id || `lesson_${Date.now()}`;
@@ -440,11 +454,10 @@ export function useMagisterData() {
         id: lessonId, 
         instructorId: user.uid, 
         appId: appId, 
-        updatedAt: Date.now() // 🔥 Sorts perfectly in Vault
+        updatedAt: Date.now()
       });
     },
 
-    // 🔥 VAULT FIX: Injected updatedAt into Curriculum Save
     saveCurriculum: async (curriculumData: any) => {
       if (!user) return;
       const currId = curriculumData.id || `curriculum_${Date.now()}`;
@@ -452,11 +465,10 @@ export function useMagisterData() {
         ...curriculumData, 
         id: currId, 
         instructorId: user.uid, 
-        updatedAt: Date.now() // 🔥 Sorts perfectly in Vault
+        updatedAt: Date.now() 
       });
     },
 
-    // 🔥 VAULT FIX: Ensured updatedAt is injected
     createDeck: async (deckData: any) => {
         if (!user) return;
         const deckRef = doc(collection(db, 'artifacts', appId, 'decks'));
@@ -474,7 +486,7 @@ export function useMagisterData() {
             version: 1,
             stats: { cardCount: 0, totalPlays: 0, averageScore: 0 },
             createdAt: Date.now(),
-            updatedAt: Date.now() // 🔥 Sorts perfectly in Vault
+            updatedAt: Date.now() 
         };
 
         try {
