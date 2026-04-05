@@ -345,20 +345,25 @@ export default function InstructorDashboard({
              </div>
            )}
 
-           {/* 🔥 LIVE ARENA MODAL */}
+{/* 🔥 LIVE ARENA MODAL */}
            <LiveSetupModal 
                isOpen={isLiveModalOpen}
                onClose={() => {
                    setIsLiveModalOpen(false);
-                   setPreselectedContent(null); // 🔥 NEW: Clears preselection on close
+                   setPreselectedContent(null); // 🔥 Clears preselection on close
                }}
-               preselectedContent={preselectedContent} // 🔥 NEW: Passes the Vault selection
+               preselectedContent={preselectedContent} // 🔥 Passes the Vault selection
                classes={userData?.classes || []}
                decks={allDecks}
                lessons={lessons}
                onDeploy={(config: any) => {
                    setIsLiveModalOpen(false);
                    setPreselectedContent(null);
+                   
+                   // 🔥 BOOM: Instantly assign this content to the cohort's dashboard
+                   if (onAssign) {
+                       onAssign(config.classId, config.contentId);
+                   }
                    
                    // Delay the launch by a fraction of a second to allow the modal to animate out smoothly
                    setTimeout(() => {
