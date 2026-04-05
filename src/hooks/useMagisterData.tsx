@@ -431,14 +431,20 @@ export function useMagisterData() {
       });
     },
 
+    // 🔥 VAULT FIX: Injected updatedAt into Lesson Save
     saveLesson: async (lessonData: any) => {
       if (!user) return;
       const lessonId = lessonData.id || `lesson_${Date.now()}`;
       await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', lessonId), {
-        ...lessonData, id: lessonId, instructorId: user.uid, appId: appId, updatedAt: Date.now()
+        ...lessonData, 
+        id: lessonId, 
+        instructorId: user.uid, 
+        appId: appId, 
+        updatedAt: Date.now() // 🔥 Sorts perfectly in Vault
       });
     },
 
+    // 🔥 VAULT FIX: Injected updatedAt into Curriculum Save
     saveCurriculum: async (curriculumData: any) => {
       if (!user) return;
       const currId = curriculumData.id || `curriculum_${Date.now()}`;
@@ -446,10 +452,11 @@ export function useMagisterData() {
         ...curriculumData, 
         id: currId, 
         instructorId: user.uid, 
-        updatedAt: Date.now()
+        updatedAt: Date.now() // 🔥 Sorts perfectly in Vault
       });
     },
 
+    // 🔥 VAULT FIX: Ensured updatedAt is injected
     createDeck: async (deckData: any) => {
         if (!user) return;
         const deckRef = doc(collection(db, 'artifacts', appId, 'decks'));
@@ -465,13 +472,9 @@ export function useMagisterData() {
             isPublic: deckData.isPublic || false,
             status: "draft", 
             version: 1,
-            stats: {
-                cardCount: 0,
-                totalPlays: 0,
-                averageScore: 0
-            },
+            stats: { cardCount: 0, totalPlays: 0, averageScore: 0 },
             createdAt: Date.now(),
-            updatedAt: Date.now()
+            updatedAt: Date.now() // 🔥 Sorts perfectly in Vault
         };
 
         try {
