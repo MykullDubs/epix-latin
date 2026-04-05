@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
     X, Play, Users, Layers, MonitorPlay, 
-    Gamepad2, Brain, Zap, TabletSmartphone, BookOpen 
+    Gamepad2, Brain, Zap, TabletSmartphone, BookOpen, Lock 
 } from 'lucide-react';
 
 export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = {}, lessons = [], onDeploy, preselectedContent }: any) {
@@ -42,6 +42,15 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
         });
     };
 
+    const getLockedTitle = () => {
+        if (requiresLesson) {
+            return lessons.find((l:any) => l.id === selectedContentId)?.title || "Selected Lesson Payload";
+        } else {
+            const targetDeck = Object.values(decks || {}).find((d:any) => d.id === selectedContentId) as any;
+            return targetDeck?.title || targetDeck?.name || "Selected Data Crystal";
+        }
+    };
+
     const ModeButton = ({ id, icon: Icon, label, type, colorClass }: any) => {
         const isSelected = selectedMode === id;
         return (
@@ -51,7 +60,7 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
                     const currentModeRequiresLesson = selectedMode === 'hud' || selectedMode === 'presentation';
                     setSelectedMode(id);
                     
-                    // 🔥 NEW: Only clear the payload if we are switching between incompatible types (e.g., Deck -> Lesson)
+                    // Only clear the payload if we are switching between incompatible types (e.g., Deck -> Lesson)
                     if (newModeRequiresLesson !== currentModeRequiresLesson) {
                         setSelectedContentId(''); 
                     }
@@ -118,31 +127,39 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
                         </div>
                     </div>
 
-                    {/* STEP 3: PAYLOAD (Dynamic) */}
+                    {/* STEP 3: PAYLOAD (Dynamic & Intelligent) */}
                     {selectedMode && (
                         <div className="space-y-3 animate-in slide-in-from-top-4 duration-300">
                             <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400">
                                 {requiresLesson ? <BookOpen size={14} /> : <Layers size={14} />} 
-                                3. Select {requiresLesson ? 'Lesson Payload' : 'Data Crystal (Deck)'}
+                                3. {preselectedContent && selectedContentId === preselectedContent.id ? 'Locked Payload' : `Select ${requiresLesson ? 'Lesson Payload' : 'Data Crystal (Deck)'}`}
                             </label>
                             
-                            <select 
-                                value={selectedContentId}
-                                onChange={(e) => setSelectedContentId(e.target.value)}
-                                className="w-full bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-2xl px-5 py-4 outline-none focus:border-indigo-500 transition-all"
-                            >
-                                <option value="" disabled>Select content to deploy...</option>
-                                {requiresLesson ? (
-                                    lessons.map((l: any) => <option key={l.id} value={l.id}>{l.title}</option>)
-                                ) : (
-                                    availableDecks.map((d: any) => <option key={d.id} value={d.id}>{d.title || d.name}</option>)
-                                )}
-                            </select>
+                            {/* 🔥 THE FIX: If the vault passed a payload, bypass the dropdown completely */}
+                            {preselectedContent && selectedContentId === preselectedContent.id ? (
+                                <div className="w-full bg-indigo-50 dark:bg-indigo-500/10 border-2 border-indigo-200 dark:border-indigo-500/30 text-indigo-800 dark:text-indigo-200 font-bold rounded-2xl px-5 py-4 flex items-center justify-between shadow-inner">
+                                    <span className="truncate pr-4 text-sm md:text-base">{getLockedTitle()}</span>
+                                    <span className="text-[10px] font-black uppercase tracking-widest bg-indigo-200 dark:bg-indigo-500/30 px-3 py-1.5 rounded-lg flex items-center gap-1.5 shrink-0"><Lock size={12} /> Ready</span>
+                                </div>
+                            ) : (
+                                <select 
+                                    value={selectedContentId}
+                                    onChange={(e) => setSelectedContentId(e.target.value)}
+                                    className="w-full bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-2xl px-5 py-4 outline-none focus:border-indigo-500 transition-all"
+                                >
+                                    <option value="" disabled>Select content to deploy...</option>
+                                    {requiresLesson ? (
+                                        lessons.map((l: any) => <option key={l.id} value={l.id}>{l.title}</option>)
+                                    ) : (
+                                        availableDecks.map((d: any) => <option key={d.id} value={d.id}>{d.title || d.name}</option>)
+                                    )}
+                                </select>
+                            )}
                             
-                            {requiresLesson && lessons.length === 0 && (
+                            {!preselectedContent && requiresLesson && lessons.length === 0 && (
                                 <p className="text-xs text-rose-500 font-bold mt-2">No lessons available. Create one in the Studio Hub first.</p>
                             )}
-                            {requiresDeck && availableDecks.length === 0 && (
+                            {!preselectedContent && requiresDeck && availableDecks.length === 0 && (
                                 <p className="text-xs text-rose-500 font-bold mt-2">No decks available. Create one in the Studio Hub first.</p>
                             )}
                         </div>
