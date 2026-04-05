@@ -2,13 +2,16 @@
 import React, { useState, useMemo } from 'react';
 import { 
     Search, BookOpen, Layers, Clock, Edit3, 
-    Play, ShieldAlert, ArrowDownAZ, LayoutGrid 
+    Play, ShieldAlert, ArrowDownAZ, LayoutGrid, Trash2
 } from 'lucide-react';
 
-export default function InstructorVault({ decks = {}, lessons = [], onLaunchLive, onEditArtifact }: any) {
+export default function InstructorVault({ decks = {}, lessons = [], onLaunchLive, onEditArtifact, onDeleteArtifact }: any) {
     const [searchQuery, setSearchQuery] = useState('');
     const [filterType, setFilterType] = useState<'all' | 'lesson' | 'deck'>('all');
     const [sortBy, setSortBy] = useState<'recent' | 'alpha'>('recent');
+    
+    // State to hold the artifact that is queued for deletion
+    const [pendingDelete, setPendingDelete] = useState<{id: string, type: string, title: string} | null>(null);
 
     // 1. Normalize and combine Decks and Lessons into a single "Artifacts" pool
     const artifacts = useMemo(() => {
@@ -66,10 +69,36 @@ export default function InstructorVault({ decks = {}, lessons = [], onLaunchLive
     }, [artifacts, searchQuery, filterType, sortBy]);
 
     return (
-        <div className="h-full flex flex-col max-w-7xl mx-auto w-full p-4 md:p-8 animate-in fade-in duration-500 overflow-hidden">
+        <div className="h-full flex flex-col max-w-7xl mx-auto w-full p-4 md:p-8 animate-in fade-in duration-500 overflow-hidden relative">
             
+            {/* --- DELETION CONFIRMATION TOAST --- */}
+            {pendingDelete && (
+                <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-[100] bg-slate-900 dark:bg-slate-800 text-white px-6 py-4 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-4 border-rose-500/30 flex flex-col sm:flex-row items-center gap-6 animate-in slide-in-from-bottom-12 fade-in duration-300">
+                    <div className="text-center sm:text-left">
+                        <p className="text-sm font-black tracking-widest uppercase mb-1">Delete Artifact?</p>
+                        <p className="text-xs text-slate-400 font-bold max-w-[200px] truncate">"{pendingDelete.title}" will be permanently destroyed.</p>
+                    </div>
+                    <div className="flex gap-2 shrink-0 w-full sm:w-auto">
+                        <button 
+                            onClick={() => setPendingDelete(null)} 
+                            className="flex-1 sm:flex-none px-6 py-3 bg-slate-800 hover:bg-slate-700 dark:bg-slate-950 dark:hover:bg-slate-900 rounded-xl text-xs font-black uppercase tracking-widest transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            onClick={() => {
+                                onDeleteArtifact(pendingDelete.id, pendingDelete.type);
+                                setPendingDelete(null);
+                            }} 
+                            className="flex-1 sm:flex-none px-6 py-3 bg-rose-600 hover:bg-rose-500 rounded-xl text-xs font-black uppercase tracking-widest transition-colors shadow-lg shadow-rose-600/20"
+                        >
+                            Confirm
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* --- HEADER & CONTROLS --- */}
-            {/* 🔥 FIXED: Added shrink-0 so it doesn't get crushed */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 shrink-0">
                 <div>
                     <h2 className="text-3xl md:text-4xl font-black text-slate-800 dark:text-white uppercase tracking-tighter">The Vault</h2>
@@ -102,7 +131,6 @@ export default function InstructorVault({ decks = {}, lessons = [], onLaunchLive
             </div>
 
             {/* --- TYPE FILTERS --- */}
-            {/* 🔥 FIXED: Added shrink-0 so the buttons maintain their height */}
             <div className="flex gap-4 mb-8 overflow-x-auto custom-scrollbar pb-2 shrink-0">
                 <button onClick={() => setFilterType('all')} className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center gap-2 shrink-0 ${filterType === 'all' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-indigo-300'}`}>
                     <LayoutGrid size={16} /> All Artifacts
@@ -116,7 +144,6 @@ export default function InstructorVault({ decks = {}, lessons = [], onLaunchLive
             </div>
 
             {/* --- THE GRID --- */}
-            {/* 🔥 FIXED: Wrapped grid in a flex-1 min-h-0 container so it safely handles its own scroll */}
             <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar -mx-2 px-2 pb-12">
                 {processedArtifacts.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center p-12 bg-white/50 dark:bg-slate-900/50 rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-slate-800">
@@ -137,8 +164,10 @@ export default function InstructorVault({ decks = {}, lessons = [], onLaunchLive
                                         <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${typeColor}`}>
                                             {isLesson ? <BookOpen size={24} /> : <Layers size={24} />}
                                         </div>
-                                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
-                                            <Clock size={10} /> {new Date(artifact.timestamp || Date.now()).toLocaleDateString()}
+                                        <div className="flex items-center gap-2">
+                                            <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+                                                <Clock size={10} /> {new Date(artifact.timestamp || Date.now()).toLocaleDateString()}
+                                            </div>
                                         </div>
                                     </div>
 
@@ -151,6 +180,14 @@ export default function InstructorVault({ decks = {}, lessons = [], onLaunchLive
                                         <span className="text-xs font-black uppercase tracking-widest text-slate-400">{artifact.metric}</span>
                                         
                                         <div className="flex gap-2">
+                                            {/* 🔥 DELETE BUTTON */}
+                                            <button 
+                                                onClick={() => setPendingDelete({ id: artifact.id, type: artifact.artifactType, title: artifact.displayTitle })}
+                                                className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/20 flex items-center justify-center transition-colors"
+                                                title="Delete Artifact"
+                                            >
+                                                <Trash2 size={16} strokeWidth={3} />
+                                            </button>
                                             <button 
                                                 onClick={() => onEditArtifact(artifact.id, artifact.artifactType)}
                                                 className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/20 flex items-center justify-center transition-colors"
@@ -159,7 +196,7 @@ export default function InstructorVault({ decks = {}, lessons = [], onLaunchLive
                                                 <Edit3 size={16} strokeWidth={3} />
                                             </button>
                                             <button 
-                                                onClick={() => onLaunchLive()}
+                                                onClick={() => onLaunchLive(artifact.id, artifact.artifactType)}
                                                 className="w-10 h-10 rounded-full bg-indigo-600 text-white hover:bg-indigo-500 flex items-center justify-center transition-transform active:scale-90 shadow-md"
                                                 title="Deploy to Classroom"
                                             >
