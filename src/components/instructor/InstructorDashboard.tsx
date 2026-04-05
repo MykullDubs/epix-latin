@@ -13,6 +13,7 @@ import InstructorInbox from './InstructorInbox';
 import { AnalyticsDashboard } from './InstructorTools';
 import CommandCenter from './CommandCenter';
 import LiveSetupModal from './LiveSetupModal'; 
+import InstructorVault from './InstructorVault'; // 🔥 NEW: Imported the Vault
 
 // 🔥 PRO-LMS: Import the new Grading Engines
 import GradebookMatrix from './GradebookMatrix';
@@ -245,84 +246,18 @@ export default function InstructorDashboard({
              </div>
            )}
 
+           {/* 🔥 PRO-LMS: THE NEW INSTRUCTOR VAULT */}
            {activeTab === 'vault' && (
-             <div className="h-full overflow-y-auto p-6 md:p-12 custom-scrollbar animate-in slide-in-from-bottom-6 duration-500">
-                <div className="max-w-6xl mx-auto space-y-8">
-                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 border-b border-slate-200 dark:border-slate-800 pb-8 transition-colors">
-                        <div>
-                            <div className="flex items-center gap-3 mb-2">
-                                <div className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse" />
-                                <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.4em]">Magister Engine</span>
-                            </div>
-                            <h2 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter uppercase leading-none mb-4 transition-colors">Global Vault</h2>
-                            <p className="text-slate-500 dark:text-slate-400 font-medium max-w-xl text-lg transition-colors">Deploy comprehensive learning pathways directly to your cohorts.</p>
-                        </div>
-
-                        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border-2 border-slate-100 dark:border-slate-800 shadow-sm min-w-[250px] transition-colors">
-                            <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Target Cohort</label>
-                            <select 
-                                value={selectedClassId}
-                                onChange={(e) => setSelectedClassId(e.target.value)}
-                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-xl px-4 py-3 outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900 transition-all"
-                            >
-                                <option value="" disabled>Select a class...</option>
-                                {userData?.classes?.map((c: any) => (
-                                    <option key={c.id} value={c.id}>{c.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {curriculums?.map((curr: any) => {
-                            const activeClass = userData?.classes?.find((c: any) => c.id === selectedClassId);
-                            const isAssigned = activeClass?.assignedCurriculums?.includes(curr.id);
-
-                            return (
-                                <div key={curr.id} className="bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-[2rem] overflow-hidden hover:border-indigo-200 dark:hover:border-indigo-500/50 transition-all shadow-sm hover:shadow-2xl dark:hover:shadow-indigo-900/20 group flex flex-col">
-                                    <div className="h-48 relative overflow-hidden bg-slate-900">
-                                        <img 
-                                            src={curr.coverImage} 
-                                            alt={curr.title} 
-                                            className="w-full h-full object-cover opacity-60 group-hover:scale-105 group-hover:opacity-80 transition-all duration-700" 
-                                        />
-                                        <div className="absolute top-4 left-4">
-                                            <span 
-                                                className="px-4 py-1.5 bg-white dark:bg-slate-950 font-black text-xs rounded-xl uppercase tracking-widest shadow-lg transition-colors"
-                                                style={{ color: curr.themeColor }}
-                                            >
-                                                {curr.level} Level
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <div className="p-8 flex-1 flex flex-col">
-                                        <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-3 transition-colors">{curr.title}</h3>
-                                        <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 flex-1 transition-colors">{curr.description}</p>
-                                        
-                                        <div className="flex items-center gap-2 mb-8 text-slate-400 dark:text-slate-500 text-sm font-bold bg-slate-50 dark:bg-slate-800/50 px-4 py-3 rounded-xl border border-slate-100 dark:border-slate-700/50 transition-colors">
-                                            <BookOpen size={18} className="text-indigo-400" />
-                                            {curr.lessonIds?.length || 0} Interactive Lessons
-                                        </div>
-
-                                        {!selectedClassId ? (
-                                            <button disabled className="w-full py-4 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 rounded-xl font-black text-xs uppercase cursor-not-allowed transition-colors">Select a class first</button>
-                                        ) : isAssigned ? (
-                                            <button disabled className="w-full py-4 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl font-black text-xs uppercase flex items-center justify-center gap-2 border border-emerald-200 dark:border-emerald-500/20 transition-colors"><CheckCircle2 size={18} /> Active in {activeClass?.name}</button>
-                                        ) : (
-                                            <button 
-                                                onClick={() => onAssignCurriculum(selectedClassId, curr.id)}
-                                                className="w-full py-4 bg-slate-900 dark:bg-indigo-600 hover:bg-indigo-600 dark:hover:bg-indigo-500 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-colors shadow-xl active:scale-95"
-                                            >
-                                                Assign to {activeClass?.name}
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
+             <div className="h-full animate-in zoom-in-95 duration-500">
+               <InstructorVault 
+                   decks={allDecks} 
+                   lessons={lessons} 
+                   onLaunchLive={() => setIsLiveModalOpen(true)}
+                   onEditArtifact={(id: string, type: string) => {
+                       // We can wire this up later to directly load an artifact into the Studio!
+                       setActiveTab('studio');
+                   }}
+               />
              </div>
            )}
 
@@ -434,6 +369,6 @@ export default function InstructorDashboard({
 
         </div>
       </main>
-    </div>
+    </div> 
   );
 }
