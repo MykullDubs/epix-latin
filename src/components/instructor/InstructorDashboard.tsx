@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { 
     GraduationCap, ChevronLeft, Menu, Activity, PenTool, 
     School, Layers, Inbox, BarChart2, Shield, User, 
-    LogOut, BookOpen, CheckCircle2, Briefcase 
+    LogOut, BookOpen, CheckCircle2, Briefcase, ArrowLeft
 } from 'lucide-react';
 
 // Import the specialized views
@@ -13,9 +13,7 @@ import InstructorInbox from './InstructorInbox';
 import { AnalyticsDashboard } from './InstructorTools';
 import CommandCenter from './CommandCenter';
 import LiveSetupModal from './LiveSetupModal'; 
-import InstructorVault from './InstructorVault'; // 🔥 NEW: Imported the Vault
-
-// 🔥 PRO-LMS: Import the new Grading Engines
+import InstructorVault from './InstructorVault'; 
 import GradebookMatrix from './GradebookMatrix';
 import InstructorGradebook from './InstructorGradebook';
 
@@ -35,7 +33,7 @@ export default function InstructorDashboard({
   onSaveCard,
   onUpdateCard,
   onDeleteCard,
-  onDeleteArtifact, // 🔥 NEW: Added delete prop
+  onDeleteArtifact,
   onMoveToFolder,
   onAssign,            
   onRevoke,            
@@ -46,7 +44,7 @@ export default function InstructorDashboard({
   onAddStudent,
   onRemoveStudent,   
   onStartPresentation, 
-  onStartHUD, // 🔥 HUD Launcher
+  onStartHUD,
   onStartVocabGame,
   onStartConnectFour,
   onStartSlipstream, 
@@ -55,25 +53,49 @@ export default function InstructorDashboard({
   onLogout,
   AdminDashboardView 
 }: any) {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  // 🔥 THE NEW ROUTING ENGINE: Stack-based History
+  const [tabHistory, setTabHistory] = useState<string[]>(['dashboard']);
+  const activeTab = tabHistory[tabHistory.length - 1] || 'dashboard';
+
   const [isRailExpanded, setIsRailExpanded] = useState(false);
   const [selectedClassId, setSelectedClassId] = useState<string>(''); 
   const [dashCohortId, setDashCohortId] = useState<string>(userData?.classes?.[0]?.id || '');
   
-  // 🔥 PRO-LMS: Gradebook States
   const [gradebookClassId, setGradebookClassId] = useState<string>(userData?.classes?.[0]?.id || '');
   const [gradeView, setGradeView] = useState<'matrix' | 'speedmoderator'>('matrix');
 
-  // STATE FOR LIVE ARENA MODAL
   const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
-  const [preselectedContent, setPreselectedContent] = useState<{id: string, type: string} | null>(null); // 🔥 NEW: Holds Vault selection
+  const [preselectedContent, setPreselectedContent] = useState<{id: string, type: string} | null>(null);
+
+  // --- NAVIGATION HANDLERS ---
+  
+  // 1. Root Navigation (Clicking the Sidebar) resets the stack
+  const handleSidebarNav = (tab: string) => {
+      setTabHistory([tab]);
+      if (window.innerWidth < 768) {
+          setIsRailExpanded(false); // Auto-close rail on mobile
+      }
+  };
+
+  // 2. Drill-down Navigation (Clicking Action Cards) builds the stack
+  const handleDrillDown = (tab: string) => {
+      setTabHistory(prev => {
+          if (prev[prev.length - 1] === tab) return prev; // Prevent duplicates
+          return [...prev, tab];
+      });
+  };
+
+  // 3. Popping the Stack (Clicking Back)
+  const handleGoBack = () => {
+      setTabHistory(prev => prev.length > 1 ? prev.slice(0, -1) : prev);
+  };
 
   const NavItem = ({ id, icon, label, badge }: { id: string; icon: React.ReactNode; label: string; badge?: boolean }) => {
     const isActive = activeTab === id;
     
     return (
       <button 
-        onClick={() => setActiveTab(id)}
+        onClick={() => handleSidebarNav(id)}
         role="tab"
         aria-selected={isActive}
         className={`relative flex items-center h-14 w-full rounded-[1.5rem] transition-all duration-300 ease-out group outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 active:scale-[0.96] ${
@@ -164,7 +186,7 @@ export default function InstructorDashboard({
         <div className="p-4 border-t border-slate-900 dark:border-slate-800/60 space-y-2 shrink-0 bg-slate-950/50 dark:bg-black/50">
          {(userData?.role === 'admin' || userData?.role === 'org_admin') && (
             <button 
-              onClick={() => setActiveTab('admin')}
+              onClick={() => handleSidebarNav('admin')}
               className={`relative flex items-center h-14 w-full rounded-[1.5rem] transition-all duration-300 active:scale-[0.96] group overflow-hidden ${activeTab === 'admin' ? 'bg-emerald-500/20 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.5)]' : 'hover:bg-slate-900 dark:hover:bg-slate-900'}`}
             >
               <div className="w-14 flex items-center justify-center shrink-0 ml-1">
@@ -199,8 +221,22 @@ export default function InstructorDashboard({
       </aside>
 
       {/* --- MAIN STAGE --- */}
-      <main className="flex-1 overflow-hidden relative bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
-        <div className="h-full w-full">
+      <main className="flex-1 flex flex-col overflow-hidden relative bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+        
+        {/* 🔥 THE GLOBAL RETURN BUTTON (Only shows if there is history) */}
+        {tabHistory.length > 1 && (
+            <div className="shrink-0 px-4 md:px-8 pt-4 pb-2 z-10 flex items-center animate-in slide-in-from-top-4 duration-300">
+                <button
+                    onClick={handleGoBack}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm rounded-[1rem] text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-200 dark:hover:border-indigo-500/30 transition-all hover:-translate-x-1 active:scale-95 group"
+                >
+                    <ArrowLeft size={16} strokeWidth={3} className="group-hover:-translate-x-1 transition-transform" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Return</span>
+                </button>
+            </div>
+        )}
+
+        <div className="flex-1 overflow-hidden relative w-full h-full">
             
            {activeTab === 'admin' && AdminDashboardView && (
              <div className="h-full animate-in zoom-in-95 duration-500">
@@ -249,20 +285,21 @@ export default function InstructorDashboard({
              </div>
            )}
 
- {/* 🔥 PRO-LMS: THE NEW INSTRUCTOR VAULT */}
+           {/* 🔥 PRO-LMS: THE NEW INSTRUCTOR VAULT */}
            {activeTab === 'vault' && (
              <div className="h-full animate-in zoom-in-95 duration-500">
                <InstructorVault 
                    decks={allDecks} 
                    lessons={lessons} 
                    onDeleteArtifact={onDeleteArtifact} 
-                   onMoveToFolder={onMoveToFolder} // 🔥 AND PASS IT HERE
+                   onMoveToFolder={onMoveToFolder} 
                    onLaunchLive={(id: string, type: string) => {
                        setPreselectedContent({ id, type });
                        setIsLiveModalOpen(true);
                    }}
                    onEditArtifact={(id: string, type: string) => {
-                       setActiveTab('studio');
+                       // Drill down into the studio so clicking 'Back' returns them to the Vault
+                       handleDrillDown('studio');
                    }}
                />
              </div>
@@ -327,7 +364,7 @@ export default function InstructorDashboard({
                       curriculums={curriculums}
                       onAssign={onAssign}
                       onLaunchLive={() => setIsLiveModalOpen(true)} 
-                      setActiveTab={setActiveTab} 
+                      setActiveTab={handleDrillDown} // 🔥 We pass drill-down here so clicking a card pushes history!
                       onStartHUD={onStartHUD} 
                   />
                 )}
@@ -346,12 +383,12 @@ export default function InstructorDashboard({
              </div>
            )}
 
-{/* 🔥 LIVE ARENA MODAL */}
+           {/* 🔥 LIVE ARENA MODAL */}
            <LiveSetupModal 
                isOpen={isLiveModalOpen}
                onClose={() => {
                    setIsLiveModalOpen(false);
-                   setPreselectedContent(null); 
+                   setPreselectedContent(null);
                }}
                preselectedContent={preselectedContent}
                classes={userData?.classes || []}
@@ -361,7 +398,6 @@ export default function InstructorDashboard({
                    setIsLiveModalOpen(false);
                    setPreselectedContent(null);
                    
-                   // 🔥 NEW: Only auto-assign if they deployed to a real cohort!
                    if (onAssign && config.classId !== 'sandbox') {
                        onAssign(config.classId, config.contentId);
                    }
