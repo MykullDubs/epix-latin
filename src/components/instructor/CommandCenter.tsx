@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { 
     Users, Play, FileText, Activity, 
     CheckCircle2, PenTool, Layers, BookOpen, 
-    Clock, School, Inbox, Archive
+    Clock, School, Inbox, Archive, Zap
 } from 'lucide-react';
 import LiveActivityFeed from './LiveActivityFeed';
 import DeploymentModal from './DeploymentModal'; 
