@@ -43,7 +43,7 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
   const [compiledStats, setCompiledStats] = useState<Record<string, any>>({});
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  // 🔥 LOCAL DRAG AND DROP STATE
+  // LOCAL DRAG AND DROP STATE
   const [localClasses, setLocalClasses] = useState<any[]>([]);
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
@@ -53,7 +53,7 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
       setLocalClasses(classes || []);
   }, [classes]);
 
-  // --- 🔥 INBOX UNREAD LISTENER ---
+  // INBOX UNREAD LISTENER
   const [unreadCount, setUnreadCount] = useState(0);
   const studentEmail = user?.email || auth?.currentUser?.email;
 
@@ -108,7 +108,7 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
   const themeColor = activeOrg?.themeColor || '#4f46e5'; 
   const themeName = activeOrg?.name || 'Magister';
 
-  // --- DAILY TARGETS LOGIC ---
+  // DAILY TARGETS LOGIC
   const todayStr = new Date().toDateString();
   const isToday = userData?.lastActivityDate === todayStr;
   
@@ -141,7 +141,7 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
           }).map(([key, deck]: any) => ({ ...deck, id: key }));
 
           if (activeDecks.length === 0) {
-              setToastMsg("You have no active decks in your library.");
+              setToastMsg("You have no active flashcards in your library.");
               setIsCompilingQueue(false);
               return;
           }
@@ -192,7 +192,7 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
           });
 
           if (allDueCards.length === 0) {
-              setToastMsg("Matrix is optimal! No targets due for review.");
+              setToastMsg("You're all caught up! No reviews due right now.");
               setIsCompilingQueue(false);
               return;
           }
@@ -206,7 +206,7 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
 
       } catch (err) {
           console.error("Failed to compile Global Queue:", err);
-          setToastMsg("System error compiling queue.");
+          setToastMsg("System error loading your review queue.");
       } finally {
           setIsCompilingQueue(false);
       }
@@ -220,7 +220,7 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                       <X size={20} strokeWidth={3}/>
                   </button>
                   <div className="flex flex-col items-center">
-                      <span className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-0.5">Global Queue</span>
+                      <span className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-0.5">Smart Review</span>
                       <span className="text-sm font-black text-white line-clamp-1">Spaced Repetition</span>
                   </div>
                   <div className="w-11"></div>
@@ -234,7 +234,7 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                       onFinish={() => {
                           setLaunchDailyReview(false);
                           setCompiledQueue(null);
-                          setToastMsg("Global Review Complete! Matrix updated.");
+                          setToastMsg("Review Complete! Great job.");
                       }} 
                   />
               </div>
@@ -243,42 +243,46 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
   }
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 font-sans transition-colors duration-300 relative">
+    <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 font-sans transition-colors duration-300 relative overflow-hidden">
         {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
 
-        {/* 1. DYNAMIC APP BAR */}
-        <header className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm transition-colors duration-300">
+        {/* 1. UNIFIED M3 HEADER */}
+        <header className="h-24 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 md:px-10 flex justify-between items-center shrink-0 z-50 shadow-sm transition-colors duration-300">
             <div className="flex items-center gap-3">
                 {activeOrg?.logoUrl ? (
-                    <img src={activeOrg.logoUrl} alt={`${themeName} Logo`} className="w-8 h-8 object-contain rounded-md" />
+                    <img src={activeOrg.logoUrl} alt={`${themeName} Logo`} className="w-10 h-10 object-contain rounded-xl shadow-sm" />
                 ) : (
-                    <div className="text-white p-1.5 rounded-lg shadow-sm" style={{ backgroundColor: themeColor }} aria-hidden="true">
-                        <GraduationCap size={18} strokeWidth={3}/>
+                    <div className="text-white p-2.5 rounded-xl shadow-sm" style={{ backgroundColor: themeColor }} aria-hidden="true">
+                        <GraduationCap size={20} strokeWidth={2.5}/>
                     </div>
                 )}
-                <span className="font-black tracking-tighter text-lg truncate max-w-[150px]" style={{ color: themeColor }}>
-                    {themeName}
-                </span>
+                <div className="flex flex-col">
+                    <span className="font-black tracking-tighter text-xl leading-none" style={{ color: themeColor }}>
+                        {themeName}
+                    </span>
+                    <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] mt-1">Student Portal</span>
+                </div>
             </div>
 
-            <div className="flex items-center gap-3">
-                {/* 🔥 THE INBOX / NOTIFICATION BELL */}
+            <div className="flex items-center gap-4">
                 <button 
                     onClick={() => setActiveTab('inbox')}
-                    className="relative p-2 bg-slate-100 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all active:scale-95 text-slate-500 dark:text-slate-400 group"
+                    className="relative p-3 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all active:scale-95 text-slate-500 dark:text-slate-400 group"
                 >
-                    <Inbox size={16} className="group-hover:text-indigo-500 transition-colors" />
+                    <Inbox size={18} className="group-hover:text-indigo-500 transition-colors" />
                     {unreadCount > 0 && (
-                        <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                        <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500 border-2 border-white dark:border-slate-900"></span>
+                            <span className="relative inline-flex rounded-full h-4 w-4 bg-rose-500 border-2 border-white dark:border-slate-900 items-center justify-center text-[8px] font-black text-white">
+                                {unreadCount}
+                            </span>
                         </span>
                     )}
                 </button>
 
-                <div className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 shrink-0 transition-colors duration-300" aria-label={`Target Language: ${targetLang}`}>
-                    <Globe size={14} className="text-slate-400 dark:text-slate-500" aria-hidden="true"/>
-                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide">{targetLang}</span>
+                <div className="hidden sm:flex px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 items-center gap-2 shrink-0 transition-colors duration-300" aria-label={`Target Language: ${targetLang}`}>
+                    <Globe size={16} className="text-slate-400 dark:text-slate-500" aria-hidden="true"/>
+                    <span className="text-xs font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest">{targetLang}</span>
                 </div>
             </div>
         </header>
@@ -286,202 +290,197 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
         <main ref={scrollViewportRef} className="flex-1 overflow-y-auto custom-scrollbar pb-32 focus:outline-none" tabIndex={-1}>
             
             {/* 2. COMPACT HERO SECTION */}
-            <section className="bg-white dark:bg-slate-900 pt-4 pb-5 px-6 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 dark:border-slate-800 relative z-10 transition-colors duration-300">
-                <div className="grid grid-cols-3 gap-3">
-                    <div className={`p-3 rounded-2xl flex flex-col items-center justify-center text-white shadow-md transition-transform ${streak > 0 && isToday ? 'bg-gradient-to-br from-orange-400 to-rose-500 shadow-orange-500/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 shadow-none'}`}>
-                        <div className="flex items-center gap-1.5 mb-1">
-                            <Flame size={16} aria-hidden="true" className={streak > 0 && isToday ? 'fill-white' : ''}/>
-                            <span className="text-lg font-black leading-none">{streak}</span>
+            <section className="bg-white dark:bg-slate-900 pt-6 pb-8 px-6 md:px-10 rounded-b-[2.5rem] shadow-sm border-b border-slate-200 dark:border-slate-800 relative z-10 transition-colors duration-300">
+                <div className="max-w-4xl mx-auto">
+                    <div className="grid grid-cols-3 gap-4">
+                        <div className={`p-4 rounded-[1.5rem] flex flex-col items-center justify-center text-white shadow-sm transition-transform ${streak > 0 && isToday ? 'bg-gradient-to-br from-orange-400 to-rose-500 shadow-orange-500/30 border border-orange-300 dark:border-orange-500/50' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700'}`}>
+                            <div className="flex items-center gap-2 mb-1">
+                                <Flame size={20} aria-hidden="true" className={streak > 0 && isToday ? 'fill-white' : ''}/>
+                                <span className="text-2xl font-black leading-none">{streak}</span>
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-widest opacity-90 mt-1">Day Streak</span>
                         </div>
-                        <span className="text-[9px] font-black uppercase tracking-widest opacity-80">Streak</span>
+
+                        <div className="p-4 rounded-[1.5rem] flex flex-col items-center justify-center text-white shadow-lg bg-gradient-to-br from-amber-400 to-orange-500 shadow-amber-500/30 border border-amber-300 dark:border-amber-500/50">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Zap size={20} aria-hidden="true" className="fill-white"/>
+                                <span className="text-2xl font-black leading-none">{xp}</span>
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-widest opacity-90 mt-1">Total XP</span>
+                        </div>
+
+                        <div className="p-4 rounded-[1.5rem] flex flex-col items-center justify-center text-white shadow-lg bg-gradient-to-br from-emerald-400 to-teal-600 shadow-emerald-500/30 border border-emerald-300 dark:border-emerald-500/50">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Trophy size={20} aria-hidden="true" className="fill-white"/>
+                                <span className="text-2xl font-black leading-none">{level}</span>
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-widest opacity-90 mt-1">Current Level</span>
+                        </div>
                     </div>
 
-                    <div className="p-3 rounded-2xl flex flex-col items-center justify-center text-white shadow-md bg-gradient-to-br from-amber-400 to-orange-500 shadow-amber-500/30">
-                        <div className="flex items-center gap-1.5 mb-1">
-                            <Zap size={16} aria-hidden="true" className="fill-white"/>
-                            <span className="text-lg font-black leading-none">{xp}</span>
+                    <div className="mt-6 flex items-center gap-4 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800" aria-label={`Progress to next level: ${progressPct}%`}>
+                        <div className="flex-1 h-3 bg-slate-200 dark:bg-slate-900 rounded-full overflow-hidden shadow-inner dark:shadow-none transition-colors duration-300">
+                            <div 
+                                className="h-full transition-all duration-1000 ease-out rounded-full" 
+                                style={{ width: `${progressPct}%`, backgroundColor: themeColor }}
+                            />
                         </div>
-                        <span className="text-[9px] font-black uppercase tracking-widest opacity-80">Total XP</span>
+                        <span className="text-xs font-black text-slate-500 dark:text-slate-400 whitespace-nowrap uppercase tracking-widest">
+                            {xpToNext} XP to Level {level + 1}
+                        </span>
                     </div>
-
-                    <div className="p-3 rounded-2xl flex flex-col items-center justify-center text-white shadow-md bg-gradient-to-br from-emerald-400 to-teal-600 shadow-emerald-500/30">
-                        <div className="flex items-center gap-1.5 mb-1">
-                            <Trophy size={16} aria-hidden="true" className="fill-white"/>
-                            <span className="text-lg font-black leading-none">{level}</span>
-                        </div>
-                        <span className="text-[9px] font-black uppercase tracking-widest opacity-80">Level</span>
-                    </div>
-                </div>
-
-                <div className="mt-5 flex items-center gap-3" aria-label={`Progress to next level: ${progressPct}%`}>
-                    <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner dark:shadow-none transition-colors duration-300">
-                        <div 
-                            className="h-full transition-all duration-1000 ease-out" 
-                            style={{ width: `${progressPct}%`, backgroundColor: themeColor }}
-                        />
-                    </div>
-                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 whitespace-nowrap uppercase tracking-widest">
-                        {xpToNext} XP to Level Up
-                    </span>
                 </div>
             </section>
 
-            <div className="px-6 space-y-8 mt-6">
+            <div className="px-6 md:px-10 max-w-7xl mx-auto space-y-12 mt-10">
 
               {/* 🔥 3. ACTION CENTER CAROUSEL */}
               <section className="animate-in slide-in-from-bottom-4 transition-all duration-500">
-                  <div className="mb-3 ml-1">
-                      <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
-                          <Activity size={16} className="text-indigo-500" /> Action Center
+                  <div className="mb-4">
+                      <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest flex items-center gap-2">
+                          <Activity size={18} className="text-indigo-500" /> Action Center
                       </h3>
                   </div>
 
-                  {/* STRICT MATH SPACERS APPLIED HERE (w-3 + gap-3 = 24px left margin) */}
-                  <div className="flex gap-3 overflow-x-auto hide-scrollbar snap-x pb-2 -mx-6" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                      
-                      <div className="w-3 shrink-0" aria-hidden="true" /> {/* Left Edge Spacer */}
+                  <div className="flex gap-4 overflow-x-auto hide-scrollbar snap-x pb-4 -mx-6 md:mx-0 px-6 md:px-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                       
                       {/* CARD 1: COMBINED DAILY TARGETS */}
-                      <div className="snap-start shrink-0 w-[150px] h-32 relative bg-gradient-to-br from-emerald-400 to-teal-600 rounded-[1.5rem] p-4 shadow-lg shadow-emerald-500/20 overflow-hidden flex flex-col justify-between border border-emerald-400/50">
+                      <div className="snap-start shrink-0 w-[180px] h-40 relative bg-gradient-to-br from-emerald-400 to-teal-600 rounded-[2rem] p-5 shadow-lg shadow-emerald-500/20 overflow-hidden flex flex-col justify-between border border-emerald-400/50">
                           <div className="absolute -right-4 -bottom-4 p-4 opacity-20 pointer-events-none">
-                              <Target size={80} className="text-white" />
+                              <Target size={100} className="text-white" />
                           </div>
                           
                           <div className="relative z-10 flex justify-between items-start w-full">
-                              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md shadow-inner">
-                                  <Target size={16} className="text-white" />
+                              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md shadow-inner">
+                                  <Target size={20} className="text-white" />
                               </div>
                               {allQuestsDone ? (
-                                  <span className="flex items-center justify-center w-6 h-6 bg-white text-emerald-600 rounded-full shadow-sm">
-                                      <Check size={12} strokeWidth={3} />
+                                  <span className="flex items-center justify-center w-8 h-8 bg-white text-emerald-600 rounded-full shadow-sm">
+                                      <Check size={16} strokeWidth={3} />
                                   </span>
                               ) : (
-                                  <span className="text-[9px] font-black uppercase tracking-widest text-emerald-50 bg-black/20 px-2 py-1 rounded-lg backdrop-blur-md border border-white/10 shadow-sm">
-                                      {hoursRemaining}h
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-50 bg-black/20 px-3 py-1.5 rounded-xl backdrop-blur-md border border-white/10 shadow-sm">
+                                      {hoursRemaining}h left
                                   </span>
                               )}
                           </div>
 
                           <div className="relative z-10 mt-auto w-full">
-                              <div className="flex flex-col gap-1.5 mb-2.5 w-full pr-2">
+                              <div className="flex flex-col gap-2 mb-3 w-full pr-2">
                                   <div className="flex items-center gap-2 w-full">
-                                      <Zap size={10} className="text-yellow-300 fill-yellow-300 shrink-0" />
-                                      <div className="flex-1 h-1.5 bg-black/20 rounded-full overflow-hidden">
+                                      <Zap size={12} className="text-yellow-300 fill-yellow-300 shrink-0" />
+                                      <div className="flex-1 h-2 bg-black/20 rounded-full overflow-hidden">
                                           <div className="h-full bg-yellow-300 transition-all duration-1000" style={{ width: `${Math.min(100, (todayXp / 50) * 100)}%` }} />
                                       </div>
                                   </div>
                                   <div className="flex items-center gap-2 w-full">
-                                      <BookOpen size={10} className="text-white shrink-0" />
-                                      <div className="flex-1 h-1.5 bg-black/20 rounded-full overflow-hidden">
+                                      <BookOpen size={12} className="text-white shrink-0" />
+                                      <div className="flex-1 h-2 bg-black/20 rounded-full overflow-hidden">
                                           <div className="h-full bg-white transition-all duration-1000" style={{ width: `${Math.min(100, (todayLessons / 1) * 100)}%` }} />
                                       </div>
                                   </div>
                               </div>
-                              <h3 className="text-sm font-black text-white leading-tight mb-0.5">Daily Targets</h3>
-                              <p className="text-[9px] font-black uppercase tracking-widest text-emerald-100">{allQuestsDone ? 'Completed' : 'In Progress'}</p>
+                              <h3 className="text-base font-black text-white leading-tight mb-0.5">Daily Targets</h3>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-100">{allQuestsDone ? 'Completed' : 'In Progress'}</p>
                           </div>
                       </div>
 
-                      {/* CARD 2: GLOBAL QUEUE */}
+                      {/* CARD 2: SMART REVIEW (Global Queue) */}
                       <button 
                           onClick={handleLaunchGlobalQueue}
                           disabled={isCompilingQueue}
-                          className="snap-start shrink-0 w-[150px] h-32 relative bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-[1.5rem] p-4 shadow-lg shadow-indigo-500/20 overflow-hidden group text-left transition-all active:scale-[0.98] flex flex-col justify-between border border-indigo-400/50"
+                          className="snap-start shrink-0 w-[180px] h-40 relative bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-[2rem] p-5 shadow-lg shadow-indigo-500/20 overflow-hidden group text-left transition-all active:scale-[0.98] flex flex-col justify-between border border-indigo-400/50"
                       >
                           <div className="absolute -right-4 -bottom-4 p-4 opacity-20 group-hover:opacity-30 transition-opacity pointer-events-none">
-                              <Brain size={80} className="text-white" />
+                              <Brain size={100} className="text-white" />
                           </div>
                           
                           <div className="relative z-10 flex justify-between items-start w-full">
-                              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md shadow-inner">
-                                  <Brain size={16} className="text-white" />
+                              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md shadow-inner">
+                                  <Brain size={20} className="text-white" />
                               </div>
-                              <span className="flex items-center justify-center w-6 h-6 bg-white text-indigo-600 rounded-full shadow-sm group-hover:scale-110 transition-transform">
-                                  {isCompilingQueue ? <Loader2 size={10} className="animate-spin" /> : <Play size={10} className="ml-0.5" fill="currentColor" />}
+                              <span className="flex items-center justify-center w-8 h-8 bg-white text-indigo-600 rounded-full shadow-sm group-hover:scale-110 transition-transform">
+                                  {isCompilingQueue ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} className="ml-0.5" fill="currentColor" />}
                               </span>
                           </div>
                           
                           <div className="relative z-10 mt-auto">
-                              <h3 className="text-sm font-black text-white leading-tight mb-0.5">Global Queue</h3>
-                              <p className="text-[9px] font-black uppercase tracking-widest text-indigo-200">Spaced Review</p>
+                              <h3 className="text-base font-black text-white leading-tight mb-1">Smart Review</h3>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Spaced Repetition</p>
                           </div>
                       </button>
 
                       {/* CARD 3: STUDIO */}
                       <button 
                           onClick={() => setActiveTab('create')}
-                          className="snap-start shrink-0 w-[150px] h-32 relative bg-gradient-to-br from-fuchsia-500 to-purple-600 rounded-[1.5rem] p-4 shadow-lg shadow-fuchsia-500/20 overflow-hidden group text-left transition-all active:scale-[0.98] flex flex-col justify-between border border-fuchsia-400/50"
+                          className="snap-start shrink-0 w-[180px] h-40 relative bg-gradient-to-br from-fuchsia-500 to-purple-600 rounded-[2rem] p-5 shadow-lg shadow-fuchsia-500/20 overflow-hidden group text-left transition-all active:scale-[0.98] flex flex-col justify-between border border-fuchsia-400/50"
                       >
                           <div className="absolute -right-4 -bottom-4 p-4 opacity-20 group-hover:opacity-30 transition-opacity pointer-events-none">
-                              <Feather size={80} className="text-white" />
+                              <Feather size={100} className="text-white" />
                           </div>
                           
                           <div className="relative z-10 flex justify-between items-start w-full">
-                              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md shadow-inner">
-                                  <Feather size={16} className="text-white" />
+                              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md shadow-inner">
+                                  <Feather size={20} className="text-white" />
                               </div>
-                              <span className="flex items-center justify-center w-6 h-6 bg-white text-fuchsia-600 rounded-full shadow-sm group-hover:scale-110 transition-transform">
-                                  <Plus size={12} strokeWidth={3} />
+                              <span className="flex items-center justify-center w-8 h-8 bg-white text-fuchsia-600 rounded-full shadow-sm group-hover:scale-110 transition-transform">
+                                  <Plus size={16} strokeWidth={3} />
                               </span>
                           </div>
                           
                           <div className="relative z-10 mt-auto">
-                              <h3 className="text-sm font-black text-white leading-tight mb-0.5">Studio</h3>
-                              <p className="text-[9px] font-black uppercase tracking-widest text-fuchsia-200">Create Content</p>
+                              <h3 className="text-base font-black text-white leading-tight mb-1">Studio</h3>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-fuchsia-200">Create Content</p>
                           </div>
                       </button>
 
-                      {/* 🔥 CARD 4: THE INTEL FEED (INBOX) */}
+                      {/* 🔥 CARD 4: MESSAGES (Inbox) */}
                       <button 
                           onClick={() => setActiveTab('inbox')}
-                          className={`snap-start shrink-0 w-[150px] h-32 relative rounded-[1.5rem] p-4 shadow-lg overflow-hidden group text-left transition-all active:scale-[0.98] flex flex-col justify-between border ${unreadCount > 0 ? 'bg-gradient-to-br from-rose-500 to-pink-600 shadow-rose-500/30 border-rose-400/50' : 'bg-gradient-to-br from-slate-700 to-slate-900 shadow-slate-900/20 border-slate-600/50'}`}
+                          className={`snap-start shrink-0 w-[180px] h-40 relative rounded-[2rem] p-5 shadow-lg overflow-hidden group text-left transition-all active:scale-[0.98] flex flex-col justify-between border ${unreadCount > 0 ? 'bg-gradient-to-br from-rose-500 to-pink-600 shadow-rose-500/30 border-rose-400/50' : 'bg-gradient-to-br from-slate-700 to-slate-900 shadow-slate-900/20 border-slate-600/50'}`}
                       >
                           <div className="absolute -right-4 -bottom-4 p-4 opacity-20 group-hover:opacity-30 transition-opacity pointer-events-none">
-                              <Inbox size={80} className="text-white" />
+                              <Inbox size={100} className="text-white" />
                           </div>
                           
                           <div className="relative z-10 flex justify-between items-start w-full">
-                              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md shadow-inner">
-                                  <Inbox size={16} className="text-white" />
+                              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md shadow-inner">
+                                  <Inbox size={20} className="text-white" />
                               </div>
                               {unreadCount > 0 && (
-                                  <span className="flex items-center justify-center min-w-6 h-6 px-1.5 bg-white text-rose-600 font-black text-[10px] rounded-full shadow-sm group-hover:scale-110 transition-transform">
+                                  <span className="flex items-center justify-center min-w-8 h-8 px-2.5 bg-white text-rose-600 font-black text-[12px] rounded-full shadow-sm group-hover:scale-110 transition-transform">
                                       {unreadCount}
                                   </span>
                               )}
                           </div>
                           
                           <div className="relative z-10 mt-auto">
-                              <h3 className="text-sm font-black text-white leading-tight mb-0.5">Intel Feed</h3>
-                              <p className={`text-[9px] font-black uppercase tracking-widest ${unreadCount > 0 ? 'text-rose-200' : 'text-slate-400'}`}>
-                                  {unreadCount > 0 ? 'Unread Signals' : 'Comms Inbox'}
+                              <h3 className="text-base font-black text-white leading-tight mb-1">Messages</h3>
+                              <p className={`text-[10px] font-black uppercase tracking-widest ${unreadCount > 0 ? 'text-rose-200' : 'text-slate-400'}`}>
+                                  {unreadCount > 0 ? 'Unread Messages' : 'Inbox'}
                               </p>
                           </div>
                       </button>
-                      
-                      <div className="w-3 shrink-0" aria-hidden="true" /> {/* Right Edge Spacer */}
                   </div>
               </section>
 
-              {/* 4. ACTIVE SUBJECTS SECTION (NOW DRAGGABLE) */}
+              {/* 4. ACTIVE SUBJECTS SECTION (DRAGGABLE) */}
               {localClasses && localClasses.length > 0 ? (
                 <section className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
-                    <div className="flex justify-between items-end mb-4 ml-1">
-                        <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                    <div className="flex justify-between items-end mb-4">
+                        <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest flex items-center gap-2">
                             Active Subjects
                         </h3>
                         <button 
                             onClick={() => setActiveTab('classes')} 
-                            className="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-sm"
+                            className="text-[10px] md:text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest hover:underline focus:outline-none rounded-sm"
                         >
                             View All
                         </button>
                     </div>
                     
-                    <div className="flex gap-4 overflow-x-auto pb-8 -mx-6 hide-scrollbar snap-x pt-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                    <div className="flex gap-5 overflow-x-auto pb-8 -mx-6 md:mx-0 px-6 md:px-0 hide-scrollbar snap-x pt-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                         
-                        <div className="w-2 shrink-0" aria-hidden="true" /> {/* Left Edge Spacer */}
-
                         {localClasses.map((cls: any, index: number) => { 
                             const primaryCurriculum = curriculums?.find((c: any) => cls.assignedCurriculums?.includes(c.id));
                             const effectiveSubject = cls.subject || primaryCurriculum?.subject || 'General Studies';
@@ -500,9 +499,9 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                                     onDragEnd={handleDragEnd}
                                     onDragOver={(e) => e.preventDefault()}
                                     onClick={() => onSelectClass(cls)}
-                                    className="snap-start shrink-0 w-[280px] text-left bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 transition-all duration-300 flex flex-col active:scale-[0.98] shadow-sm hover:-translate-y-1 hover:shadow-xl hover:border-indigo-200 dark:hover:border-indigo-500/50 group cursor-grab active:cursor-grabbing"
+                                    className="snap-start shrink-0 w-[300px] text-left bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col active:scale-[0.98] shadow-sm hover:-translate-y-1 hover:shadow-lg hover:border-indigo-300 dark:hover:border-indigo-500/50 group cursor-grab active:cursor-grabbing"
                                 >
-                                    <div className="flex justify-between items-start mb-4 w-full">
+                                    <div className="flex justify-between items-start mb-5 w-full">
                                         <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${theme.bgColor} ${theme.textColor}`}>
                                             {effectiveSubject}
                                         </div>
@@ -512,33 +511,33 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                                             <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm border ${
                                                 cls.type === 'solo' 
                                                 ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' 
-                                                : 'bg-slate-800 dark:bg-slate-950 text-white dark:text-slate-300 border-transparent dark:border-slate-800'
+                                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-transparent dark:border-slate-700'
                                             }`}>
                                                 {cls.type === 'solo' ? 'Solo' : effectiveGrade}
                                             </div>
                                             
                                             {/* Drag Indicator Icon */}
                                             <div className="text-slate-300 dark:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <GripVertical size={14} />
+                                                <GripVertical size={16} />
                                             </div>
                                         </div>
                                     </div>
                                     
-                                    <div className="flex items-center gap-4 mb-8 mt-2">
-                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg transition-transform duration-500 shrink-0 bg-gradient-to-br ${theme.gradient} ${theme.shadow} group-hover:scale-110`}>
-                                            <Icon size={24} strokeWidth={2.5} aria-hidden="true" />
+                                    <div className="flex items-center gap-5 mb-8 mt-2">
+                                        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-white shadow-lg transition-transform duration-500 shrink-0 bg-gradient-to-br ${theme.gradient} ${theme.shadow} group-hover:scale-110`}>
+                                            <Icon size={28} strokeWidth={2.5} aria-hidden="true" />
                                         </div>
                                         <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 leading-tight line-clamp-2">
                                             {cls.title || cls.name}
                                         </h3>
                                     </div>
 
-                                    <div className="w-full mt-auto pt-5 border-t border-slate-50 dark:border-slate-800/60">
-                                        <div className="flex justify-between items-center mb-2">
-                                            <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Year Progress</span>
+                                    <div className="w-full mt-auto pt-6 border-t border-slate-100 dark:border-slate-800">
+                                        <div className="flex justify-between items-center mb-3">
+                                            <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Course Progress</span>
                                             <span className={`text-xs font-black ${theme.textColor}`}>{progress}%</span>
                                         </div>
-                                        <div className="h-2.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                        <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner dark:shadow-none">
                                             <div 
                                                 className={`h-full transition-all duration-1000 bg-gradient-to-r ${theme.gradient}`} 
                                                 style={{ width: `${progress}%` }} 
@@ -548,19 +547,17 @@ export default function HomeView({ setActiveTab, classes, curriculums = [], onSe
                                 </button>
                             ); 
                         })}
-
-                        <div className="w-2 shrink-0" aria-hidden="true" /> {/* Right Edge Spacer */}
                     </div>
                 </section>
               ) : (
-                 <section className="p-6 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[2rem] text-center transition-colors duration-300">
-                    <School size={32} className="mx-auto text-slate-300 dark:text-slate-600 mb-2" aria-hidden="true"/>
-                    <p className="text-sm text-slate-400 dark:text-slate-500 font-bold mb-4">No active subjects right now.</p>
+                 <section className="p-8 md:p-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[3rem] text-center transition-colors duration-300 bg-white/50 dark:bg-slate-900/50">
+                    <School size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" aria-hidden="true"/>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 font-bold mb-6">No active subjects right now.</p>
                     <button 
                         onClick={() => setActiveTab('classes')} 
-                        className="px-6 py-3 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="px-8 py-4 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors shadow-sm"
                     >
-                        Browse Campus
+                        Browse Course Catalog
                     </button>
                  </section>
               )}
