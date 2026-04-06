@@ -36,6 +36,7 @@ export default function InstructorDashboard({
   onUpdateCard,
   onDeleteCard,
   onDeleteArtifact, // 🔥 NEW: Added delete prop
+  onMoveToFolder,
   onAssign,            
   onRevoke,            
   onCreateClass,  
@@ -248,19 +249,19 @@ export default function InstructorDashboard({
              </div>
            )}
 
-           {/* 🔥 PRO-LMS: THE NEW INSTRUCTOR VAULT */}
+ {/* 🔥 PRO-LMS: THE NEW INSTRUCTOR VAULT */}
            {activeTab === 'vault' && (
              <div className="h-full animate-in zoom-in-95 duration-500">
                <InstructorVault 
                    decks={allDecks} 
                    lessons={lessons} 
-                   onDeleteArtifact={onDeleteArtifact} // 🔥 WIRED UP DELETION
+                   onDeleteArtifact={onDeleteArtifact} 
+                   onMoveToFolder={onMoveToFolder} // 🔥 AND PASS IT HERE
                    onLaunchLive={(id: string, type: string) => {
                        setPreselectedContent({ id, type });
                        setIsLiveModalOpen(true);
                    }}
                    onEditArtifact={(id: string, type: string) => {
-                       // We can wire this up later to directly load an artifact into the Studio!
                        setActiveTab('studio');
                    }}
                />
