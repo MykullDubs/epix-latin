@@ -1,11 +1,10 @@
 // src/components/instructor/CommandCenter.tsx
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { 
     Users, Play, FileText, Activity, 
     CheckCircle2, PenTool, Layers, BookOpen, 
-    Clock, School, Inbox, Archive, Zap, GripHorizontal
+    Clock, School, Inbox, Archive, Zap, GripHorizontal, ChevronDown
 } from 'lucide-react';
-import LiveActivityFeed from './LiveActivityFeed';
 import DeploymentModal from './DeploymentModal'; 
 
 export default function CommandCenter({ 
@@ -21,6 +20,7 @@ export default function CommandCenter({
     onAssign 
 }: any) {
     const [isDeployModalOpen, setIsDeployModalOpen] = useState(false); 
+    const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false); // 🔥 CUSTOM DROPDOWN STATE
 
     const activeClass = useMemo(() => classes.find((c: any) => c.id === selectedClassId) || classes[0], [classes, selectedClassId]);
 
@@ -112,7 +112,7 @@ export default function CommandCenter({
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden select-none animate-in fade-in duration-500 relative transition-colors duration-300">
             <DeploymentModal isOpen={isDeployModalOpen} onClose={() => setIsDeployModalOpen(false)} onDeploy={onAssign} activeClass={activeClass} lessons={lessons} allDecks={allDecks} curriculums={curriculums} />
 
-            {/* UNIFIED HEADER */}
+            {/* UNIFIED HEADER WITH BESPOKE DROPDOWN */}
             <header className="h-24 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 md:px-10 flex justify-between items-center shrink-0 z-50 shadow-sm transition-colors duration-300">
                 <div className="flex items-center gap-4">
                     <div className="p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hidden sm:flex transition-all duration-500 shadow-inner dark:shadow-none">
@@ -124,24 +124,45 @@ export default function CommandCenter({
                     </div>
                 </div>
 
-                <div className="bg-slate-50 dark:bg-slate-950 p-1.5 rounded-xl shadow-inner border border-slate-200 dark:border-slate-800 flex items-center gap-2 transition-all hover:border-indigo-300 dark:hover:border-indigo-500/50">
-                    <div className="pl-3 text-indigo-500 dark:text-indigo-400"><Users size={16} /></div>
-                    <select 
-                        value={selectedClassId} 
-                        onChange={(e) => setSelectedClassId(e.target.value)}
-                        className="bg-transparent text-xs font-black text-slate-700 dark:text-slate-200 outline-none pr-6 cursor-pointer uppercase tracking-widest"
+                {/* 🔥 CUSTOM BESPOKE DROPDOWN MENU */}
+                <div className="relative">
+                    <button 
+                        onClick={() => setIsClassDropdownOpen(!isClassDropdownOpen)}
+                        className="bg-white dark:bg-slate-900 px-4 py-2.5 rounded-2xl shadow-sm ring-1 ring-slate-900/5 dark:ring-white/10 flex items-center gap-3 transition-all hover:ring-indigo-500/30 min-w-[200px] justify-between group"
                     >
-                        {classes.map((c: any) => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                    </select>
+                        <div className="flex items-center gap-3">
+                            <div className="text-indigo-500 dark:text-indigo-400 group-hover:scale-110 transition-transform"><Users size={16} /></div>
+                            <span className="text-xs font-black text-slate-700 dark:text-slate-200 uppercase tracking-widest">
+                                {activeClass?.name || 'Select Cohort'}
+                            </span>
+                        </div>
+                        <ChevronDown size={16} className={`text-slate-400 transition-transform duration-300 ${isClassDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {isClassDropdownOpen && (
+                        <>
+                            <div className="fixed inset-0 z-40" onClick={() => setIsClassDropdownOpen(false)} />
+                            <div className="absolute top-full right-0 mt-2 w-full min-w-[240px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 overflow-hidden py-2 animate-in fade-in slide-in-from-top-2">
+                                {classes.map((c: any) => (
+                                    <button
+                                        key={c.id}
+                                        onClick={() => { setSelectedClassId(c.id); setIsClassDropdownOpen(false); }}
+                                        className={`w-full text-left px-5 py-3 text-xs font-black uppercase tracking-widest transition-colors flex items-center gap-3 ${selectedClassId === c.id ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                    >
+                                        <div className={`w-1.5 h-1.5 rounded-full ${selectedClassId === c.id ? 'bg-indigo-500' : 'bg-transparent'}`} />
+                                        {c.name}
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    )}
                 </div>
             </header>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar px-4 md:px-8 py-8 pb-32">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-700">
                     
-                    {/* 1. REARRANGEABLE QUICK ACTIONS (StudentHomeView Style) */}
+                    {/* 1. REARRANGEABLE QUICK ACTIONS */}
                     <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
                         {cardOrder.map((id, index) => {
                             const config = cardConfig.find(c => c.id === id);
