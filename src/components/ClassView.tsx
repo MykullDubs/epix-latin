@@ -10,6 +10,7 @@ import {
     Plus, Minus, PenTool, Crosshair, Eraser, Wrench, Highlighter, Type, Presentation
 } from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
+import PronunciationLab from './PronunciationLab'; // 🔥 IMPORTED THE PRONUNCIATION LAB
 
 // ============================================================================
 //  CLASS VIEW (The Projector / Big Screen Mode with Keyboard Nav)
@@ -346,7 +347,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
     if (!lesson?.blocks || !Array.isArray(lesson.blocks)) return [];
     const grouped: any[] = [];
     let buffer: any[] = [];
-    const interactables = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'drag-drop'];
+    const interactables = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'drag-drop', 'pronunciation']; // 🔥 Added pronunciation to interactables list
     
     lesson.blocks.forEach((b: any) => {
       const type = String(b?.type || '');
@@ -718,6 +719,8 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                           {blockType === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
                           {blockType === 'fill-blank' && <FillBlankBlock block={block} liveState={liveState} />}
                           {blockType === 'drag-drop' && <TapSortBlock block={block} liveState={liveState} />}
+                          {/* 🔥 NEW: Added the Pronunciation Lab block renderer */}
+                          {blockType === 'pronunciation' && <PronunciationLab block={block} />} 
                       </>
                     )}
                   </div>
