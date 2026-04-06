@@ -136,7 +136,7 @@ export default function BuilderHub({
   onSaveCurriculum, 
   allDecks, 
   onPublishDeck,       
-  instructorClasses,    
+  instructorClasses,   
   lessons, 
   curriculums, 
   initialMode, 
@@ -144,12 +144,22 @@ export default function BuilderHub({
 }: any) {
   const [lessonData, setLessonData] = useState<any>({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
   const [mode, setMode] = useState<'card' | 'lesson' | 'exam' | 'arcade' | 'curriculum'>(initialMode || 'card'); 
-  const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
   
+  // 🔥 NEW: We use this to toggle the preview pane explicitly
+  const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
+  const [isPreviewActive, setIsPreviewActive] = useState(false);
+
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
 
   useEffect(() => { if (initialMode) setMode(initialMode); }, [initialMode]);
+
+  // If we leave Lesson mode, hide the preview pane.
+  useEffect(() => {
+      if (mode !== 'lesson' && mode !== 'card') {
+          setIsPreviewActive(false);
+      }
+  }, [mode]);
 
   const modes = [
     { id: 'card', label: 'Scriptorium', icon: <Layers size={18}/>, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-500/10' },
@@ -194,7 +204,7 @@ export default function BuilderHub({
         {mode !== 'curriculum' && (
           <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl md:hidden border border-slate-200 dark:border-slate-700">
             <button 
-              onClick={() => setViewMode('edit')}
+              onClick={() => { setViewMode('edit'); setIsPreviewActive(false); }}
               className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
                 viewMode === 'edit' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-md' : 'text-slate-400 dark:text-slate-500'
               }`}
@@ -202,7 +212,7 @@ export default function BuilderHub({
               <Edit3 size={14} /> Edit
             </button>
             <button 
-              onClick={() => setViewMode('preview')}
+              onClick={() => { setViewMode('preview'); setIsPreviewActive(true); }}
               className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
                 viewMode === 'preview' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-md' : 'text-slate-400 dark:text-slate-500'
               }`}
@@ -232,10 +242,10 @@ export default function BuilderHub({
           {/* Desktop View Toggles (Hidden when in Curriculum Mode) */}
           {mode !== 'curriculum' && (
             <div className="hidden md:flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl shrink-0 mr-4">
-                <button onClick={() => setViewMode('edit')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${viewMode === 'edit' ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                <button onClick={() => { setViewMode('edit'); setIsPreviewActive(false); }} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${viewMode === 'edit' ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>
                     <Edit3 size={14} /> Edit
                 </button>
-                <button onClick={() => setViewMode('preview')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${viewMode === 'preview' ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                <button onClick={() => { setViewMode('preview'); setIsPreviewActive(true); }} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${viewMode === 'preview' ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>
                     <Eye size={14} /> Preview
                 </button>
             </div>
@@ -260,12 +270,12 @@ export default function BuilderHub({
         
         {/* LEFT PANE: EDITOR */}
         <div className={`h-full overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] transition-all duration-500 ease-in-out ${
-          // 🔥 IF CURRICULUM MODE: Force full width. ELSE: respect the preview toggle.
-          mode === 'curriculum' 
-            ? 'w-full opacity-100' 
-            : (viewMode === 'edit' ? 'w-full md:w-1/2 opacity-100' : 'hidden md:block md:w-1/2 opacity-50 grayscale-[50%]')
+          // 🔥 IF PREVIEW IS ACTIVE: squish to half width. ELSE: Take up full width!
+          isPreviewActive && (mode === 'lesson' || mode === 'card')
+            ? 'w-full md:w-1/2 opacity-100' 
+            : 'w-full opacity-100'
         }`}>
-          <div className={`p-6 md:p-12 mx-auto pb-40 transition-all duration-500 ${mode === 'curriculum' ? 'max-w-5xl' : 'max-w-2xl'}`}>
+          <div className={`p-6 md:p-12 mx-auto pb-40 transition-all duration-500 ${!isPreviewActive ? 'max-w-5xl' : 'max-w-2xl'}`}>
             
             {/* The Mode Selector */}
             <div className="mb-10 flex flex-wrap bg-slate-200/50 dark:bg-slate-800/50 p-1.5 rounded-[2rem] w-fit mx-auto md:mx-0 gap-1 border border-slate-200 dark:border-slate-800">
@@ -303,6 +313,8 @@ export default function BuilderHub({
                 <LessonBuilderView 
                     data={lessonData} 
                     setData={setLessonData} 
+                    onTogglePreview={() => setIsPreviewActive(!isPreviewActive)} // 🔥 NEW: Pass toggle to LessonBuilder
+                    isPreviewActive={isPreviewActive}
                 />
               )}
               
@@ -339,70 +351,15 @@ export default function BuilderHub({
           </div>
         </div>
 
-        {/* RIGHT PANE: LIVE PREVIEW (Hidden in Curriculum Mode) */}
-        {mode !== 'curriculum' && (
-            <div className={`h-full bg-slate-100 dark:bg-slate-950/50 border-l border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center p-6 md:p-12 transition-all duration-500 ${
-              viewMode === 'preview' ? 'flex w-full md:w-1/2' : 'hidden md:flex md:w-1/2'
-            }`}>
+        {/* RIGHT PANE: LIVE PREVIEW (Only renders if isPreviewActive is true!) */}
+        {isPreviewActive && (mode === 'lesson' || mode === 'card') && (
+            <div className="h-full bg-slate-100 dark:bg-slate-950/50 border-l border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center p-6 md:p-12 transition-all duration-500 w-full md:w-1/2 animate-in slide-in-from-right-16">
               <div className="relative w-full h-full max-w-sm max-h-[750px] group flex flex-col items-center justify-center">
                 
-                {mode === 'exam' && (
-                    <div className="w-full max-w-xs aspect-[9/16] bg-white dark:bg-slate-900 border-4 border-dashed border-slate-200 dark:border-slate-800 rounded-[3rem] shadow-sm flex flex-col items-center justify-center p-8 text-center animate-in zoom-in-95 duration-500">
-                        <FileText size={64} className="text-slate-200 dark:text-slate-700 mb-6" />
-                        <h3 className="text-lg font-black text-slate-800 dark:text-white mb-2">Exam Preview</h3>
-                        <p className="text-sm font-bold text-slate-400 dark:text-slate-500">Assessments are rendered dynamically in the student's isolated testing environment.</p>
-                    </div>
-                )}
-
-                {mode === 'arcade' && (
-                    <div className="w-full h-full bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border-[12px] border-slate-900 dark:border-black animate-in zoom-in-95 duration-500 relative">
-                        <div className="absolute inset-0 bg-amber-500/10 z-0" />
-                        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative z-10">
-                            <div className="w-24 h-24 bg-amber-100 dark:bg-amber-500/20 text-amber-500 rounded-[2.5rem] flex items-center justify-center mb-6 shadow-inner dark:shadow-none border border-amber-200 dark:border-amber-500/30 rotate-12">
-                                <Gamepad2 size={48} />
-                            </div>
-                            <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-2 leading-tight">
-                                {lessonData.title || "Untitled Game"}
-                            </h3>
-                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest bg-white/80 dark:bg-slate-950/80 px-4 py-2 rounded-full mb-8 border border-slate-100 dark:border-slate-800">
-                                Template: {lessonData.gameTemplate?.replace('-', ' ') || 'None'}
-                            </p>
-                            
-                            <div className="w-full bg-white/80 dark:bg-slate-950/80 backdrop-blur-md rounded-2xl p-6 border border-slate-100 dark:border-slate-800 text-left space-y-4">
-                                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
-                                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Mode</span>
-                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{lessonData.mode === 'pvc' ? 'vs CPU' : 'Pass & Play'}</span>
-                                </div>
-                                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
-                                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Win Goal</span>
-                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{lessonData.targetScore || 3} Points</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Vocab Ammo</span>
-                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{lessonData.deckIds?.length || 0} Decks</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {(mode === 'lesson' || mode === 'card') && (
-                    <>
-                        <div className="absolute -inset-4 bg-gradient-to-tr from-indigo-500/10 to-emerald-500/10 blur-2xl rounded-[4rem] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                        <div className="relative h-full w-full animate-in zoom-in-95 duration-500 shadow-2xl rounded-[3rem] border-[12px] border-slate-900 dark:border-black overflow-hidden">
-                          <LivePreview data={lessonData} />
-                        </div>
-                    </>
-                )}
-
-                {mode !== 'exam' && (
-                    <button 
-                        onClick={handleCommit}
-                        className={`absolute -bottom-6 left-1/2 -translate-x-1/2 text-white px-10 py-5 rounded-[2rem] font-black text-[10px] uppercase tracking-[0.3em] shadow-2xl md:hidden flex items-center gap-3 active:scale-90 transition-all ${mode === 'arcade' ? 'bg-amber-500 shadow-amber-500/40' : 'bg-indigo-600 shadow-indigo-500/40'}`}
-                    >
-                        <Zap size={16} className={mode === 'arcade' ? 'text-white' : 'text-indigo-200'} /> Commit to Library
-                    </button>
-                )}
+                <div className="absolute -inset-4 bg-gradient-to-tr from-indigo-500/10 to-emerald-500/10 blur-2xl rounded-[4rem] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                <div className="relative h-full w-full animate-in zoom-in-95 duration-500 shadow-2xl rounded-[3rem] border-[12px] border-slate-900 dark:border-black overflow-hidden">
+                  <LivePreview data={lessonData} />
+                </div>
               </div>
             </div>
         )}
