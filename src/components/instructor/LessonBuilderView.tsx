@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
     Code, Trash2, AlignLeft, FileText, MessageSquare, 
-    List, HelpCircle, Image, Puzzle, MessageCircle, Gamepad2, X, Info 
+    List, HelpCircle, Image, Puzzle, MessageCircle, Gamepad2, X, Info, Activity, Mic
 } from 'lucide-react';
 
 export function InjectorButton({ icon, label, onClick }: any) {
@@ -31,14 +31,22 @@ export default function LessonBuilderView({ data, setData }: any) {
     const templates: any = {
       text: { type: 'text', title: '', content: 'New Core Concept...' },
       essay: { type: 'essay', title: 'Deep Dive', content: 'Paragraph 1...\n\nParagraph 2...' },
-      callout: { type: 'callout', label: 'Pro Tip', content: 'Did you know that...' }, // NEW
+      callout: { type: 'callout', label: 'Pro Tip', content: 'Did you know that...' }, 
       dialogue: { type: 'dialogue', lines: [{ speaker: 'A', text: '', side: 'left' }] },
       'vocab-list': { type: 'vocab-list', items: [{ term: '', definition: '' }] },
       quiz: { type: 'quiz', question: '', options: [{id:'a',text:''},{id:'b',text:''}], correctId: 'a' },
       image: { type: 'image', url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa', caption: '' },
       'fill-blank': { type: 'fill-blank', question: 'Fill in the blanks:', text: 'The [quick] brown [fox] jumps.', distractors: ['slow', 'dog'] },
       discussion: { type: 'discussion', title: 'Discussion Time', questions: ['Question 1?', 'Question 2?', 'Question 3?'] },
-      game: { type: 'game', gameType: 'connect-three', title: 'Vocabulary Battle' }
+      game: { type: 'game', gameType: 'connect-three', title: 'Vocabulary Battle' },
+      // 🔥 THE NEW PRONUNCIATION BLOCK TEMPLATE
+      pronunciation: { 
+        type: 'pronunciation', 
+        targetPhonemes: ['i', 'ɪ', 'b', 'v', 'θ', 'ð'], 
+        pairs: [
+            { id: Date.now(), p1: 'i', p2: 'ɪ', w1: 'sheep', w2: 'ship', focus: 'Vowel Tension' }
+        ] 
+      }
     };
     setData({ ...data, blocks: [...(data.blocks || []), templates[type]] });
   };
@@ -113,7 +121,7 @@ export default function LessonBuilderView({ data, setData }: any) {
                   </div>
                 )}
 
-                {/* --- NEW: CALLOUT EDITOR --- */}
+                {/* CALLOUT EDITOR */}
                 {block.type === 'callout' && (
                   <div className="space-y-4 bg-amber-50 p-5 rounded-2xl border border-amber-100">
                     <div className="flex items-center gap-2 mb-2">
@@ -264,21 +272,85 @@ export default function LessonBuilderView({ data, setData }: any) {
                      </div>
                   </div>
                 )}
+
+                {/* 🔥 NEW: PRONUNCIATION LAB EDITOR */}
+                {block.type === 'pronunciation' && (
+                  <div className="space-y-4 bg-emerald-50/50 p-5 rounded-2xl border border-emerald-100">
+                     <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                           <Activity size={16} className="text-emerald-500" />
+                           <span className="text-xs font-black uppercase tracking-widest text-emerald-800">Pronunciation Lab Matrix</span>
+                        </div>
+                     </div>
+                     
+                     <div className="space-y-2">
+                       <label className="text-[10px] font-black text-emerald-700 uppercase tracking-widest ml-1 block flex items-center gap-2">
+                           <Activity size={12} /> Target Phonemes (Comma Separated IPA)
+                       </label>
+                       <input 
+                          className="w-full bg-white border border-emerald-200 p-3 rounded-xl text-sm font-mono focus:ring-2 focus:ring-emerald-300 outline-none shadow-inner" 
+                          placeholder="i, ɪ, b, v, θ, ð" 
+                          value={(block.targetPhonemes || []).join(', ')} 
+                          onChange={e => {
+                             const ipaArr = e.target.value.split(',').map((s:string) => s.trim()).filter((s:string) => s !== '');
+                             updateBlock(idx, 'targetPhonemes', ipaArr);
+                          }} 
+                       />
+                     </div>
+
+                     <div className="pt-4 space-y-3">
+                       <label className="text-[10px] font-black text-emerald-700 uppercase tracking-widest ml-1 block flex items-center gap-2">
+                           <Mic size={12} /> Minimal Pairs Validation
+                       </label>
+                       
+                       {(block.pairs || []).map((pair: any, pIdx: number) => (
+                          <div key={pair.id || pIdx} className="flex flex-col gap-2 bg-white p-3 rounded-xl border border-emerald-100 shadow-sm relative group">
+                             <button onClick={() => { const newPairs = block.pairs.filter((_:any, i:number) => i !== pIdx); updateBlock(idx, 'pairs', newPairs); }} className="absolute top-2 right-2 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><X size={14}/></button>
+                             
+                             <input 
+                                className="w-[85%] bg-slate-50 border-none p-2 rounded-lg text-xs font-bold text-slate-600 focus:ring-2 focus:ring-emerald-200 outline-none mb-1" 
+                                placeholder="Concept Focus (e.g. Vowel Tension)" 
+                                value={pair.focus || ''} 
+                                onChange={e => { const newPairs = [...block.pairs]; newPairs[pIdx].focus = e.target.value; updateBlock(idx, 'pairs', newPairs); }} 
+                             />
+                             
+                             <div className="flex gap-2 items-center">
+                                <div className="flex-1 flex gap-2">
+                                    <input className="w-10 bg-slate-100 text-slate-500 font-mono text-center border-none p-2 rounded-lg text-xs outline-none" placeholder="/p1/" value={pair.p1} onChange={e => { const newPairs = [...block.pairs]; newPairs[pIdx].p1 = e.target.value; updateBlock(idx, 'pairs', newPairs); }} />
+                                    <input className="flex-1 bg-emerald-50 border-none p-2 rounded-lg text-sm font-bold text-emerald-900 outline-none" placeholder="Word 1" value={pair.w1} onChange={e => { const newPairs = [...block.pairs]; newPairs[pIdx].w1 = e.target.value; updateBlock(idx, 'pairs', newPairs); }} />
+                                </div>
+                                <span className="text-[10px] italic text-slate-400 px-1 font-serif">vs</span>
+                                <div className="flex-1 flex gap-2">
+                                    <input className="flex-1 bg-emerald-50 border-none p-2 rounded-lg text-sm font-bold text-emerald-900 outline-none text-right" placeholder="Word 2" value={pair.w2} onChange={e => { const newPairs = [...block.pairs]; newPairs[pIdx].w2 = e.target.value; updateBlock(idx, 'pairs', newPairs); }} />
+                                    <input className="w-10 bg-slate-100 text-slate-500 font-mono text-center border-none p-2 rounded-lg text-xs outline-none" placeholder="/p2/" value={pair.p2} onChange={e => { const newPairs = [...block.pairs]; newPairs[pIdx].p2 = e.target.value; updateBlock(idx, 'pairs', newPairs); }} />
+                                </div>
+                             </div>
+                          </div>
+                       ))}
+                       <button onClick={() => updateBlock(idx, 'pairs', [...(block.pairs||[]), { id: Date.now(), p1: '', p2: '', w1: '', w2: '', focus: '' }])} className="w-full py-3 border-2 border-dashed border-emerald-200 rounded-xl text-xs font-black uppercase tracking-widest text-emerald-500 hover:text-emerald-700 hover:border-emerald-400 hover:bg-emerald-50 transition-colors">+ Add Minimal Pair</button>
+                     </div>
+                  </div>
+                )}
+
               </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-10 border-t border-slate-100">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-10 border-t border-slate-100">
              <InjectorButton icon={<AlignLeft/>} label="Text" onClick={() => addBlock('text')} />
              <InjectorButton icon={<FileText/>} label="Essay" onClick={() => addBlock('essay')} />
-             <InjectorButton icon={<Info/>} label="Callout" onClick={() => addBlock('callout')} /> {/* NEW BUTTON */}
+             <InjectorButton icon={<Info/>} label="Callout" onClick={() => addBlock('callout')} /> 
              <InjectorButton icon={<MessageSquare/>} label="Dialogue" onClick={() => addBlock('dialogue')} />
+             
              <InjectorButton icon={<List/>} label="Vocab" onClick={() => addBlock('vocab-list')} />
              <InjectorButton icon={<HelpCircle/>} label="Quiz" onClick={() => addBlock('quiz')} />
              <InjectorButton icon={<Image/>} label="Visual" onClick={() => addBlock('image')} />
              <InjectorButton icon={<Puzzle/>} label="Fill Blank" onClick={() => addBlock('fill-blank')} />
+             
              <InjectorButton icon={<MessageCircle/>} label="Discussion" onClick={() => addBlock('discussion')} />
              <InjectorButton icon={<Gamepad2/>} label="Game" onClick={() => addBlock('game')} />
+             {/* 🔥 THE PRONUNCIATION INJECTOR */}
+             <InjectorButton icon={<Mic/>} label="Pronunciation" onClick={() => addBlock('pronunciation')} />
           </div>
         </div>
       )}
