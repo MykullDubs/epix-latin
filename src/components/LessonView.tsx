@@ -7,6 +7,7 @@ import {
   MessageCircle, ArrowLeft, ArrowRight, Info, Zap, BookOpen,
   Play, Square, Search, MousePointerClick, Palette, Eraser, Volume2, AlertTriangle, Gamepad2, Layers
 } from 'lucide-react';
+import PronunciationLab from './PronunciationLab'; // 🔥 IMPORTED PRONUNCIATION LAB
 
 export interface LessonViewProps {
     lessonId?: string | null;
@@ -683,7 +684,7 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
     let buffer: any[] = [];
     
     // 🔥 ALL VALID BLOCK TYPES REGISTERED HERE
-    const allowedTypes = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'code', 'formula', 'timeline', 'audio-story', 'image-hotspot', 'drag-drop', 'drawing'];
+    const allowedTypes = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'code', 'formula', 'timeline', 'audio-story', 'image-hotspot', 'drag-drop', 'drawing', 'pronunciation']; // 🔥 Added pronunciation
     
     lesson.blocks.forEach((b: any) => {
       const type = String(b?.type || '');
@@ -841,6 +842,9 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
       case 'drawing': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><DrawingBlockRenderer block={block} /></div>;
       case 'image-hotspot': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><ImageHotspotBlockRenderer block={block} /></div>;
       case 'audio-story': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><AudioStoryBlockRenderer block={block} /></div>;
+      
+      // 🔥 ADDED THE PRONUNCIATION LAB BLOCK
+      case 'pronunciation': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><PronunciationLab block={block} /></div>;
 
       default:
         return <div key={blockKey} className="p-8 bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200 text-center text-xs text-slate-400 font-bold uppercase tracking-widest my-4">Unsupported Module: {blockType}</div>;
