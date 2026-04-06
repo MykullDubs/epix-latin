@@ -431,7 +431,6 @@ export function useMagisterData() {
       });
     },
 
-    // 🔥 THE NEW ARTIFACT DESTROYER
     deleteArtifact: async (id: string, type: 'lesson' | 'deck') => {
         if (!user || !id) return;
         try {
@@ -442,6 +441,23 @@ export function useMagisterData() {
             }
         } catch (error) {
             console.error(`Failed to scrub ${type}:`, error);
+            throw error;
+        }
+    },
+
+    // 🔥 THE NEW ARTIFACT FOLDER ASSIGNER
+    assignArtifactToFolder: async (artifactId: string, type: 'lesson' | 'deck', folderName: string | null) => {
+        if (!user || !artifactId) return;
+        try {
+            if (type === 'lesson') {
+                const lessonRef = doc(db, 'artifacts', appId, 'users', user.uid, 'custom_lessons', artifactId);
+                await updateDoc(lessonRef, { folder: folderName || null, updatedAt: Date.now() });
+            } else if (type === 'deck') {
+                const deckRef = doc(db, 'artifacts', appId, 'decks', artifactId);
+                await updateDoc(deckRef, { folder: folderName || null, updatedAt: Date.now() });
+            }
+        } catch (error) {
+            console.error(`Failed to assign ${type} to folder:`, error);
             throw error;
         }
     },
