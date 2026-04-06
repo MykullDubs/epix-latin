@@ -12,7 +12,7 @@ import {
 } from '../utils/profileHelpers';
 import { 
   Flame, Trophy, Zap, Settings, ChevronRight, UploadCloud, LogOut, 
-  Shield, Crown, Camera, Loader2, Heart, Activity, History, Target, Moon
+  Shield, Crown, Camera, Loader2, Heart, Activity, History, Target, Moon, User // 🔥 Added User icon here
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import HoloAvatar from './HoloAvatar'; 
