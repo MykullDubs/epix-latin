@@ -5,7 +5,7 @@ import { db, appId } from '../../config/firebase';
 import { 
     Send, Users, User, Link as LinkIcon, MessageSquare, 
     Clock, Megaphone, Plus, CheckCheck, Zap, ChevronLeft,
-    Inbox, AlertCircle
+    Inbox, AlertCircle, ChevronDown
 } from 'lucide-react';
 import { JuicyToast } from '../Toast';
 
@@ -24,28 +24,25 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
     const [subject, setSubject] = useState('');
     const [body, setBody] = useState('');
     const [actionLink, setActionLink] = useState(''); 
+    
+    // 🔥 CUSTOM DROPDOWN STATES
+    const [isTargetDropdownOpen, setIsTargetDropdownOpen] = useState(false);
+    const [isAttachDropdownOpen, setIsAttachDropdownOpen] = useState(false);
 
-    // Safely extract the instructor's email to avoid undefined errors
     const instructorEmail = user?.email || "instructor@magister.com";
 
-    // 1. Listen for OUTGOING messages (Includes Broadcasts & Directs)
+    // 1. Listen for OUTGOING messages
     useEffect(() => {
         if (!user?.uid) return;
-        const q = query(
-            collection(db, 'artifacts', appId, 'messages'),
-            where('senderId', '==', user.uid)
-        );
+        const q = query(collection(db, 'artifacts', appId, 'messages'), where('senderId', '==', user.uid));
         const unsub = onSnapshot(q, (snap) => setOutgoingMsgs(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
         return () => unsub();
     }, [user?.uid]);
 
-    // 2. Listen for INCOMING messages (Replies from students)
+    // 2. Listen for INCOMING messages
     useEffect(() => {
         if (!user?.uid) return;
-        const q = query(
-            collection(db, 'artifacts', appId, 'messages'),
-            where('recipientId', '==', user.uid)
-        );
+        const q = query(collection(db, 'artifacts', appId, 'messages'), where('recipientId', '==', user.uid));
         const unsub = onSnapshot(q, (snap) => setIncomingMsgs(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
         return () => unsub();
     }, [user?.uid]);
@@ -54,7 +51,7 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
     const threads = useMemo(() => {
         const map = new Map();
         const allMsgs = [...incomingMsgs, ...outgoingMsgs].sort((a, b) => a.timestamp - b.timestamp);
-        const seenBroadcasts = new Set(); // Prevent rendering 30 identical bubbles for 1 broadcast
+        const seenBroadcasts = new Set(); 
 
         allMsgs.forEach(msg => {
             const isSelf = msg.senderId === user.uid;
@@ -65,7 +62,6 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
                 tName = `${msg.targetCohort} (Broadcasts)`;
                 tType = 'broadcast';
                 
-                // Deduplicate broadcasts sent at the exact same timestamp
                 if (isSelf && seenBroadcasts.has(msg.timestamp)) return;
                 if (isSelf) seenBroadcasts.add(msg.timestamp);
             } else {
@@ -91,12 +87,10 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
 
     const activeThread = threads.find(t => t.id === activeThreadId);
 
-    // Auto-scroll to bottom of chat
     useEffect(() => {
         if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }, [activeThread?.messages.length]);
 
-    // Mark incoming messages as read when opening a thread
     useEffect(() => {
         if (activeThread) {
             activeThread.messages.forEach((msg: any) => {
@@ -110,7 +104,7 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
     const availableDecks = Object.values(decks || {}).filter((d: any) => d.id && d.id !== 'custom');
     const allStudents = Array.from(new Set(classes.flatMap((c: any) => c.studentEmails || [])));
 
-    // SEND NEW BROADCAST OR DIRECT MESSAGE (COMPOSER)
+    // SEND NEW BROADCAST OR DIRECT MESSAGE
     const handleDispatch = async () => {
         if (!selectedTarget) return setToastMsg("Error: Select a recipient.");
         if (!subject.trim() || !body.trim()) return setToastMsg("Error: Subject and Body are required.");
@@ -131,17 +125,9 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
                 targetClass.studentEmails.forEach((email: string) => {
                     const msgRef = doc(collection(db, 'artifacts', appId, 'messages'));
                     batch.set(msgRef, {
-                        senderId: user.uid, 
-                        senderName, 
-                        senderEmail: instructorEmail,
-                        recipientEmail: email, 
-                        targetCohort: targetClass.name,
-                        type: 'broadcast', 
-                        subject, 
-                        body, 
-                        actionLink: actionLink || null, 
-                        timestamp, 
-                        read: false
+                        senderId: user.uid, senderName, senderEmail: instructorEmail, recipientEmail: email, 
+                        targetCohort: targetClass.name, type: 'broadcast', subject, body, 
+                        actionLink: actionLink || null, timestamp, read: false
                     });
                 });
                 await batch.commit();
@@ -151,16 +137,8 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
             } else {
                 const msgRef = doc(collection(db, 'artifacts', appId, 'messages'));
                 batch.set(msgRef, {
-                    senderId: user.uid, 
-                    senderName, 
-                    senderEmail: instructorEmail,
-                    recipientEmail: selectedTarget,
-                    type: 'direct', 
-                    subject, 
-                    body, 
-                    actionLink: actionLink || null, 
-                    timestamp, 
-                    read: false
+                    senderId: user.uid, senderName, senderEmail: instructorEmail, recipientEmail: selectedTarget,
+                    type: 'direct', subject, body, actionLink: actionLink || null, timestamp, read: false
                 });
                 await batch.commit();
                 setToastMsg(`Message sent to ${selectedTarget}.`);
@@ -175,23 +153,15 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
         }
     };
 
-    // SEND QUICK REPLY (CHAT VIEW)
     const handleSendReply = async () => {
         if (!replyText.trim() || !activeThread || activeThread.type === 'broadcast') return;
         setIsSending(true);
 
         try {
             await addDoc(collection(db, 'artifacts', appId, 'messages'), {
-                senderId: user.uid,
-                senderName: user.displayName || instructorEmail.split('@')[0],
-                senderEmail: instructorEmail,
-                recipientEmail: activeThread.partnerEmail || 'student@magister.com',
-                recipientId: activeThread.partnerId || null, 
-                type: 'direct',
-                subject: `Re: Chat`,
-                body: replyText.trim(),
-                timestamp: Date.now(),
-                read: false
+                senderId: user.uid, senderName: user.displayName || instructorEmail.split('@')[0], senderEmail: instructorEmail,
+                recipientEmail: activeThread.partnerEmail || 'student@magister.com', recipientId: activeThread.partnerId || null, 
+                type: 'direct', subject: `Re: Chat`, body: replyText.trim(), timestamp: Date.now(), read: false
             });
             setReplyText('');
         } catch (error) {
@@ -200,6 +170,15 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
             setIsSending(false);
         }
     };
+
+    // Derived Labels for Dropdowns
+    const activeTargetLabel = recipientMode === 'cohort' ? classes.find((c:any) => c.id === selectedTarget)?.name : selectedTarget;
+    
+    const activeAttachLabel = actionLink 
+        ? (actionLink.startsWith('lesson_') 
+            ? lessons.find((l:any) => `lesson_${l.id}` === actionLink)?.title 
+            : availableDecks.find((d:any) => `deck_${d.id}` === actionLink)?.title || availableDecks.find((d:any) => `deck_${d.id}` === actionLink)?.name)
+        : '-- No Attachment --';
 
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden select-none animate-in fade-in duration-500 relative transition-colors duration-300">
@@ -302,10 +281,32 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
                                     </div>
                                     <div className="space-y-3">
                                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Select Recipient</label>
-                                        <select value={selectedTarget} onChange={(e) => setSelectedTarget(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-xl px-4 py-3 outline-none focus:border-indigo-500 transition-all shadow-inner">
-                                            <option value="" disabled>Select...</option>
-                                            {recipientMode === 'cohort' ? classes.map((c: any) => <option key={c.id} value={c.id}>{c.name} ({c.studentEmails?.length || 0})</option>) : allStudents.map((email: any) => <option key={email} value={email}>{email}</option>)}
-                                        </select>
+                                        {/* 🔥 CUSTOM RECIPIENT DROPDOWN */}
+                                        <div className="relative">
+                                            <button type="button" onClick={() => setIsTargetDropdownOpen(!isTargetDropdownOpen)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-xl px-4 py-3 outline-none focus:border-indigo-500 transition-all shadow-inner flex justify-between items-center">
+                                                <span className="truncate">{activeTargetLabel || 'Select...'}</span>
+                                                <ChevronDown size={16} className={`text-slate-400 transition-transform ${isTargetDropdownOpen ? 'rotate-180' : ''}`} />
+                                            </button>
+                                            {isTargetDropdownOpen && (
+                                                <>
+                                                    <div className="fixed inset-0 z-40" onClick={() => setIsTargetDropdownOpen(false)} />
+                                                    <div className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 overflow-y-auto max-h-60 py-2 custom-scrollbar">
+                                                        {recipientMode === 'cohort' 
+                                                            ? classes.map((c: any) => (
+                                                                <button key={c.id} type="button" onClick={() => { setSelectedTarget(c.id); setIsTargetDropdownOpen(false); }} className={`w-full text-left px-4 py-3 text-xs font-black uppercase tracking-widest transition-colors ${selectedTarget === c.id ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                                                                    {c.name} <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest ml-2">({c.studentEmails?.length || 0} Students)</span>
+                                                                </button>
+                                                            ))
+                                                            : allStudents.map((email: any) => (
+                                                                <button key={email} type="button" onClick={() => { setSelectedTarget(email); setIsTargetDropdownOpen(false); }} className={`w-full text-left px-4 py-3 text-xs font-bold transition-colors ${selectedTarget === email ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                                                                    {email}
+                                                                </button>
+                                                            ))
+                                                        }
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="space-y-3">
@@ -314,11 +315,37 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
                                 </div>
                                 <div className="space-y-3 bg-indigo-50 dark:bg-indigo-500/10 p-5 rounded-2xl border border-indigo-100 dark:border-indigo-500/30">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 flex items-center gap-2"><LinkIcon size={14} /> Attach Content (Optional)</label>
-                                    <select value={actionLink} onChange={(e) => setActionLink(e.target.value)} className="w-full bg-white dark:bg-slate-950 border border-indigo-200 dark:border-indigo-500/50 text-indigo-900 dark:text-indigo-200 font-bold rounded-xl px-4 py-3 outline-none focus:border-indigo-500 transition-all shadow-sm">
-                                        <option value="">-- No Attachment --</option>
-                                        <optgroup label="Lessons">{lessons.map((l: any) => <option key={l.id} value={`lesson_${l.id}`}>{l.title}</option>)}</optgroup>
-                                        <optgroup label="Flashcards">{availableDecks.map((d: any) => <option key={d.id} value={`deck_${d.id}`}>{d.title || d.name}</option>)}</optgroup>
-                                    </select>
+                                    {/* 🔥 CUSTOM ATTACHMENT DROPDOWN */}
+                                    <div className="relative">
+                                        <button type="button" onClick={() => setIsAttachDropdownOpen(!isAttachDropdownOpen)} className="w-full bg-white dark:bg-slate-950 border border-indigo-200 dark:border-indigo-500/50 text-indigo-900 dark:text-indigo-200 font-bold rounded-xl px-4 py-3 outline-none focus:border-indigo-500 transition-all shadow-sm flex justify-between items-center">
+                                            <span className="truncate">{activeAttachLabel}</span>
+                                            <ChevronDown size={16} className={`text-indigo-400 transition-transform ${isAttachDropdownOpen ? 'rotate-180' : ''}`} />
+                                        </button>
+                                        {isAttachDropdownOpen && (
+                                            <>
+                                                <div className="fixed inset-0 z-40" onClick={() => setIsAttachDropdownOpen(false)} />
+                                                <div className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-500/50 rounded-xl shadow-2xl z-50 overflow-y-auto max-h-64 py-2 custom-scrollbar">
+                                                    <button type="button" onClick={() => { setActionLink(''); setIsAttachDropdownOpen(false); }} className="w-full text-left px-4 py-3 text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                                        -- No Attachment --
+                                                    </button>
+                                                    
+                                                    {lessons.length > 0 && <div className="px-4 py-2 mt-2 text-[10px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-50/50 dark:bg-indigo-500/5">Lessons</div>}
+                                                    {lessons.map((l: any) => (
+                                                        <button key={l.id} type="button" onClick={() => { setActionLink(`lesson_${l.id}`); setIsAttachDropdownOpen(false); }} className={`w-full text-left px-4 py-3 text-sm font-bold transition-colors ${actionLink === `lesson_${l.id}` ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                                                            {l.title}
+                                                        </button>
+                                                    ))}
+                                                    
+                                                    {availableDecks.length > 0 && <div className="px-4 py-2 mt-2 text-[10px] font-black text-fuchsia-400 uppercase tracking-widest bg-fuchsia-50/50 dark:bg-fuchsia-500/5">Flashcards</div>}
+                                                    {availableDecks.map((d: any) => (
+                                                        <button key={d.id} type="button" onClick={() => { setActionLink(`deck_${d.id}`); setIsAttachDropdownOpen(false); }} className={`w-full text-left px-4 py-3 text-sm font-bold transition-colors ${actionLink === `deck_${d.id}` ? 'bg-fuchsia-50 dark:bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                                                            {d.title || d.name}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="space-y-3 flex-1 flex flex-col">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Message Body</label>
