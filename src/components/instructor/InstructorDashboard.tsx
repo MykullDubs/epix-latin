@@ -53,7 +53,7 @@ export default function InstructorDashboard({
   onLogout,
   AdminDashboardView 
 }: any) {
-  // 🔥 THE NEW ROUTING ENGINE: Stack-based History
+  // 🔥 THE ROUTING ENGINE: Stack-based History
   const [tabHistory, setTabHistory] = useState<string[]>(['dashboard']);
   const activeTab = tabHistory[tabHistory.length - 1] || 'dashboard';
 
@@ -68,24 +68,20 @@ export default function InstructorDashboard({
   const [preselectedContent, setPreselectedContent] = useState<{id: string, type: string} | null>(null);
 
   // --- NAVIGATION HANDLERS ---
-  
-  // 1. Root Navigation (Clicking the Sidebar) resets the stack
   const handleSidebarNav = (tab: string) => {
       setTabHistory([tab]);
       if (window.innerWidth < 768) {
-          setIsRailExpanded(false); // Auto-close rail on mobile
+          setIsRailExpanded(false);
       }
   };
 
-  // 2. Drill-down Navigation (Clicking Action Cards) builds the stack
   const handleDrillDown = (tab: string) => {
       setTabHistory(prev => {
-          if (prev[prev.length - 1] === tab) return prev; // Prevent duplicates
+          if (prev[prev.length - 1] === tab) return prev;
           return [...prev, tab];
       });
   };
 
-  // 3. Popping the Stack (Clicking Back)
   const handleGoBack = () => {
       setTabHistory(prev => prev.length > 1 ? prev.slice(0, -1) : prev);
   };
@@ -148,7 +144,8 @@ export default function InstructorDashboard({
       >
         <div className="h-24 flex items-center border-b border-slate-900 dark:border-slate-800/60 overflow-hidden shrink-0">
           <div className="w-20 flex items-center justify-center shrink-0">
-            <div className={`w-11 h-11 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 transition-all duration-700 ${isRailExpanded ? 'rotate-0' : 'rotate-12 scale-90 hover:scale-100 hover:rotate-0 cursor-pointer'}`} onClick={() => !isRailExpanded && setIsRailExpanded(true)}>
+            {/* 🔥 FIXED: Removed the rotate-12 so the hat is straight */}
+            <div className={`w-11 h-11 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 transition-all duration-500 ${isRailExpanded ? 'scale-100' : 'scale-90 hover:scale-100 cursor-pointer'}`} onClick={() => !isRailExpanded && setIsRailExpanded(true)}>
               <GraduationCap size={24} strokeWidth={2.5} />
             </div>
           </div>
@@ -223,7 +220,7 @@ export default function InstructorDashboard({
       {/* --- MAIN STAGE --- */}
       <main className="flex-1 flex flex-col overflow-hidden relative bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
         
-        {/* 🔥 THE GLOBAL RETURN BUTTON (Only shows if there is history) */}
+        {/* THE GLOBAL RETURN BUTTON */}
         {tabHistory.length > 1 && (
             <div className="shrink-0 px-4 md:px-8 pt-4 pb-2 z-10 flex items-center animate-in slide-in-from-top-4 duration-300">
                 <button
@@ -285,7 +282,6 @@ export default function InstructorDashboard({
              </div>
            )}
 
-           {/* 🔥 PRO-LMS: THE NEW INSTRUCTOR VAULT */}
            {activeTab === 'vault' && (
              <div className="h-full animate-in zoom-in-95 duration-500">
                <InstructorVault 
@@ -298,14 +294,12 @@ export default function InstructorDashboard({
                        setIsLiveModalOpen(true);
                    }}
                    onEditArtifact={(id: string, type: string) => {
-                       // Drill down into the studio so clicking 'Back' returns them to the Vault
                        handleDrillDown('studio');
                    }}
                />
              </div>
            )}
 
-           {/* 🔥 PRO-LMS: THE GRADEBOOK HUB */}
            {activeTab === 'gradebook' && (
              <div className="h-full flex flex-col animate-in slide-in-from-bottom-6 duration-500">
                 <div className="flex-none p-6 md:px-8 flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl">
@@ -364,14 +358,13 @@ export default function InstructorDashboard({
                       curriculums={curriculums}
                       onAssign={onAssign}
                       onLaunchLive={() => setIsLiveModalOpen(true)} 
-                      setActiveTab={handleDrillDown} // 🔥 We pass drill-down here so clicking a card pushes history!
+                      setActiveTab={handleDrillDown} 
                       onStartHUD={onStartHUD} 
                   />
                 )}
                 
                 {activeTab === 'analytics' && <AnalyticsDashboard classes={userData?.classes} />}
                 
-                {/* 🔥 PRO-LMS: Fully Wired Inbox */}
                 {activeTab === 'inbox' && (
                     <InstructorInbox 
                         user={user} 
@@ -383,7 +376,7 @@ export default function InstructorDashboard({
              </div>
            )}
 
-           {/* 🔥 LIVE ARENA MODAL */}
+           {/* LIVE ARENA MODAL */}
            <LiveSetupModal 
                isOpen={isLiveModalOpen}
                onClose={() => {
