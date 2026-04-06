@@ -375,6 +375,7 @@ export default function App() {
         onUpdateCard={actions.updateCard}
         onDeleteCard={actions.deleteCard} // 🔥 ADDED Delete Card
         onDeleteArtifact={actions.deleteArtifact} // 🔥 ADDED Delete Artifact (for Vault)
+        onMoveToFolder={actions.assignArtifactToFolder}  
         onAssign={actions.assignContent}
         onRevoke={actions.revokeContent}
         onCreateClass={actions.createClass}
