@@ -7,7 +7,8 @@ import {
     MessageSquare, MessageCircle, Gamepad2, CheckCircle2, X, Puzzle, 
     ChevronLeft, ChevronRight, Zap, Users, Clock, EyeOff, HelpCircle, 
     Layers, MousePointerClick, QrCode, Hourglass, Play, Pause, RotateCcw, 
-    Plus, Minus, PenTool, Crosshair, Eraser, Wrench, Highlighter, Type, Presentation
+    Plus, Minus, PenTool, Crosshair, Eraser, Wrench, Highlighter, Type, Presentation,
+    ChevronDown, ChevronUp // 🔥 IMPORTED CHEVRONS FOR THE NEW SMART DRAWERS
 } from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
 import PronunciationLab from './PronunciationLab'; 
@@ -123,7 +124,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       const timer = setInterval(() => setElapsedTime(prev => prev + 1), 1000);
       
       setTimerPos({ x: window.innerWidth - 350, y: 50 }); 
-      // 🔥 UPDATED: Spawns horizontally centered near the top so it isn't clipped off-screen
       setToolbarPos({ x: Math.max(50, window.innerWidth / 2 - 350), y: 80 }); 
       setMainToolsPos({ x: window.innerWidth - 340, y: window.innerHeight - 580 }); 
       
@@ -718,8 +718,11 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                           {blockType === 'discussion' && <DiscussionBlock block={block} />}
                           {blockType === 'game' && block.gameType === 'connect-three' && <GameBlock block={block} lessonVocab={lessonVocab} />}
                           {blockType === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
+                          
+                          {/* 🔥 NEW SMART DRAWERS INTEGRATED */}
                           {blockType === 'fill-blank' && <FillBlankBlock block={block} liveState={liveState} />}
                           {blockType === 'drag-drop' && <TapSortBlock block={block} liveState={liveState} />}
+                          
                           {blockType === 'pronunciation' && <PronunciationLab block={block} />} 
                       </>
                     )}
@@ -738,7 +741,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         )}
       </main>
 
-      {/* 🔥 NEW ABSOLUTE GLASSMORPHISM FOOTER OVERLAY */}
+      {/* ABSOLUTE GLASSMORPHISM FOOTER OVERLAY */}
       <footer className="absolute bottom-0 left-0 right-0 h-16 bg-slate-900/60 backdrop-blur-xl border-t border-white/10 flex items-center justify-between px-8 shrink-0 z-[8800] hover:bg-slate-900/90 transition-colors duration-500">
           <div className="flex items-center gap-4 md:gap-6">
               <h2 className="text-sm font-black text-slate-200 uppercase tracking-widest drop-shadow-md">{String(lesson?.title || '')}</h2>
@@ -917,11 +920,15 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
   const [wordBank, setWordBank] = useState<WordItem[]>(initialWordBank);
   const [filledBlanks, setFilledBlanks] = useState<(WordItem | null)[]>(Array(correctAnswers.length).fill(null));
   const [isChecked, setIsChecked] = useState(false);
+  
+  // 🔥 THE NEW SMART DRAWER STATE
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
       setWordBank(initialWordBank);
       setFilledBlanks(Array(correctAnswers.length).fill(null));
       setIsChecked(false);
+      setIsExpanded(false);
   }, [initialWordBank, correctAnswers.length]);
 
   const handleBankClick = (item: WordItem) => {
@@ -957,9 +964,10 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
 
       {!isChecked && (
         <div className="sticky top-4 z-50 -mx-4 px-4 mb-12">
-            <div className="bg-white/95 backdrop-blur-2xl rounded-[2.5rem] p-6 border-4 border-slate-200/50 shadow-[0_10px_40px_rgba(0,0,0,0.08)] flex flex-col items-center gap-4 max-h-[25vh] transition-all duration-300">
+            <div className={`bg-white/95 backdrop-blur-2xl rounded-[2.5rem] p-6 border-4 border-slate-200/50 shadow-[0_10px_40px_rgba(0,0,0,0.08)] flex flex-col items-center gap-4 transition-all duration-500 relative overflow-hidden ${isExpanded ? 'max-h-[60vh]' : 'max-h-[22vh] min-h-[22vh]'}`}>
                 <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest shrink-0 text-center">Word Bank Options</span>
-                <div className="flex flex-wrap gap-4 justify-center items-start overflow-y-auto custom-scrollbar w-full pb-2">
+                
+                <div className={`flex flex-wrap gap-4 justify-center items-start w-full transition-all duration-500 ${isExpanded ? 'overflow-y-auto custom-scrollbar pb-12' : 'overflow-hidden pb-4'}`}>
                   {wordBank.length === 0 ? (
                       <span className="text-[2.5vh] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                           <CheckCircle2 size={24} className="text-emerald-500" /> All placed
@@ -975,6 +983,18 @@ const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) =>
                       ))
                   )}
                 </div>
+
+                {/* 🔥 THE NEW SMART DRAWER TOGGLE */}
+                {wordBank.length > 6 && (
+                    <div className={`absolute bottom-0 left-0 right-0 flex justify-center pb-3 pt-12 pointer-events-none transition-all ${!isExpanded ? 'bg-gradient-to-t from-white via-white/95 to-transparent' : ''}`}>
+                        <button
+                            onClick={() => setIsExpanded(!isExpanded)}
+                            className="pointer-events-auto bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-8 py-3 rounded-full font-black text-[2vh] uppercase tracking-widest flex items-center gap-2 shadow-sm transition-all active:scale-95 border-2 border-indigo-200 hover:border-indigo-300"
+                        >
+                            {isExpanded ? <><ChevronUp size={24} /> Collapse</> : <><ChevronDown size={24} /> View All {wordBank.length} Options</>}
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
       )}
@@ -1065,6 +1085,9 @@ const TapSortBlock = ({ block, liveState }: { block: any, liveState?: any }) => 
     const [items, setItems] = useState<SortItem[]>(normalizedItems);
     const [placed, setPlaced] = useState<Record<string, SortItem[]>>({});
     const [selectedItem, setSelectedItem] = useState<SortItem | null>(null);
+    
+    // 🔥 THE NEW SMART DRAWER STATE
+    const [isExpanded, setIsExpanded] = useState(false);
 
     useEffect(() => {
         setItems(normalizedItems);
@@ -1072,6 +1095,7 @@ const TapSortBlock = ({ block, liveState }: { block: any, liveState?: any }) => 
         parsedCategories.forEach((c: string) => { init[c] = []; });
         setPlaced(init);
         setSelectedItem(null);
+        setIsExpanded(false);
     }, [normalizedItems, parsedCategories]);
 
     const handleBucketClick = (category: string) => {
@@ -1092,9 +1116,10 @@ const TapSortBlock = ({ block, liveState }: { block: any, liveState?: any }) => 
             </div>
 
             <div className="sticky top-4 z-50 -mx-4 px-4 mb-12">
-               <div className="bg-white/95 backdrop-blur-2xl rounded-[2.5rem] p-6 border-4 border-slate-200/50 shadow-[0_10px_40px_rgba(0,0,0,0.08)] flex flex-col items-center gap-3 max-h-[25vh] transition-all duration-300">
+               <div className={`bg-white/95 backdrop-blur-2xl rounded-[2.5rem] p-6 border-4 border-slate-200/50 shadow-[0_10px_40px_rgba(0,0,0,0.08)] flex flex-col items-center gap-3 transition-all duration-500 relative overflow-hidden ${isExpanded ? 'max-h-[60vh]' : 'max-h-[22vh] min-h-[22vh]'}`}>
                    <span className="text-[2vh] font-black text-amber-500 uppercase tracking-widest text-center shrink-0">Items to Sort</span>
-                   <div className="flex flex-wrap justify-center gap-4 overflow-y-auto custom-scrollbar w-full pb-2">
+                   
+                   <div className={`flex flex-wrap justify-center gap-4 w-full transition-all duration-500 ${isExpanded ? 'overflow-y-auto custom-scrollbar pb-12' : 'overflow-hidden pb-4'}`}>
                         {items.length === 0 ? (
                             <p className="text-amber-500 font-bold uppercase tracking-widest my-auto flex items-center gap-2"><CheckCircle2 size={24}/> All sorted!</p>
                         ) : (
@@ -1109,6 +1134,18 @@ const TapSortBlock = ({ block, liveState }: { block: any, liveState?: any }) => 
                             ))
                         )}
                    </div>
+
+                   {/* 🔥 THE NEW SMART DRAWER TOGGLE */}
+                   {items.length > 6 && (
+                       <div className={`absolute bottom-0 left-0 right-0 flex justify-center pb-3 pt-12 pointer-events-none transition-all ${!isExpanded ? 'bg-gradient-to-t from-white via-white/95 to-transparent' : ''}`}>
+                           <button
+                               onClick={() => setIsExpanded(!isExpanded)}
+                               className="pointer-events-auto bg-amber-100 hover:bg-amber-200 text-amber-700 px-8 py-3 rounded-full font-black text-[2vh] uppercase tracking-widest flex items-center gap-2 shadow-sm transition-all active:scale-95 border-2 border-amber-200 hover:border-amber-300"
+                           >
+                               {isExpanded ? <><ChevronUp size={24} /> Collapse</> : <><ChevronDown size={24} /> View All {items.length} Items</>}
+                           </button>
+                       </div>
+                   )}
                </div>
             </div>
 
