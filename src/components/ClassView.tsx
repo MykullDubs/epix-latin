@@ -424,13 +424,13 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const activePage = pages[activePageIdx];
   if (!lesson || !activePage) return null;
 
-  // 🔥 UPDATE: Generates the link to auto-join the live class view
   const joinUrl = `${window.location.origin}/play/${classId}`;
 
   return (
     <div 
         ref={classViewRef}
-        className="w-full h-[100dvh] flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500 relative"
+        // 🔥 FIXED: Broken out of app shell and forced true fullscreen
+        className="fixed inset-0 z-[9999] flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500"
         onContextMenu={handleRightClick} 
     >
       {/* 🔥 OS OVERLAYS & TOOLS */}
@@ -648,7 +648,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       )}
 
       {/* CORE PRESENTATION LAYER */}
-      <main className="flex-1 flex overflow-hidden relative group/canvas bg-slate-50 text-slate-900 z-0 w-full h-full">
+      <main className="flex-1 flex overflow-hidden relative group/canvas bg-slate-50 text-slate-900 z-0">
         
         {activePageIdx > 0 && (
             <button onClick={handlePrev} className="absolute left-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/5 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 shadow-lg"><ChevronLeft size={48} /></button>
@@ -729,8 +729,8 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       </main>
 
       {/* 🔥 NEW ABSOLUTE GLASSMORPHISM FOOTER OVERLAY */}
-      <footer className="absolute bottom-0 left-0 right-0 h-16 bg-slate-900/20 backdrop-blur-md border-t border-white/10 flex items-center justify-between px-8 shrink-0 z-[8800] hover:bg-slate-900/60 transition-colors duration-500">
-          <div className="flex items-center gap-6">
+      <footer className="absolute bottom-0 left-0 right-0 h-16 bg-slate-900/60 backdrop-blur-xl border-t border-white/10 flex items-center justify-between px-8 shrink-0 z-[8800] hover:bg-slate-900/90 transition-colors duration-500">
+          <div className="flex items-center gap-4 md:gap-6">
               <h2 className="text-sm font-black text-slate-200 uppercase tracking-widest drop-shadow-md">{String(lesson?.title || '')}</h2>
               <div className="h-5 w-px bg-white/20" />
               <span className="flex items-center gap-2 font-mono text-sm font-bold text-slate-300 drop-shadow-md"><Clock size={14} /> {formatTime(elapsedTime)}</span>
@@ -742,6 +742,14 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all text-xs font-black uppercase tracking-widest shadow-sm active:scale-95 border backdrop-blur-lg ${showTools || isAnnotating || isSpotlight || showTimer || isBlanked || showWhiteboard ? 'bg-indigo-600/90 text-white border-indigo-400/50 shadow-[0_0_15px_rgba(79,70,229,0.4)]' : 'bg-black/30 hover:bg-indigo-600/80 text-white border-white/10 hover:border-indigo-500/50'}`}
               >
                   <Wrench size={14} /> Tools (W)
+              </button>
+
+              {/* 🔥 NEW EXIT BUTTON TO RETURN TO DASHBOARD */}
+              <button 
+                  onClick={onExit} 
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl bg-rose-500/20 text-rose-300 hover:bg-rose-500 hover:text-white transition-colors ml-2 border border-rose-500/30 font-black text-[10px] uppercase tracking-widest"
+              >
+                  <X size={14} strokeWidth={3} /> Exit
               </button>
           </div>
           
