@@ -1,11 +1,10 @@
 // src/components/instructor/CommandCenter.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
     Users, Play, FileText, Activity, 
     CheckCircle2, PenTool, Layers, BookOpen, 
-    Clock, School, Inbox, Archive, Zap
+    Clock, School, Inbox, Archive, Zap, GripHorizontal
 } from 'lucide-react';
-import LiveActivityFeed from './LiveActivityFeed';
 import DeploymentModal from './DeploymentModal'; 
 
 export default function CommandCenter({ 
@@ -27,7 +26,18 @@ export default function CommandCenter({
         classes.find((c: any) => c.id === selectedClassId) || classes[0], 
     [classes, selectedClassId]);
 
-    // 2. Calculate Activity Trends
+    // 2. Calculate Real-Time Stats
+    const stats = useMemo(() => {
+        const classLogs = logs.filter((l: any) => l.classId === activeClass?.id);
+        const weeklyXp = classLogs.reduce((acc: number, log: any) => acc + (log.xp || 0), 0);
+        return {
+            activeStudents: activeClass?.studentEmails?.length || 0,
+            weeklyXp: weeklyXp,
+            avgLevel: Math.floor(weeklyXp / 5000) + 1 
+        };
+    }, [activeClass, logs]);
+
+    // 3. Calculate Activity Trends
     const weeklyActivity = useMemo(() => {
         const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
         const classLogs = logs.filter((l: any) => l.classId === activeClass?.id);
@@ -40,7 +50,7 @@ export default function CommandCenter({
         });
     }, [activeClass, logs]);
 
-    // 3. Time Formatter for the Live Pulse
+    // 4. Time Formatter for the Live Pulse
     const formatTimeAgo = (timestamp: number) => {
         if (!timestamp) return '';
         const diffMins = (Date.now() - timestamp) / 60000;
@@ -52,6 +62,74 @@ export default function CommandCenter({
         
         const diffDays = diffHours / 24;
         return `${Math.round(diffDays)}d ago`;
+    };
+
+    // ========================================================================
+    // DRAG AND DROP CARD CONFIGURATION
+    // ========================================================================
+    const cardConfig = useMemo(() => [
+        { id: 'live', title: 'Start Live Session', subtitle: 'Projector & Games', icon: Play, colorClass: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 border-indigo-200 dark:border-indigo-500/30', borderClass: 'hover:border-indigo-400 dark:hover:border-indigo-500', action: onLaunchLive },
+        { id: 'assign', title: 'Assign Content', subtitle: 'To Dashboards', icon: FileText, colorClass: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30', borderClass: 'hover:border-emerald-400 dark:hover:border-emerald-500', action: () => setIsDeployModalOpen(true) },
+        { id: 'lesson', title: 'Create Lesson', subtitle: 'Build Modules', icon: PenTool, colorClass: 'text-blue-500 bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30', borderClass: 'hover:border-blue-400 dark:hover:border-blue-500', action: () => setActiveTab('studio') },
+        { id: 'deck', title: 'Create Deck', subtitle: 'Flashcard Data', icon: Layers, colorClass: 'text-fuchsia-500 bg-fuchsia-50 dark:bg-fuchsia-500/10 border-fuchsia-200 dark:border-fuchsia-500/30', borderClass: 'hover:border-fuchsia-400 dark:hover:border-fuchsia-500', action: () => setActiveTab('studio') },
+        { id: 'cohorts', title: 'Cohort Manager', subtitle: 'Manage Rosters', icon: School, colorClass: 'text-violet-500 bg-violet-50 dark:bg-violet-500/10 border-violet-200 dark:border-violet-500/30', borderClass: 'hover:border-violet-400 dark:hover:border-violet-500', action: () => setActiveTab('classes') },
+        { id: 'gradebook', title: 'Gradebook', subtitle: 'Review Scores', icon: BookOpen, colorClass: 'text-rose-500 bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/30', borderClass: 'hover:border-rose-400 dark:hover:border-rose-500', action: () => setActiveTab('gradebook') },
+        { id: 'inbox', title: 'Comms Inbox', subtitle: 'Read & Send', icon: Inbox, colorClass: 'text-amber-500 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30', borderClass: 'hover:border-amber-400 dark:hover:border-amber-500', action: () => setActiveTab('inbox') },
+        { id: 'vault', title: 'Global Vault', subtitle: 'Saved Payloads', icon: Archive, colorClass: 'text-cyan-500 bg-cyan-50 dark:bg-cyan-500/10 border-cyan-200 dark:border-cyan-500/30', borderClass: 'hover:border-cyan-400 dark:hover:border-cyan-500', action: () => setActiveTab('vault') }
+    ], [onLaunchLive, setActiveTab, setIsDeployModalOpen]);
+
+    const [cardOrder, setCardOrder] = useState<string[]>(() => {
+        const saved = localStorage.getItem('magister_dashboard_order');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                if (parsed.length === cardConfig.length) return parsed;
+            } catch (e) {}
+        }
+        return cardConfig.map(c => c.id);
+    });
+
+    const dragItem = useRef<number | null>(null);
+    const dragOverItem = useRef<number | null>(null);
+
+    const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+        dragItem.current = index;
+        e.dataTransfer.effectAllowed = 'move';
+        // Add a slight delay to allow the drag image to generate before fading the original
+        setTimeout(() => {
+            if (e.target instanceof HTMLElement) e.target.classList.add('opacity-50');
+        }, 0);
+    };
+
+    const handleDragEnter = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+        e.preventDefault();
+        dragOverItem.current = index;
+    };
+
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault(); // Necessary to allow dropping
+    };
+
+    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        if (dragItem.current !== null && dragOverItem.current !== null && dragItem.current !== dragOverItem.current) {
+            const newOrder = [...cardOrder];
+            const draggedId = newOrder[dragItem.current];
+            newOrder.splice(dragItem.current, 1);
+            newOrder.splice(dragOverItem.current, 0, draggedId);
+            
+            setCardOrder(newOrder);
+            localStorage.setItem('magister_dashboard_order', JSON.stringify(newOrder));
+        }
+        if (e.target instanceof HTMLElement) e.target.classList.remove('opacity-50');
+        dragItem.current = null;
+        dragOverItem.current = null;
+    };
+
+    const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+        if (e.target instanceof HTMLElement) e.target.classList.remove('opacity-50');
+        dragItem.current = null;
+        dragOverItem.current = null;
     };
 
     return (
@@ -94,120 +172,41 @@ export default function CommandCenter({
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-700">
                 
-                {/* 1. THE 8-CARD QUICK ACTION GRID (M3 Tonal Harmony) */}
-                <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
-                    
-                    {/* 1. Indigo Tonal - Live Session */}
-                    <button 
-                        onClick={onLaunchLive}
-                        className="w-full p-5 bg-indigo-50 dark:bg-indigo-500/10 rounded-[2rem] flex flex-col justify-between group shadow-sm hover:shadow-md active:scale-[0.98] transition-all h-36 ring-1 ring-indigo-100 dark:ring-indigo-500/20 hover:ring-indigo-300"
-                    >
-                        <div className="w-12 h-12 bg-indigo-200 dark:bg-indigo-500/30 rounded-2xl flex items-center justify-center transition-colors group-hover:bg-indigo-300 dark:group-hover:bg-indigo-500/50">
-                            <Play size={20} className="text-indigo-700 dark:text-indigo-300 group-hover:scale-110 transition-transform ml-1" fill="currentColor" />
-                        </div>
-                        <div className="text-left mt-auto">
-                            <span className="font-black text-lg text-indigo-900 dark:text-indigo-100 uppercase tracking-tighter block leading-none mb-1">Start Live Session</span>
-                            <span className="text-[9px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">Projector & Games</span>
-                        </div>
-                    </button>
-                    
-                    {/* 2. Emerald Tonal - Deploy Content */}
-                    <button 
-                        onClick={() => setIsDeployModalOpen(true)}
-                        className="w-full p-5 bg-emerald-50 dark:bg-emerald-500/10 rounded-[2rem] flex flex-col justify-between group shadow-sm hover:shadow-md active:scale-[0.98] transition-all h-36 ring-1 ring-emerald-100 dark:ring-emerald-500/20 hover:ring-emerald-300"
-                    >
-                        <div className="w-12 h-12 bg-emerald-200 dark:bg-emerald-500/30 rounded-2xl flex items-center justify-center transition-colors group-hover:bg-emerald-300 dark:group-hover:bg-emerald-500/50">
-                            <FileText size={20} className="text-emerald-700 dark:text-emerald-300 group-hover:scale-110 transition-transform" />
-                        </div>
-                        <div className="text-left mt-auto">
-                            <span className="font-black text-lg text-emerald-900 dark:text-emerald-100 uppercase tracking-tighter block leading-none mb-1">Assign Content</span>
-                            <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">To Student Dashboard</span>
-                        </div>
-                    </button>
+                {/* 1. REARRANGEABLE QUICK ACTIONS (StudentHomeView Style) */}
+                <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
+                    {cardOrder.map((id, index) => {
+                        const config = cardConfig.find(c => c.id === id);
+                        if (!config) return null;
+                        const Icon = config.icon;
 
-                    {/* 3. Blue Tonal - Create Lesson */}
-                    <button 
-                        onClick={() => setActiveTab('studio')}
-                        className="w-full p-5 bg-blue-50 dark:bg-blue-500/10 rounded-[2rem] flex flex-col justify-between group shadow-sm hover:shadow-md active:scale-[0.98] transition-all h-36 ring-1 ring-blue-100 dark:ring-blue-500/20 hover:ring-blue-300"
-                    >
-                        <div className="w-12 h-12 bg-blue-200 dark:bg-blue-500/30 rounded-2xl flex items-center justify-center transition-colors group-hover:bg-blue-300 dark:group-hover:bg-blue-500/50">
-                            <PenTool size={20} className="text-blue-700 dark:text-blue-300 group-hover:scale-110 transition-transform" />
-                        </div>
-                        <div className="text-left mt-auto">
-                            <span className="font-black text-lg text-blue-900 dark:text-blue-100 uppercase tracking-tighter block leading-none mb-1">Create Lesson</span>
-                            <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">Build Interactive Modules</span>
-                        </div>
-                    </button>
+                        return (
+                            <div
+                                key={config.id}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, index)}
+                                onDragEnter={(e) => handleDragEnter(e, index)}
+                                onDragOver={handleDragOver}
+                                onDrop={handleDrop}
+                                onDragEnd={handleDragEnd}
+                                onClick={config.action}
+                                className={`bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-[2rem] p-6 flex flex-col transition-all cursor-pointer group relative overflow-hidden h-[180px] ${config.borderClass} hover:shadow-[0_10px_30px_rgba(99,102,241,0.15)]`}
+                            >
+                                <div className="flex justify-between items-start mb-auto relative z-10 shrink-0">
+                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border ${config.colorClass}`}>
+                                        <Icon size={24} />
+                                    </div>
+                                    <div className="text-slate-200 dark:text-slate-700 group-hover:text-slate-400 transition-colors opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing p-1">
+                                        <GripHorizontal size={20} />
+                                    </div>
+                                </div>
 
-                    {/* 4. Fuchsia Tonal - Create Deck */}
-                    <button 
-                        onClick={() => setActiveTab('studio')}
-                        className="w-full p-5 bg-fuchsia-50 dark:bg-fuchsia-500/10 rounded-[2rem] flex flex-col justify-between group shadow-sm hover:shadow-md active:scale-[0.98] transition-all h-36 ring-1 ring-fuchsia-100 dark:ring-fuchsia-500/20 hover:ring-fuchsia-300"
-                    >
-                        <div className="w-12 h-12 bg-fuchsia-200 dark:bg-fuchsia-500/30 rounded-2xl flex items-center justify-center transition-colors group-hover:bg-fuchsia-300 dark:group-hover:bg-fuchsia-500/50">
-                            <Layers size={20} className="text-fuchsia-700 dark:text-fuchsia-300 group-hover:scale-110 transition-transform" />
-                        </div>
-                        <div className="text-left mt-auto">
-                            <span className="font-black text-lg text-fuchsia-900 dark:text-fuchsia-100 uppercase tracking-tighter block leading-none mb-1">Create Deck</span>
-                            <span className="text-[9px] font-bold text-fuchsia-600 dark:text-fuchsia-400 uppercase tracking-widest">Build Flashcard Data</span>
-                        </div>
-                    </button>
-
-                    {/* 5. Violet Tonal - Cohort Manager */}
-                    <button 
-                        onClick={() => setActiveTab('classes')}
-                        className="w-full p-5 bg-violet-50 dark:bg-violet-500/10 rounded-[2rem] flex flex-col justify-between group shadow-sm hover:shadow-md active:scale-[0.98] transition-all h-36 ring-1 ring-violet-100 dark:ring-violet-500/20 hover:ring-violet-300"
-                    >
-                        <div className="w-12 h-12 bg-violet-200 dark:bg-violet-500/30 rounded-2xl flex items-center justify-center transition-colors group-hover:bg-violet-300 dark:group-hover:bg-violet-500/50">
-                            <School size={20} className="text-violet-700 dark:text-violet-300 group-hover:scale-110 transition-transform" />
-                        </div>
-                        <div className="text-left mt-auto">
-                            <span className="font-black text-lg text-violet-900 dark:text-violet-100 uppercase tracking-tighter block leading-none mb-1">Cohort Manager</span>
-                            <span className="text-[9px] font-bold text-violet-600 dark:text-violet-400 uppercase tracking-widest">Manage Students & Rosters</span>
-                        </div>
-                    </button>
-
-                    {/* 6. Rose Tonal - Gradebook */}
-                    <button 
-                        onClick={() => setActiveTab('gradebook')}
-                        className="w-full p-5 bg-rose-50 dark:bg-rose-500/10 rounded-[2rem] flex flex-col justify-between group shadow-sm hover:shadow-md active:scale-[0.98] transition-all h-36 ring-1 ring-rose-100 dark:ring-rose-500/20 hover:ring-rose-300"
-                    >
-                        <div className="w-12 h-12 bg-rose-200 dark:bg-rose-500/30 rounded-2xl flex items-center justify-center transition-colors group-hover:bg-rose-300 dark:group-hover:bg-rose-500/50">
-                            <BookOpen size={20} className="text-rose-700 dark:text-rose-300 group-hover:scale-110 transition-transform" />
-                        </div>
-                        <div className="text-left mt-auto">
-                            <span className="font-black text-lg text-rose-900 dark:text-rose-100 uppercase tracking-tighter block leading-none mb-1">Gradebook</span>
-                            <span className="text-[9px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-widest">Review Academic Performance</span>
-                        </div>
-                    </button>
-
-                    {/* 7. Amber Tonal - Inbox */}
-                    <button 
-                        onClick={() => setActiveTab('inbox')}
-                        className="w-full p-5 bg-amber-50 dark:bg-amber-500/10 rounded-[2rem] flex flex-col justify-between group shadow-sm hover:shadow-md active:scale-[0.98] transition-all h-36 ring-1 ring-amber-100 dark:ring-amber-500/20 hover:ring-amber-300"
-                    >
-                        <div className="w-12 h-12 bg-amber-200 dark:bg-amber-500/30 rounded-2xl flex items-center justify-center transition-colors group-hover:bg-amber-300 dark:group-hover:bg-amber-500/50">
-                            <Inbox size={20} className="text-amber-700 dark:text-amber-300 group-hover:scale-110 transition-transform" />
-                        </div>
-                        <div className="text-left mt-auto">
-                            <span className="font-black text-lg text-amber-900 dark:text-amber-100 uppercase tracking-tighter block leading-none mb-1">Comms Inbox</span>
-                            <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest">Read & Send Messages</span>
-                        </div>
-                    </button>
-
-                    {/* 8. Cyan Tonal - Global Vault */}
-                    <button 
-                        onClick={() => setActiveTab('vault')}
-                        className="w-full p-5 bg-cyan-50 dark:bg-cyan-500/10 rounded-[2rem] flex flex-col justify-between group shadow-sm hover:shadow-md active:scale-[0.98] transition-all h-36 ring-1 ring-cyan-100 dark:ring-cyan-500/20 hover:ring-cyan-300"
-                    >
-                        <div className="w-12 h-12 bg-cyan-200 dark:bg-cyan-500/30 rounded-2xl flex items-center justify-center transition-colors group-hover:bg-cyan-300 dark:group-hover:bg-cyan-500/50">
-                            <Archive size={20} className="text-cyan-700 dark:text-cyan-300 group-hover:scale-110 transition-transform" />
-                        </div>
-                        <div className="text-left mt-auto">
-                            <span className="font-black text-lg text-cyan-900 dark:text-cyan-100 uppercase tracking-tighter block leading-none mb-1">Global Vault</span>
-                            <span className="text-[9px] font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-widest">Browse Saved Payloads</span>
-                        </div>
-                    </button>
+                                <div className="relative z-10 mt-auto">
+                                    <h3 className="text-xl font-black text-slate-900 dark:text-white leading-tight mb-1">{config.title}</h3>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{config.subtitle}</p>
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
 
                 {/* 2. BOTTOM ROW: CHARTS & LOGS */}
