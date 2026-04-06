@@ -1,9 +1,11 @@
 // src/components/instructor/CommandCenter.tsx
 import React, { useState, useMemo } from 'react';
 import { 
-    Users, Zap, TrendingUp, Play, FileText, 
-    Activity, Shield, CheckCircle2, PenTool, Layers, BookOpen, Clock
+    Users, Play, FileText, Activity, 
+    CheckCircle2, PenTool, Layers, BookOpen, 
+    Clock, School, Inbox, Archive
 } from 'lucide-react';
+import LiveActivityFeed from './LiveActivityFeed';
 import DeploymentModal from './DeploymentModal'; 
 
 export default function CommandCenter({ 
@@ -25,18 +27,7 @@ export default function CommandCenter({
         classes.find((c: any) => c.id === selectedClassId) || classes[0], 
     [classes, selectedClassId]);
 
-    // 2. Calculate Real-Time Stats
-    const stats = useMemo(() => {
-        const classLogs = logs.filter((l: any) => l.classId === activeClass?.id);
-        const weeklyXp = classLogs.reduce((acc: number, log: any) => acc + (log.xp || 0), 0);
-        return {
-            activeStudents: activeClass?.studentEmails?.length || 0,
-            weeklyXp: weeklyXp,
-            avgLevel: Math.floor(weeklyXp / 5000) + 1 
-        };
-    }, [activeClass, logs]);
-
-    // 3. Calculate Activity Trends
+    // 2. Calculate Activity Trends
     const weeklyActivity = useMemo(() => {
         const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
         const classLogs = logs.filter((l: any) => l.classId === activeClass?.id);
@@ -49,7 +40,7 @@ export default function CommandCenter({
         });
     }, [activeClass, logs]);
 
-    // 4. Time Formatter for the Live Pulse
+    // 3. Time Formatter for the Live Pulse
     const formatTimeAgo = (timestamp: number) => {
         if (!timestamp) return '';
         const diffMins = (Date.now() - timestamp) / 60000;
@@ -103,10 +94,10 @@ export default function CommandCenter({
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-700">
                 
-                {/* 1. TOP ROW: QUICK ACTIONS (M3 Tonal Harmony) */}
-                <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-2">
+                {/* 1. THE 8-CARD QUICK ACTION GRID (M3 Tonal Harmony) */}
+                <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
                     
-                    {/* Indigo Tonal */}
+                    {/* 1. Indigo Tonal - Live Session */}
                     <button 
                         onClick={onLaunchLive}
                         className="w-full p-5 bg-indigo-50 dark:bg-indigo-500/10 rounded-[2rem] flex flex-col justify-between group shadow-sm hover:shadow-md active:scale-[0.98] transition-all h-36 ring-1 ring-indigo-100 dark:ring-indigo-500/20 hover:ring-indigo-300"
@@ -120,7 +111,7 @@ export default function CommandCenter({
                         </div>
                     </button>
                     
-                    {/* Emerald Tonal */}
+                    {/* 2. Emerald Tonal - Deploy Content */}
                     <button 
                         onClick={() => setIsDeployModalOpen(true)}
                         className="w-full p-5 bg-emerald-50 dark:bg-emerald-500/10 rounded-[2rem] flex flex-col justify-between group shadow-sm hover:shadow-md active:scale-[0.98] transition-all h-36 ring-1 ring-emerald-100 dark:ring-emerald-500/20 hover:ring-emerald-300"
@@ -134,7 +125,7 @@ export default function CommandCenter({
                         </div>
                     </button>
 
-                    {/* Blue Tonal */}
+                    {/* 3. Blue Tonal - Create Lesson */}
                     <button 
                         onClick={() => setActiveTab('studio')}
                         className="w-full p-5 bg-blue-50 dark:bg-blue-500/10 rounded-[2rem] flex flex-col justify-between group shadow-sm hover:shadow-md active:scale-[0.98] transition-all h-36 ring-1 ring-blue-100 dark:ring-blue-500/20 hover:ring-blue-300"
@@ -148,7 +139,7 @@ export default function CommandCenter({
                         </div>
                     </button>
 
-                    {/* Fuchsia Tonal */}
+                    {/* 4. Fuchsia Tonal - Create Deck */}
                     <button 
                         onClick={() => setActiveTab('studio')}
                         className="w-full p-5 bg-fuchsia-50 dark:bg-fuchsia-500/10 rounded-[2rem] flex flex-col justify-between group shadow-sm hover:shadow-md active:scale-[0.98] transition-all h-36 ring-1 ring-fuchsia-100 dark:ring-fuchsia-500/20 hover:ring-fuchsia-300"
@@ -161,30 +152,65 @@ export default function CommandCenter({
                             <span className="text-[9px] font-bold text-fuchsia-600 dark:text-fuchsia-400 uppercase tracking-widest">Build Flashcard Data</span>
                         </div>
                     </button>
+
+                    {/* 5. Violet Tonal - Cohort Manager */}
+                    <button 
+                        onClick={() => setActiveTab('classes')}
+                        className="w-full p-5 bg-violet-50 dark:bg-violet-500/10 rounded-[2rem] flex flex-col justify-between group shadow-sm hover:shadow-md active:scale-[0.98] transition-all h-36 ring-1 ring-violet-100 dark:ring-violet-500/20 hover:ring-violet-300"
+                    >
+                        <div className="w-12 h-12 bg-violet-200 dark:bg-violet-500/30 rounded-2xl flex items-center justify-center transition-colors group-hover:bg-violet-300 dark:group-hover:bg-violet-500/50">
+                            <School size={20} className="text-violet-700 dark:text-violet-300 group-hover:scale-110 transition-transform" />
+                        </div>
+                        <div className="text-left mt-auto">
+                            <span className="font-black text-lg text-violet-900 dark:text-violet-100 uppercase tracking-tighter block leading-none mb-1">Cohort Manager</span>
+                            <span className="text-[9px] font-bold text-violet-600 dark:text-violet-400 uppercase tracking-widest">Manage Students & Rosters</span>
+                        </div>
+                    </button>
+
+                    {/* 6. Rose Tonal - Gradebook */}
+                    <button 
+                        onClick={() => setActiveTab('gradebook')}
+                        className="w-full p-5 bg-rose-50 dark:bg-rose-500/10 rounded-[2rem] flex flex-col justify-between group shadow-sm hover:shadow-md active:scale-[0.98] transition-all h-36 ring-1 ring-rose-100 dark:ring-rose-500/20 hover:ring-rose-300"
+                    >
+                        <div className="w-12 h-12 bg-rose-200 dark:bg-rose-500/30 rounded-2xl flex items-center justify-center transition-colors group-hover:bg-rose-300 dark:group-hover:bg-rose-500/50">
+                            <BookOpen size={20} className="text-rose-700 dark:text-rose-300 group-hover:scale-110 transition-transform" />
+                        </div>
+                        <div className="text-left mt-auto">
+                            <span className="font-black text-lg text-rose-900 dark:text-rose-100 uppercase tracking-tighter block leading-none mb-1">Gradebook</span>
+                            <span className="text-[9px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-widest">Review Academic Performance</span>
+                        </div>
+                    </button>
+
+                    {/* 7. Amber Tonal - Inbox */}
+                    <button 
+                        onClick={() => setActiveTab('inbox')}
+                        className="w-full p-5 bg-amber-50 dark:bg-amber-500/10 rounded-[2rem] flex flex-col justify-between group shadow-sm hover:shadow-md active:scale-[0.98] transition-all h-36 ring-1 ring-amber-100 dark:ring-amber-500/20 hover:ring-amber-300"
+                    >
+                        <div className="w-12 h-12 bg-amber-200 dark:bg-amber-500/30 rounded-2xl flex items-center justify-center transition-colors group-hover:bg-amber-300 dark:group-hover:bg-amber-500/50">
+                            <Inbox size={20} className="text-amber-700 dark:text-amber-300 group-hover:scale-110 transition-transform" />
+                        </div>
+                        <div className="text-left mt-auto">
+                            <span className="font-black text-lg text-amber-900 dark:text-amber-100 uppercase tracking-tighter block leading-none mb-1">Comms Inbox</span>
+                            <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest">Read & Send Messages</span>
+                        </div>
+                    </button>
+
+                    {/* 8. Cyan Tonal - Global Vault */}
+                    <button 
+                        onClick={() => setActiveTab('vault')}
+                        className="w-full p-5 bg-cyan-50 dark:bg-cyan-500/10 rounded-[2rem] flex flex-col justify-between group shadow-sm hover:shadow-md active:scale-[0.98] transition-all h-36 ring-1 ring-cyan-100 dark:ring-cyan-500/20 hover:ring-cyan-300"
+                    >
+                        <div className="w-12 h-12 bg-cyan-200 dark:bg-cyan-500/30 rounded-2xl flex items-center justify-center transition-colors group-hover:bg-cyan-300 dark:group-hover:bg-cyan-500/50">
+                            <Archive size={20} className="text-cyan-700 dark:text-cyan-300 group-hover:scale-110 transition-transform" />
+                        </div>
+                        <div className="text-left mt-auto">
+                            <span className="font-black text-lg text-cyan-900 dark:text-cyan-100 uppercase tracking-tighter block leading-none mb-1">Global Vault</span>
+                            <span className="text-[9px] font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-widest">Browse Saved Payloads</span>
+                        </div>
+                    </button>
                 </div>
 
-                {/* 2. MIDDLE ROW: KPI TILES */}
-                <div className="lg:col-span-3 grid grid-cols-3 gap-4">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] shadow-sm ring-1 ring-slate-900/5 dark:ring-white/5 flex flex-col items-center md:items-start transition-all hover:shadow-md">
-                        <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 rounded-2xl flex items-center justify-center mb-4"><Users size={24} /></div>
-                        <span className="text-3xl font-black text-slate-800 dark:text-white mb-1">{stats.activeStudents}</span>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Enrolled Students</span>
-                    </div>
-                    
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] shadow-sm ring-1 ring-slate-900/5 dark:ring-white/5 flex flex-col items-center md:items-start transition-all hover:shadow-md">
-                        <div className="w-12 h-12 bg-amber-50 dark:bg-amber-500/10 text-amber-500 rounded-2xl flex items-center justify-center mb-4"><Zap size={24} fill="currentColor" /></div>
-                        <span className="text-3xl font-black text-slate-800 dark:text-white mb-1">{stats.weeklyXp.toLocaleString()}</span>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Class XP</span>
-                    </div>
-
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] shadow-sm ring-1 ring-slate-900/5 dark:ring-white/5 flex flex-col items-center md:items-start transition-all hover:shadow-md">
-                        <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 rounded-2xl flex items-center justify-center mb-4"><TrendingUp size={24} /></div>
-                        <span className="text-3xl font-black text-slate-800 dark:text-white mb-1">Lvl {stats.avgLevel}</span>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Class Level</span>
-                    </div>
-                </div>
-
-                {/* 3. BOTTOM ROW: CHARTS & LOGS */}
+                {/* 2. BOTTOM ROW: CHARTS & LOGS */}
                 <div className="lg:col-span-2 flex flex-col gap-6">
                     {/* ACTIVITY CHART */}
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-sm ring-1 ring-slate-900/5 dark:ring-white/5 flex flex-col h-full min-h-[350px]">
@@ -207,7 +233,7 @@ export default function CommandCenter({
                     </div>
                 </div>
 
-                {/* 4. RIGHT COLUMN: M3 INLINE LIVE PULSE */}
+                {/* 3. RIGHT COLUMN: M3 INLINE LIVE PULSE */}
                 <div className="lg:col-span-1 bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-sm ring-1 ring-slate-900/5 dark:ring-white/5 flex flex-col h-[500px]">
                     <div className="flex items-center justify-between mb-6 shrink-0">
                         <h2 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2">
