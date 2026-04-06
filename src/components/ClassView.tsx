@@ -121,9 +121,12 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       if (!lesson?.id) return;
       startLiveClass(lesson.id);
       const timer = setInterval(() => setElapsedTime(prev => prev + 1), 1000);
+      
       setTimerPos({ x: window.innerWidth - 350, y: 50 }); 
-      setToolbarPos({ x: window.innerWidth - 120, y: 80 }); 
+      // 🔥 UPDATED: Spawns horizontally centered near the top so it isn't clipped off-screen
+      setToolbarPos({ x: Math.max(50, window.innerWidth / 2 - 350), y: 80 }); 
       setMainToolsPos({ x: window.innerWidth - 340, y: window.innerHeight - 580 }); 
+      
       return () => { clearInterval(timer); endLiveClass(); };
   }, [lesson?.id]);
 
@@ -429,7 +432,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   return (
     <div 
         ref={classViewRef}
-        // 🔥 FIXED: Broken out of app shell and forced true fullscreen
         className="fixed inset-0 z-[9999] flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500"
         onContextMenu={handleRightClick} 
     >
@@ -490,25 +492,26 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           )}
       </div>
 
-      {/* 🎨 ADVANCED FLOATING PALETTE (Movable & Resizable) */}
+      {/* 🎨 HORIZONTAL FLOATING PALETTE (Movable & Resizable) */}
       {isAnnotating && (
           <div 
               className="absolute z-[8700] flex flex-col items-center pointer-events-auto animate-in fade-in zoom-in-95 duration-200"
               style={{ left: toolbarPos.x, top: toolbarPos.y, transform: `scale(${toolbarScale})`, transformOrigin: 'top left' }}
               onMouseDown={(e) => e.stopPropagation()}
           >
-              <div className="bg-slate-900/95 backdrop-blur-2xl p-4 pt-1 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-4 border-slate-700 flex flex-col gap-5 w-20 items-center relative overflow-hidden">
+              <div className="bg-slate-900/95 backdrop-blur-2xl p-3 pl-1 pr-8 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-4 border-slate-700 flex flex-row gap-5 items-center relative overflow-hidden">
                   
-                  {/* The Move Drag Handle */}
+                  {/* The Move Drag Handle (Now on the left) */}
                   <div 
-                      className="w-full h-8 cursor-grab active:cursor-grabbing flex justify-center items-center opacity-50 hover:opacity-100 transition-opacity bg-slate-800/50 rounded-t-[2rem] -mt-1 mb-1"
+                      className="h-16 w-8 cursor-grab active:cursor-grabbing flex justify-center items-center opacity-50 hover:opacity-100 transition-opacity bg-slate-800/50 rounded-l-full -ml-1 mr-1"
                       onMouseDown={startToolbarDrag}
                       title="Drag to move"
                   >
-                      <div className="w-8 h-1.5 bg-slate-400 rounded-full" />
+                      <div className="w-1.5 h-8 bg-slate-400 rounded-full" />
                   </div>
 
-                  <div className="flex flex-col gap-2 bg-slate-800/80 p-2 rounded-3xl w-full items-center border border-slate-700">
+                  {/* Tools Group */}
+                  <div className="flex flex-row gap-2 bg-slate-800/80 p-2 rounded-3xl items-center border border-slate-700">
                       <button onClick={() => { setMarkerStyle('pen'); forceSaveText(); }} className={`p-3 rounded-2xl transition-all ${markerStyle === 'pen' ? 'bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.6)]' : 'text-slate-400 hover:text-white'}`}>
                           <PenTool size={24} />
                       </button>
@@ -520,7 +523,10 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                       </button>
                   </div>
 
-                  <div className="flex flex-col gap-3">
+                  <div className="w-px h-10 bg-slate-700" />
+
+                  {/* Colors Group */}
+                  <div className="flex flex-row gap-3">
                       {['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#a855f7', '#ffffff', '#0f172a'].map(c => (
                           <button 
                               key={c} 
@@ -531,7 +537,10 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                       ))}
                   </div>
 
-                  <div className="flex flex-col items-center gap-3 bg-slate-800/80 p-2 rounded-3xl w-full border border-slate-700">
+                  <div className="w-px h-10 bg-slate-700" />
+
+                  {/* Sizes Group */}
+                  <div className="flex flex-row items-center gap-3 bg-slate-800/80 p-2 rounded-3xl border border-slate-700">
                       {[4, 8, 14].map(s => (
                           <button key={s} onClick={() => { setMarkerSize(s); if(activeText) setActiveText({...activeText}); }} className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-colors ${markerSize === s ? 'bg-slate-700' : 'hover:bg-slate-700/50'}`}>
                               <div className={`rounded-full transition-all ${markerStyle === 'text' ? 'bg-emerald-500' : 'bg-slate-300'}`} style={{ width: s, height: s }} />
@@ -539,13 +548,14 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                       ))}
                   </div>
                   
-                  <button onClick={clearAnnotations} title="Clear Ink & Text" className="bg-slate-800 hover:bg-rose-500 text-slate-400 hover:text-white p-4 rounded-2xl transition-all w-full flex items-center justify-center mb-4">
+                  {/* Clear Annotations Button */}
+                  <button onClick={clearAnnotations} title="Clear Ink & Text" className="bg-slate-800 hover:bg-rose-500 text-slate-400 hover:text-white p-4 rounded-full transition-all flex items-center justify-center ml-2">
                       <Eraser size={24} />
                   </button>
 
                   {/* The Scale Resize Handle */}
                   <div 
-                      className="absolute bottom-0 right-0 w-10 h-10 cursor-nwse-resize flex items-end justify-end p-2 opacity-50 hover:opacity-100 bg-slate-800/30 rounded-tl-full z-20"
+                      className="absolute bottom-0 right-0 w-8 h-8 cursor-nwse-resize flex items-end justify-end p-2 opacity-50 hover:opacity-100 bg-slate-800/30 rounded-tl-full rounded-br-full z-20"
                       onMouseDown={startToolbarResize}
                       title="Drag to resize"
                   >
@@ -648,7 +658,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       )}
 
       {/* CORE PRESENTATION LAYER */}
-      <main className="flex-1 flex overflow-hidden relative group/canvas bg-slate-50 text-slate-900 z-0">
+      <main className="flex-1 flex overflow-hidden relative group/canvas bg-slate-50 text-slate-900 z-0 w-full h-full">
         
         {activePageIdx > 0 && (
             <button onClick={handlePrev} className="absolute left-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/5 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 shadow-lg"><ChevronLeft size={48} /></button>
@@ -744,7 +754,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                   <Wrench size={14} /> Tools (W)
               </button>
 
-              {/* 🔥 NEW EXIT BUTTON TO RETURN TO DASHBOARD */}
               <button 
                   onClick={onExit} 
                   className="flex items-center gap-2 px-3 py-2 rounded-xl bg-rose-500/20 text-rose-300 hover:bg-rose-500 hover:text-white transition-colors ml-2 border border-rose-500/30 font-black text-[10px] uppercase tracking-widest"
