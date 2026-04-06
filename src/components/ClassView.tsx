@@ -10,7 +10,7 @@ import {
     Plus, Minus, PenTool, Crosshair, Eraser, Wrench, Highlighter, Type, Presentation
 } from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
-import PronunciationLab from './PronunciationLab'; // 🔥 IMPORTED THE PRONUNCIATION LAB
+import PronunciationLab from './PronunciationLab'; 
 
 // ============================================================================
 //  CLASS VIEW (The Projector / Big Screen Mode with Keyboard Nav)
@@ -19,14 +19,14 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const [activePageIdx, setActivePageIdx] = useState(0);
   const [showForum, setShowForum] = useState(false);
   
-  // 🔥 OS FEATURE: Presentation Telemetry & Overlays
+  // OS FEATURE: Presentation Telemetry & Overlays
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isBlanked, setIsBlanked] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [showTools, setShowTools] = useState(false);
   const [showWhiteboard, setShowWhiteboard] = useState(false);
   
-  // 🔥 OS FEATURE: Moveable Draggable Timer
+  // OS FEATURE: Moveable Draggable Timer
   const [showTimer, setShowTimer] = useState(false);
   const [timeLeft, setTimeLeft] = useState(300);
   const [timerRunning, setTimerRunning] = useState(false);
@@ -34,7 +34,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const isDraggingTimer = useRef(false);
   const timerDragOffset = useRef({ x: 0, y: 0 });
 
-  // 🔥 OS FEATURE: Moveable Main Tools Drawer
+  // OS FEATURE: Moveable Main Tools Drawer
   const [mainToolsPos, setMainToolsPos] = useState({ x: 0, y: 0 });
   const [mainToolsScale, setMainToolsScale] = useState(1);
   const isDraggingMainTools = useRef(false);
@@ -42,12 +42,12 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const mainToolsDragOffset = useRef({ x: 0, y: 0 });
   const mainToolsStartData = useRef({ y: 0, scale: 1 });
 
-  // 🔥 OS FEATURE: Spotlight & Annotation Marker
+  // OS FEATURE: Spotlight & Annotation Marker
   const [isSpotlight, setIsSpotlight] = useState(false);
   const [mousePos, setMousePos] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
   const [isAnnotating, setIsAnnotating] = useState(false);
   
-  // 🎨 NEW: Advanced Moveable/Resizable Annotation Palette
+  // ADVANCED Moveable/Resizable Annotation Palette
   const [markerColor, setMarkerColor] = useState('#ef4444');
   const [markerSize, setMarkerSize] = useState(6);
   const [markerStyle, setMarkerStyle] = useState<'pen' | 'highlighter' | 'text'>('pen');
@@ -84,8 +84,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
   const { liveState, startLiveClass, endLiveClass, changeSlide, triggerQuiz } = useLiveClass(classId, true);
 
-  // 🔥 OS FEATURE: Remote Control Slide Sync (Left/Right)
-  // This forces the projector to change slides when the HUD updates Firebase
+  // OS FEATURE: Remote Control Slide Sync (Left/Right)
   useEffect(() => {
       if (liveState?.currentBlockIndex !== undefined && liveState.currentBlockIndex !== activePageIdx) {
           setActivePageIdx(liveState.currentBlockIndex);
@@ -93,8 +92,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       }
   }, [liveState?.currentBlockIndex]);
 
-  // 🔥 OS FEATURE: Remote Control Scroll Receiver (Up/Down)
-  // This listens for scroll commands dispatched from the Instructor HUD
+  // OS FEATURE: Remote Control Scroll Receiver (Up/Down)
   useEffect(() => {
       if (!liveState?.scrollCommand || !stageRef.current) return;
       
@@ -124,8 +122,8 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       startLiveClass(lesson.id);
       const timer = setInterval(() => setElapsedTime(prev => prev + 1), 1000);
       setTimerPos({ x: window.innerWidth - 350, y: 50 }); 
-      setToolbarPos({ x: window.innerWidth - 120, y: 80 }); // Default marker palette position
-      setMainToolsPos({ x: window.innerWidth - 340, y: window.innerHeight - 580 }); // Default main tools position
+      setToolbarPos({ x: window.innerWidth - 120, y: 80 }); 
+      setMainToolsPos({ x: window.innerWidth - 340, y: window.innerHeight - 580 }); 
       return () => { clearInterval(timer); endLiveClass(); };
   }, [lesson?.id]);
 
@@ -142,31 +140,25 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   // GLOBAL MOUSE MOVEMENT HANDLER (Timer, Palettes, Tools, Spotlight)
   useEffect(() => {
       const handleMouseMove = (e: MouseEvent) => {
-          // Timer Dragging
           if (isDraggingTimer.current) {
               setTimerPos({ x: e.clientX - timerDragOffset.current.x, y: e.clientY - timerDragOffset.current.y });
           }
-          // Marker Palette Dragging
           if (isDraggingToolbar.current) {
               setToolbarPos({ x: e.clientX - toolbarDragOffset.current.x, y: e.clientY - toolbarDragOffset.current.y });
           }
-          // Marker Palette Resizing
           if (isResizingToolbar.current) {
               const dy = e.clientY - toolbarStartData.current.y;
               const newScale = Math.max(0.6, Math.min(2.2, toolbarStartData.current.scale + (dy * 0.005)));
               setToolbarScale(newScale);
           }
-          // Main Tools Dragging
           if (isDraggingMainTools.current) {
               setMainToolsPos({ x: e.clientX - mainToolsDragOffset.current.x, y: e.clientY - mainToolsDragOffset.current.y });
           }
-          // Main Tools Resizing
           if (isResizingMainTools.current) {
               const dy = e.clientY - mainToolsStartData.current.y;
               const newScale = Math.max(0.6, Math.min(2.2, mainToolsStartData.current.scale + (dy * 0.005)));
               setMainToolsScale(newScale);
           }
-          // Spotlight Tracking
           if (isSpotlight) {
               if (classViewRef.current) {
                   const rect = classViewRef.current.getBoundingClientRect();
@@ -347,7 +339,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
     if (!lesson?.blocks || !Array.isArray(lesson.blocks)) return [];
     const grouped: any[] = [];
     let buffer: any[] = [];
-    const interactables = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'drag-drop', 'pronunciation']; // 🔥 Added pronunciation to interactables list
+    const interactables = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'drag-drop', 'pronunciation'];
     
     lesson.blocks.forEach((b: any) => {
       const type = String(b?.type || '');
@@ -433,13 +425,12 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   if (!lesson || !activePage) return null;
 
   // 🔥 UPDATE: Generates the link to auto-join the live class view
-  const joinUrl = `${window.location.origin}/live/${classId}`;
+  const joinUrl = `${window.location.origin}/play/${classId}`;
 
   return (
     <div 
         ref={classViewRef}
-        className="w-full flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500 relative"
-        style={{ height: 'calc(100dvh - 4rem)' }}
+        className="w-full h-[100dvh] flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500 relative"
         onContextMenu={handleRightClick} 
     >
       {/* 🔥 OS OVERLAYS & TOOLS */}
@@ -657,7 +648,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       )}
 
       {/* CORE PRESENTATION LAYER */}
-      <main className="flex-1 flex overflow-hidden relative group/canvas bg-slate-50 text-slate-900 z-0">
+      <main className="flex-1 flex overflow-hidden relative group/canvas bg-slate-50 text-slate-900 z-0 w-full h-full">
         
         {activePageIdx > 0 && (
             <button onClick={handlePrev} className="absolute left-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/5 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 shadow-lg"><ChevronLeft size={48} /></button>
@@ -667,7 +658,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         )}
 
         <div ref={stageRef} className={`flex-1 overflow-y-auto w-full relative transition-all duration-500 ${showForum ? 'mr-[450px]' : ''} scroll-smooth`}>
-          <div className="flex flex-col min-h-full w-full items-center px-16 py-12 lg:px-32">
+          <div className="flex flex-col min-h-full w-full items-center px-16 py-12 lg:px-32 pb-24">
             <div className="w-full max-w-7xl space-y-24 my-auto">
               {activePage.blocks.map((block: any, i: number) => {
                 if (!block) return null;
@@ -719,7 +710,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                           {blockType === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
                           {blockType === 'fill-blank' && <FillBlankBlock block={block} liveState={liveState} />}
                           {blockType === 'drag-drop' && <TapSortBlock block={block} liveState={liveState} />}
-                          {/* 🔥 NEW: Added the Pronunciation Lab block renderer */}
                           {blockType === 'pronunciation' && <PronunciationLab block={block} />} 
                       </>
                     )}
@@ -738,28 +728,29 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         )}
       </main>
 
-      <footer className="h-20 bg-slate-900 border-t border-slate-800 flex items-center justify-between px-12 shrink-0 relative z-[8800]">
-          <div className="flex items-center gap-8">
-              <h2 className="text-xl font-black text-slate-400 uppercase tracking-widest">{String(lesson?.title || '')}</h2>
-              <div className="h-6 w-px bg-slate-800" />
-              <span className="flex items-center gap-2 font-mono text-lg font-bold text-slate-500"><Clock size={18} /> {formatTime(elapsedTime)}</span>
+      {/* 🔥 NEW ABSOLUTE GLASSMORPHISM FOOTER OVERLAY */}
+      <footer className="absolute bottom-0 left-0 right-0 h-16 bg-slate-900/20 backdrop-blur-md border-t border-white/10 flex items-center justify-between px-8 shrink-0 z-[8800] hover:bg-slate-900/60 transition-colors duration-500">
+          <div className="flex items-center gap-6">
+              <h2 className="text-sm font-black text-slate-200 uppercase tracking-widest drop-shadow-md">{String(lesson?.title || '')}</h2>
+              <div className="h-5 w-px bg-white/20" />
+              <span className="flex items-center gap-2 font-mono text-sm font-bold text-slate-300 drop-shadow-md"><Clock size={14} /> {formatTime(elapsedTime)}</span>
               
-              <div className="h-6 w-px bg-slate-800 mx-2" />
+              <div className="h-5 w-px bg-white/20 mx-2" />
               
               <button 
                   onClick={() => setShowTools(prev => !prev)} 
-                  className={`flex items-center gap-2 px-6 py-3 rounded-xl transition-all text-sm font-black uppercase tracking-widest shadow-sm active:scale-95 border ${showTools || isAnnotating || isSpotlight || showTimer || isBlanked || showWhiteboard ? 'bg-indigo-600 text-white border-indigo-500 shadow-[0_0_20px_rgba(79,70,229,0.5)]' : 'bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white border-slate-700 hover:border-indigo-500'}`}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all text-xs font-black uppercase tracking-widest shadow-sm active:scale-95 border backdrop-blur-lg ${showTools || isAnnotating || isSpotlight || showTimer || isBlanked || showWhiteboard ? 'bg-indigo-600/90 text-white border-indigo-400/50 shadow-[0_0_15px_rgba(79,70,229,0.4)]' : 'bg-black/30 hover:bg-indigo-600/80 text-white border-white/10 hover:border-indigo-500/50'}`}
               >
-                  <Wrench size={18} /> Tools (W)
+                  <Wrench size={14} /> Tools (W)
               </button>
           </div>
           
-          <div className="flex items-center gap-6">
-              <div ref={progressBarRef} onClick={handleProgressBarClick} className="w-64 h-3 bg-slate-800 rounded-full overflow-hidden cursor-pointer group relative">
-                  <div className="absolute inset-0 bg-slate-700 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="flex items-center gap-4">
+              <div ref={progressBarRef} onClick={handleProgressBarClick} className="w-48 h-2 bg-black/40 rounded-full overflow-hidden cursor-pointer group relative backdrop-blur-sm border border-white/10">
+                  <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
                   <div className="h-full bg-indigo-500 transition-all duration-300 relative z-10" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} />
               </div>
-              <span className="font-black text-slate-400 tracking-widest uppercase w-32 text-right">Slide {activePageIdx + 1} of {pages.length}</span>
+              <span className="font-black text-slate-300 tracking-widest uppercase w-28 text-right text-[10px] drop-shadow-md">Slide {activePageIdx + 1} of {pages.length}</span>
           </div>
       </footer>
     </div>
