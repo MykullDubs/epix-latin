@@ -350,9 +350,9 @@ export default function InstructorDashboard({
                isOpen={isLiveModalOpen}
                onClose={() => {
                    setIsLiveModalOpen(false);
-                   setPreselectedContent(null); // 🔥 Clears preselection on close
+                   setPreselectedContent(null); 
                }}
-               preselectedContent={preselectedContent} // 🔥 Passes the Vault selection
+               preselectedContent={preselectedContent}
                classes={userData?.classes || []}
                decks={allDecks}
                lessons={lessons}
@@ -360,12 +360,11 @@ export default function InstructorDashboard({
                    setIsLiveModalOpen(false);
                    setPreselectedContent(null);
                    
-                   // 🔥 BOOM: Instantly assign this content to the cohort's dashboard
-                   if (onAssign) {
+                   // 🔥 NEW: Only auto-assign if they deployed to a real cohort!
+                   if (onAssign && config.classId !== 'sandbox') {
                        onAssign(config.classId, config.contentId);
                    }
                    
-                   // Delay the launch by a fraction of a second to allow the modal to animate out smoothly
                    setTimeout(() => {
                        if (config.mode === 'connect_four') {
                            if (onStartConnectFour) onStartConnectFour(config.contentId, config.classId);
