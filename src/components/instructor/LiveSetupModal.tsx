@@ -10,13 +10,12 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
     const [selectedMode, setSelectedMode] = useState<'hud' | 'presentation' | 'trivia' | 'connect_four' | 'slipstream' | ''>('');
     const [selectedContentId, setSelectedContentId] = useState('');
 
-    // 🔥 NEW: Auto-hydrate the modal if opened from the Vault
+    // 🔥 Auto-hydrate the modal if opened from the Vault
     useEffect(() => {
         if (isOpen) {
             setSelectedClassId('');
             if (preselectedContent) {
                 setSelectedContentId(preselectedContent.id);
-                // Intelligently default the mode based on what they clicked in the Vault
                 setSelectedMode(preselectedContent.type === 'lesson' ? 'presentation' : 'trivia');
             } else {
                 setSelectedMode('');
@@ -29,7 +28,6 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
 
     const availableDecks = Object.values(decks || {}).filter((d: any) => d.id && d.id !== 'custom');
     
-    // Determine what type of payload the selected mode requires
     const requiresLesson = selectedMode === 'hud' || selectedMode === 'presentation';
     const requiresDeck = selectedMode === 'trivia' || selectedMode === 'connect_four' || selectedMode === 'slipstream';
 
@@ -60,7 +58,6 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
                     const currentModeRequiresLesson = selectedMode === 'hud' || selectedMode === 'presentation';
                     setSelectedMode(id);
                     
-                    // Only clear the payload if we are switching between incompatible types (e.g., Deck -> Lesson)
                     if (newModeRequiresLesson !== currentModeRequiresLesson) {
                         setSelectedContentId(''); 
                     }
@@ -107,9 +104,13 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
                             className="w-full bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-2xl px-5 py-4 outline-none focus:border-indigo-500 transition-all"
                         >
                             <option value="" disabled>Select a class...</option>
-                            {classes.map((c: any) => (
-                                <option key={c.id} value={c.id}>{c.name}</option>
-                            ))}
+                            {/* 🔥 NEW: Quick Launch / Sandbox Option */}
+                            <option value="sandbox" className="font-black text-amber-600">⚡ Quick Launch (Test / Guest Mode)</option>
+                            <optgroup label="Your Cohorts">
+                                {classes.map((c: any) => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                            </optgroup>
                         </select>
                     </div>
 
@@ -127,7 +128,7 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
                         </div>
                     </div>
 
-                    {/* STEP 3: PAYLOAD (Dynamic & Intelligent) */}
+                    {/* STEP 3: PAYLOAD */}
                     {selectedMode && (
                         <div className="space-y-3 animate-in slide-in-from-top-4 duration-300">
                             <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400">
@@ -135,7 +136,6 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
                                 3. {preselectedContent && selectedContentId === preselectedContent.id ? 'Locked Payload' : `Select ${requiresLesson ? 'Lesson Payload' : 'Data Crystal (Deck)'}`}
                             </label>
                             
-                            {/* 🔥 THE FIX: If the vault passed a payload, bypass the dropdown completely */}
                             {preselectedContent && selectedContentId === preselectedContent.id ? (
                                 <div className="w-full bg-indigo-50 dark:bg-indigo-500/10 border-2 border-indigo-200 dark:border-indigo-500/30 text-indigo-800 dark:text-indigo-200 font-bold rounded-2xl px-5 py-4 flex items-center justify-between shadow-inner">
                                     <span className="truncate pr-4 text-sm md:text-base">{getLockedTitle()}</span>
@@ -155,13 +155,6 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
                                     )}
                                 </select>
                             )}
-                            
-                            {!preselectedContent && requiresLesson && lessons.length === 0 && (
-                                <p className="text-xs text-rose-500 font-bold mt-2">No lessons available. Create one in the Studio Hub first.</p>
-                            )}
-                            {!preselectedContent && requiresDeck && availableDecks.length === 0 && (
-                                <p className="text-xs text-rose-500 font-bold mt-2">No decks available. Create one in the Studio Hub first.</p>
-                            )}
                         </div>
                     )}
                 </div>
@@ -175,7 +168,6 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
                         <Play size={20} fill="currentColor" /> Initialize Sequence
                     </button>
                 </div>
-
             </div>
         </div>
     );
