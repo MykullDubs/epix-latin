@@ -145,16 +145,13 @@ export default function BuilderHub({
   const [lessonData, setLessonData] = useState<any>({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
   const [mode, setMode] = useState<'card' | 'lesson' | 'exam' | 'arcade' | 'curriculum'>(initialMode || 'card'); 
   
-  // 🔥 NEW: We use this to toggle the preview pane explicitly
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
   const [isPreviewActive, setIsPreviewActive] = useState(false);
-
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
 
   useEffect(() => { if (initialMode) setMode(initialMode); }, [initialMode]);
 
-  // If we leave Lesson mode, hide the preview pane.
   useEffect(() => {
       if (mode !== 'lesson' && mode !== 'card') {
           setIsPreviewActive(false);
@@ -162,7 +159,7 @@ export default function BuilderHub({
   }, [mode]);
 
   const modes = [
-    { id: 'card', label: 'Scriptorium', icon: <Layers size={18}/>, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-500/10' },
+    { id: 'card', label: 'Magister Studio', icon: <Layers size={18}/>, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-500/10' },
     { id: 'lesson', label: 'Curriculum', icon: <BookOpen size={18}/>, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
     { id: 'exam', label: 'Assessment', icon: <FileText size={18}/>, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-500/10' },
     { id: 'arcade', label: 'Arcade', icon: <Gamepad2 size={18}/>, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-500/10' },
@@ -188,7 +185,7 @@ export default function BuilderHub({
     <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden select-none animate-in fade-in duration-500 relative transition-colors duration-300">
       {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
       
-      {/* HEADER */}
+      {/* UNIFIED HEADER */}
       <header className="h-24 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 md:px-10 flex justify-between items-center shrink-0 z-50 shadow-sm transition-colors duration-300">
         <div className="flex items-center gap-4">
           <div className={`p-3 rounded-2xl ${activeModeConfig.bg} ${activeModeConfig.color} hidden sm:flex transition-all duration-500 shadow-inner dark:shadow-none`}>
@@ -196,88 +193,41 @@ export default function BuilderHub({
           </div>
           <div>
             <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter uppercase leading-none">{activeModeConfig.label}</h2>
-            <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] mt-1">Magister Studio</p>
+            <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] mt-1">Content Creation</p>
           </div>
         </div>
 
-        {/* Mobile View Toggles (Hidden when in Curriculum Mode) */}
         {mode !== 'curriculum' && (
           <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl md:hidden border border-slate-200 dark:border-slate-700">
-            <button 
-              onClick={() => { setViewMode('edit'); setIsPreviewActive(false); }}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                viewMode === 'edit' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-md' : 'text-slate-400 dark:text-slate-500'
-              }`}
-            >
-              <Edit3 size={14} /> Edit
-            </button>
-            <button 
-              onClick={() => { setViewMode('preview'); setIsPreviewActive(true); }}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                viewMode === 'preview' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-md' : 'text-slate-400 dark:text-slate-500'
-              }`}
-            >
-              <Eye size={14} /> Preview
-            </button>
+            <button onClick={() => { setViewMode('edit'); setIsPreviewActive(false); }} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'edit' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-md' : 'text-slate-400 dark:text-slate-500'}`}><Edit3 size={14} /> Edit</button>
+            <button onClick={() => { setViewMode('preview'); setIsPreviewActive(true); }} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'preview' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-md' : 'text-slate-400 dark:text-slate-500'}`}><Eye size={14} /> Preview</button>
           </div>
         )}
 
         <div className="flex items-center gap-3">
+          <button onClick={() => setIsToolsOpen(!isToolsOpen)} className={`p-3 rounded-2xl transition-all border ${isToolsOpen ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/30' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 hover:text-indigo-500 dark:hover:text-indigo-400 hover:border-indigo-200 dark:hover:border-indigo-500/50'}`} title="Open Phonetic Engine"><Wrench size={20} /></button>
+          {initialMode && <button onClick={onClearMode} className="p-3 bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 rounded-2xl hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:text-rose-500 dark:hover:text-rose-400 transition-all border border-slate-200 dark:border-slate-700"><X size={20} /></button>}
           
-          {/* THE NEW TOOLS BUTTON */}
-          <button 
-             onClick={() => setIsToolsOpen(!isToolsOpen)}
-             className={`p-3 rounded-2xl transition-all border ${isToolsOpen ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/30' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 hover:text-indigo-500 dark:hover:text-indigo-400 hover:border-indigo-200 dark:hover:border-indigo-500/50'}`}
-             title="Open Phonetic Engine"
-          >
-             <Wrench size={20} />
-          </button>
-
-          {initialMode && (
-            <button onClick={onClearMode} className="p-3 bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 rounded-2xl hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:text-rose-500 dark:hover:text-rose-400 transition-all border border-slate-200 dark:border-slate-700">
-              <X size={20} />
-            </button>
-          )}
-          
-          {/* Desktop View Toggles (Hidden when in Curriculum Mode) */}
           {mode !== 'curriculum' && (
             <div className="hidden md:flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl shrink-0 mr-4">
-                <button onClick={() => { setViewMode('edit'); setIsPreviewActive(false); }} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${viewMode === 'edit' ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>
-                    <Edit3 size={14} /> Edit
-                </button>
-                <button onClick={() => { setViewMode('preview'); setIsPreviewActive(true); }} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${viewMode === 'preview' ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>
-                    <Eye size={14} /> Preview
-                </button>
+                <button onClick={() => { setViewMode('edit'); setIsPreviewActive(false); }} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${viewMode === 'edit' ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Edit3 size={14} /> Edit</button>
+                <button onClick={() => { setViewMode('preview'); setIsPreviewActive(true); }} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${viewMode === 'preview' ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Eye size={14} /> Preview</button>
             </div>
           )}
-
-          {mode !== 'exam' && (
-            <button 
-               onClick={handleCommit}
-               className={`hidden sm:flex text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all ${mode === 'arcade' ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/30' : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/30'}`}
-             >
-               Commit {mode === 'arcade' ? 'Game' : 'Unit'}
-             </button>
-          )}
+          {mode !== 'exam' && <button onClick={handleCommit} className={`hidden sm:flex text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all ${mode === 'arcade' ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/30' : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/30'}`}>Commit {mode === 'arcade' ? 'Game' : 'Unit'}</button>}
         </div>
       </header>
 
-      {/* 🔥 THE PHONETIC DRAWER OVERLAY */}
+      {/* THE PHONETIC DRAWER OVERLAY */}
       <PhoneticEngine isOpen={isToolsOpen} onClose={() => setIsToolsOpen(false)} />
 
       {/* WORKSPACE */}
       <div className="flex-1 flex overflow-hidden relative">
-        
-        {/* LEFT PANE: EDITOR */}
         <div className={`h-full overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] transition-all duration-500 ease-in-out ${
-          // 🔥 IF PREVIEW IS ACTIVE: squish to half width. ELSE: Take up full width!
-          isPreviewActive && (mode === 'lesson' || mode === 'card')
-            ? 'w-full md:w-1/2 opacity-100' 
-            : 'w-full opacity-100'
+          isPreviewActive && (mode === 'lesson' || mode === 'card') ? 'w-full md:w-1/2 opacity-100' : 'w-full opacity-100'
         }`}>
           <div className={`p-6 md:p-12 mx-auto pb-40 transition-all duration-500 ${!isPreviewActive ? 'max-w-5xl' : 'max-w-2xl'}`}>
             
-            {/* The Mode Selector */}
             <div className="mb-10 flex flex-wrap bg-slate-200/50 dark:bg-slate-800/50 p-1.5 rounded-[2rem] w-fit mx-auto md:mx-0 gap-1 border border-slate-200 dark:border-slate-800">
               {modes.map((m) => (
                 <button 
@@ -287,75 +237,26 @@ export default function BuilderHub({
                     if (m.id === 'arcade') setLessonData({ title: '', description: '', gameTemplate: 'connect-three', targetScore: 3, mode: 'pvp', deckIds: [] });
                     if (m.id === 'lesson') setLessonData({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
                   }} 
-                  className={`px-6 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${
-                    mode === m.id ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-lg scale-105 border border-slate-100 dark:border-slate-700' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                  }`}
+                  className={`px-6 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${mode === m.id ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-lg scale-105 border border-slate-100 dark:border-slate-700' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                 >
                   {m.id}
                 </button>
               ))}
             </div>
 
-            {/* The Content Renderers */}
             <div className="animate-in fade-in slide-in-from-bottom-4">
-              {mode === 'card' && (
-                <CardBuilderView 
-                    onSaveCard={onSaveCard} 
-                    onUpdateCard={onUpdateCard} 
-                    onDeleteCard={onDeleteCard} 
-                    availableDecks={allDecks} 
-                    onPublishDeck={onPublishDeck}            
-                    instructorClasses={instructorClasses}   
-                />
-              )}
-              
-              {mode === 'lesson' && (
-                <LessonBuilderView 
-                    data={lessonData} 
-                    setData={setLessonData} 
-                    onTogglePreview={() => setIsPreviewActive(!isPreviewActive)} // 🔥 NEW: Pass toggle to LessonBuilder
-                    isPreviewActive={isPreviewActive}
-                />
-              )}
-              
-              {mode === 'exam' && (
-                <div className="-mx-6 md:-mx-12">
-                   <ExamBuilderView 
-                      onSave={(examObj: any) => { 
-                          onSaveLesson(examObj); 
-                          setToastMsg("Assessment Successfully Built! 🎯"); 
-                      }} 
-                   />
-                </div>
-              )}
-              
-              {mode === 'arcade' && (
-                <ArcadeBuilderView 
-                    data={lessonData} 
-                    setData={setLessonData} 
-                    availableDecks={allDecks} 
-                />
-              )}
-
-              {mode === 'curriculum' && (
-                <div className="-mx-2 md:-mx-8">
-                   <CurriculumBuilderView 
-                      availableLessons={lessons} 
-                      onSaveCurriculum={onSaveCurriculum} 
-                      classes={instructorClasses} 
-                      curriculums={curriculums}   
-                   />
-                </div>
-              )}
+              {mode === 'card' && <CardBuilderView onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} availableDecks={allDecks} onPublishDeck={onPublishDeck} instructorClasses={instructorClasses} />}
+              {mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onTogglePreview={() => setIsPreviewActive(!isPreviewActive)} isPreviewActive={isPreviewActive} />}
+              {mode === 'exam' && <div className="-mx-6 md:-mx-12"><ExamBuilderView onSave={(examObj: any) => { onSaveLesson(examObj); setToastMsg("Assessment Successfully Built! 🎯"); }} /></div>}
+              {mode === 'arcade' && <ArcadeBuilderView data={lessonData} setData={setLessonData} availableDecks={allDecks} />}
+              {mode === 'curriculum' && <div className="-mx-2 md:-mx-8"><CurriculumBuilderView availableLessons={lessons} onSaveCurriculum={onSaveCurriculum} classes={instructorClasses} curriculums={curriculums} /></div>}
             </div>
           </div>
         </div>
 
-        {/* RIGHT PANE: LIVE PREVIEW (Only renders if isPreviewActive is true!) */}
         {isPreviewActive && (mode === 'lesson' || mode === 'card') && (
             <div className="h-full bg-slate-100 dark:bg-slate-950/50 border-l border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center p-6 md:p-12 transition-all duration-500 w-full md:w-1/2 animate-in slide-in-from-right-16">
               <div className="relative w-full h-full max-w-sm max-h-[750px] group flex flex-col items-center justify-center">
-                
                 <div className="absolute -inset-4 bg-gradient-to-tr from-indigo-500/10 to-emerald-500/10 blur-2xl rounded-[4rem] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
                 <div className="relative h-full w-full animate-in zoom-in-95 duration-500 shadow-2xl rounded-[3rem] border-[12px] border-slate-900 dark:border-black overflow-hidden">
                   <LivePreview data={lessonData} />
@@ -365,11 +266,8 @@ export default function BuilderHub({
         )}
       </div>
 
-      {/* MOBILE/TABLET FOOTER (Hidden in Curriculum Mode) */}
       {mode !== 'curriculum' && (
-          <div className={`md:hidden fixed bottom-10 left-1/2 -translate-x-1/2 z-50 transition-all duration-500 ${
-            viewMode === 'edit' ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'
-          }`}>
+          <div className={`md:hidden fixed bottom-10 left-1/2 -translate-x-1/2 z-50 transition-all duration-500 ${viewMode === 'edit' ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'}`}>
             <div className="bg-slate-900/90 dark:bg-slate-800/90 backdrop-blur-xl border border-slate-700 px-8 py-4 rounded-full shadow-2xl flex items-center gap-4">
               <div className={`w-2 h-2 rounded-full animate-pulse ${activeModeConfig.color.replace('text-', 'bg-')}`} />
               <p className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Editing: {mode}</p>
