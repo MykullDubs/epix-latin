@@ -1,8 +1,8 @@
-// src/components/student/GuestPlayScreen.tsx
+// src/components/GuestPlayScreen.tsx
 import React, { useState, useEffect } from 'react';
 import { doc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
-import { db, appId } from '../../config/firebase';
-import { Gamepad2, Zap, User, ArrowRight, CheckCircle2, ShieldAlert, Loader2 } from 'lucide-react';
+import { db, appId } from '../config/firebase'; // 🔥 FIXED: Path corrected to go up only one level
+import { Gamepad2, Zap, User, CheckCircle2, ShieldAlert, Loader2 } from 'lucide-react';
 
 export default function GuestPlayScreen({ classId }: { classId: string }) {
     const [nickname, setNickname] = useState('');
