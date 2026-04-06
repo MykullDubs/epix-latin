@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
     Code, Trash2, AlignLeft, FileText, MessageSquare, 
-    List, HelpCircle, Image, Puzzle, MessageCircle, Gamepad2, X, Info, Activity, Mic, Play
+    List, HelpCircle, Image, Puzzle, MessageCircle, Gamepad2, X, Info, Activity, Mic, Play, Tag
 } from 'lucide-react';
 
 export function InjectorButton({ icon, label, subtitle, onClick, colorTheme = 'indigo' }: any) {
@@ -39,6 +39,9 @@ export function InjectorButton({ icon, label, subtitle, onClick, colorTheme = 'i
 export default function LessonBuilderView({ data, setData, onTogglePreview, isPreviewActive }: any) {
   const [jsonMode, setJsonMode] = useState(false);
   const [jsonInput, setJsonInput] = useState(JSON.stringify(data, null, 2));
+  
+  // 🔥 SMART TAG STATE
+  const [tagInput, setTagInput] = useState('');
 
   const updateBlock = (index: number, field: string, value: any) => {
     const newBlocks = [...(data.blocks || [])];
@@ -79,6 +82,23 @@ export default function LessonBuilderView({ data, setData, onTogglePreview, isPr
     setData({ ...data, blocks: newBlocks });
   };
 
+  // 🔥 TAG HANDLING LOGIC
+  const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter' || e.key === ',') {
+          e.preventDefault();
+          const newTag = tagInput.trim().toLowerCase();
+          if (newTag && !(data.tags || []).includes(newTag)) {
+              setData({ ...data, tags: [...(data.tags || []), newTag] });
+          }
+          setTagInput('');
+      }
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+      const newTags = (data.tags || []).filter((t: string) => t !== tagToRemove);
+      setData({ ...data, tags: newTags });
+  };
+
   const handleImportJson = () => {
     try {
       const parsed = JSON.parse(jsonInput);
@@ -96,14 +116,13 @@ export default function LessonBuilderView({ data, setData, onTogglePreview, isPr
   return (
     <div className="max-w-4xl mx-auto space-y-10 pb-64 relative">
       
-      {/* 🔥 STICKY HEADER WITH TOGGLES */}
+      {/* STICKY HEADER WITH TOGGLES */}
       <div className="sticky top-4 z-50 flex justify-between items-center bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl p-3 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-[0_10px_40px_rgba(0,0,0,0.08)]">
          <div className="flex gap-2">
              <button onClick={() => setJsonMode(!jsonMode)} className={`flex items-center gap-2 px-5 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${jsonMode ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
                 <Code size={16} /> {jsonMode ? 'Exit JSON' : 'Advanced JSON'}
              </button>
              
-             {/* THE NEW PREVIEW TOGGLE */}
              {onTogglePreview && (
                  <button onClick={onTogglePreview} className={`flex items-center gap-2 px-5 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${isPreviewActive ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100 hover:border-indigo-200'}`}>
                      <Play size={16} fill={isPreviewActive ? "currentColor" : "none"} /> {isPreviewActive ? 'Close Preview' : 'Live Preview'}
@@ -125,6 +144,27 @@ export default function LessonBuilderView({ data, setData, onTogglePreview, isPr
           <div className="space-y-4 px-2">
             <input className="text-4xl md:text-5xl font-black border-none w-full focus:ring-0 p-0 tracking-tighter bg-transparent outline-none text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-700" placeholder="Unit Title..." value={data.title || ''} onChange={e => setData({...data, title: e.target.value})} />
             <input className="text-lg md:text-xl font-bold text-slate-400 border-none w-full focus:ring-0 p-0 tracking-tight bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-700" placeholder="Subtitle..." value={data.subtitle || ''} onChange={e => setData({...data, subtitle: e.target.value})} />
+            
+            {/* 🔥 NEW: SMART TAGS UI */}
+            <div className="flex flex-wrap items-center gap-2 pt-2">
+                {(data.tags || []).map((tag: string) => (
+                    <span key={tag} className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-lg text-[10px] font-black uppercase tracking-widest border border-indigo-100 dark:border-indigo-500/20 shadow-sm animate-in zoom-in-95 duration-200">
+                        {tag}
+                        <button onClick={() => handleRemoveTag(tag)} className="hover:text-rose-500 ml-1 transition-colors"><X size={12} strokeWidth={3} /></button>
+                    </span>
+                ))}
+                <div className="flex items-center relative">
+                    <Tag size={14} className="absolute left-3 text-slate-400" />
+                    <input 
+                        type="text" 
+                        placeholder="Add tags (press Enter)..." 
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={handleAddTag}
+                        className="pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 outline-none focus:border-indigo-500 transition-colors w-48 shadow-sm"
+                    />
+                </div>
+            </div>
           </div>
 
           <div className="space-y-6">
