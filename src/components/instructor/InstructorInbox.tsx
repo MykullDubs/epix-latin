@@ -25,7 +25,7 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
     const [body, setBody] = useState('');
     const [actionLink, setActionLink] = useState(''); 
     
-    // 🔥 CUSTOM DROPDOWN STATES
+    // CUSTOM DROPDOWN STATES
     const [isTargetDropdownOpen, setIsTargetDropdownOpen] = useState(false);
     const [isAttachDropdownOpen, setIsAttachDropdownOpen] = useState(false);
 
@@ -101,7 +101,7 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
         }
     }, [activeThread, user?.uid]);
 
-    const availableDecks = Object.values(decks || {}).filter((d: any) => d.id && d.id !== 'custom');
+    const availableDecks: any[] = Object.values(decks || {}).filter((d: any) => d.id && d.id !== 'custom');
     const allStudents = Array.from(new Set(classes.flatMap((c: any) => c.studentEmails || [])));
 
     // SEND NEW BROADCAST OR DIRECT MESSAGE
@@ -171,14 +171,21 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
         }
     };
 
-    // Derived Labels for Dropdowns
+    // 🔥 FIXED: Safely typed derived labels
     const activeTargetLabel = recipientMode === 'cohort' ? classes.find((c:any) => c.id === selectedTarget)?.name : selectedTarget;
     
-    const activeAttachLabel = actionLink 
-        ? (actionLink.startsWith('lesson_') 
-            ? lessons.find((l:any) => `lesson_${l.id}` === actionLink)?.title 
-            : availableDecks.find((d:any) => `deck_${d.id}` === actionLink)?.title || availableDecks.find((d:any) => `deck_${d.id}` === actionLink)?.name)
-        : '-- No Attachment --';
+    const activeAttachLabel = useMemo(() => {
+        if (!actionLink) return '-- No Attachment --';
+        if (actionLink.startsWith('lesson_')) {
+            const lesson: any = lessons.find((l: any) => `lesson_${l.id}` === actionLink);
+            return lesson?.title || 'Unknown Lesson';
+        }
+        if (actionLink.startsWith('deck_')) {
+            const deck: any = availableDecks.find((d: any) => `deck_${d.id}` === actionLink);
+            return deck?.title || deck?.name || 'Unknown Deck';
+        }
+        return '-- No Attachment --';
+    }, [actionLink, lessons, availableDecks]);
 
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden select-none animate-in fade-in duration-500 relative transition-colors duration-300">
@@ -281,7 +288,7 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
                                     </div>
                                     <div className="space-y-3">
                                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Select Recipient</label>
-                                        {/* 🔥 CUSTOM RECIPIENT DROPDOWN */}
+                                        {/* CUSTOM RECIPIENT DROPDOWN */}
                                         <div className="relative">
                                             <button type="button" onClick={() => setIsTargetDropdownOpen(!isTargetDropdownOpen)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-xl px-4 py-3 outline-none focus:border-indigo-500 transition-all shadow-inner flex justify-between items-center">
                                                 <span className="truncate">{activeTargetLabel || 'Select...'}</span>
@@ -315,7 +322,7 @@ export default function InstructorInbox({ user, classes = [], decks = {}, lesson
                                 </div>
                                 <div className="space-y-3 bg-indigo-50 dark:bg-indigo-500/10 p-5 rounded-2xl border border-indigo-100 dark:border-indigo-500/30">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 flex items-center gap-2"><LinkIcon size={14} /> Attach Content (Optional)</label>
-                                    {/* 🔥 CUSTOM ATTACHMENT DROPDOWN */}
+                                    {/* CUSTOM ATTACHMENT DROPDOWN */}
                                     <div className="relative">
                                         <button type="button" onClick={() => setIsAttachDropdownOpen(!isAttachDropdownOpen)} className="w-full bg-white dark:bg-slate-950 border border-indigo-200 dark:border-indigo-500/50 text-indigo-900 dark:text-indigo-200 font-bold rounded-xl px-4 py-3 outline-none focus:border-indigo-500 transition-all shadow-sm flex justify-between items-center">
                                             <span className="truncate">{activeAttachLabel}</span>
