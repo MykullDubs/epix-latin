@@ -87,7 +87,6 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
 
         setIsGenerating(true);
 
-        // 🔥 EXPANDED SYSTEM PROMPT WITH ESSAY AND PRONUNCIATION SCHEMAS
         const systemPrompt = `You are an expert instructional designer. Generate educational content based on the provided topic, text, or attached PDF document.
         Target Audience: ${gradeLevel}.
         
@@ -306,7 +305,8 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
                                 <span className="text-xs font-black uppercase tracking-widest">Dialogue</span>
                             </button>
 
-                            <button disabled={is/Generating} onClick={() => toggleType('discussion')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.discussion ? 'bg-violet-50 dark:bg-violet-500/10 border-violet-500 text-violet-700 dark:text-violet-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-violet-300'}`}>
+                            {/* 🔥 FIX: Typo removed here! */}
+                            <button disabled={isGenerating} onClick={() => toggleType('discussion')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.discussion ? 'bg-violet-50 dark:bg-violet-500/10 border-violet-500 text-violet-700 dark:text-violet-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-violet-300'}`}>
                                 <MessageCircle size={18} className={selectedTypes.discussion ? 'text-violet-500' : 'text-slate-400'} />
                                 <span className="text-xs font-black uppercase tracking-widest">Discussion</span>
                             </button>
