@@ -18,7 +18,6 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
     const [pdfBase64, setPdfBase64] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // 🔥 EXPANDED GENERATION TARGETS
     const [selectedTypes, setSelectedTypes] = useState({
         text: true,
         vocab: true,
@@ -85,7 +84,6 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
 
         setIsGenerating(true);
 
-        // 🔥 EXPANDED SYSTEM PROMPT WITH NEW SCHEMAS
         const systemPrompt = `You are an expert instructional designer. Generate educational content based on the provided topic, text, or attached PDF document.
         Target Audience: ${gradeLevel}.
         
@@ -114,7 +112,8 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
         }
 
         try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+            // 🔥 UPDATED TO GEMINI 3.1 FLASH-LITE
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -176,7 +175,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
                         </div>
                         <div>
                             <h2 className="text-xl font-black uppercase tracking-widest leading-none">Magic Generator</h2>
-                            <p className="text-[10px] font-bold text-indigo-100 uppercase tracking-widest mt-1">Multimodal Document Analysis</p>
+                            <p className="text-[10px] font-bold text-indigo-100 uppercase tracking-widest mt-1">Powered by Gemini 3.1 Flash-Lite</p>
                         </div>
                     </div>
                     <button 
@@ -191,7 +190,6 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
                 {/* Body */}
                 <div className="p-8 flex flex-col gap-6 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-slate-950">
                     
-                    {/* PDF UPLOAD ZONE */}
                     <div className="space-y-3">
                         <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
                             Source Document (Optional)
@@ -233,7 +231,6 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
                         <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
                     </div>
 
-                    {/* Prompt Input */}
                     <div className="space-y-3">
                         <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
                             Context & Instructions
@@ -271,7 +268,6 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
                         </div>
                     </div>
 
-                    {/* 🔥 EXPANDED BLOCK SELECTORS */}
                     <div className="space-y-3 pb-4">
                         <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
                             Generated Assets
