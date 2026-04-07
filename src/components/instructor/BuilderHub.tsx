@@ -228,20 +228,29 @@ export default function BuilderHub({
         }`}>
           <div className={`p-6 md:p-12 mx-auto pb-40 transition-all duration-500 ${!isPreviewActive ? 'max-w-5xl' : 'max-w-2xl'}`}>
             
-            <div className="mb-10 flex flex-wrap bg-slate-200/50 dark:bg-slate-800/50 p-1.5 rounded-[2rem] w-fit mx-auto md:mx-0 gap-1 border border-slate-200 dark:border-slate-800">
-              {modes.map((m) => (
-                <button 
-                  key={m.id}
-                  onClick={() => {
-                    setMode(m.id as any);
-                    if (m.id === 'arcade') setLessonData({ title: '', description: '', gameTemplate: 'connect-three', targetScore: 3, mode: 'pvp', deckIds: [] });
-                    if (m.id === 'lesson') setLessonData({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
-                  }} 
-                  className={`px-6 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${mode === m.id ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-lg scale-105 border border-slate-100 dark:border-slate-700' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
-                >
-                  {m.id}
-                </button>
-              ))}
+            {/* 🔥 NEW GLASSMORPHIC PILL CONTAINER */}
+            <div className="w-full bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200/60 dark:border-slate-800/60 p-1.5 rounded-[2rem] flex flex-wrap sm:flex-nowrap items-center shadow-sm relative z-10 mb-10 overflow-hidden">
+                {modes.map((m) => {
+                    const isActive = mode === m.id;
+                    return (
+                        <button 
+                            key={m.id}
+                            onClick={() => {
+                                setMode(m.id as any);
+                                if (m.id === 'arcade') setLessonData({ title: '', description: '', gameTemplate: 'connect-three', targetScore: 3, mode: 'pvp', deckIds: [] });
+                                if (m.id === 'lesson') setLessonData({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
+                            }} 
+                            className={`flex-1 min-w-[100px] py-3 px-3 rounded-[1.5rem] text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all duration-300 flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 ${
+                                isActive 
+                                ? `bg-white dark:bg-slate-800 ${m.color} shadow-md border border-slate-100 dark:border-slate-700` 
+                                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-white/40 dark:hover:bg-slate-800/40 border border-transparent'
+                            }`}
+                        >
+                            {m.icon}
+                            <span className="truncate">{m.label.replace('Magister Studio', 'Cards').replace('Pathway Map', 'Pathways')}</span>
+                        </button>
+                    );
+                })}
             </div>
 
             <div className="animate-in fade-in slide-in-from-bottom-4">
