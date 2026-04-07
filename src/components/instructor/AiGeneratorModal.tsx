@@ -2,7 +2,8 @@
 import React, { useState, useRef } from 'react';
 import { 
     Sparkles, Wand2, X, Loader2, FileText, 
-    ListChecks, Puzzle, Brain, ChevronDown, UploadCloud, File
+    ListChecks, Puzzle, Brain, ChevronDown, 
+    UploadCloud, File, MessageSquare, MessageCircle, Info 
 } from 'lucide-react';
 import { JuicyToast } from '../Toast'; 
 
@@ -12,16 +13,20 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
     const [isGenerating, setIsGenerating] = useState(false);
     const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-    // 🔥 NEW PDF STATES
+    // PDF STATES
     const [pdfFileName, setPdfFileName] = useState<string | null>(null);
     const [pdfBase64, setPdfBase64] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // 🔥 EXPANDED GENERATION TARGETS
     const [selectedTypes, setSelectedTypes] = useState({
+        text: true,
         vocab: true,
         quiz: true,
         fillBlank: false,
-        text: true
+        dialogue: false,
+        discussion: false,
+        callout: false
     });
 
     if (!isOpen) return null;
@@ -30,7 +35,6 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
         setSelectedTypes(prev => ({ ...prev, [type]: !prev[type] }));
     };
 
-    // 🔥 HANDLE PDF UPLOAD & BASE64 CONVERSION
     const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -40,7 +44,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
             return;
         }
 
-        if (file.size > 15 * 1024 * 1024) { // 15MB limit for inline API limits
+        if (file.size > 15 * 1024 * 1024) { 
             setToastMsg("File is too large. Please upload a PDF under 15MB.");
             return;
         }
@@ -49,8 +53,6 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
         
         const reader = new FileReader();
         reader.onloadend = () => {
-            // reader.result returns "data:application/pdf;base64,JVBER..."
-            // We only want the raw base64 string after the comma
             const base64String = (reader.result as string).split(',')[1];
             setPdfBase64(base64String);
             setToastMsg(`PDF "${file.name}" attached successfully! ✨`);
@@ -83,6 +85,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
 
         setIsGenerating(true);
 
+        // 🔥 EXPANDED SYSTEM PROMPT WITH NEW SCHEMAS
         const systemPrompt = `You are an expert instructional designer. Generate educational content based on the provided topic, text, or attached PDF document.
         Target Audience: ${gradeLevel}.
         
@@ -91,13 +94,15 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
         
         ${selectedTypes.text ? `- A "text" block: An engaging, well-structured introduction or summary. Schema: { "type": "text", "title": "Catchy Title", "content": "Paragraph content..." }` : ''}
         ${selectedTypes.vocab ? `- A "vocab-list" block: 3 to 5 key terms and definitions based heavily on the source material. Schema: { "type": "vocab-list", "items": [{ "term": "Word", "definition": "Meaning" }] }` : ''}
-        ${selectedTypes.quiz ? `- A "quiz" block: A multiple choice question testing comprehension of the source material. Schema: { "type": "quiz", "question": "The question?", "options": [{ "id": "a", "text": "opt 1" }, { "id": "b", "text": "opt 2" }, { "id": "c", "text": "opt 3" }, { "id": "d", "text": "opt 4" }], "correctId": "b" }` : ''}
-        ${selectedTypes.fillBlank ? `- A "fill-blank" block: A sentence with exactly two blank words enclosed in [brackets] drawn from the core concepts. Schema: { "type": "fill-blank", "question": "Fill in the missing words", "text": "The [first] word and the [second] word.", "distractors": ["wrong1", "wrong2"] }` : ''}
+        ${selectedTypes.quiz ? `- A "quiz" block: A multiple choice question testing comprehension. Schema: { "type": "quiz", "question": "The question?", "options": [{ "id": "a", "text": "opt 1" }, { "id": "b", "text": "opt 2" }, { "id": "c", "text": "opt 3" }, { "id": "d", "text": "opt 4" }], "correctId": "b" }` : ''}
+        ${selectedTypes.fillBlank ? `- A "fill-blank" block: A sentence with exactly two blank words enclosed in [brackets]. Schema: { "type": "fill-blank", "question": "Fill in the missing words", "text": "The [first] word and the [second] word.", "distractors": ["wrong1", "wrong2"] }` : ''}
+        ${selectedTypes.dialogue ? `- A "dialogue" block: A conversational exchange between two characters illustrating the concept. Schema: { "type": "dialogue", "lines": [{ "speaker": "Name 1", "text": "What they say", "translation": "Context or translation", "side": "left" }, { "speaker": "Name 2", "text": "Reply", "translation": "Context or translation", "side": "right" }] }` : ''}
+        ${selectedTypes.discussion ? `- A "discussion" block: 3 thought-provoking questions for group discussion. Schema: { "type": "discussion", "title": "Discussion Topic", "questions": ["Question 1", "Question 2", "Question 3"] }` : ''}
+        ${selectedTypes.callout ? `- A "callout" block: A highlighted pro-tip, grammar rule, or important fact. Schema: { "type": "callout", "label": "Pro Tip / Important", "content": "The critical information..." }` : ''}
         
         Additional User Instructions / Topic:
         "${prompt || 'Analyze the attached PDF and extract the most important learning concepts.'}"`;
 
-        // 🔥 ASSEMBLE THE MULTIMODAL PAYLOAD
         const parts: any[] = [{ text: systemPrompt }];
         if (pdfBase64) {
             parts.push({
@@ -144,7 +149,6 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
             setIsGenerating(false);
             onAppendBlocks(stampedBlocks);
             
-            // Clean up states
             setPrompt('');
             removePdf();
             onClose();
@@ -162,7 +166,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
             
             <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={() => !isGenerating && onClose()} />
             
-            <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[3rem] shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-500 max-h-[90vh]">
+            <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[3rem] shadow-2xl w-full max-w-3xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-500 max-h-[90vh]">
                 
                 {/* Header */}
                 <div className="px-8 py-6 bg-gradient-to-r from-indigo-500 to-purple-600 flex justify-between items-center shrink-0">
@@ -187,7 +191,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
                 {/* Body */}
                 <div className="p-8 flex flex-col gap-6 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-slate-950">
                     
-                    {/* 🔥 NEW PDF UPLOAD ZONE */}
+                    {/* PDF UPLOAD ZONE */}
                     <div className="space-y-3">
                         <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
                             Source Document (Optional)
@@ -238,12 +242,11 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
                             disabled={isGenerating}
                             value={prompt}
                             onChange={(e) => setPrompt(e.target.value)}
-                            placeholder="Type a topic, paste a YouTube link, or give specific instructions for your PDF (e.g. 'Focus only on the vocabulary from chapter 2')..."
+                            placeholder="Type a topic, paste a YouTube link, or give specific instructions for your PDF (e.g. 'Generate a dialogue about ordering food in Spanish based on this menu')..."
                             className="w-full h-24 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-2xl p-4 text-sm font-medium text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500 transition-colors resize-none shadow-inner disabled:opacity-50 custom-scrollbar"
                         />
                     </div>
 
-                    {/* Settings Row */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-3">
                             <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
@@ -268,45 +271,45 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
                         </div>
                     </div>
 
-                    {/* Block Selectors */}
+                    {/* 🔥 EXPANDED BLOCK SELECTORS */}
                     <div className="space-y-3 pb-4">
                         <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
                             Generated Assets
                         </label>
-                        <div className="grid grid-cols-2 gap-3">
-                            <button 
-                                disabled={isGenerating}
-                                onClick={() => toggleType('text')}
-                                className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.text ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-500 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-indigo-300'}`}
-                            >
-                                <FileText size={20} className={selectedTypes.text ? 'text-indigo-500' : 'text-slate-400'} />
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            
+                            <button disabled={isGenerating} onClick={() => toggleType('text')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.text ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-500 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-indigo-300'}`}>
+                                <FileText size={18} className={selectedTypes.text ? 'text-indigo-500' : 'text-slate-400'} />
                                 <span className="text-xs font-black uppercase tracking-widest">Summary Text</span>
                             </button>
 
-                            <button 
-                                disabled={isGenerating}
-                                onClick={() => toggleType('vocab')}
-                                className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.vocab ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-500 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-indigo-300'}`}
-                            >
-                                <ListChecks size={20} className={selectedTypes.vocab ? 'text-indigo-500' : 'text-slate-400'} />
+                            <button disabled={isGenerating} onClick={() => toggleType('vocab')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.vocab ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-500 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-indigo-300'}`}>
+                                <ListChecks size={18} className={selectedTypes.vocab ? 'text-indigo-500' : 'text-slate-400'} />
                                 <span className="text-xs font-black uppercase tracking-widest">Vocab List</span>
                             </button>
 
-                            <button 
-                                disabled={isGenerating}
-                                onClick={() => toggleType('quiz')}
-                                className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.quiz ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-500 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-indigo-300'}`}
-                            >
-                                <Brain size={20} className={selectedTypes.quiz ? 'text-indigo-500' : 'text-slate-400'} />
+                            <button disabled={isGenerating} onClick={() => toggleType('callout')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.callout ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-500 text-amber-700 dark:text-amber-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-amber-300'}`}>
+                                <Info size={18} className={selectedTypes.callout ? 'text-amber-500' : 'text-slate-400'} />
+                                <span className="text-xs font-black uppercase tracking-widest">Pro-Tip Callout</span>
+                            </button>
+
+                            <button disabled={isGenerating} onClick={() => toggleType('dialogue')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.dialogue ? 'bg-blue-50 dark:bg-blue-500/10 border-blue-500 text-blue-700 dark:text-blue-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-blue-300'}`}>
+                                <MessageSquare size={18} className={selectedTypes.dialogue ? 'text-blue-500' : 'text-slate-400'} />
+                                <span className="text-xs font-black uppercase tracking-widest">Dialogue</span>
+                            </button>
+
+                            <button disabled={isGenerating} onClick={() => toggleType('discussion')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.discussion ? 'bg-violet-50 dark:bg-violet-500/10 border-violet-500 text-violet-700 dark:text-violet-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-violet-300'}`}>
+                                <MessageCircle size={18} className={selectedTypes.discussion ? 'text-violet-500' : 'text-slate-400'} />
+                                <span className="text-xs font-black uppercase tracking-widest">Discussion</span>
+                            </button>
+
+                            <button disabled={isGenerating} onClick={() => toggleType('quiz')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.quiz ? 'bg-rose-50 dark:bg-rose-500/10 border-rose-500 text-rose-700 dark:text-rose-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-rose-300'}`}>
+                                <Brain size={18} className={selectedTypes.quiz ? 'text-rose-500' : 'text-slate-400'} />
                                 <span className="text-xs font-black uppercase tracking-widest">Trivia Quiz</span>
                             </button>
 
-                            <button 
-                                disabled={isGenerating}
-                                onClick={() => toggleType('fillBlank')}
-                                className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.fillBlank ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-500 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-indigo-300'}`}
-                            >
-                                <Puzzle size={20} className={selectedTypes.fillBlank ? 'text-indigo-500' : 'text-slate-400'} />
+                            <button disabled={isGenerating} onClick={() => toggleType('fillBlank')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left col-span-2 sm:col-span-1 ${selectedTypes.fillBlank ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-500 text-emerald-700 dark:text-emerald-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-emerald-300'}`}>
+                                <Puzzle size={18} className={selectedTypes.fillBlank ? 'text-emerald-500' : 'text-slate-400'} />
                                 <span className="text-xs font-black uppercase tracking-widest">Fill-in Blanks</span>
                             </button>
                         </div>
