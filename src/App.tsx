@@ -7,7 +7,7 @@ import { GLOBAL_CURRICULUMS } from './constants/curriculums';
 
 // Sub-component Imports
 import AuthView from './components/AuthView';
-import LandingPage from './components/LandingPage'; // 🔥 IMPORTED THE NEW LANDING PAGE
+import PublicDiscoveryHub from './components/PublicDiscoveryHub'; // 🔥 IMPORTED THE NEW NETFLIX-STYLE LANDING PAGE
 import HomeView from './components/HomeView';
 import DiscoveryView from './components/DiscoveryView';
 import FlashcardView from './components/FlashcardView';
@@ -246,7 +246,6 @@ export default function App() {
 
   useEffect(() => {
     const handlePopState = () => {
-      // Just ONE perfectly typed declaration!
       const params = new URLSearchParams(window.location.search);
       
       setCurrentView((params.get('view') as any) || 'student');
@@ -264,10 +263,12 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [combinedClasses, allLessons]);
 
+  // ==========================================================================
   // --- BOOT SEQUENCE & AUTHENTICATION ---
+  // ==========================================================================
   if (!authChecked) {
       return (
-          <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-950 text-indigo-500 font-mono">
+          <div className="h-[100dvh] w-full flex flex-col items-center justify-center bg-slate-950 text-indigo-500 font-mono">
               <div className="animate-pulse space-y-4 text-center">
                   <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
                   <p className="text-xs font-black tracking-[0.5em] uppercase">Booting Magister OS...</p>
@@ -276,17 +277,23 @@ export default function App() {
       );
   }
 
-  // 🔥 NEW LANDING PAGE ROUTING
+  // 🔥 NEW LANDING PAGE & SSO ROUTING LOGIC
   if (!user) {
     return showAuth ? (
-      <div className={`relative min-h-screen transition-colors duration-500 ${activeThemeClass}`}>
-         <button onClick={() => setShowAuth(false)} className="absolute top-6 left-6 z-50 text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold text-sm transition-colors">← Back</button>
+      <div className={`relative min-h-[100dvh] w-full transition-colors duration-500 ${activeThemeClass}`}>
+         <button onClick={() => setShowAuth(false)} className="absolute top-6 left-6 z-50 text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold text-sm transition-colors uppercase tracking-widest flex items-center gap-2">
+             ← Back to Network
+         </button>
          <AuthView />
       </div>
     ) : (
-      <LandingPage onLogin={() => setShowAuth(true)} onGetStarted={() => setShowAuth(true)} />
+      <PublicDiscoveryHub onAuthenticateToLaunch={() => setShowAuth(true)} />
     );
   }
+
+  // ==========================================================================
+  //  AUTHENTICATED APP VIEWS
+  // ==========================================================================
 
   // 2. PROJECTOR / PRESENTATION MODE
   if (activePresentation) {
@@ -304,7 +311,7 @@ export default function App() {
     );
   }
 
-  // 🔥 2.5 INSTRUCTOR HUD (The iPad Remote)
+  // 2.5 INSTRUCTOR HUD (The iPad Remote)
   if (activeHUD) {
     const lesson = allLessons.find(l => l.id === activeHUD.lessonId);
     const activeClassForHUD = instructorClasses.find(c => c.id === activeHUD.classId);
@@ -405,7 +412,7 @@ export default function App() {
     <div className={themeClassModifier}>
       <div className={`min-h-[100dvh] w-full flex flex-col items-center relative overflow-hidden transition-colors duration-700 ${activeThemeClass}`}>
         
-        {/* Floating Command Center Button features the user's avatar! */}
+        {/* Floating Command Center Button */}
         {userData?.role !== 'student' && (
           <button 
               onClick={() => setCurrentView(userData?.role === 'instructor' ? 'instructor' : 'admin')} 
