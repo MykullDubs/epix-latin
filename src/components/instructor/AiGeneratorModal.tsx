@@ -4,7 +4,7 @@ import {
     Sparkles, Wand2, X, Loader2, FileText, 
     ListChecks, Puzzle, Brain, ChevronDown 
 } from 'lucide-react';
-import { JuicyToast } from '../Toast'; // Assuming you have this
+import { JuicyToast } from '../Toast'; 
 
 export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: any) {
     const [prompt, setPrompt] = useState('');
@@ -31,89 +31,76 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
             return;
         }
         
+        if (!Object.values(selectedTypes).some(v => v)) {
+            setToastMsg("Please select at least one type of content to generate.");
+            return;
+        }
+
+        const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;        
+        if (!apiKey) {
+            setToastMsg("CRITICAL: Missing Gemini API Key in .env file.");
+            return;
+        }
+
         setIsGenerating(true);
 
-        // ====================================================================
-        // 🚀 PRODUCTION API CALL (Uncomment and configure when ready)
-        // ====================================================================
-        /*
+        const systemPrompt = `You are an expert instructional designer. Generate educational content based on the user's topic.
+        Target Audience: ${gradeLevel}.
+        
+        You must return a single JSON array of objects. Do not include markdown formatting or outside text.
+        Generate ONLY the block types requested by the user below:
+        
+        ${selectedTypes.text ? `- A "text" block: An engaging, well-structured introduction or summary. Schema: { "type": "text", "title": "Catchy Title", "content": "Paragraph content..." }` : ''}
+        ${selectedTypes.vocab ? `- A "vocab-list" block: 3 to 5 key terms and definitions. Schema: { "type": "vocab-list", "items": [{ "term": "Word", "definition": "Meaning" }] }` : ''}
+        ${selectedTypes.quiz ? `- A "quiz" block: A multiple choice question. Schema: { "type": "quiz", "question": "The question?", "options": [{ "id": "a", "text": "opt 1" }, { "id": "b", "text": "opt 2" }, { "id": "c", "text": "opt 3" }, { "id": "d", "text": "opt 4" }], "correctId": "b" }` : ''}
+        ${selectedTypes.fillBlank ? `- A "fill-blank" block: A sentence with exactly two blank words enclosed in [brackets]. Schema: { "type": "fill-blank", "question": "Fill in the missing words", "text": "The [first] word and the [second] word.", "distractors": ["wrong1", "wrong2"] }` : ''}
+        
+        Source Material / Topic:
+        "${prompt}"`;
+
         try {
-            const response = await fetch('YOUR_FIREBASE_CLOUD_FUNCTION_URL', {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    prompt: prompt,
-                    gradeLevel: gradeLevel,
-                    types: selectedTypes
+                    contents: [{ role: "user", parts: [{ text: systemPrompt }] }],
+                    generationConfig: {
+                        responseMimeType: "application/json" 
+                    }
                 })
             });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error("Gemini API Error Details:", errorData);
+                throw new Error(`API call failed: ${errorData.error?.message || response.statusText}`);
+            }
+
             const data = await response.json();
-            onAppendBlocks(data.blocks);
-            onClose();
-        } catch (error) {
-            setToastMsg("AI Generation failed. Please try again.");
-        }
-        */
-
-        // ====================================================================
-        // 🧪 SIMULATED MOCK GENERATION (For testing the UI/UX)
-        // ====================================================================
-        setTimeout(() => {
-            const generatedBlocks: any[] = [];
-
-            if (selectedTypes.text) {
-                generatedBlocks.push({
-                    id: `block_${Date.now()}_1`,
-                    type: 'text',
-                    title: `Introduction to: ${prompt.substring(0, 20)}...`,
-                    content: `This is an AI-generated introduction for ${gradeLevel} students regarding the topic of ${prompt}. It automatically synthesizes the core concepts into an easy-to-read format.`
-                });
+            let rawText = data.candidates[0].content.parts[0].text;
+            
+            // Using hex codes to prevent the chat parser from breaking
+            rawText = rawText.replace(/^\x60\x60\x60(?:json)?\s*/i, '').replace(/\x60\x60\x60\s*$/i, '').trim();
+            const generatedBlocks = JSON.parse(rawText);
+            
+            if (!Array.isArray(generatedBlocks)) {
+                throw new Error("AI did not return the correct array schema.");
             }
 
-            if (selectedTypes.vocab) {
-                generatedBlocks.push({
-                    id: `block_${Date.now()}_2`,
-                    type: 'vocab-list',
-                    items: [
-                        { term: 'Synthesis', definition: 'The combination of ideas to form a theory or system.' },
-                        { term: 'Algorithm', definition: 'A process or set of rules to be followed in calculations.' },
-                        { term: 'Dynamic', definition: 'Characterized by constant change, activity, or progress.' }
-                    ]
-                });
-            }
-
-            if (selectedTypes.quiz) {
-                generatedBlocks.push({
-                    id: `block_${Date.now()}_3`,
-                    type: 'quiz',
-                    question: `Which of the following best describes the main concept of ${prompt}?`,
-                    content: {
-                        question: `Which of the following best describes the main concept of ${prompt}?`,
-                        options: [
-                            { id: 'a', text: 'It relies entirely on manual input.' },
-                            { id: 'b', text: 'It is an automated, dynamic process.' }, // Correct
-                            { id: 'c', text: 'It has no educational value.' },
-                            { id: 'd', text: 'It was invented in 1920.' }
-                        ],
-                        correctId: 'b'
-                    }
-                });
-            }
-
-            if (selectedTypes.fillBlank) {
-                generatedBlocks.push({
-                    id: `block_${Date.now()}_4`,
-                    type: 'fill-blank',
-                    question: "Complete the sentence:",
-                    text: `The new AI [generator] allows teachers to instantly build [interactive] lessons.`,
-                    distractors: ["manual", "boring", "calculator"]
-                });
-            }
+            const stampedBlocks = generatedBlocks.map((block: any, idx: number) => ({
+                ...block,
+                id: `ai_generated_${Date.now()}_${idx}`
+            }));
 
             setIsGenerating(false);
-            onAppendBlocks(generatedBlocks);
+            onAppendBlocks(stampedBlocks);
             onClose();
-        }, 3500); // Simulate a 3.5 second API wait time
+
+        } catch (err: any) {
+            console.error("Magic Generator Error:", err);
+            setToastMsg(`Generation failed: ${err.message}`);
+            setIsGenerating(false);
+        }
     };
 
     return (
@@ -132,7 +119,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
                         </div>
                         <div>
                             <h2 className="text-xl font-black uppercase tracking-widest leading-none">Magic Generator</h2>
-                            <p className="text-[10px] font-bold text-indigo-100 uppercase tracking-widest mt-1">AI-Powered Lesson Creation</p>
+                            <p className="text-[10px] font-bold text-indigo-100 uppercase tracking-widest mt-1">Powered by Gemini 2.5 Flash</p>
                         </div>
                     </div>
                     <button 
@@ -160,9 +147,6 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
                                 placeholder="Paste a Wikipedia article, a YouTube URL, or simply type a topic like 'The French Revolution'..."
                                 className="w-full h-32 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-2xl p-4 text-sm md:text-base font-medium text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500 transition-colors resize-none shadow-inner disabled:opacity-50 custom-scrollbar"
                             />
-                            <div className="absolute bottom-3 right-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                {prompt.length} chars
-                            </div>
                         </div>
                     </div>
 
