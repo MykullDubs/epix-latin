@@ -22,9 +22,6 @@ export default function AuthView() {
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
-    // ====================================================================
-    // THE MAGIC ROSTER HANDSHAKE (Shared between Email and Google Auth)
-    // ====================================================================
     const executeRosterHandshake = async (userEmail: string, finalName: string, uid: string) => {
         try {
             const classesQuery = query(collectionGroup(db, 'classes'), where('studentEmails', 'array-contains', userEmail));
@@ -55,9 +52,6 @@ export default function AuthView() {
         }
     };
 
-    // ====================================================================
-    // GOOGLE SSO FLOW
-    // ====================================================================
     const handleGoogleSignIn = async () => {
         setError('');
         setIsGoogleLoading(true);
@@ -79,16 +73,14 @@ export default function AuthView() {
                     ...DEFAULT_USER_DATA,
                     name: finalName,
                     email: userEmail,
-                    role: isLogin ? 'student' : role, // Default to student unless they toggled instructor on signup
+                    role: isLogin ? 'student' : role,
                     joinedAt: Date.now(),
                     isOnboarded: true
                 });
                 
                 await executeRosterHandshake(userEmail, finalName, user.uid);
             }
-
         } catch (err: any) {
-            console.error("Auth Error:", err);
             if (err.code !== 'auth/popup-closed-by-user') {
                 setError(err.message.replace('Firebase: ', '').split('-').join(' '));
             }
@@ -97,9 +89,6 @@ export default function AuthView() {
         }
     };
 
-    // ====================================================================
-    // EMAIL/PASSWORD FLOW
-    // ====================================================================
     const handleEmailAuth = async (e: any) => { 
         e.preventDefault(); 
         setError(''); 
@@ -129,7 +118,6 @@ export default function AuthView() {
                 
                 await executeRosterHandshake(userEmail, finalName, userCredential.user.uid);
             } 
-
         } catch (err: any) { 
             setError(err.message.replace('Firebase: ', '').replace('Error (auth/', '').replace(').', '').split('-').join(' ')); 
         } finally { 
@@ -140,14 +128,13 @@ export default function AuthView() {
     return ( 
         <div className="min-h-screen w-full flex items-center justify-center p-6 relative overflow-hidden font-sans selection:bg-indigo-500/30">
             
-            {/* --- IMMERSIVE BACKGROUND --- */}
-            <div className="absolute inset-0 bg-slate-950 z-0">
+            {/* 🔥 FIX: ADDED pointer-events-none TO PREVENT CLICK INTERCEPTION */}
+            <div className="absolute inset-0 bg-slate-950 z-0 pointer-events-none">
                 <div className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] rounded-full bg-indigo-600/30 blur-[120px] mix-blend-screen animate-pulse" style={{ animationDuration: '8s' }}></div>
                 <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] rounded-full bg-rose-600/20 blur-[100px] mix-blend-screen animate-pulse" style={{ animationDuration: '10s' }}></div>
                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03] mix-blend-overlay"></div>
             </div>
 
-            {/* --- GLASSMORPHISM CARD --- */}
             <div className="w-full max-w-[420px] bg-slate-900/60 backdrop-blur-2xl border border-white/10 p-8 md:p-10 rounded-[3rem] shadow-2xl relative z-10 animate-in zoom-in-95 duration-700">
                 
                 <div className="text-center mb-8">
@@ -158,7 +145,6 @@ export default function AuthView() {
                     <p className="text-indigo-300 font-medium text-sm">Authentication Gateway</p>
                 </div>
 
-                {/* SIGN UP ONLY: Role Toggle */}
                 {!isLogin && (
                     <div className="animate-in slide-in-from-top-4 fade-in duration-300 mb-6">
                         <div className="flex bg-slate-950/50 p-1.5 rounded-2xl border border-white/5">
@@ -180,7 +166,6 @@ export default function AuthView() {
                     </div>
                 )}
 
-                {/* 🔥 NEW: GOOGLE SSO HERO BUTTON */}
                 <button 
                     onClick={handleGoogleSignIn}
                     disabled={isGoogleLoading || loading}
@@ -277,7 +262,6 @@ export default function AuthView() {
                     </button>
                 </form>
 
-                {/* Mode Switcher */}
                 <div className="mt-8 text-center pt-6 border-t border-white/5">
                     <button 
                         onClick={() => { setIsLogin(!isLogin); setError(''); }} 
