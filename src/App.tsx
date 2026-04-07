@@ -7,7 +7,7 @@ import { GLOBAL_CURRICULUMS } from './constants/curriculums';
 
 // Sub-component Imports
 import AuthView from './components/AuthView';
-import MarketingSite from './components/MarketingSite';
+import LandingPage from './components/LandingPage'; // 🔥 IMPORTED THE NEW LANDING PAGE
 import HomeView from './components/HomeView';
 import DiscoveryView from './components/DiscoveryView';
 import FlashcardView from './components/FlashcardView';
@@ -26,7 +26,7 @@ import LiveSlipstreamProjector from './components/LiveSlipstreamProjector';
 import CelebrationScreen from './components/CelebrationScreen';
 import HoloAvatar from './components/HoloAvatar'; 
 import InstructorHUD from './components/instructor/InstructorHUD'; 
-import StudentInbox from './components/StudentInbox'; // 🔥 IMPORTED INBOX
+import StudentInbox from './components/StudentInbox';
 
 // 🔥 DYNAMIC OS THEME ENGINE
 const OS_THEMES: Record<string, string> = {
@@ -180,11 +180,11 @@ export default function App() {
     if (!authChecked || isHydrated.current) return;
     const params = new URLSearchParams(window.location.search);
     
-    // 🔥 NEW OS FEATURE: QR Code Route Interceptor
+    // 🔥 OS FEATURE: QR Code Route Interceptor
     const pathParts = window.location.pathname.split('/').filter(Boolean);
-    if ((pathParts[0] === 'join' || pathParts[0] === 'live') && pathParts[1]) {
+    if ((pathParts[0] === 'join' || pathParts[0] === 'live' || pathParts[0] === 'play') && pathParts[1]) {
         params.set('classId', pathParts[1]);
-        params.set('autoJoin', 'true'); // Flag to instantly open the lobby
+        params.set('autoJoin', 'true'); 
         window.history.replaceState({}, '', `/?${params.toString()}`);
     }
 
@@ -276,13 +276,16 @@ export default function App() {
       );
   }
 
+  // 🔥 NEW LANDING PAGE ROUTING
   if (!user) {
     return showAuth ? (
       <div className={`relative min-h-screen transition-colors duration-500 ${activeThemeClass}`}>
-         <button onClick={() => setShowAuth(false)} className="absolute top-6 left-6 z-50 text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold text-sm transition-colors">← Regresar</button>
+         <button onClick={() => setShowAuth(false)} className="absolute top-6 left-6 z-50 text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold text-sm transition-colors">← Back</button>
          <AuthView />
       </div>
-    ) : <MarketingSite onLoginClick={() => setShowAuth(true)} />;
+    ) : (
+      <LandingPage onLogin={() => setShowAuth(true)} onGetStarted={() => setShowAuth(true)} />
+    );
   }
 
   // 2. PROJECTOR / PRESENTATION MODE
@@ -291,8 +294,8 @@ export default function App() {
     return (
       <div className="fixed inset-0 z-[5000] bg-slate-900 flex flex-col">
         <div className="h-16 px-6 flex justify-between items-center border-b border-white/10" style={{ backgroundColor: activeOrg?.themeColor || '#4f46e5' }}>
-          <span className="font-black text-white uppercase tracking-widest">{activeOrg?.name || 'Magister'} | CLASE EN VIVO</span>
-          <button onClick={() => setActivePresentation(null)} className="bg-black/20 text-white px-6 py-2 rounded-full font-black text-xs hover:bg-rose-600 transition-colors">Terminar Clase</button>
+          <span className="font-black text-white uppercase tracking-widest">{activeOrg?.name || 'Magister'} | LIVE CLASS</span>
+          <button onClick={() => setActivePresentation(null)} className="bg-black/20 text-white px-6 py-2 rounded-full font-black text-xs hover:bg-rose-600 transition-colors">End Presentation</button>
         </div>
         <div className="flex-1 bg-white">
           <ClassView lesson={lesson} classId={activePresentation.classId} userData={userData} activeOrg={activeOrg} onExit={() => setActivePresentation(null)} />
@@ -373,8 +376,8 @@ export default function App() {
         onSaveCurriculum={actions.saveCurriculum}
         onSaveCard={actions.saveCard}
         onUpdateCard={actions.updateCard}
-        onDeleteCard={actions.deleteCard} // 🔥 ADDED Delete Card
-        onDeleteArtifact={actions.deleteArtifact} // 🔥 ADDED Delete Artifact (for Vault)
+        onDeleteCard={actions.deleteCard} 
+        onDeleteArtifact={actions.deleteArtifact} 
         onMoveToFolder={actions.assignArtifactToFolder}  
         onAssign={actions.assignContent}
         onRevoke={actions.revokeContent}
@@ -439,7 +442,6 @@ export default function App() {
             ) : activeTab === 'profile' ? (
               <ProfileView user={user} userData={userData} />
             ) : activeTab === 'inbox' ? (
-              // 🔥 PRO-LMS: INBOX ROUTER 
               <StudentInbox 
                   user={user} 
                   onLaunchContent={(type: 'lesson' | 'deck', id: string) => {
