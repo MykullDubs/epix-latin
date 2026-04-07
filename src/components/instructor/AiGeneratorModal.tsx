@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import { 
     Sparkles, Wand2, X, Loader2, FileText, AlignLeft,
     ListChecks, Puzzle, Brain, ChevronDown, 
-    UploadCloud, File, MessageSquare, MessageCircle, Info, Mic 
+    UploadCloud, File, MessageSquare, MessageCircle, Info, Mic, Image as ImageIcon
 } from 'lucide-react';
 import { JuicyToast } from '../Toast'; 
 
@@ -18,8 +18,9 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
     const [pdfBase64, setPdfBase64] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // 🔥 EXPANDED GENERATION TARGETS (Now with 9 Blocks!)
+    // 🔥 EXPANDED GENERATION TARGETS (Now with 10 Blocks!)
     const [selectedTypes, setSelectedTypes] = useState({
+        image: true,
         text: true,
         essay: false,
         vocab: true,
@@ -74,7 +75,8 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
             return;
         }
         
-        if (!Object.values(selectedTypes).some(v => v)) {
+        const isContentRequested = Object.values(selectedTypes).some(v => v);
+        if (!isContentRequested) {
             setToastMsg("Please select at least one type of content to generate.");
             return;
         }
@@ -87,6 +89,9 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
 
         setIsGenerating(true);
 
+        // ====================================================================
+        // 1. PREPARE TEXT GENERATION (Gemini 3.1 Flash-Lite)
+        // ====================================================================
         const systemPrompt = `You are an expert instructional designer. Generate educational content based on the provided topic, text, or attached PDF document.
         Target Audience: ${gradeLevel}.
         
@@ -116,32 +121,87 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
             });
         }
 
-        try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`, {
+        const textRequest = fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ role: "user", parts: parts }],
+                generationConfig: {
+                    responseMimeType: "application/json" 
+                }
+            })
+        });
+
+        // ====================================================================
+        // 2. PREPARE IMAGE GENERATION (Imagen 4 Fast)
+        // ====================================================================
+        let imageRequest: Promise<Response> | null = null;
+        if (selectedTypes.image) {
+            // Determine a good subject for the image, falling back to the PDF name if prompt is empty
+            const imageSubject = prompt.trim() || (pdfFileName ? pdfFileName.replace('.pdf', '') : 'a classroom concept');
+            const imagePrompt = `A beautiful, modern, clean educational vector illustration representing the concept of: ${imageSubject}. Minimalist background, vibrant colors, no text or words in the image.`;
+            
+            imageRequest = fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-fast-generate-001:predict?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ role: "user", parts: parts }],
-                    generationConfig: {
-                        responseMimeType: "application/json" 
+                    instances: [{ prompt: imagePrompt }],
+                    parameters: {
+                        sampleCount: 1,
+                        aspectRatio: "16:9"
                     }
                 })
             });
+        }
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                console.error("Gemini API Error Details:", errorData);
-                throw new Error(`API call failed: ${errorData.error?.message || response.statusText}`);
+        // ====================================================================
+        // 3. PARALLEL EXECUTION
+        // ====================================================================
+        try {
+            // We run both promises simultaneously so the user doesn't wait twice
+            const promises: Promise<any>[] = [textRequest];
+            if (imageRequest) promises.push(imageRequest);
+
+            const results = await Promise.allSettled(promises);
+
+            // -- Handle Text Results --
+            const textRes = results[0];
+            if (textRes.status === 'rejected' || !textRes.value.ok) {
+                throw new Error("Text generation failed or timed out.");
             }
-
-            const data = await response.json();
-            let rawText = data.candidates[0].content.parts[0].text;
             
+            const textData = await textRes.value.json();
+            if (textData.error) throw new Error(textData.error.message);
+
+            let rawText = textData.candidates[0].content.parts[0].text;
             rawText = rawText.replace(/^\x60\x60\x60(?:json)?\s*/i, '').replace(/\x60\x60\x60\s*$/i, '').trim();
             const generatedBlocks = JSON.parse(rawText);
             
             if (!Array.isArray(generatedBlocks)) {
                 throw new Error("AI did not return the correct array schema.");
+            }
+
+            // -- Handle Image Results --
+            let heroImageUrl = null;
+            if (selectedTypes.image && results[1] && results[1].status === 'fulfilled' && results[1].value.ok) {
+                try {
+                    const imgData = await results[1].value.json();
+                    const base64Image = imgData.predictions?.[0]?.bytesBase64Encoded; 
+                    if (base64Image) {
+                        heroImageUrl = `data:image/jpeg;base64,${base64Image}`;
+                    }
+                } catch (imgError) {
+                    console.warn("Image parsing failed, but continuing with text...", imgError);
+                }
+            }
+
+            // -- Combine & Render --
+            if (heroImageUrl) {
+                generatedBlocks.unshift({
+                    type: 'image',
+                    url: heroImageUrl,
+                    caption: `Conceptual Visualization: ${prompt.substring(0, 40) || 'Source Document'}`
+                });
             }
 
             const stampedBlocks = generatedBlocks.map((block: any, idx: number) => ({
@@ -169,7 +229,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
             
             <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={() => !isGenerating && onClose()} />
             
-            <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[3rem] shadow-2xl w-full max-w-3xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-500 max-h-[90vh]">
+            <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[3rem] shadow-2xl w-full max-w-4xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-500 max-h-[90vh]">
                 
                 {/* Header */}
                 <div className="px-8 py-6 bg-gradient-to-r from-indigo-500 to-purple-600 flex justify-between items-center shrink-0">
@@ -179,7 +239,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
                         </div>
                         <div>
                             <h2 className="text-xl font-black uppercase tracking-widest leading-none">Magic Generator</h2>
-                            <p className="text-[10px] font-bold text-indigo-100 uppercase tracking-widest mt-1">Powered by Gemini 3.1 Flash-Lite</p>
+                            <p className="text-[10px] font-bold text-indigo-100 uppercase tracking-widest mt-1">Powered by Gemini & Imagen 4</p>
                         </div>
                     </div>
                     <button 
@@ -273,13 +333,18 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
                         </div>
                     </div>
 
-                    {/* 🔥 EXPANDED BLOCK SELECTORS (3x3 Grid) */}
+                    {/* 🔥 EXPANDED BLOCK SELECTORS (Auto-flowing Grid) */}
                     <div className="space-y-3 pb-4">
                         <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
                             Generated Assets
                         </label>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                             
+                            <button disabled={isGenerating} onClick={() => toggleType('image')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.image ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-500 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-indigo-300'}`}>
+                                <ImageIcon size={18} className={selectedTypes.image ? 'text-indigo-500' : 'text-slate-400'} />
+                                <span className="text-xs font-black uppercase tracking-widest">Hero Image</span>
+                            </button>
+
                             <button disabled={isGenerating} onClick={() => toggleType('text')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.text ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-500 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-indigo-300'}`}>
                                 <AlignLeft size={18} className={selectedTypes.text ? 'text-indigo-500' : 'text-slate-400'} />
                                 <span className="text-xs font-black uppercase tracking-widest">Summary</span>
@@ -305,7 +370,6 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
                                 <span className="text-xs font-black uppercase tracking-widest">Dialogue</span>
                             </button>
 
-                            {/* 🔥 FIX: Typo removed here! */}
                             <button disabled={isGenerating} onClick={() => toggleType('discussion')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.discussion ? 'bg-violet-50 dark:bg-violet-500/10 border-violet-500 text-violet-700 dark:text-violet-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-violet-300'}`}>
                                 <MessageCircle size={18} className={selectedTypes.discussion ? 'text-violet-500' : 'text-slate-400'} />
                                 <span className="text-xs font-black uppercase tracking-widest">Discussion</span>
@@ -339,7 +403,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
                     >
                         {isGenerating ? (
                             <>
-                                <Loader2 size={20} className="animate-spin" /> Analyzing Document...
+                                <Loader2 size={20} className="animate-spin" /> Synthesizing Content...
                             </>
                         ) : (
                             <>
