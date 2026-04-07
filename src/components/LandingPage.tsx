@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { 
     ArrowRight, Sparkles, Wand2, MonitorPlay, 
     Smartphone, Zap, CheckCircle2, GraduationCap, 
-    QrCode, BrainCircuit, Shield, Layers, Play, X
+    QrCode, BrainCircuit, Play, X, Quote, ZapOff, Clock, Server
 } from 'lucide-react';
 
 export default function LandingPage({ onGetStarted, onLogin }: any) {
@@ -16,7 +16,7 @@ export default function LandingPage({ onGetStarted, onLogin }: any) {
     }, []);
 
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-indigo-500 selection:text-white overflow-x-hidden">
+        <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-indigo-500 selection:text-white overflow-x-hidden pb-24">
             
             {/* FLOATING NAVBAR */}
             <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? 'bg-slate-950/80 backdrop-blur-xl border-b border-white/10 py-4' : 'bg-transparent py-6'}`}>
@@ -36,16 +36,15 @@ export default function LandingPage({ onGetStarted, onLogin }: any) {
                 </div>
             </nav>
 
-            {/* HERO SECTION */}
-            <section className="relative pt-40 pb-20 md:pt-52 md:pb-32 px-6 overflow-hidden">
-                {/* Ambient Background Glow */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
+            {/* 1. HERO SECTION & MAIN MOCKUP */}
+            <section className="relative pt-40 pb-20 px-6 overflow-hidden">
+                <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
                 <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-fuchsia-600/10 rounded-full blur-[100px] pointer-events-none" />
 
                 <div className="max-w-5xl mx-auto text-center relative z-10 animate-in slide-in-from-bottom-8 fade-in duration-1000">
                     <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-md mb-8 shadow-2xl">
                         <Sparkles size={14} className="text-indigo-400" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Introducing the Next Generation LMS</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-200">The Next Generation LMS</span>
                     </div>
                     
                     <h1 className="text-5xl md:text-7xl lg:text-[5.5rem] font-black tracking-tighter leading-[1.05] mb-8 text-transparent bg-clip-text bg-gradient-to-br from-white via-white to-slate-400">
@@ -57,38 +56,51 @@ export default function LandingPage({ onGetStarted, onLogin }: any) {
                         Magister OS transforms static PDFs and Wikipedia articles into gamified, highly interactive live classroom experiences in under 10 seconds using AI.
                     </p>
                     
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
                         <button onClick={onGetStarted} className="w-full sm:w-auto bg-indigo-500 hover:bg-indigo-400 text-white px-8 py-4 rounded-2xl text-sm font-black uppercase tracking-widest shadow-[0_0_40px_rgba(99,102,241,0.4)] active:scale-95 transition-all flex items-center justify-center gap-3">
                             Launch Your Classroom <ArrowRight size={18} />
                         </button>
-                        <button onClick={onLogin} className="w-full sm:w-auto bg-white/5 hover:bg-white/10 border border-white/10 text-white px-8 py-4 rounded-2xl text-sm font-black uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-3">
-                            <Play size={18} fill="currentColor" className="text-slate-300" /> View Demo
-                        </button>
+                    </div>
+
+                    {/* 🔥 HERO VIDEO PLACEHOLDER */}
+                    <div className="w-full max-w-5xl mx-auto aspect-video bg-black rounded-[2rem] md:rounded-[3rem] border-4 border-slate-800/80 shadow-[0_20px_80px_rgba(0,0,0,0.6)] relative overflow-hidden flex items-center justify-center group">
+                        <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center">
+                            <MonitorPlay size={64} className="text-slate-700 mb-4" />
+                            <span className="text-xs font-black uppercase tracking-widest text-slate-500">Drop `hero_demo.mp4` here</span>
+                        </div>
+                        {/* <video autoPlay loop muted playsInline className="w-full h-full object-cover relative z-10">
+                            <source src="/assets/hero_demo.mp4" type="video/mp4" />
+                        </video> 
+                        */}
                     </div>
                 </div>
             </section>
 
-            {/* BENTO BOX FEATURE GRID */}
+            {/* 2. BENTO BOX FEATURE GRID */}
             <section className="max-w-7xl mx-auto px-6 py-20 relative z-10">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[minmax(280px,auto)]">
                     
-                    {/* BENTO 1: AI Magic Generator (Spans 2 columns on desktop) */}
-                    <div className="md:col-span-2 bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2.5rem] border border-white/10 p-8 md:p-12 relative overflow-hidden group hover:border-indigo-500/50 transition-colors duration-500">
+                    {/* BENTO 1: AI Magic Generator (Spans 2 columns) */}
+                    <div className="md:col-span-2 bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2.5rem] border border-white/10 p-8 md:p-12 relative overflow-hidden group hover:border-indigo-500/50 transition-colors duration-500 flex flex-col md:flex-row items-center gap-8">
                         <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-indigo-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                        <div className="relative z-10 h-full flex flex-col justify-between">
-                            <div>
-                                <div className="w-14 h-14 bg-indigo-500/20 text-indigo-400 rounded-2xl flex items-center justify-center mb-6 border border-indigo-500/30">
-                                    <Wand2 size={28} />
-                                </div>
-                                <h3 className="text-3xl font-black tracking-tight text-white mb-4">The Magic Generator</h3>
-                                <p className="text-slate-400 font-medium text-lg max-w-md">
-                                    Paste a Wikipedia link or YouTube transcript. Magister's AI instantly forges a complete interactive curriculum with vocab lists, quizzes, and fill-in-the-blanks.
-                                </p>
+                        <div className="flex-1 relative z-10">
+                            <div className="w-14 h-14 bg-indigo-500/20 text-indigo-400 rounded-2xl flex items-center justify-center mb-6 border border-indigo-500/30">
+                                <Wand2 size={28} />
                             </div>
-                            <div className="mt-8 flex gap-3">
+                            <h3 className="text-3xl font-black tracking-tight text-white mb-4">The Magic Generator</h3>
+                            <p className="text-slate-400 font-medium text-lg">
+                                Paste a Wikipedia link or YouTube transcript. Magister's AI instantly forges a complete interactive curriculum with vocab lists, quizzes, and fill-in-the-blanks.
+                            </p>
+                            <div className="mt-8 flex flex-wrap gap-3">
                                 <span className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest">Powered by Gemini</span>
                                 <span className="bg-white/5 border border-white/10 text-slate-300 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest">10 Second Generation</span>
                             </div>
+                        </div>
+                        
+                        {/* 🔥 SPEED-LAPSE VIDEO PLACEHOLDER */}
+                        <div className="w-full md:w-[280px] shrink-0 aspect-[3/4] bg-slate-950 rounded-[2rem] border border-white/10 shadow-2xl relative overflow-hidden flex items-center justify-center">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 text-center px-4">`ai_speedlapse.mp4`</span>
+                            {/* <video autoPlay loop muted playsInline className="w-full h-full object-cover"><source src="..." /></video> */}
                         </div>
                     </div>
 
@@ -105,58 +117,104 @@ export default function LandingPage({ onGetStarted, onLogin }: any) {
                         </div>
                     </div>
 
-                    {/* BENTO 3: Smartboard Projector Mode */}
-                    <div className="bg-gradient-to-tr from-slate-900 to-slate-950 rounded-[2.5rem] border border-white/10 p-8 relative overflow-hidden group hover:border-fuchsia-500/50 transition-colors duration-500 flex flex-col justify-between">
-                        <div className="relative z-10">
-                            <div className="w-14 h-14 bg-fuchsia-500/20 text-fuchsia-400 rounded-2xl flex items-center justify-center mb-6 border border-fuchsia-500/30">
-                                <MonitorPlay size={28} />
-                            </div>
-                            <h3 className="text-2xl font-black tracking-tight text-white mb-3">Projector Mode</h3>
-                            <p className="text-slate-400 font-medium text-sm">
-                                Reclaim your classroom. The gorgeous, distraction-free smartboard view includes floating tool palettes, focus timers, and digital whiteboards.
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* BENTO 4: Student HUD (Spans 2 columns) */}
-                    <div className="md:col-span-2 bg-gradient-to-tl from-slate-900 to-slate-950 rounded-[2.5rem] border border-white/10 p-8 md:p-12 relative overflow-hidden group hover:border-cyan-500/50 transition-colors duration-500 flex flex-col md:flex-row items-center gap-8">
-                        <div className="flex-1 relative z-10">
-                            <div className="w-14 h-14 bg-cyan-500/20 text-cyan-400 rounded-2xl flex items-center justify-center mb-6 border border-cyan-500/30">
-                                <Smartphone size={28} />
-                            </div>
-                            <h3 className="text-3xl font-black tracking-tight text-white mb-4">Mobile-First Student HUD</h3>
-                            <p className="text-slate-400 font-medium text-lg">
-                                Learning shouldn't feel like homework. The student app acts as a tactile wireless controller during live presentations, and transforms into a spaced-repetition study engine at home.
-                            </p>
-                            <ul className="mt-6 space-y-3">
-                                <li className="flex items-center gap-3 text-sm font-bold text-slate-300"><CheckCircle2 size={16} className="text-cyan-500"/> Connect-4 Multiplayer</li>
-                                <li className="flex items-center gap-3 text-sm font-bold text-slate-300"><CheckCircle2 size={16} className="text-cyan-500"/> Spaced Repetition Flashcards</li>
-                                <li className="flex items-center gap-3 text-sm font-bold text-slate-300"><CheckCircle2 size={16} className="text-cyan-500"/> Pronunciation Lab Matrix</li>
-                            </ul>
-                        </div>
-                        <div className="w-full md:w-[250px] shrink-0 aspect-[9/16] bg-black border-4 border-slate-800 rounded-[2.5rem] shadow-2xl relative overflow-hidden flex items-center justify-center">
-                            {/* Mock Mobile Screen */}
-                            <div className="absolute inset-0 bg-slate-950 flex flex-col p-4">
-                                <div className="w-full h-3 bg-slate-800 rounded-full mb-4 mt-6" />
-                                <div className="flex-1 bg-indigo-600 rounded-2xl flex flex-col items-center justify-center p-4 text-center">
-                                    <BrainCircuit size={40} className="text-white mb-4" />
-                                    <span className="text-white font-black text-xl">Lock In!</span>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2 mt-4">
-                                    <div className="h-16 bg-rose-500 rounded-xl" />
-                                    <div className="h-16 bg-blue-500 rounded-xl" />
-                                    <div className="h-16 bg-amber-500 rounded-xl" />
-                                    <div className="h-16 bg-emerald-500 rounded-xl" />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                 </div>
             </section>
 
-            {/* PRICING SECTION */}
-            <section className="max-w-4xl mx-auto px-6 py-24 text-center">
+            {/* 3. DUAL-SCREEN SYNC ENGINE SHOWCASE */}
+            <section className="max-w-7xl mx-auto px-6 py-24 relative z-10 border-t border-white/5 mt-12">
+                <div className="text-center mb-16 max-w-3xl mx-auto">
+                    <h2 className="text-4xl md:text-5xl font-black tracking-tight text-white mb-6">Zero Latency. <br className="md:hidden"/>Absolute Control.</h2>
+                    <p className="text-lg text-slate-400 font-medium">Powered by a high-speed Websocket architecture, Magister OS syncs your smartboard projector with 30 student phones simultaneously in real-time.</p>
+                </div>
+
+                <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-12 relative">
+                    
+                    {/* PROJECTOR PLACEHOLDER */}
+                    <div className="w-full md:w-3/5 aspect-[16/10] bg-slate-900 rounded-[2rem] border-4 border-slate-800 shadow-2xl relative overflow-hidden flex flex-col">
+                        <div className="h-8 bg-slate-950 border-b border-slate-800 flex items-center px-4 gap-2 shrink-0">
+                            <div className="w-3 h-3 rounded-full bg-rose-500/50" /><div className="w-3 h-3 rounded-full bg-amber-500/50" /><div className="w-3 h-3 rounded-full bg-emerald-500/50" />
+                        </div>
+                        <div className="flex-1 flex items-center justify-center p-6">
+                            <span className="text-xs font-black uppercase tracking-widest text-slate-600 text-center">Projector View<br/>`projector_sync.mp4`</span>
+                        </div>
+                    </div>
+
+                    {/* SYNC INDICATOR */}
+                    <div className="hidden md:flex flex-col items-center justify-center gap-2 text-indigo-500 animate-pulse">
+                        <Zap size={32} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Live Sync</span>
+                    </div>
+
+                    {/* MOBILE HUD PLACEHOLDER */}
+                    <div className="w-2/3 md:w-1/4 aspect-[9/19] bg-black rounded-[3rem] border-8 border-slate-800 shadow-2xl relative overflow-hidden flex items-center justify-center">
+                        <div className="absolute top-0 w-1/2 h-6 bg-slate-800 rounded-b-3xl" /> {/* Notch */}
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 text-center px-4">Student HUD<br/>`mobile_sync.mp4`</span>
+                    </div>
+                </div>
+            </section>
+
+            {/* 4. THE "WHY SWITCH?" MATRIX */}
+            <section className="max-w-5xl mx-auto px-6 py-24 relative z-10">
+                <div className="text-center mb-16">
+                    <h2 className="text-4xl font-black tracking-tight text-white mb-4">The LMS paradigm is broken.</h2>
+                    <p className="text-slate-400 font-medium">See why educators are leaving legacy systems behind.</p>
+                </div>
+
+                <div className="bg-slate-900 rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl">
+                    <div className="grid grid-cols-4 bg-slate-950/50 border-b border-white/10 p-6 text-[10px] sm:text-xs font-black uppercase tracking-widest text-slate-400">
+                        <div className="col-span-1">Feature</div>
+                        <div className="col-span-1 text-center">Legacy LMS</div>
+                        <div className="col-span-1 text-center">Game Apps</div>
+                        <div className="col-span-1 text-center text-indigo-400">Magister OS</div>
+                    </div>
+                    
+                    {[
+                        { label: "AI Content Generation", legacy: false, games: false, magister: true },
+                        { label: "Live Multiplayer Mode", legacy: false, games: true, magister: true },
+                        { label: "Spaced Repetition Engine", legacy: false, games: false, magister: true },
+                        { label: "Pronunciation Analysis", legacy: false, games: false, magister: true },
+                        { label: "Offline Mobile App", legacy: false, games: false, magister: true },
+                        { label: "Frictionless Setup", legacy: false, games: true, magister: true },
+                    ].map((row, i) => (
+                        <div key={i} className="grid grid-cols-4 p-6 border-b border-white/5 items-center hover:bg-white/5 transition-colors">
+                            <div className="col-span-1 text-xs md:text-sm font-bold text-white pr-4">{row.label}</div>
+                            <div className="col-span-1 flex justify-center">{row.legacy ? <CheckCircle2 className="text-emerald-500" /> : <X className="text-slate-700" />}</div>
+                            <div className="col-span-1 flex justify-center">{row.games ? <CheckCircle2 className="text-emerald-500" /> : <X className="text-slate-700" />}</div>
+                            <div className="col-span-1 flex justify-center"><div className="bg-indigo-500/20 p-2 rounded-full"><CheckCircle2 className="text-indigo-400" /></div></div>
+                        </div>
+                    ))}
+                </div>
+            </section>
+
+            {/* 5. SOCIAL PROOF / TESTIMONIALS */}
+            <section className="max-w-7xl mx-auto px-6 py-24 relative z-10 border-t border-white/5">
+                <div className="text-center mb-16">
+                    <h2 className="text-3xl md:text-4xl font-black tracking-tight text-white mb-4">Built by educators, for educators.</h2>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {[
+                        { quote: "Magister OS saved me 4 hours of lesson prep this week alone. The AI generator feels like cheating.", author: "Sarah J.", role: "High School ESL Teacher" },
+                        { quote: "Finally, an LMS that doesn't feel like it was built in 2004. My students actually ask to play the vocab battles.", author: "David M.", role: "University Professor" },
+                        { quote: "The zero-latency smartboard syncing is flawless. I display the QR code, and the whole class is locked in within seconds.", author: "Elena R.", role: "Instructional Designer" }
+                    ].map((t, i) => (
+                        <div key={i} className="bg-gradient-to-b from-slate-900 to-slate-950 p-8 rounded-[2.5rem] border border-white/5 shadow-xl relative">
+                            <Quote size={40} className="text-indigo-500/20 absolute top-6 right-6" />
+                            <p className="text-slate-300 font-medium leading-relaxed mb-8 relative z-10">"{t.quote}"</p>
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-black text-slate-400">{t.author.charAt(0)}</div>
+                                <div>
+                                    <h4 className="text-sm font-black text-white">{t.author}</h4>
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t.role}</p>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </section>
+
+            {/* 6. PRICING SECTION */}
+            <section className="max-w-4xl mx-auto px-6 py-24 text-center border-t border-white/5 mt-12">
                 <h2 className="text-4xl font-black tracking-tight text-white mb-4">Simple, transparent pricing.</h2>
                 <p className="text-slate-400 font-medium mb-12">Stop paying for legacy software. Upgrade your classroom today.</p>
                 
@@ -169,7 +227,7 @@ export default function LandingPage({ onGetStarted, onLogin }: any) {
                             <li className="flex items-center gap-3 text-slate-300 font-bold"><CheckCircle2 size={18} className="text-slate-600"/> 1 Active Cohort</li>
                             <li className="flex items-center gap-3 text-slate-300 font-bold"><CheckCircle2 size={18} className="text-slate-600"/> Max 30 Students</li>
                             <li className="flex items-center gap-3 text-slate-300 font-bold"><CheckCircle2 size={18} className="text-slate-600"/> Standard Flashcards</li>
-                            <li className="flex items-center gap-3 text-slate-500 font-bold opacity-50"><X size={18} className="text-slate-700"/> No AI Generation</li>
+                            <li className="flex items-center gap-3 text-slate-500 font-bold opacity-50"><ZapOff size={18} className="text-slate-700"/> No AI Generation</li>
                         </ul>
                         <button onClick={onGetStarted} className="w-full py-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-black uppercase tracking-widest text-xs transition-colors">Start Free</button>
                     </div>
