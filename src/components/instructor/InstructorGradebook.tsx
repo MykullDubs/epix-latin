@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, orderBy, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
-import { ChevronDown, X, CheckCircle2, MessageSquare, AlertTriangle, FileText, Target } from 'lucide-react';
+import { ChevronDown, X, CheckCircle2, MessageSquare, AlertTriangle, FileText, Target, User } from 'lucide-react';
 import { JuicyToast } from '../Toast';
 
 export default function InstructorGradebook({ classData }: any) {
