@@ -1,9 +1,9 @@
 // src/components/instructor/AiGeneratorModal.tsx
 import React, { useState, useRef } from 'react';
 import { 
-    Sparkles, Wand2, X, Loader2, FileText, 
+    Sparkles, Wand2, X, Loader2, FileText, AlignLeft,
     ListChecks, Puzzle, Brain, ChevronDown, 
-    UploadCloud, File, MessageSquare, MessageCircle, Info 
+    UploadCloud, File, MessageSquare, MessageCircle, Info, Mic 
 } from 'lucide-react';
 import { JuicyToast } from '../Toast'; 
 
@@ -18,14 +18,17 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
     const [pdfBase64, setPdfBase64] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // 🔥 EXPANDED GENERATION TARGETS (Now with 9 Blocks!)
     const [selectedTypes, setSelectedTypes] = useState({
         text: true,
+        essay: false,
         vocab: true,
         quiz: true,
         fillBlank: false,
         dialogue: false,
         discussion: false,
-        callout: false
+        callout: false,
+        pronunciation: false
     });
 
     if (!isOpen) return null;
@@ -84,6 +87,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
 
         setIsGenerating(true);
 
+        // 🔥 EXPANDED SYSTEM PROMPT WITH ESSAY AND PRONUNCIATION SCHEMAS
         const systemPrompt = `You are an expert instructional designer. Generate educational content based on the provided topic, text, or attached PDF document.
         Target Audience: ${gradeLevel}.
         
@@ -91,12 +95,14 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
         Generate ONLY the block types requested by the user below:
         
         ${selectedTypes.text ? `- A "text" block: An engaging, well-structured introduction or summary. Schema: { "type": "text", "title": "Catchy Title", "content": "Paragraph content..." }` : ''}
+        ${selectedTypes.essay ? `- An "essay" block: A longer, deep-dive reading passage. Schema: { "type": "essay", "title": "Deep Dive Topic", "content": "Multiple paragraphs of detailed content..." }` : ''}
         ${selectedTypes.vocab ? `- A "vocab-list" block: 3 to 5 key terms and definitions based heavily on the source material. Schema: { "type": "vocab-list", "items": [{ "term": "Word", "definition": "Meaning" }] }` : ''}
         ${selectedTypes.quiz ? `- A "quiz" block: A multiple choice question testing comprehension. Schema: { "type": "quiz", "question": "The question?", "options": [{ "id": "a", "text": "opt 1" }, { "id": "b", "text": "opt 2" }, { "id": "c", "text": "opt 3" }, { "id": "d", "text": "opt 4" }], "correctId": "b" }` : ''}
         ${selectedTypes.fillBlank ? `- A "fill-blank" block: A sentence with exactly two blank words enclosed in [brackets]. Schema: { "type": "fill-blank", "question": "Fill in the missing words", "text": "The [first] word and the [second] word.", "distractors": ["wrong1", "wrong2"] }` : ''}
         ${selectedTypes.dialogue ? `- A "dialogue" block: A conversational exchange between two characters illustrating the concept. Schema: { "type": "dialogue", "lines": [{ "speaker": "Name 1", "text": "What they say", "translation": "Context or translation", "side": "left" }, { "speaker": "Name 2", "text": "Reply", "translation": "Context or translation", "side": "right" }] }` : ''}
         ${selectedTypes.discussion ? `- A "discussion" block: 3 thought-provoking questions for group discussion. Schema: { "type": "discussion", "title": "Discussion Topic", "questions": ["Question 1", "Question 2", "Question 3"] }` : ''}
         ${selectedTypes.callout ? `- A "callout" block: A highlighted pro-tip, grammar rule, or important fact. Schema: { "type": "callout", "label": "Pro Tip / Important", "content": "The critical information..." }` : ''}
+        ${selectedTypes.pronunciation ? `- A "pronunciation" block: A minimal pairs lab comparing challenging sounds. Extract 2 related phonemes (IPA format) and provide minimal pair examples. Schema: { "type": "pronunciation", "targetPhonemes": ["IPA1", "IPA2"], "pairs": [{ "p1": "IPA1", "p2": "IPA2", "w1": "Word 1", "w2": "Word 2", "focus": "Concept Focus" }] }` : ''}
         
         Additional User Instructions / Topic:
         "${prompt || 'Analyze the attached PDF and extract the most important learning concepts.'}"`;
@@ -112,7 +118,6 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
         }
 
         try {
-            // 🔥 UPDATED TO GEMINI 3.1 FLASH-LITE
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -190,6 +195,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
                 {/* Body */}
                 <div className="p-8 flex flex-col gap-6 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-slate-950">
                     
+                    {/* PDF UPLOAD ZONE */}
                     <div className="space-y-3">
                         <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
                             Source Document (Optional)
@@ -268,6 +274,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
                         </div>
                     </div>
 
+                    {/* 🔥 EXPANDED BLOCK SELECTORS (3x3 Grid) */}
                     <div className="space-y-3 pb-4">
                         <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
                             Generated Assets
@@ -275,8 +282,13 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                             
                             <button disabled={isGenerating} onClick={() => toggleType('text')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.text ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-500 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-indigo-300'}`}>
-                                <FileText size={18} className={selectedTypes.text ? 'text-indigo-500' : 'text-slate-400'} />
-                                <span className="text-xs font-black uppercase tracking-widest">Summary Text</span>
+                                <AlignLeft size={18} className={selectedTypes.text ? 'text-indigo-500' : 'text-slate-400'} />
+                                <span className="text-xs font-black uppercase tracking-widest">Summary</span>
+                            </button>
+
+                            <button disabled={isGenerating} onClick={() => toggleType('essay')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.essay ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-500 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-indigo-300'}`}>
+                                <FileText size={18} className={selectedTypes.essay ? 'text-indigo-500' : 'text-slate-400'} />
+                                <span className="text-xs font-black uppercase tracking-widest">Essay</span>
                             </button>
 
                             <button disabled={isGenerating} onClick={() => toggleType('vocab')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.vocab ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-500 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-indigo-300'}`}>
@@ -286,7 +298,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
 
                             <button disabled={isGenerating} onClick={() => toggleType('callout')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.callout ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-500 text-amber-700 dark:text-amber-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-amber-300'}`}>
                                 <Info size={18} className={selectedTypes.callout ? 'text-amber-500' : 'text-slate-400'} />
-                                <span className="text-xs font-black uppercase tracking-widest">Pro-Tip Callout</span>
+                                <span className="text-xs font-black uppercase tracking-widest">Callout</span>
                             </button>
 
                             <button disabled={isGenerating} onClick={() => toggleType('dialogue')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.dialogue ? 'bg-blue-50 dark:bg-blue-500/10 border-blue-500 text-blue-700 dark:text-blue-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-blue-300'}`}>
@@ -294,19 +306,24 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks }: an
                                 <span className="text-xs font-black uppercase tracking-widest">Dialogue</span>
                             </button>
 
-                            <button disabled={isGenerating} onClick={() => toggleType('discussion')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.discussion ? 'bg-violet-50 dark:bg-violet-500/10 border-violet-500 text-violet-700 dark:text-violet-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-violet-300'}`}>
+                            <button disabled={is/Generating} onClick={() => toggleType('discussion')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.discussion ? 'bg-violet-50 dark:bg-violet-500/10 border-violet-500 text-violet-700 dark:text-violet-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-violet-300'}`}>
                                 <MessageCircle size={18} className={selectedTypes.discussion ? 'text-violet-500' : 'text-slate-400'} />
                                 <span className="text-xs font-black uppercase tracking-widest">Discussion</span>
                             </button>
 
                             <button disabled={isGenerating} onClick={() => toggleType('quiz')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.quiz ? 'bg-rose-50 dark:bg-rose-500/10 border-rose-500 text-rose-700 dark:text-rose-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-rose-300'}`}>
                                 <Brain size={18} className={selectedTypes.quiz ? 'text-rose-500' : 'text-slate-400'} />
-                                <span className="text-xs font-black uppercase tracking-widest">Trivia Quiz</span>
+                                <span className="text-xs font-black uppercase tracking-widest">Quiz</span>
                             </button>
 
-                            <button disabled={isGenerating} onClick={() => toggleType('fillBlank')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left col-span-2 sm:col-span-1 ${selectedTypes.fillBlank ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-500 text-emerald-700 dark:text-emerald-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-emerald-300'}`}>
+                            <button disabled={isGenerating} onClick={() => toggleType('fillBlank')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.fillBlank ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-500 text-emerald-700 dark:text-emerald-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-emerald-300'}`}>
                                 <Puzzle size={18} className={selectedTypes.fillBlank ? 'text-emerald-500' : 'text-slate-400'} />
-                                <span className="text-xs font-black uppercase tracking-widest">Fill-in Blanks</span>
+                                <span className="text-xs font-black uppercase tracking-widest">Fill Blanks</span>
+                            </button>
+
+                            <button disabled={isGenerating} onClick={() => toggleType('pronunciation')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.pronunciation ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-500 text-emerald-700 dark:text-emerald-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-emerald-300'}`}>
+                                <Mic size={18} className={selectedTypes.pronunciation ? 'text-emerald-500' : 'text-slate-400'} />
+                                <span className="text-xs font-black uppercase tracking-widest">Pronounce</span>
                             </button>
                         </div>
                     </div>
