@@ -2,8 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
     Code, Trash2, AlignLeft, FileText, MessageSquare, 
-    List, HelpCircle, Image, Puzzle, MessageCircle, Gamepad2, X, Info, Activity, Mic, Play, Tag
+    List, HelpCircle, Image, Puzzle, MessageCircle, Gamepad2, X, Info, Activity, Mic, Play, Tag,
+    Wand2 // 🔥 IMPORTED THE WAND ICON FOR THE AI GENERATOR
 } from 'lucide-react';
+import AiGeneratorModal from './AiGeneratorModal'; // 🔥 IMPORTED THE NEW COMPONENT
 
 export function InjectorButton({ icon, label, subtitle, onClick, colorTheme = 'indigo' }: any) {
     const themeMap: Record<string, { bg: string, text: string, ring: string, iconBg: string, iconText: string }> = {
@@ -42,6 +44,10 @@ export default function LessonBuilderView({ data, setData, onTogglePreview, isPr
   
   // 🔥 SMART TAG STATE
   const [tagInput, setTagInput] = useState('');
+  
+  // 🔥 AI GENERATOR STATE
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [newlyAddedIndices, setNewlyAddedIndices] = useState<number[]>([]);
 
   const updateBlock = (index: number, field: string, value: any) => {
     const newBlocks = [...(data.blocks || [])];
@@ -69,6 +75,8 @@ export default function LessonBuilderView({ data, setData, onTogglePreview, isPr
         ] 
       }
     };
+    
+    const newIndex = (data.blocks || []).length;
     setData({ ...data, blocks: [...(data.blocks || []), templates[type]] });
     
     // Auto-scroll to the bottom when a new block is added
@@ -80,6 +88,23 @@ export default function LessonBuilderView({ data, setData, onTogglePreview, isPr
   const removeBlock = (index: number) => {
     const newBlocks = [...(data.blocks || [])].filter((_, i) => i !== index);
     setData({ ...data, blocks: newBlocks });
+  };
+
+  // 🔥 AI GENERATOR APPEND LOGIC
+  const handleAppendAiBlocks = (generatedBlocks: any[]) => {
+      const startIndex = (data.blocks || []).length;
+      const newIndices = generatedBlocks.map((_, i) => startIndex + i);
+      
+      setData({ ...data, blocks: [...(data.blocks || []), ...generatedBlocks] });
+      setNewlyAddedIndices(newIndices);
+      
+      // Clear highlight after 3 seconds
+      setTimeout(() => setNewlyAddedIndices([]), 3000);
+      
+      // Auto-scroll to the first new block
+      setTimeout(() => {
+          window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      }, 100);
   };
 
   // 🔥 TAG HANDLING LOGIC
@@ -116,6 +141,12 @@ export default function LessonBuilderView({ data, setData, onTogglePreview, isPr
   return (
     <div className="max-w-4xl mx-auto space-y-10 pb-64 relative">
       
+      <AiGeneratorModal 
+          isOpen={isAiModalOpen} 
+          onClose={() => setIsAiModalOpen(false)} 
+          onAppendBlocks={handleAppendAiBlocks} 
+      />
+
       {/* STICKY HEADER WITH TOGGLES */}
       <div className="sticky top-4 z-50 flex justify-between items-center bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl p-3 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-[0_10px_40px_rgba(0,0,0,0.08)]">
          <div className="flex gap-2">
@@ -123,6 +154,15 @@ export default function LessonBuilderView({ data, setData, onTogglePreview, isPr
                 <Code size={16} /> {jsonMode ? 'Exit JSON' : 'Advanced JSON'}
              </button>
              
+             {/* 🔥 THE MAGIC GENERATOR TRIGGER */}
+             {!jsonMode && (
+                 <button onClick={() => setIsAiModalOpen(true)} className="flex items-center gap-2 px-5 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 hover:scale-105 active:scale-95">
+                    <Wand2 size={16} /> Magic Generate
+                 </button>
+             )}
+         </div>
+         
+         <div className="flex gap-2">
              {onTogglePreview && (
                  <button onClick={onTogglePreview} className={`flex items-center gap-2 px-5 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${isPreviewActive ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100 hover:border-indigo-200'}`}>
                      <Play size={16} fill={isPreviewActive ? "currentColor" : "none"} /> {isPreviewActive ? 'Close Preview' : 'Live Preview'}
@@ -145,7 +185,7 @@ export default function LessonBuilderView({ data, setData, onTogglePreview, isPr
             <input className="text-4xl md:text-5xl font-black border-none w-full focus:ring-0 p-0 tracking-tighter bg-transparent outline-none text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-700" placeholder="Unit Title..." value={data.title || ''} onChange={e => setData({...data, title: e.target.value})} />
             <input className="text-lg md:text-xl font-bold text-slate-400 border-none w-full focus:ring-0 p-0 tracking-tight bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-700" placeholder="Subtitle..." value={data.subtitle || ''} onChange={e => setData({...data, subtitle: e.target.value})} />
             
-            {/* 🔥 NEW: SMART TAGS UI */}
+            {/* SMART TAGS UI */}
             <div className="flex flex-wrap items-center gap-2 pt-2">
                 {(data.tags || []).map((tag: string) => (
                     <span key={tag} className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-lg text-[10px] font-black uppercase tracking-widest border border-indigo-100 dark:border-indigo-500/20 shadow-sm animate-in zoom-in-95 duration-200">
@@ -168,12 +208,15 @@ export default function LessonBuilderView({ data, setData, onTogglePreview, isPr
           </div>
 
           <div className="space-y-6">
-            {(data.blocks || []).map((block: any, idx: number) => (
-              <div key={idx} className="group bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-500/50 transition-all relative shadow-sm">
+            {(data.blocks || []).map((block: any, idx: number) => {
+              const isNewlyAdded = newlyAddedIndices.includes(idx);
+              return (
+              <div key={idx} className={`group bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border-2 transition-all relative shadow-sm ${isNewlyAdded ? 'border-purple-400 shadow-[0_0_30px_rgba(168,85,247,0.3)] scale-[1.02]' : 'border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-500/50'}`}>
                 <div className="flex justify-between items-center mb-6 pb-6 border-b border-slate-50 dark:border-slate-800/50">
                    <div className="flex items-center gap-3">
-                       <span className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-xs font-black text-indigo-600 dark:text-indigo-400">{idx + 1}</span>
+                       <span className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black ${isNewlyAdded ? 'bg-purple-100 text-purple-700' : 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'}`}>{idx + 1}</span>
                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{block.type}</span>
+                       {isNewlyAdded && <span className="ml-2 px-2 py-1 bg-purple-500 text-white text-[8px] font-black uppercase tracking-widest rounded-md animate-pulse">AI Generated</span>}
                    </div>
                    <button onClick={() => removeBlock(idx)} className="p-3 bg-rose-50 dark:bg-rose-500/10 text-rose-500 rounded-xl hover:bg-rose-500 hover:text-white transition-colors"><Trash2 size={18} strokeWidth={2.5} /></button>
                 </div>
@@ -243,17 +286,20 @@ export default function LessonBuilderView({ data, setData, onTogglePreview, isPr
                 {/* QUIZ EDITOR */}
                 {block.type === 'quiz' && (
                   <div className="space-y-4 bg-indigo-50/50 dark:bg-indigo-500/10 p-6 rounded-3xl border border-indigo-100 dark:border-indigo-900/50">
-                     <textarea className="w-full bg-white dark:bg-slate-900 dark:text-white border border-indigo-100 dark:border-indigo-800/50 p-4 rounded-2xl text-sm font-bold resize-none h-24 outline-none focus:ring-2 focus:ring-indigo-300 shadow-sm" placeholder="Quiz Question..." value={block.question || ''} onChange={e => updateBlock(idx, 'question', e.target.value)} />
+                     <textarea className="w-full bg-white dark:bg-slate-900 dark:text-white border border-indigo-100 dark:border-indigo-800/50 p-4 rounded-2xl text-sm font-bold resize-none h-24 outline-none focus:ring-2 focus:ring-indigo-300 shadow-sm" placeholder="Quiz Question..." value={block.content?.question || block.question || ''} onChange={e => updateBlock(idx, 'question', e.target.value)} />
                      <div className="space-y-3 mt-4">
                        <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest ml-1">Options (Select Correct)</span>
-                       {(block.options || []).map((opt: any, oIdx: number) => (
-                          <div key={oIdx} className="flex items-center gap-3">
-                             <input type="radio" className="w-5 h-5 text-indigo-600 focus:ring-indigo-500 cursor-pointer" checked={block.correctId === opt.id} onChange={() => updateBlock(idx, 'correctId', opt.id)} />
-                             <input className="w-16 bg-white dark:bg-slate-900 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800/50 p-3 rounded-xl text-xs font-mono font-bold text-center outline-none shadow-sm" placeholder="ID" value={opt.id} onChange={e => { const newOpts = [...block.options]; newOpts[oIdx].id = e.target.value; updateBlock(idx, 'options', newOpts); }} />
-                             <input className="flex-1 bg-white dark:bg-slate-900 dark:text-white border border-indigo-100 dark:border-indigo-800/50 p-3 rounded-xl text-sm font-medium outline-none shadow-sm" placeholder="Answer Text" value={opt.text} onChange={e => { const newOpts = [...block.options]; newOpts[oIdx].text = e.target.value; updateBlock(idx, 'options', newOpts); }} />
-                          </div>
-                       ))}
-                       <button onClick={() => updateBlock(idx, 'options', [...(block.options||[]), {id: String.fromCharCode(97 + (block.options?.length || 0)), text: ''}])} className="text-xs font-black text-indigo-500 mt-2 hover:text-indigo-700 transition-colors uppercase tracking-widest">+ Add Option</button>
+                       {(block.content?.options || block.options || []).map((opt: any, oIdx: number) => {
+                           const isCorrect = (block.content?.correctId || block.correctId) === opt.id;
+                           return (
+                           <div key={oIdx} className="flex items-center gap-3">
+                              <input type="radio" className="w-5 h-5 text-indigo-600 focus:ring-indigo-500 cursor-pointer" checked={isCorrect} onChange={() => updateBlock(idx, 'correctId', opt.id)} />
+                              <input className="w-16 bg-white dark:bg-slate-900 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800/50 p-3 rounded-xl text-xs font-mono font-bold text-center outline-none shadow-sm" placeholder="ID" value={opt.id} onChange={e => { const newOpts = [...(block.content?.options || block.options)]; newOpts[oIdx].id = e.target.value; updateBlock(idx, 'options', newOpts); }} />
+                              <input className="flex-1 bg-white dark:bg-slate-900 dark:text-white border border-indigo-100 dark:border-indigo-800/50 p-3 rounded-xl text-sm font-medium outline-none shadow-sm" placeholder="Answer Text" value={opt.text} onChange={e => { const newOpts = [...(block.content?.options || block.options)]; newOpts[oIdx].text = e.target.value; updateBlock(idx, 'options', newOpts); }} />
+                           </div>
+                           );
+                       })}
+                       <button onClick={() => updateBlock(idx, 'options', [...(block.content?.options || block.options || []), {id: String.fromCharCode(97 + ((block.content?.options || block.options)?.length || 0)), text: ''}])} className="text-xs font-black text-indigo-500 mt-2 hover:text-indigo-700 transition-colors uppercase tracking-widest">+ Add Option</button>
                      </div>
                   </div>
                 )}
@@ -408,7 +454,8 @@ export default function LessonBuilderView({ data, setData, onTogglePreview, isPr
                 )}
 
               </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 pt-12 pb-12 border-t border-slate-100 dark:border-slate-800">
@@ -424,7 +471,6 @@ export default function LessonBuilderView({ data, setData, onTogglePreview, isPr
              
              <InjectorButton icon={<MessageCircle/>} label="Discussion" subtitle="Live Forums" colorTheme="violet" onClick={() => addBlock('discussion')} />
              <InjectorButton icon={<Gamepad2/>} label="Game" subtitle="Multiplayer" colorTheme="rose" onClick={() => addBlock('game')} />
-             {/* 🔥 THE PRONUNCIATION INJECTOR */}
              <InjectorButton icon={<Mic/>} label="Pronunciation" subtitle="Lab Matrix" colorTheme="emerald" onClick={() => addBlock('pronunciation')} />
           </div>
         </div>
