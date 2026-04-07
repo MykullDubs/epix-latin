@@ -44,7 +44,7 @@ const getDeckTheme = (title: string = '') => {
     return { icon: Layers, gradient: 'from-indigo-400 to-indigo-600', shadow: 'shadow-indigo-500/30' };
 };
 
-// 🔥 Added `activeOrg` to destructured props!
+// 🔥 Added `activeOrg` to destructured props
 export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck, onLogActivity, userData, onSaveCard, onToggleStar, onToggleArchive, onCreateFolder, onAssignToFolder, onHideDeck, onUpdateFolder, onDeleteFolder, onReorderFolders, onReorderDecks, user, activeOrg }: any) {
     const [internalMode, setInternalMode] = useState<'library' | 'menu' | 'playing' | 'create'>('library');
     const [activeGame, setActiveGame] = useState<'standard' | 'quiz' | 'match' | 'tower'>('standard');
@@ -270,7 +270,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         onLogActivity(resolvedDeck?.id || 'custom', earnedXP, `${deckTitle} (${activeGame})`, { scorePct, mode: activeGame });
         
         window.history.back(); 
-        setTimeout(() => setToastMsg(`Protocol Complete! +${earnedXP} XP Earned!`), 100);
+        setTimeout(() => setToastMsg(`Session Complete! +${earnedXP} XP Earned!`), 100);
     };
 
     const handleSwipeStart = (e: React.TouchEvent) => {
@@ -324,7 +324,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         }
 
         setIsFetchingCards(true);
-        setToastMsg("Compiling Omni-Deck...");
+        setToastMsg("Compiling Study Queue...");
         
         try {
             const allPromises = folderDecks.map(async (deck: any) => {
@@ -367,13 +367,13 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             window.history.pushState({ view: 'menu' }, ''); 
             setOmniDeck({
                 id: `omni_${folderName}`,
-                title: `${folderName} (Omni-Mode)`,
+                title: `${folderName} (Study All)`,
                 cards: allCards.sort(() => Math.random() - 0.5) 
             });
             setInternalMode('menu');
         } catch (err) {
             console.error("Omni-Fetch failed:", err);
-            setToastMsg("Failed to compile Omni-Deck.");
+            setToastMsg("Failed to compile Study Queue.");
         } finally {
             setIsFetchingCards(false);
         }
@@ -393,7 +393,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 onSave={handleSaveFromBuilder} 
                 onCancel={(success?: boolean) => {
                     window.history.back();
-                    if (success) setTimeout(() => setToastMsg(builderConfig.type === 'new_deck' ? "Deck Forged." : "Card Appended."), 100);
+                    if (success) setTimeout(() => setToastMsg(builderConfig.type === 'new_deck' ? "Deck Created." : "Card Added."), 100);
                 }} 
             />
         );
@@ -415,7 +415,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
         };
 
         return (
-            <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors relative">
+            <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors relative overflow-hidden">
                 {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
                 
                 {showFolderModal.isOpen && (
@@ -429,23 +429,29 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 )}
 
                 <div className="sticky top-0 z-30 w-full flex flex-col shrink-0 shadow-sm">
-                    {/* 🔥 SYNCED GLOBAL HEADER */}
-                    <header className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex justify-between items-center transition-colors duration-300 pt-safe">
+                    {/* UNIFIED M3 HEADER */}
+                    <header className="h-24 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 md:px-10 flex justify-between items-center shrink-0 transition-colors duration-300">
                         <div className="flex items-center gap-3">
                             {activeOrg?.logoUrl ? (
-                                <img src={activeOrg.logoUrl} alt={`${themeName} Logo`} className="w-8 h-8 object-contain rounded-md" />
+                                <img src={activeOrg.logoUrl} alt={`${themeName} Logo`} className="w-10 h-10 object-contain rounded-xl shadow-sm" />
                             ) : (
-                                <div className="text-white p-1.5 rounded-lg shadow-sm" style={{ backgroundColor: themeColor }} aria-hidden="true">
-                                    <GraduationCap size={18} strokeWidth={3}/>
+                                <div className="text-white p-2.5 rounded-xl shadow-sm" style={{ backgroundColor: themeColor }} aria-hidden="true">
+                                    <GraduationCap size={20} strokeWidth={2.5}/>
                                 </div>
                             )}
-                            <span className="font-black tracking-tighter text-lg truncate max-w-[150px]" style={{ color: themeColor }}>
-                                Study Hub
-                            </span>
+                            <div className="flex flex-col">
+                                <span className="font-black tracking-tighter text-xl leading-none" style={{ color: themeColor }}>
+                                    {themeName}
+                                </span>
+                                <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] mt-1">Study Hub</span>
+                            </div>
                         </div>
-                        <div className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 shrink-0 transition-colors duration-300" aria-label={`Target Language: ${targetLang}`}>
-                            <Globe size={14} className="text-slate-400 dark:text-slate-500" aria-hidden="true"/>
-                            <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide">{targetLang}</span>
+
+                        <div className="flex items-center gap-4">
+                            <div className="hidden sm:flex px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 items-center gap-2 shrink-0 transition-colors duration-300" aria-label={`Target Language: ${targetLang}`}>
+                                <Globe size={16} className="text-slate-400 dark:text-slate-500" aria-hidden="true"/>
+                                <span className="text-xs font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest">{targetLang}</span>
+                            </div>
                         </div>
                     </header>
 
@@ -490,273 +496,273 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                     ref={scrollContainerRef} 
                     onTouchStart={handleLibrarySwipeStart}
                     onTouchEnd={handleLibrarySwipeEnd}
-                    className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 relative z-10 custom-scrollbar overscroll-y-contain h-full"
+                    className="flex-1 overflow-y-auto p-6 md:p-10 pb-32 relative z-10 custom-scrollbar overscroll-y-contain"
                 >
-                    <div className="flex justify-between items-end mb-6 pl-1">
-                        <div>
-                            <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight">My Vault</h2>
-                            <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] flex items-center gap-1.5 mt-1"><Library size={12}/> Memory Network</p>
-                        </div>
-                        <button 
-                            onClick={() => {
-                                window.history.pushState({ view: 'create' }, ''); 
-                                setBuilderConfig({ type: 'new_deck', folder: null });
-                                setInternalMode('create');
-                            }} 
-                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-indigo-500/30 active:scale-95 transition-all"
-                        >
-                            <Plus size={16} strokeWidth={3} /> New Deck
-                        </button>
-                    </div>
-
-                    <div className={`grid ${isDense ? 'grid-cols-3 gap-3' : 'grid-cols-2 md:grid-cols-3 gap-4'}`}>
-                        
-                        {localFolders.includes(deckFilter) && (
-                            <div className="col-span-full animate-in fade-in duration-300 mb-2 mt-2 px-2">
-                                <button onClick={() => window.history.back()} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-500 transition-colors w-fit bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 active:scale-95">
-                                    <ArrowLeft size={14} /> Back to Library
-                                </button>
-                                
-                                <div className="flex items-center gap-3 mt-6 mb-4">
-                                    <FolderOpen size={28} className={FOLDER_COLORS[folderColors[deckFilter] || 'indigo'].textColor} />
-                                    <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">{deckFilter}</h2>
-                                </div>
-                                
-                                <div className="flex gap-2">
-                                    <button 
-                                        onClick={() => {
-                                            window.history.pushState({ view: 'create' }, ''); 
-                                            setBuilderConfig({ type: 'new_deck', folder: deckFilter });
-                                            setInternalMode('create');
-                                        }}
-                                        className="flex-1 flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 shadow-sm active:scale-95 transition-all hover:border-indigo-200"
-                                    >
-                                        <Plus size={16} /> New Deck
-                                    </button>
-                                    <button 
-                                        onClick={() => launchOmniMode(deckFilter)}
-                                        disabled={isFetchingCards}
-                                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white shadow-md active:scale-95 transition-all disabled:opacity-50 ${FOLDER_COLORS[folderColors[deckFilter] || 'indigo'].hex}`}
-                                    >
-                                        {isFetchingCards ? <Loader2 size={16} className="animate-spin" /> : <Infinity size={16} />} 
-                                        Omni-Study
-                                    </button>
-                                </div>
+                    <div className="max-w-6xl mx-auto">
+                        <div className="flex justify-between items-end mb-8 pl-1">
+                            <div>
+                                <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight">My Library</h2>
+                                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] flex items-center gap-1.5 mt-1"><Library size={12}/> Flashcards & Content</p>
                             </div>
-                        )}
+                            <button 
+                                onClick={() => {
+                                    window.history.pushState({ view: 'create' }, ''); 
+                                    setBuilderConfig({ type: 'new_deck', folder: null });
+                                    setInternalMode('create');
+                                }} 
+                                className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-3 rounded-full text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-sm active:scale-95 transition-all"
+                            >
+                                <Plus size={16} strokeWidth={3} /> New Deck
+                            </button>
+                        </div>
 
-                        {deckFilter === 'all' && localFolders.map((folderName: string) => {
-                            const itemCount = Object.keys(allDecks).filter(key => userData?.deckPrefs?.[key]?.folder === folderName && !userData?.deckPrefs?.[key]?.archived).length;
-                            const theme = FOLDER_COLORS[folderColors[folderName] || 'indigo'];
+                        <div className={`grid ${isDense ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'}`}>
                             
-                            const isDragged = draggedItem?.id === folderName;
-                            const isGap = dragOverGapId === folderName && draggedItem?.type === 'folder';
-                            const isCatchingDeck = dragOverFolderCatch === folderName && draggedItem?.type === 'deck';
-                            
-                            return (
-                                <div 
-                                    key={`folder-${folderName}`} 
-                                    className={`relative group transition-all duration-300 h-full ${
-                                        isDragged ? 'opacity-40 scale-95 z-0' : 'z-10'
-                                    } ${
-                                        isGap ? 'translate-x-4 scale-[0.90] opacity-60 border-indigo-300 dark:border-indigo-700' : ''
-                                    } ${
-                                        isCatchingDeck ? 'scale-105 ring-4 ring-indigo-500 shadow-xl' : ''
-                                    }`}
-                                    draggable={true}
-                                    onDragStart={(e) => {
-                                        setDraggedItem({ id: folderName, type: 'folder' });
-                                        e.dataTransfer.effectAllowed = 'move';
-                                    }}
-                                    onDragEnd={() => {
-                                        setDraggedItem(null);
-                                        setDragOverGapId(null);
-                                        setDragOverFolderCatch(null);
-                                    }}
-                                    onDragOver={(e) => {
-                                        e.preventDefault();
-                                        if (draggedItem?.type === 'folder' && draggedItem.id !== folderName) {
-                                            setDragOverGapId(folderName);
-                                        } else if (draggedItem?.type === 'deck') {
-                                            setDragOverFolderCatch(folderName);
-                                        }
-                                    }}
-                                    onDragLeave={() => {
-                                        if (dragOverGapId === folderName) setDragOverGapId(null);
-                                        if (dragOverFolderCatch === folderName) setDragOverFolderCatch(null);
-                                    }}
-                                    onDrop={(e) => {
-                                        e.preventDefault();
-                                        if (draggedItem?.type === 'folder') {
-                                            const draggedIdx = localFolders.indexOf(draggedItem.id);
-                                            const targetIdx = localFolders.indexOf(folderName);
-                                            if (draggedIdx !== -1 && targetIdx !== -1) {
-                                                const newFolders = [...localFolders];
-                                                newFolders.splice(draggedIdx, 1);
-                                                newFolders.splice(targetIdx, 0, draggedItem.id);
-                                                setLocalFolders(newFolders);
-                                                if (onReorderFolders) onReorderFolders(newFolders); 
-                                            }
-                                        } else if (draggedItem?.type === 'deck') {
-                                            if (onAssignToFolder) onAssignToFolder(draggedItem.id, folderName);
-                                            setToastMsg(`Moved to ${folderName}`);
-                                        }
-                                        setDraggedItem(null);
-                                        setDragOverGapId(null);
-                                        setDragOverFolderCatch(null);
-                                    }}
-                                >
-                                    <button 
-                                        onClick={() => {
-                                            window.history.pushState({ view: 'folder' }, '');
-                                            setDeckFilter(folderName);
-                                        }} 
-                                        className={`w-full bg-white dark:bg-slate-900 rounded-[2rem] ${isDense ? 'p-4 sm:p-5' : 'p-5'} border-2 border-slate-100 dark:border-slate-800 transition-all text-left flex flex-col h-full relative cursor-grab active:cursor-grabbing ${!isGap && !isCatchingDeck ? `hover:-translate-y-1 shadow-sm hover:shadow-xl ${theme.hover}` : ''}`}
-                                    >
-                                        <div className="flex justify-between items-start mb-4 pointer-events-none">
-                                            <div className={`${isDense ? 'w-10 h-10 rounded-xl' : 'w-14 h-14 rounded-2xl'} ${theme.iconBg} ${theme.iconColor} flex items-center justify-center text-xl group-hover:scale-110 transition-transform`}>
-                                                <Folder size={isDense ? 20 : 24} fill="currentColor" className={isCatchingDeck ? 'animate-bounce' : ''} />
-                                            </div>
-                                        </div>
-                                        <h3 className={`font-black text-slate-800 dark:text-white ${isDense ? 'text-sm' : 'text-base'} leading-snug line-clamp-3 pr-4 mb-auto pointer-events-none`}>{folderName}</h3>
-                                        <div className="mt-3 pointer-events-none">
-                                            <span className={`text-[9px] uppercase font-black tracking-widest ${theme.badge} px-2.5 py-1 rounded-md shadow-sm`}>
-                                                {itemCount} Decks
-                                            </span>
-                                        </div>
+                            {localFolders.includes(deckFilter) && (
+                                <div className="col-span-full animate-in fade-in duration-300 mb-4 px-2">
+                                    <button onClick={() => window.history.back()} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-500 transition-colors w-fit bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 active:scale-95">
+                                        <ArrowLeft size={14} /> Back to Library
                                     </button>
-
-                                    <button 
-                                        onClick={(e) => { 
-                                            e.preventDefault(); e.stopPropagation(); 
-                                            window.history.pushState({ view: 'modal' }, '');
-                                            setActiveOptionsFolder(folderName);
-                                        }}
-                                        className={`absolute ${isDense ? 'top-3 right-2' : 'top-3 right-3'} p-2 rounded-full ${theme.iconColor} hover:bg-white/50 transition-colors active:bg-white/80 z-20`}
-                                        aria-label="Folder Options"
-                                    >
-                                        <MoreVertical size={20} />
-                                    </button>
+                                    
+                                    <div className="flex items-center gap-3 mt-8 mb-6">
+                                        <FolderOpen size={32} className={FOLDER_COLORS[folderColors[deckFilter] || 'indigo'].textColor} />
+                                        <h2 className="text-4xl font-black text-slate-800 dark:text-white tracking-tight">{deckFilter}</h2>
+                                    </div>
+                                    
+                                    <div className="flex flex-col sm:flex-row gap-3 max-w-xl">
+                                        <button 
+                                            onClick={() => {
+                                                window.history.pushState({ view: 'create' }, ''); 
+                                                setBuilderConfig({ type: 'new_deck', folder: deckFilter });
+                                                setInternalMode('create');
+                                            }}
+                                            className="flex-1 flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-5 py-4 rounded-[1.5rem] text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 shadow-sm active:scale-95 transition-all hover:border-indigo-300 dark:hover:border-indigo-500/50"
+                                        >
+                                            <Plus size={18} /> New Deck
+                                        </button>
+                                        <button 
+                                            onClick={() => launchOmniMode(deckFilter)}
+                                            disabled={isFetchingCards}
+                                            className={`flex-1 flex items-center justify-center gap-2 px-5 py-4 rounded-[1.5rem] text-xs font-black uppercase tracking-widest text-white shadow-sm active:scale-95 transition-all disabled:opacity-50 ${FOLDER_COLORS[folderColors[deckFilter] || 'indigo'].hex}`}
+                                        >
+                                            {isFetchingCards ? <Loader2 size={18} className="animate-spin" /> : <Infinity size={18} />} 
+                                            Study All Items
+                                        </button>
+                                    </div>
                                 </div>
-                            );
-                        })}
+                            )}
 
-                        {localDecks.length === 0 && deckFilter !== 'all' && localFolders.includes(deckFilter) && (
-                             <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[2.5rem] mt-4 text-slate-400 font-bold text-sm uppercase tracking-widest flex flex-col items-center gap-3">
-                                 <FolderPlus size={32} className="opacity-20" />
-                                 Folder is empty
-                             </div>
-                        )}
-
-                        {localDecks.map(([key, deck]: any) => {
-                            const displayTitle = deck.id === 'custom' ? "My Study Cards" : deck.title;
-                            const theme = getDeckTheme(displayTitle);
-                            const DeckIcon = deck.icon || theme.icon;
-                            const cardCount = deck.id === 'custom' ? (deck.cards?.length || 0) : (deck.stats?.cardCount || 0);
-                            
-                            const languages = deck.languages || [];
-                            
-                            const isDragged = draggedItem?.id === key;
-                            const isGap = dragOverGapId === key && draggedItem?.type === 'deck';
-
-                            return (
-                                <div 
-                                    key={key} 
-                                    className={`relative group transition-all duration-300 h-full pt-3 ${
-                                        isDragged ? 'opacity-40 scale-95 z-0' : 'z-10'
-                                    } ${
-                                        isGap ? 'scale-[0.90] translate-x-6 opacity-50 blur-[1px] border-indigo-300 dark:border-indigo-700' : ''
-                                    }`}
-                                    draggable={true}
-                                    onDragStart={(e) => {
-                                        setDraggedItem({ id: key, type: 'deck' });
-                                        e.dataTransfer.effectAllowed = 'move';
-                                    }}
-                                    onDragEnd={() => {
-                                        setDraggedItem(null);
-                                        setDragOverGapId(null);
-                                    }}
-                                    onDragOver={(e) => {
-                                        e.preventDefault();
-                                        if (draggedItem?.type === 'deck' && draggedItem.id !== key) {
-                                            setDragOverGapId(key);
-                                        }
-                                    }}
-                                    onDragLeave={() => {
-                                        if (dragOverGapId === key) setDragOverGapId(null);
-                                    }}
-                                    onDrop={(e) => {
-                                        e.preventDefault();
-                                        if (draggedItem?.type === 'deck') {
-                                            const draggedIdx = localDecks.findIndex(d => d[0] === draggedItem.id);
-                                            const targetIdx = localDecks.findIndex(d => d[0] === key);
-                                            if (draggedIdx !== -1 && targetIdx !== -1) {
-                                                const newDecks = [...localDecks];
-                                                const [removed] = newDecks.splice(draggedIdx, 1);
-                                                newDecks.splice(targetIdx, 0, removed);
-                                                setLocalDecks(newDecks);
-                                                if (onReorderDecks) onReorderDecks(newDecks.map(d => d[0]));
+                            {deckFilter === 'all' && localFolders.map((folderName: string) => {
+                                const itemCount = Object.keys(allDecks).filter(key => userData?.deckPrefs?.[key]?.folder === folderName && !userData?.deckPrefs?.[key]?.archived).length;
+                                const theme = FOLDER_COLORS[folderColors[folderName] || 'indigo'];
+                                
+                                const isDragged = draggedItem?.id === folderName;
+                                const isGap = dragOverGapId === folderName && draggedItem?.type === 'folder';
+                                const isCatchingDeck = dragOverFolderCatch === folderName && draggedItem?.type === 'deck';
+                                
+                                return (
+                                    <div 
+                                        key={`folder-${folderName}`} 
+                                        className={`relative group transition-all duration-300 h-full ${
+                                            isDragged ? 'opacity-40 scale-95 z-0' : 'z-10'
+                                        } ${
+                                            isGap ? 'translate-x-4 scale-[0.90] opacity-60 border-indigo-300 dark:border-indigo-700' : ''
+                                        } ${
+                                            isCatchingDeck ? 'scale-105 ring-4 ring-indigo-500 shadow-xl' : ''
+                                        }`}
+                                        draggable={true}
+                                        onDragStart={(e) => {
+                                            setDraggedItem({ id: folderName, type: 'folder' });
+                                            e.dataTransfer.effectAllowed = 'move';
+                                        }}
+                                        onDragEnd={() => {
+                                            setDraggedItem(null);
+                                            setDragOverGapId(null);
+                                            setDragOverFolderCatch(null);
+                                        }}
+                                        onDragOver={(e) => {
+                                            e.preventDefault();
+                                            if (draggedItem?.type === 'folder' && draggedItem.id !== folderName) {
+                                                setDragOverGapId(folderName);
+                                            } else if (draggedItem?.type === 'deck') {
+                                                setDragOverFolderCatch(folderName);
                                             }
-                                        }
-                                        setDraggedItem(null);
-                                        setDragOverGapId(null);
-                                    }}
-                                >
-                                    {/* 🔥 VISUALS: THE DECK STACK EFFECT */}
-                                    <div className="absolute inset-x-3 top-1 bottom-2 bg-slate-200/50 dark:bg-slate-800/50 rounded-[2rem] border border-slate-200 dark:border-slate-700 -rotate-2 transition-transform duration-300 group-hover:-rotate-3 group-hover:translate-y-1 pointer-events-none" />
-                                    <div className="absolute inset-x-1.5 top-2 bottom-1 bg-slate-100/80 dark:bg-slate-800/80 rounded-[2rem] border border-slate-200 dark:border-slate-700 rotate-1 transition-transform duration-300 group-hover:rotate-2 group-hover:translate-y-0.5 pointer-events-none" />
-
-                                    <button 
-                                        onClick={() => { 
-                                            window.history.pushState({ view: 'menu' }, ''); 
-                                            onSelectDeck(key); 
-                                            setInternalMode('menu'); 
-                                        }} 
-                                        className={`w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] ${isDense ? 'p-4 sm:p-5' : 'p-5'} border-2 border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all text-left shadow-sm relative z-10 flex flex-col cursor-grab active:cursor-grabbing ${!isGap ? 'group-hover:-translate-y-1 hover:shadow-xl hover:border-indigo-200 dark:hover:border-indigo-500/50' : ''}`}
-                                    > 
-                                        {/* 🔥 FIXED LANGUAGE BUBBLES */}
-                                        <div className={`flex items-start gap-2 ${isDense ? 'mb-3' : 'mb-4'} pointer-events-none w-full pr-6`}>
-                                            <div className={`${isDense ? 'w-10 h-10 rounded-xl' : 'w-12 h-12 rounded-[1rem]'} shrink-0 flex items-center justify-center text-white text-xl border shadow-inner transition-transform bg-gradient-to-br ${theme.gradient} ${theme.shadow} group-hover:scale-110`}>
-                                                {typeof DeckIcon === 'string' ? DeckIcon : <DeckIcon size={isDense ? 20 : 24}/>}
-                                            </div>
-
-                                            {languages && languages.length > 0 && (
-                                                <div className="flex flex-wrap gap-1 mt-1">
-                                                    {languages.map((lang: string, idx: number) => (
-                                                        <span key={idx} className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shadow-sm">
-                                                            {lang.substring(0, 3)}
-                                                        </span>
-                                                    ))}
+                                        }}
+                                        onDragLeave={() => {
+                                            if (dragOverGapId === folderName) setDragOverGapId(null);
+                                            if (dragOverFolderCatch === folderName) setDragOverFolderCatch(null);
+                                        }}
+                                        onDrop={(e) => {
+                                            e.preventDefault();
+                                            if (draggedItem?.type === 'folder') {
+                                                const draggedIdx = localFolders.indexOf(draggedItem.id);
+                                                const targetIdx = localFolders.indexOf(folderName);
+                                                if (draggedIdx !== -1 && targetIdx !== -1) {
+                                                    const newFolders = [...localFolders];
+                                                    newFolders.splice(draggedIdx, 1);
+                                                    newFolders.splice(targetIdx, 0, draggedItem.id);
+                                                    setLocalFolders(newFolders);
+                                                    if (onReorderFolders) onReorderFolders(newFolders); 
+                                                }
+                                            } else if (draggedItem?.type === 'deck') {
+                                                if (onAssignToFolder) onAssignToFolder(draggedItem.id, folderName);
+                                                setToastMsg(`Moved to ${folderName}`);
+                                            }
+                                            setDraggedItem(null);
+                                            setDragOverGapId(null);
+                                            setDragOverFolderCatch(null);
+                                        }}
+                                    >
+                                        <button 
+                                            onClick={() => {
+                                                window.history.pushState({ view: 'folder' }, '');
+                                                setDeckFilter(folderName);
+                                            }} 
+                                            className={`w-full bg-white dark:bg-slate-900 rounded-[2.5rem] p-6 border border-slate-200 dark:border-slate-800 transition-all text-left flex flex-col h-full relative cursor-grab active:cursor-grabbing ${!isGap && !isCatchingDeck ? `hover:-translate-y-1 shadow-sm hover:shadow-md ${theme.hover}` : ''}`}
+                                        >
+                                            <div className="flex justify-between items-start mb-5 pointer-events-none">
+                                                <div className={`w-14 h-14 rounded-2xl ${theme.iconBg} ${theme.iconColor} flex items-center justify-center text-xl group-hover:scale-110 transition-transform`}>
+                                                    <Folder size={24} fill="currentColor" className={isCatchingDeck ? 'animate-bounce' : ''} />
                                                 </div>
-                                            )}
-                                        </div>
-                                        
-                                        <h3 className={`font-black text-slate-800 dark:text-white ${isDense ? 'text-sm' : 'text-base'} leading-snug line-clamp-3 pr-4 mb-2 pointer-events-none`}>{displayTitle}</h3>
-                                        
-                                        <div className="mt-auto pt-1 flex flex-col gap-2 pointer-events-none">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest flex items-center gap-1">
-                                                    <Layers size={10} /> {cardCount}
+                                            </div>
+                                            <h3 className="font-black text-slate-800 dark:text-white text-lg leading-snug line-clamp-2 pr-4 mb-auto pointer-events-none">{folderName}</h3>
+                                            <div className="mt-4 pointer-events-none">
+                                                <span className={`text-[10px] uppercase font-black tracking-widest ${theme.badge} px-3 py-1.5 rounded-lg shadow-sm`}>
+                                                    {itemCount} Decks
                                                 </span>
                                             </div>
-                                        </div>
-                                    </button>
+                                        </button>
 
-                                    <button 
-                                        onClick={(e) => { 
-                                            e.preventDefault(); e.stopPropagation(); 
-                                            window.history.pushState({ view: 'modal' }, '');
-                                            setActiveOptionsDeck(deck);
-                                            setMenuView('main'); 
+                                        <button 
+                                            onClick={(e) => { 
+                                                e.preventDefault(); e.stopPropagation(); 
+                                                window.history.pushState({ view: 'modal' }, '');
+                                                setActiveOptionsFolder(folderName);
+                                            }}
+                                            className="absolute top-5 right-5 p-2 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors z-20"
+                                            aria-label="Folder Options"
+                                        >
+                                            <MoreVertical size={20} />
+                                        </button>
+                                    </div>
+                                );
+                            })}
+
+                            {localDecks.length === 0 && deckFilter !== 'all' && localFolders.includes(deckFilter) && (
+                                 <div className="col-span-full py-16 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[3rem] mt-6 text-slate-400 font-bold text-sm uppercase tracking-widest flex flex-col items-center gap-3">
+                                     <FolderPlus size={40} className="opacity-20" />
+                                     Folder is empty
+                                 </div>
+                            )}
+
+                            {localDecks.map(([key, deck]: any) => {
+                                const displayTitle = deck.id === 'custom' ? "My Study Cards" : deck.title;
+                                const theme = getDeckTheme(displayTitle);
+                                const DeckIcon = deck.icon || theme.icon;
+                                const cardCount = deck.id === 'custom' ? (deck.cards?.length || 0) : (deck.stats?.cardCount || 0);
+                                
+                                const languages = deck.languages || [];
+                                
+                                const isDragged = draggedItem?.id === key;
+                                const isGap = dragOverGapId === key && draggedItem?.type === 'deck';
+
+                                return (
+                                    <div 
+                                        key={key} 
+                                        className={`relative group transition-all duration-300 h-full pt-3 ${
+                                            isDragged ? 'opacity-40 scale-95 z-0' : 'z-10'
+                                        } ${
+                                            isGap ? 'scale-[0.90] translate-x-6 opacity-50 blur-[1px] border-indigo-300 dark:border-indigo-700' : ''
+                                        }`}
+                                        draggable={true}
+                                        onDragStart={(e) => {
+                                            setDraggedItem({ id: key, type: 'deck' });
+                                            e.dataTransfer.effectAllowed = 'move';
                                         }}
-                                        className={`absolute ${isDense ? 'top-3 right-1' : 'top-4 right-2'} p-2 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors z-20`}
-                                        aria-label="Deck Options"
+                                        onDragEnd={() => {
+                                            setDraggedItem(null);
+                                            setDragOverGapId(null);
+                                        }}
+                                        onDragOver={(e) => {
+                                            e.preventDefault();
+                                            if (draggedItem?.type === 'deck' && draggedItem.id !== key) {
+                                                setDragOverGapId(key);
+                                            }
+                                        }}
+                                        onDragLeave={() => {
+                                            if (dragOverGapId === key) setDragOverGapId(null);
+                                        }}
+                                        onDrop={(e) => {
+                                            e.preventDefault();
+                                            if (draggedItem?.type === 'deck') {
+                                                const draggedIdx = localDecks.findIndex(d => d[0] === draggedItem.id);
+                                                const targetIdx = localDecks.findIndex(d => d[0] === key);
+                                                if (draggedIdx !== -1 && targetIdx !== -1) {
+                                                    const newDecks = [...localDecks];
+                                                    const [removed] = newDecks.splice(draggedIdx, 1);
+                                                    newDecks.splice(targetIdx, 0, removed);
+                                                    setLocalDecks(newDecks);
+                                                    if (onReorderDecks) onReorderDecks(newDecks.map(d => d[0]));
+                                                }
+                                            }
+                                            setDraggedItem(null);
+                                            setDragOverGapId(null);
+                                        }}
                                     >
-                                        <MoreVertical size={20} />
-                                    </button>
-                                </div>
-                            );
-                        })}
+                                        <div className="absolute inset-x-3 top-1 bottom-2 bg-slate-200/50 dark:bg-slate-800/50 rounded-[2.5rem] border border-slate-200 dark:border-slate-700 -rotate-2 transition-transform duration-300 group-hover:-rotate-3 group-hover:translate-y-1 pointer-events-none" />
+                                        <div className="absolute inset-x-1.5 top-2 bottom-1 bg-slate-100/80 dark:bg-slate-800/80 rounded-[2.5rem] border border-slate-200 dark:border-slate-700 rotate-1 transition-transform duration-300 group-hover:rotate-2 group-hover:translate-y-0.5 pointer-events-none" />
+
+                                        <button 
+                                            onClick={() => { 
+                                                window.history.pushState({ view: 'menu' }, ''); 
+                                                onSelectDeck(key); 
+                                                setInternalMode('menu'); 
+                                            }} 
+                                            className={`w-full h-full bg-white dark:bg-slate-900 rounded-[2.5rem] p-6 border border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all text-left shadow-sm relative z-10 flex flex-col cursor-grab active:cursor-grabbing ${!isGap ? 'group-hover:-translate-y-1 hover:shadow-md' : ''}`}
+                                        > 
+                                            <div className="flex items-start gap-3 mb-5 pointer-events-none w-full pr-6">
+                                                <div className={`w-14 h-14 rounded-[1.25rem] shrink-0 flex items-center justify-center text-white border border-white/10 shadow-inner transition-transform bg-gradient-to-br ${theme.gradient} ${theme.shadow} group-hover:scale-110`}>
+                                                    {typeof DeckIcon === 'string' ? DeckIcon : <DeckIcon size={24}/>}
+                                                </div>
+
+                                                {languages && languages.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1 mt-1">
+                                                        {languages.map((lang: string, idx: number) => (
+                                                            <span key={idx} className="px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-slate-700 shadow-sm">
+                                                                {lang.substring(0, 3)}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            
+                                            <h3 className="font-black text-slate-800 dark:text-white text-lg leading-snug line-clamp-2 pr-4 mb-3 pointer-events-none">{displayTitle}</h3>
+                                            
+                                            <div className="mt-auto pt-3 border-t border-slate-50 dark:border-slate-800/50 flex flex-col gap-2 pointer-events-none w-full">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 rounded-md">
+                                                        <Layers size={12} /> {cardCount} Cards
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </button>
+
+                                        <button 
+                                            onClick={(e) => { 
+                                                e.preventDefault(); e.stopPropagation(); 
+                                                window.history.pushState({ view: 'modal' }, '');
+                                                setActiveOptionsDeck(deck);
+                                                setMenuView('main'); 
+                                            }}
+                                            className="absolute top-5 right-3 p-2 rounded-full text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors z-20"
+                                            aria-label="Deck Options"
+                                        >
+                                            <MoreVertical size={20} />
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
 
@@ -793,7 +799,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                     }} 
                                     className="w-full text-left px-5 py-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-3 transition-colors active:scale-[0.98]"
                                 >
-                                    <Infinity size={20} className="text-emerald-500" /> Study Omni-Mode
+                                    <Infinity size={20} className="text-emerald-500" /> Study All Content
                                 </button>
                                 <div className="h-4" />
                                 <button 
@@ -857,7 +863,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                                             window.history.back(); 
                                             setTimeout(() => {
                                                 if (onHideDeck) onHideDeck(activeOptionsDeck.id);
-                                                setToastMsg("Deck banished."); 
+                                                setToastMsg("Deck removed from view."); 
                                             }, 50);
                                         }} 
                                         className="w-full text-left px-5 py-4 bg-rose-50 dark:bg-rose-500/10 rounded-2xl text-sm font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 flex items-center gap-3 transition-colors active:scale-[0.98]"
@@ -919,7 +925,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
     }
 
     if (internalMode === 'menu') {
-        const displayMenuTitle = deckTitle.includes('(Omni-Mode)') ? deckTitle.replace(' (Omni-Mode)', '') : deckTitle;
+        const displayMenuTitle = deckTitle.includes('(Study All)') ? deckTitle.replace(' (Study All)', '') : deckTitle;
         const theme = getDeckTheme(displayMenuTitle);
         const DeckIcon = resolvedDeck?.icon || theme.icon;
         
@@ -930,7 +936,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                 className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors animate-in slide-in-from-right-8 duration-300 pb-safe relative"
             >
                 <div className="px-6 pt-safe-8 pb-6 shrink-0 bg-white/80 dark:bg-slate-950/80 backdrop-blur-2xl border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 shadow-sm">
-                    <button onClick={() => window.history.back()} className="flex items-center text-slate-400 hover:text-indigo-600 mb-6 text-xs font-black uppercase tracking-widest bg-white dark:bg-slate-900 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm active:scale-95 transition-all">
+                    <button onClick={() => window.history.back()} className="flex items-center text-slate-400 hover:text-indigo-600 mb-6 text-xs font-black uppercase tracking-widest bg-white dark:bg-slate-900 px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm active:scale-95 transition-all w-fit">
                         <ArrowLeft size={14} className="mr-2"/> Back
                     </button>
                     
@@ -940,7 +946,7 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                         </div>
                         <div className="flex-1 overflow-hidden">
                             <div className="flex items-center gap-1.5 mb-1 overflow-x-auto custom-scrollbar hide-scrollbar whitespace-nowrap">
-                                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 shrink-0">Vault</span>
+                                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 shrink-0">Library</span>
                                 <ChevronRight size={10} className="text-slate-300 shrink-0" />
                                 <span className="text-[9px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 shrink-0 truncate">
                                     {displayMenuTitle}
@@ -948,80 +954,68 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
                             </div>
                             <div className="flex items-start justify-between gap-2">
                                 <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight truncate">{displayMenuTitle}</h1>
-                                {!omniDeck && (
-                                    <button 
-                                        onClick={() => {
-                                            window.history.pushState({ view: 'create' }, '');
-                                            setBuilderConfig({ type: 'add_card', deck: resolvedDeck });
-                                            setInternalMode('create');
-                                        }} 
-                                        className="bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 p-2.5 rounded-xl shadow-sm border border-indigo-100 dark:border-indigo-500/30 active:scale-95 transition-all shrink-0"
-                                    >
-                                        <Plus size={20} strokeWidth={3} />
-                                    </button>
-                                )}
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-24">
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-24 max-w-4xl mx-auto w-full">
                     <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl flex items-center gap-2 w-fit mb-2 transition-colors ${
                         isFetchingCards ? 'bg-slate-100 dark:bg-slate-800 text-slate-400' :
                         dueCards.length === 0 ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 border border-emerald-100 dark:border-emerald-500/20' : 
                         'bg-rose-50 dark:bg-rose-500/10 text-rose-500 border border-rose-100 dark:border-rose-500/20'
                     }`}>
                         {isFetchingCards ? (
-                            <><Loader2 size={12} className="animate-spin" /> Calculating Matrix...</>
+                            <><Loader2 size={12} className="animate-spin" /> Preparing Content...</>
                         ) : dueCards.length === 0 ? (
-                            <><CheckCircle2 size={12} /> All Caught Up • {cards.length} Total</>
+                            <><CheckCircle2 size={12} /> All Caught Up • {cards.length} Total Items</>
                         ) : (
-                            <><BrainCircuit size={12} className="animate-pulse" /> {dueCards.length} Due for Review • {cards.length} Total</>
+                            <><BrainCircuit size={12} className="animate-pulse" /> {dueCards.length} Due for Review • {cards.length} Total Items</>
                         )}
                     </span>
 
                     {isFetchingCards ? (
                         <div className="h-full flex flex-col items-center justify-center opacity-40 py-12">
                             <Loader2 size={48} className="animate-spin mb-4 text-indigo-500" />
-                            <p className="font-black uppercase tracking-widest text-slate-500 text-xs">Decrypting Cards...</p>
+                            <p className="font-black uppercase tracking-widest text-slate-500 text-xs">Loading Content...</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <button 
                                 onClick={() => launchGame('standard')} 
-                                className={`p-6 rounded-[2.5rem] border-[3px] shadow-sm hover:-translate-y-1 transition-all group text-left ${
+                                className={`p-6 md:p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm hover:-translate-y-1 transition-all group text-left ${
                                     dueCards.length > 0 
-                                        ? 'bg-rose-50 dark:bg-rose-500/5 border-rose-200 dark:border-rose-500/30 hover:border-rose-300 dark:hover:border-rose-500/50' 
-                                        : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-500/50'
+                                        ? 'bg-rose-50/50 dark:bg-rose-500/5 hover:border-rose-300 dark:hover:border-rose-500/50 hover:shadow-lg' 
+                                        : 'bg-white dark:bg-slate-900 hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-lg'
                                 }`}
                             >
-                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 group-hover:rotate-6 transition-transform ${dueCards.length > 0 ? 'bg-rose-100 dark:bg-rose-500/20 text-rose-500' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-500'}`}>
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform ${dueCards.length > 0 ? 'bg-rose-100 dark:bg-rose-500/20 text-rose-500' : 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500'}`}>
                                     {dueCards.length > 0 ? <BrainCircuit size={28}/> : <Layers size={28}/>}
                                 </div>
-                                <h4 className="font-black text-slate-800 dark:text-white text-xl leading-none mb-2">
-                                    {dueCards.length > 0 ? 'Review Due' : 'Browse Deck'}
+                                <h4 className="font-black text-slate-800 dark:text-white text-2xl md:text-3xl leading-none mb-3">
+                                    {dueCards.length > 0 ? 'Smart Review' : 'Browse Deck'}
                                 </h4>
-                                <p className={`text-[10px] font-black uppercase tracking-widest ${dueCards.length > 0 ? 'text-rose-400' : 'text-slate-400'}`}>
+                                <p className={`text-xs font-bold uppercase tracking-widest ${dueCards.length > 0 ? 'text-rose-400' : 'text-slate-400'}`}>
                                     {dueCards.length > 0 ? 'Spaced Repetition' : 'Standard Mode'}
                                 </p>
                             </button>
 
-                            <button onClick={() => launchGame('quiz')} className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-100 dark:border-slate-800 shadow-sm hover:border-emerald-300 dark:hover:border-emerald-500/50 hover:-translate-y-1 transition-all group text-left">
-                                <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 rounded-2xl flex items-center justify-center mb-4 group-hover:-rotate-6 transition-transform"><HelpCircle size={28}/></div>
-                                <h4 className="font-black text-slate-800 dark:text-white text-xl leading-none mb-2">Quiz</h4>
-                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Multiple Choice</p>
+                            <button onClick={() => launchGame('quiz')} className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm hover:border-emerald-300 dark:hover:border-emerald-500/50 hover:-translate-y-1 transition-all group text-left hover:shadow-lg">
+                                <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><HelpCircle size={28}/></div>
+                                <h4 className="font-black text-slate-800 dark:text-white text-2xl md:text-3xl leading-none mb-3">Trivia Quiz</h4>
+                                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Multiple Choice</p>
                             </button>
 
-                            <button onClick={() => launchGame('match')} className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-100 dark:border-slate-800 shadow-sm hover:border-purple-300 dark:hover:border-purple-500/50 hover:-translate-y-1 transition-all group text-left">
-                                <div className="w-14 h-14 bg-purple-50 dark:bg-purple-500/10 text-purple-500 rounded-2xl flex items-center justify-center mb-4 group-hover:rotate-12 transition-transform"><Puzzle size={28}/></div>
-                                <h4 className="font-black text-slate-800 dark:text-white text-xl leading-none mb-2">Match</h4>
-                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Speed Pairs</p>
+                            <button onClick={() => launchGame('match')} className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm hover:border-purple-300 dark:hover:border-purple-500/50 hover:-translate-y-1 transition-all group text-left hover:shadow-lg">
+                                <div className="w-14 h-14 bg-purple-50 dark:bg-purple-500/10 text-purple-500 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"><Puzzle size={28}/></div>
+                                <h4 className="font-black text-slate-800 dark:text-white text-2xl md:text-3xl leading-none mb-3">Speed Match</h4>
+                                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Beat the clock</p>
                             </button>
 
-                            <button className="bg-slate-900 p-6 rounded-[2.5rem] border-[3px] border-slate-800 shadow-xl opacity-50 cursor-not-allowed group text-left relative overflow-hidden">
-                                <div className="w-14 h-14 bg-orange-500/20 text-orange-400 rounded-2xl flex items-center justify-center mb-4"><Flame size={28} fill="currentColor"/></div>
-                                <h4 className="font-black text-white text-xl leading-none mb-2">Tower</h4>
-                                <p className="text-[10px] text-orange-400 font-black uppercase tracking-widest">Survival</p>
+                            <button className="bg-slate-50 dark:bg-slate-900/50 p-6 md:p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm opacity-50 cursor-not-allowed group text-left relative overflow-hidden">
+                                <div className="w-14 h-14 bg-orange-100 dark:bg-orange-500/20 text-orange-500 rounded-2xl flex items-center justify-center mb-6"><Flame size={28} fill="currentColor"/></div>
+                                <h4 className="font-black text-slate-400 dark:text-slate-500 text-2xl md:text-3xl leading-none mb-3">Tower Game</h4>
+                                <p className="text-xs text-orange-400/50 font-bold uppercase tracking-widest">Locked Mode</p>
                             </button>
                         </div>
                     )}
@@ -1036,10 +1030,10 @@ export default function FlashcardView({ allDecks, selectedDeckKey, onSelectDeck,
             onTouchEnd={handleMenuSwipeEnd}
             className="h-[100dvh] flex flex-col bg-slate-50 dark:bg-slate-950 animate-in slide-in-from-bottom-8 duration-500 relative z-[100] transition-colors pb-safe"
         >
-            <div className="px-4 py-4 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center shrink-0">
+            <div className="px-4 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center shrink-0 shadow-sm">
                 <button onClick={() => window.history.back()} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-full hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition-colors"><X size={20} strokeWidth={3}/></button>
                 <div className="flex flex-col items-center">
-                    <span className="text-[9px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-[0.2em] mb-0.5">{activeGame} Protocol</span>
+                    <span className="text-[9px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-[0.2em] mb-0.5">{activeGame === 'standard' ? 'Spaced Repetition' : activeGame} Mode</span>
                     <span className="text-sm font-black text-slate-900 dark:text-white line-clamp-1">{deckTitle}</span>
                 </div>
                 <div className="w-11"></div>
@@ -1058,32 +1052,34 @@ function FolderModal({ initialName, initialColor, isEdit, onSave, onClose }: any
     const [color, setColor] = useState(initialColor || 'indigo');
 
     return (
-        <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl border border-slate-100 dark:border-slate-800 animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-black text-2xl text-slate-800 dark:text-white mb-6 text-center">
-                {isEdit ? 'Edit Folder' : 'New Folder'}
-            </h3>
-            <input 
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g., Midterm Prep"
-                className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 font-bold text-slate-800 dark:text-white focus:border-indigo-500 outline-none mb-6 text-lg text-center"
-                autoFocus
-            />
-            <div className="mb-8">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-3 text-center">Select Theme Color</span>
-                <div className="flex justify-center gap-3">
-                    {Object.keys(FOLDER_COLORS).map(c => (
-                        <button 
-                            key={c} 
-                            onClick={(e) => { e.preventDefault(); setColor(c); }}
-                            className={`w-8 h-8 rounded-full shadow-sm transition-all active:scale-90 ${FOLDER_COLORS[c].hex} ${color === c ? 'ring-4 ring-indigo-500/30 scale-110' : 'ring-2 ring-transparent opacity-70 hover:opacity-100'}`} 
-                        />
-                    ))}
+        <div className="fixed inset-0 z-[9999] bg-slate-900/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl border border-slate-100 dark:border-slate-800 animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
+                <h3 className="font-black text-2xl text-slate-800 dark:text-white mb-6 text-center">
+                    {isEdit ? 'Edit Folder' : 'New Folder'}
+                </h3>
+                <input 
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g., Midterm Prep"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 font-bold text-slate-800 dark:text-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-500/20 outline-none mb-6 text-lg text-center shadow-inner"
+                    autoFocus
+                />
+                <div className="mb-8">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-3 text-center">Select Theme Color</span>
+                    <div className="flex justify-center gap-3">
+                        {Object.keys(FOLDER_COLORS).map(c => (
+                            <button 
+                                key={c} 
+                                onClick={(e) => { e.preventDefault(); setColor(c); }}
+                                className={`w-8 h-8 rounded-full shadow-sm transition-all active:scale-90 ${FOLDER_COLORS[c].hex} ${color === c ? 'ring-4 ring-indigo-500/30 scale-110' : 'ring-2 ring-transparent opacity-70 hover:opacity-100'}`} 
+                            />
+                        ))}
+                    </div>
                 </div>
-            </div>
-            <div className="flex gap-3">
-                <button onClick={(e) => { e.preventDefault(); onClose(); }} className="flex-1 px-4 py-4 rounded-2xl font-black text-slate-500 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors active:scale-95">Cancel</button>
-                <button onClick={(e) => { e.preventDefault(); onSave(name, color); }} disabled={!name.trim()} className="flex-1 px-4 py-4 rounded-2xl font-black text-white bg-indigo-600 disabled:bg-indigo-400 active:scale-95 transition-all">Save</button>
+                <div className="flex gap-3">
+                    <button onClick={(e) => { e.preventDefault(); onClose(); }} className="flex-1 px-4 py-4 rounded-2xl font-black text-slate-500 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors active:scale-95 border border-slate-200 dark:border-slate-700">Cancel</button>
+                    <button onClick={(e) => { e.preventDefault(); onSave(name, color); }} disabled={!name.trim()} className="flex-1 px-4 py-4 rounded-2xl font-black text-white bg-indigo-600 disabled:bg-indigo-400 active:scale-95 transition-all shadow-md">Save</button>
+                </div>
             </div>
         </div>
     );
