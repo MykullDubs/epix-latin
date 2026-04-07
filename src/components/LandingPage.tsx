@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { 
     ArrowRight, Sparkles, Wand2, MonitorPlay, 
     Smartphone, Zap, CheckCircle2, GraduationCap, 
-    QrCode, BrainCircuit, Shield, Layers, Play
+    QrCode, BrainCircuit, Shield, Layers, Play, X
 } from 'lucide-react';
 
 export default function LandingPage({ onGetStarted, onLogin }: any) {
