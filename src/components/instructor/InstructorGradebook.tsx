@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, orderBy, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
-import { ChevronDown, X, CheckCircle2, MessageSquare, AlertTriangle, FileText, Target, User, Download } from 'lucide-react'; // 🔥 ADDED Download ICON
+import { ChevronDown, X, CheckCircle2, MessageSquare, AlertTriangle, FileText, Target, User, Download } from 'lucide-react'; 
 import { JuicyToast } from '../Toast';
 
 export default function InstructorGradebook({ classData }: any) {
@@ -82,8 +82,8 @@ export default function InstructorGradebook({ classData }: any) {
 
         // 3. Format as CSV string (Handling commas and quotes safely)
         const csvContent = [
-            headers.map(h => `"${String(h).replace(/"/g, '""')}"`).join(','),
-            ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+            headers.map((h: any) => `"${String(h).replace(/"/g, '""')}"`).join(','),
+            ...rows.map((row: any[]) => row.map((cell: any) => `"${String(cell).replace(/"/g, '""')}"`).join(',')) // 🔥 Added explicit types here
         ].join('\n');
 
         // 4. Trigger the Download
