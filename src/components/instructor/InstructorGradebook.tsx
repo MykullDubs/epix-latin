@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, orderBy, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { db, appId } from '../../config/firebase';
-import { ChevronDown, X, CheckCircle2, MessageSquare, AlertTriangle, FileText, Target, User } from 'lucide-react';
+import { ChevronDown, X, CheckCircle2, MessageSquare, AlertTriangle, FileText, Target, User, Download } from 'lucide-react'; // 🔥 ADDED Download ICON
 import { JuicyToast } from '../Toast';
 
 export default function InstructorGradebook({ classData }: any) {
@@ -37,10 +37,71 @@ export default function InstructorGradebook({ classData }: any) {
         viewType === 'all' || a.contentType === 'test' || a.contentType === 'exam'
     );
 
+    // ========================================================================
+    // 🔥 CSV DATA ESCAPER (The Enterprise Export Engine)
+    // ========================================================================
+    const exportToCSV = () => {
+        if (!classData.students || classData.students.length === 0) {
+            setToastMsg("No students to export.");
+            return;
+        }
+
+        // 1. Build the Headers
+        const headers = ['Student Name', 'Email'];
+        displayedAssignments.forEach((a: any) => headers.push(a.title));
+        headers.push('Cumulative GPA');
+
+        // 2. Build the Rows
+        const rows = classData.students.map((studentObj: any) => {
+            const studentEmail = typeof studentObj === 'string' ? studentObj : studentObj.email;
+            const studentName = typeof studentObj === 'string' ? studentEmail.split('@')[0] : (studentObj.name || studentEmail.split('@')[0]);
+            
+            const rowData = [studentName, studentEmail];
+            let totalScore = 0;
+            let scoredAssignmentsCount = 0;
+
+            // Calculate scores for each assignment
+            displayedAssignments.forEach((a: any) => {
+                const log = logs.find(l => l.studentEmail === studentEmail && (l.itemId === a.id || l.itemTitle === a.title));
+                if (log) {
+                    const pct = log.scoreDetail?.finalScorePct ?? (log.scoreDetail?.total > 0 ? Math.round((log.scoreDetail.score / log.scoreDetail.total) * 100) : 0);
+                    rowData.push(`${pct}%`);
+                    totalScore += pct;
+                    scoredAssignmentsCount++;
+                } else {
+                    rowData.push('N/A');
+                }
+            });
+
+            // Calculate Cumulative GPA
+            const gpa = scoredAssignmentsCount === 0 ? 'N/A' : `${Math.round(totalScore / scoredAssignmentsCount)}%`;
+            rowData.push(gpa);
+
+            return rowData;
+        });
+
+        // 3. Format as CSV string (Handling commas and quotes safely)
+        const csvContent = [
+            headers.map(h => `"${String(h).replace(/"/g, '""')}"`).join(','),
+            ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        ].join('\n');
+
+        // 4. Trigger the Download
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${classData.name || 'Magister_OS'}_Gradebook.csv`.replace(/\s+/g, '_'));
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        setToastMsg("CSV Export Complete! 📊");
+    };
+
     // --- SPEED MODERATOR LOGIC ---
     const openModerator = (log: any) => {
         setReviewingLog(log);
-        // Create a deep copy of the details so we can edit them before saving
         setLocalScoreDetails(JSON.parse(JSON.stringify(log.scoreDetail)));
     };
 
@@ -48,12 +109,11 @@ export default function InstructorGradebook({ classData }: any) {
         if (!localScoreDetails) return;
         const updatedDetails = localScoreDetails.details.map((q: any) => {
             if (q.qId === qId) {
-                return { ...q, awardedPoints: Math.min(Math.max(0, newPoints), q.maxPoints) }; // Constrain 0 to Max
+                return { ...q, awardedPoints: Math.min(Math.max(0, newPoints), q.maxPoints) };
             }
             return q;
         });
 
-        // Recalculate Totals
         const newScore = updatedDetails.reduce((sum: number, q: any) => sum + q.awardedPoints, 0);
         const newPct = localScoreDetails.total > 0 ? Math.round((newScore / localScoreDetails.total) * 100) : 0;
 
@@ -82,7 +142,7 @@ export default function InstructorGradebook({ classData }: any) {
             await setDoc(logRef, {
                 scoreDetail: { 
                     ...localScoreDetails, 
-                    status: 'graded' // Flips the switch from pending_review
+                    status: 'graded' 
                 },
                 lastUpdated: Date.now()
             }, { merge: true });
@@ -135,6 +195,14 @@ export default function InstructorGradebook({ classData }: any) {
                         <button onClick={() => setViewType('exams')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewType === 'exams' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200 dark:border-slate-700' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>Assessments Only</button>
                         <button onClick={() => setViewType('all')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewType === 'all' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200 dark:border-slate-700' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>Show All Logged Data</button>
                     </div>
+                    
+                    {/* 🔥 THE CSV EXPORT BUTTON */}
+                    <button 
+                        onClick={exportToCSV}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md hover:shadow-lg shadow-indigo-600/20 active:scale-95 transition-all flex items-center gap-2"
+                    >
+                        <Download size={16} strokeWidth={2.5} /> Export CSV
+                    </button>
                 </div>
 
                 <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden overflow-x-auto custom-scrollbar flex-1 relative transition-colors">
