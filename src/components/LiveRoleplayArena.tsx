@@ -21,7 +21,8 @@ export default function LiveRoleplayArena({ scenarioPrompt, onClose }: LiveRolep
     const processorRef = useRef<ScriptProcessorNode | null>(null);
     const nextPlayTimeRef = useRef<number>(0);
 
-    const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
+    // Explicitly grab the Vite Environment Variable
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     // ─────────────────────────────────────────────────────────────────────────────
     // UTILS: PCM <--> BASE64 CONVERSIONS
@@ -58,10 +59,14 @@ export default function LiveRoleplayArena({ scenarioPrompt, onClose }: LiveRolep
     // 1. BOOT THE AUDIO ENGINE & SOCKET
     // ─────────────────────────────────────────────────────────────────────────────
     const startCall = async () => {
+        console.log("Initializing Gemini Live Engine...");
+        
         if (!apiKey) {
-            setError("Critical: Missing Gemini API Key.");
+            console.error("CRITICAL: VITE_GEMINI_API_KEY is undefined.");
+            setError("Missing Neural Engine API Key. Please configure your environment variables.");
             return;
         }
+
         setIsConnecting(true);
         setError(null);
 
@@ -71,15 +76,20 @@ export default function LiveRoleplayArena({ scenarioPrompt, onClose }: LiveRolep
             audioContextRef.current = audioCtx;
 
             // B. Request Microphone Access
+            console.log("Requesting microphone permissions...");
             const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000 } });
             streamRef.current = stream;
+            console.log("Microphone access granted.");
 
             // C. Connect to Gemini Live WebSocket
             const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+            console.log("Opening WebSocket to:", wsUrl.replace(apiKey, "HIDDEN_KEY"));
+            
             const ws = new WebSocket(wsUrl);
             wsRef.current = ws;
 
             ws.onopen = () => {
+                console.log("WebSocket opened. Sending initial setup config...");
                 // Send the initial setup framing to define the persona
                 const setupMessage = {
                     setup: {
@@ -121,14 +131,18 @@ export default function LiveRoleplayArena({ scenarioPrompt, onClose }: LiveRolep
                 setIsConnecting(false);
             };
 
-            ws.onclose = () => {
+            ws.onclose = (e) => {
+                console.log("WebSocket closed.", e.code, e.reason);
                 setIsConnected(false);
                 setAiSpeaking(false);
+                if (e.code !== 1000 && !error) {
+                    setError(`Socket closed unexpectedly (Code ${e.code}).`);
+                }
             };
 
         } catch (err: any) {
-            console.error("Mic Access Denied:", err);
-            setError("Microphone access is required to enter the Roleplay Arena.");
+            console.error("Engine Initialization Failed:", err);
+            setError(err.name === 'NotAllowedError' ? "Microphone access denied. Please allow mic permissions in your browser settings." : "Failed to initialize the audio engine.");
             setIsConnecting(false);
         }
     };
@@ -139,6 +153,7 @@ export default function LiveRoleplayArena({ scenarioPrompt, onClose }: LiveRolep
     const handleIncomingData = (data: any) => {
         // Setup confirmation
         if (data.setupComplete) {
+            console.log("Setup Complete received. Link established.");
             setIsConnected(true);
             setIsConnecting(false);
             startMicrophoneCapture();
