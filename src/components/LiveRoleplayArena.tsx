@@ -22,8 +22,7 @@ export default function LiveRoleplayArena({ scenarioPrompt, onClose }: LiveRolep
     const nextPlayTimeRef = useRef<number>(0);
 
     // Explicitly grab the Vite Environment Variable
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-
+const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
     // ─────────────────────────────────────────────────────────────────────────────
     // UTILS: PCM <--> BASE64 CONVERSIONS
     // ─────────────────────────────────────────────────────────────────────────────
