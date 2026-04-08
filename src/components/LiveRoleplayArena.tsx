@@ -92,7 +92,7 @@ const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
                 // Send the initial setup framing to define the persona
                 const setupMessage = {
                     setup: {
-                        model: "models/gemini-2.0-flash-exp",
+                        model: "models/gemini-2.5-flash-live-preview",
                         generationConfig: {
                             responseModalities: ["AUDIO"],
                             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } } }
