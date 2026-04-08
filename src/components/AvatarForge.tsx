@@ -2,21 +2,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Save, RefreshCw, Cpu, Eye, Smile, ArrowUpCircle, Headphones, Fingerprint, User, Sparkles, Shirt, Gamepad2, Compass, Zap, Palette } from 'lucide-react';
 
-// 🔥 STRICT DICEBEAR V9 COLOR PALETTES
+// 🔥 EXPANDED COLOR PALETTES
 const BG_COLORS = [
     'transparent', '4f46e5', '06b6d4', '10b981', 'f59e0b', 'f43f5e', '8b5cf6', '64748b', 'ef4444', 
     'eab308', '84cc16', '14b8a6', '3b82f6', 'd946ef', '1e293b', '000000', 'ffffff'
 ];
-
 const SKIN_TONES = ['ffdbac', 'f1c27d', 'e0ac69', '8d5524', 'c68642', '3d2c23'];
-const HAIR_COLORS = ['000000', '2a2a2a', '4a3123', 'a56b46', 'e8b923', 'd6b370', '724133', 'c93305', 'f59797', 'ecf0f1'];
+const HAIR_COLORS = ['000000', '2a2a2a', '4a3123', 'a56b46', 'e8b923', 'd6b370', '724133', 'c93305', 'f59797', 'ecf0f1', '3b82f6', '8b5cf6', '10b981'];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SPECIES MATRIX (Strictly Validated for v9)
+// STRICTLY VALIDATED DICEBEAR V9 SPECIES MATRIX
 // ─────────────────────────────────────────────────────────────────────────────
 const SPECIES_MATRIX: Record<string, any> = {
     bottts: {
-        id: 'bottts', label: 'Mecha', icon: Cpu, endpoint: 'bottts', colorParam: 'baseColor', hasSkinTone: false, hasHairColor: false,
+        id: 'bottts', label: 'Mecha', icon: Cpu, endpoint: 'bottts', hasSkinTone: false, hasHairColor: false, hasPrimaryColor: true,
         tabs: [
             { id: 'face', icon: Cpu, label: 'Chassis' },
             { id: 'eyes', icon: Eye, label: 'Optics' },
@@ -35,7 +34,7 @@ const SPECIES_MATRIX: Record<string, any> = {
         }
     },
     avataaars: {
-        id: 'avataaars', label: 'Human', icon: User, endpoint: 'avataaars', colorParam: 'skinColor', hasSkinTone: true, hasHairColor: true,
+        id: 'avataaars', label: 'Human', icon: User, endpoint: 'avataaars', hasSkinTone: true, hasHairColor: true, hasPrimaryColor: false,
         tabs: [
             { id: 'top', icon: ArrowUpCircle, label: 'Hair' },
             { id: 'accessories', icon: Eye, label: 'Eyewear' },
@@ -54,7 +53,7 @@ const SPECIES_MATRIX: Record<string, any> = {
         }
     },
     funEmoji: {
-        id: 'funEmoji', label: 'Emoji', icon: Smile, endpoint: 'fun-emoji', colorParam: null, hasSkinTone: false, hasHairColor: false,
+        id: 'funEmoji', label: 'Emoji', icon: Smile, endpoint: 'fun-emoji', hasSkinTone: false, hasHairColor: false, hasPrimaryColor: false,
         tabs: [
             { id: 'eyes', icon: Eye, label: 'Eyes' },
             { id: 'mouth', icon: Smile, label: 'Mouth' }
@@ -65,7 +64,7 @@ const SPECIES_MATRIX: Record<string, any> = {
         }
     },
     toonHead: {
-        id: 'toonHead', label: 'Toon', icon: User, endpoint: 'toon-head', colorParam: 'skinColor', hasSkinTone: true, hasHairColor: true,
+        id: 'toonHead', label: 'Toon', icon: User, endpoint: 'toon-head', hasSkinTone: true, hasHairColor: true, hasPrimaryColor: false,
         tabs: [
             { id: 'rearHair', icon: ArrowUpCircle, label: 'Back Hair' },
             { id: 'frontHair', icon: ArrowUpCircle, label: 'Front Hair' },
@@ -80,7 +79,7 @@ const SPECIES_MATRIX: Record<string, any> = {
         }
     },
     pixelArt: {
-        id: 'pixelArt', label: 'Retro', icon: Gamepad2, endpoint: 'pixel-art', colorParam: null, hasSkinTone: false, hasHairColor: false,
+        id: 'pixelArt', label: 'Retro', icon: Gamepad2, endpoint: 'pixel-art', hasSkinTone: false, hasHairColor: false, hasPrimaryColor: false,
         tabs: [
             { id: 'eyes', icon: Eye, label: 'Eyes' },
             { id: 'glasses', icon: Sparkles, label: 'Eyewear' },
@@ -95,7 +94,7 @@ const SPECIES_MATRIX: Record<string, any> = {
         }
     },
     adventurer: {
-        id: 'adventurer', label: 'Hero', icon: Compass, endpoint: 'adventurer', colorParam: 'skinColor', hasSkinTone: true, hasHairColor: true,
+        id: 'adventurer', label: 'Hero', icon: Compass, endpoint: 'adventurer', hasSkinTone: true, hasHairColor: true, hasPrimaryColor: false,
         tabs: [
             { id: 'hair', icon: ArrowUpCircle, label: 'Hair' },
             { id: 'eyes', icon: Eye, label: 'Eyes' },
@@ -112,7 +111,7 @@ const SPECIES_MATRIX: Record<string, any> = {
         }
     },
     croodles: {
-        id: 'croodles', label: 'Doodle', icon: Fingerprint, endpoint: 'croodles', colorParam: 'baseColor', hasSkinTone: false, hasHairColor: false,
+        id: 'croodles', label: 'Doodle', icon: Fingerprint, endpoint: 'croodles', hasSkinTone: false, hasHairColor: false, hasPrimaryColor: true,
         tabs: [
             { id: 'face', icon: User, label: 'Face' },
             { id: 'eyes', icon: Eye, label: 'Eyes' },
@@ -127,7 +126,7 @@ const SPECIES_MATRIX: Record<string, any> = {
         }
     },
     icons: {
-        id: 'icons', label: 'Symbol', icon: Zap, endpoint: 'icons', colorParam: 'iconColor', hasSkinTone: false, hasHairColor: false,
+        id: 'icons', label: 'Symbol', icon: Zap, endpoint: 'icons', hasSkinTone: false, hasHairColor: false, hasPrimaryColor: true,
         tabs: [
             { id: 'icon', icon: Zap, label: 'Icon' }
         ],
@@ -138,33 +137,28 @@ const SPECIES_MATRIX: Record<string, any> = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// URL BUILDER (Safely routes API parameters)
+// URL BUILDER (Safely applies exact API parameters)
 // ─────────────────────────────────────────────────────────────────────────────
 const buildUrl = (specId: string, cfg: any): string => {
     const spec = SPECIES_MATRIX[specId];
-    
-    // Base URL requests transparent background (handled by React container instead)
     let url = `https://api.dicebear.com/9.x/${spec.endpoint}/svg?backgroundColor=transparent`;
 
-    // 1. Color Parameters
-    if (spec.colorParam) {
-        if (specId === 'icons') url += `&iconColor=${cfg.primaryColor}`;
-        else if (specId === 'bottts' || specId === 'croodles') url += `&baseColor=${cfg.primaryColor}`;
-        else url += `&${spec.colorParam}=${cfg.skinTone || 'ffdbac'}`;
+    // Strict Color Mapping
+    if (spec.hasPrimaryColor && cfg.primaryColor) {
+        url += specId === 'icons' ? `&iconColor=${cfg.primaryColor}` : `&baseColor=${cfg.primaryColor}`;
     }
-
-    // 2. Hair Color Parameters (Avataaars, ToonHead, Adventurer)
+    if (spec.hasSkinTone && cfg.skinTone) {
+        url += `&skinColor=${cfg.skinTone}`;
+    }
     if (spec.hasHairColor && cfg.hairColor) {
-        if (specId === 'toonHead' || specId === 'avataaars') url += `&hairColor=${cfg.hairColor}`;
+        url += `&hairColor=${cfg.hairColor}`;
     }
 
-    // 3. Icon Special Case
     if (specId === 'icons') {
         if (cfg.icon) url += `&icon=${cfg.icon}`;
         return url;
     }
 
-    // 4. Standard Feature Parameters
     spec.tabs.forEach((t: any) => {
         const val = cfg[t.id];
         if (val && val !== 'none') {
@@ -194,7 +188,7 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
     const initialSpeciesId = useMemo(() => getInitialSpecies(currentConfig?.url), [currentConfig]);
     const [speciesId, setSpeciesId] = useState<string>(initialSpeciesId);
 
-    // State tracks complete configuration for ALL species simultaneously
+    // State tracks configuration for ALL species simultaneously
     const [configs, setConfigs] = useState<Record<string, any>>({
         bottts: { face: 'square01', eyes: 'glow', mouth: 'bite', top: 'none', sides: 'none', texture: 'none', primaryColor: '4f46e5', bgColor: 'transparent' },
         avataaars: { top: 'shortHair', accessories: 'none', clothing: 'hoodie', eyes: 'default', mouth: 'smile', facialHair: 'none', skinTone: 'ffdbac', hairColor: '2a2a2a', bgColor: 'transparent' },
@@ -240,6 +234,7 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
     };
 
     const formatPartLabel = (str: string) => {
+        if (str === 'none') return 'None';
         return str.replace(/([A-Z])/g, ' $1')
                   .replace(/(\d+)/g, ' $1')
                   .trim()
@@ -248,67 +243,68 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
 
     return (
         <div className="fixed inset-0 z-[7000] flex items-end sm:items-center justify-center p-0 sm:p-6 pb-safe">
-            <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md transition-opacity animate-in fade-in" onClick={onClose} />
+            <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl transition-opacity animate-in fade-in" onClick={onClose} />
 
-            <div className="bg-white dark:bg-slate-950 w-full max-w-lg sm:rounded-[2.5rem] rounded-t-[2.5rem] shadow-2xl border-t sm:border-4 border-slate-100 dark:border-slate-800 relative z-10 animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-500 overflow-hidden flex flex-col h-[90vh] sm:max-h-[85vh]">
+            <div className="bg-white dark:bg-slate-950 w-full max-w-xl sm:rounded-[3rem] rounded-t-[3rem] shadow-2xl border-t sm:border border-slate-200 dark:border-slate-800 relative z-10 animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-500 overflow-hidden flex flex-col h-[95vh] sm:max-h-[90vh]">
 
                 {/* ── HEADER & PREVIEW ── */}
-                <div className="bg-slate-50 dark:bg-slate-900 p-6 pb-4 relative flex flex-col items-center border-b border-slate-200 dark:border-slate-800 shrink-0">
-                    <button onClick={onClose} className="absolute top-6 right-6 p-2 bg-white dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500 transition-colors z-20 shadow-sm">
+                <div className="bg-slate-50 dark:bg-slate-900/50 p-6 pb-6 relative flex flex-col items-center border-b border-slate-200 dark:border-slate-800 shrink-0">
+                    <button onClick={onClose} className="absolute top-6 right-6 p-2 bg-white dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500 transition-transform hover:scale-110 active:scale-95 z-20 shadow-sm border border-slate-200 dark:border-slate-700">
                         <X size={20} strokeWidth={3} />
                     </button>
 
-                    <button onClick={handleRandomize} className="absolute top-6 left-6 p-2 bg-white dark:bg-slate-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-full text-indigo-500 transition-colors z-20 shadow-sm" title="Randomize">
+                    <button onClick={handleRandomize} className="absolute top-6 left-6 p-2 bg-white dark:bg-slate-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-full text-indigo-600 dark:text-indigo-400 transition-transform hover:scale-110 active:scale-95 z-20 shadow-sm border border-slate-200 dark:border-slate-700" title="Randomize">
                         <RefreshCw size={20} strokeWidth={3} />
                     </button>
 
                     {/* LIVE PREVIEW WITH REACT BG COLOR */}
                     <div 
-                        className="w-32 h-32 sm:w-40 sm:h-40 rounded-[2rem] shadow-inner border-4 border-white dark:border-slate-800 flex items-center justify-center p-4 relative mb-6 shrink-0 transition-all duration-300"
+                        className="w-36 h-36 sm:w-44 sm:h-44 rounded-full shadow-inner border-4 border-white dark:border-slate-800 flex items-center justify-center p-5 relative mb-6 shrink-0 transition-all duration-300 group"
                         style={{ backgroundColor: configs[speciesId].bgColor === 'transparent' ? 'transparent' : `#${configs[speciesId].bgColor}20` }}
                     >
-                        <img src={previewUrl} alt="Live Avatar Preview" className="w-full h-full object-contain drop-shadow-2xl" />
+                        <img src={previewUrl} alt="Live Avatar Preview" className="w-full h-full object-contain drop-shadow-2xl group-hover:scale-110 transition-transform duration-500" />
                     </div>
 
                     {/* SPECIES TABS */}
-                    <div className="w-full flex justify-center gap-2 mb-2 flex-wrap">
+                    <div className="w-full flex justify-center gap-2 flex-wrap">
                         {Object.values(SPECIES_MATRIX).map((spec: any) => {
                             const SpecIcon = spec.icon;
                             return (
                                 <button
                                     key={spec.id}
                                     onClick={() => setSpeciesId(spec.id)}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${speciesId === spec.id ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-indigo-50 dark:hover:bg-slate-700'}`}
+                                    className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm border ${speciesId === spec.id ? 'bg-indigo-600 text-white border-indigo-600 scale-105' : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:bg-indigo-50 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-800 hover:border-indigo-200'}`}
                                 >
                                     <SpecIcon size={12} /> {spec.label}
                                 </button>
                             );
-                        })}
+                        });}
                     </div>
                 </div>
 
                 {/* ── WORKBENCH ── */}
-                <div className="flex flex-col p-6 pt-4 flex-1 overflow-hidden bg-white dark:bg-slate-950">
+                <div className="flex flex-col p-6 pt-6 flex-1 overflow-hidden bg-white dark:bg-slate-950">
                     
                     {/* Dynamic Top Nav Tabs */}
                     <div className="flex gap-2 mb-6 overflow-x-auto custom-scrollbar pb-2 shrink-0">
-                        {/* Backdrop Color */}
+                        
+                        {/* Always show Background Color Tab */}
                         <button 
                             onClick={() => setActiveTab('bgColor')}
-                            className={`shrink-0 flex flex-col items-center justify-center py-2.5 px-4 rounded-xl transition-colors min-w-[70px] border ${activeTab === 'bgColor' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' : 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-500'}`}
+                            className={`shrink-0 flex flex-col items-center justify-center py-3 px-5 rounded-2xl transition-all min-w-[75px] border-2 ${activeTab === 'bgColor' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500 shadow-md shadow-indigo-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 text-slate-500 hover:border-indigo-200 dark:hover:border-slate-700'}`}
                         >
-                            <Palette size={18} className="mb-1" />
-                            <span className="text-[9px] font-black uppercase tracking-widest">Backdrop</span>
+                            <Palette size={20} className="mb-1.5" />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Backdrop</span>
                         </button>
 
                         {/* Skin Tone Tab */}
                         {activeSpecies.hasSkinTone && (
                             <button 
                                 onClick={() => setActiveTab('skinTone')}
-                                className={`shrink-0 flex flex-col items-center justify-center py-2.5 px-4 rounded-xl transition-colors min-w-[70px] border ${activeTab === 'skinTone' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' : 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-500'}`}
+                                className={`shrink-0 flex flex-col items-center justify-center py-3 px-5 rounded-2xl transition-all min-w-[75px] border-2 ${activeTab === 'skinTone' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500 shadow-md shadow-indigo-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 text-slate-500 hover:border-indigo-200 dark:hover:border-slate-700'}`}
                             >
-                                <User size={18} className="mb-1" />
-                                <span className="text-[9px] font-black uppercase tracking-widest">Skin</span>
+                                <User size={20} className="mb-1.5" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Skin</span>
                             </button>
                         )}
 
@@ -316,21 +312,21 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                         {activeSpecies.hasHairColor && (
                             <button 
                                 onClick={() => setActiveTab('hairColor')}
-                                className={`shrink-0 flex flex-col items-center justify-center py-2.5 px-4 rounded-xl transition-colors min-w-[70px] border ${activeTab === 'hairColor' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' : 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-500'}`}
+                                className={`shrink-0 flex flex-col items-center justify-center py-3 px-5 rounded-2xl transition-all min-w-[75px] border-2 ${activeTab === 'hairColor' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500 shadow-md shadow-indigo-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 text-slate-500 hover:border-indigo-200 dark:hover:border-slate-700'}`}
                             >
-                                <Sparkles size={18} className="mb-1" />
-                                <span className="text-[9px] font-black uppercase tracking-widest">Hair Dye</span>
+                                <Sparkles size={20} className="mb-1.5" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Hair Dye</span>
                             </button>
                         )}
 
                         {/* Primary Color Tab */}
-                        {activeSpecies.colorParam && !activeSpecies.hasSkinTone && (
+                        {activeSpecies.hasPrimaryColor && (
                             <button 
                                 onClick={() => setActiveTab('primaryColor')}
-                                className={`shrink-0 flex flex-col items-center justify-center py-2.5 px-4 rounded-xl transition-colors min-w-[70px] border ${activeTab === 'primaryColor' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' : 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-500'}`}
+                                className={`shrink-0 flex flex-col items-center justify-center py-3 px-5 rounded-2xl transition-all min-w-[75px] border-2 ${activeTab === 'primaryColor' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500 shadow-md shadow-indigo-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 text-slate-500 hover:border-indigo-200 dark:hover:border-slate-700'}`}
                             >
-                                <Sparkles size={18} className="mb-1" />
-                                <span className="text-[9px] font-black uppercase tracking-widest">Color</span>
+                                <Sparkles size={20} className="mb-1.5" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Color</span>
                             </button>
                         )}
 
@@ -341,10 +337,10 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                                 <button 
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
-                                    className={`shrink-0 flex flex-col items-center justify-center py-2.5 px-4 rounded-xl transition-colors min-w-[70px] border ${activeTab === tab.id ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' : 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-500'}`}
+                                    className={`shrink-0 flex flex-col items-center justify-center py-3 px-5 rounded-2xl transition-all min-w-[75px] border-2 ${activeTab === tab.id ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500 shadow-md shadow-indigo-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 text-slate-500 hover:border-indigo-200 dark:hover:border-slate-700'}`}
                                 >
-                                    <Icon size={18} className="mb-1" />
-                                    <span className="text-[9px] font-black uppercase tracking-widest">{tab.label}</span>
+                                    <Icon size={20} className="mb-1.5" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">{tab.label}</span>
                                 </button>
                             );
                         })}
@@ -353,16 +349,17 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                     {/* Dynamic Content Area */}
                     <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-12">
                         
-                        {/* 1. Color Pickers (Backdrop, Skin, Hair, Primary) */}
+                        {/* 1. Color Pickers */}
                         {['bgColor', 'primaryColor', 'skinTone', 'hairColor'].includes(activeTab) && (
-                            <div className="flex flex-wrap gap-4 justify-center py-4 animate-in fade-in">
+                            <div className="flex flex-wrap gap-4 justify-center py-2 animate-in fade-in zoom-in-95 duration-300">
                                 {
-                                    (activeTab === 'skinTone' ? SKIN_TONES : activeTab === 'hairColor' ? HAIR_COLORS : BG_COLORS).map(color => (
+                                    (activeTab === 'skinTone' ? SKIN_TONES : activeTab === 'hairColor' ? HAIR_COLORS : BG_COLORS).map((color, idx) => (
                                     <button 
                                         key={color}
                                         onClick={() => updateConfig(activeTab, color)}
-                                        className={`w-12 h-12 rounded-2xl shadow-sm transition-transform ${configs[speciesId][activeTab] === color ? 'scale-110 ring-4 ring-offset-4 ring-indigo-500 dark:ring-indigo-400 dark:ring-offset-slate-900' : 'hover:scale-110 ring-1 ring-slate-200 dark:ring-slate-700'} ${color === 'transparent' ? 'bg-[url("https://www.transparenttextures.com/patterns/cubes.png")] bg-slate-100 dark:bg-slate-800' : ''}`}
+                                        className={`w-14 h-14 rounded-[1rem] shadow-sm transition-all ${configs[speciesId][activeTab] === color ? 'scale-110 ring-4 ring-offset-4 ring-indigo-500 dark:ring-indigo-400 dark:ring-offset-slate-900' : 'hover:scale-110 ring-1 ring-slate-200 dark:ring-slate-700'} ${color === 'transparent' ? 'bg-[url("https://www.transparenttextures.com/patterns/cubes.png")] bg-slate-100 dark:bg-slate-800' : ''}`}
                                         style={color !== 'transparent' ? { backgroundColor: `#${color}` } : {}}
+                                        style={{ animationDelay: `${idx * 20}ms` }}
                                     />
                                 ))}
                             </div>
@@ -370,14 +367,15 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
 
                         {/* 2. Parts Grid */}
                         {!['bgColor', 'primaryColor', 'skinTone', 'hairColor'].includes(activeTab) && (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 animate-in fade-in">
-                                {activeSpecies.parts[activeTab]?.map((part: string) => {
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                {activeSpecies.parts[activeTab]?.map((part: string, idx: number) => {
                                     const isSelected = configs[speciesId][activeTab] === part;
                                     return (
                                         <button 
                                             key={part}
                                             onClick={() => updateConfig(activeTab, part)}
-                                            className={`py-4 px-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center text-center ${isSelected ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30 border-2 border-indigo-500' : 'bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 text-slate-500 hover:border-indigo-300 dark:hover:border-indigo-500/50'}`}
+                                            className={`py-5 px-3 rounded-[1rem] text-[11px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center text-center animate-in fade-in slide-in-from-bottom-2 ${isSelected ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/40 border-2 border-indigo-400' : 'bg-slate-50 dark:bg-slate-900/50 border-2 border-slate-100 dark:border-slate-800 text-slate-500 hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:bg-white dark:hover:bg-slate-900'}`}
+                                            style={{ animationDelay: `${idx * 15}ms` }}
                                         >
                                             <span className="truncate w-full">{formatPartLabel(part)}</span>
                                         </button>
@@ -392,7 +390,7 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                 <div className="p-6 pt-0 shrink-0 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 mt-auto pb-safe-6">
                     <button 
                         onClick={() => onSave(previewUrl, { ...configs[speciesId], url: previewUrl, species: speciesId })}
-                        className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 p-5 rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2 shadow-2xl"
+                        className="w-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 p-5 rounded-2xl font-black text-sm uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-3 shadow-2xl"
                     >
                         <Save size={20} /> Save Identity 
                     </button>
