@@ -61,7 +61,6 @@ const SPECIES_MATRIX: Record<string, any> = {
     }
 };
 
-// Helper to extract the species from an existing DiceBear URL or default to bottts
 const getInitialSpecies = (url: string) => {
     if (url?.includes('avataaars')) return 'avataaars';
     if (url?.includes('fun-emoji')) return 'funEmoji';
@@ -72,7 +71,6 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
     const initialSpeciesId = useMemo(() => getInitialSpecies(currentConfig?.url), [currentConfig]);
     const [speciesId, setSpeciesId] = useState<string>(initialSpeciesId);
     
-    // We maintain a config object for EACH species so switching back and forth remembers your work
     const [configs, setConfigs] = useState<Record<string, any>>({
         bottts: {
             base: currentConfig?.base || 'square01', eyes: currentConfig?.eyes || 'glow', mouth: currentConfig?.mouth || 'bite',
@@ -90,7 +88,6 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
     const activeSpecies = SPECIES_MATRIX[speciesId];
     const [activeTab, setActiveTab] = useState<string>(activeSpecies.tabs[0].id);
 
-    // If species changes, reset the active tab to the first valid one
     useEffect(() => {
         setActiveTab(SPECIES_MATRIX[speciesId].tabs[0].id);
     }, [speciesId]);
@@ -99,9 +96,8 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
         const spec = SPECIES_MATRIX[specId];
         let url = `https://api.dicebear.com/7.x/${spec.endpoint}/svg?backgroundColor=transparent`;
         
-        // Avataaars don't natively use baseColor the way Bottts do, but we apply it as a background for consistency
         if (specId === 'bottts') url += `&baseColor=${cfg.baseColor}`;
-        if (specId === 'funEmoji' || specId === 'avataaars') url += `&backgroundColor=${cfg.baseColor}40`; // 25% opacity background
+        if (specId === 'funEmoji' || specId === 'avataaars') url += `&backgroundColor=${cfg.baseColor}40`; 
         
         spec.tabs.forEach((t: any) => {
             if (cfg[t.id] && cfg[t.id] !== 'none' && cfg[t.id] !== 'blank') {
@@ -113,9 +109,10 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
 
     const previewUrl = buildUrl(speciesId, configs[speciesId]);
 
+    // 🔥 FIX: Added Record<string, string> type to newCfg to satisfy TypeScript
     const handleRandomize = () => {
         const spec = SPECIES_MATRIX[speciesId];
-        const newCfg = { baseColor: FORGE_COLORS[Math.floor(Math.random() * FORGE_COLORS.length)] };
+        const newCfg: Record<string, string> = { baseColor: FORGE_COLORS[Math.floor(Math.random() * FORGE_COLORS.length)] };
         
         spec.tabs.forEach((t: any) => {
             const partsArray = spec.parts[t.id];
@@ -152,7 +149,7 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                         <img src={previewUrl} alt="Live Avatar Preview" className="w-full h-full object-contain drop-shadow-xl animate-in zoom-in" />
                     </div>
 
-                    {/* 🔥 NEW: SPECIES SELECTOR */}
+                    {/* SPECIES SELECTOR */}
                     <div className="w-full flex justify-center gap-2 mb-4">
                         {Object.values(SPECIES_MATRIX).map(spec => {
                             const SpecIcon = spec.icon;
