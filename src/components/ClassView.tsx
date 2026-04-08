@@ -8,11 +8,11 @@ import {
     ChevronLeft, ChevronRight, Zap, Users, Clock, EyeOff, HelpCircle, 
     Layers, MousePointerClick, QrCode, Hourglass, Play, Pause, RotateCcw, 
     Plus, Minus, PenTool, Crosshair, Eraser, Wrench, Highlighter, Type, Presentation,
-    ChevronDown, ChevronUp, Mic // 🔥 IMPORTED MIC FOR ROLEPLAY 
+    ChevronDown, ChevronUp, Mic, Info, Search, Palette, Square, BookOpen
 } from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
 import PronunciationLab from './PronunciationLab'; 
-import LiveRoleplayArena from './LiveRoleplayArena'; // 🔥 IMPORTED AUDIO ARENA
+import LiveRoleplayArena from './LiveRoleplayArena'; 
 
 // ============================================================================
 //  CLASS VIEW (The Projector / Big Screen Mode with Keyboard Nav)
@@ -28,7 +28,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const [showTools, setShowTools] = useState(false);
   const [showWhiteboard, setShowWhiteboard] = useState(false);
 
-  // 🔥 STATE FOR THE LIVE AUDIO ROLEPLAY OVERLAY
+  // OS FEATURE: Live Audio Roleplay Overlay
   const [activeRoleplayPrompt, setActiveRoleplayPrompt] = useState<string | null>(null);
   
   // OS FEATURE: Moveable Draggable Timer
@@ -144,7 +144,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       return () => clearInterval(interval);
   }, [timerRunning, timeLeft]);
 
-  // GLOBAL MOUSE MOVEMENT HANDLER (Timer, Palettes, Tools, Spotlight)
+  // GLOBAL MOUSE MOVEMENT HANDLER
   useEffect(() => {
       const handleMouseMove = (e: MouseEvent) => {
           if (isDraggingTimer.current) {
@@ -348,7 +348,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
     let buffer: any[] = [];
     
     // 🔥 ALL VALID BLOCK TYPES REGISTERED HERE
-    const interactables = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'drag-drop', 'pronunciation', 'roleplay'];
+    const interactables = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'drag-drop', 'pronunciation', 'roleplay', 'audio-story', 'image-hotspot', 'drawing', 'code', 'timeline'];
     
     lesson.blocks.forEach((b: any) => {
       const type = String(b?.type || '');
@@ -463,7 +463,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           />
       )}
 
-      {/* Instant Scratchpad (Whiteboard Background) */}
       <div 
           className={`absolute inset-0 z-[8550] transition-transform duration-500 ease-in-out pointer-events-none ${showWhiteboard ? 'translate-y-0' : '-translate-y-full'}`}
           style={{ backgroundColor: '#f8fafc', backgroundImage: 'radial-gradient(#cbd5e1 2px, transparent 2px)', backgroundSize: '40px 40px' }}
@@ -474,7 +473,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           ))}
       </div>
 
-      {/* 1. SLIDE ANNOTATION LAYER (Static over slides) */}
       <div className="absolute inset-0 z-[8400] pointer-events-none overflow-hidden">
           <canvas ref={slideCanvasRef} className="absolute inset-0 w-full h-full" />
           {slideTexts.map(t => (
@@ -482,7 +480,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           ))}
       </div>
 
-      {/* INVISIBLE GLASS ROUTER PANE */}
       <div
           onMouseDown={startAnnotation}
           onMouseMove={drawAnnotation}
@@ -508,7 +505,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           )}
       </div>
 
-      {/* 🎨 HORIZONTAL FLOATING PALETTE (Movable & Resizable) */}
       {isAnnotating && (
           <div 
               className="absolute z-[8700] flex flex-col items-center pointer-events-auto animate-in fade-in zoom-in-95 duration-200"
@@ -517,7 +513,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           >
               <div className="bg-slate-900/95 backdrop-blur-2xl p-3 pl-1 pr-8 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-4 border-slate-700 flex flex-row gap-5 items-center relative overflow-hidden">
                   
-                  {/* The Move Drag Handle */}
                   <div 
                       className="h-16 w-8 cursor-grab active:cursor-grabbing flex justify-center items-center opacity-50 hover:opacity-100 transition-opacity bg-slate-800/50 rounded-l-full -ml-1 mr-1"
                       onMouseDown={startToolbarDrag}
@@ -526,7 +521,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                       <div className="w-1.5 h-8 bg-slate-400 rounded-full" />
                   </div>
 
-                  {/* Tools Group */}
                   <div className="flex flex-row gap-2 bg-slate-800/80 p-2 rounded-3xl items-center border border-slate-700">
                       <button onClick={() => { setMarkerStyle('pen'); forceSaveText(); }} className={`p-3 rounded-2xl transition-all ${markerStyle === 'pen' ? 'bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.6)]' : 'text-slate-400 hover:text-white'}`}>
                           <PenTool size={24} />
@@ -541,7 +535,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
                   <div className="w-px h-10 bg-slate-700" />
 
-                  {/* Colors Group */}
                   <div className="flex flex-row gap-3">
                       {['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#a855f7', '#ffffff', '#0f172a'].map(c => (
                           <button 
@@ -555,7 +548,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
 
                   <div className="w-px h-10 bg-slate-700" />
 
-                  {/* Sizes Group */}
                   <div className="flex flex-row items-center gap-3 bg-slate-800/80 p-2 rounded-3xl border border-slate-700">
                       {[4, 8, 14].map(s => (
                           <button key={s} onClick={() => { setMarkerSize(s); if(activeText) setActiveText({...activeText}); }} className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-colors ${markerSize === s ? 'bg-slate-700' : 'hover:bg-slate-700/50'}`}>
@@ -564,12 +556,10 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                       ))}
                   </div>
                   
-                  {/* Clear Annotations Button */}
                   <button onClick={clearAnnotations} title="Clear Ink & Text" className="bg-slate-800 hover:bg-rose-500 text-slate-400 hover:text-white p-4 rounded-full transition-all flex items-center justify-center ml-2">
                       <Eraser size={24} />
                   </button>
 
-                  {/* The Scale Resize Handle */}
                   <div 
                       className="absolute bottom-0 right-0 w-8 h-8 cursor-nwse-resize flex items-end justify-end p-2 opacity-50 hover:opacity-100 bg-slate-800/30 rounded-tl-full rounded-br-full z-20"
                       onMouseDown={startToolbarResize}
@@ -581,14 +571,12 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           </div>
       )}
 
-      {/* 🔥 THE NEW MAIN TOOLS OS WINDOW (Movable & Resizable) */}
       {showTools && (
           <div 
               className="absolute z-[8900] bg-slate-900/95 backdrop-blur-2xl border-4 border-slate-700 rounded-[2.5rem] p-6 pt-10 pb-8 shadow-[0_40px_80px_rgba(0,0,0,0.6)] flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200 w-72 pointer-events-auto overflow-hidden"
               style={{ left: mainToolsPos.x, top: mainToolsPos.y, transform: `scale(${mainToolsScale})`, transformOrigin: 'top left' }}
               onMouseDown={(e) => e.stopPropagation()} 
           >
-              {/* Drag Handle Top */}
               <div 
                   className="absolute top-0 left-0 right-0 h-10 cursor-grab active:cursor-grabbing flex justify-center items-center opacity-50 hover:opacity-100 transition-opacity bg-slate-800/50"
                   onMouseDown={startMainToolsDrag}
@@ -624,7 +612,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                   <EyeOff size={20} /> <span className="flex-1">{isBlanked ? 'Restore Screen' : 'Blackout Screen'}</span> <span className="text-slate-600 text-xs font-black">B</span>
               </button>
 
-              {/* Resize Handle Bottom Right */}
               <div 
                   className="absolute bottom-0 right-0 w-12 h-12 cursor-nwse-resize flex items-end justify-end p-3 opacity-50 hover:opacity-100 bg-slate-800/30 rounded-tl-[2rem] z-20"
                   onMouseDown={startMainToolsResize}
@@ -735,22 +722,44 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                           {blockType === 'game' && block.gameType === 'connect-three' && <GameBlock block={block} lessonVocab={lessonVocab} />}
                           {blockType === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
                           
-                          {blockType === 'fill-blank' && (
-                              <div className="w-full max-w-5xl mx-auto text-center py-12">
-                                  <div className="inline-flex items-center justify-center p-6 bg-amber-50 text-amber-600 rounded-3xl mb-8 shadow-inner" aria-hidden="true"><Puzzle size={64} /></div>
-                                  <h3 className="text-[6vh] font-black text-slate-800 leading-none">Vocabulary Drill</h3>
-                                  <p className="text-[3vh] font-bold text-slate-400 uppercase tracking-[0.4em] mt-4">Look at your device</p>
-                              </div>
-                          )}
+                          {blockType === 'callout' && <CalloutBlock block={block} />}
+                          {blockType === 'drawing' && <DrawingBlock block={block} />}
+                          {blockType === 'image-hotspot' && <ImageHotspotBlock block={block} />}
+                          {blockType === 'audio-story' && <AudioStoryBlock block={block} />}
                           
-                          {blockType === 'drag-drop' && (
-                              <div className="w-full max-w-5xl mx-auto text-center py-12">
-                                  <div className="inline-flex items-center justify-center p-6 bg-amber-50 text-amber-600 rounded-3xl mb-8 shadow-inner" aria-hidden="true"><MousePointerClick size={64} /></div>
-                                  <h3 className="text-[6vh] font-black text-slate-800 leading-none">{String(block.title || 'Sort the Items!')}</h3>
-                                  <p className="text-[3vh] font-bold text-slate-400 uppercase tracking-[0.4em] mt-4">Look at your device</p>
+                          {blockType === 'code' && (
+                              <div className="py-12 w-full max-w-6xl mx-auto">
+                                <div className="bg-[#0D1117] rounded-[3rem] overflow-hidden shadow-2xl border-4 border-slate-800">
+                                  <div className="bg-white/5 px-8 py-6 flex justify-between items-center border-b border-white/5">
+                                      <div className="flex gap-3"><div className="w-4 h-4 rounded-full bg-rose-500"></div><div className="w-4 h-4 rounded-full bg-amber-500"></div><div className="w-4 h-4 rounded-full bg-emerald-500"></div></div>
+                                      <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest">{String(block.language || 'Terminal')}</span>
+                                  </div>
+                                  <div className="p-12 overflow-x-auto"><pre className="text-emerald-400 font-mono text-[3vh] leading-relaxed"><code>{String(block.content || '')}</code></pre></div>
+                                </div>
                               </div>
                           )}
 
+                          {blockType === 'timeline' && (
+                             <div className="py-12 w-full max-w-6xl mx-auto">
+                                {block.title && (<div className="flex items-center gap-6 mb-16 justify-center"><div className="p-6 bg-amber-50 text-amber-600 rounded-[2rem]"><BookOpen size={48} /></div><h3 className="text-[5vh] font-black text-slate-800 tracking-tight">{String(block.title)}</h3></div>)}
+                                <div className="space-y-12 relative before:absolute before:inset-0 before:mx-auto before:h-full before:w-2 before:bg-slate-200 before:rounded-full">
+                                   {(Array.isArray(block.events) ? block.events : []).map((event: any, evIdx: number) => (
+                                      <div key={evIdx} className="relative flex items-center justify-between odd:flex-row-reverse group">
+                                          <div className="flex items-center justify-center w-20 h-20 rounded-full border-8 border-white bg-indigo-600 text-white shadow-xl shrink-0 order-1 group-odd:-translate-x-1/2 group-even:translate-x-1/2 z-10 transition-transform group-hover:scale-110"><div className="w-4 h-4 bg-white rounded-full" /></div>
+                                          <div className="w-[calc(50%-4rem)] p-10 rounded-[3rem] bg-white border-2 border-slate-100 shadow-lg hover:shadow-2xl transition-all group-hover:border-indigo-200 group-hover:-translate-y-2">
+                                              <span className="font-black text-indigo-600 text-[2vh] tracking-[0.2em] uppercase mb-4 block">{String(event.date || '')}</span>
+                                              <h4 className="font-black text-slate-800 text-[4vh] leading-tight mb-4">{String(event.title || '')}</h4>
+                                              <p className="text-slate-600 text-[2.5vh] font-medium leading-relaxed">{String(event.description || '')}</p>
+                                          </div>
+                                      </div>
+                                   ))}
+                                </div>
+                             </div>
+                          )}
+                          
+                          {blockType === 'fill-blank' && <FillBlankBlock block={block} liveState={liveState} />}
+                          {blockType === 'drag-drop' && <TapSortBlock block={block} liveState={liveState} />}
+                          
                           {blockType === 'pronunciation' && <PronunciationLab block={block} />} 
 
                           {/* 🔥 LIVE AUDIO ROLEPLAY RENDERER (Projector Mode) */}
@@ -833,11 +842,78 @@ const EssayBlock = ({ block }: { block: any }) => (
 const ImageBlock = ({ block }: { block: any }) => (
   <figure className="w-full flex flex-col items-center py-12">
     <div className="relative group overflow-hidden rounded-[3rem] shadow-2xl border-8 border-slate-50">
-        <img src={String(block.url || '')} alt="presentation slide" className="max-h-[65vh] object-cover animate-in zoom-in-105 duration-[20s]" />
+        <img src={String(block.url || block.imageUrl || '')} alt="presentation slide" className="max-h-[65vh] object-cover animate-in zoom-in-105 duration-[20s]" />
     </div>
     {block.caption && <figcaption className="text-[3vh] text-slate-500 font-bold mt-8 text-center max-w-4xl">{String(block.caption)}</figcaption>}
   </figure>
 );
+
+const CalloutBlock = ({ block }: { block: any }) => (
+    <div className="my-12 p-12 md:p-16 rounded-[4rem] bg-amber-50 border-4 border-amber-100 relative overflow-hidden group shadow-lg max-w-6xl mx-auto w-full">
+      <Zap size={250} className="absolute -right-12 -top-12 text-amber-200/40 rotate-12 group-hover:scale-110 transition-transform duration-700" fill="currentColor" />
+      <div className="relative z-10 flex flex-col items-center text-center">
+        <div className="flex items-center gap-4 mb-8">
+          <div className="p-3 bg-amber-500 text-white rounded-2xl shadow-md"><Info size={32} strokeWidth={3} /></div>
+          <span className="text-[3vh] font-black text-amber-600 uppercase tracking-widest">{String(block.label || block.title || 'Spotlight')}</span>
+        </div>
+        <p className="text-[4.5vh] text-slate-700 font-bold leading-relaxed italic max-w-4xl">"{String(block.content || block.text || '')}"</p>
+      </div>
+    </div>
+);
+
+const AudioStoryBlock = ({ block }: { block: any }) => {
+    const [isPlaying, setIsPlaying] = useState(false);
+    return (
+        <div className="bg-white rounded-[4rem] overflow-hidden shadow-2xl border-8 border-indigo-50 my-12 w-full max-w-6xl mx-auto">
+            <div className="relative">
+                <img src={String(block.imageUrl || 'https://images.unsplash.com/photo-1518152006812-edab29b069ac?q=80&w=800&auto=format&fit=crop')} alt="Story visual" className="w-full h-[40vh] object-cover" />
+                <button onClick={() => setIsPlaying(!isPlaying)} className={`absolute -bottom-12 right-16 w-24 h-24 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 ${isPlaying ? 'bg-rose-500 text-white scale-110' : 'bg-indigo-600 text-white hover:scale-105'}`}>
+                    {isPlaying ? <Square fill="currentColor" size={40} /> : <Play fill="currentColor" size={48} className="ml-2" />}
+                </button>
+            </div>
+            <div className="p-12 md:p-16 pt-20">
+                <h3 className="text-[2vh] font-black text-indigo-400 uppercase tracking-widest mb-6 flex items-center gap-3"><Volume2 size={24} /> Read Along</h3>
+                <p className={`text-[5vh] font-bold text-slate-800 leading-snug transition-colors duration-500 ${isPlaying ? 'text-indigo-600' : ''}`}>{String(block.text || "The legend says they looked for an eagle on a cactus...")}</p>
+            </div>
+        </div>
+    );
+};
+
+const ImageHotspotBlock = ({ block }: { block: any }) => {
+    const [activeSpot, setActiveSpot] = useState<number | null>(null);
+    return (
+        <div className="bg-slate-900 p-12 rounded-[4rem] shadow-2xl my-12 w-full max-w-7xl mx-auto">
+            <div className="flex items-center justify-center gap-4 mb-10"><Search className="text-cyan-400" size={40} /><h3 className="text-[5vh] font-black text-white text-center">{String(block.title || 'Explore the Map!')}</h3></div>
+            <div className="relative rounded-[3rem] overflow-hidden border-8 border-slate-700 bg-slate-800">
+                <img src={String(block.imageUrl || 'https://images.unsplash.com/photo-1565670119853-23910c2830f3?q=80&w=800&auto=format&fit=crop')} className="w-full h-auto opacity-80" alt="Explorer Map" />
+                {(Array.isArray(block.hotspots) ? block.hotspots : []).map((spot: any, i: number) => (
+                    <React.Fragment key={i}>
+                        <button onClick={() => setActiveSpot(activeSpot === i ? null : i)} className="absolute w-16 h-16 bg-rose-500 rounded-full border-4 border-white shadow-[0_0_30px_rgba(244,63,94,0.8)] flex items-center justify-center animate-pulse hover:scale-110 transition-transform z-10" style={{ top: `${spot.y || 0}%`, left: `${spot.x || 0}%`, transform: 'translate(-50%, -50%)' }}>
+                            <Search size={24} className="text-white" strokeWidth={3} />
+                        </button>
+                        {activeSpot === i && (
+                            <div className="absolute z-20 bg-white p-8 rounded-[2.5rem] shadow-2xl w-96 text-center animate-in zoom-in-95 duration-200" style={{ top: `${spot.y || 0}%`, left: `${spot.x || 0}%`, transform: 'translate(-50%, -115%)' }}>
+                                <h4 className="text-[3.5vh] font-black text-indigo-600 mb-4 leading-tight">{String(spot.title || '')}</h4>
+                                <p className="text-[2vh] font-bold text-slate-600 leading-snug">{String(spot.description || '')}</p>
+                                <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-8 h-8 bg-white rotate-45"></div>
+                            </div>
+                        )}
+                    </React.Fragment>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const DrawingBlock = ({ block }: { block: any }) => {
+    return (
+        <div className="bg-white p-12 rounded-[4rem] border-8 border-slate-100 shadow-2xl my-12 w-full max-w-6xl mx-auto text-center flex flex-col items-center">
+            <div className="inline-flex items-center justify-center p-6 bg-fuchsia-50 text-fuchsia-600 rounded-3xl mb-8 shadow-inner"><Palette size={64} /></div>
+            <h3 className="text-[6vh] font-black text-slate-800 leading-none">{String(block.title || "Let's Draw!")}</h3>
+            <p className="text-[3vh] font-bold text-slate-400 uppercase tracking-[0.4em] mt-4">Look at your device</p>
+        </div>
+    );
+};
 
 const DialogueBlock = ({ block }: { block: any }) => (
   <div className="w-full max-w-5xl mx-auto space-y-12 py-12">
@@ -857,9 +933,9 @@ const DialogueBlock = ({ block }: { block: any }) => (
 );
 
 const VocabListBlock = ({ block }: { block: any }) => (
-  <div className="grid grid-cols-2 gap-10 py-12">
+  <div className="grid grid-cols-2 gap-10 py-12 w-full max-w-7xl mx-auto">
     {(Array.isArray(block.items) ? block.items : []).map((item: any, j: number) => (
-      <div key={j} className="bg-gradient-to-br from-slate-50 to-slate-100 p-12 rounded-[3rem] border border-white shadow-xl text-left relative overflow-hidden group">
+      <div key={j} className="bg-gradient-to-br from-slate-50 to-slate-100 p-12 rounded-[3rem] border-2 border-white shadow-xl text-left relative overflow-hidden group hover:-translate-y-2 transition-transform duration-300">
         <div className="absolute -right-12 -top-12 opacity-5 text-indigo-900 rotate-12 group-hover:scale-110 transition-transform duration-700"><Layers size={200} /></div>
         <p className="text-[5vh] font-black text-indigo-600 mb-4 relative z-10">{String(item.term || '')}</p>
         <p className="text-[3vh] text-slate-600 font-medium leading-relaxed relative z-10">{String(item.definition || '')}</p>
@@ -915,7 +991,28 @@ const ScenarioBlock = ({ block, liveState }: { block: any, liveState: any }) => 
   );
 };
 
-// 🔥 LIVE AUDIO ROLEPLAY RENDERER (Projector Mode)
+// 🔥 SMART DRAWER RENDERERS (Projector Mode simply tells students to look at their devices)
+const FillBlankBlock = ({ block, liveState }: { block: any, liveState: any }) => {
+  return (
+    <div className="w-full max-w-5xl mx-auto text-center py-12">
+        <div className="inline-flex items-center justify-center p-6 bg-amber-50 text-amber-600 rounded-3xl mb-8 shadow-inner" aria-hidden="true"><Puzzle size={64} /></div>
+        <h3 className="text-[6vh] font-black text-slate-800 leading-none">Vocabulary Drill</h3>
+        <p className="text-[3vh] font-bold text-slate-400 uppercase tracking-[0.4em] mt-4">Look at your device</p>
+    </div>
+  );
+};
+
+const TapSortBlock = ({ block, liveState }: { block: any, liveState?: any }) => {
+  return (
+    <div className="w-full max-w-5xl mx-auto text-center py-12">
+        <div className="inline-flex items-center justify-center p-6 bg-amber-50 text-amber-600 rounded-3xl mb-8 shadow-inner" aria-hidden="true"><MousePointerClick size={64} /></div>
+        <h3 className="text-[6vh] font-black text-slate-800 leading-none">{String(block.title || 'Sort the Items!')}</h3>
+        <p className="text-[3vh] font-bold text-slate-400 uppercase tracking-[0.4em] mt-4">Look at your device</p>
+    </div>
+  );
+};
+
+// 🔥 LIVE AUDIO ROLEPLAY RENDERER
 const LiveRoleplayBlock = ({ block, onLaunch }: { block: any, onLaunch: (prompt: string) => void }) => (
     <div className="bg-slate-950 p-12 md:p-16 rounded-[4rem] shadow-2xl my-12 text-white relative overflow-hidden group w-full max-w-5xl mx-auto text-center border-8 border-cyan-500/20">
         <div className="absolute -right-20 -top-20 w-96 h-96 bg-cyan-500/20 rounded-full blur-[100px] pointer-events-none group-hover:bg-cyan-500/30 transition-colors duration-700" />
