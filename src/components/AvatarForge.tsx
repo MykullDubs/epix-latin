@@ -278,7 +278,7 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                                     <SpecIcon size={12} /> {spec.label}
                                 </button>
                             );
-                        });}
+                        })}
                     </div>
                 </div>
 
@@ -358,8 +358,10 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                                         key={color}
                                         onClick={() => updateConfig(activeTab, color)}
                                         className={`w-14 h-14 rounded-[1rem] shadow-sm transition-all ${configs[speciesId][activeTab] === color ? 'scale-110 ring-4 ring-offset-4 ring-indigo-500 dark:ring-indigo-400 dark:ring-offset-slate-900' : 'hover:scale-110 ring-1 ring-slate-200 dark:ring-slate-700'} ${color === 'transparent' ? 'bg-[url("https://www.transparenttextures.com/patterns/cubes.png")] bg-slate-100 dark:bg-slate-800' : ''}`}
-                                        style={color !== 'transparent' ? { backgroundColor: `#${color}` } : {}}
-                                        style={{ animationDelay: `${idx * 20}ms` }}
+                                        style={{
+                                            ...(color !== 'transparent' ? { backgroundColor: `#${color}` } : {}),
+                                            animationDelay: `${idx * 20}ms`
+                                        }}
                                     />
                                 ))}
                             </div>
