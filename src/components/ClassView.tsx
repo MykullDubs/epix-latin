@@ -29,8 +29,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const [showWhiteboard, setShowWhiteboard] = useState(false);
 
   // OS FEATURE: Live Audio Roleplay Overlay
-  const [activeRoleplayPrompt, setActiveRoleplayPrompt] = useState<string | null>(null);
-  
+const [activeRoleplayBlock, setActiveRoleplayBlock] = useState<any | null>(null);  
   // OS FEATURE: Moveable Draggable Timer
   const [showTimer, setShowTimer] = useState(false);
   const [timeLeft, setTimeLeft] = useState(300);
@@ -387,7 +386,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           const tag = (e.target as HTMLElement).tagName;
           if (['INPUT', 'TEXTAREA'].indexOf(tag) !== -1 && e.key !== 'Escape') return; 
           
-          if (activeRoleplayPrompt) return; // Disable keyboard nav in Roleplay mode
+         if (activeRoleplayBlock) return; // Disable keyboard nav in Roleplay mode
 
           if (e.key === 'ArrowRight' || e.key === ' ') { 
               e.preventDefault(); handleNext();
@@ -443,11 +442,12 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         className="fixed inset-0 z-[9999] flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500"
         onContextMenu={handleRightClick} 
     >
-      {/* 🔥 THE LIVE AUDIO ARENA OVERLAY */}
-      {activeRoleplayPrompt && (
+     {/* 🔥 THE LIVE AUDIO ARENA OVERLAY */}
+      {activeRoleplayBlock && (
           <LiveRoleplayArena 
-              scenarioPrompt={activeRoleplayPrompt} 
-              onClose={() => setActiveRoleplayPrompt(null)} 
+              scenarioPrompt={activeRoleplayBlock.prompt} 
+              tools={activeRoleplayBlock.metadata?.tools} // <-- Pass the tools here!
+              onClose={() => setActiveRoleplayBlock(null)} 
           />
       )}
 
@@ -768,7 +768,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                           {blockType === 'pronunciation' && <PronunciationLab block={block} />} 
 
                           {/* 🔥 LIVE AUDIO ROLEPLAY RENDERER (Projector Mode) */}
-                          {blockType === 'roleplay' && <LiveRoleplayBlock block={block} onLaunch={setActiveRoleplayPrompt} />}
+                          {blockType === 'roleplay' && <LiveRoleplayBlock block={block} onLaunch={() => setActiveRoleplayBlock(block)} />}
                       </>
                     )}
                   </div>
