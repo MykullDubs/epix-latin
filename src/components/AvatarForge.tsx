@@ -8,7 +8,7 @@ const FORGE_COLORS = [
     'eab308', '84cc16', '14b8a6', '3b82f6', 'd946ef', '1e293b', '000000', 'ffffff'
 ];
 
-// 🔥 THE MULTI-LIBRARY SPECIES MATRIX
+// 🔥 THE MULTI-LIBRARY SPECIES MATRIX (Patched 'clothes' to 'clothing')
 const SPECIES_MATRIX: Record<string, any> = {
     bottts: {
         id: 'bottts', label: 'Mecha', icon: Cpu, endpoint: 'bottts',
@@ -34,7 +34,7 @@ const SPECIES_MATRIX: Record<string, any> = {
         tabs: [
             { id: 'top', icon: ArrowUpCircle, label: 'Hair & Hats' },
             { id: 'accessories', icon: Eye, label: 'Eyewear' },
-            { id: 'clothes', icon: Shirt, label: 'Outfit' },
+            { id: 'clothing', icon: Shirt, label: 'Outfit' },
             { id: 'eyes', icon: Sparkles, label: 'Eyes' },
             { id: 'mouth', icon: Smile, label: 'Mouth' },
             { id: 'facialHair', icon: User, label: 'Facial Hair' }
@@ -42,7 +42,7 @@ const SPECIES_MATRIX: Record<string, any> = {
         parts: {
             top: ['longHair', 'shortHair', 'eyepatch', 'hat', 'hijab', 'turban', 'winterHat1', 'winterHat2', 'bigHair', 'bob', 'bun', 'curly', 'curvy', 'dreads', 'frida', 'fro', 'froBand', 'miaWallace', 'shaggy', 'shaggyMullet', 'shaved', 'shortCurly', 'shortFlat', 'shortRound', 'shortWaved', 'sides', 'straight01', 'straight02', 'straightStrand'],
             accessories: ['blank', 'kurt', 'prescription01', 'prescription02', 'round', 'sunglasses', 'wayfarers'],
-            clothes: ['blazerAndShirt', 'blazerAndSweater', 'collarAndSweater', 'graphicShirt', 'hoodie', 'overall', 'shirtCrewNeck', 'shirtScoopNeck', 'shirtVNeck'],
+            clothing: ['blazerAndShirt', 'blazerAndSweater', 'collarAndSweater', 'graphicShirt', 'hoodie', 'overall', 'shirtCrewNeck', 'shirtScoopNeck', 'shirtVNeck'],
             eyes: ['close', 'cry', 'default', 'dizzy', 'eyeRoll', 'happy', 'hearts', 'side', 'squint', 'surprised', 'wink', 'winkWacky'],
             mouth: ['concerned', 'default', 'disbelief', 'eating', 'grimace', 'sad', 'scream', 'serious', 'smile', 'twinkle', 'vomit'],
             facialHair: ['blank', 'beardMedium', 'beardLight', 'beardMajestic', 'moustacheFancy', 'moustacheMagnum']
@@ -78,7 +78,7 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
             baseColor: currentConfig?.baseColor || '4f46e5'
         },
         avataaars: {
-            top: 'shortHair', accessories: 'blank', clothes: 'hoodie', eyes: 'default', mouth: 'smile', facialHair: 'blank', baseColor: '4f46e5'
+            top: 'shortHair', accessories: 'blank', clothing: 'hoodie', eyes: 'default', mouth: 'smile', facialHair: 'blank', baseColor: '4f46e5'
         },
         funEmoji: {
             eyes: 'cute', mouth: 'smile', baseColor: 'f59e0b'
@@ -92,12 +92,14 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
         setActiveTab(SPECIES_MATRIX[speciesId].tabs[0].id);
     }, [speciesId]);
 
+    // 🔥 API SAFETY FIX: We request a completely transparent background from DiceBear
     const buildUrl = (specId: string, cfg: any) => {
         const spec = SPECIES_MATRIX[specId];
         let url = `https://api.dicebear.com/7.x/${spec.endpoint}/svg?backgroundColor=transparent`;
         
-        if (specId === 'bottts') url += `&baseColor=${cfg.baseColor}`;
-        if (specId === 'funEmoji' || specId === 'avataaars') url += `&backgroundColor=${cfg.baseColor}40`; 
+        if (specId === 'bottts') {
+            url += `&baseColor=${cfg.baseColor}`;
+        }
         
         spec.tabs.forEach((t: any) => {
             if (cfg[t.id] && cfg[t.id] !== 'none' && cfg[t.id] !== 'blank') {
@@ -109,7 +111,6 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
 
     const previewUrl = buildUrl(speciesId, configs[speciesId]);
 
-    // 🔥 FIX: Added Record<string, string> type to newCfg to satisfy TypeScript
     const handleRandomize = () => {
         const spec = SPECIES_MATRIX[speciesId];
         const newCfg: Record<string, string> = { baseColor: FORGE_COLORS[Math.floor(Math.random() * FORGE_COLORS.length)] };
@@ -145,7 +146,11 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                         <RefreshCw size={20} strokeWidth={3} />
                     </button>
 
-                    <div className="w-32 h-32 sm:w-40 sm:h-40 bg-white dark:bg-slate-900 rounded-[2rem] shadow-inner border-4 border-slate-50 dark:border-slate-800 flex items-center justify-center p-4 relative mb-4 shrink-0 transition-all duration-300">
+                    {/* 🔥 UI SAFETY FIX: Applying the color tint via CSS background instead of the API parameter */}
+                    <div 
+                        className="w-32 h-32 sm:w-40 sm:h-40 rounded-[2rem] shadow-inner border-4 border-white dark:border-slate-800 flex items-center justify-center p-4 relative mb-4 shrink-0 transition-all duration-300"
+                        style={{ backgroundColor: speciesId === 'bottts' ? 'transparent' : `#${configs[speciesId].baseColor}30` }}
+                    >
                         <img src={previewUrl} alt="Live Avatar Preview" className="w-full h-full object-contain drop-shadow-xl animate-in zoom-in" />
                     </div>
 
