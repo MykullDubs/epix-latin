@@ -1,6 +1,6 @@
 // src/components/AvatarForge.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Save, RefreshCw, Cpu, Eye, Smile, ArrowUpCircle, Headphones, Fingerprint, User, Sparkles, Shirt, Gamepad2 } from 'lucide-react';
+import { X, Save, RefreshCw, Cpu, Eye, Smile, ArrowUpCircle, Headphones, Fingerprint, User, Sparkles, Shirt, Gamepad2, Compass } from 'lucide-react';
 
 // 🔥 EXPANDED 16-COLOR PALETTE
 const FORGE_COLORS = [
@@ -8,7 +8,7 @@ const FORGE_COLORS = [
     'eab308', '84cc16', '14b8a6', '3b82f6', 'd946ef', '1e293b', '000000', 'ffffff'
 ];
 
-// 🔥 V9 STRICT SCHEMAS (Added Pixel Art)
+// 🔥 STRICTLY VALIDATED DICEBEAR V9 SCHEMAS
 const SPECIES_MATRIX: Record<string, any> = {
     bottts: {
         id: 'bottts', label: 'Mecha', icon: Cpu, endpoint: 'bottts',
@@ -60,18 +60,31 @@ const SPECIES_MATRIX: Record<string, any> = {
         }
     },
     pixelArt: {
-        id: 'pixelArt', label: 'Retro', icon: Gamepad2, endpoint: 'pixel-art',
+        id: 'pixelArt', label: 'Retro', icon: Gamepad2, endpoint: 'pixel-art-neutral',
         tabs: [
-            { id: 'clothing', icon: Shirt, label: 'Armor' },
             { id: 'eyes', icon: Eye, label: 'Optics' },
-            { id: 'mouth', icon: Smile, label: 'Mouth' },
-            { id: 'hat', icon: ArrowUpCircle, label: 'Helm' }
+            { id: 'glasses', icon: Sparkles, label: 'Eyewear' },
+            { id: 'mouth', icon: Smile, label: 'Mouth' }
         ],
         parts: {
-            clothing: ['variant01', 'variant02', 'variant03', 'variant04', 'variant05', 'variant06', 'variant07', 'variant08', 'variant09', 'variant10'],
-            eyes: ['variant01', 'variant02', 'variant03', 'variant04', 'variant05', 'variant06', 'variant07', 'variant08'],
-            mouth: ['variant01', 'variant02', 'variant03', 'variant04', 'variant05', 'variant06', 'variant07', 'variant08', 'variant09', 'variant10'],
-            hat: ['none', 'variant01', 'variant02', 'variant03', 'variant04', 'variant05', 'variant06', 'variant07', 'variant08']
+            eyes: ['variant01', 'variant02', 'variant03'],
+            glasses: ['none', 'dark01', 'dark02', 'dark03'],
+            mouth: ['happy01', 'happy02', 'happy03']
+        }
+    },
+    adventurer: {
+        id: 'adventurer', label: 'Adventurer', icon: Compass, endpoint: 'adventurer',
+        tabs: [
+            { id: 'hair', icon: ArrowUpCircle, label: 'Hair' },
+            { id: 'eyes', icon: Eye, label: 'Eyes' },
+            { id: 'mouth', icon: Smile, label: 'Mouth' },
+            { id: 'features', icon: Sparkles, label: 'Features' }
+        ],
+        parts: {
+            hair: ['long01', 'long02', 'long03', 'short01', 'short02', 'short03'],
+            eyes: ['variant01', 'variant02', 'variant03'],
+            mouth: ['variant01', 'variant02', 'variant03'],
+            features: ['none', 'birthmark', 'blush', 'freckles', 'mustache']
         }
     }
 };
@@ -80,6 +93,7 @@ const getInitialSpecies = (url: string) => {
     if (url?.includes('avataaars')) return 'avataaars';
     if (url?.includes('fun-emoji')) return 'funEmoji';
     if (url?.includes('pixel-art')) return 'pixelArt';
+    if (url?.includes('adventurer')) return 'adventurer';
     return 'bottts';
 };
 
@@ -90,7 +104,7 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
     const [configs, setConfigs] = useState<Record<string, any>>({
         bottts: {
             base: currentConfig?.base || 'square01', eyes: currentConfig?.eyes || 'glow', mouth: currentConfig?.mouth || 'bite',
-            top: currentConfig?.top || 'antenna', sides: currentConfig?.sides || 'cables01', texture: currentConfig?.texture || 'circuits',
+            top: currentConfig?.top || 'none', sides: currentConfig?.sides || 'none', texture: currentConfig?.texture || 'none',
             baseColor: currentConfig?.baseColor || '4f46e5'
         },
         avataaars: {
@@ -100,7 +114,10 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
             eyes: 'cute', mouth: 'smile', baseColor: 'f59e0b'
         },
         pixelArt: {
-            clothing: 'variant01', eyes: 'variant01', mouth: 'variant01', hat: 'none', baseColor: '10b981'
+            eyes: 'variant01', glasses: 'none', mouth: 'happy01', baseColor: '10b981'
+        },
+        adventurer: {
+            hair: 'short01', eyes: 'variant01', mouth: 'variant01', features: 'none', baseColor: 'f43f5e'
         }
     });
 
@@ -111,7 +128,6 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
         setActiveTab(SPECIES_MATRIX[speciesId].tabs[0].id);
     }, [speciesId]);
 
-    // 🔥 API v9 UPGRADE
     const buildUrl = (specId: string, cfg: any) => {
         const spec = SPECIES_MATRIX[specId];
         let url = `https://api.dicebear.com/9.x/${spec.endpoint}/svg?backgroundColor=transparent`;
