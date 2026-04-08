@@ -1,6 +1,6 @@
 // src/components/AvatarForge.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Save, RefreshCw, Cpu, Eye, Smile, ArrowUpCircle, Headphones, Fingerprint, User, Sparkles, Shirt, Gamepad2, Compass } from 'lucide-react';
+import { X, Save, RefreshCw, Cpu, Eye, Smile, ArrowUpCircle, Headphones, Fingerprint, User, Sparkles, Shirt, Gamepad2, Compass, Zap } from 'lucide-react';
 
 // 🔥 EXPANDED 16-COLOR PALETTE
 const FORGE_COLORS = [
@@ -8,7 +8,7 @@ const FORGE_COLORS = [
     'eab308', '84cc16', '14b8a6', '3b82f6', 'd946ef', '1e293b', '000000', 'ffffff'
 ];
 
-// 🔥 STRICTLY VALIDATED DICEBEAR V9 SCHEMAS
+// 🔥 STRICTLY VALIDATED DICEBEAR V9 SCHEMAS (Now 7 Libraries!)
 const SPECIES_MATRIX: Record<string, any> = {
     bottts: {
         id: 'bottts', label: 'Mecha', icon: Cpu, endpoint: 'bottts',
@@ -73,7 +73,7 @@ const SPECIES_MATRIX: Record<string, any> = {
         }
     },
     adventurer: {
-        id: 'adventurer', label: 'Adventurer', icon: Compass, endpoint: 'adventurer',
+        id: 'adventurer', label: 'Hero', icon: Compass, endpoint: 'adventurer',
         tabs: [
             { id: 'hair', icon: ArrowUpCircle, label: 'Hair' },
             { id: 'eyes', icon: Eye, label: 'Eyes' },
@@ -86,6 +86,31 @@ const SPECIES_MATRIX: Record<string, any> = {
             mouth: ['variant01', 'variant02', 'variant03'],
             features: ['none', 'birthmark', 'blush', 'freckles', 'mustache']
         }
+    },
+    croodles: {
+        id: 'croodles', label: 'Doodle', icon: Fingerprint, endpoint: 'croodles',
+        tabs: [
+            { id: 'face', icon: User, label: 'Face' },
+            { id: 'eyes', icon: Eye, label: 'Eyes' },
+            { id: 'mouth', icon: Smile, label: 'Mouth' },
+            { id: 'nose', icon: ArrowUpCircle, label: 'Nose' }
+        ],
+        parts: {
+            face: ['variant01', 'variant02', 'variant03', 'variant04'],
+            eyes: ['variant01', 'variant02', 'variant03', 'variant04'],
+            mouth: ['variant01', 'variant02', 'variant03', 'variant04'],
+            nose: ['variant01', 'variant02', 'variant03', 'variant04']
+        }
+    },
+    icons: {
+        id: 'icons', label: 'Symbol', icon: Zap, endpoint: 'icons',
+        tabs: [
+            { id: 'icon', icon: Zap, label: 'Icon' }
+        ],
+        parts: {
+            // These map perfectly to valid Bootstrap Icon names used by the library
+            icon: ['airplane', 'alarm', 'apple', 'archive', 'asterisk', 'bank', 'bell', 'bicycle', 'book', 'boombox', 'bug', 'camera', 'capsule', 'car-front', 'cloud', 'cpu', 'cup-hot', 'droplet', 'earbuds', 'egg', 'emoji-smile', 'envelope', 'eyeglasses', 'eye', 'feather', 'fire', 'flag', 'flower1', 'gem', 'gift', 'globe', 'hammer', 'headphones', 'heart', 'key', 'lamp', 'lightning', 'moon', 'music-note', 'palette', 'peace', 'pen', 'pencil', 'phone', 'play', 'puzzle', 'rocket', 'scissors', 'shield', 'snow', 'star', 'sun', 'tornado', 'trash', 'tree', 'trophy', 'umbrella', 'wifi']
+        }
     }
 };
 
@@ -94,6 +119,8 @@ const getInitialSpecies = (url: string) => {
     if (url?.includes('fun-emoji')) return 'funEmoji';
     if (url?.includes('pixel-art')) return 'pixelArt';
     if (url?.includes('adventurer')) return 'adventurer';
+    if (url?.includes('croodles')) return 'croodles';
+    if (url?.includes('icons')) return 'icons';
     return 'bottts';
 };
 
@@ -118,6 +145,12 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
         },
         adventurer: {
             hair: 'short01', eyes: 'variant01', mouth: 'variant01', features: 'none', baseColor: 'f43f5e'
+        },
+        croodles: {
+            face: 'variant01', eyes: 'variant01', mouth: 'variant01', nose: 'variant01', baseColor: '06b6d4'
+        },
+        icons: {
+            icon: 'star', baseColor: 'f59e0b'
         }
     });
 
@@ -132,7 +165,9 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
         const spec = SPECIES_MATRIX[specId];
         let url = `https://api.dicebear.com/9.x/${spec.endpoint}/svg?backgroundColor=transparent`;
         
+        // Colors are handled uniquely depending on the species library in v9
         if (specId === 'bottts') url += `&baseColor=${cfg.baseColor}`;
+        if (specId === 'icons') url += `&iconColor=${cfg.baseColor}`;
         
         spec.tabs.forEach((t: any) => {
             if (cfg[t.id] && cfg[t.id] !== 'none' && cfg[t.id] !== 'blank') {
@@ -181,7 +216,7 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
 
                     <div 
                         className="w-32 h-32 sm:w-40 sm:h-40 rounded-[2rem] shadow-inner border-4 border-white dark:border-slate-800 flex items-center justify-center p-4 relative mb-4 shrink-0 transition-all duration-300"
-                        style={{ backgroundColor: speciesId === 'bottts' ? 'transparent' : `#${configs[speciesId].baseColor}30` }}
+                        style={{ backgroundColor: (speciesId === 'bottts' || speciesId === 'icons') ? 'transparent' : `#${configs[speciesId].baseColor}30` }}
                     >
                         <img src={previewUrl} alt="Live Avatar Preview" className="w-full h-full object-contain drop-shadow-xl animate-in zoom-in" />
                     </div>
