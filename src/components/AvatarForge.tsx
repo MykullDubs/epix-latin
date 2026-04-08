@@ -8,7 +8,7 @@ const FORGE_COLORS = [
     'eab308', '84cc16', '14b8a6', '3b82f6', 'd946ef', '1e293b', '000000', 'ffffff'
 ];
 
-// 🔥 STRICTLY VALIDATED DICEBEAR V9 SCHEMAS (Now 7 Libraries!)
+// 🔥 STRICTLY VALIDATED DICEBEAR V9 SCHEMAS (Now 8 Libraries!)
 const SPECIES_MATRIX: Record<string, any> = {
     bottts: {
         id: 'bottts', label: 'Mecha', icon: Cpu, endpoint: 'bottts',
@@ -57,6 +57,19 @@ const SPECIES_MATRIX: Record<string, any> = {
         parts: {
             eyes: ['closed', 'closed2', 'crying', 'cute', 'dizzy', 'lookDown', 'peeking', 'pensive', 'shades', 'starStruck', 'tear', 'wink', 'wink2'],
             mouth: ['aww', 'cute', 'dizzy', 'faceMask', 'kissHeart', 'peeking', 'sad', 'shades', 'smile', 'smileLol', 'smileTeeth', 'starStruck', 'tear', 'tongueOut', 'wink']
+        }
+    },
+    toonHead: {
+        id: 'toonHead', label: 'Toon', icon: User, endpoint: 'toon-head',
+        tabs: [
+            { id: 'hair', icon: ArrowUpCircle, label: 'Hair' },
+            { id: 'eyes', icon: Eye, label: 'Eyes' },
+            { id: 'mouth', icon: Smile, label: 'Mouth' }
+        ],
+        parts: {
+            hair: ['none', 'bun', 'sideComed', 'spiky', 'undercut', 'longStraight', 'longWavy', 'neckHigh', 'shoulderHigh'],
+            eyes: ['bow', 'happy', 'humble', 'wide', 'wink'],
+            mouth: ['agape', 'angry', 'laugh']
         }
     },
     pixelArt: {
@@ -108,7 +121,6 @@ const SPECIES_MATRIX: Record<string, any> = {
             { id: 'icon', icon: Zap, label: 'Icon' }
         ],
         parts: {
-            // These map perfectly to valid Bootstrap Icon names used by the library
             icon: ['airplane', 'alarm', 'apple', 'archive', 'asterisk', 'bank', 'bell', 'bicycle', 'book', 'boombox', 'bug', 'camera', 'capsule', 'car-front', 'cloud', 'cpu', 'cup-hot', 'droplet', 'earbuds', 'egg', 'emoji-smile', 'envelope', 'eyeglasses', 'eye', 'feather', 'fire', 'flag', 'flower1', 'gem', 'gift', 'globe', 'hammer', 'headphones', 'heart', 'key', 'lamp', 'lightning', 'moon', 'music-note', 'palette', 'peace', 'pen', 'pencil', 'phone', 'play', 'puzzle', 'rocket', 'scissors', 'shield', 'snow', 'star', 'sun', 'tornado', 'trash', 'tree', 'trophy', 'umbrella', 'wifi']
         }
     }
@@ -117,6 +129,7 @@ const SPECIES_MATRIX: Record<string, any> = {
 const getInitialSpecies = (url: string) => {
     if (url?.includes('avataaars')) return 'avataaars';
     if (url?.includes('fun-emoji')) return 'funEmoji';
+    if (url?.includes('toon-head')) return 'toonHead';
     if (url?.includes('pixel-art')) return 'pixelArt';
     if (url?.includes('adventurer')) return 'adventurer';
     if (url?.includes('croodles')) return 'croodles';
@@ -139,6 +152,9 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
         },
         funEmoji: {
             eyes: 'cute', mouth: 'smile', baseColor: 'f59e0b'
+        },
+        toonHead: {
+            hair: 'none', eyes: 'happy', mouth: 'smile', baseColor: 'f43f5e'
         },
         pixelArt: {
             eyes: 'variant01', glasses: 'none', mouth: 'happy01', baseColor: '10b981'
@@ -165,7 +181,6 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
         const spec = SPECIES_MATRIX[specId];
         let url = `https://api.dicebear.com/9.x/${spec.endpoint}/svg?backgroundColor=transparent`;
         
-        // Colors are handled uniquely depending on the species library in v9
         if (specId === 'bottts') url += `&baseColor=${cfg.baseColor}`;
         if (specId === 'icons') url += `&iconColor=${cfg.baseColor}`;
         
@@ -204,7 +219,6 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
             
             <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] shadow-2xl border-4 border-slate-100 dark:border-slate-800 relative z-10 animate-in zoom-in-95 duration-300 overflow-hidden flex flex-col h-[90vh] sm:h-auto sm:max-h-[85vh]">
                 
-                {/* HEADER & LIVE PREVIEW */}
                 <div className="bg-slate-100 dark:bg-slate-800 p-6 sm:p-8 pb-4 relative flex flex-col items-center border-b border-slate-200 dark:border-slate-700 shrink-0">
                     <button onClick={onClose} className="absolute top-6 right-6 p-2 bg-white/50 dark:bg-black/20 hover:bg-white dark:hover:bg-black/40 rounded-full text-slate-500 transition-colors z-20">
                         <X size={20} strokeWidth={3} />
@@ -221,7 +235,6 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                         <img src={previewUrl} alt="Live Avatar Preview" className="w-full h-full object-contain drop-shadow-xl animate-in zoom-in" />
                     </div>
 
-                    {/* SPECIES SELECTOR */}
                     <div className="w-full flex justify-center gap-2 mb-4 flex-wrap">
                         {Object.values(SPECIES_MATRIX).map(spec => {
                             const SpecIcon = spec.icon;
@@ -237,7 +250,6 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                         })}
                     </div>
 
-                    {/* Scrollable Color Swatches */}
                     <div className="w-full overflow-x-auto custom-scrollbar pb-2">
                         <div className="flex gap-2 w-max px-2">
                             {FORGE_COLORS.map(color => (
@@ -252,10 +264,8 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                     </div>
                 </div>
 
-                {/* THE WORKBENCH CONTROLS */}
                 <div className="flex flex-col p-6 flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950">
                     
-                    {/* Scrollable Navigation Tabs */}
                     <div className="flex gap-2 mb-6 overflow-x-auto custom-scrollbar pb-2 shrink-0">
                         {activeSpecies.tabs.map((tab: any) => {
                             const Icon = tab.icon;
@@ -273,7 +283,6 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                         })}
                     </div>
 
-                    {/* High-Density Part Grid */}
                     <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
                         <div className="grid grid-cols-3 gap-2 pb-4 animate-in fade-in">
                             {activeSpecies.parts[activeTab]?.map((part: string) => {
@@ -292,7 +301,6 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                     </div>
                 </div>
 
-                {/* SAVE FOOTER */}
                 <div className="p-6 pt-0 shrink-0 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 mt-auto">
                     <button 
                         onClick={() => onSave(previewUrl, { ...configs[speciesId], url: previewUrl })}
