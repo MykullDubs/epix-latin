@@ -350,6 +350,7 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                     {/* Dynamic Content Area */}
                     <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-12">
                         
+                        {/* 1. Color Pickers */}
                         {['bgColor', 'primaryColor', 'skinTone', 'hairColor'].includes(activeTab) && (
                             <div className="flex flex-wrap gap-4 justify-center py-2 animate-in fade-in zoom-in-95 duration-300">
                                 {
@@ -358,13 +359,16 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                                         key={color}
                                         onClick={() => updateConfig(activeTab, color)}
                                         className={`w-14 h-14 rounded-[1rem] shadow-sm transition-all ${configs[speciesId][activeTab] === color ? 'scale-110 ring-4 ring-offset-4 ring-indigo-500 dark:ring-indigo-400 dark:ring-offset-slate-900' : 'hover:scale-110 ring-1 ring-slate-200 dark:ring-slate-700'} ${color === 'transparent' ? 'bg-[url("https://www.transparenttextures.com/patterns/cubes.png")] bg-slate-100 dark:bg-slate-800' : ''}`}
-                                        style={color !== 'transparent' ? { backgroundColor: `#${color}` } : {}}
-                                        style={{ animationDelay: `${idx * 20}ms` }}
+                                        style={{
+                                            ...(color !== 'transparent' ? { backgroundColor: `#${color}` } : {}),
+                                            animationDelay: `${idx * 20}ms`
+                                        }}
                                     />
                                 ))}
                             </div>
                         )}
 
+                        {/* 2. Parts Grid */}
                         {!['bgColor', 'primaryColor', 'skinTone', 'hairColor'].includes(activeTab) && (
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                 {activeSpecies.parts[activeTab]?.map((part: string, idx: number) => {
