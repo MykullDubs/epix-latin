@@ -1,18 +1,22 @@
 // src/components/LiveRoleplayArena.tsx
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, X, Activity, Loader2, Sparkles, AlertCircle } from 'lucide-react';
+import { Mic, MicOff, X, Activity, Loader2, Sparkles, AlertCircle, Award, CheckCircle2 } from 'lucide-react';
 
 interface LiveRoleplayArenaProps {
     scenarioPrompt: string;
+    tools?: any[]; // <-- Added to receive the tool schema
     onClose: () => void;
 }
 
-export default function LiveRoleplayArena({ scenarioPrompt, onClose }: LiveRoleplayArenaProps) {
+export default function LiveRoleplayArena({ scenarioPrompt, tools, onClose }: LiveRoleplayArenaProps) {
     const [isConnecting, setIsConnecting] = useState(false);
     const [isConnected, setIsConnected] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
     const [aiSpeaking, setAiSpeaking] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    
+    // 🔥 NEW: State for the Victory Screen
+    const [victoryState, setVictoryState] = useState<{ achieved: boolean; feedback: string } | null>(null);
 
     // Audio & Socket Refs
     const wsRef = useRef<WebSocket | null>(null);
@@ -22,7 +26,8 @@ export default function LiveRoleplayArena({ scenarioPrompt, onClose }: LiveRolep
     const nextPlayTimeRef = useRef<number>(0);
 
     // Explicitly grab the Vite Environment Variable
-const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
+    const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
+
     // ─────────────────────────────────────────────────────────────────────────────
     // UTILS: PCM <--> BASE64 CONVERSIONS
     // ─────────────────────────────────────────────────────────────────────────────
@@ -70,27 +75,21 @@ const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
         setError(null);
 
         try {
-            // A. Initialize Web Audio API for 16kHz capture (Gemini requires 16kHz input)
             const audioCtx = new window.AudioContext({ sampleRate: 16000 });
             audioContextRef.current = audioCtx;
 
-            // B. Request Microphone Access
             console.log("Requesting microphone permissions...");
             const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000 } });
             streamRef.current = stream;
             console.log("Microphone access granted.");
 
-            // C. Connect to Gemini Live WebSocket
             const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
-            console.log("Opening WebSocket to:", wsUrl.replace(apiKey, "HIDDEN_KEY"));
-            
             const ws = new WebSocket(wsUrl);
             wsRef.current = ws;
 
             ws.onopen = () => {
                 console.log("WebSocket opened. Sending initial setup config...");
-                // Send the initial setup framing to define the persona
-                const setupMessage = {
+                const setupMessage: any = {
                     setup: {
                         model: "models/gemini-2.5-flash-native-audio-preview-12-2025",
                         generationConfig: {
@@ -102,6 +101,12 @@ const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
                         }
                     }
                 };
+
+                // 🔥 NEW: Inject tools if they exist
+                if (tools && tools.length > 0) {
+                    setupMessage.setup.tools = tools;
+                }
+
                 ws.send(JSON.stringify(setupMessage));
             };
 
@@ -147,10 +152,9 @@ const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
     };
 
     // ─────────────────────────────────────────────────────────────────────────────
-    // 2. DATA HANDLER (Processing incoming WebSocket messages)
+    // 2. DATA HANDLER (Intercepting Audio & Function Calls)
     // ─────────────────────────────────────────────────────────────────────────────
     const handleIncomingData = (data: any) => {
-        // Setup confirmation
         if (data.setupComplete) {
             console.log("Setup Complete received. Link established.");
             setIsConnected(true);
@@ -159,31 +163,52 @@ const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
             return;
         }
 
-        // Catch incoming audio chunks
         const parts = data?.serverContent?.modelTurn?.parts;
         if (parts && parts.length > 0) {
-            const inlineData = parts[0]?.inlineData;
-            if (inlineData && inlineData.mimeType.startsWith('audio/pcm')) {
-                setAiSpeaking(true);
-                playAudioChunk(inlineData.data);
+            for (const part of parts) {
+                // 🔥 NEW: Catch the function call!
+                if (part.functionCall && part.functionCall.name === "complete_mission") {
+                    console.log("Mission Accomplished Triggered by AI!");
+                    const feedback = part.functionCall.args?.feedback || "Great job! You accomplished the objective.";
+                    triggerVictoryState(feedback);
+                }
+
+                // Standard Audio Playback
+                if (part.inlineData && part.inlineData.mimeType.startsWith('audio/pcm')) {
+                    setAiSpeaking(true);
+                    playAudioChunk(part.inlineData.data);
+                }
             }
         }
 
-        // Detect end of AI's turn
         if (data?.serverContent?.turnComplete) {
-            // Add a slight delay to turn off the visualization so the last audio chunk finishes playing
             setTimeout(() => setAiSpeaking(false), 500); 
         }
     };
 
     // ─────────────────────────────────────────────────────────────────────────────
-    // 3. AUDIO PLAYBACK (Queuing AI Audio)
+    // 3. VICTORY PROTOCOL
+    // ─────────────────────────────────────────────────────────────────────────────
+    const triggerVictoryState = (feedback: string) => {
+        // Shutdown recording and socket instantly
+        if (wsRef.current) wsRef.current.close();
+        if (processorRef.current) processorRef.current.disconnect();
+        if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
+        
+        setIsConnected(false);
+        setAiSpeaking(false);
+        
+        // Trigger the UI
+        setVictoryState({ achieved: true, feedback });
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // 4. AUDIO PLAYBACK
     // ─────────────────────────────────────────────────────────────────────────────
     const playAudioChunk = (base64Data: string) => {
         if (!audioContextRef.current) return;
         const ctx = audioContextRef.current;
         
-        // Gemini outputs 24kHz PCM
         const float32Data = base64ToFloat32(base64Data);
         const audioBuffer = ctx.createBuffer(1, float32Data.length, 24000); 
         audioBuffer.getChannelData(0).set(float32Data);
@@ -192,7 +217,6 @@ const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
         source.buffer = audioBuffer;
         source.connect(ctx.destination);
 
-        // Seamless queueing
         const currentTime = ctx.currentTime;
         if (nextPlayTimeRef.current < currentTime) {
             nextPlayTimeRef.current = currentTime;
@@ -203,19 +227,17 @@ const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
     };
 
     // ─────────────────────────────────────────────────────────────────────────────
-    // 4. MICROPHONE CAPTURE (Streaming to AI)
+    // 5. MICROPHONE CAPTURE
     // ─────────────────────────────────────────────────────────────────────────────
     const startMicrophoneCapture = () => {
         if (!audioContextRef.current || !streamRef.current || !wsRef.current) return;
         const ctx = audioContextRef.current;
         const source = ctx.createMediaStreamSource(streamRef.current);
 
-        // Create a script processor to grab raw audio chunks
         const processor = ctx.createScriptProcessor(4096, 1, 1);
         processorRef.current = processor;
 
         processor.onaudioprocess = (e) => {
-            // If the user muted the mic or the socket dropped, do nothing
             if (isMuted || wsRef.current?.readyState !== WebSocket.OPEN) return;
 
             const inputData = e.inputBuffer.getChannelData(0);
@@ -233,11 +255,11 @@ const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
         };
 
         source.connect(processor);
-        processor.connect(ctx.destination); // Required for Safari to process audio
+        processor.connect(ctx.destination);
     };
 
     // ─────────────────────────────────────────────────────────────────────────────
-    // 5. TEARDOWN PROTOCOL
+    // 6. TEARDOWN PROTOCOL
     // ─────────────────────────────────────────────────────────────────────────────
     const endCall = () => {
         if (wsRef.current) wsRef.current.close();
@@ -248,11 +270,49 @@ const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
         onClose();
     };
 
-    // Cleanup on unmount
     useEffect(() => {
         return () => { endCall(); };
     }, []);
 
+    // ─────────────────────────────────────────────────────────────────────────────
+    // RENDER: VICTORY STATE OVERRIDE
+    // ─────────────────────────────────────────────────────────────────────────────
+    if (victoryState) {
+        return (
+            <div className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col items-center justify-center animate-in zoom-in-95 duration-500 overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-b from-indigo-900/20 to-slate-950 pointer-events-none" />
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03] mix-blend-overlay pointer-events-none" />
+                
+                <div className="relative z-10 flex flex-col items-center text-center max-w-lg px-6">
+                    <div className="w-24 h-24 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mb-8 border-4 border-emerald-500/20 shadow-[0_0_80px_rgba(16,185,129,0.3)] animate-bounce">
+                        <Award size={48} />
+                    </div>
+                    
+                    <h2 className="text-4xl font-black text-white uppercase tracking-widest mb-4">Mission Accomplished</h2>
+                    
+                    <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 mb-10 shadow-2xl backdrop-blur-md">
+                        <div className="flex items-start gap-4 text-left">
+                            <CheckCircle2 className="text-emerald-400 shrink-0 mt-1" size={24} />
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Instructor AI Feedback</p>
+                                <p className="text-slate-200 text-lg font-medium leading-relaxed">
+                                    "{victoryState.feedback}"
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onClick={onClose} className="px-10 py-5 bg-white text-slate-900 hover:bg-slate-200 rounded-2xl font-black uppercase tracking-widest text-sm transition-all active:scale-95 shadow-xl shadow-white/10">
+                        Return to Lesson
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // RENDER: NORMAL ARENA
+    // ─────────────────────────────────────────────────────────────────────────────
     return (
         <div className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col items-center justify-center animate-in fade-in duration-500 overflow-hidden">
             
