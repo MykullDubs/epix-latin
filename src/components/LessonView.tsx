@@ -5,9 +5,10 @@ import { db } from '../config/firebase';
 import { 
   HelpCircle, CheckCircle2, X, Edit3, MessageSquare, 
   MessageCircle, ArrowLeft, ArrowRight, Info, Zap, BookOpen,
-  Play, Square, Search, MousePointerClick, Palette, Eraser, Volume2, AlertTriangle, Gamepad2, Layers
+  Play, Square, Search, MousePointerClick, Palette, Eraser, Volume2, AlertTriangle, Gamepad2, Layers, Mic
 } from 'lucide-react';
-import PronunciationLab from './PronunciationLab'; // 🔥 IMPORTED PRONUNCIATION LAB
+import PronunciationLab from './PronunciationLab'; 
+import LiveRoleplayArena from './LiveRoleplayArena'; // 🔥 IMPORTED AUDIO ARENA
 
 export interface LessonViewProps {
     lessonId?: string | null;
@@ -18,7 +19,7 @@ export interface LessonViewProps {
 }
 
 // ============================================================================
-//  INTERACTIVE RENDERERS (Strictly Typed & Armored)
+//  INTERACTIVE RENDERERS 
 // ============================================================================
 
 const QuizBlockRenderer = ({ block }: any) => {
@@ -107,7 +108,6 @@ const QuizBlockRenderer = ({ block }: any) => {
     );
 };
 
-// 🔥 MOBILE FLIPPABLE FLASHCARD DECK (3D CSS FIXED)
 const VocabListBlockRenderer = ({ block }: any) => {
     const [index, setIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
@@ -139,7 +139,6 @@ const VocabListBlockRenderer = ({ block }: any) => {
                     className="relative w-full h-80 md:h-96 cursor-pointer transition-transform duration-500" 
                     style={{ transformStyle: 'preserve-3d', WebkitTransformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
                 >
-                    {/* FRONT OF CARD (TERM) */}
                     <div 
                         className="absolute inset-0 bg-white rounded-[2.5rem] shadow-lg border-4 border-slate-100 flex flex-col items-center justify-center p-8 text-center"
                         style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
@@ -149,7 +148,6 @@ const VocabListBlockRenderer = ({ block }: any) => {
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest absolute bottom-6 animate-pulse bg-slate-50 px-4 py-2 rounded-full border border-slate-200">Tap to Flip</p>
                     </div>
 
-                    {/* BACK OF CARD (DEFINITION) */}
                     <div 
                         className="absolute inset-0 bg-indigo-600 rounded-[2.5rem] shadow-xl border-4 border-indigo-500 flex flex-col items-center justify-center p-8 text-white text-center" 
                         style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
@@ -163,7 +161,6 @@ const VocabListBlockRenderer = ({ block }: any) => {
                 </div>
             </div>
 
-            {/* DECK NAVIGATION */}
             <div className="flex justify-between items-center mt-8 px-2">
                 <button onClick={() => handleNav(-1)} className="p-4 bg-white rounded-2xl shadow-sm border-2 border-slate-100 text-slate-500 hover:text-indigo-600 hover:border-indigo-100 active:scale-95 transition-all">
                     <ArrowLeft size={20} strokeWidth={2.5} />
@@ -338,6 +335,47 @@ const FillBlankBlockRenderer = ({ block }: any) => {
                     )}
                 </div>
             )}
+        </div>
+    );
+};
+
+// 🔥 NEW: LIVE AUDIO ROLEPLAY BLOCK
+const LiveRoleplayBlockRenderer = ({ block, onLaunch }: { block: any, onLaunch: (prompt: string) => void }) => {
+    return (
+        <div className="bg-slate-950 p-6 md:p-8 rounded-[3rem] shadow-2xl my-8 text-white relative overflow-hidden group">
+            {/* Cinematic background flare */}
+            <div className="absolute -right-20 -top-20 w-64 h-64 bg-cyan-500/20 rounded-full blur-[80px] pointer-events-none group-hover:bg-cyan-500/30 transition-colors duration-700" />
+            <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-indigo-500/20 rounded-full blur-[80px] pointer-events-none group-hover:bg-indigo-500/30 transition-colors duration-700" />
+            
+            <div className="relative z-10 flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-slate-900 border-2 border-cyan-500/30 rounded-2xl flex items-center justify-center text-cyan-400 mb-6 shadow-[0_0_30px_rgba(6,182,212,0.2)]">
+                    <Mic size={32} />
+                </div>
+                
+                <h3 className="text-2xl md:text-3xl font-black mb-2 leading-tight">
+                    {String(block.title || "Live Simulation")}
+                </h3>
+                
+                <div className="flex gap-4 items-center justify-center mb-6">
+                    <div className="px-3 py-1 bg-slate-800 rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        AI: <span className="text-cyan-400">{block.metadata?.aiPersona || 'Unknown'}</span>
+                    </div>
+                    <div className="px-3 py-1 bg-slate-800 rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        You: <span className="text-indigo-400">{block.metadata?.studentRole || 'Unknown'}</span>
+                    </div>
+                </div>
+
+                <p className="text-slate-300 font-medium leading-relaxed max-w-md mb-8">
+                    Your Objective: <strong className="text-white">{block.metadata?.objective || 'Complete the scenario successfully.'}</strong>
+                </p>
+
+                <button 
+                    onClick={() => onLaunch(block.prompt)}
+                    className="w-full sm:w-auto px-10 py-5 bg-gradient-to-r from-cyan-500 to-indigo-500 text-white rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-lg hover:shadow-cyan-500/25 active:scale-95 transition-all flex items-center justify-center gap-3"
+                >
+                    <Mic size={18} /> Enter Arena
+                </button>
+            </div>
         </div>
     );
 };
@@ -677,14 +715,17 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollTimeout = useRef<any>(null); 
 
+  // 🔥 STATE FOR THE LIVE AUDIO ROLEPLAY OVERLAY
+  const [activeRoleplayPrompt, setActiveRoleplayPrompt] = useState<string | null>(null);
+
   const pages = useMemo(() => {
     if (!lesson || !Array.isArray(lesson.blocks)) return [];
     
     const grouped: any[] = [];
     let buffer: any[] = [];
     
-    // 🔥 ALL VALID BLOCK TYPES REGISTERED HERE
-    const allowedTypes = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'code', 'formula', 'timeline', 'audio-story', 'image-hotspot', 'drag-drop', 'drawing', 'pronunciation']; // 🔥 Added pronunciation
+    // 🔥 ALL VALID BLOCK TYPES REGISTERED HERE (Added roleplay)
+    const allowedTypes = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'code', 'formula', 'timeline', 'audio-story', 'image-hotspot', 'drag-drop', 'drawing', 'pronunciation', 'roleplay'];
     
     lesson.blocks.forEach((b: any) => {
       const type = String(b?.type || '');
@@ -730,6 +771,9 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
         const tag = (e.target as HTMLElement).tagName;
         if (['INPUT', 'TEXTAREA'].indexOf(tag) !== -1) return;
         
+        // Disable keyboard nav if the user is inside the roleplay arena
+        if (activeRoleplayPrompt) return;
+
         if (e.key === 'ArrowRight' || e.key === ' ') {
             e.preventDefault();
             if (activePageIdx < pages.length - 1) handleNext();
@@ -747,7 +791,7 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activePageIdx, pages.length]);
+  }, [activePageIdx, pages.length, activeRoleplayPrompt]);
 
   const handlePrev = () => {
       const newIdx = Math.max(0, activePageIdx - 1);
@@ -842,9 +886,10 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
       case 'drawing': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><DrawingBlockRenderer block={block} /></div>;
       case 'image-hotspot': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><ImageHotspotBlockRenderer block={block} /></div>;
       case 'audio-story': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><AudioStoryBlockRenderer block={block} /></div>;
-      
-      // 🔥 ADDED THE PRONUNCIATION LAB BLOCK
       case 'pronunciation': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><PronunciationLab block={block} /></div>;
+      
+      // 🔥 THE LIVE AUDIO ROLEPLAY LAUNCHER
+      case 'roleplay': return <div key={blockKey} className="animate-in slide-in-from-bottom-4 fade-in"><LiveRoleplayBlockRenderer block={block} onLaunch={setActiveRoleplayPrompt} /></div>;
 
       default:
         return <div key={blockKey} className="p-8 bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200 text-center text-xs text-slate-400 font-bold uppercase tracking-widest my-4">Unsupported Module: {blockType}</div>;
@@ -870,6 +915,15 @@ export default function LessonView({ lesson, onFinish, isInstructor = true }: Le
 
   return (
     <div className="flex flex-col min-h-[100dvh] h-[100dvh] bg-slate-50/50 overflow-hidden font-sans relative">
+      
+      {/* THE LIVE AUDIO ARENA OVERLAY */}
+      {activeRoleplayPrompt && (
+          <LiveRoleplayArena 
+              scenarioPrompt={activeRoleplayPrompt} 
+              onClose={() => setActiveRoleplayPrompt(null)} 
+          />
+      )}
+
       <div className="px-5 md:px-8 pt-8 md:pt-10 pb-4 bg-white border-b border-slate-100 shrink-0 shadow-sm relative z-10">
         <div className="flex justify-between items-end">
           <div>
