@@ -8,7 +8,7 @@ const FORGE_COLORS = [
     'eab308', '84cc16', '14b8a6', '3b82f6', 'd946ef', '1e293b', '000000', 'ffffff'
 ];
 
-// 🔥 THE MULTI-LIBRARY SPECIES MATRIX (Patched 'clothes' to 'clothing')
+// 🔥 STRICTLY VALIDATED DICEBEAR SCHEMAS
 const SPECIES_MATRIX: Record<string, any> = {
     bottts: {
         id: 'bottts', label: 'Mecha', icon: Cpu, endpoint: 'bottts',
@@ -21,12 +21,12 @@ const SPECIES_MATRIX: Record<string, any> = {
             { id: 'texture', icon: Fingerprint, label: 'Decals' }
         ],
         parts: {
-            base: ['round01', 'round02', 'square01', 'square02', 'square03', 'square04', 'cylinder01', 'cylinder02', 'cylinder03', 'cylinder04', 'diamond01', 'diamond02', 'diamond03', 'diamond04', 'shield01', 'shield02', 'shield03'],
-            eyes: ['bulging', 'dizzy', 'eva', 'frame1', 'frame2', 'glow', 'happy', 'hearts', 'robocop', 'round', 'roundFrame01', 'roundFrame02', 'sensor', 'smile', 'squareFrame01', 'squareFrame02', 'visor', 'wallE', 'winking'],
-            mouth: ['bite', 'diagram', 'dirge', 'face01', 'face02', 'grill01', 'grill02', 'grill03', 'smile01', 'smile02', 'square01', 'square02', 'art01', 'art02', 'art03', 'art04', 'pixel1', 'pixel2', 'teeth01'],
-            top: ['antenna', 'antennaCrooked', 'bulb01', 'floating', 'glowingBulb01', 'glowingBulb02', 'horns', 'lights', 'pyramid', 'radar', 'none', 'hat01', 'hat02', 'plume', 'spikes', 'exhaust', 'siren'],
-            sides: ['antenna01', 'antenna02', 'cables01', 'cables02', 'round', 'square', 'squareAssymetric', 'none', 'wings', 'pincers', 'speakers', 'exhaust01', 'exhaust02', 'panels01', 'panels02'],
-            texture: ['camo01', 'camo02', 'circuits', 'dirty01', 'dirty02', 'dots', 'none', 'stripes', 'checkerboard', 'hazard', 'rust01', 'rust02', 'scales', 'carbon']
+            base: ['round01', 'round02', 'square01', 'square02', 'square03', 'square04'],
+            eyes: ['bulging', 'dizzy', 'eva', 'frame1', 'frame2', 'glow', 'happy', 'hearts', 'robocop', 'round', 'roundFrame01', 'roundFrame02', 'sensor', 'smile'],
+            mouth: ['bite', 'diagram', 'dirge', 'face01', 'face02', 'grill01', 'grill02', 'grill03', 'smile01', 'smile02', 'square01', 'square02'],
+            top: ['none', 'antenna', 'antennaCrooked', 'bulb01', 'floating', 'glowingBulb01', 'glowingBulb02', 'horns', 'lights', 'pyramid', 'radar'],
+            sides: ['none', 'antenna01', 'antenna02', 'cables01', 'cables02', 'round', 'square', 'squareAssymetric'],
+            texture: ['none', 'camo01', 'camo02', 'circuits', 'dirty01', 'dirty02', 'dots']
         }
     },
     avataaars: {
@@ -41,11 +41,11 @@ const SPECIES_MATRIX: Record<string, any> = {
         ],
         parts: {
             top: ['longHair', 'shortHair', 'eyepatch', 'hat', 'hijab', 'turban', 'winterHat1', 'winterHat2', 'bigHair', 'bob', 'bun', 'curly', 'curvy', 'dreads', 'frida', 'fro', 'froBand', 'miaWallace', 'shaggy', 'shaggyMullet', 'shaved', 'shortCurly', 'shortFlat', 'shortRound', 'shortWaved', 'sides', 'straight01', 'straight02', 'straightStrand'],
-            accessories: ['blank', 'kurt', 'prescription01', 'prescription02', 'round', 'sunglasses', 'wayfarers'],
+            accessories: ['none', 'kurt', 'prescription01', 'prescription02', 'round', 'sunglasses', 'wayfarers'],
             clothing: ['blazerAndShirt', 'blazerAndSweater', 'collarAndSweater', 'graphicShirt', 'hoodie', 'overall', 'shirtCrewNeck', 'shirtScoopNeck', 'shirtVNeck'],
             eyes: ['close', 'cry', 'default', 'dizzy', 'eyeRoll', 'happy', 'hearts', 'side', 'squint', 'surprised', 'wink', 'winkWacky'],
             mouth: ['concerned', 'default', 'disbelief', 'eating', 'grimace', 'sad', 'scream', 'serious', 'smile', 'twinkle', 'vomit'],
-            facialHair: ['blank', 'beardMedium', 'beardLight', 'beardMajestic', 'moustacheFancy', 'moustacheMagnum']
+            facialHair: ['none', 'beardMedium', 'beardLight', 'beardMajestic', 'moustacheFancy', 'moustacheMagnum']
         }
     },
     funEmoji: {
@@ -55,7 +55,7 @@ const SPECIES_MATRIX: Record<string, any> = {
             { id: 'mouth', icon: Smile, label: 'Expression' }
         ],
         parts: {
-            eyes: ['closed', 'closed2', 'crying', 'cute', 'dizzy', 'hearts', 'lookDown', 'peeking', 'pensive', 'shades', 'starStruck', 'tear', 'wink', 'wink2'],
+            eyes: ['closed', 'closed2', 'crying', 'cute', 'dizzy', 'lookDown', 'peeking', 'pensive', 'shades', 'starStruck', 'tear', 'wink', 'wink2'],
             mouth: ['aww', 'cute', 'dizzy', 'faceMask', 'kissHeart', 'peeking', 'sad', 'shades', 'smile', 'smileLol', 'smileTeeth', 'starStruck', 'tear', 'tongueOut', 'wink']
         }
     }
@@ -78,7 +78,7 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
             baseColor: currentConfig?.baseColor || '4f46e5'
         },
         avataaars: {
-            top: 'shortHair', accessories: 'blank', clothing: 'hoodie', eyes: 'default', mouth: 'smile', facialHair: 'blank', baseColor: '4f46e5'
+            top: 'shortHair', accessories: 'none', clothing: 'hoodie', eyes: 'default', mouth: 'smile', facialHair: 'none', baseColor: '4f46e5'
         },
         funEmoji: {
             eyes: 'cute', mouth: 'smile', baseColor: 'f59e0b'
@@ -92,14 +92,12 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
         setActiveTab(SPECIES_MATRIX[speciesId].tabs[0].id);
     }, [speciesId]);
 
-    // 🔥 API SAFETY FIX: We request a completely transparent background from DiceBear
     const buildUrl = (specId: string, cfg: any) => {
         const spec = SPECIES_MATRIX[specId];
         let url = `https://api.dicebear.com/7.x/${spec.endpoint}/svg?backgroundColor=transparent`;
         
-        if (specId === 'bottts') {
-            url += `&baseColor=${cfg.baseColor}`;
-        }
+        if (specId === 'bottts') url += `&baseColor=${cfg.baseColor}`;
+        if (specId === 'funEmoji' || specId === 'avataaars') url += `&backgroundColor=${cfg.baseColor}40`; 
         
         spec.tabs.forEach((t: any) => {
             if (cfg[t.id] && cfg[t.id] !== 'none' && cfg[t.id] !== 'blank') {
@@ -146,7 +144,6 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                         <RefreshCw size={20} strokeWidth={3} />
                     </button>
 
-                    {/* 🔥 UI SAFETY FIX: Applying the color tint via CSS background instead of the API parameter */}
                     <div 
                         className="w-32 h-32 sm:w-40 sm:h-40 rounded-[2rem] shadow-inner border-4 border-white dark:border-slate-800 flex items-center justify-center p-4 relative mb-4 shrink-0 transition-all duration-300"
                         style={{ backgroundColor: speciesId === 'bottts' ? 'transparent' : `#${configs[speciesId].baseColor}30` }}
