@@ -429,7 +429,7 @@ const [activeRoleplayBlock, setActiveRoleplayBlock] = useState<any | null>(null)
       
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleNext, handlePrev, forceSaveText, activeRoleplayPrompt]);
+ }, [handleNext, handlePrev, forceSaveText, activeRoleplayBlock]);
 
   const activePage = pages[activePageIdx];
   if (!lesson || !activePage) return null;
