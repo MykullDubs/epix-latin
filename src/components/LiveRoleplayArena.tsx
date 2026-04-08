@@ -15,7 +15,7 @@ export default function LiveRoleplayArena({ scenarioPrompt, tools, onClose }: Li
     const [aiSpeaking, setAiSpeaking] = useState(false);
     const [error, setError] = useState<string | null>(null);
     
-    // 🔥 NEW: State for the Victory Screen
+    // 🔥 State for the Victory Screen
     const [victoryState, setVictoryState] = useState<{ achieved: boolean; feedback: string } | null>(null);
 
     // Audio & Socket Refs
@@ -64,6 +64,7 @@ export default function LiveRoleplayArena({ scenarioPrompt, tools, onClose }: Li
     // ─────────────────────────────────────────────────────────────────────────────
     const startCall = async () => {
         console.log("Initializing Gemini Live Engine...");
+        console.log("Loaded Tools Schema:", tools); // <-- Verify tools are passed in!
         
         if (!apiKey) {
             console.error("CRITICAL: VITE_GEMINI_API_KEY is undefined.");
@@ -102,7 +103,7 @@ export default function LiveRoleplayArena({ scenarioPrompt, tools, onClose }: Li
                     }
                 };
 
-                // 🔥 NEW: Inject tools if they exist
+                // Inject tools if they exist
                 if (tools && tools.length > 0) {
                     setupMessage.setup.tools = tools;
                 }
@@ -166,7 +167,7 @@ export default function LiveRoleplayArena({ scenarioPrompt, tools, onClose }: Li
         const parts = data?.serverContent?.modelTurn?.parts;
         if (parts && parts.length > 0) {
             for (const part of parts) {
-                // 🔥 NEW: Catch the function call!
+                // 🔥 Catch the function call!
                 if (part.functionCall && part.functionCall.name === "complete_mission") {
                     console.log("Mission Accomplished Triggered by AI!");
                     const feedback = part.functionCall.args?.feedback || "Great job! You accomplished the objective.";
@@ -187,19 +188,26 @@ export default function LiveRoleplayArena({ scenarioPrompt, tools, onClose }: Li
     };
 
     // ─────────────────────────────────────────────────────────────────────────────
-    // 3. VICTORY PROTOCOL
+    // 3. VICTORY PROTOCOL (Robust Teardown)
     // ─────────────────────────────────────────────────────────────────────────────
     const triggerVictoryState = (feedback: string) => {
-        // Shutdown recording and socket instantly
-        if (wsRef.current) wsRef.current.close();
-        if (processorRef.current) processorRef.current.disconnect();
-        if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
-        
-        setIsConnected(false);
-        setAiSpeaking(false);
-        
-        // Trigger the UI
-        setVictoryState({ achieved: true, feedback });
+        console.log("🏆 Victory Triggered! Shutting down link...");
+        try {
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                wsRef.current.close(1000); 
+            }
+            if (processorRef.current) processorRef.current.disconnect();
+            if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
+            if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                audioContextRef.current.close();
+            }
+        } catch (e) {
+            console.warn("Minor error during victory teardown, continuing...", e);
+        } finally {
+            setIsConnected(false);
+            setAiSpeaking(false);
+            setVictoryState({ achieved: true, feedback });
+        }
     };
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -259,15 +267,25 @@ export default function LiveRoleplayArena({ scenarioPrompt, tools, onClose }: Li
     };
 
     // ─────────────────────────────────────────────────────────────────────────────
-    // 6. TEARDOWN PROTOCOL
+    // 6. TEARDOWN PROTOCOL (Robust Teardown)
     // ─────────────────────────────────────────────────────────────────────────────
     const endCall = () => {
-        if (wsRef.current) wsRef.current.close();
-        if (processorRef.current) processorRef.current.disconnect();
-        if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
-        if (audioContextRef.current) audioContextRef.current.close();
-        setIsConnected(false);
-        onClose();
+        try {
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                wsRef.current.close(1000);
+            }
+            if (processorRef.current) processorRef.current.disconnect();
+            if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
+            if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                audioContextRef.current.close();
+            }
+        } catch (e) {
+            console.warn("Minor error during teardown, forcing close...", e);
+        } finally {
+            setIsConnected(false);
+            setAiSpeaking(false);
+            onClose(); // This guarantees the window closes!
+        }
     };
 
     useEffect(() => {
