@@ -1,5 +1,5 @@
 // src/components/instructor/RoleplayBuilderModal.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X, Save, Bot, User, Target, Globe, Mic, Sparkles, MessageSquare } from 'lucide-react';
 
 export default function RoleplayBuilderModal({ isOpen, onClose, onSaveBlock }: any) {
@@ -9,7 +9,7 @@ export default function RoleplayBuilderModal({ isOpen, onClose, onSaveBlock }: a
     const [objective, setObjective] = useState('');
     const [language, setLanguage] = useState('English (B1 Intermediate)');
 
-    // Real-time Prompt Compiler
+    // Real-time Prompt Compiler (Updated with Rule 5)
     const compiledPrompt = `You are ${aiPersona || '[AI Persona]'}. 
 The user you are speaking to is ${studentRole || '[Student Role]'}. 
 The user's objective is to ${objective || '[Objective]'}.
@@ -19,12 +19,31 @@ Strict Rules:
 1. Stay entirely in character. Never break the fourth wall.
 2. Keep your responses concise, conversational, and natural (1-3 sentences max).
 3. React realistically to the user's statements. If they fail their objective, push back.
-4. Do not offer translations unless explicitly asked in character.`;
+4. Do not offer translations unless explicitly asked in character.
+5. IMPORTANT: Once the user successfully achieves their objective, you MUST immediately call the "complete_mission" function.`;
 
     if (!isOpen) return null;
 
     const handleSave = () => {
         if (!title || !aiPersona || !studentRole || !objective) return;
+
+        // 1. Define the tool exactly how the Live API expects it
+        const winConditionTool = {
+            function_declarations: [{
+                name: "complete_mission",
+                description: `Call this function strictly when the user has accomplished their objective: ${objective}. Do not call it until the objective is fully met.`,
+                parameters: {
+                    type: "OBJECT",
+                    properties: {
+                        feedback: {
+                            type: "STRING",
+                            description: "A short, encouraging sentence of feedback on the user's performance."
+                        }
+                    },
+                    required: ["feedback"]
+                }
+            }]
+        };
 
         const newBlock = {
             id: `roleplay_${Date.now()}`,
@@ -35,7 +54,9 @@ Strict Rules:
                 aiPersona,
                 studentRole,
                 objective,
-                language
+                language,
+                // 2. Attach the tool to the block's metadata
+                tools: [winConditionTool]
             }
         };
 
