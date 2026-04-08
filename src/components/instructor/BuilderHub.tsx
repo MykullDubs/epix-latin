@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Layers, BookOpen, FileText, Gamepad2, X, Edit3, Eye, Zap, Map, 
-  Wrench, Search, Loader2, Volume2, AlertCircle 
+  Wrench, Search, Loader2, Volume2, AlertCircle, Mic 
 } from 'lucide-react';
 import { JuicyToast } from '../Toast';
 import CardBuilderView from './CardBuilderView';
@@ -11,6 +11,7 @@ import ExamBuilderView from './ExamBuilderView';
 import ArcadeBuilderView from './ArcadeBuilderView';
 import CurriculumBuilderView from './CurriculumBuilderView';
 import LivePreview from '../LivePreview';
+import RoleplayBuilderModal from './RoleplayBuilderModal'; // 🔥 IMPORTED THE SCENARIO FORGE
 
 // ============================================================================
 //  SUB-COMPONENT: PHONETIC ENGINE DRAWER
@@ -148,7 +149,10 @@ export default function BuilderHub({
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
   const [isPreviewActive, setIsPreviewActive] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  
+  // Tool States
   const [isToolsOpen, setIsToolsOpen] = useState(false);
+  const [isRoleplayForgeOpen, setIsRoleplayForgeOpen] = useState(false); // 🔥 NEW SCENARIO FORGE STATE
 
   useEffect(() => { if (initialMode) setMode(initialMode); }, [initialMode]);
 
@@ -185,6 +189,20 @@ export default function BuilderHub({
     <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden select-none animate-in fade-in duration-500 relative transition-colors duration-300">
       {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
       
+      {/* 🔥 THE ROLEPLAY FORGE MODAL */}
+      <RoleplayBuilderModal 
+          isOpen={isRoleplayForgeOpen} 
+          onClose={() => setIsRoleplayForgeOpen(false)} 
+          onSaveBlock={(block: any) => {
+              if (mode === 'lesson') {
+                  setLessonData({ ...lessonData, blocks: [...lessonData.blocks, block] });
+                  setToastMsg("Scenario injected into lesson! 🎙️");
+              } else {
+                  setToastMsg("Please switch to Curriculum Builder to add scenarios.");
+              }
+          }} 
+      />
+
       {/* UNIFIED HEADER */}
       <header className="h-24 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 md:px-10 flex justify-between items-center shrink-0 z-50 shadow-sm transition-colors duration-300">
         <div className="flex items-center gap-4">
@@ -205,11 +223,28 @@ export default function BuilderHub({
         )}
 
         <div className="flex items-center gap-3">
-          <button onClick={() => setIsToolsOpen(!isToolsOpen)} className={`p-3 rounded-2xl transition-all border ${isToolsOpen ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/30' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 hover:text-indigo-500 dark:hover:text-indigo-400 hover:border-indigo-200 dark:hover:border-indigo-500/50'}`} title="Open Phonetic Engine"><Wrench size={20} /></button>
+          
+          {/* 🔥 NEW: LIVE SCENARIO FORGE BUTTON */}
+          <button 
+              onClick={() => setIsRoleplayForgeOpen(true)} 
+              className={`p-3 rounded-2xl transition-all border ${isRoleplayForgeOpen ? 'bg-cyan-600 border-cyan-500 text-white shadow-lg shadow-cyan-500/30' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 hover:text-cyan-500 dark:hover:text-cyan-400 hover:border-cyan-200 dark:hover:border-cyan-500/50'}`} 
+              title="Launch Scenario Forge"
+          >
+              <Mic size={20} />
+          </button>
+
+          <button 
+              onClick={() => setIsToolsOpen(!isToolsOpen)} 
+              className={`p-3 rounded-2xl transition-all border ${isToolsOpen ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/30' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 hover:text-indigo-500 dark:hover:text-indigo-400 hover:border-indigo-200 dark:hover:border-indigo-500/50'}`} 
+              title="Open Phonetic Engine"
+          >
+              <Wrench size={20} />
+          </button>
+          
           {initialMode && <button onClick={onClearMode} className="p-3 bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 rounded-2xl hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:text-rose-500 dark:hover:text-rose-400 transition-all border border-slate-200 dark:border-slate-700"><X size={20} /></button>}
           
           {mode !== 'curriculum' && (
-            <div className="hidden md:flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl shrink-0 mr-4">
+            <div className="hidden md:flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl shrink-0 mr-4 border border-slate-200 dark:border-slate-800">
                 <button onClick={() => { setViewMode('edit'); setIsPreviewActive(false); }} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${viewMode === 'edit' ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Edit3 size={14} /> Edit</button>
                 <button onClick={() => { setViewMode('preview'); setIsPreviewActive(true); }} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${viewMode === 'preview' ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}><Eye size={14} /> Preview</button>
             </div>
@@ -218,7 +253,7 @@ export default function BuilderHub({
         </div>
       </header>
 
-      {/* THE PHONETIC DRAWER OVERLAY */}
+      {/* THE TOOLS OVERLAYS */}
       <PhoneticEngine isOpen={isToolsOpen} onClose={() => setIsToolsOpen(false)} />
 
       {/* WORKSPACE */}
@@ -228,7 +263,7 @@ export default function BuilderHub({
         }`}>
           <div className={`p-6 md:p-12 mx-auto pb-40 transition-all duration-500 ${!isPreviewActive ? 'max-w-5xl' : 'max-w-2xl'}`}>
             
-            {/* 🔥 NEW GLASSMORPHIC PILL CONTAINER */}
+            {/* GLASSMORPHIC PILL CONTAINER */}
             <div className="w-full bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200/60 dark:border-slate-800/60 p-1.5 rounded-[2rem] flex flex-wrap sm:flex-nowrap items-center shadow-sm relative z-10 mb-10 overflow-hidden">
                 {modes.map((m) => {
                     const isActive = mode === m.id;
@@ -267,7 +302,7 @@ export default function BuilderHub({
             <div className="h-full bg-slate-100 dark:bg-slate-950/50 border-l border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center p-6 md:p-12 transition-all duration-500 w-full md:w-1/2 animate-in slide-in-from-right-16">
               <div className="relative w-full h-full max-w-sm max-h-[750px] group flex flex-col items-center justify-center">
                 <div className="absolute -inset-4 bg-gradient-to-tr from-indigo-500/10 to-emerald-500/10 blur-2xl rounded-[4rem] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                <div className="relative h-full w-full animate-in zoom-in-95 duration-500 shadow-2xl rounded-[3rem] border-[12px] border-slate-900 dark:border-black overflow-hidden">
+                <div className="relative h-full w-full animate-in zoom-in-95 duration-500 shadow-2xl rounded-[3rem] border-[12px] border-slate-900 dark:border-black overflow-hidden bg-white dark:bg-slate-900">
                   <LivePreview data={lessonData} />
                 </div>
               </div>
