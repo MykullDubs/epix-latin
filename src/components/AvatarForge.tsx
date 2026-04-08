@@ -100,6 +100,7 @@ const SPECIES_MATRIX: Record<string, any> = {
             { id: 'eyes', icon: Eye, label: 'Eyes' },
             { id: 'eyebrows', icon: Sparkles, label: 'Brows' },
             { id: 'mouth', icon: Smile, label: 'Mouth' },
+            { id: 'features', icon: Sparkles, label: 'Features' },
             { id: 'glasses', icon: Eye, label: 'Eyewear' }
         ],
         parts: {
@@ -107,6 +108,7 @@ const SPECIES_MATRIX: Record<string, any> = {
             eyes: ['variant01', 'variant02', 'variant03', 'variant04', 'variant05', 'variant06', 'variant07', 'variant08', 'variant09', 'variant10', 'variant11', 'variant12', 'variant13', 'variant14', 'variant15', 'variant16', 'variant17', 'variant18', 'variant19', 'variant20', 'variant21', 'variant22', 'variant23', 'variant24', 'variant25', 'variant26'],
             eyebrows: ['variant01', 'variant02', 'variant03', 'variant04', 'variant05', 'variant06', 'variant07', 'variant08', 'variant09', 'variant10', 'variant11', 'variant12', 'variant13', 'variant14', 'variant15'],
             mouth: ['variant01', 'variant02', 'variant03', 'variant04', 'variant05', 'variant06', 'variant07', 'variant08', 'variant09', 'variant10', 'variant11', 'variant12', 'variant13', 'variant14', 'variant15', 'variant16', 'variant17', 'variant18', 'variant19', 'variant20', 'variant21', 'variant22', 'variant23', 'variant24', 'variant25', 'variant26', 'variant27', 'variant28', 'variant29', 'variant30'],
+            features: ['none', 'birthmark', 'blush', 'freckles', 'mustache'],
             glasses: ['none', 'variant01', 'variant02', 'variant03', 'variant04', 'variant05']
         }
     },
@@ -137,13 +139,12 @@ const SPECIES_MATRIX: Record<string, any> = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// URL BUILDER (Safely applies exact API parameters)
+// URL BUILDER (Includes Probability Override Fix)
 // ─────────────────────────────────────────────────────────────────────────────
 const buildUrl = (specId: string, cfg: any): string => {
     const spec = SPECIES_MATRIX[specId];
     let url = `https://api.dicebear.com/9.x/${spec.endpoint}/svg?backgroundColor=transparent`;
 
-    // Strict Color Mapping
     if (spec.hasPrimaryColor && cfg.primaryColor) {
         url += specId === 'icons' ? `&iconColor=${cfg.primaryColor}` : `&baseColor=${cfg.primaryColor}`;
     }
@@ -161,8 +162,14 @@ const buildUrl = (specId: string, cfg: any): string => {
 
     spec.tabs.forEach((t: any) => {
         const val = cfg[t.id];
-        if (val && val !== 'none') {
+        if (val && val !== 'none' && val !== 'blank') {
             url += `&${t.id}=${val}`;
+            
+            // 🔥 PROBABILITY OVERRIDE: Force optional accessories to 100% visibility
+            const probabilityTraits = ['accessories', 'facialHair', 'features', 'glasses', 'texture'];
+            if (probabilityTraits.includes(t.id)) {
+                url += `&${t.id}Probability=100`;
+            }
         }
     });
 
@@ -188,14 +195,13 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
     const initialSpeciesId = useMemo(() => getInitialSpecies(currentConfig?.url), [currentConfig]);
     const [speciesId, setSpeciesId] = useState<string>(initialSpeciesId);
 
-    // State tracks configuration for ALL species simultaneously
     const [configs, setConfigs] = useState<Record<string, any>>({
         bottts: { face: 'square01', eyes: 'glow', mouth: 'bite', top: 'none', sides: 'none', texture: 'none', primaryColor: '4f46e5', bgColor: 'transparent' },
         avataaars: { top: 'shortHair', accessories: 'none', clothing: 'hoodie', eyes: 'default', mouth: 'smile', facialHair: 'none', skinTone: 'ffdbac', hairColor: '2a2a2a', bgColor: 'transparent' },
         funEmoji: { eyes: 'cute', mouth: 'smileTeeth', bgColor: 'transparent' },
         toonHead: { rearHair: 'longStraight', frontHair: 'none', eyes: 'happy', mouth: 'smile', skinTone: 'f9c9b6', hairColor: '2a2a2a', bgColor: 'transparent' },
         pixelArt: { eyes: 'variant01', glasses: 'none', mouth: 'happy01', hair: 'short01', bgColor: 'transparent' },
-        adventurer: { hair: 'short01', eyes: 'variant01', eyebrows: 'variant01', mouth: 'variant01', glasses: 'none', skinTone: 'f2d3b1', hairColor: '2a2a2a', bgColor: 'transparent' },
+        adventurer: { hair: 'short01', eyes: 'variant01', eyebrows: 'variant01', mouth: 'variant01', features: 'none', glasses: 'none', skinTone: 'f2d3b1', hairColor: '2a2a2a', bgColor: 'transparent' },
         croodles: { face: 'variant01', eyes: 'variant01', mouth: 'variant01', nose: 'variant01', primaryColor: '06b6d4', bgColor: 'transparent' },
         icons: { icon: 'star', primaryColor: 'f59e0b', bgColor: 'transparent' }
     });
@@ -234,7 +240,7 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
     };
 
     const formatPartLabel = (str: string) => {
-        if (str === 'none') return 'None';
+        if (str === 'none' || str === 'blank') return 'None';
         return str.replace(/([A-Z])/g, ' $1')
                   .replace(/(\d+)/g, ' $1')
                   .trim()
@@ -288,7 +294,6 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                     {/* Dynamic Top Nav Tabs */}
                     <div className="flex gap-2 mb-6 overflow-x-auto custom-scrollbar pb-2 shrink-0">
                         
-                        {/* Always show Background Color Tab */}
                         <button 
                             onClick={() => setActiveTab('bgColor')}
                             className={`shrink-0 flex flex-col items-center justify-center py-3 px-5 rounded-2xl transition-all min-w-[75px] border-2 ${activeTab === 'bgColor' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500 shadow-md shadow-indigo-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 text-slate-500 hover:border-indigo-200 dark:hover:border-slate-700'}`}
@@ -297,7 +302,6 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                             <span className="text-[10px] font-black uppercase tracking-widest">Backdrop</span>
                         </button>
 
-                        {/* Skin Tone Tab */}
                         {activeSpecies.hasSkinTone && (
                             <button 
                                 onClick={() => setActiveTab('skinTone')}
@@ -308,7 +312,6 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                             </button>
                         )}
 
-                        {/* Hair Color Tab */}
                         {activeSpecies.hasHairColor && (
                             <button 
                                 onClick={() => setActiveTab('hairColor')}
@@ -319,7 +322,6 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                             </button>
                         )}
 
-                        {/* Primary Color Tab */}
                         {activeSpecies.hasPrimaryColor && (
                             <button 
                                 onClick={() => setActiveTab('primaryColor')}
@@ -330,7 +332,6 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                             </button>
                         )}
 
-                        {/* Feature Tabs */}
                         {activeSpecies.tabs.map((tab: any) => {
                             const Icon = tab.icon;
                             return (
@@ -349,7 +350,6 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                     {/* Dynamic Content Area */}
                     <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-12">
                         
-                        {/* 1. Color Pickers */}
                         {['bgColor', 'primaryColor', 'skinTone', 'hairColor'].includes(activeTab) && (
                             <div className="flex flex-wrap gap-4 justify-center py-2 animate-in fade-in zoom-in-95 duration-300">
                                 {
@@ -358,16 +358,13 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                                         key={color}
                                         onClick={() => updateConfig(activeTab, color)}
                                         className={`w-14 h-14 rounded-[1rem] shadow-sm transition-all ${configs[speciesId][activeTab] === color ? 'scale-110 ring-4 ring-offset-4 ring-indigo-500 dark:ring-indigo-400 dark:ring-offset-slate-900' : 'hover:scale-110 ring-1 ring-slate-200 dark:ring-slate-700'} ${color === 'transparent' ? 'bg-[url("https://www.transparenttextures.com/patterns/cubes.png")] bg-slate-100 dark:bg-slate-800' : ''}`}
-                                        style={{
-                                            ...(color !== 'transparent' ? { backgroundColor: `#${color}` } : {}),
-                                            animationDelay: `${idx * 20}ms`
-                                        }}
+                                        style={color !== 'transparent' ? { backgroundColor: `#${color}` } : {}}
+                                        style={{ animationDelay: `${idx * 20}ms` }}
                                     />
                                 ))}
                             </div>
                         )}
 
-                        {/* 2. Parts Grid */}
                         {!['bgColor', 'primaryColor', 'skinTone', 'hairColor'].includes(activeTab) && (
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                 {activeSpecies.parts[activeTab]?.map((part: string, idx: number) => {
