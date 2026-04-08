@@ -1,6 +1,6 @@
 // src/components/AvatarForge.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Save, RefreshCw, Cpu, Eye, Smile, ArrowUpCircle, Headphones, Fingerprint, User, Sparkles, Shirt } from 'lucide-react';
+import { X, Save, RefreshCw, Cpu, Eye, Smile, ArrowUpCircle, Headphones, Fingerprint, User, Sparkles, Shirt, Gamepad2 } from 'lucide-react';
 
 // 🔥 EXPANDED 16-COLOR PALETTE
 const FORGE_COLORS = [
@@ -8,7 +8,7 @@ const FORGE_COLORS = [
     'eab308', '84cc16', '14b8a6', '3b82f6', 'd946ef', '1e293b', '000000', 'ffffff'
 ];
 
-// 🔥 STRICTLY VALIDATED DICEBEAR SCHEMAS
+// 🔥 V9 STRICT SCHEMAS (Added Pixel Art)
 const SPECIES_MATRIX: Record<string, any> = {
     bottts: {
         id: 'bottts', label: 'Mecha', icon: Cpu, endpoint: 'bottts',
@@ -58,12 +58,28 @@ const SPECIES_MATRIX: Record<string, any> = {
             eyes: ['closed', 'closed2', 'crying', 'cute', 'dizzy', 'lookDown', 'peeking', 'pensive', 'shades', 'starStruck', 'tear', 'wink', 'wink2'],
             mouth: ['aww', 'cute', 'dizzy', 'faceMask', 'kissHeart', 'peeking', 'sad', 'shades', 'smile', 'smileLol', 'smileTeeth', 'starStruck', 'tear', 'tongueOut', 'wink']
         }
+    },
+    pixelArt: {
+        id: 'pixelArt', label: 'Retro', icon: Gamepad2, endpoint: 'pixel-art',
+        tabs: [
+            { id: 'clothing', icon: Shirt, label: 'Armor' },
+            { id: 'eyes', icon: Eye, label: 'Optics' },
+            { id: 'mouth', icon: Smile, label: 'Mouth' },
+            { id: 'hat', icon: ArrowUpCircle, label: 'Helm' }
+        ],
+        parts: {
+            clothing: ['variant01', 'variant02', 'variant03', 'variant04', 'variant05', 'variant06', 'variant07', 'variant08', 'variant09', 'variant10'],
+            eyes: ['variant01', 'variant02', 'variant03', 'variant04', 'variant05', 'variant06', 'variant07', 'variant08'],
+            mouth: ['variant01', 'variant02', 'variant03', 'variant04', 'variant05', 'variant06', 'variant07', 'variant08', 'variant09', 'variant10'],
+            hat: ['none', 'variant01', 'variant02', 'variant03', 'variant04', 'variant05', 'variant06', 'variant07', 'variant08']
+        }
     }
 };
 
 const getInitialSpecies = (url: string) => {
     if (url?.includes('avataaars')) return 'avataaars';
     if (url?.includes('fun-emoji')) return 'funEmoji';
+    if (url?.includes('pixel-art')) return 'pixelArt';
     return 'bottts';
 };
 
@@ -82,6 +98,9 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
         },
         funEmoji: {
             eyes: 'cute', mouth: 'smile', baseColor: 'f59e0b'
+        },
+        pixelArt: {
+            clothing: 'variant01', eyes: 'variant01', mouth: 'variant01', hat: 'none', baseColor: '10b981'
         }
     });
 
@@ -92,12 +111,12 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
         setActiveTab(SPECIES_MATRIX[speciesId].tabs[0].id);
     }, [speciesId]);
 
+    // 🔥 API v9 UPGRADE
     const buildUrl = (specId: string, cfg: any) => {
         const spec = SPECIES_MATRIX[specId];
-        let url = `https://api.dicebear.com/7.x/${spec.endpoint}/svg?backgroundColor=transparent`;
+        let url = `https://api.dicebear.com/9.x/${spec.endpoint}/svg?backgroundColor=transparent`;
         
         if (specId === 'bottts') url += `&baseColor=${cfg.baseColor}`;
-        if (specId === 'funEmoji' || specId === 'avataaars') url += `&backgroundColor=${cfg.baseColor}40`; 
         
         spec.tabs.forEach((t: any) => {
             if (cfg[t.id] && cfg[t.id] !== 'none' && cfg[t.id] !== 'blank') {
@@ -152,7 +171,7 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                     </div>
 
                     {/* SPECIES SELECTOR */}
-                    <div className="w-full flex justify-center gap-2 mb-4">
+                    <div className="w-full flex justify-center gap-2 mb-4 flex-wrap">
                         {Object.values(SPECIES_MATRIX).map(spec => {
                             const SpecIcon = spec.icon;
                             return (
@@ -185,7 +204,7 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                 {/* THE WORKBENCH CONTROLS */}
                 <div className="flex flex-col p-6 flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950">
                     
-                    {/* Scrollable Navigation Tabs (Dynamic to Species) */}
+                    {/* Scrollable Navigation Tabs */}
                     <div className="flex gap-2 mb-6 overflow-x-auto custom-scrollbar pb-2 shrink-0">
                         {activeSpecies.tabs.map((tab: any) => {
                             const Icon = tab.icon;
@@ -203,7 +222,7 @@ export default function AvatarForge({ currentConfig, onSave, onClose }: any) {
                         })}
                     </div>
 
-                    {/* High-Density Part Grid (3 Columns) */}
+                    {/* High-Density Part Grid */}
                     <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
                         <div className="grid grid-cols-3 gap-2 pb-4 animate-in fade-in">
                             {activeSpecies.parts[activeTab]?.map((part: string) => {
