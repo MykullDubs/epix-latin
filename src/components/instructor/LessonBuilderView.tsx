@@ -38,16 +38,38 @@ export function InjectorButton({ icon, label, subtitle, onClick, colorTheme = 'i
     );
 }
 
-export default function LessonBuilderView({ data, setData, onTogglePreview, isPreviewActive }: any) {
+export default function LessonBuilderView({ 
+    data, setData, onTogglePreview, isPreviewActive, 
+    triggerAiModal, onAiModalHandled, userData 
+}: any) {
   const [jsonMode, setJsonMode] = useState(false);
   const [jsonInput, setJsonInput] = useState(JSON.stringify(data, null, 2));
   
   // 🔥 SMART TAG STATE
   const [tagInput, setTagInput] = useState('');
   
-  // 🔥 AI GENERATOR STATE
+  // 🔥 AI GENERATOR STATE & GATEKEEPER
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [newlyAddedIndices, setNewlyAddedIndices] = useState<number[]>([]);
+
+  const handleMagicGenerateClick = () => {
+      const isPro = userData?.subscriptionTier === 'pro';
+      const aiUses = userData?.magicGenerationsCount || 0;
+      
+      if (isPro || aiUses < 3) {
+          setIsAiModalOpen(true);
+      } else {
+          setIsUpgradeModalOpen(true);
+      }
+  };
+
+  useEffect(() => {
+      if (triggerAiModal) {
+          handleMagicGenerateClick();
+          if (onAiModalHandled) onAiModalHandled();
+      }
+  }, [triggerAiModal, onAiModalHandled]);
 
   const updateBlock = (index: number, field: string, value: any) => {
     const newBlocks = [...(data.blocks || [])];
@@ -79,10 +101,7 @@ export default function LessonBuilderView({ data, setData, onTogglePreview, isPr
     const newIndex = (data.blocks || []).length;
     setData({ ...data, blocks: [...(data.blocks || []), templates[type]] });
     
-    // Auto-scroll to the bottom when a new block is added
-    setTimeout(() => {
-        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-    }, 100);
+    setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
   };
 
   const removeBlock = (index: number) => {
@@ -90,44 +109,30 @@ export default function LessonBuilderView({ data, setData, onTogglePreview, isPr
     setData({ ...data, blocks: newBlocks });
   };
 
-  // 🔥 MOVE BLOCK REORDERING LOGIC
   const moveBlock = (index: number, direction: 'up' | 'down') => {
       const newBlocks = [...(data.blocks || [])];
-      
       if (direction === 'up' && index > 0) {
           [newBlocks[index], newBlocks[index - 1]] = [newBlocks[index - 1], newBlocks[index]];
       } else if (direction === 'down' && index < newBlocks.length - 1) {
           [newBlocks[index], newBlocks[index + 1]] = [newBlocks[index + 1], newBlocks[index]];
       }
-      
       setData({ ...data, blocks: newBlocks });
   };
 
-  // 🔥 AI GENERATOR APPEND LOGIC
   const handleAppendAiBlocks = (generatedBlocks: any[]) => {
       const startIndex = (data.blocks || []).length;
       const newIndices = generatedBlocks.map((_, i) => startIndex + i);
-      
       setData({ ...data, blocks: [...(data.blocks || []), ...generatedBlocks] });
       setNewlyAddedIndices(newIndices);
-      
-      // Clear highlight after 3 seconds
       setTimeout(() => setNewlyAddedIndices([]), 3000);
-      
-      // Auto-scroll to the first new block
-      setTimeout(() => {
-          window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-      }, 100);
+      setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
   };
 
-  // 🔥 TAG HANDLING LOGIC
   const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Enter' || e.key === ',') {
           e.preventDefault();
           const newTag = tagInput.trim().toLowerCase();
-          if (newTag && !(data.tags || []).includes(newTag)) {
-              setData({ ...data, tags: [...(data.tags || []), newTag] });
-          }
+          if (newTag && !(data.tags || []).includes(newTag)) setData({ ...data, tags: [...(data.tags || []), newTag] });
           setTagInput('');
       }
   };
@@ -158,7 +163,32 @@ export default function LessonBuilderView({ data, setData, onTogglePreview, isPr
           isOpen={isAiModalOpen} 
           onClose={() => setIsAiModalOpen(false)} 
           onAppendBlocks={handleAppendAiBlocks} 
+          userData={userData}
       />
+
+      {/* 🔥 THE UPGRADE PAYWALL MODAL */}
+      {isUpgradeModalOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsUpgradeModalOpen(false)} />
+              <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 max-w-sm w-full relative z-10 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-300 text-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center text-white mx-auto mb-6 shadow-lg shadow-indigo-500/30">
+                      <Wand2 size={32} strokeWidth={2.5} />
+                  </div>
+                  <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Out of Magic!</h2>
+                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
+                      You've used all 3 of your free AI generations. Upgrade to Magister Pro for unlimited AI scenario building, premium assets, and priority support.
+                  </p>
+                  <div className="space-y-3">
+                      <button className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black uppercase tracking-widest text-[10px] py-4 rounded-xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all">
+                          Upgrade to Pro — $15/mo
+                      </button>
+                      <button onClick={() => setIsUpgradeModalOpen(false)} className="w-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black uppercase tracking-widest text-[10px] py-4 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                          Maybe Later
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
 
       {/* STICKY HEADER WITH TOGGLES */}
       <div className="sticky top-4 z-50 flex justify-between items-center bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl p-3 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-[0_10px_40px_rgba(0,0,0,0.08)]">
@@ -167,9 +197,8 @@ export default function LessonBuilderView({ data, setData, onTogglePreview, isPr
                 <Code size={16} /> {jsonMode ? 'Exit JSON' : 'Advanced JSON'}
              </button>
              
-             {/* 🔥 THE MAGIC GENERATOR TRIGGER */}
              {!jsonMode && (
-                 <button onClick={() => setIsAiModalOpen(true)} className="flex items-center gap-2 px-5 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 hover:scale-105 active:scale-95">
+                 <button onClick={handleMagicGenerateClick} className="flex items-center gap-2 px-5 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 hover:scale-105 active:scale-95">
                     <Wand2 size={16} /> Magic Generate
                  </button>
              )}
