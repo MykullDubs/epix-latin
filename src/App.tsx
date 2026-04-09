@@ -51,7 +51,7 @@ export default function App() {
   const [useAdvancedDashboard, setUseAdvancedDashboard] = useState(false); 
   const [activeTab, setActiveTab] = useState<string>('home');
   const [showAuth, setShowAuth] = useState(false);
-  const [hasAutoRouted, setHasAutoRouted] = useState(false); // 🔥 NEW AUTO-ROUTING STATE
+  const [hasAutoRouted, setHasAutoRouted] = useState(false); 
   
   // Content State
   const [activeLesson, setActiveLesson] = useState<any>(null); 
@@ -267,13 +267,22 @@ export default function App() {
   }, [combinedClasses, allLessons]);
 
   // ==========================================================================
-  // 🔥 AUTH CLEANUP & AUTO-ROUTING
+  // 🔥 AUTH CLEANUP & AUTO-ROUTING (NUCLEAR DOM CLEANUP)
   // ==========================================================================
   useEffect(() => {
     if (user) {
-        // 1. Failsafe: Remove any lingering body locks or dark overlays from Auth popups
-        document.body.style.overflow = 'unset';
-        setShowAuth(false); // Reset auth view so logging out returns to landing page
+        // 1. NUCLEAR DOM CLEANUP: Destroy any orphaned modal backdrops and body locks
+        document.body.style.overflow = '';
+        document.body.style.pointerEvents = '';
+        document.body.removeAttribute('data-scroll-locked');
+        document.body.removeAttribute('aria-hidden');
+        
+        // Target and destroy orphaned Headless UI / Radix portals
+        const orphanedPortals = document.querySelectorAll('[data-radix-portal], [id^="headlessui-portal"]');
+        orphanedPortals.forEach(portal => portal.remove());
+
+        // Reset auth view state
+        setShowAuth(false); 
 
         // 2. Auto-route teachers and admins to their respective dashboards
         if (userData?.role && !hasAutoRouted) {
