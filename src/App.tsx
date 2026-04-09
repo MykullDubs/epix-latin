@@ -454,14 +454,17 @@ export default function App() {
       );
     } 
     
-    // 🔥 LITE VIEW: The Simplified MagisterHub
+  // 🔥 LITE VIEW: The Simplified MagisterHub
     else {
       return (
         <MagisterHub 
+            userData={userData}                 // <-- INJECTED
+            classes={instructorClasses}         // <-- INJECTED
+            lessons={allLessons}                // <-- INJECTED
             onLaunchClass={(id: string) => setUseAdvancedDashboard(true)}
             onOpenGenerator={() => setUseAdvancedDashboard(true)}
             onNavigateToEditor={(id: string) => setUseAdvancedDashboard(true)}
-            onSwitchToAdvancedView={() => setUseAdvancedDashboard(true)} // FLIP TO ADVANCED
+            onSwitchToAdvancedView={() => setUseAdvancedDashboard(true)} 
         />
       );
     }
