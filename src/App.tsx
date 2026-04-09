@@ -14,7 +14,7 @@ import FlashcardView from './components/FlashcardView';
 import ProfileView from './components/ProfileView';
 import StorefrontView from './components/StorefrontView'; 
 import InstructorDashboard from './components/instructor/InstructorDashboard';
-import MagisterHub from './components/instructor/MagisterHub'; // 🔥 NEW IMPORT
+import MagisterHub from './components/instructor/MagisterHub'; 
 import AdminDashboardView from './components/admin/AdminDashboardView';
 import StudentClassView from './components/StudentClassView';
 import StudentNavBar from './components/StudentNavBar';
@@ -48,9 +48,10 @@ export default function App() {
   
   // Navigation State
   const [currentView, setCurrentView] = useState<'student' | 'instructor' | 'admin'>('student');
-  const [useAdvancedDashboard, setUseAdvancedDashboard] = useState(false); // 🔥 NEW TOGGLE STATE
+  const [useAdvancedDashboard, setUseAdvancedDashboard] = useState(false); 
   const [activeTab, setActiveTab] = useState<string>('home');
   const [showAuth, setShowAuth] = useState(false);
+  const [hasAutoRouted, setHasAutoRouted] = useState(false); // 🔥 NEW AUTO-ROUTING STATE
   
   // Content State
   const [activeLesson, setActiveLesson] = useState<any>(null); 
@@ -266,6 +267,32 @@ export default function App() {
   }, [combinedClasses, allLessons]);
 
   // ==========================================================================
+  // 🔥 AUTH CLEANUP & AUTO-ROUTING
+  // ==========================================================================
+  useEffect(() => {
+    if (user) {
+        // 1. Failsafe: Remove any lingering body locks or dark overlays from Auth popups
+        document.body.style.overflow = 'unset';
+        setShowAuth(false); // Reset auth view so logging out returns to landing page
+
+        // 2. Auto-route teachers and admins to their respective dashboards
+        if (userData?.role && !hasAutoRouted) {
+            const params = new URLSearchParams(window.location.search);
+            
+            // Only auto-route if the URL didn't explicitly request a specific view
+            if (!params.get('view')) {
+                if (userData.role === 'instructor') {
+                    setCurrentView('instructor');
+                } else if (userData.role === 'admin' || userData.role === 'org_admin') {
+                    setCurrentView('admin');
+                }
+            }
+            setHasAutoRouted(true);
+        }
+    }
+  }, [user, userData, hasAutoRouted]);
+
+  // ==========================================================================
   // --- BOOT SEQUENCE & AUTHENTICATION ---
   // ==========================================================================
   if (!authChecked) {
@@ -417,8 +444,6 @@ export default function App() {
     else {
       return (
         <MagisterHub 
-            // For now, any action in the basic hub seamlessly bumps them to the advanced view 
-            // where your LiveSetupModal and BuilderHub are already fully wired up!
             onLaunchClass={(id: string) => setUseAdvancedDashboard(true)}
             onOpenGenerator={() => setUseAdvancedDashboard(true)}
             onNavigateToEditor={(id: string) => setUseAdvancedDashboard(true)}
