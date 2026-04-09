@@ -1,5 +1,5 @@
 // src/components/instructor/InstructorDashboard.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
     GraduationCap, ChevronLeft, Menu, Activity, PenTool, 
     School, Layers, Inbox, BarChart2, Shield, User, 
@@ -51,7 +51,9 @@ export default function InstructorDashboard({
   onPublishDeck, 
   onSwitchView, 
   onLogout,
-  onSwitchToBasicView, // 🔥 NEW: Added prop to handle switching to Basic view
+  onSwitchToBasicView, 
+  proIntent,         // 🔥 INTENT PROPS
+  clearProIntent,    // 🔥 INTENT PROPS
   AdminDashboardView 
 }: any) {
   // 🔥 THE ROUTING ENGINE: Stack-based History
@@ -67,6 +69,28 @@ export default function InstructorDashboard({
 
   const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
   const [preselectedContent, setPreselectedContent] = useState<{id: string, type: string} | null>(null);
+
+  // 🔥 CATCH INTENTS FROM BASIC HUB
+  useEffect(() => {
+      if (proIntent) {
+          // Switch to the correct tab (Studio, Vault, Dashboard, etc)
+          setTabHistory([proIntent.tab]);
+          
+          // If they clicked "Project to Smartboard" on a lesson
+          if (proIntent.action === 'launch_content' && proIntent.targetId) {
+              setPreselectedContent({ id: proIntent.targetId, type: 'lesson' });
+              setIsLiveModalOpen(true);
+          } 
+          // If they clicked "Start Session" on a specific class
+          else if (proIntent.action === 'launch_class' && proIntent.targetId) {
+              setDashCohortId(proIntent.targetId);
+              setIsLiveModalOpen(true); // 🔥 INSTANTLY POP THE MODAL
+          }
+          
+          // Clear it so it doesn't fire again
+          if (clearProIntent) clearProIntent();
+      }
+  }, [proIntent, clearProIntent]);
 
   // --- NAVIGATION HANDLERS ---
   const handleSidebarNav = (tab: string) => {
