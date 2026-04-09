@@ -49,7 +49,6 @@ export default function App() {
   // Navigation State
   const [currentView, setCurrentView] = useState<'student' | 'instructor' | 'admin'>('student');
   const [useAdvancedDashboard, setUseAdvancedDashboard] = useState(false); 
-  const [proIntent, setProIntent] = useState<{tab: string, action?: string, targetId?: string} | null>(null); // 🔥 NEW INTENT STATE
   const [activeTab, setActiveTab] = useState<string>('home');
   const [showAuth, setShowAuth] = useState(false);
   const [hasAutoRouted, setHasAutoRouted] = useState(false); 
@@ -450,8 +449,6 @@ export default function App() {
           onSwitchView={() => setCurrentView('student')}
           onLogout={actions.logout} 
           onSwitchToBasicView={() => setUseAdvancedDashboard(false)} 
-          proIntent={proIntent}                               // 🔥 INTENT PASSED DOWN
-          clearProIntent={() => setProIntent(null)}           // 🔥 INTENT CLEARER
           AdminDashboardView={AdminDashboardView}
         />
       );
@@ -463,23 +460,16 @@ export default function App() {
         <MagisterHub 
             userData={userData}                 
             classes={instructorClasses}         
-            lessons={allLessons}                
-            onLaunchClass={(classId: string) => {
-                setProIntent({ tab: 'dashboard', action: 'launch_class', targetId: classId });
-                setUseAdvancedDashboard(true);
-            }}
-            onLaunchContent={(lessonId: string) => {
-                setProIntent({ tab: 'vault', action: 'launch_content', targetId: lessonId });
-                setUseAdvancedDashboard(true);
-            }}
-            onOpenGenerator={() => {
-                setProIntent({ tab: 'studio', action: 'generate' });
-                setUseAdvancedDashboard(true);
-            }}
-            onNavigateToEditor={(lessonId: string) => {
-                setProIntent({ tab: 'studio', action: 'edit', targetId: lessonId });
-                setUseAdvancedDashboard(true);
-            }}
+            lessons={allLessons}  
+            decks={allDecks}              
+            onAssign={actions.assignContent}
+            onStartPresentation={(lessonId: string, classId: string) => setActivePresentation({ lessonId, classId })}
+            onStartHUD={(lessonId: string, classId: string) => setActiveHUD({ lessonId, classId })}
+            onStartVocabGame={handleStartVocabGame}      
+            onStartConnectFour={handleStartConnectFour} 
+            onStartSlipstream={handleStartSlipstream}
+            onOpenGenerator={() => setUseAdvancedDashboard(true)}
+            onNavigateToEditor={() => setUseAdvancedDashboard(true)}
             onSwitchToAdvancedView={() => setUseAdvancedDashboard(true)} 
         />
       );
