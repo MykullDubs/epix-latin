@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { 
     GraduationCap, ChevronLeft, Menu, Activity, PenTool, 
     School, Layers, Inbox, BarChart2, Shield, User, 
-    LogOut, BookOpen, CheckCircle2, Briefcase, ArrowLeft
+    LogOut, BookOpen, CheckCircle2, Briefcase, ArrowLeft, LayoutGrid
 } from 'lucide-react';
 
 // Import the specialized views
@@ -35,8 +35,8 @@ export default function InstructorDashboard({
   onDeleteCard,
   onDeleteArtifact,
   onMoveToFolder,
-  onAssign,            
-  onRevoke,            
+  onAssign,             
+  onRevoke,             
   onCreateClass,  
   onDeleteClass,  
   onRenameClass,
@@ -51,6 +51,7 @@ export default function InstructorDashboard({
   onPublishDeck, 
   onSwitchView, 
   onLogout,
+  onSwitchToBasicView, // 🔥 NEW: Added prop to handle switching to Basic view
   AdminDashboardView 
 }: any) {
   // 🔥 THE ROUTING ENGINE: Stack-based History
@@ -194,6 +195,17 @@ export default function InstructorDashboard({
               </span>
             </button>
           )}
+
+          {/* 🔥 NEW: Toggle back to Basic View Button */}
+          <button 
+            onClick={onSwitchToBasicView}
+            className="flex items-center h-14 w-full rounded-[1.5rem] text-indigo-400 hover:bg-indigo-950/30 hover:text-indigo-300 transition-all active:scale-[0.96] group border border-indigo-500/10 hover:border-indigo-500/30"
+          >
+            <div className="w-14 flex items-center justify-center shrink-0 ml-1">
+              <LayoutGrid size={20} className="group-hover:scale-110 transition-transform" />
+            </div>
+            {isRailExpanded && <span className="font-black text-[11px] uppercase tracking-[0.2em] whitespace-nowrap opacity-100 transition-opacity text-indigo-400">Basic View</span>}
+          </button>
 
           <button 
             onClick={onSwitchView}
