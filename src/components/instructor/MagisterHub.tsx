@@ -11,6 +11,7 @@ export default function MagisterHub({
     classes = [], 
     lessons = [], 
     onLaunchClass, 
+    onLaunchContent, // 🔥 IMPORTED THE CONTENT LAUNCHER FOR SMARTBOARDS
     onOpenGenerator, 
     onNavigateToEditor, 
     onSwitchToAdvancedView 
@@ -167,7 +168,8 @@ export default function MagisterHub({
                                         {/* Quick Launch Hover Action */}
                                         <div className="absolute inset-x-0 bottom-0 p-4 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-300 flex justify-center pointer-events-none">
                                             <button 
-                                                onClick={(e) => { e.stopPropagation(); onLaunchClass(lesson.id); }}
+                                                // 🔥 NOW USING THE DEDICATED CONTENT LAUNCHER
+                                                onClick={(e) => { e.stopPropagation(); onLaunchContent(lesson.id); }} 
                                                 className="pointer-events-auto bg-slate-900 text-white w-full py-3 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 shadow-lg hover:bg-indigo-600 transition-colors"
                                             >
                                                 <MonitorPlay size={14} /> Project to Smartboard
@@ -204,7 +206,8 @@ export default function MagisterHub({
                                             <Clock size={12} /> {cohort.schedule || 'Active Status'}
                                         </p>
                                         <button 
-                                            onClick={() => onLaunchClass(cohort.id)}
+                                            // 🔥 USING THE CLASS LAUNCHER FOR COHORTS
+                                            onClick={() => onLaunchClass(cohort.id)} 
                                             className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-indigo-600/20"
                                         >
                                             <Play size={14} fill="currentColor" /> Start Session
