@@ -49,6 +49,7 @@ export default function App() {
   // Navigation State
   const [currentView, setCurrentView] = useState<'student' | 'instructor' | 'admin'>('student');
   const [useAdvancedDashboard, setUseAdvancedDashboard] = useState(false); 
+  const [proIntent, setProIntent] = useState<{tab: string, action?: string, targetId?: string} | null>(null); // 🔥 NEW INTENT STATE
   const [activeTab, setActiveTab] = useState<string>('home');
   const [showAuth, setShowAuth] = useState(false);
   const [hasAutoRouted, setHasAutoRouted] = useState(false); 
@@ -449,6 +450,8 @@ export default function App() {
           onSwitchView={() => setCurrentView('student')}
           onLogout={actions.logout} 
           onSwitchToBasicView={() => setUseAdvancedDashboard(false)} 
+          proIntent={proIntent}                              // 🔥 PASS INTENT DOWN
+          clearProIntent={() => setProIntent(null)}          // 🔥 PASS CLEARER DOWN
           AdminDashboardView={AdminDashboardView}
         />
       );
@@ -468,8 +471,16 @@ export default function App() {
             onStartVocabGame={handleStartVocabGame}      
             onStartConnectFour={handleStartConnectFour} 
             onStartSlipstream={handleStartSlipstream}
-            onOpenGenerator={() => setUseAdvancedDashboard(true)}
-            onNavigateToEditor={() => setUseAdvancedDashboard(true)}
+            
+            // 🔥 FULLY WIRED INTENT LAUNCHERS
+            onOpenGenerator={() => {
+                setProIntent({ tab: 'studio', action: 'generate' });
+                setUseAdvancedDashboard(true);
+            }}
+            onNavigateToEditor={(lessonId: string) => {
+                setProIntent({ tab: 'studio', action: 'edit', targetId: lessonId });
+                setUseAdvancedDashboard(true);
+            }}
             onSwitchToAdvancedView={() => setUseAdvancedDashboard(true)} 
         />
       );
