@@ -7,13 +7,14 @@ import { GLOBAL_CURRICULUMS } from './constants/curriculums';
 
 // Sub-component Imports
 import AuthView from './components/AuthView';
-import PublicDiscoveryHub from './components/PublicDiscoveryHub'; // 🔥 IMPORTED THE NEW NETFLIX-STYLE LANDING PAGE
+import PublicDiscoveryHub from './components/PublicDiscoveryHub'; 
 import HomeView from './components/HomeView';
 import DiscoveryView from './components/DiscoveryView';
 import FlashcardView from './components/FlashcardView';
 import ProfileView from './components/ProfileView';
 import StorefrontView from './components/StorefrontView'; 
 import InstructorDashboard from './components/instructor/InstructorDashboard';
+import MagisterHub from './components/instructor/MagisterHub'; // 🔥 NEW IMPORT
 import AdminDashboardView from './components/admin/AdminDashboardView';
 import StudentClassView from './components/StudentClassView';
 import StudentNavBar from './components/StudentNavBar';
@@ -47,6 +48,7 @@ export default function App() {
   
   // Navigation State
   const [currentView, setCurrentView] = useState<'student' | 'instructor' | 'admin'>('student');
+  const [useAdvancedDashboard, setUseAdvancedDashboard] = useState(false); // 🔥 NEW TOGGLE STATE
   const [activeTab, setActiveTab] = useState<string>('home');
   const [showAuth, setShowAuth] = useState(false);
   
@@ -370,41 +372,60 @@ export default function App() {
 
   // 4. INSTRUCTOR VIEW
   if (currentView === 'instructor' && userData?.role !== 'student') {
-    return (
-      <InstructorDashboard 
-        user={user} 
-        userData={{ ...userData, classes: instructorClasses }} 
-        allDecks={allDecks} 
-        lessons={allLessons} 
-        curriculums={allCurriculums}
-        activityLogs={activityLogs}
-        onAssignCurriculum={actions.assignCurriculum} 
-        onSaveLesson={actions.saveLesson} 
-        onSaveCurriculum={actions.saveCurriculum}
-        onSaveCard={actions.saveCard}
-        onUpdateCard={actions.updateCard}
-        onDeleteCard={actions.deleteCard} 
-        onDeleteArtifact={actions.deleteArtifact} 
-        onMoveToFolder={actions.assignArtifactToFolder}  
-        onAssign={actions.assignContent}
-        onRevoke={actions.revokeContent}
-        onCreateClass={actions.createClass}
-        onDeleteClass={actions.deleteClass}
-        onRenameClass={actions.renameClass}
-        onUpdateClassDescription={actions.updateClassDescription}
-        onAddStudent={actions.addStudent}
-        onRemoveStudent={actions.removeStudent} 
-        onStartPresentation={(lessonId: string, classId: string) => setActivePresentation({ lessonId, classId })}
-        onStartHUD={(lessonId: string, classId: string) => setActiveHUD({ lessonId, classId })}
-        onStartVocabGame={handleStartVocabGame}      
-        onStartConnectFour={handleStartConnectFour} 
-        onStartSlipstream={handleStartSlipstream}
-        onPublishDeck={actions.publishDeck}
-        onSwitchView={() => setCurrentView('student')}
-        onLogout={actions.logout} 
-        AdminDashboardView={AdminDashboardView}
-      />
-    );
+    
+    // 🔥 PRO VIEW: The Advanced Instructor Dashboard
+    if (useAdvancedDashboard) {
+      return (
+        <InstructorDashboard 
+          user={user} 
+          userData={{ ...userData, classes: instructorClasses }} 
+          allDecks={allDecks} 
+          lessons={allLessons} 
+          curriculums={allCurriculums}
+          activityLogs={activityLogs}
+          onAssignCurriculum={actions.assignCurriculum} 
+          onSaveLesson={actions.saveLesson} 
+          onSaveCurriculum={actions.saveCurriculum}
+          onSaveCard={actions.saveCard}
+          onUpdateCard={actions.updateCard}
+          onDeleteCard={actions.deleteCard} 
+          onDeleteArtifact={actions.deleteArtifact} 
+          onMoveToFolder={actions.assignArtifactToFolder}  
+          onAssign={actions.assignContent}
+          onRevoke={actions.revokeContent}
+          onCreateClass={actions.createClass}
+          onDeleteClass={actions.deleteClass}
+          onRenameClass={actions.renameClass}
+          onUpdateClassDescription={actions.updateClassDescription}
+          onAddStudent={actions.addStudent}
+          onRemoveStudent={actions.removeStudent} 
+          onStartPresentation={(lessonId: string, classId: string) => setActivePresentation({ lessonId, classId })}
+          onStartHUD={(lessonId: string, classId: string) => setActiveHUD({ lessonId, classId })}
+          onStartVocabGame={handleStartVocabGame}      
+          onStartConnectFour={handleStartConnectFour} 
+          onStartSlipstream={handleStartSlipstream}
+          onPublishDeck={actions.publishDeck}
+          onSwitchView={() => setCurrentView('student')}
+          onLogout={actions.logout} 
+          onSwitchToBasicView={() => setUseAdvancedDashboard(false)} // FLIP TO BASIC
+          AdminDashboardView={AdminDashboardView}
+        />
+      );
+    } 
+    
+    // 🔥 LITE VIEW: The Simplified MagisterHub
+    else {
+      return (
+        <MagisterHub 
+            // For now, any action in the basic hub seamlessly bumps them to the advanced view 
+            // where your LiveSetupModal and BuilderHub are already fully wired up!
+            onLaunchClass={(id: string) => setUseAdvancedDashboard(true)}
+            onOpenGenerator={() => setUseAdvancedDashboard(true)}
+            onNavigateToEditor={(id: string) => setUseAdvancedDashboard(true)}
+            onSwitchToAdvancedView={() => setUseAdvancedDashboard(true)} // FLIP TO ADVANCED
+        />
+      );
+    }
   }
 
   // 5. STUDENT MOBILE APP
