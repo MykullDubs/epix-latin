@@ -49,6 +49,7 @@ export default function App() {
   // Navigation State
   const [currentView, setCurrentView] = useState<'student' | 'instructor' | 'admin'>('student');
   const [useAdvancedDashboard, setUseAdvancedDashboard] = useState(false); 
+  const [proIntent, setProIntent] = useState<{tab: string, action?: string, targetId?: string} | null>(null); // 🔥 NEW INTENT STATE
   const [activeTab, setActiveTab] = useState<string>('home');
   const [showAuth, setShowAuth] = useState(false);
   const [hasAutoRouted, setHasAutoRouted] = useState(false); 
@@ -448,22 +449,37 @@ export default function App() {
           onPublishDeck={actions.publishDeck}
           onSwitchView={() => setCurrentView('student')}
           onLogout={actions.logout} 
-          onSwitchToBasicView={() => setUseAdvancedDashboard(false)} // FLIP TO BASIC
+          onSwitchToBasicView={() => setUseAdvancedDashboard(false)} 
+          proIntent={proIntent}                               // 🔥 INTENT PASSED DOWN
+          clearProIntent={() => setProIntent(null)}           // 🔥 INTENT CLEARER
           AdminDashboardView={AdminDashboardView}
         />
       );
     } 
     
-  // 🔥 LITE VIEW: The Simplified MagisterHub
+    // 🔥 LITE VIEW: The Simplified MagisterHub
     else {
       return (
         <MagisterHub 
-            userData={userData}                 // <-- INJECTED
-            classes={instructorClasses}         // <-- INJECTED
-            lessons={allLessons}                // <-- INJECTED
-            onLaunchClass={(id: string) => setUseAdvancedDashboard(true)}
-            onOpenGenerator={() => setUseAdvancedDashboard(true)}
-            onNavigateToEditor={(id: string) => setUseAdvancedDashboard(true)}
+            userData={userData}                 
+            classes={instructorClasses}         
+            lessons={allLessons}                
+            onLaunchClass={(classId: string) => {
+                setProIntent({ tab: 'dashboard', action: 'launch_class', targetId: classId });
+                setUseAdvancedDashboard(true);
+            }}
+            onLaunchContent={(lessonId: string) => {
+                setProIntent({ tab: 'vault', action: 'launch_content', targetId: lessonId });
+                setUseAdvancedDashboard(true);
+            }}
+            onOpenGenerator={() => {
+                setProIntent({ tab: 'studio', action: 'generate' });
+                setUseAdvancedDashboard(true);
+            }}
+            onNavigateToEditor={(lessonId: string) => {
+                setProIntent({ tab: 'studio', action: 'edit', targetId: lessonId });
+                setUseAdvancedDashboard(true);
+            }}
             onSwitchToAdvancedView={() => setUseAdvancedDashboard(true)} 
         />
       );
