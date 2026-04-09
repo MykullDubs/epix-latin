@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
     Code, Trash2, AlignLeft, FileText, MessageSquare, 
-    List, HelpCircle, Image, Puzzle, MessageCircle, Gamepad2, X, Info, Activity, Mic, Play, Tag,
-    Wand2 // 🔥 IMPORTED THE WAND ICON FOR THE AI GENERATOR
+    List, HelpCircle, Image, Puzzle, MessageCircle, Gamepad2, X, Info, Activity, Mic, Play, Tag, ChevronUp, ChevronDown,
+    Wand2 
 } from 'lucide-react';
-import AiGeneratorModal from './AiGeneratorModal'; // 🔥 IMPORTED THE NEW COMPONENT
+import AiGeneratorModal from './AiGeneratorModal'; 
 
 export function InjectorButton({ icon, label, subtitle, onClick, colorTheme = 'indigo' }: any) {
     const themeMap: Record<string, { bg: string, text: string, ring: string, iconBg: string, iconText: string }> = {
@@ -88,6 +88,19 @@ export default function LessonBuilderView({ data, setData, onTogglePreview, isPr
   const removeBlock = (index: number) => {
     const newBlocks = [...(data.blocks || [])].filter((_, i) => i !== index);
     setData({ ...data, blocks: newBlocks });
+  };
+
+  // 🔥 MOVE BLOCK REORDERING LOGIC
+  const moveBlock = (index: number, direction: 'up' | 'down') => {
+      const newBlocks = [...(data.blocks || [])];
+      
+      if (direction === 'up' && index > 0) {
+          [newBlocks[index], newBlocks[index - 1]] = [newBlocks[index - 1], newBlocks[index]];
+      } else if (direction === 'down' && index < newBlocks.length - 1) {
+          [newBlocks[index], newBlocks[index + 1]] = [newBlocks[index + 1], newBlocks[index]];
+      }
+      
+      setData({ ...data, blocks: newBlocks });
   };
 
   // 🔥 AI GENERATOR APPEND LOGIC
@@ -212,13 +225,40 @@ export default function LessonBuilderView({ data, setData, onTogglePreview, isPr
               const isNewlyAdded = newlyAddedIndices.includes(idx);
               return (
               <div key={idx} className={`group bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border-2 transition-all relative shadow-sm ${isNewlyAdded ? 'border-purple-400 shadow-[0_0_30px_rgba(168,85,247,0.3)] scale-[1.02]' : 'border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-500/50'}`}>
+                
+                {/* 🔥 BLOCK HEADER WITH MOVEMENT & DELETE CONTROLS */}
                 <div className="flex justify-between items-center mb-6 pb-6 border-b border-slate-50 dark:border-slate-800/50">
                    <div className="flex items-center gap-3">
                        <span className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black ${isNewlyAdded ? 'bg-purple-100 text-purple-700' : 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'}`}>{idx + 1}</span>
                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{block.type}</span>
                        {isNewlyAdded && <span className="ml-2 px-2 py-1 bg-purple-500 text-white text-[8px] font-black uppercase tracking-widest rounded-md animate-pulse">AI Generated</span>}
                    </div>
-                   <button onClick={() => removeBlock(idx)} className="p-3 bg-rose-50 dark:bg-rose-500/10 text-rose-500 rounded-xl hover:bg-rose-500 hover:text-white transition-colors"><Trash2 size={18} strokeWidth={2.5} /></button>
+                   
+                   <div className="flex items-center gap-2">
+                       {/* 🔥 REORDER CONTROLS */}
+                       <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 border border-slate-200 dark:border-slate-700">
+                           <button 
+                               onClick={() => moveBlock(idx, 'up')}
+                               disabled={idx === 0}
+                               className="p-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-900 rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                               title="Move Block Up"
+                           >
+                               <ChevronUp size={16} strokeWidth={3} />
+                           </button>
+                           <button 
+                               onClick={() => moveBlock(idx, 'down')}
+                               disabled={idx === (data.blocks || []).length - 1}
+                               className="p-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-900 rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                               title="Move Block Down"
+                           >
+                               <ChevronDown size={16} strokeWidth={3} />
+                           </button>
+                       </div>
+                       
+                       <button onClick={() => removeBlock(idx)} className="p-3 bg-rose-50 dark:bg-rose-500/10 text-rose-500 rounded-xl hover:bg-rose-500 hover:text-white transition-colors" title="Delete Block">
+                           <Trash2 size={18} strokeWidth={2.5} />
+                       </button>
+                   </div>
                 </div>
 
                 {/* TEXT EDITOR */}
