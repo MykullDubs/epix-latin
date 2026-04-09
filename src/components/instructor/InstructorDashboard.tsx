@@ -52,11 +52,11 @@ export default function InstructorDashboard({
   onSwitchView, 
   onLogout,
   onSwitchToBasicView, 
-  proIntent,         // 🔥 INTENT PROPS
-  clearProIntent,    // 🔥 INTENT PROPS
+  proIntent,         
+  clearProIntent,    
   AdminDashboardView 
 }: any) {
-  // 🔥 THE ROUTING ENGINE: Stack-based History
+  // 🔥 THE ROUTING ENGINE
   const [tabHistory, setTabHistory] = useState<string[]>(['dashboard']);
   const activeTab = tabHistory[tabHistory.length - 1] || 'dashboard';
 
@@ -70,21 +70,30 @@ export default function InstructorDashboard({
   const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
   const [preselectedContent, setPreselectedContent] = useState<{id: string, type: string} | null>(null);
 
+  // 🔥 NEW: State to hold the specific lesson ID for the Studio
+  const [studioTargetId, setStudioTargetId] = useState<string | null>(null);
+
   // 🔥 CATCH INTENTS FROM BASIC HUB
   useEffect(() => {
       if (proIntent) {
           // Switch to the correct tab (Studio, Vault, Dashboard, etc)
           setTabHistory([proIntent.tab]);
           
-          // If they clicked "Project to Smartboard" on a lesson
           if (proIntent.action === 'launch_content' && proIntent.targetId) {
               setPreselectedContent({ id: proIntent.targetId, type: 'lesson' });
               setIsLiveModalOpen(true);
           } 
-          // If they clicked "Start Session" on a specific class
           else if (proIntent.action === 'launch_class' && proIntent.targetId) {
               setDashCohortId(proIntent.targetId);
-              setIsLiveModalOpen(true); // 🔥 INSTANTLY POP THE MODAL
+              setIsLiveModalOpen(true); 
+          }
+          // 🔥 CAUGHT THE EDIT INTENT
+          else if (proIntent.action === 'edit' && proIntent.targetId) {
+              setStudioTargetId(proIntent.targetId); // Save the ID to pass to BuilderHub
+          }
+          // 🔥 CAUGHT THE GENERATOR INTENT
+          else if (proIntent.action === 'generate') {
+              setStudioTargetId('generate'); // Tell BuilderHub to open AI modal
           }
           
           // Clear it so it doesn't fire again
@@ -113,7 +122,6 @@ export default function InstructorDashboard({
 
   const NavItem = ({ id, icon, label, badge }: { id: string; icon: React.ReactNode; label: string; badge?: boolean }) => {
     const isActive = activeTab === id;
-    
     return (
       <button 
         onClick={() => handleSidebarNav(id)}
@@ -126,7 +134,6 @@ export default function InstructorDashboard({
         {isActive && (
             <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-indigo-500 dark:from-indigo-500 dark:to-indigo-400 rounded-[1.5rem] shadow-lg shadow-indigo-900/50 dark:shadow-indigo-900/30 animate-in fade-in zoom-in-95 duration-300 border border-indigo-400/20" />
         )}
-
         <div className="relative z-10 flex items-center w-full">
             <div className="w-20 shrink-0 flex items-center justify-center relative">
                 {React.cloneElement(icon as React.ReactElement, { 
@@ -134,7 +141,6 @@ export default function InstructorDashboard({
                     strokeWidth: isActive ? 2.5 : 2,
                     className: `transition-colors duration-300 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-indigo-400'}`
                 })}
-                
                 {badge && !isActive && (
                     <span className="absolute top-3 right-5 flex h-2.5 w-2.5">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
@@ -142,7 +148,6 @@ export default function InstructorDashboard({
                     </span>
                 )}
             </div>
-
             <span className={`font-black text-[11px] uppercase tracking-[0.2em] whitespace-nowrap transition-all duration-300 ease-out ${
                 isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'
             } ${
@@ -151,7 +156,6 @@ export default function InstructorDashboard({
                 {label}
             </span>
         </div>
-
         {isActive && !isRailExpanded && (
           <div className="absolute left-1.5 w-1 h-8 bg-white rounded-full z-20 shadow-[0_0_12px_rgba(255,255,255,0.8)] animate-in slide-in-from-left-full duration-300" />
         )}
@@ -169,7 +173,6 @@ export default function InstructorDashboard({
       >
         <div className="h-24 flex items-center border-b border-slate-900 dark:border-slate-800/60 overflow-hidden shrink-0">
           <div className="w-20 flex items-center justify-center shrink-0">
-            {/* 🔥 FIXED: Removed the rotate-12 so the hat is straight */}
             <div className={`w-11 h-11 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 transition-all duration-500 ${isRailExpanded ? 'scale-100' : 'scale-90 hover:scale-100 cursor-pointer'}`} onClick={() => !isRailExpanded && setIsRailExpanded(true)}>
               <GraduationCap size={24} strokeWidth={2.5} />
             </div>
@@ -220,7 +223,6 @@ export default function InstructorDashboard({
             </button>
           )}
 
-          {/* 🔥 NEW: Toggle back to Basic View Button */}
           <button 
             onClick={onSwitchToBasicView}
             className="flex items-center h-14 w-full rounded-[1.5rem] text-indigo-400 hover:bg-indigo-950/30 hover:text-indigo-300 transition-all active:scale-[0.96] group border border-indigo-500/10 hover:border-indigo-500/30"
@@ -290,6 +292,8 @@ export default function InstructorDashboard({
                  onPublishDeck={onPublishDeck} 
                  instructorClasses={userData?.classes || []}
                  curriculums={curriculums}
+                 targetLessonId={studioTargetId} // 🔥 PASSING THE ID TO THE BUILDER!
+                 clearTargetLesson={() => setStudioTargetId(null)} // 🔥 CLEAR PROP
                />
              </div>
            )}
@@ -330,7 +334,8 @@ export default function InstructorDashboard({
                        setIsLiveModalOpen(true);
                    }}
                    onEditArtifact={(id: string, type: string) => {
-                       handleDrillDown('studio');
+                       setStudioTargetId(id); // Set the target
+                       handleDrillDown('studio'); // Navigate to studio
                    }}
                />
              </div>
