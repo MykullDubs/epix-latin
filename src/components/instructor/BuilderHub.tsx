@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Layers, BookOpen, FileText, Gamepad2, X, Edit3, Eye, Zap, Map, 
-  Wrench, Search, Loader2, Volume2, AlertCircle, Mic 
+  Wrench, Search, Loader2, Volume2, AlertCircle
 } from 'lucide-react';
 import { JuicyToast } from '../Toast';
 import CardBuilderView from './CardBuilderView';
@@ -11,7 +11,6 @@ import ExamBuilderView from './ExamBuilderView';
 import ArcadeBuilderView from './ArcadeBuilderView';
 import CurriculumBuilderView from './CurriculumBuilderView';
 import LivePreview from '../LivePreview';
-import RoleplayBuilderModal from './RoleplayBuilderModal'; 
 
 // ============================================================================
 //  SUB-COMPONENT: PHONETIC ENGINE DRAWER
@@ -130,6 +129,7 @@ const PhoneticEngine = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => v
 //  MAIN BUILDER HUB
 // ============================================================================
 export default function BuilderHub({ 
+  userData, // 🔥 CATCH USER DATA
   onSaveCard, 
   onUpdateCard, 
   onDeleteCard, 
@@ -142,8 +142,8 @@ export default function BuilderHub({
   curriculums, 
   initialMode, 
   onClearMode,
-  targetLessonId,     // 🔥 INTENT BRIDGE PROP
-  clearTargetLesson   // 🔥 INTENT BRIDGE PROP
+  targetLessonId,     
+  clearTargetLesson   
 }: any) {
   const [lessonData, setLessonData] = useState<any>({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
   const [mode, setMode] = useState<'card' | 'lesson' | 'exam' | 'arcade' | 'curriculum'>(initialMode || 'card'); 
@@ -152,9 +152,8 @@ export default function BuilderHub({
   const [isPreviewActive, setIsPreviewActive] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   
-  // Tool States
   const [isToolsOpen, setIsToolsOpen] = useState(false);
-  const [isRoleplayForgeOpen, setIsRoleplayForgeOpen] = useState(false); 
+  const [triggerAiModal, setTriggerAiModal] = useState(false); // 🔥 INTENT BRIDGE TRIGGER
 
   // 🔥 CATCH INTENT FROM DASHBOARD
   useEffect(() => {
@@ -165,10 +164,10 @@ export default function BuilderHub({
         } 
         else if (targetLessonId === 'generate') {
             setMode('lesson');
-            setIsRoleplayForgeOpen(true); // Open the AI generator
+            setLessonData({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
+            setTriggerAiModal(true); // Trigger the AI Modal explicitly
         } 
         else {
-            // Find the specific lesson and load it into the canvas
             const lessonToEdit = lessons.find((l: any) => l.id === targetLessonId);
             if (lessonToEdit) {
                 setMode('lesson');
@@ -176,7 +175,6 @@ export default function BuilderHub({
             }
         }
         
-        // Clear intent so it doesn't loop
         if (clearTargetLesson) clearTargetLesson();
     }
   }, [targetLessonId, lessons, clearTargetLesson]);
@@ -200,9 +198,7 @@ export default function BuilderHub({
   const handleCommit = () => {
     const payload = mode === 'arcade' ? { ...lessonData, type: 'arcade_game' } : lessonData;
     onSaveLesson(payload);
-    
     setToastMsg(mode === 'arcade' ? "Arcade Game Committed! 🎮" : "Unit Committed! 📚");
-
     if (mode === 'lesson') {
         setLessonData({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
     } else if (mode === 'arcade') {
@@ -215,20 +211,6 @@ export default function BuilderHub({
   return ( 
     <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden select-none animate-in fade-in duration-500 relative transition-colors duration-300">
       {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
-      
-      {/* 🔥 THE ROLEPLAY FORGE MODAL */}
-      <RoleplayBuilderModal 
-          isOpen={isRoleplayForgeOpen} 
-          onClose={() => setIsRoleplayForgeOpen(false)} 
-          onSaveBlock={(block: any) => {
-              if (mode === 'lesson') {
-                  setLessonData({ ...lessonData, blocks: [...lessonData.blocks, block] });
-                  setToastMsg("Scenario injected into lesson! 🎙️");
-              } else {
-                  setToastMsg("Please switch to Curriculum Builder to add scenarios.");
-              }
-          }} 
-      />
 
       {/* UNIFIED HEADER */}
       <header className="h-24 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 md:px-10 flex justify-between items-center shrink-0 z-50 shadow-sm transition-colors duration-300">
@@ -250,15 +232,6 @@ export default function BuilderHub({
         )}
 
         <div className="flex items-center gap-3">
-          
-          <button 
-              onClick={() => setIsRoleplayForgeOpen(true)} 
-              className={`p-3 rounded-2xl transition-all border ${isRoleplayForgeOpen ? 'bg-cyan-600 border-cyan-500 text-white shadow-lg shadow-cyan-500/30' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 hover:text-cyan-500 dark:hover:text-cyan-400 hover:border-cyan-200 dark:hover:border-cyan-500/50'}`} 
-              title="Launch Scenario Forge"
-          >
-              <Mic size={20} />
-          </button>
-
           <button 
               onClick={() => setIsToolsOpen(!isToolsOpen)} 
               className={`p-3 rounded-2xl transition-all border ${isToolsOpen ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/30' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 hover:text-indigo-500 dark:hover:text-indigo-400 hover:border-indigo-200 dark:hover:border-indigo-500/50'}`} 
@@ -316,7 +289,8 @@ export default function BuilderHub({
 
             <div className="animate-in fade-in slide-in-from-bottom-4">
               {mode === 'card' && <CardBuilderView onSaveCard={onSaveCard} onUpdateCard={onUpdateCard} onDeleteCard={onDeleteCard} availableDecks={allDecks} onPublishDeck={onPublishDeck} instructorClasses={instructorClasses} />}
-              {mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onTogglePreview={() => setIsPreviewActive(!isPreviewActive)} isPreviewActive={isPreviewActive} />}
+              {/* 🔥 PASSING USER DATA & TRIGGERS DOWN TO LESSON VIEW */}
+              {mode === 'lesson' && <LessonBuilderView data={lessonData} setData={setLessonData} onTogglePreview={() => setIsPreviewActive(!isPreviewActive)} isPreviewActive={isPreviewActive} triggerAiModal={triggerAiModal} onAiModalHandled={() => setTriggerAiModal(false)} userData={userData} />}
               {mode === 'exam' && <div className="-mx-6 md:-mx-12"><ExamBuilderView onSave={(examObj: any) => { onSaveLesson(examObj); setToastMsg("Assessment Successfully Built! 🎯"); }} /></div>}
               {mode === 'arcade' && <ArcadeBuilderView data={lessonData} setData={setLessonData} availableDecks={allDecks} />}
               {mode === 'curriculum' && <div className="-mx-2 md:-mx-8"><CurriculumBuilderView availableLessons={lessons} onSaveCurriculum={onSaveCurriculum} classes={instructorClasses} curriculums={curriculums} /></div>}
