@@ -5,7 +5,7 @@ import {
     Search, FolderOpen, Crown
 } from 'lucide-react';
 
-export default function MagisterHub({ onLaunchClass, onOpenGenerator, onNavigateToEditor }: any) {
+export default function MagisterHub({ onLaunchClass, onOpenGenerator, onNavigateToEditor, onSwitchToAdvancedView }: any) {
     const [searchQuery, setSearchQuery] = useState('');
 
     // Mock Data - Will come from your Firebase 'artifacts' collection
@@ -44,9 +44,15 @@ export default function MagisterHub({ onLaunchClass, onOpenGenerator, onNavigate
                         />
                     </div>
                     <div className="h-8 w-px bg-slate-200 hidden md:block" />
-                    <button className="flex items-center gap-2 bg-amber-100 text-amber-700 hover:bg-amber-200 px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-colors border border-amber-200">
+                    
+                    {/* 🔥 WIRED UP THE PRO BUTTON HERE */}
+                    <button 
+                        onClick={onSwitchToAdvancedView}
+                        className="flex items-center gap-2 bg-amber-100 text-amber-700 hover:bg-amber-200 hover:scale-105 active:scale-95 px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all shadow-sm border border-amber-200 cursor-pointer"
+                    >
                         <Crown size={14} /> Pro Active
                     </button>
+
                     <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-black shadow-md cursor-pointer hover:scale-105 transition-transform">
                         JD
                     </div>
