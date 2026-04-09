@@ -450,8 +450,8 @@ export default function App() {
           onSwitchView={() => setCurrentView('student')}
           onLogout={actions.logout} 
           onSwitchToBasicView={() => setUseAdvancedDashboard(false)} 
-          proIntent={proIntent}                              // 🔥 PASS INTENT DOWN
-          clearProIntent={() => setProIntent(null)}          // 🔥 PASS CLEARER DOWN
+          proIntent={proIntent} // 🔥 NEW INTENT STATE
+          clearProIntent={() => setProIntent(null)} // 🔥 INTENT CLEARER
           AdminDashboardView={AdminDashboardView}
         />
       );
@@ -464,7 +464,8 @@ export default function App() {
             userData={userData}                 
             classes={instructorClasses}         
             lessons={allLessons}  
-            decks={allDecks}              
+            decks={allDecks} 
+            curriculums={allCurriculums}             
             onAssign={actions.assignContent}
             onStartPresentation={(lessonId: string, classId: string) => setActivePresentation({ lessonId, classId })}
             onStartHUD={(lessonId: string, classId: string) => setActiveHUD({ lessonId, classId })}
@@ -472,15 +473,14 @@ export default function App() {
             onStartConnectFour={handleStartConnectFour} 
             onStartSlipstream={handleStartSlipstream}
             
-            // 🔥 FULLY WIRED INTENT LAUNCHERS
-            onOpenGenerator={() => {
-                setProIntent({ tab: 'studio', action: 'generate' });
-                setUseAdvancedDashboard(true);
-            }}
-            onNavigateToEditor={(lessonId: string) => {
-                setProIntent({ tab: 'studio', action: 'edit', targetId: lessonId });
-                setUseAdvancedDashboard(true);
-            }}
+            // 🔥 FED ALL BUILDER FUNCTIONS TO HUB SO IT CAN RENDER BUILDERHUB INTERNALLY
+            onSaveLesson={actions.saveLesson}
+            onSaveCard={actions.saveCard}
+            onUpdateCard={actions.updateCard}
+            onDeleteCard={actions.deleteCard}
+            onSaveCurriculum={actions.saveCurriculum}
+            onPublishDeck={actions.publishDeck}
+            
             onSwitchToAdvancedView={() => setUseAdvancedDashboard(true)} 
         />
       );
