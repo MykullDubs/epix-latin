@@ -1,24 +1,48 @@
-import React, { useState } from 'react';
+// src/components/instructor/MagisterHub.tsx
+import React, { useState, useMemo } from 'react';
 import { 
     Wand2, MonitorPlay, Users, BookOpen, Plus, 
     Sparkles, Clock, ChevronRight, Play, MoreVertical, 
     Search, FolderOpen, Crown
 } from 'lucide-react';
 
-export default function MagisterHub({ onLaunchClass, onOpenGenerator, onNavigateToEditor, onSwitchToAdvancedView }: any) {
+export default function MagisterHub({ 
+    userData, 
+    classes = [], 
+    lessons = [], 
+    onLaunchClass, 
+    onOpenGenerator, 
+    onNavigateToEditor, 
+    onSwitchToAdvancedView 
+}: any) {
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Mock Data - Will come from your Firebase 'artifacts' collection
-    const upcomingClasses = [
-        { id: 'class_1', name: 'Intermediate ESL - Group B', time: 'Tomorrow, 9:00 AM', students: 24, deckId: 'kitchen_comm_1' },
-        { id: 'class_2', name: 'Culinary Spanish 101', time: 'Thursday, 2:00 PM', students: 18, deckId: 'kitchen_comm_2' }
-    ];
+    // Extract initials for the avatar
+    const userInitials = userData?.name 
+        ? userData.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() 
+        : 'M';
 
-    const recentLessons = [
-        { id: 'lesson_1', title: 'Kitchen Comm: Safety Callouts', subject: 'Vocab & Roleplay', lastEdited: '2 hours ago', slides: 12, aiGenerated: true },
-        { id: 'lesson_2', title: 'Past Tense Irregular Verbs', subject: 'Grammar Lab', lastEdited: 'Yesterday', slides: 8, aiGenerated: false },
-        { id: 'lesson_3', title: 'The Angry Customer Simulation', subject: 'Live Audio Arena', lastEdited: '3 days ago', slides: 4, aiGenerated: true },
-    ];
+    // Format dates to "2 days ago", "Yesterday", etc.
+    const formatTimeAgo = (timestamp: number) => {
+        if (!timestamp) return 'Recently';
+        const days = Math.floor((Date.now() - timestamp) / (1000 * 60 * 60 * 24));
+        if (days === 0) return 'Today';
+        if (days === 1) return 'Yesterday';
+        return `${days} days ago`;
+    };
+
+    // Safely map and filter the live lessons data
+    const activeLessons = useMemo(() => {
+        return lessons
+            .filter((l: any) => l.title?.toLowerCase().includes(searchQuery.toLowerCase()))
+            .sort((a: any, b: any) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0))
+            .slice(0, 6); // Show top 6 most recent
+    }, [lessons, searchQuery]);
+
+    // Format upcoming classes
+    const activeClasses = useMemo(() => {
+        return classes.slice(0, 4); // Show top 4 active cohorts
+    }, [classes]);
 
     return (
         <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-24">
@@ -45,7 +69,6 @@ export default function MagisterHub({ onLaunchClass, onOpenGenerator, onNavigate
                     </div>
                     <div className="h-8 w-px bg-slate-200 hidden md:block" />
                     
-                    {/* 🔥 WIRED UP THE PRO BUTTON HERE */}
                     <button 
                         onClick={onSwitchToAdvancedView}
                         className="flex items-center gap-2 bg-amber-100 text-amber-700 hover:bg-amber-200 hover:scale-105 active:scale-95 px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all shadow-sm border border-amber-200 cursor-pointer"
@@ -53,8 +76,8 @@ export default function MagisterHub({ onLaunchClass, onOpenGenerator, onNavigate
                         <Crown size={14} /> Pro Active
                     </button>
 
-                    <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-black shadow-md cursor-pointer hover:scale-105 transition-transform">
-                        JD
+                    <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-black shadow-md">
+                        {userInitials}
                     </div>
                 </div>
             </header>
@@ -64,8 +87,12 @@ export default function MagisterHub({ onLaunchClass, onOpenGenerator, onNavigate
                 {/* ── WELCOME & QUICK ACTIONS ── */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div>
-                        <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight mb-2">Welcome back, John.</h1>
-                        <p className="text-slate-500 font-medium">You have 2 classes scheduled for this week. What are we building today?</p>
+                        <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight mb-2">
+                            Welcome back, {userData?.name?.split(' ')[0] || 'Instructor'}.
+                        </h1>
+                        <p className="text-slate-500 font-medium">
+                            You have {activeClasses.length} active cohorts right now. What are we building today?
+                        </p>
                     </div>
                     
                     <div className="flex flex-wrap gap-3">
@@ -93,53 +120,64 @@ export default function MagisterHub({ onLaunchClass, onOpenGenerator, onNavigate
                             <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
                                 <FolderOpen size={20} className="text-indigo-500" /> Recent Lessons
                             </h2>
-                            <button className="text-sm font-bold text-indigo-600 hover:text-indigo-500 flex items-center gap-1">
+                            <button onClick={onSwitchToAdvancedView} className="text-sm font-bold text-indigo-600 hover:text-indigo-500 flex items-center gap-1">
                                 View Entire Library <ChevronRight size={16} />
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                            {recentLessons.map((lesson) => (
-                                <div key={lesson.id} className="bg-white rounded-[2rem] p-6 border border-slate-200 shadow-sm hover:shadow-xl hover:border-indigo-300 transition-all duration-300 group flex flex-col cursor-pointer" onClick={() => onNavigateToEditor(lesson.id)}>
-                                    
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="flex items-center gap-2">
-                                            <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-widest">
-                                                {lesson.subject}
-                                            </span>
-                                            {lesson.aiGenerated && (
-                                                <span className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
-                                                    <Sparkles size={10} /> AI
+                        {activeLessons.length === 0 ? (
+                            <div className="bg-white rounded-[2rem] border border-slate-200 p-12 text-center shadow-sm">
+                                <BookOpen size={48} className="mx-auto text-slate-300 mb-4" />
+                                <h3 className="text-lg font-black text-slate-700 mb-2">No lessons found</h3>
+                                <p className="text-slate-500 font-medium mb-6">You haven't created any curriculum yet.</p>
+                                <button onClick={onOpenGenerator} className="text-indigo-600 font-bold hover:underline">
+                                    Generate your first lesson with AI →
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                {activeLessons.map((lesson: any) => (
+                                    <div key={lesson.id} className="bg-white rounded-[2rem] p-6 border border-slate-200 shadow-sm hover:shadow-xl hover:border-indigo-300 transition-all duration-300 group flex flex-col cursor-pointer" onClick={() => onNavigateToEditor(lesson.id)}>
+                                        
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className="flex items-center gap-2">
+                                                <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-widest line-clamp-1 max-w-[120px]">
+                                                    {lesson.subject || 'General'}
                                                 </span>
-                                            )}
+                                                {lesson.generatedByAI && (
+                                                    <span className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
+                                                        <Sparkles size={10} /> AI
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <button className="text-slate-400 hover:text-slate-600 p-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); onSwitchToAdvancedView(); }}>
+                                                <MoreVertical size={16} />
+                                            </button>
                                         </div>
-                                        <button className="text-slate-400 hover:text-slate-600 p-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); /* Open menu */ }}>
-                                            <MoreVertical size={16} />
-                                        </button>
-                                    </div>
 
-                                    <h3 className="text-lg font-black text-slate-800 leading-tight mb-2 group-hover:text-indigo-600 transition-colors line-clamp-2">
-                                        {lesson.title}
-                                    </h3>
-                                    
-                                    <div className="mt-auto pt-6 flex items-center justify-between text-xs font-bold text-slate-500">
-                                        <span className="flex items-center gap-1.5"><BookOpen size={14} /> {lesson.slides} Slides</span>
-                                        <span className="flex items-center gap-1.5"><Clock size={14} /> Edited {lesson.lastEdited}</span>
-                                    </div>
-                                    
-                                    {/* Quick Launch Hover Action */}
-                                    <div className="absolute inset-x-0 bottom-0 p-4 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-300 flex justify-center pointer-events-none">
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); onLaunchClass(lesson.id); }}
-                                            className="pointer-events-auto bg-slate-900 text-white w-full py-3 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 shadow-lg hover:bg-indigo-600 transition-colors"
-                                        >
-                                            <MonitorPlay size={14} /> Project to Smartboard
-                                        </button>
-                                    </div>
+                                        <h3 className="text-lg font-black text-slate-800 leading-tight mb-2 group-hover:text-indigo-600 transition-colors line-clamp-2">
+                                            {lesson.title}
+                                        </h3>
+                                        
+                                        <div className="mt-auto pt-6 flex items-center justify-between text-xs font-bold text-slate-500">
+                                            <span className="flex items-center gap-1.5"><BookOpen size={14} /> {lesson.cards?.length || 0} Slides</span>
+                                            <span className="flex items-center gap-1.5"><Clock size={14} /> {formatTimeAgo(lesson.updatedAt || lesson.createdAt)}</span>
+                                        </div>
+                                        
+                                        {/* Quick Launch Hover Action */}
+                                        <div className="absolute inset-x-0 bottom-0 p-4 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-300 flex justify-center pointer-events-none">
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); onLaunchClass(lesson.id); }}
+                                                className="pointer-events-auto bg-slate-900 text-white w-full py-3 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 shadow-lg hover:bg-indigo-600 transition-colors"
+                                            >
+                                                <MonitorPlay size={14} /> Project to Smartboard
+                                            </button>
+                                        </div>
 
-                                </div>
-                            ))}
-                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     {/* ── RIGHT COLUMN: ACTIVE ROSTER ── */}
@@ -149,24 +187,24 @@ export default function MagisterHub({ onLaunchClass, onOpenGenerator, onNavigate
                             
                             <div className="flex items-center justify-between mb-8 relative z-10">
                                 <h2 className="text-xl font-black text-white flex items-center gap-2">
-                                    <Users size={20} className="text-indigo-400" /> Upcoming Classes
+                                    <Users size={20} className="text-indigo-400" /> Active Cohorts
                                 </h2>
                             </div>
 
                             <div className="space-y-4 relative z-10">
-                                {upcomingClasses.map((cohort) => (
+                                {activeClasses.map((cohort: any) => (
                                     <div key={cohort.id} className="bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-2xl p-5 transition-colors">
                                         <div className="flex justify-between items-start mb-3">
-                                            <h4 className="font-black text-white text-sm">{cohort.name}</h4>
-                                            <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
-                                                <Users size={10} /> {cohort.students}
+                                            <h4 className="font-black text-white text-sm line-clamp-1">{cohort.name}</h4>
+                                            <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest flex items-center gap-1 shrink-0">
+                                                <Users size={10} /> {cohort.students?.length || 0}
                                             </span>
                                         </div>
                                         <p className="text-xs font-bold text-slate-400 flex items-center gap-1.5 mb-4">
-                                            <Clock size={12} /> {cohort.time}
+                                            <Clock size={12} /> {cohort.schedule || 'Active Status'}
                                         </p>
                                         <button 
-                                            onClick={() => onLaunchClass(cohort.deckId)}
+                                            onClick={() => onLaunchClass(cohort.id)}
                                             className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-indigo-600/20"
                                         >
                                             <Play size={14} fill="currentColor" /> Start Session
@@ -174,15 +212,15 @@ export default function MagisterHub({ onLaunchClass, onOpenGenerator, onNavigate
                                     </div>
                                 ))}
 
-                                {upcomingClasses.length === 0 && (
+                                {activeClasses.length === 0 && (
                                     <div className="text-center py-8">
-                                        <p className="text-slate-500 font-medium text-sm">No classes scheduled.</p>
+                                        <p className="text-slate-500 font-medium text-sm">No cohorts created yet.</p>
                                     </div>
                                 )}
                             </div>
                             
-                            <button className="w-full mt-6 py-3 border-2 border-dashed border-slate-700 hover:border-slate-500 text-slate-400 hover:text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-colors flex items-center justify-center gap-2 relative z-10">
-                                <Plus size={16} /> Add New Cohort
+                            <button onClick={onSwitchToAdvancedView} className="w-full mt-6 py-3 border-2 border-dashed border-slate-700 hover:border-slate-500 text-slate-400 hover:text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-colors flex items-center justify-center gap-2 relative z-10">
+                                <Plus size={16} /> Manage Roster
                             </button>
                         </div>
                     </div>
