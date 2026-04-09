@@ -13,9 +13,10 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
     
     // CONTENT STATES
     const [prompt, setPrompt] = useState('');
-    const [scenarioPrompt, setScenarioPrompt] = useState(''); // Separate prompt for scenario tab
+    const [scenarioPrompt, setScenarioPrompt] = useState(''); 
     const [gradeLevel, setGradeLevel] = useState('High School');
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isLoading, setIsLoading] = useState(false); // 🔥 ADDED THE MISSING STATE HERE
     const [toastMsg, setToastMsg] = useState<string | null>(null);
 
     // PDF STATES
