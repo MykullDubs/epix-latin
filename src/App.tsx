@@ -317,16 +317,21 @@ export default function App() {
 
   // 🔥 NEW LANDING PAGE & SSO ROUTING LOGIC
   if (!user) {
-    return showAuth ? (
-      <div className={`relative min-h-[100dvh] w-full transition-colors duration-500 ${activeThemeClass}`}>
-         <button onClick={() => setShowAuth(false)} className="absolute top-6 left-6 z-50 text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold text-sm transition-colors uppercase tracking-widest flex items-center gap-2">
-             ← Back to Network
-         </button>
-         <AuthView />
-      </div>
-    ) : (
-      <PublicDiscoveryHub onAuthenticateToLaunch={() => setShowAuth(true)} />
-    );
+    if (showAuth) {
+      return (
+        <>
+           <button 
+             onClick={() => setShowAuth(false)} 
+             className="fixed top-6 left-6 z-[9999] text-slate-400 hover:text-white font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-colors bg-slate-900/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/10"
+           >
+               ← Back to Hub
+           </button>
+           <AuthView />
+        </>
+      );
+    }
+    
+    return <PublicDiscoveryHub onAuthenticateToLaunch={() => setShowAuth(true)} />;
   }
 
   // ==========================================================================
