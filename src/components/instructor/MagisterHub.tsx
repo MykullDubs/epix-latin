@@ -5,18 +5,28 @@ import {
     Sparkles, Clock, ChevronRight, Play, MoreVertical, 
     Search, FolderOpen, Crown
 } from 'lucide-react';
+import LiveSetupModal from './LiveSetupModal'; // 🔥 IMPORTED THE MODAL
 
 export default function MagisterHub({ 
     userData, 
     classes = [], 
-    lessons = [], 
-    onLaunchClass, 
-    onLaunchContent, // 🔥 IMPORTED THE CONTENT LAUNCHER FOR SMARTBOARDS
+    lessons = [],
+    decks = {}, // 🔥 ADDED DECKS FOR MODAL
+    onAssign,   // 🔥 ADDED LAUNCHERS
+    onStartPresentation, 
+    onStartHUD,
+    onStartVocabGame,
+    onStartConnectFour,
+    onStartSlipstream,
     onOpenGenerator, 
     onNavigateToEditor, 
     onSwitchToAdvancedView 
 }: any) {
     const [searchQuery, setSearchQuery] = useState('');
+    
+    // 🔥 ADDED LOCAL STATE FOR THE MODAL
+    const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
+    const [preselectedContent, setPreselectedContent] = useState<{id: string, type: string} | null>(null);
 
     // Extract initials for the avatar
     const userInitials = userData?.name 
@@ -168,8 +178,12 @@ export default function MagisterHub({
                                         {/* Quick Launch Hover Action */}
                                         <div className="absolute inset-x-0 bottom-0 p-4 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-300 flex justify-center pointer-events-none">
                                             <button 
-                                                // 🔥 NOW USING THE DEDICATED CONTENT LAUNCHER
-                                                onClick={(e) => { e.stopPropagation(); onLaunchContent(lesson.id); }} 
+                                                // 🔥 INSTANTLY OPENS MODAL IN THE BASIC HUB
+                                                onClick={(e) => { 
+                                                    e.stopPropagation(); 
+                                                    setPreselectedContent({ id: lesson.id, type: 'lesson' });
+                                                    setIsLiveModalOpen(true);
+                                                }} 
                                                 className="pointer-events-auto bg-slate-900 text-white w-full py-3 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 shadow-lg hover:bg-indigo-600 transition-colors"
                                             >
                                                 <MonitorPlay size={14} /> Project to Smartboard
@@ -206,8 +220,8 @@ export default function MagisterHub({
                                             <Clock size={12} /> {cohort.schedule || 'Active Status'}
                                         </p>
                                         <button 
-                                            // 🔥 USING THE CLASS LAUNCHER FOR COHORTS
-                                            onClick={() => onLaunchClass(cohort.id)} 
+                                            // 🔥 OPENS MODAL DIRECTLY
+                                            onClick={() => setIsLiveModalOpen(true)} 
                                             className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-indigo-600/20"
                                         >
                                             <Play size={14} fill="currentColor" /> Start Session
@@ -230,6 +244,42 @@ export default function MagisterHub({
 
                 </div>
             </main>
+
+            {/* 🔥 LIVE ARENA MODAL ATTACHED DIRECTLY TO HUB */}
+            <LiveSetupModal 
+               isOpen={isLiveModalOpen}
+               onClose={() => {
+                   setIsLiveModalOpen(false);
+                   setPreselectedContent(null);
+               }}
+               preselectedContent={preselectedContent}
+               classes={classes}
+               decks={decks}
+               lessons={lessons}
+               onDeploy={(config: any) => {
+                   setIsLiveModalOpen(false);
+                   setPreselectedContent(null);
+                   
+                   if (onAssign && config.classId !== 'sandbox') {
+                       onAssign(config.classId, config.contentId);
+                   }
+                   
+                   setTimeout(() => {
+                       if (config.mode === 'connect_four') {
+                           if (onStartConnectFour) onStartConnectFour(config.contentId, config.classId);
+                       } else if (config.mode === 'trivia') {
+                           if (onStartVocabGame) onStartVocabGame(config.contentId, config.classId);
+                       } else if (config.mode === 'slipstream') {
+                           if (onStartSlipstream) onStartSlipstream(config.contentId, config.classId);
+                       } else if (config.mode === 'presentation') {
+                           if (onStartPresentation) onStartPresentation(config.contentId, config.classId);
+                       } else if (config.mode === 'hud') {
+                           if (onStartHUD) onStartHUD(config.contentId, config.classId);
+                       }
+                   }, 300);
+               }}
+           />
+
         </div>
     );
 }
