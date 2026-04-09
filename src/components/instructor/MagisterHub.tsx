@@ -3,38 +3,44 @@ import React, { useState, useMemo } from 'react';
 import { 
     Wand2, MonitorPlay, Users, BookOpen, Plus, 
     Sparkles, Clock, ChevronRight, Play, MoreVertical, 
-    Search, FolderOpen, Crown, PenTool
+    Search, FolderOpen, Crown, PenTool, ArrowLeft
 } from 'lucide-react';
 import LiveSetupModal from './LiveSetupModal';
+import BuilderHub from './BuilderHub'; // 🔥 IMPORT THE BUILDER
 
 export default function MagisterHub({ 
     userData, 
     classes = [], 
     lessons = [],
     decks = {}, 
+    curriculums = [],
     onAssign,   
     onStartPresentation, 
     onStartHUD,
     onStartVocabGame,
     onStartConnectFour,
     onStartSlipstream,
-    onOpenGenerator, 
-    onNavigateToEditor, 
+    onSaveLesson,     // 🔥 BUILDER PROPS
+    onSaveCard,       // 🔥 BUILDER PROPS
+    onUpdateCard,     // 🔥 BUILDER PROPS
+    onDeleteCard,     // 🔥 BUILDER PROPS
+    onSaveCurriculum, // 🔥 BUILDER PROPS
+    onPublishDeck,    // 🔥 BUILDER PROPS
     onSwitchToAdvancedView 
 }: any) {
+    // 🔥 LOCAL ROUTING STATE
+    const [localView, setLocalView] = useState<'hub' | 'builder'>('hub');
+    const [studioTargetId, setStudioTargetId] = useState<string | null>(null);
+
     const [searchQuery, setSearchQuery] = useState('');
-    
-    // 🔥 MODAL STATE
     const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
     const [preselectedContent, setPreselectedContent] = useState<{id: string, type: string} | null>(null);
     const [preselectedClassId, setPreselectedClassId] = useState<string | null>(null);
 
-    // Extract initials for the avatar
     const userInitials = userData?.name 
         ? userData.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() 
         : 'M';
 
-    // Format dates
     const formatTimeAgo = (timestamp: number) => {
         if (!timestamp) return 'Recently';
         const days = Math.floor((Date.now() - timestamp) / (1000 * 60 * 60 * 24));
@@ -43,7 +49,6 @@ export default function MagisterHub({
         return `${days} days ago`;
     };
 
-    // Safely map and filter
     const activeLessons = useMemo(() => {
         return lessons
             .filter((l: any) => l.title?.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -55,10 +60,61 @@ export default function MagisterHub({
         return classes.slice(0, 4);
     }, [classes]);
 
+    // 🔥 NAV HANDLERS FOR FREEMIUM BUILDER
+    const handleOpenBuilder = (targetId: string) => {
+        setStudioTargetId(targetId);
+        setLocalView('builder');
+    };
+
+    // ========================================================================
+    // 🔥 FREEMIUM BUILDER VIEW 
+    // ========================================================================
+    if (localView === 'builder') {
+        return (
+            <div className="h-screen w-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors animate-in fade-in duration-300">
+                 {/* Top Navigation Bar */}
+                 <div className="h-16 px-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 shrink-0 shadow-sm z-50">
+                     <button 
+                         onClick={() => setLocalView('hub')} 
+                         className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 transition-colors font-black text-xs uppercase tracking-widest"
+                     >
+                         <ArrowLeft size={16} strokeWidth={3} /> Return to Hub
+                     </button>
+                     <button 
+                         onClick={onSwitchToAdvancedView}
+                         className="flex items-center gap-2 bg-amber-100 text-amber-700 hover:bg-amber-200 hover:scale-105 active:scale-95 px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all shadow-sm border border-amber-200 cursor-pointer"
+                     >
+                         <Crown size={14} /> Pro Active
+                     </button>
+                 </div>
+
+                 {/* The Actual Editor */}
+                 <div className="flex-1 overflow-hidden relative">
+                     <BuilderHub 
+                         userData={userData} // Allows the paywall to check uses!
+                         onSaveLesson={onSaveLesson}
+                         onSaveCard={onSaveCard}
+                         onUpdateCard={onUpdateCard}
+                         onDeleteCard={onDeleteCard}
+                         onSaveCurriculum={onSaveCurriculum}
+                         lessons={lessons}
+                         allDecks={decks}
+                         onPublishDeck={onPublishDeck}
+                         instructorClasses={classes}
+                         curriculums={curriculums}
+                         targetLessonId={studioTargetId}
+                         clearTargetLesson={() => setStudioTargetId(null)}
+                     />
+                 </div>
+            </div>
+        );
+    }
+
+    // ========================================================================
+    // 🔥 STANDARD HUB DASHBOARD
+    // ========================================================================
     return (
         <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-24">
-            
-            {/* ── HEADER ── */}
             <header className="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center sticky top-0 z-40 shadow-sm">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-indigo-600 rounded-[1rem] flex items-center justify-center text-white shadow-lg shadow-indigo-600/20">
@@ -94,8 +150,6 @@ export default function MagisterHub({
             </header>
 
             <main className="max-w-7xl mx-auto px-8 pt-10">
-                
-                {/* ── WELCOME & QUICK ACTIONS ── */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div>
                         <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight mb-2">
@@ -108,13 +162,13 @@ export default function MagisterHub({
                     
                     <div className="flex flex-wrap gap-3">
                         <button 
-                            onClick={onOpenGenerator}
+                            onClick={() => handleOpenBuilder('generate')} // 🔥 USES LOCAL BUILDER
                             className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white px-6 py-3 rounded-2xl font-black text-sm shadow-lg shadow-indigo-600/30 transition-all active:scale-95 flex items-center gap-2"
                         >
                             <Wand2 size={18} /> Magic Generate Lesson
                         </button>
                         <button 
-                            onClick={() => onNavigateToEditor('new')}
+                            onClick={() => handleOpenBuilder('new')} // 🔥 USES LOCAL BUILDER
                             className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-6 py-3 rounded-2xl font-black text-sm shadow-sm transition-all active:scale-95 flex items-center gap-2"
                         >
                             <Plus size={18} /> Blank Canvas
@@ -123,10 +177,7 @@ export default function MagisterHub({
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    
-                    {/* ── LEFT COLUMN: THE LIBRARY ── */}
                     <div className="lg:col-span-2 space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
-                        
                         <div className="flex items-center justify-between">
                             <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
                                 <FolderOpen size={20} className="text-indigo-500" /> Recent Lessons
@@ -141,7 +192,7 @@ export default function MagisterHub({
                                 <BookOpen size={48} className="mx-auto text-slate-300 mb-4" />
                                 <h3 className="text-lg font-black text-slate-700 mb-2">No lessons found</h3>
                                 <p className="text-slate-500 font-medium mb-6">You haven't created any curriculum yet.</p>
-                                <button onClick={onOpenGenerator} className="text-indigo-600 font-bold hover:underline">
+                                <button onClick={() => handleOpenBuilder('generate')} className="text-indigo-600 font-bold hover:underline">
                                     Generate your first lesson with AI →
                                 </button>
                             </div>
@@ -151,13 +202,11 @@ export default function MagisterHub({
                                     <div 
                                         key={lesson.id} 
                                         className="bg-white rounded-[2rem] p-6 border border-slate-200 shadow-sm hover:shadow-xl hover:border-indigo-300 transition-all duration-300 group flex flex-col cursor-pointer relative overflow-hidden" 
-                                        // 🔥 CLICKING THE CARD OPENS THE PROJECTOR MODAL DIRECTLY
                                         onClick={() => {
                                             setPreselectedContent({ id: lesson.id, type: 'lesson' });
                                             setIsLiveModalOpen(true);
                                         }}
                                     >
-                                        
                                         <div className="flex justify-between items-start mb-4">
                                             <div className="flex items-center gap-2">
                                                 <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-widest line-clamp-1 max-w-[120px]">
@@ -183,41 +232,36 @@ export default function MagisterHub({
                                             <span className="flex items-center gap-1.5"><Clock size={14} /> {formatTimeAgo(lesson.updatedAt || lesson.createdAt)}</span>
                                         </div>
                                         
-                                        {/* 🔥 CHANGED HOVER ACTION TO "EDIT CANVAS" */}
+                                        {/* 🔥 EDIT ACTION USES LOCAL BUILDER */}
                                         <div className="absolute inset-x-0 bottom-0 p-4 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-300 flex justify-center pointer-events-none z-20">
                                             <button 
                                                 onClick={(e) => { 
                                                     e.stopPropagation(); 
-                                                    onNavigateToEditor(lesson.id);
+                                                    handleOpenBuilder(lesson.id);
                                                 }} 
                                                 className="pointer-events-auto bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white w-full py-3 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 shadow-lg transition-colors border border-indigo-100 hover:border-indigo-600"
                                             >
                                                 <PenTool size={14} /> Edit Canvas
                                             </button>
                                         </div>
-
                                     </div>
                                 ))}
                             </div>
                         )}
                     </div>
 
-                    {/* ── RIGHT COLUMN: ACTIVE ROSTER ── */}
                     <div className="lg:col-span-1 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
                         <div className="bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden">
                             <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none" />
-                            
                             <div className="flex items-center justify-between mb-8 relative z-10">
                                 <h2 className="text-xl font-black text-white flex items-center gap-2">
                                     <Users size={20} className="text-indigo-400" /> Active Cohorts
                                 </h2>
                             </div>
-
                             <div className="space-y-4 relative z-10">
                                 {activeClasses.map((cohort: any) => (
                                     <div 
                                         key={cohort.id} 
-                                        // 🔥 CLICKING THE COHORT OPENS THE PROJECTOR MODAL DIRECTLY
                                         onClick={() => {
                                             setPreselectedClassId(cohort.id);
                                             setIsLiveModalOpen(true);
@@ -233,31 +277,25 @@ export default function MagisterHub({
                                         <p className="text-xs font-bold text-slate-400 flex items-center gap-1.5 mb-4">
                                             <Clock size={12} /> {cohort.schedule || 'Active Status'}
                                         </p>
-                                        <button 
-                                            className="w-full bg-indigo-600 group-hover:bg-indigo-500 text-white py-2.5 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-indigo-600/20 pointer-events-none"
-                                        >
+                                        <button className="w-full bg-indigo-600 group-hover:bg-indigo-500 text-white py-2.5 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-indigo-600/20 pointer-events-none">
                                             <Play size={14} fill="currentColor" /> Launch Arena
                                         </button>
                                     </div>
                                 ))}
-
                                 {activeClasses.length === 0 && (
                                     <div className="text-center py-8">
                                         <p className="text-slate-500 font-medium text-sm">No cohorts created yet.</p>
                                     </div>
                                 )}
                             </div>
-                            
                             <button onClick={onSwitchToAdvancedView} className="w-full mt-6 py-3 border-2 border-dashed border-slate-700 hover:border-slate-500 text-slate-400 hover:text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-colors flex items-center justify-center gap-2 relative z-10">
                                 <Plus size={16} /> Manage Roster
                             </button>
                         </div>
                     </div>
-
                 </div>
             </main>
 
-            {/* 🔥 LIVE ARENA MODAL ATTACHED DIRECTLY TO HUB */}
             <LiveSetupModal 
                isOpen={isLiveModalOpen}
                onClose={() => {
@@ -266,7 +304,7 @@ export default function MagisterHub({
                    setPreselectedClassId(null);
                }}
                preselectedContent={preselectedContent}
-               preselectedClassId={preselectedClassId} // Pass down the target class if they clicked a cohort
+               preselectedClassId={preselectedClassId} 
                classes={classes}
                decks={decks}
                lessons={lessons}
@@ -294,7 +332,6 @@ export default function MagisterHub({
                    }, 300);
                }}
            />
-
         </div>
     );
 }
