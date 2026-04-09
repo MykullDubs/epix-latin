@@ -3,16 +3,16 @@ import React, { useState, useMemo } from 'react';
 import { 
     Wand2, MonitorPlay, Users, BookOpen, Plus, 
     Sparkles, Clock, ChevronRight, Play, MoreVertical, 
-    Search, FolderOpen, Crown
+    Search, FolderOpen, Crown, PenTool
 } from 'lucide-react';
-import LiveSetupModal from './LiveSetupModal'; // 🔥 IMPORTED THE MODAL
+import LiveSetupModal from './LiveSetupModal';
 
 export default function MagisterHub({ 
     userData, 
     classes = [], 
     lessons = [],
-    decks = {}, // 🔥 ADDED DECKS FOR MODAL
-    onAssign,   // 🔥 ADDED LAUNCHERS
+    decks = {}, 
+    onAssign,   
     onStartPresentation, 
     onStartHUD,
     onStartVocabGame,
@@ -24,16 +24,17 @@ export default function MagisterHub({
 }: any) {
     const [searchQuery, setSearchQuery] = useState('');
     
-    // 🔥 ADDED LOCAL STATE FOR THE MODAL
+    // 🔥 MODAL STATE
     const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
     const [preselectedContent, setPreselectedContent] = useState<{id: string, type: string} | null>(null);
+    const [preselectedClassId, setPreselectedClassId] = useState<string | null>(null);
 
     // Extract initials for the avatar
     const userInitials = userData?.name 
         ? userData.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() 
         : 'M';
 
-    // Format dates to "2 days ago", "Yesterday", etc.
+    // Format dates
     const formatTimeAgo = (timestamp: number) => {
         if (!timestamp) return 'Recently';
         const days = Math.floor((Date.now() - timestamp) / (1000 * 60 * 60 * 24));
@@ -42,17 +43,16 @@ export default function MagisterHub({
         return `${days} days ago`;
     };
 
-    // Safely map and filter the live lessons data
+    // Safely map and filter
     const activeLessons = useMemo(() => {
         return lessons
             .filter((l: any) => l.title?.toLowerCase().includes(searchQuery.toLowerCase()))
             .sort((a: any, b: any) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0))
-            .slice(0, 6); // Show top 6 most recent
+            .slice(0, 6);
     }, [lessons, searchQuery]);
 
-    // Format upcoming classes
     const activeClasses = useMemo(() => {
-        return classes.slice(0, 4); // Show top 4 active cohorts
+        return classes.slice(0, 4);
     }, [classes]);
 
     return (
@@ -148,7 +148,15 @@ export default function MagisterHub({
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                 {activeLessons.map((lesson: any) => (
-                                    <div key={lesson.id} className="bg-white rounded-[2rem] p-6 border border-slate-200 shadow-sm hover:shadow-xl hover:border-indigo-300 transition-all duration-300 group flex flex-col cursor-pointer" onClick={() => onNavigateToEditor(lesson.id)}>
+                                    <div 
+                                        key={lesson.id} 
+                                        className="bg-white rounded-[2rem] p-6 border border-slate-200 shadow-sm hover:shadow-xl hover:border-indigo-300 transition-all duration-300 group flex flex-col cursor-pointer relative overflow-hidden" 
+                                        // 🔥 CLICKING THE CARD OPENS THE PROJECTOR MODAL DIRECTLY
+                                        onClick={() => {
+                                            setPreselectedContent({ id: lesson.id, type: 'lesson' });
+                                            setIsLiveModalOpen(true);
+                                        }}
+                                    >
                                         
                                         <div className="flex justify-between items-start mb-4">
                                             <div className="flex items-center gap-2">
@@ -166,27 +174,25 @@ export default function MagisterHub({
                                             </button>
                                         </div>
 
-                                        <h3 className="text-lg font-black text-slate-800 leading-tight mb-2 group-hover:text-indigo-600 transition-colors line-clamp-2">
+                                        <h3 className="text-lg font-black text-slate-800 leading-tight mb-2 group-hover:text-indigo-600 transition-colors line-clamp-2 relative z-10">
                                             {lesson.title}
                                         </h3>
                                         
-                                        <div className="mt-auto pt-6 flex items-center justify-between text-xs font-bold text-slate-500">
+                                        <div className="mt-auto pt-6 flex items-center justify-between text-xs font-bold text-slate-500 relative z-10">
                                             <span className="flex items-center gap-1.5"><BookOpen size={14} /> {lesson.cards?.length || 0} Slides</span>
                                             <span className="flex items-center gap-1.5"><Clock size={14} /> {formatTimeAgo(lesson.updatedAt || lesson.createdAt)}</span>
                                         </div>
                                         
-                                        {/* Quick Launch Hover Action */}
-                                        <div className="absolute inset-x-0 bottom-0 p-4 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-300 flex justify-center pointer-events-none">
+                                        {/* 🔥 CHANGED HOVER ACTION TO "EDIT CANVAS" */}
+                                        <div className="absolute inset-x-0 bottom-0 p-4 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-300 flex justify-center pointer-events-none z-20">
                                             <button 
-                                                // 🔥 INSTANTLY OPENS MODAL IN THE BASIC HUB
                                                 onClick={(e) => { 
                                                     e.stopPropagation(); 
-                                                    setPreselectedContent({ id: lesson.id, type: 'lesson' });
-                                                    setIsLiveModalOpen(true);
+                                                    onNavigateToEditor(lesson.id);
                                                 }} 
-                                                className="pointer-events-auto bg-slate-900 text-white w-full py-3 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 shadow-lg hover:bg-indigo-600 transition-colors"
+                                                className="pointer-events-auto bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white w-full py-3 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 shadow-lg transition-colors border border-indigo-100 hover:border-indigo-600"
                                             >
-                                                <MonitorPlay size={14} /> Project to Smartboard
+                                                <PenTool size={14} /> Edit Canvas
                                             </button>
                                         </div>
 
@@ -209,7 +215,15 @@ export default function MagisterHub({
 
                             <div className="space-y-4 relative z-10">
                                 {activeClasses.map((cohort: any) => (
-                                    <div key={cohort.id} className="bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-2xl p-5 transition-colors">
+                                    <div 
+                                        key={cohort.id} 
+                                        // 🔥 CLICKING THE COHORT OPENS THE PROJECTOR MODAL DIRECTLY
+                                        onClick={() => {
+                                            setPreselectedClassId(cohort.id);
+                                            setIsLiveModalOpen(true);
+                                        }}
+                                        className="bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-2xl p-5 transition-colors cursor-pointer group"
+                                    >
                                         <div className="flex justify-between items-start mb-3">
                                             <h4 className="font-black text-white text-sm line-clamp-1">{cohort.name}</h4>
                                             <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest flex items-center gap-1 shrink-0">
@@ -220,11 +234,9 @@ export default function MagisterHub({
                                             <Clock size={12} /> {cohort.schedule || 'Active Status'}
                                         </p>
                                         <button 
-                                            // 🔥 OPENS MODAL DIRECTLY
-                                            onClick={() => setIsLiveModalOpen(true)} 
-                                            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-indigo-600/20"
+                                            className="w-full bg-indigo-600 group-hover:bg-indigo-500 text-white py-2.5 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-indigo-600/20 pointer-events-none"
                                         >
-                                            <Play size={14} fill="currentColor" /> Start Session
+                                            <Play size={14} fill="currentColor" /> Launch Arena
                                         </button>
                                     </div>
                                 ))}
@@ -251,14 +263,17 @@ export default function MagisterHub({
                onClose={() => {
                    setIsLiveModalOpen(false);
                    setPreselectedContent(null);
+                   setPreselectedClassId(null);
                }}
                preselectedContent={preselectedContent}
+               preselectedClassId={preselectedClassId} // Pass down the target class if they clicked a cohort
                classes={classes}
                decks={decks}
                lessons={lessons}
                onDeploy={(config: any) => {
                    setIsLiveModalOpen(false);
                    setPreselectedContent(null);
+                   setPreselectedClassId(null);
                    
                    if (onAssign && config.classId !== 'sandbox') {
                        onAssign(config.classId, config.contentId);
