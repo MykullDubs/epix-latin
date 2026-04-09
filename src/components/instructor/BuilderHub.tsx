@@ -11,7 +11,7 @@ import ExamBuilderView from './ExamBuilderView';
 import ArcadeBuilderView from './ArcadeBuilderView';
 import CurriculumBuilderView from './CurriculumBuilderView';
 import LivePreview from '../LivePreview';
-import RoleplayBuilderModal from './RoleplayBuilderModal'; // 🔥 IMPORTED THE SCENARIO FORGE
+import RoleplayBuilderModal from './RoleplayBuilderModal'; 
 
 // ============================================================================
 //  SUB-COMPONENT: PHONETIC ENGINE DRAWER
@@ -141,7 +141,9 @@ export default function BuilderHub({
   lessons, 
   curriculums, 
   initialMode, 
-  onClearMode 
+  onClearMode,
+  targetLessonId,     // 🔥 INTENT BRIDGE PROP
+  clearTargetLesson   // 🔥 INTENT BRIDGE PROP
 }: any) {
   const [lessonData, setLessonData] = useState<any>({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
   const [mode, setMode] = useState<'card' | 'lesson' | 'exam' | 'arcade' | 'curriculum'>(initialMode || 'card'); 
@@ -152,7 +154,32 @@ export default function BuilderHub({
   
   // Tool States
   const [isToolsOpen, setIsToolsOpen] = useState(false);
-  const [isRoleplayForgeOpen, setIsRoleplayForgeOpen] = useState(false); // 🔥 NEW SCENARIO FORGE STATE
+  const [isRoleplayForgeOpen, setIsRoleplayForgeOpen] = useState(false); 
+
+  // 🔥 CATCH INTENT FROM DASHBOARD
+  useEffect(() => {
+    if (targetLessonId) {
+        if (targetLessonId === 'new') {
+            setMode('lesson');
+            setLessonData({ title: '', subtitle: '', blocks: [], theme: 'indigo' });
+        } 
+        else if (targetLessonId === 'generate') {
+            setMode('lesson');
+            setIsRoleplayForgeOpen(true); // Open the AI generator
+        } 
+        else {
+            // Find the specific lesson and load it into the canvas
+            const lessonToEdit = lessons.find((l: any) => l.id === targetLessonId);
+            if (lessonToEdit) {
+                setMode('lesson');
+                setLessonData(lessonToEdit);
+            }
+        }
+        
+        // Clear intent so it doesn't loop
+        if (clearTargetLesson) clearTargetLesson();
+    }
+  }, [targetLessonId, lessons, clearTargetLesson]);
 
   useEffect(() => { if (initialMode) setMode(initialMode); }, [initialMode]);
 
@@ -224,7 +251,6 @@ export default function BuilderHub({
 
         <div className="flex items-center gap-3">
           
-          {/* 🔥 NEW: LIVE SCENARIO FORGE BUTTON */}
           <button 
               onClick={() => setIsRoleplayForgeOpen(true)} 
               className={`p-3 rounded-2xl transition-all border ${isRoleplayForgeOpen ? 'bg-cyan-600 border-cyan-500 text-white shadow-lg shadow-cyan-500/30' : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 hover:text-cyan-500 dark:hover:text-cyan-400 hover:border-cyan-200 dark:hover:border-cyan-500/50'}`} 
