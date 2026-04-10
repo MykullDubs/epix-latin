@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { 
     Search, BookOpen, Clock, Play, PenTool, Trash2, 
-    ArrowLeft, Filter, Plus, Zap, MoreVertical
+    ArrowLeft, Filter, Plus, Zap, MoreVertical, ChevronDown
 } from 'lucide-react';
 
 export default function LessonLibrary({ 
