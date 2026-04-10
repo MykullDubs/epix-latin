@@ -4,7 +4,7 @@ import {
     Wand2, MonitorPlay, Users, BookOpen, Plus, 
     Sparkles, Clock, ChevronRight, Play, MoreVertical, 
     Search, FolderOpen, Crown, PenTool, ArrowLeft,
-    LogOut, Settings, User
+    LogOut, Settings, User, Share2, Trash2 // 🔥 IMPORTED NEW ICONS
 } from 'lucide-react';
 import LiveSetupModal from './LiveSetupModal';
 import BuilderHub from './BuilderHub'; 
@@ -43,12 +43,14 @@ export default function MagisterHub({
     const [libraryInitialSearch, setLibraryInitialSearch] = useState(''); 
     const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
     const [isCohortManagerOpen, setIsCohortManagerOpen] = useState(false); 
-    const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false); // 🔥 DROPDOWN STATE
+    const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false); 
+    
+    // 🔥 NEW: State to track which lesson's 3-dot menu is currently open
+    const [openLessonMenuId, setOpenLessonMenuId] = useState<string | null>(null);
     
     const [preselectedContent, setPreselectedContent] = useState<{id: string, type: string} | null>(null);
     const [preselectedClassId, setPreselectedClassId] = useState<string | null>(null);
 
-    // 🔥 CHECK SUBSCRIPTION STATUS
     const isPro = userData?.subscriptionTier === 'pro';
 
     const userInitials = userData?.name 
@@ -176,7 +178,6 @@ export default function MagisterHub({
                     </div>
                     <div className="h-8 w-px bg-slate-200 hidden md:block" />
                     
-                    {/* We only show this standalone button if they are already PRO */}
                     {isPro && (
                         <button 
                             onClick={onSwitchToAdvancedView}
@@ -186,7 +187,6 @@ export default function MagisterHub({
                         </button>
                     )}
 
-                    {/* 🔥 NEW PROFILE DROPDOWN WRAPPER */}
                     <div className="relative">
                         <div 
                             className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-black shadow-md cursor-pointer hover:scale-105 transition-transform" 
@@ -215,14 +215,12 @@ export default function MagisterHub({
                                     </div>
                                     
                                     <div className="py-2">
-                                        {/* 🔥 UPGRADE CALL TO ACTION (ONLY FOR FREE USERS) */}
                                         {!isPro && (
                                             <div className="px-3 pb-3 mb-2 border-b border-slate-100">
                                                 <button 
                                                     className="w-full bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-amber-950 font-black uppercase text-[11px] tracking-widest py-3 rounded-xl shadow-lg shadow-amber-500/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
                                                     onClick={() => { 
                                                         setIsProfileMenuOpen(false); 
-                                                        // Route them to the advanced view to trigger the paywall/upgrade screen
                                                         onSwitchToAdvancedView(); 
                                                     }}
                                                 >
@@ -342,9 +340,60 @@ export default function MagisterHub({
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <button className="text-white/70 hover:text-white p-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-full backdrop-blur-md" onClick={(e) => { e.stopPropagation(); onSwitchToAdvancedView(); }}>
-                                                        <MoreVertical size={16} />
-                                                    </button>
+                                                    
+                                                    {/* 🔥 THE NEW THREE-DOT DROPDOWN MENU */}
+                                                    <div className="relative">
+                                                        <button 
+                                                            className="text-white/70 hover:text-white p-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-full backdrop-blur-md" 
+                                                            onClick={(e) => { 
+                                                                e.stopPropagation(); 
+                                                                setOpenLessonMenuId(openLessonMenuId === lesson.id ? null : lesson.id); 
+                                                            }}
+                                                        >
+                                                            <MoreVertical size={16} />
+                                                        </button>
+
+                                                        {openLessonMenuId === lesson.id && (
+                                                            <>
+                                                                <div className="fixed inset-0 z-40 cursor-default" onClick={(e) => { e.stopPropagation(); setOpenLessonMenuId(null); }} />
+                                                                <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 py-2 animate-in fade-in zoom-in-95 duration-200">
+                                                                    <button 
+                                                                        onClick={(e) => { 
+                                                                            e.stopPropagation(); 
+                                                                            setOpenLessonMenuId(null); 
+                                                                            handleOpenBuilder(lesson.id); 
+                                                                        }}
+                                                                        className="w-full px-4 py-2 text-left text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex items-center gap-2"
+                                                                    >
+                                                                        <PenTool size={14} /> Edit Lesson
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={(e) => { 
+                                                                            e.stopPropagation(); 
+                                                                            setOpenLessonMenuId(null); 
+                                                                            navigator.clipboard.writeText(`${window.location.origin}/?lessonId=${lesson.id}`);
+                                                                        }}
+                                                                        className="w-full px-4 py-2 text-left text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex items-center gap-2"
+                                                                    >
+                                                                        <Share2 size={14} /> Copy Share Link
+                                                                    </button>
+                                                                    <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
+                                                                    <button 
+                                                                        onClick={(e) => { 
+                                                                            e.stopPropagation(); 
+                                                                            setOpenLessonMenuId(null); 
+                                                                            if (window.confirm('Are you sure you want to delete this lesson? This cannot be undone.')) {
+                                                                                onDeleteLesson(lesson.id); 
+                                                                            }
+                                                                        }}
+                                                                        className="w-full px-4 py-2 text-left text-sm font-bold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors flex items-center gap-2"
+                                                                    >
+                                                                        <Trash2 size={14} /> Delete Lesson
+                                                                    </button>
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
 
