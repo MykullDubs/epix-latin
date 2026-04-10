@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import LiveSetupModal from './LiveSetupModal';
 import BuilderHub from './BuilderHub'; 
-import LessonLibrary from './LessonLibrary'; // 🔥 IMPORTED THE NEW LIBRARY
+import LessonLibrary from './LessonLibrary'; 
+import CohortManagerModal from './CohortManagerModal'; // 🔥 IMPORT NEW MODAL
 
 export default function MagisterHub({ 
     userData, 
@@ -25,17 +26,22 @@ export default function MagisterHub({
     onSaveCard,       
     onUpdateCard,     
     onDeleteCard, 
-    onDeleteLesson,   // 🔥 NEW: Pass down the delete action for the library
+    onDeleteLesson,   
     onSaveCurriculum, 
-    onPublishDeck,    
+    onPublishDeck, 
+    onCreateClass,     // 🔥 ADDED
+    onDeleteClass,     // 🔥 ADDED
+    onRemoveStudent,   // 🔥 ADDED
     onSwitchToAdvancedView 
 }: any) {
-    // 🔥 LOCAL ROUTING STATE NOW INCLUDES 'library'
     const [localView, setLocalView] = useState<'hub' | 'builder' | 'library'>('hub');
     const [studioTargetId, setStudioTargetId] = useState<string | null>(null);
 
     const [searchQuery, setSearchQuery] = useState('');
+    const [libraryInitialSearch, setLibraryInitialSearch] = useState(''); // 🔥 Passes search to library
     const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
+    const [isCohortManagerOpen, setIsCohortManagerOpen] = useState(false); // 🔥 Modal State
+    
     const [preselectedContent, setPreselectedContent] = useState<{id: string, type: string} | null>(null);
     const [preselectedClassId, setPreselectedClassId] = useState<string | null>(null);
 
@@ -67,6 +73,15 @@ export default function MagisterHub({
         setLocalView('builder');
     };
 
+    // 🔥 SMART SEARCH BAR HANDLER
+    const handleSearchSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter' && searchQuery.trim() !== '') {
+            setLibraryInitialSearch(searchQuery);
+            setLocalView('library');
+            setSearchQuery(''); // clear hub search
+        }
+    };
+
     // ========================================================================
     // 🔥 LESSON LIBRARY VIEW
     // ========================================================================
@@ -74,6 +89,7 @@ export default function MagisterHub({
         return (
             <LessonLibrary 
                 lessons={lessons}
+                initialSearch={libraryInitialSearch} // Pass it down if your library supports it
                 onNavigateBack={() => setLocalView('hub')}
                 onEditLesson={handleOpenBuilder}
                 onPlayLesson={(id: string) => {
@@ -132,7 +148,7 @@ export default function MagisterHub({
     // 🔥 STANDARD HUB DASHBOARD
     // ========================================================================
     return (
-        <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-24">
+        <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-24 relative">
             <header className="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center sticky top-0 z-40 shadow-sm">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-indigo-600 rounded-[1rem] flex items-center justify-center text-white shadow-lg shadow-indigo-600/20">
@@ -146,10 +162,11 @@ export default function MagisterHub({
                         <Search size={16} className="text-slate-400 mr-2" />
                         <input 
                             type="text" 
-                            placeholder="Search your library..." 
+                            placeholder="Search (Press Enter for library)..." 
                             className="bg-transparent border-none outline-none text-sm font-medium w-full"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
+                            onKeyDown={handleSearchSubmit} // 🔥 WIRED UP
                         />
                     </div>
                     <div className="h-8 w-px bg-slate-200 hidden md:block" />
@@ -161,7 +178,7 @@ export default function MagisterHub({
                         <Crown size={14} /> Pro Active
                     </button>
 
-                    <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-black shadow-md">
+                    <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-black shadow-md cursor-pointer hover:scale-105 transition-transform" onClick={() => setLocalView('library')}>
                         {userInitials}
                     </div>
                 </div>
@@ -200,7 +217,6 @@ export default function MagisterHub({
                             <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
                                 <FolderOpen size={20} className="text-indigo-500" /> Recent Lessons
                             </h2>
-                            {/* 🔥 UPDATED: This now routes to the local library view instead of the command center */}
                             <button onClick={() => setLocalView('library')} className="text-sm font-bold text-indigo-600 hover:text-indigo-500 flex items-center gap-1">
                                 View Entire Library <ChevronRight size={16} />
                             </button>
@@ -323,7 +339,8 @@ export default function MagisterHub({
                                     </div>
                                 )}
                             </div>
-                            <button onClick={onSwitchToAdvancedView} className="w-full mt-6 py-3 border-2 border-dashed border-slate-700 hover:border-slate-500 text-slate-400 hover:text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-colors flex items-center justify-center gap-2 relative z-10">
+                            {/* 🔥 NOW OPENS THE COHORT MANAGER MODAL */}
+                            <button onClick={() => setIsCohortManagerOpen(true)} className="w-full mt-6 py-3 border-2 border-dashed border-slate-700 hover:border-slate-500 text-slate-400 hover:text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-colors flex items-center justify-center gap-2 relative z-10">
                                 <Plus size={16} /> Manage Roster
                             </button>
                         </div>
@@ -366,6 +383,16 @@ export default function MagisterHub({
                        }
                    }, 300);
                }}
+            />
+
+            {/* 🔥 RENDER NEW MODAL */}
+            <CohortManagerModal 
+                isOpen={isCohortManagerOpen}
+                onClose={() => setIsCohortManagerOpen(false)}
+                classes={classes}
+                onCreateClass={onCreateClass}
+                onDeleteClass={onDeleteClass}
+                onRemoveStudent={onRemoveStudent}
             />
         </div>
     );
