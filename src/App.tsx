@@ -457,7 +457,7 @@ export default function App() {
       );
     } 
     
-    // 🔥 LITE VIEW: The Simplified MagisterHub
+  // 🔥 LITE VIEW: The Simplified MagisterHub
     else {
       return (
         <MagisterHub 
@@ -478,6 +478,7 @@ export default function App() {
             onSaveCard={actions.saveCard}
             onUpdateCard={actions.updateCard}
             onDeleteCard={actions.deleteCard}
+            onDeleteLesson={(id: string) => actions.deleteArtifact(id, 'lesson')} // 🔥 ADDED THE DELETE ACTION
             onSaveCurriculum={actions.saveCurriculum}
             onPublishDeck={actions.publishDeck}
             
@@ -485,7 +486,6 @@ export default function App() {
         />
       );
     }
-  }
 
   // 5. STUDENT MOBILE APP
   return (
