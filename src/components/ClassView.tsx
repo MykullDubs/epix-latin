@@ -8,7 +8,8 @@ import {
     ChevronLeft, ChevronRight, Zap, Users, Clock, EyeOff, HelpCircle, 
     Layers, MousePointerClick, QrCode, Hourglass, Play, Pause, RotateCcw, 
     Plus, Minus, PenTool, Crosshair, Eraser, Wrench, Highlighter, Type, Presentation,
-    ChevronDown, ChevronUp, Mic, Info, Search, Palette, Square, BookOpen, Volume2 
+    ChevronDown, ChevronUp, Mic, Info, Search, Palette, Square, BookOpen, Volume2,
+    AlertCircle // 🔥 ADDED ALERTCIRCLE FOR THE GRAMMAR BLOCK
 } from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
 import PronunciationLab from './PronunciationLab'; 
@@ -362,8 +363,8 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
     const grouped: any[] = [];
     let buffer: any[] = [];
     
-    // 🔥 ALL VALID BLOCK TYPES REGISTERED HERE
-    const interactables = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'drag-drop', 'pronunciation', 'roleplay', 'audio-story', 'image-hotspot', 'drawing', 'code', 'timeline'];
+    // 🔥 ALL VALID BLOCK TYPES REGISTERED HERE (ADDED 'grammar')
+    const interactables = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'drag-drop', 'pronunciation', 'roleplay', 'audio-story', 'image-hotspot', 'drawing', 'code', 'timeline', 'grammar'];
     
     lesson.blocks.forEach((b: any) => {
       const type = String(b?.type || '');
@@ -827,6 +828,9 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                               {blockType === 'drag-drop' && <TapSortBlock block={block} liveState={liveState} />}
                               
                               {blockType === 'pronunciation' && <PronunciationLab block={block} />} 
+
+                              {/* 🔥 NEW GRAMMAR BLOCK WIRED IN HERE */}
+                              {blockType === 'grammar' && <GrammarBlock block={block} />} 
 
                               {blockType === 'roleplay' && <LiveRoleplayBlock block={block} onLaunch={() => setActiveRoleplayBlock(block)} />}
                           </>
@@ -1383,3 +1387,88 @@ const LiveRoleplayBlock = ({ block, onLaunch }: { block: any, onLaunch: (prompt:
         </div>
     </div>
 );
+
+// 🔥 NEW GRAMMAR BLOCK RENDERER
+const GrammarBlock = ({ block }: { block: any }) => {
+    // Local state to track which target words the teacher has "revealed".
+    // If you don't click it, the target word is obscured!
+    const [revealed, setRevealed] = useState<Record<number, boolean>>({});
+
+    const toggleReveal = (idx: number) => {
+        setRevealed(prev => ({ ...prev, [idx]: !prev[idx] }));
+    };
+
+    return (
+        <div className="w-full max-w-6xl mx-auto my-12 animate-in fade-in slide-in-from-bottom-8 duration-700 pointer-events-auto">
+            {/* The "Whiteboard" */}
+            <div className="bg-slate-900 rounded-[4rem] p-12 md:p-16 shadow-[0_30px_60px_rgba(0,0,0,0.5)] border-8 border-slate-800 relative overflow-hidden">
+                {/* Decorative background glow */}
+                <div className="absolute top-0 left-0 w-full h-4 bg-gradient-to-r from-indigo-500 via-cyan-400 to-emerald-400" />
+                <div className="absolute -top-32 -right-32 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none" />
+
+                <header className="mb-12 relative z-10 flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
+                    <div className="p-6 bg-indigo-500/20 text-indigo-400 rounded-[2rem] shrink-0 border border-indigo-500/30">
+                        <Presentation size={64} />
+                    </div>
+                    <div>
+                        <h2 className="text-[5vh] font-black text-white tracking-tight mb-4 leading-none">
+                            {block.title || 'Grammar Focus'}
+                        </h2>
+                        <p className="text-[3vh] text-slate-300 font-medium leading-relaxed">
+                            {block.rule}
+                        </p>
+                    </div>
+                </header>
+
+                {/* The Formula Box */}
+                {block.formula && (
+                    <div className="bg-slate-950/50 border border-slate-800 rounded-[2rem] p-10 mb-12 relative z-10 shadow-inner">
+                        <div className="text-[2vh] font-black uppercase tracking-widest text-slate-500 mb-4 flex items-center justify-center md:justify-start gap-3">
+                            <AlertCircle size={20} className="text-amber-400" /> Structure Formula
+                        </div>
+                        <p className="text-[4.5vh] md:text-[5vh] font-mono font-bold text-cyan-400 tracking-wide text-center md:text-left leading-snug">
+                            {block.formula}
+                        </p>
+                    </div>
+                )}
+
+                {/* The Drill Examples */}
+                <div className="space-y-6 relative z-10">
+                    <div className="text-[2vh] font-black uppercase tracking-widest text-slate-500 mb-6 flex items-center justify-center md:justify-start gap-3">
+                        <AlertCircle size={20} /> Drill Examples
+                    </div>
+                    
+                    {block.examples?.map((ex: any, idx: number) => {
+                        // Split the sentence by the target word (case-insensitive)
+                        const parts = ex.en.split(new RegExp(`(${ex.target})`, 'gi'));
+                        const isRevealed = revealed[idx];
+                        
+                        return (
+                            <div key={idx} className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 p-8 bg-slate-800/50 hover:bg-slate-800 rounded-[2rem] border border-slate-700/50 transition-colors group">
+                                <p className="text-[4vh] font-medium text-white flex-1 leading-snug cursor-pointer" onClick={() => toggleReveal(idx)}>
+                                    {parts.map((part: string, i: number) => 
+                                        part.toLowerCase() === (ex.target || '').toLowerCase() ? (
+                                            <span 
+                                                key={i} 
+                                                className={`inline-block mx-2 font-black border-b-4 transition-all duration-300 px-3 py-1 rounded-xl ${isRevealed ? 'text-amber-400 border-amber-400/50 bg-amber-400/10' : 'text-transparent border-slate-600 bg-slate-700/50 hover:bg-slate-600 w-32'}`}
+                                            >
+                                                {isRevealed ? part : ''}
+                                            </span>
+                                        ) : (
+                                            <span key={i}>{part}</span>
+                                        )
+                                    )}
+                                </p>
+                                {ex.note && (
+                                    <p className="text-[2.5vh] font-bold text-slate-400 xl:max-w-md text-left xl:text-right border-l-4 xl:border-l-0 border-slate-700 pl-6 xl:pl-0 pt-4 xl:pt-0">
+                                        {ex.note}
+                                    </p>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+};
