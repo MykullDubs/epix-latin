@@ -15,6 +15,11 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
     const [prompt, setPrompt] = useState('');
     const [scenarioPrompt, setScenarioPrompt] = useState(''); 
     const [gradeLevel, setGradeLevel] = useState('High School');
+    
+    // 🔥 NEW IMAGE FLEXIBILITY STATES
+    const [imageStyle, setImageStyle] = useState('vector');
+    const [customImagePrompt, setCustomImagePrompt] = useState('');
+    
     const [isGenerating, setIsGenerating] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -24,7 +29,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
     const [pdfBase64, setPdfBase64] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // 🔥 EXPANDED GENERATION TARGETS
+    // EXPANDED GENERATION TARGETS
     const [selectedTypes, setSelectedTypes] = useState({
         image: true,
         text: true,
@@ -38,7 +43,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
         pronunciation: false
     });
 
-    // 🔥 FREEMIUM GATE CHECK
+    // FREEMIUM GATE CHECK
     const isPro = userData?.subscriptionTier === 'pro';
 
     if (!isOpen) return null;
@@ -78,7 +83,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
-    // 🔥 SCENARIO FORGE GENERATION (PRO ONLY)
+    // SCENARIO FORGE GENERATION (PRO ONLY)
     const handleGenerateScenario = async () => {
         if (!scenarioPrompt.trim()) return;
         setIsLoading(true);
@@ -97,7 +102,6 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
         Schema: [{ "type": "dialogue", "lines": [{ "speaker": "Name 1", "text": "What they say", "translation": "Context or translation", "side": "left" }, { "speaker": "Name 2", "text": "Reply", "translation": "Context or translation", "side": "right" }] }]`;
 
         try {
-            // 🚀 USING GEMINI 3.1 FLASH-LITE PREVIEW
             const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -134,7 +138,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
         }
     };
 
-    // 🔥 STANDARD LESSON ARCHITECT GENERATION
+    // STANDARD LESSON ARCHITECT GENERATION
     const handleGenerate = async () => {
         if (!prompt.trim() && !pdfBase64) {
             setToastMsg("Please provide a topic, text, or upload a PDF.");
@@ -184,19 +188,37 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
             });
         }
 
-        // 🚀 POLLINATIONS.AI ZERO-CONFIG URL GENERATION
+        // 🔥 DYNAMIC POLLINATIONS.AI URL GENERATION
         let heroImageUrl = null;
         if (selectedTypes.image) {
-            const imageSubject = prompt.trim() || (pdfFileName ? pdfFileName.replace('.pdf', '') : 'a classroom concept');
-            const imagePrompt = `A beautiful, modern, clean educational vector illustration representing the concept of: ${imageSubject}. Minimalist background, vibrant colors, no text or words in the image.`;
+            // 1. Establish the base subject (Overrides with Custom Prompt if provided)
+            const baseSubject = customImagePrompt.trim() || prompt.trim() || (pdfFileName ? pdfFileName.replace('.pdf', '') : 'a classroom concept');
             
-            // Random seed locks the generated image so it doesn't change every time the component remounts
+            // 2. Define the style dictionary
+            const styleModifiers: Record<string, string> = {
+                vector: "A beautiful, modern, clean educational vector illustration, minimalist, vibrant colors",
+                photo: "A high-quality, 8k resolution cinematic photograph, highly detailed, photorealistic",
+                render3d: "A high-quality 3D render, Unreal Engine 5 style, volumetric lighting, highly detailed",
+                watercolor: "A beautiful detailed watercolor painting, soft lighting, artistic, expressive",
+                scifi: "A highly detailed sci-fi concept art piece, futuristic, cinematic lighting, cyberpunk",
+                fantasy: "A highly detailed fantasy concept art piece, magical, ethereal, epic lighting",
+                raw: "" // Uses the prompt exactly as typed
+            };
+
+            const modifier = styleModifiers[imageStyle] || styleModifiers.vector;
+            
+            // 3. Assemble the final prompt string
+            const finalImagePrompt = imageStyle === 'raw' 
+                ? `${baseSubject}, high quality, no text or words` 
+                : `${modifier} representing the concept of: ${baseSubject}. No text, no words, clean design.`;
+            
+            // 4. Generate random seed so the image locks and doesn't flicker on re-renders
             const seed = Math.floor(Math.random() * 10000000);
-            heroImageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?seed=${seed}&width=1280&height=720&nologo=true`;
+            heroImageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalImagePrompt)}?seed=${seed}&width=1280&height=720&nologo=true`;
         }
 
         try {
-            // 🚀 ONLY AWAITING THE TEXT REQUEST USING GEMINI 3.1 FLASH-LITE PREVIEW
+            // AWAITING GEMINI 3.1 FLASH-LITE
             const textRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -220,12 +242,12 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
             
             if (!Array.isArray(generatedBlocks)) throw new Error("AI did not return the correct array schema.");
 
-            // INJECT HERO IMAGE AT THE VERY TOP
+            // INJECT HERO IMAGE
             if (heroImageUrl) {
                 generatedBlocks.unshift({
                     type: 'image',
                     url: heroImageUrl,
-                    caption: `Conceptual Visualization: ${prompt.substring(0, 40) || 'Source Document'}`
+                    caption: `Conceptual Visualization: ${customImagePrompt.substring(0, 40) || prompt.substring(0, 40) || 'Source Document'}`
                 });
             }
 
@@ -237,7 +259,9 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
             setIsGenerating(false);
             onAppendBlocks(stampedBlocks);
             
+            // Clean up
             setPrompt('');
+            setCustomImagePrompt('');
             removePdf();
             onClose();
 
@@ -332,7 +356,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
                             </div>
 
                             <div className="space-y-3">
-                                <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Context & Instructions</label>
+                                <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Lesson Context & Instructions</label>
                                 <textarea 
                                     disabled={isGenerating} value={prompt} onChange={(e) => setPrompt(e.target.value)}
                                     placeholder="Type a topic, paste a YouTube link, or give specific instructions for your PDF..."
@@ -340,6 +364,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
                                 />
                             </div>
 
+                            {/* 🔥 NEW UI: GRADE LEVEL & VISUAL STYLE SIDE-BY-SIDE */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-3">
                                     <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Target Grade Level</label>
@@ -358,7 +383,42 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
                                         <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                                     </div>
                                 </div>
+
+                                <div className="space-y-3">
+                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Visual Art Style</label>
+                                    <div className="relative">
+                                        <select 
+                                            disabled={isGenerating || !selectedTypes.image} value={imageStyle} onChange={(e) => setImageStyle(e.target.value)}
+                                            className="w-full appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm font-black text-slate-700 dark:text-slate-300 outline-none focus:border-indigo-500 transition-colors shadow-sm disabled:opacity-50"
+                                        >
+                                            <option value="vector">Modern Vector (Default)</option>
+                                            <option value="photo">Cinematic Photo</option>
+                                            <option value="render3d">3D Render (Unreal 5)</option>
+                                            <option value="watercolor">Watercolor</option>
+                                            <option value="scifi">Sci-Fi Concept Art</option>
+                                            <option value="fantasy">Fantasy Concept Art</option>
+                                            <option value="raw">Raw (Use Custom Prompt Exactly)</option>
+                                        </select>
+                                        <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                    </div>
+                                </div>
                             </div>
+
+                            {/* 🔥 NEW UI: OPTIONAL CUSTOM IMAGE PROMPT */}
+                            {selectedTypes.image && (
+                                <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300 bg-indigo-50/50 dark:bg-indigo-500/5 p-4 rounded-2xl border border-indigo-100 dark:border-indigo-500/20">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
+                                        <ImageIcon size={14} /> Specific Image Instruction (Optional)
+                                    </label>
+                                    <input 
+                                        disabled={isGenerating} 
+                                        value={customImagePrompt} 
+                                        onChange={(e) => setCustomImagePrompt(e.target.value)}
+                                        placeholder="Leave blank to let AI decide, or type a specific visual (e.g. 'A cute cartoon taco')"
+                                        className="w-full bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-500/20 rounded-xl p-3 text-sm font-medium text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500 transition-colors shadow-sm disabled:opacity-50"
+                                    />
+                                </div>
+                            )}
 
                             <div className="space-y-3 pb-4">
                                 <label className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Generated Assets</label>
