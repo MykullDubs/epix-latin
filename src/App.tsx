@@ -485,7 +485,7 @@ export default function App() {
             onSwitchToAdvancedView={() => setUseAdvancedDashboard(true)} 
         />
       );
-    }
+    
 
   // 5. STUDENT MOBILE APP
   return (
