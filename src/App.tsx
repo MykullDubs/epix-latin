@@ -457,7 +457,7 @@ export default function App() {
       );
     } 
     
-  // 🔥 LITE VIEW: The Simplified MagisterHub
+// 🔥 LITE VIEW: The Simplified MagisterHub
     else {
       return (
         <MagisterHub 
@@ -473,15 +473,19 @@ export default function App() {
             onStartConnectFour={handleStartConnectFour} 
             onStartSlipstream={handleStartSlipstream}
             
-            // 🔥 FED ALL BUILDER FUNCTIONS TO HUB SO IT CAN RENDER BUILDERHUB INTERNALLY
             onSaveLesson={actions.saveLesson}
             onSaveCard={actions.saveCard}
             onUpdateCard={actions.updateCard}
             onDeleteCard={actions.deleteCard}
-            onDeleteLesson={(id: string) => actions.deleteArtifact(id, 'lesson')} // 🔥 ADDED THE DELETE ACTION
+            onDeleteLesson={(id: string) => actions.deleteArtifact(id, 'lesson')} 
             onSaveCurriculum={actions.saveCurriculum}
             onPublishDeck={actions.publishDeck}
             
+            // 🔥 FED CLASS MANAGEMENT ACTIONS TO THE LITE HUB
+            onCreateClass={actions.createClass}
+            onDeleteClass={actions.deleteClass}
+            onRemoveStudent={actions.removeStudent}
+
             onSwitchToAdvancedView={() => setUseAdvancedDashboard(true)} 
         />
       );
