@@ -4,11 +4,17 @@ import {
     Sparkles, Wand2, X, Loader2, FileText, AlignLeft,
     ListChecks, Puzzle, Brain, ChevronDown, 
     UploadCloud, File, MessageSquare, MessageCircle, Info, Mic, Image as ImageIcon,
-    Lock, Crown, CheckCircle2
+    Lock, Crown, CheckCircle2, Presentation // 🔥 Added Presentation Icon just in case
 } from 'lucide-react';
 import { JuicyToast } from '../Toast'; 
 
-export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, userData }: any) {
+export default function AiGeneratorModal({ 
+    isOpen, 
+    onClose, 
+    onAppendBlocks, 
+    userData,
+    onUpgradeRequest // 🔥 NEW PROP TO TRIGGER PRO CHECKOUT
+}: any) {
     const [activeTab, setActiveTab] = useState<'lesson' | 'scenario'>('lesson');
     
     // CONTENT STATES
@@ -29,10 +35,11 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
     const [pdfBase64, setPdfBase64] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // EXPANDED GENERATION TARGETS
+    // EXPANDED GENERATION TARGETS (Added Grammar!)
     const [selectedTypes, setSelectedTypes] = useState({
         image: true,
         text: true,
+        grammar: true, // 🔥 Added default grammar generation
         essay: false,
         vocab: true,
         quiz: true,
@@ -167,6 +174,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
         
         ${selectedTypes.text ? `- A "text" block: An engaging, well-structured introduction or summary. Schema: { "type": "text", "title": "Catchy Title", "content": "Paragraph content..." }` : ''}
         ${selectedTypes.essay ? `- An "essay" block: A longer, deep-dive reading passage. Schema: { "type": "essay", "title": "Deep Dive Topic", "content": "Multiple paragraphs of detailed content..." }` : ''}
+        ${selectedTypes.grammar ? `- A "grammar" block: A clear, whiteboard-style breakdown of a specific grammar mechanic. Schema: { "type": "grammar", "title": "Grammar Point", "rule": "Simple explanation of when to use it", "formula": "Subject + Verb + Object", "examples": [{ "en": "The full example sentence", "target": "the specific words in the sentence to highlight", "note": "Brief context or translation" }] }` : ''}
         ${selectedTypes.vocab ? `- A "vocab-list" block: 3 to 5 key terms and definitions based heavily on the source material. Schema: { "type": "vocab-list", "items": [{ "term": "Word", "definition": "Meaning" }] }` : ''}
         ${selectedTypes.quiz ? `- A "quiz" block: A multiple choice question testing comprehension. Schema: { "type": "quiz", "question": "The question?", "options": [{ "id": "a", "text": "opt 1" }, { "id": "b", "text": "opt 2" }, { "id": "c", "text": "opt 3" }, { "id": "d", "text": "opt 4" }], "correctId": "b" }` : ''}
         ${selectedTypes.fillBlank ? `- A "fill-blank" block: A sentence with exactly two blank words enclosed in [brackets]. Schema: { "type": "fill-blank", "question": "Fill in the missing words", "text": "The [first] word and the [second] word.", "distractors": ["wrong1", "wrong2"] }` : ''}
@@ -431,6 +439,10 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
                                         <AlignLeft size={18} className={selectedTypes.text ? 'text-indigo-500' : 'text-slate-400'} />
                                         <span className="text-xs font-black uppercase tracking-widest">Summary</span>
                                     </button>
+                                    <button disabled={isGenerating} onClick={() => toggleType('grammar')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.grammar ? 'bg-cyan-50 dark:bg-cyan-500/10 border-cyan-500 text-cyan-700 dark:text-cyan-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-cyan-300'}`}>
+                                        <Presentation size={18} className={selectedTypes.grammar ? 'text-cyan-500' : 'text-slate-400'} />
+                                        <span className="text-xs font-black uppercase tracking-widest">Grammar</span>
+                                    </button>
                                     <button disabled={isGenerating} onClick={() => toggleType('essay')} className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all text-left ${selectedTypes.essay ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-500 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-indigo-300'}`}>
                                         <FileText size={18} className={selectedTypes.essay ? 'text-indigo-500' : 'text-slate-400'} />
                                         <span className="text-xs font-black uppercase tracking-widest">Essay</span>
@@ -544,7 +556,14 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
                                     <li className="flex items-center gap-3 text-sm font-bold text-slate-700 dark:text-slate-300"><CheckCircle2 className="text-emerald-500 shrink-0" size={18} /> Auto-Grading Pronunciation</li>
                                 </ul>
 
-                                <button className="w-full bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-amber-950 font-black uppercase text-xs tracking-widest py-4 rounded-[1.5rem] shadow-xl shadow-amber-500/20 hover:scale-105 active:scale-95 transition-all">
+                                {/* 🔥 THIS NOW FIRES THE UPGRADE TRIGGER SO THE PARENT CAN POP THE MODAL */}
+                                <button 
+                                    onClick={() => {
+                                        onClose();
+                                        if (onUpgradeRequest) onUpgradeRequest();
+                                    }}
+                                    className="w-full bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-amber-950 font-black uppercase text-xs tracking-widest py-4 rounded-[1.5rem] shadow-xl shadow-amber-500/20 hover:scale-105 active:scale-95 transition-all"
+                                >
                                     Upgrade to Magister Pro
                                 </button>
                             </div>
