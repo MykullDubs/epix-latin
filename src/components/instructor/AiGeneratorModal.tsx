@@ -97,8 +97,8 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
         Schema: [{ "type": "dialogue", "lines": [{ "speaker": "Name 1", "text": "What they say", "translation": "Context or translation", "side": "left" }, { "speaker": "Name 2", "text": "Reply", "translation": "Context or translation", "side": "right" }] }]`;
 
         try {
-            // 🚀 USING GEMINI 3.1 FLASH
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash:generateContent?key=${apiKey}`, {
+            // 🚀 USING GEMINI 3.1 FLASH-LITE PREVIEW
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -184,8 +184,8 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
             });
         }
 
-        // 🚀 USING GEMINI 3.1 FLASH
-        const textRequest = fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash:generateContent?key=${apiKey}`, {
+        // 🚀 USING GEMINI 3.1 FLASH-LITE PREVIEW
+        const textRequest = fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -201,17 +201,12 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
             const imageSubject = prompt.trim() || (pdfFileName ? pdfFileName.replace('.pdf', '') : 'a classroom concept');
             const imagePrompt = `A beautiful, modern, clean educational vector illustration representing the concept of: ${imageSubject}. Minimalist background, vibrant colors, no text or words in the image.`;
             
-            // 🔥 UPGRADED TO IMAGEN 4 ULTRA GENERATE (with required parameters to prevent 400 errors)
-            imageRequest = fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-ultra-generate-001:predict?key=${apiKey}`, {
+            // 🚀 USING GEMINI 3.1 FLASH IMAGE VIA GENERATECONTENT
+            imageRequest = fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    instances: [{ prompt: imagePrompt }],
-                    parameters: { 
-                        sampleCount: 1,
-                        outputMimeType: "image/jpeg",
-                        aspectRatio: "16:9" 
-                    }
+                    contents: [{ role: "user", parts: [{ text: imagePrompt }] }]
                 })
             });
         }
@@ -242,11 +237,12 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
                 if (results[1].value.ok) {
                     try {
                         const imgData = await results[1].value.json();
-                        // 🔥 EXTRACTING BASE64 FROM IMAGEN 4 SCHEMA
-                        const base64Image = imgData.predictions?.[0]?.bytesBase64Encoded; 
+                        // 🔥 EXTRACTING BASE64 FROM NEW GENERATECONTENT SCHEMA
+                        const base64Image = imgData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data; 
+                        const mimeType = imgData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.mimeType || 'image/png';
                         
                         if (base64Image) {
-                            heroImageUrl = `data:image/jpeg;base64,${base64Image}`;
+                            heroImageUrl = `data:${mimeType};base64,${base64Image}`;
                         } else {
                             console.warn("Imagen returned OK, but no image data found:", imgData);
                         }
@@ -303,7 +299,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
                         </div>
                         <div>
                             <h2 className="text-lg font-black uppercase tracking-widest leading-none">Magic Generator</h2>
-                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">Powered by Gemini 3.1 & Imagen 4 Ultra</p>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">Powered by Gemini 3.1 Flash-Lite</p>
                         </div>
                     </div>
 
