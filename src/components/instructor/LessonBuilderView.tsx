@@ -193,14 +193,16 @@ export default function LessonBuilderView({
     if (!jsonMode) setJsonInput(JSON.stringify(data, null, 2));
   }, [data, jsonMode]);
 
-  return (
+ return (
     <div className="max-w-4xl mx-auto space-y-10 pb-64 relative">
       
+      {/* 🔥 THE GENERATOR MODAL WITH THE NEW UPGRADE PROP */}
       <AiGeneratorModal 
           isOpen={isAiModalOpen} 
           onClose={() => setIsAiModalOpen(false)} 
           onAppendBlocks={handleAppendAiBlocks} 
           userData={userData}
+          onUpgradeRequest={() => setIsUpgradeModalOpen(true)} 
       />
 
       {/* 🔥 THE UPGRADE PAYWALL MODAL */}
@@ -216,7 +218,14 @@ export default function LessonBuilderView({
                       Upgrade to Magister Pro to unlock unlimited AI generations, premium interactive blocks (like Audio Stories and Roleplay), and priority support.
                   </p>
                   <div className="space-y-3">
-                      <button className="w-full bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-amber-950 font-black uppercase tracking-widest text-[10px] py-4 rounded-xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all">
+                      {/* 🔥 YOU CAN ALSO WIRE THIS BUTTON TO YOUR CHECKOUT LOGIC LATER */}
+                      <button 
+                          className="w-full bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-amber-950 font-black uppercase tracking-widest text-[10px] py-4 rounded-xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all"
+                          onClick={() => {
+                              console.log("Initiating Stripe checkout from Builder...");
+                              // onCheckout('monthly') or whatever your global handler will be!
+                          }}
+                      >
                           Upgrade to Pro — $15/mo
                       </button>
                       <button onClick={() => setIsUpgradeModalOpen(false)} className="w-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black uppercase tracking-widest text-[10px] py-4 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
