@@ -11,6 +11,7 @@ import BuilderHub from './BuilderHub';
 import LessonLibrary from './LessonLibrary'; 
 import CohortManagerModal from './CohortManagerModal'; 
 import { JuicyToast } from '../Toast'; 
+import ProUpgradeModal from '../ProUpgradeModal'; // 🔥 IMPORTED THE NEW MODAL
 
 export default function MagisterHub({ 
     userData, 
@@ -49,7 +50,7 @@ export default function MagisterHub({
     const [openLessonMenuId, setOpenLessonMenuId] = useState<string | null>(null);
     const [toastMsg, setToastMsg] = useState<string | null>(null); 
     
-    // 🔥 NEW: HUB-LEVEL UPGRADE MODAL
+    // 🔥 HUB-LEVEL UPGRADE MODAL STATE
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
     const [preselectedContent, setPreselectedContent] = useState<{id: string, type: string} | null>(null);
@@ -162,29 +163,15 @@ export default function MagisterHub({
         <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-24 relative">
             {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
 
-            {/* 🔥 HUB-LEVEL PAYWALL MODAL */}
-            {isUpgradeModalOpen && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsUpgradeModalOpen(false)} />
-                    <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 max-w-sm w-full relative z-10 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-300 text-center">
-                        <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-500 rounded-2xl flex items-center justify-center text-white mx-auto mb-6 shadow-lg shadow-amber-500/30">
-                            <Crown size={32} strokeWidth={2.5} />
-                        </div>
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Magister Pro Feature</h2>
-                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
-                            Upgrade to Magister Pro to unlock unlimited Cohorts, premium interactive blocks, Advanced Analytics, and priority support.
-                        </p>
-                        <div className="space-y-3">
-                            <button className="w-full bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-amber-950 font-black uppercase tracking-widest text-[10px] py-4 rounded-xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all">
-                                Upgrade to Pro — $15/mo
-                            </button>
-                            <button onClick={() => setIsUpgradeModalOpen(false)} className="w-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black uppercase tracking-widest text-[10px] py-4 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-                                Maybe Later
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* 🔥 HUB-LEVEL PAYWALL MODAL INJECTED HERE */}
+            <ProUpgradeModal 
+                isOpen={isUpgradeModalOpen}
+                onClose={() => setIsUpgradeModalOpen(false)}
+                onCheckout={(cycle: 'monthly' | 'annual') => {
+                    console.log(`Initiating Stripe checkout for ${cycle} plan...`);
+                    // TODO: Wire this up to the Stripe Redirect logic in App.tsx!
+                }}
+            />
 
             <header className="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center sticky top-0 z-40 shadow-sm">
                 <div className="flex items-center gap-3">
@@ -540,7 +527,6 @@ export default function MagisterHub({
                }}
             />
 
-            {/* 🔥 PASSED THE UPGRADE TRIGGERS INTO THE COHORT MANAGER MODAL */}
             <CohortManagerModal 
                 isOpen={isCohortManagerOpen}
                 onClose={() => setIsCohortManagerOpen(false)}
