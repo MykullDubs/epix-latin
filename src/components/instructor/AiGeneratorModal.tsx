@@ -97,7 +97,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
         Schema: [{ "type": "dialogue", "lines": [{ "speaker": "Name 1", "text": "What they say", "translation": "Context or translation", "side": "left" }, { "speaker": "Name 2", "text": "Reply", "translation": "Context or translation", "side": "right" }] }]`;
 
         try {
-            // 🚀 UPGRADED TO GEMINI 3.1 FLASH
+            // 🚀 USING GEMINI 3.1 FLASH
             const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -184,7 +184,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
             });
         }
 
-        // 🚀 UPGRADED TO GEMINI 3.1 FLASH
+        // 🚀 USING GEMINI 3.1 FLASH
         const textRequest = fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -201,13 +201,17 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
             const imageSubject = prompt.trim() || (pdfFileName ? pdfFileName.replace('.pdf', '') : 'a classroom concept');
             const imagePrompt = `A beautiful, modern, clean educational vector illustration representing the concept of: ${imageSubject}. Minimalist background, vibrant colors, no text or words in the image.`;
             
-            // 🚀 UPGRADED TO IMAGEN 4 FAST GENERATE
-            imageRequest = fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-fast-generate-001:predict?key=${apiKey}`, {
+            // 🔥 UPGRADED TO IMAGEN 4 ULTRA GENERATE (with required parameters to prevent 400 errors)
+            imageRequest = fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-ultra-generate-001:predict?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     instances: [{ prompt: imagePrompt }],
-                    parameters: { sampleCount: 1 }
+                    parameters: { 
+                        sampleCount: 1,
+                        outputMimeType: "image/jpeg",
+                        aspectRatio: "16:9" 
+                    }
                 })
             });
         }
@@ -251,7 +255,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
                     }
                 } else {
                     const imgErrData = await results[1].value.json();
-                    console.warn("Image API Rejected Request:", imgErrData);
+                    console.error("IMAGE API REJECTED REQUEST. Full Error:", imgErrData); 
                 }
             }
 
@@ -299,7 +303,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
                         </div>
                         <div>
                             <h2 className="text-lg font-black uppercase tracking-widest leading-none">Magic Generator</h2>
-                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">Powered by Gemini 3.1 & Imagen 4</p>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">Powered by Gemini 3.1 & Imagen 4 Ultra</p>
                         </div>
                     </div>
 
