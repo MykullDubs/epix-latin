@@ -3,12 +3,13 @@ import React, { useState, useMemo } from 'react';
 import { 
     Wand2, MonitorPlay, Users, BookOpen, Plus, 
     Sparkles, Clock, ChevronRight, Play, MoreVertical, 
-    Search, FolderOpen, Crown, PenTool, ArrowLeft
+    Search, FolderOpen, Crown, PenTool, ArrowLeft,
+    LogOut, Settings, User
 } from 'lucide-react';
 import LiveSetupModal from './LiveSetupModal';
 import BuilderHub from './BuilderHub'; 
 import LessonLibrary from './LessonLibrary'; 
-import CohortManagerModal from './CohortManagerModal'; // 🔥 IMPORT NEW MODAL
+import CohortManagerModal from './CohortManagerModal'; 
 
 export default function MagisterHub({ 
     userData, 
@@ -29,21 +30,26 @@ export default function MagisterHub({
     onDeleteLesson,   
     onSaveCurriculum, 
     onPublishDeck, 
-    onCreateClass,     // 🔥 ADDED
-    onDeleteClass,     // 🔥 ADDED
-    onRemoveStudent,   // 🔥 ADDED
+    onCreateClass,     
+    onDeleteClass,     
+    onRemoveStudent,
+    onLogout,          
     onSwitchToAdvancedView 
 }: any) {
     const [localView, setLocalView] = useState<'hub' | 'builder' | 'library'>('hub');
     const [studioTargetId, setStudioTargetId] = useState<string | null>(null);
 
     const [searchQuery, setSearchQuery] = useState('');
-    const [libraryInitialSearch, setLibraryInitialSearch] = useState(''); // 🔥 Passes search to library
+    const [libraryInitialSearch, setLibraryInitialSearch] = useState(''); 
     const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
-    const [isCohortManagerOpen, setIsCohortManagerOpen] = useState(false); // 🔥 Modal State
+    const [isCohortManagerOpen, setIsCohortManagerOpen] = useState(false); 
+    const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false); // 🔥 DROPDOWN STATE
     
     const [preselectedContent, setPreselectedContent] = useState<{id: string, type: string} | null>(null);
     const [preselectedClassId, setPreselectedClassId] = useState<string | null>(null);
+
+    // 🔥 CHECK SUBSCRIPTION STATUS
+    const isPro = userData?.subscriptionTier === 'pro';
 
     const userInitials = userData?.name 
         ? userData.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() 
@@ -73,12 +79,11 @@ export default function MagisterHub({
         setLocalView('builder');
     };
 
-    // 🔥 SMART SEARCH BAR HANDLER
     const handleSearchSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter' && searchQuery.trim() !== '') {
             setLibraryInitialSearch(searchQuery);
             setLocalView('library');
-            setSearchQuery(''); // clear hub search
+            setSearchQuery(''); 
         }
     };
 
@@ -89,7 +94,7 @@ export default function MagisterHub({
         return (
             <LessonLibrary 
                 lessons={lessons}
-                initialSearch={libraryInitialSearch} // Pass it down if your library supports it
+                initialSearch={libraryInitialSearch} 
                 onNavigateBack={() => setLocalView('hub')}
                 onEditLesson={handleOpenBuilder}
                 onPlayLesson={(id: string) => {
@@ -166,20 +171,91 @@ export default function MagisterHub({
                             className="bg-transparent border-none outline-none text-sm font-medium w-full"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            onKeyDown={handleSearchSubmit} // 🔥 WIRED UP
+                            onKeyDown={handleSearchSubmit} 
                         />
                     </div>
                     <div className="h-8 w-px bg-slate-200 hidden md:block" />
                     
-                    <button 
-                        onClick={onSwitchToAdvancedView}
-                        className="flex items-center gap-2 bg-amber-100 text-amber-700 hover:bg-amber-200 hover:scale-105 active:scale-95 px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all shadow-sm border border-amber-200 cursor-pointer"
-                    >
-                        <Crown size={14} /> Pro Active
-                    </button>
+                    {/* We only show this standalone button if they are already PRO */}
+                    {isPro && (
+                        <button 
+                            onClick={onSwitchToAdvancedView}
+                            className="hidden md:flex items-center gap-2 bg-amber-100 text-amber-700 hover:bg-amber-200 hover:scale-105 active:scale-95 px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all shadow-sm border border-amber-200 cursor-pointer"
+                        >
+                            <Crown size={14} /> Pro Active
+                        </button>
+                    )}
 
-                    <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-black shadow-md cursor-pointer hover:scale-105 transition-transform" onClick={() => setLocalView('library')}>
-                        {userInitials}
+                    {/* 🔥 NEW PROFILE DROPDOWN WRAPPER */}
+                    <div className="relative">
+                        <div 
+                            className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-black shadow-md cursor-pointer hover:scale-105 transition-transform" 
+                            onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                        >
+                            {userInitials}
+                        </div>
+
+                        {isProfileMenuOpen && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setIsProfileMenuOpen(false)} />
+                                <div className="absolute right-0 top-full mt-3 w-64 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                    
+                                    <div className="px-4 py-4 border-b border-slate-100">
+                                        <p className="text-sm font-black text-slate-900 truncate">{userData?.name || 'Instructor'}</p>
+                                        <p className="text-xs font-bold text-slate-500 truncate mb-3">{userData?.email || 'Instructor Account'}</p>
+                                        {isPro ? (
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-100 text-amber-700 rounded-md text-[10px] font-black uppercase tracking-widest border border-amber-200">
+                                                <Crown size={12} /> Magister Pro Active
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-500 rounded-md text-[10px] font-black uppercase tracking-widest border border-slate-200">
+                                                Free Plan
+                                            </span>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="py-2">
+                                        {/* 🔥 UPGRADE CALL TO ACTION (ONLY FOR FREE USERS) */}
+                                        {!isPro && (
+                                            <div className="px-3 pb-3 mb-2 border-b border-slate-100">
+                                                <button 
+                                                    className="w-full bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-amber-950 font-black uppercase text-[11px] tracking-widest py-3 rounded-xl shadow-lg shadow-amber-500/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+                                                    onClick={() => { 
+                                                        setIsProfileMenuOpen(false); 
+                                                        // Route them to the advanced view to trigger the paywall/upgrade screen
+                                                        onSwitchToAdvancedView(); 
+                                                    }}
+                                                >
+                                                    <Crown size={16} /> Upgrade to Pro
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        <button 
+                                            onClick={() => { setIsProfileMenuOpen(false); setLocalView('library'); }} 
+                                            className="w-full px-4 py-2.5 text-left text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors flex items-center gap-3"
+                                        >
+                                            <FolderOpen size={16} /> Lesson Library
+                                        </button>
+                                        <button 
+                                            onClick={() => { setIsProfileMenuOpen(false); onSwitchToAdvancedView(); }} 
+                                            className="w-full px-4 py-2.5 text-left text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition-colors flex items-center gap-3"
+                                        >
+                                            <Settings size={16} /> Advanced Hub
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="border-t border-slate-100 py-2">
+                                        <button 
+                                            onClick={() => { setIsProfileMenuOpen(false); if(onLogout) onLogout(); }} 
+                                            className="w-full px-4 py-2.5 text-left text-sm font-bold text-rose-500 hover:bg-rose-50 transition-colors flex items-center gap-3"
+                                        >
+                                            <LogOut size={16} /> Sign Out
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             </header>
@@ -339,7 +415,6 @@ export default function MagisterHub({
                                     </div>
                                 )}
                             </div>
-                            {/* 🔥 NOW OPENS THE COHORT MANAGER MODAL */}
                             <button onClick={() => setIsCohortManagerOpen(true)} className="w-full mt-6 py-3 border-2 border-dashed border-slate-700 hover:border-slate-500 text-slate-400 hover:text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-colors flex items-center justify-center gap-2 relative z-10">
                                 <Plus size={16} /> Manage Roster
                             </button>
@@ -385,7 +460,6 @@ export default function MagisterHub({
                }}
             />
 
-            {/* 🔥 RENDER NEW MODAL */}
             <CohortManagerModal 
                 isOpen={isCohortManagerOpen}
                 onClose={() => setIsCohortManagerOpen(false)}
