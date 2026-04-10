@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { 
     X, Send, Search, Layers, FileText, 
     Milestone, ShieldCheck, Zap, Target,
-    Loader2, CheckCircle2 // 🔥 Added new icons for the deployment sequence
+    Loader2, CheckCircle2, Gamepad2, Presentation, Inbox, HelpCircle, Crown, Lock
 } from 'lucide-react';
 
 export default function DeploymentModal({ 
@@ -13,13 +13,16 @@ export default function DeploymentModal({
     activeClass, 
     lessons = [], 
     allDecks = {}, 
-    curriculums = [] 
+    curriculums = [],
+    isPro,             // 🔥 ADDED FREEMIUM GATE
+    onUpgradeRequest   // 🔥 ADDED UPGRADE TRIGGER
 }: any) {
     const [search, setSearch] = useState('');
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [selectedType, setSelectedType] = useState<'deck' | 'lesson' | 'curriculum'>('deck');
     
-    // 🔥 NEW: Tactical deployment state
+    // 🔥 NEW: Deployment Protocol State
+    const [deployMode, setDeployMode] = useState<'assign' | 'presentation' | 'trivia' | 'connect_four' | 'slipstream'>('assign');
     const [deployState, setDeployState] = useState<'idle' | 'deploying' | 'success'>('idle');
 
     if (!isOpen) return null;
@@ -37,6 +40,24 @@ export default function DeploymentModal({
         item.type === selectedType
     );
 
+    // Filter available modes based on the selected content type
+    const availableProtocols = [
+        { id: 'assign', label: 'Silent Assign', icon: Inbox, pro: false, validFor: ['lesson', 'deck', 'curriculum'] },
+        { id: 'presentation', label: 'Live Sync', icon: Presentation, pro: false, validFor: ['lesson'] },
+        { id: 'trivia', label: 'Trivia Arena', icon: HelpCircle, pro: false, validFor: ['deck'] },
+        { id: 'connect_four', label: 'Connect 4', icon: Gamepad2, pro: true, validFor: ['deck'] },
+        { id: 'slipstream', label: 'Slipstream', icon: Zap, pro: true, validFor: ['deck'] },
+    ].filter(p => p.validFor.includes(selectedType));
+
+    const handleProtocolClick = (protocolId: string, isPremium: boolean) => {
+        if (isPremium && !isPro) {
+            onClose(); // Close this modal to prevent stacking
+            if (onUpgradeRequest) onUpgradeRequest();
+        } else {
+            setDeployMode(protocolId as any);
+        }
+    };
+
     const handleDeploy = () => {
         if (!selectedId) return;
         
@@ -49,13 +70,14 @@ export default function DeploymentModal({
             
             // 3. Execute database change & close modal
             setTimeout(() => {
-                // 🔥 FIXED: Pass the string ID to match your Firestore schema
-                onDeploy(activeClass.id, selectedId);
+                // 🔥 UPDATED: Passing the selected mode alongside the IDs
+                onDeploy({ classId: activeClass.id, contentId: selectedId, mode: deployMode });
                 setDeployState('idle');
                 setSelectedId(null);
+                setDeployMode('assign');
                 onClose();
             }, 1000);
-        }, 1500); // 1.5 second artificial delay for tactical "feel"
+        }, 1500); 
     };
 
     return (
@@ -83,7 +105,7 @@ export default function DeploymentModal({
                 </div>
 
                 {/* Content Picker OR Deployment Screen */}
-                <div className="p-8 flex flex-col h-[500px] relative">
+                <div className="p-8 flex flex-col h-[550px] relative">
                     
                     {deployState !== 'idle' ? (
                         // 🔥 THE TACTICAL UPLINK SCREEN
@@ -96,7 +118,7 @@ export default function DeploymentModal({
                                         <Zap size={32} className="text-indigo-500 animate-pulse" />
                                     </div>
                                     <h3 className="text-2xl font-black uppercase tracking-tighter italic text-slate-900 dark:text-white mb-2">Establishing Uplink</h3>
-                                    <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] animate-pulse">Transmitting Payload to Fleet...</p>
+                                    <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] animate-pulse">Transmitting Protocol: {deployMode}...</p>
                                 </>
                             ) : (
                                 <>
@@ -110,9 +132,9 @@ export default function DeploymentModal({
                         </div>
                     ) : (
                         // STANDARD SELECTION SCREEN
-                        <>
+                        <div className="flex flex-col h-full">
                             {/* Tabs */}
-                            <div className="flex gap-2 mb-6">
+                            <div className="flex gap-2 mb-6 shrink-0">
                                 {[
                                     { id: 'deck', label: 'Flash Decks', icon: Layers },
                                     { id: 'lesson', label: 'Lessons', icon: FileText },
@@ -120,7 +142,11 @@ export default function DeploymentModal({
                                 ].map((tab) => (
                                     <button
                                         key={tab.id}
-                                        onClick={() => { setSelectedType(tab.id as any); setSelectedId(null); }}
+                                        onClick={() => { 
+                                            setSelectedType(tab.id as any); 
+                                            setSelectedId(null); 
+                                            setDeployMode('assign'); // Reset mode on tab switch
+                                        }}
                                         className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${
                                             selectedType === tab.id 
                                             ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20' 
@@ -133,7 +159,7 @@ export default function DeploymentModal({
                             </div>
 
                             {/* Search */}
-                            <div className="relative mb-6">
+                            <div className="relative mb-6 shrink-0">
                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                                 <input 
                                     type="text" 
@@ -144,8 +170,8 @@ export default function DeploymentModal({
                                 />
                             </div>
 
-                            {/* List */}
-                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-2">
+                            {/* Content List */}
+                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-2 mb-6">
                                 {filteredContent.length > 0 ? filteredContent.map((item: any) => (
                                     <button
                                         key={item.id}
@@ -178,7 +204,35 @@ export default function DeploymentModal({
                                     </div>
                                 )}
                             </div>
-                        </>
+
+                            {/* 🔥 NEW: DEPLOYMENT PROTOCOL SELECTOR */}
+                            {selectedId && availableProtocols.length > 0 && (
+                                <div className="shrink-0 animate-in slide-in-from-bottom-4 duration-300">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Select Deployment Protocol</label>
+                                    <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">
+                                        {availableProtocols.map(p => (
+                                            <button
+                                                key={p.id}
+                                                onClick={() => handleProtocolClick(p.id, p.pro)}
+                                                className={`flex-1 min-w-[120px] flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border-2 transition-all relative overflow-hidden ${
+                                                    deployMode === p.id 
+                                                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300' 
+                                                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-500 hover:border-indigo-300'
+                                                }`}
+                                            >
+                                                {p.pro && (
+                                                    <div className="absolute top-0 right-0 bg-amber-400 text-amber-950 p-1 rounded-bl-lg shadow-sm">
+                                                        <Crown size={10} strokeWidth={3} />
+                                                    </div>
+                                                )}
+                                                <p.icon size={18} className={deployMode === p.id ? 'text-indigo-500' : 'text-slate-400'} />
+                                                <span className="text-[10px] font-black uppercase tracking-widest">{p.label}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     )}
                 </div>
 
