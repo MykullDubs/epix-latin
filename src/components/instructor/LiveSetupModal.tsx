@@ -2,10 +2,20 @@
 import React, { useState, useEffect } from 'react';
 import { 
     X, Play, Users, Layers, MonitorPlay, 
-    Gamepad2, Brain, Zap, TabletSmartphone, BookOpen, Lock 
+    Gamepad2, Brain, Zap, TabletSmartphone, BookOpen, Lock, Crown // 🔥 IMPORTED CROWN
 } from 'lucide-react';
 
-export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = {}, lessons = [], onDeploy, preselectedContent }: any) {
+export default function LiveSetupModal({ 
+    isOpen, 
+    onClose, 
+    classes = [], 
+    decks = {}, 
+    lessons = [], 
+    onDeploy, 
+    preselectedContent,
+    isPro,              // 🔥 NEW PROP: Checks if user is premium
+    onUpgradeRequest    // 🔥 NEW PROP: Triggers the upgrade modal
+}: any) {
     const [selectedClassId, setSelectedClassId] = useState('');
     const [selectedMode, setSelectedMode] = useState<'hud' | 'presentation' | 'trivia' | 'connect_four' | 'slipstream' | ''>('');
     const [selectedContentId, setSelectedContentId] = useState('');
@@ -49,11 +59,19 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
         }
     };
 
-    const ModeButton = ({ id, icon: Icon, label, type, colorClass }: any) => {
+    // 🔥 UPDATED MODE BUTTON WITH PREMIUM GATING
+    const ModeButton = ({ id, icon: Icon, label, type, colorClass, isPremium = false }: any) => {
         const isSelected = selectedMode === id;
         return (
             <button 
                 onClick={() => {
+                    // 🔥 THE FREEMIUM INTERCEPTOR
+                    if (isPremium && !isPro) {
+                        onClose();
+                        if (onUpgradeRequest) onUpgradeRequest();
+                        return;
+                    }
+
                     const newModeRequiresLesson = id === 'hud' || id === 'presentation';
                     const currentModeRequiresLesson = selectedMode === 'hud' || selectedMode === 'presentation';
                     setSelectedMode(id);
@@ -62,14 +80,21 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
                         setSelectedContentId(''); 
                     }
                 }}
-                className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-2 text-center ${
+                className={`relative p-4 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-2 text-center overflow-hidden ${
                     isSelected 
                         ? `${colorClass} shadow-lg scale-105` 
                         : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-slate-300 dark:hover:border-slate-700'
                 }`}
             >
-                <Icon size={24} />
-                <div>
+                {/* 🔥 PREMIUM CROWN BADGE */}
+                {isPremium && (
+                    <div className="absolute top-0 right-0 bg-amber-400 text-amber-950 p-1 rounded-bl-lg shadow-sm z-10">
+                        <Crown size={10} strokeWidth={3} />
+                    </div>
+                )}
+
+                <Icon size={24} className="relative z-10" />
+                <div className="relative z-10">
                     <div className="text-xs font-black uppercase tracking-widest">{label}</div>
                     <div className="text-[9px] font-bold uppercase tracking-widest opacity-60 mt-0.5">Requires {type}</div>
                 </div>
@@ -104,7 +129,6 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
                             className="w-full bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-2xl px-5 py-4 outline-none focus:border-indigo-500 transition-all"
                         >
                             <option value="" disabled>Select a class...</option>
-                            {/* 🔥 NEW: Quick Launch / Sandbox Option */}
                             <option value="sandbox" className="font-black text-amber-600">⚡ Quick Launch (Test / Guest Mode)</option>
                             <optgroup label="Your Cohorts">
                                 {classes.map((c: any) => (
@@ -120,11 +144,14 @@ export default function LiveSetupModal({ isOpen, onClose, classes = [], decks = 
                             <Zap size={14} /> 2. Operating Mode
                         </label>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            {/* 🟢 FREE MODES */}
                             <ModeButton id="hud" icon={TabletSmartphone} label="Instructor HUD" type="Lesson" colorClass="bg-indigo-600 border-indigo-500 text-white" />
                             <ModeButton id="presentation" icon={MonitorPlay} label="Live Projector" type="Lesson" colorClass="bg-indigo-600 border-indigo-500 text-white" />
                             <ModeButton id="trivia" icon={Brain} label="Arena: Trivia" type="Deck" colorClass="bg-fuchsia-600 border-fuchsia-500 text-white" />
-                            <ModeButton id="connect_four" icon={Gamepad2} label="Squad Strike" type="Deck" colorClass="bg-emerald-600 border-emerald-500 text-white" />
-                            <ModeButton id="slipstream" icon={Zap} label="Slipstream" type="Deck" colorClass="bg-amber-500 border-amber-400 text-white" />
+                            
+                            {/* 👑 PREMIUM MODES */}
+                            <ModeButton id="connect_four" icon={Gamepad2} label="Squad Strike" type="Deck" colorClass="bg-emerald-600 border-emerald-500 text-white" isPremium={true} />
+                            <ModeButton id="slipstream" icon={Zap} label="Slipstream" type="Deck" colorClass="bg-amber-500 border-amber-400 text-white" isPremium={true} />
                         </div>
                     </div>
 
