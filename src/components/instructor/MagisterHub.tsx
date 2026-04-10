@@ -4,12 +4,13 @@ import {
     Wand2, MonitorPlay, Users, BookOpen, Plus, 
     Sparkles, Clock, ChevronRight, Play, MoreVertical, 
     Search, FolderOpen, Crown, PenTool, ArrowLeft,
-    LogOut, Settings, User, Share2, Trash2 // 🔥 IMPORTED NEW ICONS
+    LogOut, Settings, User, Share2, Trash2
 } from 'lucide-react';
 import LiveSetupModal from './LiveSetupModal';
 import BuilderHub from './BuilderHub'; 
 import LessonLibrary from './LessonLibrary'; 
 import CohortManagerModal from './CohortManagerModal'; 
+import { JuicyToast } from '../Toast'; // 🔥 IMPORTED TOAST
 
 export default function MagisterHub({ 
     userData, 
@@ -45,8 +46,8 @@ export default function MagisterHub({
     const [isCohortManagerOpen, setIsCohortManagerOpen] = useState(false); 
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false); 
     
-    // 🔥 NEW: State to track which lesson's 3-dot menu is currently open
     const [openLessonMenuId, setOpenLessonMenuId] = useState<string | null>(null);
+    const [toastMsg, setToastMsg] = useState<string | null>(null); // 🔥 NEW TOAST STATE
     
     const [preselectedContent, setPreselectedContent] = useState<{id: string, type: string} | null>(null);
     const [preselectedClassId, setPreselectedClassId] = useState<string | null>(null);
@@ -156,6 +157,9 @@ export default function MagisterHub({
     // ========================================================================
     return (
         <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-24 relative">
+            {/* 🔥 RENDER TOAST OVERLAY */}
+            {toastMsg && <JuicyToast message={toastMsg} onClose={() => setToastMsg(null)} />}
+
             <header className="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center sticky top-0 z-40 shadow-sm">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-indigo-600 rounded-[1rem] flex items-center justify-center text-white shadow-lg shadow-indigo-600/20">
@@ -341,7 +345,6 @@ export default function MagisterHub({
                                                         )}
                                                     </div>
                                                     
-                                                    {/* 🔥 THE NEW THREE-DOT DROPDOWN MENU */}
                                                     <div className="relative">
                                                         <button 
                                                             className="text-white/70 hover:text-white p-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-full backdrop-blur-md" 
@@ -367,16 +370,20 @@ export default function MagisterHub({
                                                                     >
                                                                         <PenTool size={14} /> Edit Lesson
                                                                     </button>
+                                                                    
+                                                                    {/* 🔥 THE SHARE BUTTON NOW FIRES A TOAST */}
                                                                     <button 
                                                                         onClick={(e) => { 
                                                                             e.stopPropagation(); 
                                                                             setOpenLessonMenuId(null); 
                                                                             navigator.clipboard.writeText(`${window.location.origin}/?lessonId=${lesson.id}`);
+                                                                            setToastMsg("Share link copied to clipboard! ✨");
                                                                         }}
                                                                         className="w-full px-4 py-2 text-left text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex items-center gap-2"
                                                                     >
                                                                         <Share2 size={14} /> Copy Share Link
                                                                     </button>
+
                                                                     <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
                                                                     <button 
                                                                         onClick={(e) => { 
