@@ -97,8 +97,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
         Schema: [{ "type": "dialogue", "lines": [{ "speaker": "Name 1", "text": "What they say", "translation": "Context or translation", "side": "left" }, { "speaker": "Name 2", "text": "Reply", "translation": "Context or translation", "side": "right" }] }]`;
 
         try {
-            // 🚀 USING GEMINI 3.1 FLASH-LITE PREVIEW
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`, {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -184,76 +183,41 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
             });
         }
 
-        // 🚀 USING GEMINI 3.1 FLASH-LITE PREVIEW
-        const textRequest = fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ role: "user", parts: parts }],
-                generationConfig: {
-                    responseMimeType: "application/json" 
-                }
-            })
-        });
-
-        let imageRequest: Promise<Response> | null = null;
+        // 🚀 POLLINATIONS.AI ZERO-CONFIG URL GENERATION
+        let heroImageUrl = null;
         if (selectedTypes.image) {
             const imageSubject = prompt.trim() || (pdfFileName ? pdfFileName.replace('.pdf', '') : 'a classroom concept');
             const imagePrompt = `A beautiful, modern, clean educational vector illustration representing the concept of: ${imageSubject}. Minimalist background, vibrant colors, no text or words in the image.`;
             
-            // 🚀 USING GEMINI 3.1 FLASH IMAGE VIA GENERATECONTENT
-            imageRequest = fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ role: "user", parts: [{ text: imagePrompt }] }]
-                })
-            });
+            // Random seed locks the generated image so it doesn't change every time the component remounts
+            const seed = Math.floor(Math.random() * 10000000);
+            heroImageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?seed=${seed}&width=1280&height=720&nologo=true`;
         }
 
         try {
-            const promises: Promise<any>[] = [textRequest];
-            if (imageRequest) promises.push(imageRequest);
-
-            const results = await Promise.allSettled(promises);
-
-            const textRes = results[0];
-            if (textRes.status === 'rejected') throw new Error("Network connection failed.");
+            // ONLY AWAITING THE TEXT REQUEST NOW! MUCH FASTER.
+            const textRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ role: "user", parts: parts }],
+                    generationConfig: {
+                        responseMimeType: "application/json" 
+                    }
+                })
+            });
             
-            if (!textRes.value.ok) {
-                const errData = await textRes.value.json();
-                throw new Error(errData?.error?.message || `Google API Error (${textRes.value.status})`);
+            if (!textRes.ok) {
+                const errData = await textRes.json();
+                throw new Error(errData?.error?.message || `Google API Error (${textRes.status})`);
             }
             
-            const textData = await textRes.value.json();
+            const textData = await textRes.json();
             let rawText = textData.candidates[0].content.parts[0].text;
             rawText = rawText.replace(/^\x60\x60\x60(?:json)?\s*/i, '').replace(/\x60\x60\x60\s*$/i, '').trim();
             const generatedBlocks = JSON.parse(rawText);
             
             if (!Array.isArray(generatedBlocks)) throw new Error("AI did not return the correct array schema.");
-
-            let heroImageUrl = null;
-            if (selectedTypes.image && results[1] && results[1].status === 'fulfilled') {
-                if (results[1].value.ok) {
-                    try {
-                        const imgData = await results[1].value.json();
-                        // 🔥 EXTRACTING BASE64 FROM NEW GENERATECONTENT SCHEMA
-                        const base64Image = imgData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data; 
-                        const mimeType = imgData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.mimeType || 'image/png';
-                        
-                        if (base64Image) {
-                            heroImageUrl = `data:${mimeType};base64,${base64Image}`;
-                        } else {
-                            console.warn("Imagen returned OK, but no image data found:", imgData);
-                        }
-                    } catch (imgError) {
-                        console.warn("Image parsing failed:", imgError);
-                    }
-                } else {
-                    const imgErrData = await results[1].value.json();
-                    console.error("IMAGE API REJECTED REQUEST. Full Error:", imgErrData); 
-                }
-            }
 
             // INJECT HERO IMAGE AT THE VERY TOP
             if (heroImageUrl) {
@@ -299,7 +263,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
                         </div>
                         <div>
                             <h2 className="text-lg font-black uppercase tracking-widest leading-none">Magic Generator</h2>
-                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">Powered by Gemini 3.1 Flash-Lite</p>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">Powered by Gemini 3.1 & Pollinations.ai</p>
                         </div>
                     </div>
 
