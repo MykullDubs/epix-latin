@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
     Code, Trash2, AlignLeft, FileText, MessageSquare, 
     List, HelpCircle, Image, Puzzle, MessageCircle, Gamepad2, X, Info, Activity, Mic, Play, Tag, ChevronUp, ChevronDown,
-    Wand2 
+    Wand2, Presentation // 🔥 IMPORTED PRESENTATION ICON
 } from 'lucide-react';
 import AiGeneratorModal from './AiGeneratorModal'; 
 
@@ -95,6 +95,16 @@ export default function LessonBuilderView({
         pairs: [
             { id: Date.now(), p1: 'i', p2: 'ɪ', w1: 'sheep', w2: 'ship', focus: 'Vowel Tension' }
         ] 
+      },
+      // 🔥 ADDED THE GRAMMAR TEMPLATE HERE
+      grammar: {
+          type: 'grammar',
+          title: 'Grammar Focus',
+          rule: 'Explain the rule clearly here...',
+          formula: 'Subject + Verb + Object',
+          examples: [
+              { en: "This is an example sentence.", target: "example sentence", note: "Optional context" }
+          ]
       }
     };
     
@@ -522,22 +532,94 @@ export default function LessonBuilderView({
                   </div>
                 )}
 
+                {/* 🔥 NEW: GRAMMAR BLOCK EDITOR */}
+                {block.type === 'grammar' && (
+                  <div className="space-y-6 bg-cyan-50/50 dark:bg-cyan-500/10 p-6 rounded-3xl border border-cyan-100 dark:border-cyan-900/50">
+                     <div className="flex items-center gap-2 mb-2">
+                        <Presentation size={18} className="text-cyan-600" strokeWidth={3} />
+                        <span className="text-xs font-black uppercase tracking-widest text-cyan-800 dark:text-cyan-400">Grammar Whiteboard</span>
+                     </div>
+                     
+                     <input 
+                        className="w-full bg-white dark:bg-slate-900 dark:text-white border border-cyan-200 dark:border-cyan-800/50 p-4 rounded-2xl text-lg font-black focus:ring-2 focus:ring-cyan-300 outline-none shadow-sm" 
+                        placeholder="Title (e.g., The Present Perfect)" 
+                        value={block.title || ''} 
+                        onChange={e => updateBlock(idx, 'title', e.target.value)} 
+                     />
+                     
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-cyan-600 uppercase tracking-widest ml-1">Rule / Explanation</label>
+                        <textarea 
+                           className="w-full bg-white dark:bg-slate-900 dark:text-slate-300 border border-cyan-200 dark:border-cyan-800/50 p-4 rounded-2xl text-sm font-medium resize-none h-20 focus:ring-2 focus:ring-cyan-300 outline-none shadow-sm" 
+                           placeholder="Explain when and why to use this grammar..." 
+                           value={block.rule || ''} 
+                           onChange={e => updateBlock(idx, 'rule', e.target.value)} 
+                        />
+                     </div>
+
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-cyan-600 uppercase tracking-widest ml-1">Structure Formula</label>
+                        <input 
+                           className="w-full bg-slate-900 dark:bg-slate-950 text-cyan-400 border border-cyan-200 dark:border-cyan-800/50 p-4 rounded-2xl text-sm font-mono font-bold focus:ring-2 focus:ring-cyan-300 outline-none shadow-inner" 
+                           placeholder="Subject + have/has + Past Participle" 
+                           value={block.formula || ''} 
+                           onChange={e => updateBlock(idx, 'formula', e.target.value)} 
+                        />
+                     </div>
+
+                     <div className="pt-2 space-y-3">
+                        <label className="text-[10px] font-black text-cyan-600 uppercase tracking-widest ml-1">Drill Examples</label>
+                        {(block.examples || []).map((ex: any, eIdx: number) => (
+                           <div key={eIdx} className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-cyan-100 dark:border-cyan-800/50 shadow-sm relative group/ex space-y-3">
+                              <button onClick={() => { const newEx = block.examples.filter((_:any, i:number) => i !== eIdx); updateBlock(idx, 'examples', newEx); }} className="absolute top-4 right-4 text-slate-300 hover:text-rose-500 opacity-0 group-hover/ex:opacity-100 transition-opacity"><X size={16}/></button>
+                              
+                              <input 
+                                 className="w-[85%] bg-slate-50 dark:bg-slate-950 dark:text-white border border-slate-100 dark:border-slate-800 p-3 rounded-xl text-sm font-bold focus:ring-2 focus:ring-cyan-200 outline-none" 
+                                 placeholder="Full sentence (e.g. I have eaten sushi.)" 
+                                 value={ex.en || ''} 
+                                 onChange={e => { const newEx = [...block.examples]; newEx[eIdx].en = e.target.value; updateBlock(idx, 'examples', newEx); }} 
+                              />
+                              <div className="flex gap-3">
+                                 <input 
+                                    className="w-1/3 bg-cyan-50 dark:bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-100 dark:border-cyan-500/30 p-3 rounded-xl text-xs font-black outline-none" 
+                                    placeholder="Target words to highlight" 
+                                    value={ex.target || ''} 
+                                    onChange={e => { const newEx = [...block.examples]; newEx[eIdx].target = e.target.value; updateBlock(idx, 'examples', newEx); }} 
+                                 />
+                                 <input 
+                                    className="flex-1 bg-white dark:bg-slate-900 text-slate-500 border border-slate-100 dark:border-slate-800 p-3 rounded-xl text-xs italic outline-none" 
+                                    placeholder="Context Note (Optional)" 
+                                    value={ex.note || ''} 
+                                    onChange={e => { const newEx = [...block.examples]; newEx[eIdx].note = e.target.value; updateBlock(idx, 'examples', newEx); }} 
+                                 />
+                              </div>
+                           </div>
+                        ))}
+                        <button onClick={() => updateBlock(idx, 'examples', [...(block.examples||[]), { en: '', target: '', note: '' }])} className="w-full py-3 border-2 border-dashed border-cyan-200 dark:border-cyan-800/50 rounded-2xl text-xs font-black uppercase tracking-widest text-cyan-500 hover:text-cyan-600 hover:border-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-500/10 transition-colors">+ Add Example</button>
+                     </div>
+                  </div>
+                )}
+
               </div>
               );
             })}
           </div>
 
+          {/* THE INJECTOR GRID */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 pt-12 pb-12 border-t border-slate-100 dark:border-slate-800">
              <InjectorButton icon={<AlignLeft/>} label="Text" subtitle="Paragraphs" colorTheme="slate" onClick={() => addBlock('text')} />
              <InjectorButton icon={<FileText/>} label="Essay" subtitle="Long Form" colorTheme="slate" onClick={() => addBlock('essay')} />
              <InjectorButton icon={<Info/>} label="Callout" subtitle="Pro Tips" colorTheme="amber" onClick={() => addBlock('callout')} /> 
              <InjectorButton icon={<MessageSquare/>} label="Dialogue" subtitle="Conversations" colorTheme="blue" onClick={() => addBlock('dialogue')} />
              
+             {/* 🔥 THE NEW GRAMMAR INJECTOR BUTTON */}
+             <InjectorButton icon={<Presentation/>} label="Grammar" subtitle="Whiteboard" colorTheme="cyan" onClick={() => addBlock('grammar')} />
+             
              <InjectorButton icon={<List/>} label="Vocab" subtitle="Glossary" colorTheme="fuchsia" onClick={() => addBlock('vocab-list')} />
              <InjectorButton icon={<HelpCircle/>} label="Quiz" subtitle="Assessments" colorTheme="indigo" onClick={() => addBlock('quiz')} />
              <InjectorButton icon={<Image/>} label="Visual" subtitle="Media & Images" colorTheme="cyan" onClick={() => addBlock('image')} />
-             <InjectorButton icon={<Puzzle/>} label="Fill Blank" subtitle="Interactive Text" colorTheme="emerald" onClick={() => addBlock('fill-blank')} />
              
+             <InjectorButton icon={<Puzzle/>} label="Fill Blank" subtitle="Interactive Text" colorTheme="emerald" onClick={() => addBlock('fill-blank')} />
              <InjectorButton icon={<MessageCircle/>} label="Discussion" subtitle="Live Forums" colorTheme="violet" onClick={() => addBlock('discussion')} />
              <InjectorButton icon={<Gamepad2/>} label="Game" subtitle="Multiplayer" colorTheme="rose" onClick={() => addBlock('game')} />
              <InjectorButton icon={<Mic/>} label="Pronunciation" subtitle="Lab Matrix" colorTheme="emerald" onClick={() => addBlock('pronunciation')} />
