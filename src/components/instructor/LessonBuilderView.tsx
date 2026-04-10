@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
     Code, Trash2, AlignLeft, FileText, MessageSquare, 
     List, HelpCircle, Image, Puzzle, MessageCircle, Gamepad2, X, Info, Activity, Mic, Play, Tag, ChevronUp, ChevronDown,
-    Wand2, Presentation, Crown // 🔥 IMPORTED CROWN ICON
+    Wand2, Presentation, Crown, Search // 🔥 IMPORTED CROWN ICON
 } from 'lucide-react';
 import AiGeneratorModal from './AiGeneratorModal'; 
 
