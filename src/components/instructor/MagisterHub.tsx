@@ -6,7 +6,7 @@ import {
     Search, FolderOpen, Crown, PenTool, ArrowLeft
 } from 'lucide-react';
 import LiveSetupModal from './LiveSetupModal';
-import BuilderHub from './BuilderHub'; // 🔥 IMPORT THE BUILDER
+import BuilderHub from './BuilderHub'; 
 
 export default function MagisterHub({ 
     userData, 
@@ -20,12 +20,12 @@ export default function MagisterHub({
     onStartVocabGame,
     onStartConnectFour,
     onStartSlipstream,
-    onSaveLesson,     // 🔥 BUILDER PROPS
-    onSaveCard,       // 🔥 BUILDER PROPS
-    onUpdateCard,     // 🔥 BUILDER PROPS
-    onDeleteCard,     // 🔥 BUILDER PROPS
-    onSaveCurriculum, // 🔥 BUILDER PROPS
-    onPublishDeck,    // 🔥 BUILDER PROPS
+    onSaveLesson,     
+    onSaveCard,       
+    onUpdateCard,     
+    onDeleteCard,     
+    onSaveCurriculum, 
+    onPublishDeck,    
     onSwitchToAdvancedView 
 }: any) {
     // 🔥 LOCAL ROUTING STATE
@@ -60,7 +60,6 @@ export default function MagisterHub({
         return classes.slice(0, 4);
     }, [classes]);
 
-    // 🔥 NAV HANDLERS FOR FREEMIUM BUILDER
     const handleOpenBuilder = (targetId: string) => {
         setStudioTargetId(targetId);
         setLocalView('builder');
@@ -72,7 +71,6 @@ export default function MagisterHub({
     if (localView === 'builder') {
         return (
             <div className="h-screen w-full flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors animate-in fade-in duration-300">
-                 {/* Top Navigation Bar */}
                  <div className="h-16 px-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 shrink-0 shadow-sm z-50">
                      <button 
                          onClick={() => setLocalView('hub')} 
@@ -88,10 +86,9 @@ export default function MagisterHub({
                      </button>
                  </div>
 
-                 {/* The Actual Editor */}
                  <div className="flex-1 overflow-hidden relative">
                      <BuilderHub 
-                         userData={userData} // Allows the paywall to check uses!
+                         userData={userData} 
                          onSaveLesson={onSaveLesson}
                          onSaveCard={onSaveCard}
                          onUpdateCard={onUpdateCard}
@@ -162,13 +159,13 @@ export default function MagisterHub({
                     
                     <div className="flex flex-wrap gap-3">
                         <button 
-                            onClick={() => handleOpenBuilder('generate')} // 🔥 USES LOCAL BUILDER
+                            onClick={() => handleOpenBuilder('generate')} 
                             className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white px-6 py-3 rounded-2xl font-black text-sm shadow-lg shadow-indigo-600/30 transition-all active:scale-95 flex items-center gap-2"
                         >
                             <Wand2 size={18} /> Magic Generate Lesson
                         </button>
                         <button 
-                            onClick={() => handleOpenBuilder('new')} // 🔥 USES LOCAL BUILDER
+                            onClick={() => handleOpenBuilder('new')} 
                             className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-6 py-3 rounded-2xl font-black text-sm shadow-sm transition-all active:scale-95 flex items-center gap-2"
                         >
                             <Plus size={18} /> Blank Canvas
@@ -198,54 +195,76 @@ export default function MagisterHub({
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                                {activeLessons.map((lesson: any) => (
-                                    <div 
-                                        key={lesson.id} 
-                                        className="bg-white rounded-[2rem] p-6 border border-slate-200 shadow-sm hover:shadow-xl hover:border-indigo-300 transition-all duration-300 group flex flex-col cursor-pointer relative overflow-hidden" 
-                                        onClick={() => {
-                                            setPreselectedContent({ id: lesson.id, type: 'lesson' });
-                                            setIsLiveModalOpen(true);
-                                        }}
-                                    >
-                                        <div className="flex justify-between items-start mb-4">
-                                            <div className="flex items-center gap-2">
-                                                <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-widest line-clamp-1 max-w-[120px]">
-                                                    {lesson.subject || 'General'}
-                                                </span>
-                                                {lesson.generatedByAI && (
-                                                    <span className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
-                                                        <Sparkles size={10} /> AI
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <button className="text-slate-400 hover:text-slate-600 p-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); onSwitchToAdvancedView(); }}>
-                                                <MoreVertical size={16} />
-                                            </button>
-                                        </div>
+                                {activeLessons.map((lesson: any) => {
+                                    // 🔥 1. EXTRACT THE HERO IMAGE
+                                    const heroImage = lesson.blocks?.find((b: any) => b.type === 'image')?.url;
 
-                                        <h3 className="text-lg font-black text-slate-800 leading-tight mb-2 group-hover:text-indigo-600 transition-colors line-clamp-2 relative z-10">
-                                            {lesson.title}
-                                        </h3>
-                                        
-                                        <div className="mt-auto pt-6 flex items-center justify-between text-xs font-bold text-slate-500 relative z-10">
-                                            <span className="flex items-center gap-1.5"><BookOpen size={14} /> {lesson.cards?.length || 0} Slides</span>
-                                            <span className="flex items-center gap-1.5"><Clock size={14} /> {formatTimeAgo(lesson.updatedAt || lesson.createdAt)}</span>
+                                    return (
+                                        <div 
+                                            key={lesson.id} 
+                                            className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl hover:border-indigo-300 transition-all duration-300 group flex flex-col cursor-pointer relative overflow-hidden" 
+                                            onClick={() => {
+                                                setPreselectedContent({ id: lesson.id, type: 'lesson' });
+                                                setIsLiveModalOpen(true);
+                                            }}
+                                        >
+                                            {/* 🔥 2. HERO IMAGE BANNER */}
+                                            <div className="h-32 w-full bg-slate-100 dark:bg-slate-800 relative overflow-hidden shrink-0">
+                                                {heroImage ? (
+                                                    <img src={heroImage} alt="Lesson Cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                                                ) : (
+                                                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 flex items-center justify-center">
+                                                        <BookOpen size={32} className="text-indigo-200 dark:text-indigo-800/50" />
+                                                    </div>
+                                                )}
+                                                {/* Gradient overlay to make text pop */}
+                                                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent" />
+                                                
+                                                {/* Badges moved over the image */}
+                                                <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="px-3 py-1 bg-white/20 backdrop-blur-md text-white rounded-lg text-[10px] font-black uppercase tracking-widest line-clamp-1 max-w-[120px] border border-white/20 shadow-sm">
+                                                            {lesson.subject || 'General'}
+                                                        </span>
+                                                        {lesson.generatedByAI && (
+                                                            <span className="px-2 py-1 bg-indigo-500/80 backdrop-blur-md text-white rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1 shadow-sm border border-indigo-400/30">
+                                                                <Sparkles size={10} /> AI
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <button className="text-white/70 hover:text-white p-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-full backdrop-blur-md" onClick={(e) => { e.stopPropagation(); onSwitchToAdvancedView(); }}>
+                                                        <MoreVertical size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* CONTENT WRAPPER */}
+                                            <div className="p-6 flex flex-col flex-1">
+                                                <h3 className="text-lg font-black text-slate-800 dark:text-white leading-tight mb-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-2 relative z-10">
+                                                    {lesson.title}
+                                                </h3>
+                                                
+                                                <div className="mt-auto pt-4 flex items-center justify-between text-xs font-bold text-slate-500 relative z-10">
+                                                    <span className="flex items-center gap-1.5"><BookOpen size={14} /> {lesson.cards?.length || lesson.blocks?.length || 0} Blocks</span>
+                                                    <span className="flex items-center gap-1.5"><Clock size={14} /> {formatTimeAgo(lesson.updatedAt || lesson.createdAt)}</span>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* EDIT ACTION HOVER */}
+                                            <div className="absolute inset-x-0 bottom-0 p-4 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-300 flex justify-center pointer-events-none z-20">
+                                                <button 
+                                                    onClick={(e) => { 
+                                                        e.stopPropagation(); 
+                                                        handleOpenBuilder(lesson.id);
+                                                    }} 
+                                                    className="pointer-events-auto bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-600 hover:text-white w-full py-3 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 shadow-lg transition-colors border border-indigo-100 dark:border-indigo-500/30 hover:border-indigo-600"
+                                                >
+                                                    <PenTool size={14} /> Edit Canvas
+                                                </button>
+                                            </div>
                                         </div>
-                                        
-                                        {/* 🔥 EDIT ACTION USES LOCAL BUILDER */}
-                                        <div className="absolute inset-x-0 bottom-0 p-4 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-300 flex justify-center pointer-events-none z-20">
-                                            <button 
-                                                onClick={(e) => { 
-                                                    e.stopPropagation(); 
-                                                    handleOpenBuilder(lesson.id);
-                                                }} 
-                                                className="pointer-events-auto bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white w-full py-3 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 shadow-lg transition-colors border border-indigo-100 hover:border-indigo-600"
-                                            >
-                                                <PenTool size={14} /> Edit Canvas
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
