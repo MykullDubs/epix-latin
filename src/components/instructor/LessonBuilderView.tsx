@@ -3,11 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { 
     Code, Trash2, AlignLeft, FileText, MessageSquare, 
     List, HelpCircle, Image, Puzzle, MessageCircle, Gamepad2, X, Info, Activity, Mic, Play, Tag, ChevronUp, ChevronDown,
-    Wand2, Presentation // 🔥 IMPORTED PRESENTATION ICON
+    Wand2, Presentation, Crown // 🔥 IMPORTED CROWN ICON
 } from 'lucide-react';
 import AiGeneratorModal from './AiGeneratorModal'; 
 
-export function InjectorButton({ icon, label, subtitle, onClick, colorTheme = 'indigo' }: any) {
+export function InjectorButton({ icon, label, subtitle, onClick, colorTheme = 'indigo', isPremium = false }: any) {
     const themeMap: Record<string, { bg: string, text: string, ring: string, iconBg: string, iconText: string }> = {
         indigo: { bg: 'bg-indigo-50 dark:bg-indigo-500/10', text: 'text-indigo-900 dark:text-indigo-100', ring: 'ring-1 ring-indigo-100 dark:ring-indigo-500/20 hover:ring-indigo-300', iconBg: 'bg-indigo-200 dark:bg-indigo-500/30', iconText: 'text-indigo-700 dark:text-indigo-300' },
         emerald: { bg: 'bg-emerald-50 dark:bg-emerald-500/10', text: 'text-emerald-900 dark:text-emerald-100', ring: 'ring-1 ring-emerald-100 dark:ring-emerald-500/20 hover:ring-emerald-300', iconBg: 'bg-emerald-200 dark:bg-emerald-500/30', iconText: 'text-emerald-700 dark:text-emerald-300' },
@@ -25,12 +25,20 @@ export function InjectorButton({ icon, label, subtitle, onClick, colorTheme = 'i
     return (
         <button 
             onClick={onClick} 
-            className={`w-full p-4 md:p-5 ${t.bg} rounded-[2rem] flex flex-col justify-between group shadow-sm hover:shadow-md active:scale-[0.98] transition-all h-32 md:h-36 ${t.ring}`}
+            className={`w-full p-4 md:p-5 ${t.bg} rounded-[2rem] flex flex-col justify-between group shadow-sm hover:shadow-md active:scale-[0.98] transition-all h-32 md:h-36 ${t.ring} relative overflow-hidden`}
         >
-            <div className={`w-10 h-10 md:w-12 md:h-12 ${t.iconBg} rounded-2xl flex items-center justify-center transition-colors group-hover:scale-110`}>
+            {/* 🔥 NEW: PREMIUM CROWN BADGE */}
+            {isPremium && (
+                <div className="absolute top-0 right-0 bg-amber-400 text-amber-900 px-2 py-1 rounded-bl-xl font-black flex items-center justify-center shadow-sm z-10">
+                    <Crown size={12} strokeWidth={3} />
+                </div>
+            )}
+            
+            <div className={`w-10 h-10 md:w-12 md:h-12 ${t.iconBg} rounded-2xl flex items-center justify-center transition-colors group-hover:scale-110 relative z-10`}>
                 {React.cloneElement(icon, { className: t.iconText, size: 20 })}
             </div>
-            <div className="text-left mt-auto">
+            
+            <div className="text-left mt-auto relative z-10">
                 <span className={`font-black text-sm md:text-base uppercase tracking-tighter block leading-none mb-1 ${t.text}`}>{label}</span>
                 <span className={`text-[9px] font-bold ${t.iconText} uppercase tracking-widest opacity-80`}>{subtitle}</span>
             </div>
@@ -53,12 +61,22 @@ export default function LessonBuilderView({
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [newlyAddedIndices, setNewlyAddedIndices] = useState<number[]>([]);
 
+  // 🔥 FREEMIUM GATE CHECK
+  const isPro = userData?.subscriptionTier === 'pro';
+
   const handleMagicGenerateClick = () => {
-      const isPro = userData?.subscriptionTier === 'pro';
       const aiUses = userData?.magicGenerationsCount || 0;
       
       if (isPro || aiUses < 3) {
           setIsAiModalOpen(true);
+      } else {
+          setIsUpgradeModalOpen(true);
+      }
+  };
+
+  const handlePremiumBlockClick = (type: string) => {
+      if (isPro) {
+          addBlock(type);
       } else {
           setIsUpgradeModalOpen(true);
       }
@@ -96,7 +114,6 @@ export default function LessonBuilderView({
             { id: Date.now(), p1: 'i', p2: 'ɪ', w1: 'sheep', w2: 'ship', focus: 'Vowel Tension' }
         ] 
       },
-      // 🔥 ADDED THE GRAMMAR TEMPLATE HERE
       grammar: {
           type: 'grammar',
           title: 'Grammar Focus',
@@ -105,6 +122,16 @@ export default function LessonBuilderView({
           examples: [
               { en: "This is an example sentence.", target: "example sentence", note: "Optional context" }
           ]
+      },
+      // 🔥 PREMIUM TEMPLATES
+      'audio-story': { type: 'audio-story', title: 'Listening Comprehension', text: 'Once upon a time...', imageUrl: '' },
+      'image-hotspot': { type: 'image-hotspot', title: 'Explore the Map', imageUrl: '', hotspots: [{ x: 50, y: 50, title: 'Landmark', description: 'Description here' }] },
+      'drawing': { type: 'drawing', title: 'Draw the concept!' },
+      'roleplay': { 
+          type: 'roleplay', 
+          title: 'Live Conversation Simulation', 
+          prompt: 'A customer is ordering a coffee.',
+          metadata: { aiPersona: 'Barista', studentRole: 'Customer', objective: 'Successfully order a latte.' }
       }
     };
     
@@ -181,15 +208,15 @@ export default function LessonBuilderView({
           <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
               <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsUpgradeModalOpen(false)} />
               <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 max-w-sm w-full relative z-10 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-300 text-center">
-                  <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center text-white mx-auto mb-6 shadow-lg shadow-indigo-500/30">
-                      <Wand2 size={32} strokeWidth={2.5} />
+                  <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-500 rounded-2xl flex items-center justify-center text-white mx-auto mb-6 shadow-lg shadow-amber-500/30">
+                      <Crown size={32} strokeWidth={2.5} />
                   </div>
-                  <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Out of Magic!</h2>
+                  <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Magister Pro Feature</h2>
                   <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
-                      You've used all 3 of your free AI generations. Upgrade to Magister Pro for unlimited AI scenario building, premium assets, and priority support.
+                      Upgrade to Magister Pro to unlock unlimited AI generations, premium interactive blocks (like Audio Stories and Roleplay), and priority support.
                   </p>
                   <div className="space-y-3">
-                      <button className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black uppercase tracking-widest text-[10px] py-4 rounded-xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all">
+                      <button className="w-full bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-amber-950 font-black uppercase tracking-widest text-[10px] py-4 rounded-xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all">
                           Upgrade to Pro — $15/mo
                       </button>
                       <button onClick={() => setIsUpgradeModalOpen(false)} className="w-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-black uppercase tracking-widest text-[10px] py-4 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
@@ -532,7 +559,7 @@ export default function LessonBuilderView({
                   </div>
                 )}
 
-                {/* 🔥 NEW: GRAMMAR BLOCK EDITOR */}
+                {/* 🔥 GRAMMAR BLOCK EDITOR */}
                 {block.type === 'grammar' && (
                   <div className="space-y-6 bg-cyan-50/50 dark:bg-cyan-500/10 p-6 rounded-3xl border border-cyan-100 dark:border-cyan-900/50">
                      <div className="flex items-center gap-2 mb-2">
@@ -607,22 +634,36 @@ export default function LessonBuilderView({
 
           {/* THE INJECTOR GRID */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 pt-12 pb-12 border-t border-slate-100 dark:border-slate-800">
+             {/* 🟢 STANDARD BLOCKS (FREE) */}
              <InjectorButton icon={<AlignLeft/>} label="Text" subtitle="Paragraphs" colorTheme="slate" onClick={() => addBlock('text')} />
              <InjectorButton icon={<FileText/>} label="Essay" subtitle="Long Form" colorTheme="slate" onClick={() => addBlock('essay')} />
              <InjectorButton icon={<Info/>} label="Callout" subtitle="Pro Tips" colorTheme="amber" onClick={() => addBlock('callout')} /> 
              <InjectorButton icon={<MessageSquare/>} label="Dialogue" subtitle="Conversations" colorTheme="blue" onClick={() => addBlock('dialogue')} />
-             
-             {/* 🔥 THE NEW GRAMMAR INJECTOR BUTTON */}
              <InjectorButton icon={<Presentation/>} label="Grammar" subtitle="Whiteboard" colorTheme="cyan" onClick={() => addBlock('grammar')} />
-             
              <InjectorButton icon={<List/>} label="Vocab" subtitle="Glossary" colorTheme="fuchsia" onClick={() => addBlock('vocab-list')} />
              <InjectorButton icon={<HelpCircle/>} label="Quiz" subtitle="Assessments" colorTheme="indigo" onClick={() => addBlock('quiz')} />
              <InjectorButton icon={<Image/>} label="Visual" subtitle="Media & Images" colorTheme="cyan" onClick={() => addBlock('image')} />
-             
              <InjectorButton icon={<Puzzle/>} label="Fill Blank" subtitle="Interactive Text" colorTheme="emerald" onClick={() => addBlock('fill-blank')} />
              <InjectorButton icon={<MessageCircle/>} label="Discussion" subtitle="Live Forums" colorTheme="violet" onClick={() => addBlock('discussion')} />
-             <InjectorButton icon={<Gamepad2/>} label="Game" subtitle="Multiplayer" colorTheme="rose" onClick={() => addBlock('game')} />
              <InjectorButton icon={<Mic/>} label="Pronunciation" subtitle="Lab Matrix" colorTheme="emerald" onClick={() => addBlock('pronunciation')} />
+             
+             {/* 👑 PREMIUM BLOCKS (PRO) */}
+             <InjectorButton 
+                 icon={<Gamepad2/>} label="Game" subtitle="Multiplayer" colorTheme="rose" isPremium={true} 
+                 onClick={() => handlePremiumBlockClick('game')} 
+             />
+             <InjectorButton 
+                 icon={<Activity/>} label="Audio Story" subtitle="Listening Comp" colorTheme="indigo" isPremium={true} 
+                 onClick={() => handlePremiumBlockClick('audio-story')} 
+             />
+             <InjectorButton 
+                 icon={<Search/>} label="Hotspot" subtitle="Interactive Map" colorTheme="cyan" isPremium={true} 
+                 onClick={() => handlePremiumBlockClick('image-hotspot')} 
+             />
+             <InjectorButton 
+                 icon={<Wand2/>} label="Roleplay" subtitle="AI Simulation" colorTheme="fuchsia" isPremium={true} 
+                 onClick={() => handlePremiumBlockClick('roleplay')} 
+             />
           </div>
         </div>
       )}
