@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import LiveSetupModal from './LiveSetupModal';
 import BuilderHub from './BuilderHub'; 
+import LessonLibrary from './LessonLibrary'; // 🔥 IMPORTED THE NEW LIBRARY
 
 export default function MagisterHub({ 
     userData, 
@@ -23,13 +24,14 @@ export default function MagisterHub({
     onSaveLesson,     
     onSaveCard,       
     onUpdateCard,     
-    onDeleteCard,     
+    onDeleteCard, 
+    onDeleteLesson,   // 🔥 NEW: Pass down the delete action for the library
     onSaveCurriculum, 
     onPublishDeck,    
     onSwitchToAdvancedView 
 }: any) {
-    // 🔥 LOCAL ROUTING STATE
-    const [localView, setLocalView] = useState<'hub' | 'builder'>('hub');
+    // 🔥 LOCAL ROUTING STATE NOW INCLUDES 'library'
+    const [localView, setLocalView] = useState<'hub' | 'builder' | 'library'>('hub');
     const [studioTargetId, setStudioTargetId] = useState<string | null>(null);
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -64,6 +66,25 @@ export default function MagisterHub({
         setStudioTargetId(targetId);
         setLocalView('builder');
     };
+
+    // ========================================================================
+    // 🔥 LESSON LIBRARY VIEW
+    // ========================================================================
+    if (localView === 'library') {
+        return (
+            <LessonLibrary 
+                lessons={lessons}
+                onNavigateBack={() => setLocalView('hub')}
+                onEditLesson={handleOpenBuilder}
+                onPlayLesson={(id: string) => {
+                    setPreselectedContent({ id, type: 'lesson' });
+                    setIsLiveModalOpen(true);
+                }}
+                onDeleteLesson={onDeleteLesson}
+                onCreateNew={() => handleOpenBuilder('new')}
+            />
+        );
+    }
 
     // ========================================================================
     // 🔥 FREEMIUM BUILDER VIEW 
@@ -179,7 +200,8 @@ export default function MagisterHub({
                             <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
                                 <FolderOpen size={20} className="text-indigo-500" /> Recent Lessons
                             </h2>
-                            <button onClick={onSwitchToAdvancedView} className="text-sm font-bold text-indigo-600 hover:text-indigo-500 flex items-center gap-1">
+                            {/* 🔥 UPDATED: This now routes to the local library view instead of the command center */}
+                            <button onClick={() => setLocalView('library')} className="text-sm font-bold text-indigo-600 hover:text-indigo-500 flex items-center gap-1">
                                 View Entire Library <ChevronRight size={16} />
                             </button>
                         </div>
@@ -196,7 +218,6 @@ export default function MagisterHub({
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                 {activeLessons.map((lesson: any) => {
-                                    // 🔥 1. EXTRACT THE HERO IMAGE
                                     const heroImage = lesson.blocks?.find((b: any) => b.type === 'image')?.url;
 
                                     return (
@@ -208,7 +229,6 @@ export default function MagisterHub({
                                                 setIsLiveModalOpen(true);
                                             }}
                                         >
-                                            {/* 🔥 2. HERO IMAGE BANNER */}
                                             <div className="h-32 w-full bg-slate-100 dark:bg-slate-800 relative overflow-hidden shrink-0">
                                                 {heroImage ? (
                                                     <img src={heroImage} alt="Lesson Cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
@@ -217,10 +237,8 @@ export default function MagisterHub({
                                                         <BookOpen size={32} className="text-indigo-200 dark:text-indigo-800/50" />
                                                     </div>
                                                 )}
-                                                {/* Gradient overlay to make text pop */}
                                                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent" />
                                                 
-                                                {/* Badges moved over the image */}
                                                 <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10">
                                                     <div className="flex items-center gap-2">
                                                         <span className="px-3 py-1 bg-white/20 backdrop-blur-md text-white rounded-lg text-[10px] font-black uppercase tracking-widest line-clamp-1 max-w-[120px] border border-white/20 shadow-sm">
@@ -238,7 +256,6 @@ export default function MagisterHub({
                                                 </div>
                                             </div>
 
-                                            {/* CONTENT WRAPPER */}
                                             <div className="p-6 flex flex-col flex-1">
                                                 <h3 className="text-lg font-black text-slate-800 dark:text-white leading-tight mb-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-2 relative z-10">
                                                     {lesson.title}
@@ -250,7 +267,6 @@ export default function MagisterHub({
                                                 </div>
                                             </div>
                                             
-                                            {/* EDIT ACTION HOVER */}
                                             <div className="absolute inset-x-0 bottom-0 p-4 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all duration-300 flex justify-center pointer-events-none z-20">
                                                 <button 
                                                     onClick={(e) => { 
@@ -350,7 +366,7 @@ export default function MagisterHub({
                        }
                    }, 300);
                }}
-           />
+            />
         </div>
     );
 }
