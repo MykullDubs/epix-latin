@@ -8,7 +8,7 @@ import {
     ChevronLeft, ChevronRight, Zap, Users, Clock, EyeOff, HelpCircle, 
     Layers, MousePointerClick, QrCode, Hourglass, Play, Pause, RotateCcw, 
     Plus, Minus, PenTool, Crosshair, Eraser, Wrench, Highlighter, Type, Presentation,
-    ChevronDown, ChevronUp, Mic, Info, Search, Palette, Square, BookOpen, Volume2 // 🔥 FIXED: Volume2 imported
+    ChevronDown, ChevronUp, Mic, Info, Search, Palette, Square, BookOpen, Volume2 
 } from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
 import PronunciationLab from './PronunciationLab'; 
@@ -21,6 +21,9 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const [activePageIdx, setActivePageIdx] = useState(0);
   const [showForum, setShowForum] = useState(false);
   
+  // 🔥 NEW: LOBBY STATE FOR HERO IMAGE
+  const [isLobby, setIsLobby] = useState(true);
+  
   // OS FEATURE: Presentation Telemetry & Overlays
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isBlanked, setIsBlanked] = useState(false);
@@ -29,7 +32,8 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const [showWhiteboard, setShowWhiteboard] = useState(false);
 
   // OS FEATURE: Live Audio Roleplay Overlay
-const [activeRoleplayBlock, setActiveRoleplayBlock] = useState<any | null>(null);  
+  const [activeRoleplayBlock, setActiveRoleplayBlock] = useState<any | null>(null);  
+  
   // OS FEATURE: Moveable Draggable Timer
   const [showTimer, setShowTimer] = useState(false);
   const [timeLeft, setTimeLeft] = useState(300);
@@ -88,11 +92,23 @@ const [activeRoleplayBlock, setActiveRoleplayBlock] = useState<any | null>(null)
 
   const { liveState, startLiveClass, endLiveClass, changeSlide, triggerQuiz } = useLiveClass(classId, true);
 
+  // 🔥 EXTRACT HERO IMAGE FOR LOBBY
+  const heroImage = useMemo(() => {
+      if (!lesson?.blocks) return null;
+      const imgBlock = lesson.blocks.find((b: any) => String(b.type) === 'image');
+      return imgBlock ? (imgBlock.url || imgBlock.imageUrl) : null;
+  }, [lesson]);
+
   // OS FEATURE: Remote Control Slide Sync (Left/Right)
   useEffect(() => {
-      if (liveState?.currentBlockIndex !== undefined && liveState.currentBlockIndex !== activePageIdx) {
-          setActivePageIdx(liveState.currentBlockIndex);
-          if (stageRef.current) stageRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      if (liveState?.currentBlockIndex !== undefined) {
+          if (liveState.currentBlockIndex !== activePageIdx) {
+              setActivePageIdx(liveState.currentBlockIndex);
+              setIsLobby(false); // Remote control takes over, drop the lobby
+              if (stageRef.current) stageRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+          } else if (isLobby && liveState.currentBlockIndex === 0) {
+              setIsLobby(false); // Instructor tapped "Start" on remote
+          }
       }
   }, [liveState?.currentBlockIndex]);
 
@@ -369,8 +385,22 @@ const [activeRoleplayBlock, setActiveRoleplayBlock] = useState<any | null>(null)
       }
   }, [pages.length, changeSlide]);
 
-  const handleNext = useCallback(() => jumpToSlide(activePageIdx + 1), [activePageIdx, jumpToSlide]);
-  const handlePrev = useCallback(() => jumpToSlide(activePageIdx - 1), [activePageIdx, jumpToSlide]);
+  // 🔥 UPDATED NEXT/PREV LOGIC TO HANDLE LOBBY
+  const handleNext = useCallback(() => {
+      if (isLobby) {
+          setIsLobby(false);
+      } else {
+          jumpToSlide(activePageIdx + 1);
+      }
+  }, [activePageIdx, jumpToSlide, isLobby]);
+
+  const handlePrev = useCallback(() => {
+      if (activePageIdx === 0 && !isLobby) {
+          setIsLobby(true);
+      } else {
+          jumpToSlide(activePageIdx - 1);
+      }
+  }, [activePageIdx, jumpToSlide, isLobby]);
 
   const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
       if (!progressBarRef.current) return;
@@ -378,6 +408,7 @@ const [activeRoleplayBlock, setActiveRoleplayBlock] = useState<any | null>(null)
       const clickX = e.clientX - rect.left;
       const percentage = clickX / rect.width;
       const targetSlide = Math.floor(percentage * pages.length);
+      setIsLobby(false);
       jumpToSlide(targetSlide);
   };
 
@@ -429,7 +460,7 @@ const [activeRoleplayBlock, setActiveRoleplayBlock] = useState<any | null>(null)
       
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
- }, [handleNext, handlePrev, forceSaveText, activeRoleplayBlock]);
+  }, [handleNext, handlePrev, forceSaveText, activeRoleplayBlock]);
 
   const activePage = pages[activePageIdx];
   if (!lesson || !activePage) return null;
@@ -446,7 +477,7 @@ const [activeRoleplayBlock, setActiveRoleplayBlock] = useState<any | null>(null)
       {activeRoleplayBlock && (
           <LiveRoleplayArena 
               scenarioPrompt={activeRoleplayBlock.prompt} 
-              tools={activeRoleplayBlock.metadata?.tools} // <-- Pass the tools here!
+              tools={activeRoleplayBlock.metadata?.tools} 
               onClose={() => setActiveRoleplayBlock(null)} 
           />
       )}
@@ -668,115 +699,145 @@ const [activeRoleplayBlock, setActiveRoleplayBlock] = useState<any | null>(null)
       {/* CORE PRESENTATION LAYER */}
       <main className="flex-1 flex overflow-hidden relative group/canvas bg-slate-50 text-slate-900 z-0 w-full h-full">
         
-        {activePageIdx > 0 && (
+        {/* Navigation Buttons */}
+        {(!isLobby && activePageIdx >= 0) && (
             <button onClick={handlePrev} className="absolute left-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/5 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 shadow-lg"><ChevronLeft size={48} /></button>
         )}
-        {activePageIdx < pages.length - 1 && (
+        {(isLobby || activePageIdx < pages.length - 1) && (
             <button onClick={handleNext} className="absolute right-8 top-1/2 -translate-y-1/2 z-50 p-6 bg-slate-900/5 hover:bg-slate-900 text-slate-800 hover:text-white rounded-full backdrop-blur-md opacity-0 group-hover/canvas:opacity-100 transition-all duration-300 hover:scale-110 shadow-lg"><ChevronRight size={48} /></button>
         )}
 
-        <div ref={stageRef} className={`flex-1 overflow-y-auto w-full relative transition-all duration-500 ${showForum ? 'mr-[450px]' : ''} scroll-smooth`}>
-          <div className="flex flex-col min-h-full w-full items-center px-16 py-12 lg:px-32 pb-24">
-            <div className="w-full max-w-7xl space-y-24 my-auto">
-              {activePage.blocks.map((block: any, i: number) => {
-                if (!block) return null;
-                const blockType = String(block.type || '');
-                const isQuiz = blockType === 'quiz';
-                const answerCount = Object.keys(liveState?.answers || {}).length;
+        {/* 🔥 LOBBY SCREEN (HERO IMAGE) OR SLIDE STAGE */}
+        {isLobby ? (
+            <div className="w-full h-full flex flex-col items-center justify-center text-center p-8 animate-in fade-in zoom-in-95 duration-700 relative bg-slate-950 text-white z-10">
+                {heroImage ? (
+                    <div className="w-full max-w-5xl aspect-video rounded-[3rem] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] mb-10 border-4 border-slate-800/50 relative">
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent z-10" />
+                        <img src={heroImage} alt="Lesson Cover" className="w-full h-full object-cover" />
+                    </div>
+                ) : (
+                    <div className="w-40 h-40 bg-indigo-500/20 rounded-[3rem] flex items-center justify-center mb-10 border border-indigo-500/30 shadow-2xl">
+                        <BookOpen size={64} className="text-indigo-400" />
+                    </div>
+                )}
 
-                return (
-                  <div key={i} className="animate-in fade-in zoom-in-95 duration-700 w-full">
-                    {isQuiz ? (
-                      <div className="bg-slate-900 text-white border-4 border-slate-800 rounded-[4rem] p-16 shadow-2xl text-center animate-in slide-in-from-bottom-12 duration-500 mx-auto max-w-5xl my-12 relative overflow-hidden">
-                          <div className="absolute top-0 right-0 -mr-16 -mt-16 text-slate-800 opacity-50 rotate-12"><HelpCircle size={250} /></div>
-                          <div className="relative z-10">
-                              <span className="text-[2vh] font-black text-indigo-400 uppercase tracking-widest block mb-6">Class Question</span>
-                              <h2 className="text-[5vh] md:text-[6vh] font-black mb-12 leading-tight">{String(block.content?.question || block.question || '')}</h2>
-                              
-                              {liveState?.quizState === 'waiting' && (
-                                  <button onClick={() => triggerQuiz('active')} className="bg-rose-500 hover:bg-rose-600 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest shadow-[0_0_40px_rgba(244,63,94,0.5)] transition-transform active:scale-95 flex items-center gap-4 mx-auto"><Zap size={40} fill="currentColor" /> Launch Trivia Protocol</button>
-                              )}
+                <h1 className="text-5xl md:text-7xl font-black text-white tracking-tighter mb-6 relative z-20 drop-shadow-lg">
+                    {lesson.title || 'Untitled Lesson'}
+                </h1>
+                <p className="text-xl text-slate-400 font-medium max-w-2xl mx-auto mb-12 relative z-20">
+                    {lesson.subtitle || 'Get ready for the session.'}
+                </p>
 
-                              {liveState?.quizState === 'active' && (
-                                  <div className="space-y-12 animate-in fade-in duration-500">
-                                      <div className="flex flex-col items-center justify-center gap-4 text-[6vh] font-black text-indigo-400">
-                                          <div className="flex items-center gap-6 bg-slate-800 px-10 py-6 rounded-[2rem] shadow-inner border border-slate-700">
-                                              <Users size={64} className="animate-pulse" /> <span>{answerCount} Students Locked In</span>
-                                          </div>
-                                      </div>
-                                      <button onClick={() => triggerQuiz('revealed')} className="bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest transition-transform active:scale-95 shadow-xl mx-auto">Reveal Correct Answer</button>
-                                  </div>
-                              )}
-
-                              {liveState?.quizState === 'revealed' && (
-                                  <div className="animate-in zoom-in duration-500 flex flex-col items-center">
-                                      <div className="inline-flex items-center gap-4 bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/50 px-10 py-5 rounded-[2rem] text-[4vh] font-black mb-12 shadow-[0_0_30px_rgba(16,185,129,0.2)]"><CheckCircle2 size={48} /> Correct Answer Displayed!</div>
-                                      <div className="bg-emerald-500 text-white p-8 rounded-[2rem] shadow-xl text-[4vh] font-bold border-4 border-emerald-400 min-w-[50%]">{String(block.content?.options?.find((o:any) => String(o.id) === String(block.content?.correctId))?.text || "Answer Revealed on Devices")}</div>
-                                  </div>
-                              )}
-                          </div>
-                      </div>
-                    ) : (
-                      <>
-                          {blockType === 'text' && <TextBlock block={block} />}
-                          {blockType === 'essay' && <EssayBlock block={block} />}
-                          {blockType === 'image' && <ImageBlock block={block} />}
-                          {blockType === 'dialogue' && <DialogueBlock block={block} />}
-                          {blockType === 'vocab-list' && <VocabListBlock block={block} />}
-                          {blockType === 'discussion' && <DiscussionBlock block={block} />}
-                          {blockType === 'game' && block.gameType === 'connect-three' && <GameBlock block={block} lessonVocab={lessonVocab} />}
-                          {blockType === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
-                          
-                          {blockType === 'callout' && <CalloutBlock block={block} />}
-                          {blockType === 'drawing' && <DrawingBlock block={block} />}
-                          {blockType === 'image-hotspot' && <ImageHotspotBlock block={block} />}
-                          {blockType === 'audio-story' && <AudioStoryBlock block={block} />}
-                          
-                          {blockType === 'code' && (
-                              <div className="py-12 w-full max-w-6xl mx-auto">
-                                <div className="bg-[#0D1117] rounded-[3rem] overflow-hidden shadow-2xl border-4 border-slate-800">
-                                  <div className="bg-white/5 px-8 py-6 flex justify-between items-center border-b border-white/5">
-                                      <div className="flex gap-3"><div className="w-4 h-4 rounded-full bg-rose-500"></div><div className="w-4 h-4 rounded-full bg-amber-500"></div><div className="w-4 h-4 rounded-full bg-emerald-500"></div></div>
-                                      <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest">{String(block.language || 'Terminal')}</span>
-                                  </div>
-                                  <div className="p-12 overflow-x-auto"><pre className="text-emerald-400 font-mono text-[3vh] leading-relaxed"><code>{String(block.content || '')}</code></pre></div>
-                                </div>
-                              </div>
-                          )}
-
-                          {blockType === 'timeline' && (
-                             <div className="py-12 w-full max-w-6xl mx-auto">
-                                {block.title && (<div className="flex items-center gap-6 mb-16 justify-center"><div className="p-6 bg-amber-50 text-amber-600 rounded-[2rem]"><BookOpen size={48} /></div><h3 className="text-[5vh] font-black text-slate-800 tracking-tight">{String(block.title)}</h3></div>)}
-                                <div className="space-y-12 relative before:absolute before:inset-0 before:mx-auto before:h-full before:w-2 before:bg-slate-200 before:rounded-full">
-                                   {(Array.isArray(block.events) ? block.events : []).map((event: any, evIdx: number) => (
-                                      <div key={evIdx} className="relative flex items-center justify-between odd:flex-row-reverse group">
-                                          <div className="flex items-center justify-center w-20 h-20 rounded-full border-8 border-white bg-indigo-600 text-white shadow-xl shrink-0 order-1 group-odd:-translate-x-1/2 group-even:translate-x-1/2 z-10 transition-transform group-hover:scale-110"><div className="w-4 h-4 bg-white rounded-full" /></div>
-                                          <div className="w-[calc(50%-4rem)] p-10 rounded-[3rem] bg-white border-2 border-slate-100 shadow-lg hover:shadow-2xl transition-all group-hover:border-indigo-200 group-hover:-translate-y-2">
-                                              <span className="font-black text-indigo-600 text-[2vh] tracking-[0.2em] uppercase mb-4 block">{String(event.date || '')}</span>
-                                              <h4 className="font-black text-slate-800 text-[4vh] leading-tight mb-4">{String(event.title || '')}</h4>
-                                              <p className="text-slate-600 text-[2.5vh] font-medium leading-relaxed">{String(event.description || '')}</p>
-                                          </div>
-                                      </div>
-                                   ))}
-                                </div>
-                             </div>
-                          )}
-                          
-                          {blockType === 'fill-blank' && <FillBlankBlock block={block} liveState={liveState} />}
-                          {blockType === 'drag-drop' && <TapSortBlock block={block} liveState={liveState} />}
-                          
-                          {blockType === 'pronunciation' && <PronunciationLab block={block} />} 
-
-                          {/* 🔥 LIVE AUDIO ROLEPLAY RENDERER (Projector Mode) */}
-                          {blockType === 'roleplay' && <LiveRoleplayBlock block={block} onLaunch={() => setActiveRoleplayBlock(block)} />}
-                      </>
-                    )}
-                  </div>
-                );
-              })}
+                <button 
+                    onClick={() => setIsLobby(false)}
+                    className="px-10 py-5 bg-white text-slate-900 hover:bg-indigo-50 hover:text-indigo-600 hover:scale-105 active:scale-95 rounded-full font-black text-lg uppercase tracking-widest transition-all shadow-[0_0_40px_rgba(255,255,255,0.2)] flex items-center gap-3 relative z-20"
+                >
+                    Start Broadcast <Zap size={20} fill="currentColor" />
+                </button>
             </div>
-          </div>
-        </div>
+        ) : (
+            <div ref={stageRef} className={`flex-1 overflow-y-auto w-full relative transition-all duration-500 ${showForum ? 'mr-[450px]' : ''} scroll-smooth`}>
+              <div className="flex flex-col min-h-full w-full items-center px-16 py-12 lg:px-32 pb-24">
+                <div className="w-full max-w-7xl space-y-24 my-auto">
+                  {activePage.blocks.map((block: any, i: number) => {
+                    if (!block) return null;
+                    const blockType = String(block.type || '');
+                    const isQuiz = blockType === 'quiz';
+                    const answerCount = Object.keys(liveState?.answers || {}).length;
+
+                    return (
+                      <div key={i} className="animate-in fade-in zoom-in-95 duration-700 w-full">
+                        {isQuiz ? (
+                          <div className="bg-slate-900 text-white border-4 border-slate-800 rounded-[4rem] p-16 shadow-2xl text-center animate-in slide-in-from-bottom-12 duration-500 mx-auto max-w-5xl my-12 relative overflow-hidden">
+                              <div className="absolute top-0 right-0 -mr-16 -mt-16 text-slate-800 opacity-50 rotate-12"><HelpCircle size={250} /></div>
+                              <div className="relative z-10">
+                                  <span className="text-[2vh] font-black text-indigo-400 uppercase tracking-widest block mb-6">Class Question</span>
+                                  <h2 className="text-[5vh] md:text-[6vh] font-black mb-12 leading-tight">{String(block.content?.question || block.question || '')}</h2>
+                                  
+                                  {liveState?.quizState === 'waiting' && (
+                                      <button onClick={() => triggerQuiz('active')} className="bg-rose-500 hover:bg-rose-600 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest shadow-[0_0_40px_rgba(244,63,94,0.5)] transition-transform active:scale-95 flex items-center gap-4 mx-auto"><Zap size={40} fill="currentColor" /> Launch Trivia Protocol</button>
+                                  )}
+
+                                  {liveState?.quizState === 'active' && (
+                                      <div className="space-y-12 animate-in fade-in duration-500">
+                                          <div className="flex flex-col items-center justify-center gap-4 text-[6vh] font-black text-indigo-400">
+                                              <div className="flex items-center gap-6 bg-slate-800 px-10 py-6 rounded-[2rem] shadow-inner border border-slate-700">
+                                                  <Users size={64} className="animate-pulse" /> <span>{answerCount} Students Locked In</span>
+                                              </div>
+                                          </div>
+                                          <button onClick={() => triggerQuiz('revealed')} className="bg-indigo-600 hover:bg-indigo-500 text-white px-12 py-6 rounded-full font-black text-[3vh] uppercase tracking-widest transition-transform active:scale-95 shadow-xl mx-auto">Reveal Correct Answer</button>
+                                      </div>
+                                  )}
+
+                                  {liveState?.quizState === 'revealed' && (
+                                      <div className="animate-in zoom-in duration-500 flex flex-col items-center">
+                                          <div className="inline-flex items-center gap-4 bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/50 px-10 py-5 rounded-[2rem] text-[4vh] font-black mb-12 shadow-[0_0_30px_rgba(16,185,129,0.2)]"><CheckCircle2 size={48} /> Correct Answer Displayed!</div>
+                                          <div className="bg-emerald-500 text-white p-8 rounded-[2rem] shadow-xl text-[4vh] font-bold border-4 border-emerald-400 min-w-[50%]">{String(block.content?.options?.find((o:any) => String(o.id) === String(block.content?.correctId))?.text || "Answer Revealed on Devices")}</div>
+                                      </div>
+                                  )}
+                              </div>
+                          </div>
+                        ) : (
+                          <>
+                              {blockType === 'text' && <TextBlock block={block} />}
+                              {blockType === 'essay' && <EssayBlock block={block} />}
+                              {blockType === 'image' && <ImageBlock block={block} />}
+                              {blockType === 'dialogue' && <DialogueBlock block={block} />}
+                              {blockType === 'vocab-list' && <VocabListBlock block={block} />}
+                              {blockType === 'discussion' && <DiscussionBlock block={block} />}
+                              {blockType === 'game' && block.gameType === 'connect-three' && <GameBlock block={block} lessonVocab={lessonVocab} />}
+                              {blockType === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
+                              
+                              {blockType === 'callout' && <CalloutBlock block={block} />}
+                              {blockType === 'drawing' && <DrawingBlock block={block} />}
+                              {blockType === 'image-hotspot' && <ImageHotspotBlock block={block} />}
+                              {blockType === 'audio-story' && <AudioStoryBlock block={block} />}
+                              
+                              {blockType === 'code' && (
+                                  <div className="py-12 w-full max-w-6xl mx-auto">
+                                    <div className="bg-[#0D1117] rounded-[3rem] overflow-hidden shadow-2xl border-4 border-slate-800">
+                                      <div className="bg-white/5 px-8 py-6 flex justify-between items-center border-b border-white/5">
+                                          <div className="flex gap-3"><div className="w-4 h-4 rounded-full bg-rose-500"></div><div className="w-4 h-4 rounded-full bg-amber-500"></div><div className="w-4 h-4 rounded-full bg-emerald-500"></div></div>
+                                          <span className="text-[2vh] font-black text-slate-400 uppercase tracking-widest">{String(block.language || 'Terminal')}</span>
+                                      </div>
+                                      <div className="p-12 overflow-x-auto"><pre className="text-emerald-400 font-mono text-[3vh] leading-relaxed"><code>{String(block.content || '')}</code></pre></div>
+                                    </div>
+                                  </div>
+                              )}
+
+                              {blockType === 'timeline' && (
+                                 <div className="py-12 w-full max-w-6xl mx-auto">
+                                    {block.title && (<div className="flex items-center gap-6 mb-16 justify-center"><div className="p-6 bg-amber-50 text-amber-600 rounded-[2rem]"><BookOpen size={48} /></div><h3 className="text-[5vh] font-black text-slate-800 tracking-tight">{String(block.title)}</h3></div>)}
+                                    <div className="space-y-12 relative before:absolute before:inset-0 before:mx-auto before:h-full before:w-2 before:bg-slate-200 before:rounded-full">
+                                       {(Array.isArray(block.events) ? block.events : []).map((event: any, evIdx: number) => (
+                                          <div key={evIdx} className="relative flex items-center justify-between odd:flex-row-reverse group">
+                                              <div className="flex items-center justify-center w-20 h-20 rounded-full border-8 border-white bg-indigo-600 text-white shadow-xl shrink-0 order-1 group-odd:-translate-x-1/2 group-even:translate-x-1/2 z-10 transition-transform group-hover:scale-110"><div className="w-4 h-4 bg-white rounded-full" /></div>
+                                              <div className="w-[calc(50%-4rem)] p-10 rounded-[3rem] bg-white border-2 border-slate-100 shadow-lg hover:shadow-2xl transition-all group-hover:border-indigo-200 group-hover:-translate-y-2">
+                                                  <span className="font-black text-indigo-600 text-[2vh] tracking-[0.2em] uppercase mb-4 block">{String(event.date || '')}</span>
+                                                  <h4 className="font-black text-slate-800 text-[4vh] leading-tight mb-4">{String(event.title || '')}</h4>
+                                                  <p className="text-slate-600 text-[2.5vh] font-medium leading-relaxed">{String(event.description || '')}</p>
+                                              </div>
+                                          </div>
+                                       ))}
+                                    </div>
+                                 </div>
+                              )}
+                              
+                              {blockType === 'fill-blank' && <FillBlankBlock block={block} liveState={liveState} />}
+                              {blockType === 'drag-drop' && <TapSortBlock block={block} liveState={liveState} />}
+                              
+                              {blockType === 'pronunciation' && <PronunciationLab block={block} />} 
+
+                              {blockType === 'roleplay' && <LiveRoleplayBlock block={block} onLaunch={() => setActiveRoleplayBlock(block)} />}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+        )}
 
         {showForum && (
           <aside className="absolute right-0 top-0 bottom-0 w-[450px] bg-slate-50 border-l border-slate-200 p-8 z-10 animate-in slide-in-from-right shadow-2xl">
@@ -813,9 +874,13 @@ const [activeRoleplayBlock, setActiveRoleplayBlock] = useState<any | null>(null)
           <div className="flex items-center gap-4">
               <div ref={progressBarRef} onClick={handleProgressBarClick} className="w-48 h-2 bg-black/40 rounded-full overflow-hidden cursor-pointer group relative backdrop-blur-sm border border-white/10">
                   <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <div className="h-full bg-indigo-500 transition-all duration-300 relative z-10" style={{ width: `${((activePageIdx + 1) / pages.length) * 100}%` }} />
+                  {/* 🔥 PROGRESS BAR NOW REFLECTS LOBBY STATE */}
+                  <div className="h-full bg-indigo-500 transition-all duration-300 relative z-10" style={{ width: `${isLobby ? 0 : ((activePageIdx + 1) / pages.length) * 100}%` }} />
               </div>
-              <span className="font-black text-slate-300 tracking-widest uppercase w-28 text-right text-[10px] drop-shadow-md">Slide {activePageIdx + 1} of {pages.length}</span>
+              {/* 🔥 SLIDE COUNT NOW REFLECTS LOBBY STATE */}
+              <span className="font-black text-slate-300 tracking-widest uppercase w-28 text-right text-[10px] drop-shadow-md">
+                  {isLobby ? 'LOBBY' : `Slide ${activePageIdx + 1} of ${pages.length}`}
+              </span>
           </div>
       </footer>
     </div>
