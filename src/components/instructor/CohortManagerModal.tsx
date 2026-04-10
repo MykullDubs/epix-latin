@@ -1,17 +1,29 @@
 // src/components/instructor/CohortManagerModal.tsx
 import React, { useState } from 'react';
-import { X, Users, Plus, Trash2, UserMinus, Key } from 'lucide-react';
+import { X, Users, Plus, Trash2, UserMinus, Key, Crown } from 'lucide-react';
 
-export default function CohortManagerModal({ isOpen, onClose, classes, onCreateClass, onDeleteClass, onRemoveStudent }: any) {
+export default function CohortManagerModal({ 
+    isOpen, 
+    onClose, 
+    classes, 
+    onCreateClass, 
+    onDeleteClass, 
+    onRemoveStudent,
+    isPro,            // 🔥 NEW PROP
+    onUpgradeClick    // 🔥 NEW PROP
+}: any) {
     const [newClassName, setNewClassName] = useState('');
     const [activeClassId, setActiveClassId] = useState<string | null>(classes?.[0]?.id || null);
 
     if (!isOpen) return null;
 
     const activeClass = classes?.find((c: any) => c.id === activeClassId) || classes?.[0];
+    
+    // 🔥 THE GATEKEEPER CHECK
+    const atCohortLimit = !isPro && (classes?.length || 0) >= 2;
 
     const handleCreate = () => {
-        if (!newClassName.trim()) return;
+        if (!newClassName.trim() || atCohortLimit) return;
         onCreateClass(newClassName);
         setNewClassName('');
     };
@@ -51,21 +63,39 @@ export default function CohortManagerModal({ isOpen, onClose, classes, onCreateC
 
                     <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
                         <div className="flex flex-col gap-2">
-                            <input 
-                                type="text"
-                                placeholder="New cohort name..."
-                                value={newClassName}
-                                onChange={(e) => setNewClassName(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                                className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
-                            <button 
-                                onClick={handleCreate}
-                                disabled={!newClassName.trim()}
-                                className="w-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 disabled:opacity-50 px-4 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-200 dark:hover:bg-indigo-500/40 transition-colors flex items-center justify-center gap-2"
-                            >
-                                <Plus size={16} /> Create Cohort
-                            </button>
+                            {atCohortLimit ? (
+                                /* 🔥 THE UPGRADE BUTTON (Replaces the input if they hit the limit) */
+                                <div className="space-y-3">
+                                    <div className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-500 text-center">
+                                        Free Tier Limit Reached (2/2)
+                                    </div>
+                                    <button 
+                                        onClick={onUpgradeClick}
+                                        className="w-full bg-gradient-to-r from-amber-400 to-amber-500 text-amber-950 px-4 py-3.5 rounded-xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-md flex items-center justify-center gap-2"
+                                    >
+                                        <Crown size={16} strokeWidth={3} /> Unlock Unlimited
+                                    </button>
+                                </div>
+                            ) : (
+                                /* STANDARD CREATION INPUT */
+                                <>
+                                    <input 
+                                        type="text"
+                                        placeholder="New cohort name..."
+                                        value={newClassName}
+                                        onChange={(e) => setNewClassName(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                                        className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-white"
+                                    />
+                                    <button 
+                                        onClick={handleCreate}
+                                        disabled={!newClassName.trim()}
+                                        className="w-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 disabled:opacity-50 px-4 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-200 dark:hover:bg-indigo-500/40 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <Plus size={16} /> Create Cohort
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -126,7 +156,11 @@ export default function CohortManagerModal({ isOpen, onClose, classes, onCreateC
 
                             <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
                                 <button 
-                                    onClick={() => onDeleteClass(activeClass.id)}
+                                    onClick={() => {
+                                        if (window.confirm('Are you sure you want to delete this cohort? This cannot be undone.')) {
+                                            onDeleteClass(activeClass.id);
+                                        }
+                                    }}
                                     className="flex items-center gap-2 text-rose-500 hover:text-rose-600 text-xs font-black uppercase tracking-widest transition-colors"
                                 >
                                     <Trash2 size={14} /> Delete this Cohort
