@@ -16,7 +16,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
     const [scenarioPrompt, setScenarioPrompt] = useState(''); 
     const [gradeLevel, setGradeLevel] = useState('High School');
     const [isGenerating, setIsGenerating] = useState(false);
-    const [isLoading, setIsLoading] = useState(false); // 🔥 ADDED THE MISSING STATE HERE
+    const [isLoading, setIsLoading] = useState(false);
     const [toastMsg, setToastMsg] = useState<string | null>(null);
 
     // PDF STATES
@@ -106,7 +106,10 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
                 })
             });
 
-            if (!res.ok) throw new Error("Scenario generation failed.");
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`API Error ${res.status}: ${errText}`);
+            }
             const data = await res.json();
             
             let rawText = data.candidates[0].content.parts[0].text;
@@ -196,14 +199,14 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
             const imageSubject = prompt.trim() || (pdfFileName ? pdfFileName.replace('.pdf', '') : 'a classroom concept');
             const imagePrompt = `A beautiful, modern, clean educational vector illustration representing the concept of: ${imageSubject}. Minimalist background, vibrant colors, no text or words in the image.`;
             
-            imageRequest = fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-fast-generate-001:predict?key=${apiKey}`, {
+            // 🔥 UPDATED MODEL STRING AND DROPPED STRICT ASPECT RATIO
+            imageRequest = fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     instances: [{ prompt: imagePrompt }],
                     parameters: {
-                        sampleCount: 1,
-                        aspectRatio: "16:9"
+                        sampleCount: 1
                     }
                 })
             });
@@ -216,13 +219,17 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
             const results = await Promise.allSettled(promises);
 
             const textRes = results[0];
-            if (textRes.status === 'rejected' || !textRes.value.ok) {
-                throw new Error("Text generation failed or timed out.");
+            if (textRes.status === 'rejected') {
+                throw new Error("Network connection failed.");
+            }
+            
+            // 🔥 ROBUST ERROR PARSING
+            if (!textRes.value.ok) {
+                const errData = await textRes.value.json();
+                throw new Error(errData?.error?.message || `Google API Error (${textRes.value.status})`);
             }
             
             const textData = await textRes.value.json();
-            if (textData.error) throw new Error(textData.error.message);
-
             let rawText = textData.candidates[0].content.parts[0].text;
             rawText = rawText.replace(/^\x60\x60\x60(?:json)?\s*/i, '').replace(/\x60\x60\x60\s*$/i, '').trim();
             const generatedBlocks = JSON.parse(rawText);
@@ -232,15 +239,20 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
             }
 
             let heroImageUrl = null;
-            if (selectedTypes.image && results[1] && results[1].status === 'fulfilled' && results[1].value.ok) {
-                try {
-                    const imgData = await results[1].value.json();
-                    const base64Image = imgData.predictions?.[0]?.bytesBase64Encoded; 
-                    if (base64Image) {
-                        heroImageUrl = `data:image/jpeg;base64,${base64Image}`;
+            if (selectedTypes.image && results[1] && results[1].status === 'fulfilled') {
+                if (results[1].value.ok) {
+                    try {
+                        const imgData = await results[1].value.json();
+                        const base64Image = imgData.predictions?.[0]?.bytesBase64Encoded; 
+                        if (base64Image) {
+                            heroImageUrl = `data:image/jpeg;base64,${base64Image}`;
+                        }
+                    } catch (imgError) {
+                        console.warn("Image parsing failed:", imgError);
                     }
-                } catch (imgError) {
-                    console.warn("Image parsing failed, but continuing with text...", imgError);
+                } else {
+                    const imgErrData = await results[1].value.json();
+                    console.warn("Image API Rejected Request:", imgErrData);
                 }
             }
 
@@ -266,7 +278,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
 
         } catch (err: any) {
             console.error("Magic Generator Error:", err);
-            setToastMsg(`Generation failed: ${err.message}`);
+            setToastMsg(`Failed: ${err.message}`);
             setIsGenerating(false);
         }
     };
@@ -287,7 +299,7 @@ export default function AiGeneratorModal({ isOpen, onClose, onAppendBlocks, user
                         </div>
                         <div>
                             <h2 className="text-lg font-black uppercase tracking-widest leading-none">Magic Generator</h2>
-                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">Powered by Gemini & Imagen 4</p>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">Powered by Gemini & Imagen 3</p>
                         </div>
                     </div>
 
