@@ -62,8 +62,9 @@ export default function LessonBuilderView({
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [newlyAddedIndices, setNewlyAddedIndices] = useState<number[]>([]);
 
-  // 🔥 FREEMIUM GATE CHECK
-  const isPro = userData?.subscriptionTier === 'pro';
+// 🔥 DEV HACK: Hardcoded to true so we can test premium features!
+const isPro = true; 
+// const isPro = userData?.subscriptionTier === 'pro';
 
   const handleMagicGenerateClick = () => {
       const aiUses = userData?.magicGenerationsCount || 0;
