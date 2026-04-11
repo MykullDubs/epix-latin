@@ -50,9 +50,9 @@ export default function AiGeneratorModal({
         pronunciation: false
     });
 
-    // FREEMIUM GATE CHECK
-    const isPro = userData?.subscriptionTier === 'pro';
-
+// 🔥 DEV HACK: Hardcoded to true so we can test premium features!
+const isPro = true; 
+// const isPro = userData?.subscriptionTier === 'pro';
     if (!isOpen) return null;
 
     const toggleType = (type: keyof typeof selectedTypes) => {
