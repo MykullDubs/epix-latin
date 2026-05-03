@@ -144,11 +144,17 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const [rack, setRack] = useState<any[]>(Array(7).fill(null));
   const [targetSquare, setTargetSquare] = useState<number | null>(null);
 
+  // 🔥 NEW: Directional Tracking State
+  const [lastPlacedIndex, setLastPlacedIndex] = useState<number | null>(null);
+  const [playDirection, setPlayDirection] = useState<number | null>(null);
+
   // Sync local board when global board updates
   useEffect(() => {
     if (globalBoard) {
       setLocalBoard(globalBoard);
       setTargetSquare(null);
+      setLastPlacedIndex(null);
+      setPlayDirection(null);
     }
   }, [globalBoard]);
 
@@ -170,7 +176,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     onUpdateLiveState({ bag: newBag });
   };
 
-  // 🔥 NEW: Target-First Board Click Logic
+  // 🔥 TARGET SELECTION
   const handleBoardClick = (index: number) => {
     if (localBoard[index]?.isLocked) return; 
     
@@ -184,7 +190,11 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         newBoard[index] = null;
         setRack(newRack);
         setLocalBoard(newBoard);
-        setTargetSquare(index); // Leave reticle there
+        setTargetSquare(index); 
+        
+        // Reset tracking to prevent weird auto-advances if they mess up
+        setLastPlacedIndex(null);
+        setPlayDirection(null);
       }
       return;
     }
@@ -193,7 +203,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     setTargetSquare(index);
   };
 
-  // 🔥 NEW: Fire-to-Target Rack Click Logic
+  // 🔥 SMART DIRECTIONAL TILE PLACEMENT
   const handleRackClick = (idx: number) => {
     if (!rack[idx]) return;
 
@@ -207,12 +217,40 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       setLocalBoard(newBoard);
       setRack(newRack);
 
-      // Auto-advance the reticle one square to the right
-      const nextSquare = targetSquare + 1;
-      if (targetSquare % BOARD_SIZE !== BOARD_SIZE - 1 && !newBoard[nextSquare]) {
-         setTargetSquare(nextSquare);
+      // 1. Determine direction if we have a previous tile
+      let currentDirection = playDirection;
+      if (lastPlacedIndex !== null) {
+          const delta = targetSquare - lastPlacedIndex;
+          // If they placed exactly 1 to the right, or 1 down
+          if (delta === 1 || delta === BOARD_SIZE) {
+              currentDirection = delta;
+              setPlayDirection(delta);
+          } else {
+              // They placed it somewhere random, reset the direction
+              currentDirection = null;
+              setPlayDirection(null);
+          }
+      }
+
+      setLastPlacedIndex(targetSquare);
+
+      // 2. Auto-advance logic (Only fires if we KNOW the direction)
+      if (currentDirection !== null) {
+          const nextSquare = targetSquare + currentDirection;
+          
+          // Safety checks so it doesn't wrap off the edges of the board
+          const isHorizontalValid = currentDirection === 1 && (targetSquare % BOARD_SIZE !== BOARD_SIZE - 1);
+          const isVerticalValid = currentDirection === BOARD_SIZE && (targetSquare + BOARD_SIZE < BOARD_SIZE * BOARD_SIZE);
+
+          if ((isHorizontalValid || isVerticalValid) && !newBoard[nextSquare]) {
+              setTargetSquare(nextSquare);
+          } else {
+              setTargetSquare(null);
+          }
       } else {
-         setTargetSquare(null);
+          // This was the first tile placed, or a disconnected tile. 
+          // Drop the reticle so they have to manually tap the next square to set the direction.
+          setTargetSquare(null);
       }
     }
   };
@@ -232,6 +270,8 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     setLocalBoard(newBoard);
     setRack(newRack);
     setTargetSquare(null);
+    setLastPlacedIndex(null);
+    setPlayDirection(null);
   };
 
   // ==========================================
