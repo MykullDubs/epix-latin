@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
     query, collection, where, onSnapshot, orderBy, limit, addDoc,
-    doc, updateDoc, arrayUnion, arrayRemove 
+    doc, updateDoc, arrayUnion, arrayRemove, setDoc 
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; 
 import { auth, db, storage, appId } from '../config/firebase';
@@ -14,12 +14,12 @@ import {
     Triangle, Circle, XCircle, X, ArrowDownCircle, Settings, Sparkles,
     Layers, HelpCircle, PlayCircle
 } from 'lucide-react';
-
 import StudentGradebook from './StudentGradebook';
 import LeaderboardView from './LeaderboardView';
 import StudentSlipstreamView from './StudentSlipstreamView';
 import HoloAvatar from './HoloAvatar';
 import AvatarForge from './AvatarForge';
+import MarbleScrabble from './MarbleScrabble';
 
 // --- THEME HELPER (Dark Mode Upgraded) ---
 const getSubjectTheme = (subject: string) => {
@@ -37,6 +37,7 @@ const getSubjectTheme = (subject: string) => {
 const ForumAvatar = ({ url, name, role, size = "md" }: any) => {
     const initials = name?.split(' ').map((n:any) => n[0]).join('').toUpperCase().slice(0, 2) || 'S';
     const sizeClasses: any = { xs: "w-6 h-6 text-[10px]", sm: "w-8 h-8 text-xs", md: "w-10 h-10 text-sm", lg: "w-12 h-12 text-base" };
+    
     return (
         <div className={`relative shrink-0 ${sizeClasses[size]}`}>
             <div className={`w-full h-full rounded-[35%] overflow-hidden flex items-center justify-center font-black transition-all shadow-sm ${url ? 'bg-white dark:bg-slate-800' : 'bg-gradient-to-br from-indigo-500 to-cyan-400 text-white'}`}>
@@ -64,17 +65,20 @@ const VoiceRecorder = ({ onRecordingComplete, onCancel }: any) => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
       const chunks: Blob[] = [];
+      
       recorder.ondataavailable = (e) => chunks.push(e.data);
       recorder.onstop = () => {
         const blob = new Blob(chunks, { type: 'audio/webm' });
         setAudioUrl(URL.createObjectURL(blob));
         onRecordingComplete(blob); 
       };
+      
       recorder.start();
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
     } catch (err) { alert("Microphone access denied."); }
   };
+
   const stopRecording = () => { mediaRecorderRef.current?.stop(); setIsRecording(false); };
   
   return (
@@ -83,7 +87,7 @@ const VoiceRecorder = ({ onRecordingComplete, onCancel }: any) => {
         <div className="flex items-center gap-4 w-full">
           <div className={`w-2.5 h-2.5 rounded-full ${isRecording ? 'bg-rose-500 animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.6)]' : 'bg-slate-300 dark:bg-slate-700'}`} />
           <span className={`text-[10px] font-black uppercase tracking-widest flex-1 ${isRecording ? 'text-rose-500' : 'text-slate-400'}`}>
-              {isRecording ? "Recording Transmission..." : "Attach Voice Memo"}
+            {isRecording ? "Recording Transmission..." : "Attach Voice Memo"}
           </span>
           <button type="button" onClick={isRecording ? stopRecording : startRecording} className={`w-10 h-10 flex items-center justify-center rounded-full transition-all active:scale-95 ${isRecording ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md'}`}>
             {isRecording ? <Square size={14} fill="currentColor" /> : <Mic size={16} />}
@@ -155,6 +159,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
     if (!newTitle.trim() || (!newContent.trim() && !pendingAudio)) return;
     if (!activeTopic) return;
     setIsUploading(true);
+    
     try {
       let audioUrl = "";
       if (pendingAudio) {
@@ -191,7 +196,7 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
         <header className="flex justify-between items-center mb-6 px-2">
             <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-indigo-500/10 text-indigo-500 rounded-2xl flex items-center justify-center shadow-inner">
-                    <MessageSquare size={20} />
+                  <MessageSquare size={20} />
                 </div>
                 <div>
                     <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tighter leading-none">Comms Link</h3>
@@ -234,7 +239,6 @@ const ClassForum = ({ classId, userData }: { classId: string, userData: any }) =
                         <span className="shrink-0 bg-slate-200/50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-1"><ChevronRight size={12} /> Enter</span>
                     </div>
                     <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-5 font-medium leading-relaxed">{t.content}</p>
-                    
                     <div className="flex items-center justify-between pt-4 border-t border-slate-200/50 dark:border-slate-800/50">
                         <div className="flex items-center gap-3 text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">
                             <ForumAvatar url={t.authorAvatarUrl} name={t.authorName} role={t.role} size="xs" />
@@ -435,6 +439,7 @@ const LiveTriviaRemote = ({ liveSession, lessons, allDecks, studentEmail, classI
     const currentPage = pages[liveSession?.currentBlockIndex || 0];
     const currentBlock = liveSession?.currentQuestion || currentPage?.blocks?.[0]; 
     const isQuiz = !!liveSession?.currentQuestion || currentBlock?.type === 'quiz';
+
     const safeEmail = (studentEmail || 'unknown@student').replace(/\./g, ',');
     
     const myAnswer = liveSession?.answers?.[safeEmail];
@@ -482,6 +487,7 @@ const LiveTriviaRemote = ({ liveSession, lessons, allDecks, studentEmail, classI
 
     const submitAnswer = async (optionId: string) => {
         if (liveSession?.quizState !== 'active' || myAnswer) return;
+
         const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
         
         await updateDoc(sessionRef, { 
@@ -492,6 +498,7 @@ const LiveTriviaRemote = ({ liveSession, lessons, allDecks, studentEmail, classI
 
     const handleSaveAvatar = async (finalUrl: string, config: any) => {
         if (!auth.currentUser?.uid) return;
+
         try {
             const userRef = doc(db, 'artifacts', appId, 'users', auth.currentUser.uid);
             const newEquipped = { ...(userData?.equipped || {}) };
@@ -508,6 +515,7 @@ const LiveTriviaRemote = ({ liveSession, lessons, allDecks, studentEmail, classI
                 [`joined.${safeEmail}.avatarUrl`]: finalUrl,
                 [`joined.${safeEmail}.equipped`]: newEquipped
             });
+
             setShowForge(false);
         } catch (err) {
             console.error("Avatar live sync failed:", err);
@@ -535,7 +543,6 @@ const LiveTriviaRemote = ({ liveSession, lessons, allDecks, studentEmail, classI
                 <div className="relative w-40 h-40 mb-8 cursor-pointer group" onClick={() => setShowForge(true)}>
                     <div className="absolute inset-0 bg-emerald-500 rounded-full blur-3xl opacity-20 animate-pulse" />
                     <HoloAvatar student={studentData} size="hero" className="relative z-10" />
-                    
                     <div className="absolute inset-0 bg-black/60 rounded-[35%] opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center z-20 backdrop-blur-sm">
                         <Settings className="text-white mb-1" size={24} />
                         <span className="text-[10px] font-black text-white uppercase tracking-widest">Tune</span>
@@ -576,6 +583,7 @@ const LiveTriviaRemote = ({ liveSession, lessons, allDecks, studentEmail, classI
 
     if (isRevealed) {
         const isCorrect = myAnswer === quizCorrectId;
+
         return (
             <div className={`h-full rounded-[2.5rem] flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-500 border-[8px] ${isCorrect ? 'bg-slate-900 border-emerald-500/50 shadow-[inset_0_0_100px_rgba(16,185,129,0.2)]' : 'bg-black border-slate-800'}`}>
                 {isCorrect ? <CheckCircle2 size={120} className="text-emerald-400 mb-6 animate-bounce" strokeWidth={3} /> : <XCircle size={120} className="text-slate-700 mb-6" strokeWidth={2} />}
@@ -603,6 +611,7 @@ const LiveTriviaRemote = ({ liveSession, lessons, allDecks, studentEmail, classI
                 {quizOptions.map((opt: any, idx: number) => {
                     const Theme = SHAPE_THEMES[idx % 4];
                     const isSelected = myAnswer === opt.id;
+                    
                     return (
                         <button
                             key={opt.id} disabled={!!myAnswer} onClick={() => submitAnswer(opt.id)} style={{ WebkitTapHighlightColor: 'transparent' }}
@@ -623,8 +632,7 @@ const LiveTriviaRemote = ({ liveSession, lessons, allDecks, studentEmail, classI
 //  CONNECT FOUR: STUDENT REMOTE
 // ============================================================================
 const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, userData }: any) => {
-    const [showForge, setShowForge] = useState(false); 
-
+    const [showForge, setShowForge] = useState(false);
     const safeEmail = (studentEmail || 'scholar@magister').replace(/\./g, ',');
     const myTeam = liveSession?.teams?.[safeEmail]; 
     const isMyTurn = liveSession?.currentTurn === myTeam;
@@ -674,11 +682,9 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, 
 
     const handleDrop = async (colIndex: number) => {
         if (!isMyTurn || !iHaveUnlockedDrop) return;
-        
         const currentGrid = liveSession.grid || Array(7).fill([]);
         const currentColumn = currentGrid[colIndex] || [];
         if (currentColumn.length >= 6) return;
-
         const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
         await updateDoc(sessionRef, { 
             lastMove: { 
@@ -693,6 +699,7 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, 
 
     const handleSaveAvatar = async (finalUrl: string, config: any) => {
         if (!auth.currentUser?.uid) return;
+
         try {
             const userRef = doc(db, 'artifacts', appId, 'users', auth.currentUser.uid);
             const newEquipped = { ...(userData?.equipped || {}) };
@@ -709,6 +716,7 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, 
                 [`joined.${safeEmail}.avatarUrl`]: finalUrl,
                 [`joined.${safeEmail}.equipped`]: newEquipped
             });
+
             setShowForge(false);
         } catch (err) {
             console.error("Avatar live sync failed:", err);
@@ -746,7 +754,7 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, 
                 <p className="text-slate-400 font-bold text-sm max-w-[250px] uppercase tracking-widest leading-loose mb-8">Awaiting instructor deployment...</p>
 
                 <button onClick={() => setShowForge(true)} className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest transition-colors flex items-center gap-2 border border-slate-700">
-                   <Settings size={14} /> Tune Avatar
+                    <Settings size={14} /> Tune Avatar
                 </button>
             </div>
         );
@@ -754,6 +762,7 @@ const ConnectFourRemote = ({ liveSession, classId, studentEmail, onLogActivity, 
 
     if (isFinished) {
         const iWon = liveSession.winningTeam === myTeam;
+
         return (
             <div className={`h-full rounded-[3rem] flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-500 border-[12px] ${iWon ? 'bg-slate-900 border-emerald-500' : 'bg-black border-rose-900'}`}>
                 {iWon ? <Trophy size={120} className="text-emerald-400 mb-6 animate-bounce" /> : <XCircle size={120} className="text-rose-900 mb-6" />}
@@ -827,7 +836,6 @@ export default function StudentClassView({
   
   // 🔥 FETCH DECK DATA FOR SLIPSTREAM
   const [activeDeck, setActiveDeck] = useState<any>(null);
-
   const [expandedRoadmaps, setExpandedRoadmaps] = useState<Record<string, boolean>>({ 
       [classData?.assignedCurriculums?.[0]]: true 
   });
@@ -887,7 +895,7 @@ export default function StudentClassView({
 
   const rawAssignments = Array.isArray(classData?.assignments) ? classData.assignments : [];
   const rawCurriculums = Array.isArray(classData?.assignedCurriculums) ? classData.assignedCurriculums : [];
-  
+
   // DUAL-LOOKUP ENGINE: Checks Lessons, then checks allDecks
   const populatedAssignments = rawAssignments.map((assignment: any) => {
       if (typeof assignment !== 'string') return assignment;
@@ -915,6 +923,7 @@ export default function StudentClassView({
       ...populatedAssignments.map((a:any) => a.id),
       ...assignedCurriculums.flatMap((c:any) => c.lessonIds || [])
   ]));
+
   const totalNodesCount = allClassNodeIds.length;
   const completedClassNodes = allClassNodeIds.filter(id => completedItems.includes(id)).length;
   const overallProgress = totalNodesCount > 0 ? Math.round((completedClassNodes / totalNodesCount) * 100) : 0;
@@ -922,12 +931,32 @@ export default function StudentClassView({
   const isImmersiveLiveMode = activeSubTab === 'live' && liveSession;
 
   if (isImmersiveLiveMode) {
+      // 🔥 Helper function for the student to push their tile moves to Firebase
+      const handleStudentGameUpdate = async (updates: any) => {
+          if (!classData?.id) return;
+          try {
+              const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classData.id);
+              await setDoc(sessionRef, updates, { merge: true });
+          } catch (err) {
+              console.error("Failed to sync student move:", err);
+          }
+      };
+
       return (
           <div className="fixed inset-0 z-[9999] bg-black flex flex-col animate-in slide-in-from-bottom-8 duration-500 font-sans">
               <button onClick={() => setActiveSubTab('lessons')} className="absolute top-6 left-6 z-50 p-2 text-slate-500 hover:text-white rounded-full bg-slate-900 border border-slate-800"><X size={20} /></button>
               
               <div className="flex-1 w-full h-full p-4 md:p-8 pt-20">
-                  {liveSession.type === 'slipstream' ? (
+                  {/* 🔥 NEW: MARBLE SCRABBLE ROUTE */}
+                  {liveSession?.currentQuestion?.gameType === 'marble-scrabble' ? (
+                      <MarbleScrabble 
+                          block={liveSession.currentQuestion} 
+                          isProjector={false} 
+                          liveState={liveSession} 
+                          studentId={safeEmail} 
+                          onUpdateLiveState={handleStudentGameUpdate}
+                      />
+                  ) : liveSession.type === 'slipstream' ? (
                       <StudentSlipstreamView 
                           user={userData || auth?.currentUser}
                           classId={classData.id}
@@ -947,7 +976,7 @@ export default function StudentClassView({
                     <LiveTriviaRemote 
                         liveSession={liveSession} 
                         lessons={lessons} 
-                        allDecks={allDecks} // 🔥 Passed allDecks here too just in case!
+                        allDecks={allDecks} 
                         classId={classData.id} 
                         studentEmail={userData?.email || auth?.currentUser?.email} 
                         onLogActivity={onLogActivity}
@@ -1129,7 +1158,7 @@ const CurriculumPathway = ({ curr, lessons, allDecks = {}, completedItems, isExp
     const activeNodeIndex = currLessons.findIndex((l: any) => !completedItems.includes(l.id));
     const normalizedActiveIndex = activeNodeIndex === -1 ? currLessons.length - 1 : activeNodeIndex;
     const headerAccent = curr.themeColor || '#6366f1';
-    
+
     return (
         <article className="bg-transparent relative pb-8">
             <button className="w-full text-left bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-6 md:p-8 rounded-[3rem] border border-white/40 dark:border-slate-800 shadow-xl relative overflow-hidden group transition-colors duration-300" onClick={onToggle}>
@@ -1157,7 +1186,6 @@ const CurriculumPathway = ({ curr, lessons, allDecks = {}, completedItems, isExp
             <div className={`overflow-hidden transition-all duration-700 ${isExpanded ? 'max-h-[5000px] opacity-100 mt-4' : 'max-h-0 opacity-0 pointer-events-none'}`}>
                 <div className="pt-8 pb-12 px-1 sm:px-4 relative transition-colors duration-300">
                     <div className="relative max-w-sm mx-auto w-full">
-                        
                         <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-1 bg-slate-200 dark:bg-slate-800/60 rounded-full z-0 transition-colors duration-300" />
                         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 rounded-full transition-all duration-1000 z-0 shadow-[0_0_15px_rgba(99,102,241,0.5)]" style={{ height: `${currLessons.length > 1 ? (normalizedActiveIndex / (currLessons.length - 1)) * 100 : 100}%`, backgroundColor: headerAccent }} />
                         
