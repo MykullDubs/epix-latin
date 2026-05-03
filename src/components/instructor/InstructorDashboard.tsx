@@ -48,6 +48,7 @@ export default function InstructorDashboard({
   onStartVocabGame,
   onStartConnectFour,
   onStartSlipstream, 
+  onStartMarbleScrabble, // 🔥 ADDED THIS PROP
   onPublishDeck, 
   onSwitchView, 
   onLogout,
@@ -76,7 +77,6 @@ export default function InstructorDashboard({
   // 🔥 CATCH INTENTS FROM BASIC HUB
   useEffect(() => {
       if (proIntent) {
-          // Switch to the correct tab (Studio, Vault, Dashboard, etc)
           setTabHistory([proIntent.tab]);
           
           if (proIntent.action === 'launch_content' && proIntent.targetId) {
@@ -87,16 +87,13 @@ export default function InstructorDashboard({
               setDashCohortId(proIntent.targetId);
               setIsLiveModalOpen(true); 
           }
-          // 🔥 CAUGHT THE EDIT INTENT
           else if (proIntent.action === 'edit' && proIntent.targetId) {
-              setStudioTargetId(proIntent.targetId); // Save the ID to pass to BuilderHub
+              setStudioTargetId(proIntent.targetId); 
           }
-          // 🔥 CAUGHT THE GENERATOR INTENT
           else if (proIntent.action === 'generate') {
-              setStudioTargetId('generate'); // Tell BuilderHub to open AI modal
+              setStudioTargetId('generate'); 
           }
           
-          // Clear it so it doesn't fire again
           if (clearProIntent) clearProIntent();
       }
   }, [proIntent, clearProIntent]);
@@ -292,8 +289,8 @@ export default function InstructorDashboard({
                  onPublishDeck={onPublishDeck} 
                  instructorClasses={userData?.classes || []}
                  curriculums={curriculums}
-                 targetLessonId={studioTargetId} // 🔥 PASSING THE ID TO THE BUILDER!
-                 clearTargetLesson={() => setStudioTargetId(null)} // 🔥 CLEAR PROP
+                 targetLessonId={studioTargetId} 
+                 clearTargetLesson={() => setStudioTargetId(null)}
                />
              </div>
            )}
@@ -318,6 +315,7 @@ export default function InstructorDashboard({
                   onStartPresentation={onStartPresentation} 
                   onStartVocabGame={onStartVocabGame}
                   onStartConnectFour={onStartConnectFour} 
+                  onStartMarbleScrabble={onStartMarbleScrabble} // 🔥 ADDED HERE
                />
              </div>
            )}
@@ -334,8 +332,8 @@ export default function InstructorDashboard({
                        setIsLiveModalOpen(true);
                    }}
                    onEditArtifact={(id: string, type: string) => {
-                       setStudioTargetId(id); // Set the target
-                       handleDrillDown('studio'); // Navigate to studio
+                       setStudioTargetId(id); 
+                       handleDrillDown('studio'); 
                    }}
                />
              </div>
@@ -439,6 +437,8 @@ export default function InstructorDashboard({
                    setTimeout(() => {
                        if (config.mode === 'connect_four') {
                            if (onStartConnectFour) onStartConnectFour(config.contentId, config.classId);
+                       } else if (config.mode === 'marble_scrabble') {
+                           if (onStartMarbleScrabble) onStartMarbleScrabble(config.contentId, config.classId); // 🔥 CAUGHT HERE!
                        } else if (config.mode === 'trivia') {
                            if (onStartVocabGame) onStartVocabGame(config.contentId, config.classId);
                        } else if (config.mode === 'slipstream') {
