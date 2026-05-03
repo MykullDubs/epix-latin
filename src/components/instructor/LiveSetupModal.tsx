@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
     X, Play, Users, Layers, MonitorPlay, 
-    Gamepad2, Brain, Zap, TabletSmartphone, BookOpen, Lock, Crown // 🔥 IMPORTED CROWN
+    Gamepad2, Brain, Zap, TabletSmartphone, BookOpen, Lock, Crown, Type
 } from 'lucide-react';
 
 export default function LiveSetupModal({ 
@@ -17,7 +17,8 @@ export default function LiveSetupModal({
     onUpgradeRequest    // 🔥 NEW PROP: Triggers the upgrade modal
 }: any) {
     const [selectedClassId, setSelectedClassId] = useState('');
-    const [selectedMode, setSelectedMode] = useState<'hud' | 'presentation' | 'trivia' | 'connect_four' | 'slipstream' | ''>('');
+    // 🔥 UPDATED: Added 'marble_scrabble' to the mode types
+    const [selectedMode, setSelectedMode] = useState<'hud' | 'presentation' | 'trivia' | 'connect_four' | 'slipstream' | 'marble_scrabble' | ''>('');
     const [selectedContentId, setSelectedContentId] = useState('');
 
     // 🔥 Auto-hydrate the modal if opened from the Vault
@@ -39,7 +40,8 @@ export default function LiveSetupModal({
     const availableDecks = Object.values(decks || {}).filter((d: any) => d.id && d.id !== 'custom');
     
     const requiresLesson = selectedMode === 'hud' || selectedMode === 'presentation';
-    const requiresDeck = selectedMode === 'trivia' || selectedMode === 'connect_four' || selectedMode === 'slipstream';
+    // 🔥 UPDATED: Added marble_scrabble to modes requiring a deck
+    const requiresDeck = selectedMode === 'trivia' || selectedMode === 'connect_four' || selectedMode === 'slipstream' || selectedMode === 'marble_scrabble';
 
     const handleDeploy = () => {
         if (!selectedClassId || !selectedMode || !selectedContentId) return;
@@ -152,6 +154,7 @@ export default function LiveSetupModal({
                             {/* 👑 PREMIUM MODES */}
                             <ModeButton id="connect_four" icon={Gamepad2} label="Squad Strike" type="Deck" colorClass="bg-emerald-600 border-emerald-500 text-white" isPremium={true} />
                             <ModeButton id="slipstream" icon={Zap} label="Slipstream" type="Deck" colorClass="bg-amber-500 border-amber-400 text-white" isPremium={true} />
+                            <ModeButton id="marble_scrabble" icon={Type} label="Scrabble" type="Deck" colorClass="bg-rose-500 border-rose-400 text-white" isPremium={true} />
                         </div>
                     </div>
 
