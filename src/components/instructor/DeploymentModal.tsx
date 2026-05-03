@@ -14,14 +14,14 @@ export default function DeploymentModal({
     lessons = [], 
     allDecks = {}, 
     curriculums = [],
-    isPro,             // 🔥 ADDED FREEMIUM GATE
-    onUpgradeRequest   // 🔥 ADDED UPGRADE TRIGGER
+    isPro,             
+    onUpgradeRequest   
 }: any) {
     const [search, setSearch] = useState('');
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [selectedType, setSelectedType] = useState<'deck' | 'lesson' | 'curriculum'>('deck');
     
-    // 🔥 UPDATED: Added 'marble_scrabble' to the valid state types
+    // Protocol State
     const [deployMode, setDeployMode] = useState<'assign' | 'presentation' | 'trivia' | 'connect_four' | 'slipstream' | 'marble_scrabble'>('assign');
     const [deployState, setDeployState] = useState<'idle' | 'deploying' | 'success'>('idle');
 
@@ -40,19 +40,19 @@ export default function DeploymentModal({
         item.type === selectedType
     );
 
-    // 🔥 UPDATED: Added Marble Scrabble to the available protocols
+    // 🔥 FIXED: marble_scrabble is now validFor: ['lesson', 'deck']
     const availableProtocols = [
         { id: 'assign', label: 'Silent Assign', icon: Inbox, pro: false, validFor: ['lesson', 'deck', 'curriculum'] },
         { id: 'presentation', label: 'Live Sync', icon: Presentation, pro: false, validFor: ['lesson'] },
         { id: 'trivia', label: 'Trivia Arena', icon: HelpCircle, pro: false, validFor: ['deck'] },
         { id: 'connect_four', label: 'Connect 4', icon: Gamepad2, pro: true, validFor: ['deck'] },
         { id: 'slipstream', label: 'Slipstream', icon: Zap, pro: true, validFor: ['deck'] },
-        { id: 'marble_scrabble', label: 'Scrabble', icon: Type, pro: true, validFor: ['deck'] }, // <--- ADDED HERE
+        { id: 'marble_scrabble', label: 'Scrabble', icon: Type, pro: true, validFor: ['lesson', 'deck'] }, 
     ].filter(p => p.validFor.includes(selectedType));
 
     const handleProtocolClick = (protocolId: string, isPremium: boolean) => {
         if (isPremium && !isPro) {
-            onClose(); // Close this modal to prevent stacking
+            onClose(); 
             if (onUpgradeRequest) onUpgradeRequest();
         } else {
             setDeployMode(protocolId as any);
@@ -62,14 +62,11 @@ export default function DeploymentModal({
     const handleDeploy = () => {
         if (!selectedId) return;
         
-        // 1. Trigger the "Uplink" sequence
         setDeployState('deploying');
         
         setTimeout(() => {
-            // 2. Show Success
             setDeployState('success');
             
-            // 3. Execute database change & close modal
             setTimeout(() => {
                 onDeploy({ classId: activeClass.id, contentId: selectedId, mode: deployMode });
                 setDeployState('idle');
@@ -145,7 +142,7 @@ export default function DeploymentModal({
                                         onClick={() => { 
                                             setSelectedType(tab.id as any); 
                                             setSelectedId(null); 
-                                            setDeployMode('assign'); // Reset mode on tab switch
+                                            setDeployMode('assign'); 
                                         }}
                                         className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${
                                             selectedType === tab.id 
