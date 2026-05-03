@@ -144,7 +144,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const [rack, setRack] = useState<any[]>(Array(7).fill(null));
   const [targetSquare, setTargetSquare] = useState<number | null>(null);
 
-  // 🔥 NEW: Directional Tracking State
+  // Directional Tracking State
   const [lastPlacedIndex, setLastPlacedIndex] = useState<number | null>(null);
   const [playDirection, setPlayDirection] = useState<number | null>(null);
 
@@ -158,9 +158,9 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     }
   }, [globalBoard]);
 
-  // Fill rack initially for students
+  // 🔥 UPDATED: Fill rack for students if they have empty slots when their turn starts
   useEffect(() => {
-    if (!isProjector && isMyTurn && rack.every((t: any) => t === null) && globalBag?.length > 0) {
+    if (!isProjector && isMyTurn && rack.some((t: any) => t === null) && globalBag?.length > 0) {
       drawTiles();
     }
   }, [isMyTurn]);
@@ -168,15 +168,22 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const drawTiles = () => {
     if (!globalBag || globalBag.length === 0) return;
     let newBag = [...globalBag];
+    let changed = false;
     const newRack = rack.map((slot: any) => {
-      if (slot === null && newBag.length > 0) return newBag.pop();
+      if (slot === null && newBag.length > 0) {
+        changed = true;
+        return newBag.pop();
+      }
       return slot;
     });
-    setRack(newRack);
-    onUpdateLiveState({ bag: newBag });
+    
+    if (changed) {
+      setRack(newRack);
+      onUpdateLiveState({ bag: newBag }); // Sync global bag deducts to everyone else
+    }
   };
 
-  // 🔥 TARGET SELECTION
+  // TARGET SELECTION
   const handleBoardClick = (index: number) => {
     if (localBoard[index]?.isLocked) return; 
     
@@ -203,7 +210,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     setTargetSquare(index);
   };
 
-  // 🔥 SMART DIRECTIONAL TILE PLACEMENT
+  // SMART DIRECTIONAL TILE PLACEMENT
   const handleRackClick = (idx: number) => {
     if (!rack[idx]) return;
 
@@ -221,12 +228,10 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       let currentDirection = playDirection;
       if (lastPlacedIndex !== null) {
           const delta = targetSquare - lastPlacedIndex;
-          // If they placed exactly 1 to the right, or 1 down
           if (delta === 1 || delta === BOARD_SIZE) {
               currentDirection = delta;
               setPlayDirection(delta);
           } else {
-              // They placed it somewhere random, reset the direction
               currentDirection = null;
               setPlayDirection(null);
           }
@@ -238,7 +243,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       if (currentDirection !== null) {
           const nextSquare = targetSquare + currentDirection;
           
-          // Safety checks so it doesn't wrap off the edges of the board
           const isHorizontalValid = currentDirection === 1 && (targetSquare % BOARD_SIZE !== BOARD_SIZE - 1);
           const isVerticalValid = currentDirection === BOARD_SIZE && (targetSquare + BOARD_SIZE < BOARD_SIZE * BOARD_SIZE);
 
@@ -248,8 +252,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
               setTargetSquare(null);
           }
       } else {
-          // This was the first tile placed, or a disconnected tile. 
-          // Drop the reticle so they have to manually tap the next square to set the direction.
           setTargetSquare(null);
       }
     }
@@ -309,6 +311,8 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
     const lockedBoard = localBoard.map((t: any) => t && !t.isLocked ? { ...t, isLocked: true } : t);
 
+    // Update Firebase. Note: the student's rack locally will now contain nulls where they played tiles.
+    // When it becomes their turn again, the drawTiles() useEffect will automatically refill them!
     onUpdateLiveState({
       board: lockedBoard,
       scores: { ...(liveState?.scores || {}), [myTeamId]: (scores[myTeamId] || 0) + turnScore },
@@ -348,10 +352,16 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       <div className="w-full h-full flex p-12 wood-bg text-white gap-12 overflow-hidden">
         {/* Board Area */}
         <div className="flex-1 flex flex-col items-center justify-center">
-          <div className={`mb-8 px-12 py-4 rounded-full border-4 shadow-[0_0_30px_rgba(0,0,0,0.5)] ${activeTeam?.color} border-white/20 animate-in slide-in-from-top-10`}>
-             <h2 className="text-4xl font-black uppercase tracking-widest flex items-center gap-4">
-                {activeTeam?.name}'s Turn <Clock className="ml-4" /> {timeLeft}s
-             </h2>
+          
+          {/* 🔥 REFINED SMALLER TIMER UI */}
+          <div className="mb-8 flex items-center gap-4 animate-in slide-in-from-top-8">
+             <div className={`px-6 py-2 rounded-full border-2 shadow-lg text-white font-black uppercase tracking-widest text-sm ${activeTeam?.color} border-white/20`}>
+                {activeTeam?.name}'s Turn
+             </div>
+             <div className="bg-slate-900/80 backdrop-blur-md px-5 py-2 rounded-full border border-slate-700 shadow-xl flex items-center gap-3">
+                <Clock className="text-amber-400 w-4 h-4" />
+                <span className="text-xl font-mono font-bold text-amber-100">{timeLeft}s</span>
+             </div>
           </div>
           
           <div className="board-grid bg-[#d0c8b6] p-2 rounded-lg shadow-2xl border-[4px] border-[#8b7355]">
@@ -427,8 +437,13 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       <div className="flex flex-col h-full w-full wood-bg p-6 justify-center items-center text-center">
         <ShieldAlert size={80} className={`${activeTeam?.textColor} mb-8 opacity-50`} />
         <h2 className={`text-3xl font-black uppercase tracking-widest ${activeTeam?.textColor} mb-2`}>{activeTeam?.name}'s Turn</h2>
-        <p className="text-lg font-bold text-slate-400 mb-12">Discuss strategy. Wait for your turn.</p>
-        <div className="text-8xl font-mono font-black text-amber-100/80">{timeLeft}</div>
+        <p className="text-lg font-bold text-slate-400 mb-8">Discuss strategy. Wait for your turn.</p>
+        
+        {/* 🔥 REFINED SMALLER TIMER UI FOR SPECTATORS */}
+        <div className="mt-8 flex items-center gap-3 bg-slate-900/50 backdrop-blur-md px-6 py-3 rounded-full border border-slate-700 shadow-inner">
+            <Clock className="text-amber-500 w-5 h-5" />
+            <span className="text-3xl font-mono font-bold text-amber-100">{timeLeft}s</span>
+        </div>
       </div>
     );
   }
