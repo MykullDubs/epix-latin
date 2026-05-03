@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { 
     X, Send, Search, Layers, FileText, 
     Milestone, ShieldCheck, Zap, Target,
-    Loader2, CheckCircle2, Gamepad2, Presentation, Inbox, HelpCircle, Crown, Lock
+    Loader2, CheckCircle2, Gamepad2, Presentation, Inbox, HelpCircle, Crown, Lock, Type
 } from 'lucide-react';
 
 export default function DeploymentModal({ 
@@ -21,8 +21,8 @@ export default function DeploymentModal({
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [selectedType, setSelectedType] = useState<'deck' | 'lesson' | 'curriculum'>('deck');
     
-    // 🔥 NEW: Deployment Protocol State
-    const [deployMode, setDeployMode] = useState<'assign' | 'presentation' | 'trivia' | 'connect_four' | 'slipstream'>('assign');
+    // 🔥 UPDATED: Added 'marble_scrabble' to the valid state types
+    const [deployMode, setDeployMode] = useState<'assign' | 'presentation' | 'trivia' | 'connect_four' | 'slipstream' | 'marble_scrabble'>('assign');
     const [deployState, setDeployState] = useState<'idle' | 'deploying' | 'success'>('idle');
 
     if (!isOpen) return null;
@@ -40,13 +40,14 @@ export default function DeploymentModal({
         item.type === selectedType
     );
 
-    // Filter available modes based on the selected content type
+    // 🔥 UPDATED: Added Marble Scrabble to the available protocols
     const availableProtocols = [
         { id: 'assign', label: 'Silent Assign', icon: Inbox, pro: false, validFor: ['lesson', 'deck', 'curriculum'] },
         { id: 'presentation', label: 'Live Sync', icon: Presentation, pro: false, validFor: ['lesson'] },
         { id: 'trivia', label: 'Trivia Arena', icon: HelpCircle, pro: false, validFor: ['deck'] },
         { id: 'connect_four', label: 'Connect 4', icon: Gamepad2, pro: true, validFor: ['deck'] },
         { id: 'slipstream', label: 'Slipstream', icon: Zap, pro: true, validFor: ['deck'] },
+        { id: 'marble_scrabble', label: 'Scrabble', icon: Type, pro: true, validFor: ['deck'] }, // <--- ADDED HERE
     ].filter(p => p.validFor.includes(selectedType));
 
     const handleProtocolClick = (protocolId: string, isPremium: boolean) => {
@@ -70,7 +71,6 @@ export default function DeploymentModal({
             
             // 3. Execute database change & close modal
             setTimeout(() => {
-                // 🔥 UPDATED: Passing the selected mode alongside the IDs
                 onDeploy({ classId: activeClass.id, contentId: selectedId, mode: deployMode });
                 setDeployState('idle');
                 setSelectedId(null);
@@ -205,7 +205,7 @@ export default function DeploymentModal({
                                 )}
                             </div>
 
-                            {/* 🔥 NEW: DEPLOYMENT PROTOCOL SELECTOR */}
+                            {/* PROTOCOL SELECTOR */}
                             {selectedId && availableProtocols.length > 0 && (
                                 <div className="shrink-0 animate-in slide-in-from-bottom-4 duration-300">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Select Deployment Protocol</label>
