@@ -9,11 +9,12 @@ import {
     Layers, MousePointerClick, QrCode, Hourglass, Play, Pause, RotateCcw, 
     Plus, Minus, PenTool, Crosshair, Eraser, Wrench, Highlighter, Type, Presentation,
     ChevronDown, ChevronUp, Mic, Info, Search, Palette, Square, BookOpen, Volume2,
-    AlertCircle // 🔥 ADDED ALERTCIRCLE FOR THE GRAMMAR BLOCK
+    AlertCircle
 } from 'lucide-react';
 import ConnectThreeVocab from './ConnectThreeVocab';
 import PronunciationLab from './PronunciationLab'; 
-import LiveRoleplayArena from './LiveRoleplayArena'; 
+import LiveRoleplayArena from './LiveRoleplayArena';
+import MarbleScrabble from './MarbleScrabble'; // 🔥 IMPORTED MARBLE SCRABBLE
 
 // ============================================================================
 //  CLASS VIEW (The Projector / Big Screen Mode with Keyboard Nav)
@@ -91,7 +92,8 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
   const stageRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
 
-  const { liveState, startLiveClass, endLiveClass, changeSlide, triggerQuiz } = useLiveClass(classId, true);
+  // 🔥 ADDED updateLiveState here so the projector can seed the game board
+  const { liveState, startLiveClass, endLiveClass, changeSlide, triggerQuiz, updateLiveState } = useLiveClass(classId, true);
 
   // 🔥 EXTRACT HERO IMAGE FOR LOBBY
   const heroImage = useMemo(() => {
@@ -363,7 +365,7 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
     const grouped: any[] = [];
     let buffer: any[] = [];
     
-    // 🔥 ALL VALID BLOCK TYPES REGISTERED HERE (ADDED 'grammar')
+    // 🔥 ALL VALID BLOCK TYPES REGISTERED HERE
     const interactables = ['quiz', 'flashcard', 'scenario', 'fill-blank', 'discussion', 'game', 'drag-drop', 'pronunciation', 'roleplay', 'audio-story', 'image-hotspot', 'drawing', 'code', 'timeline', 'grammar'];
     
     lesson.blocks.forEach((b: any) => {
@@ -386,7 +388,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
       }
   }, [pages.length, changeSlide]);
 
-  // 🔥 UPDATED NEXT/PREV LOGIC TO HANDLE LOBBY
   const handleNext = useCallback(() => {
       if (isLobby) {
           setIsLobby(false);
@@ -474,7 +475,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
         className="fixed inset-0 z-[9999] flex flex-col bg-slate-900 text-white overflow-hidden font-sans selection:bg-indigo-500"
         onContextMenu={handleRightClick} 
     >
-     {/* 🔥 THE LIVE AUDIO ARENA OVERLAY */}
       {activeRoleplayBlock && (
           <LiveRoleplayArena 
               scenarioPrompt={activeRoleplayBlock.prompt} 
@@ -483,7 +483,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           />
       )}
 
-      {/* 🔥 OS OVERLAYS & TOOLS */}
       <div className={`absolute inset-0 bg-black z-[9000] flex items-center justify-center transition-opacity duration-700 pointer-events-none ${isBlanked ? 'opacity-100' : 'opacity-0'}`}>
           <EyeOff size={64} className="text-white/10" />
       </div>
@@ -607,7 +606,6 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           </div>
       )}
 
-      {/* 🔥 THE NEW MAIN TOOLS OS WINDOW (Movable & Resizable) */}
       {showTools && (
           <div 
               className="absolute z-[8900] bg-slate-900/95 backdrop-blur-2xl border-4 border-slate-700 rounded-[2.5rem] p-6 pt-10 pb-8 shadow-[0_40px_80px_rgba(0,0,0,0.6)] flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200 w-72 pointer-events-auto overflow-hidden"
@@ -787,8 +785,21 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                               {blockType === 'vocab-list' && <VocabListBlock block={block} />}
                               {blockType === 'discussion' && <DiscussionBlock block={block} />}
                               {blockType === 'game' && block.gameType === 'connect-three' && <GameBlock block={block} lessonVocab={lessonVocab} />}
-                              {blockType === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
                               
+                              {/* 🔥 NEW MARBLE SCRABBLE INTEGRATION */}
+                              {blockType === 'game' && block.gameType === 'marble-scrabble' && (
+                                  <div className="w-full h-[80vh] pointer-events-auto rounded-[3rem] overflow-hidden shadow-2xl">
+                                      <MarbleScrabble 
+                                          block={block} 
+                                          isProjector={true} 
+                                          liveState={liveState} 
+                                          onUpdateLiveState={updateLiveState}
+                                          studentId="projector" 
+                                      />
+                                  </div>
+                              )}
+
+                              {blockType === 'scenario' && <ScenarioBlock block={block} liveState={liveState} />}
                               {blockType === 'callout' && <CalloutBlock block={block} />}
                               {blockType === 'drawing' && <DrawingBlock block={block} />}
                               {blockType === 'image-hotspot' && <ImageHotspotBlock block={block} />}
@@ -826,12 +837,8 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
                               
                               {blockType === 'fill-blank' && <FillBlankBlock block={block} liveState={liveState} />}
                               {blockType === 'drag-drop' && <TapSortBlock block={block} liveState={liveState} />}
-                              
                               {blockType === 'pronunciation' && <PronunciationLab block={block} />} 
-
-                              {/* 🔥 NEW GRAMMAR BLOCK WIRED IN HERE */}
                               {blockType === 'grammar' && <GrammarBlock block={block} />} 
-
                               {blockType === 'roleplay' && <LiveRoleplayBlock block={block} onLaunch={() => setActiveRoleplayBlock(block)} />}
                           </>
                         )}
@@ -878,10 +885,8 @@ export default function ClassView({ lesson, classId, userData, activeOrg, onExit
           <div className="flex items-center gap-4">
               <div ref={progressBarRef} onClick={handleProgressBarClick} className="w-48 h-2 bg-black/40 rounded-full overflow-hidden cursor-pointer group relative backdrop-blur-sm border border-white/10">
                   <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  {/* 🔥 PROGRESS BAR NOW REFLECTS LOBBY STATE */}
                   <div className="h-full bg-indigo-500 transition-all duration-300 relative z-10" style={{ width: `${isLobby ? 0 : ((activePageIdx + 1) / pages.length) * 100}%` }} />
               </div>
-              {/* 🔥 SLIDE COUNT NOW REFLECTS LOBBY STATE */}
               <span className="font-black text-slate-300 tracking-widest uppercase w-28 text-right text-[10px] drop-shadow-md">
                   {isLobby ? 'LOBBY' : `Slide ${activePageIdx + 1} of ${pages.length}`}
               </span>
