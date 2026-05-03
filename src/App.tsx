@@ -4,6 +4,7 @@ import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db, appId } from './config/firebase';   
 import { useMagisterData } from './hooks/useMagisterData';
 import { GLOBAL_CURRICULUMS } from './constants/curriculums'; 
+import { useLiveClass } from './hooks/useLiveClass'; // 🔥 ADDED FOR SCRABBLE WRAPPER
 
 // Sub-component Imports
 import AuthView from './components/AuthView';
@@ -28,14 +29,58 @@ import CelebrationScreen from './components/CelebrationScreen';
 import HoloAvatar from './components/HoloAvatar'; 
 import InstructorHUD from './components/instructor/InstructorHUD'; 
 import StudentInbox from './components/StudentInbox';
+import MarbleScrabble from './components/MarbleScrabble'; // 🔥 IMPORTED SCRABBLE COMPONENT
 
 // 🔥 DYNAMIC OS THEME ENGINE
 const OS_THEMES: Record<string, string> = {
-    // Injecting heavy background colors and matching text colors to completely override the default styling
     theme_hacker: 'bg-emerald-950 text-emerald-500 selection:bg-emerald-500/30',
     theme_synth: 'bg-fuchsia-950 text-cyan-400 selection:bg-cyan-400/30',
     theme_vapor: 'bg-violet-950 text-fuchsia-400 selection:bg-fuchsia-400/30',
     default: 'bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100'
+};
+
+// ==========================================================================
+// 🔥 NEW: STANDALONE SCRABBLE PROJECTOR WRAPPER
+// ==========================================================================
+const LiveScrabbleWrapper = ({ deckId, classId, onExit }: any) => {
+    const { liveState, startLiveClass, endLiveClass, updateLiveState } = useLiveClass(classId, true);
+    
+    const scrabblePayload = useMemo(() => ({
+        type: "game",
+        gameType: "marble-scrabble",
+        title: "Littera Marmoris: Team Battle",
+        timePerTurnSeconds: 60,
+        teams: [
+            { id: "team_1", name: "Team Alpha", color: "bg-rose-500", textColor: "text-rose-500" },
+            { id: "team_2", name: "Team Beta", color: "bg-blue-500", textColor: "text-blue-500" },
+            { id: "team_3", name: "Team Gamma", color: "bg-emerald-500", textColor: "text-emerald-500" }
+        ]
+    }), []);
+
+    useEffect(() => {
+        // Initialize the class with the payload as the 'currentQuestion'
+        startLiveClass(deckId, 'vocab', scrabblePayload);
+        return () => { endLiveClass(); };
+    }, [deckId, classId]);
+
+    return (
+        <div className="fixed inset-0 z-[5000] bg-slate-900 flex flex-col">
+            <div className="absolute top-6 right-6 z-[6000]">
+                <button onClick={onExit} className="bg-rose-500 text-white px-8 py-3 rounded-full font-black text-xs uppercase tracking-widest hover:bg-rose-600 transition-all shadow-xl active:scale-95 border-2 border-rose-400">
+                    Terminate Session
+                </button>
+            </div>
+            <div className="flex-1 relative">
+                <MarbleScrabble 
+                    block={scrabblePayload} 
+                    isProjector={true} 
+                    liveState={liveState} 
+                    studentId="projector" 
+                    onUpdateLiveState={updateLiveState}
+                />
+            </div>
+        </div>
+    );
 };
 
 export default function App() {
@@ -49,7 +94,7 @@ export default function App() {
   // Navigation State
   const [currentView, setCurrentView] = useState<'student' | 'instructor' | 'admin'>('student');
   const [useAdvancedDashboard, setUseAdvancedDashboard] = useState(false); 
-  const [proIntent, setProIntent] = useState<{tab: string, action?: string, targetId?: string} | null>(null); // 🔥 NEW INTENT STATE
+  const [proIntent, setProIntent] = useState<{tab: string, action?: string, targetId?: string} | null>(null); 
   const [activeTab, setActiveTab] = useState<string>('home');
   const [showAuth, setShowAuth] = useState(false);
   const [hasAutoRouted, setHasAutoRouted] = useState(false); 
@@ -65,13 +110,13 @@ export default function App() {
   const [activeVocabGame, setActiveVocabGame] = useState<{deckId: string, classId: string} | null>(null);
   const [activeConnectFour, setActiveConnectFour] = useState<{deckId: string, classId: string} | null>(null);
   const [activeSlipstream, setActiveSlipstream] = useState<{deckId: string, classId: string} | null>(null);
+  const [activeMarbleScrabble, setActiveMarbleScrabble] = useState<{deckId: string, classId: string} | null>(null); // 🔥 NEW SCRABBLE STATE
   const [activeHUD, setActiveHUD] = useState<{lessonId: string, classId: string} | null>(null); 
 
   const allCurriculums = useMemo(() => {
       return [...GLOBAL_CURRICULUMS, ...(customCurriculums || [])];
   }, [customCurriculums]);
 
-  // 🔥 THE NETWORK FILTER: Only passes public decks to the Discovery Radar
   const networkDecks = useMemo(() => {
       const publicDecks: Record<string, any> = {};
       if (allDecks) {
@@ -84,7 +129,6 @@ export default function App() {
       return publicDecks;
   }, [allDecks]);
 
-  // 🔥 MERGE LIVE COHORTS WITH SOLO ELECTIVES & APPLY SAVED ORDER
   const combinedClasses = useMemo(() => {
       const soloCourses = userData?.enrolledClasses || userData?.profile?.main?.enrolledClasses || [];
       
@@ -117,7 +161,6 @@ export default function App() {
       return merged;
   }, [enrolledClasses, userData, allClasses]);
 
-  // 🔥 THE GLOBAL THEME LISTENER
   const equippedThemeId = userData?.equipped?.themes || 'default';
   const activeThemeClass = OS_THEMES[equippedThemeId] || OS_THEMES.default;
   const themeClassModifier = equippedThemeId !== 'default' ? equippedThemeId.replace('_', '-') : '';
@@ -175,6 +218,11 @@ export default function App() {
       } catch (error) { console.error("Failed to launch Slipstream Run:", error); }
   };
 
+  // 🔥 NEW: Scrabble Launcher
+  const handleStartMarbleScrabble = (deckId: string, classId: string) => {
+      setActiveMarbleScrabble({ deckId, classId });
+  };
+
   // ==========================================================================
   //  URL ROUTING ENGINE
   // ==========================================================================
@@ -184,7 +232,6 @@ export default function App() {
     if (!authChecked || isHydrated.current) return;
     const params = new URLSearchParams(window.location.search);
     
-    // 🔥 OS FEATURE: QR Code Route Interceptor
     const pathParts = window.location.pathname.split('/').filter(Boolean);
     if ((pathParts[0] === 'join' || pathParts[0] === 'live' || pathParts[0] === 'play') && pathParts[1]) {
         params.set('classId', pathParts[1]);
@@ -216,7 +263,7 @@ export default function App() {
                 }
             }
         } else {
-            return; // Wait for classes to finish loading before hydrating
+            return;
         }
     }
 
@@ -267,29 +314,20 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [combinedClasses, allLessons]);
 
-  // ==========================================================================
-  // 🔥 AUTH CLEANUP & AUTO-ROUTING (NUCLEAR DOM CLEANUP)
-  // ==========================================================================
   useEffect(() => {
     if (user) {
-        // 1. NUCLEAR DOM CLEANUP: Destroy any orphaned modal backdrops and body locks
         document.body.style.overflow = '';
         document.body.style.pointerEvents = '';
         document.body.removeAttribute('data-scroll-locked');
         document.body.removeAttribute('aria-hidden');
         
-        // Target and destroy orphaned Headless UI / Radix portals
         const orphanedPortals = document.querySelectorAll('[data-radix-portal], [id^="headlessui-portal"]');
         orphanedPortals.forEach(portal => portal.remove());
 
-        // Reset auth view state
         setShowAuth(false); 
 
-        // 2. Auto-route teachers and admins to their respective dashboards
         if (userData?.role && !hasAutoRouted) {
             const params = new URLSearchParams(window.location.search);
-            
-            // Only auto-route if the URL didn't explicitly request a specific view
             if (!params.get('view')) {
                 if (userData.role === 'instructor') {
                     setCurrentView('instructor');
@@ -316,7 +354,6 @@ export default function App() {
       );
   }
 
-  // 🔥 NEW LANDING PAGE & SSO ROUTING LOGIC
   if (!user) {
     if (showAuth) {
       return (
@@ -339,7 +376,17 @@ export default function App() {
   //  AUTHENTICATED APP VIEWS
   // ==========================================================================
 
-  // 2. PROJECTOR / PRESENTATION MODE
+  // 🔥 SCRABBLE PROJECTOR OVERRIDE
+  if (activeMarbleScrabble) {
+      return (
+          <LiveScrabbleWrapper 
+              deckId={activeMarbleScrabble.deckId} 
+              classId={activeMarbleScrabble.classId} 
+              onExit={() => setActiveMarbleScrabble(null)} 
+          />
+      );
+  }
+
   if (activePresentation) {
     const lesson = allLessons.find(l => l.id === activePresentation.lessonId);
     return (
@@ -355,7 +402,6 @@ export default function App() {
     );
   }
 
-  // 2.5 INSTRUCTOR HUD (The iPad Remote)
   if (activeHUD) {
     const lesson = allLessons.find(l => l.id === activeHUD.lessonId);
     const activeClassForHUD = instructorClasses.find(c => c.id === activeHUD.classId);
@@ -446,18 +492,19 @@ export default function App() {
           onStartVocabGame={handleStartVocabGame}      
           onStartConnectFour={handleStartConnectFour} 
           onStartSlipstream={handleStartSlipstream}
+          onStartMarbleScrabble={handleStartMarbleScrabble} // 🔥 ADDED
           onPublishDeck={actions.publishDeck}
           onSwitchView={() => setCurrentView('student')}
           onLogout={actions.logout} 
           onSwitchToBasicView={() => setUseAdvancedDashboard(false)} 
-          proIntent={proIntent} // 🔥 NEW INTENT STATE
-          clearProIntent={() => setProIntent(null)} // 🔥 INTENT CLEARER
+          proIntent={proIntent} 
+          clearProIntent={() => setProIntent(null)} 
           AdminDashboardView={AdminDashboardView}
         />
       );
     } 
     
-// 🔥 LITE VIEW: The Simplified MagisterHub
+    // 🔥 LITE VIEW: The Simplified MagisterHub
     else {
       return (
         <MagisterHub 
@@ -472,6 +519,7 @@ export default function App() {
             onStartVocabGame={handleStartVocabGame}      
             onStartConnectFour={handleStartConnectFour} 
             onStartSlipstream={handleStartSlipstream}
+            onStartMarbleScrabble={handleStartMarbleScrabble} // 🔥 ADDED
             
             onSaveLesson={actions.saveLesson}
             onSaveCard={actions.saveCard}
@@ -481,7 +529,6 @@ export default function App() {
             onSaveCurriculum={actions.saveCurriculum}
             onPublishDeck={actions.publishDeck}
             
-            // 🔥 FED CLASS MANAGEMENT ACTIONS TO THE LITE HUB
             onCreateClass={actions.createClass}
             onDeleteClass={actions.deleteClass}
             onRemoveStudent={actions.removeStudent}
@@ -497,7 +544,6 @@ export default function App() {
     <div className={themeClassModifier}>
       <div className={`min-h-[100dvh] w-full flex flex-col items-center relative overflow-hidden transition-colors duration-700 ${activeThemeClass}`}>
         
-        {/* Floating Command Center Button */}
         {userData?.role !== 'student' && (
           <button 
               onClick={() => setCurrentView(userData?.role === 'instructor' ? 'instructor' : 'admin')} 
@@ -511,7 +557,6 @@ export default function App() {
           </button>
         )}
 
-        {/* The OS Device Wrapper */}
         <div className={`w-full max-w-md h-[100dvh] shadow-[0_0_50px_rgba(0,0,0,0.15)] dark:shadow-[0_0_50px_rgba(0,0,0,0.4)] relative flex flex-col overflow-hidden transition-colors duration-700 ring-1 ring-slate-900/5 dark:ring-white/5 ${activeThemeClass}`}>
           
           <div key={activeTab + (activeLesson?.id || '')} className="flex-1 overflow-hidden relative animate-in fade-in zoom-in-[0.98] duration-300 ease-out">
