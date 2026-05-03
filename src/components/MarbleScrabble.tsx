@@ -154,7 +154,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
   // Fill rack initially for students
   useEffect(() => {
-    if (!isProjector && isMyTurn && rack.every(t => t === null) && globalBag?.length > 0) {
+    if (!isProjector && isMyTurn && rack.every((t: any) => t === null) && globalBag?.length > 0) {
       drawTiles();
     }
   }, [isMyTurn]);
@@ -162,7 +162,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const drawTiles = () => {
     if (!globalBag || globalBag.length === 0) return;
     let newBag = [...globalBag];
-    const newRack = rack.map(slot => {
+    const newRack = rack.map((slot: any) => {
       if (slot === null && newBag.length > 0) return newBag.pop();
       return slot;
     });
@@ -192,7 +192,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     } 
     // Recalling a tile from the board back to the rack
     else if (localBoard[index]) {
-      const emptyRackIndex = rack.findIndex(t => t === null);
+      const emptyRackIndex = rack.findIndex((t: any) => t === null);
       if (emptyRackIndex === -1) return; // Rack full
       const newRack = [...rack];
       const newBoard = [...localBoard];
@@ -207,9 +207,9 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const recallAll = () => {
     const newRack = [...rack];
     const newBoard = [...localBoard];
-    newBoard.forEach((tile, index) => {
+    newBoard.forEach((tile: any, index: number) => {
       if (tile && !tile.isLocked) {
-        const emptyIdx = newRack.findIndex(t => t === null);
+        const emptyIdx = newRack.findIndex((t: any) => t === null);
         if (emptyIdx !== -1) {
           newRack[emptyIdx] = tile;
           newBoard[index] = null;
@@ -244,9 +244,8 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
   const commitTurn = () => {
     // 1. Calculate points (basic MVP: sum of values of newly placed tiles)
-    // Note: A real implementation would calculate entire word modifiers (DW, TW, etc.)
     let turnScore = 0;
-    localBoard.forEach((tile, idx) => {
+    localBoard.forEach((tile: any, idx: number) => {
       if (tile && !tile.isLocked) {
         turnScore += tile.value;
       }
@@ -255,7 +254,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     if (turnScore === 0) return; // No tiles placed
 
     // 2. Lock tiles
-    const lockedBoard = localBoard.map(t => t && !t.isLocked ? { ...t, isLocked: true } : t);
+    const lockedBoard = localBoard.map((t: any) => t && !t.isLocked ? { ...t, isLocked: true } : t);
 
     // 3. Pass turn and update score
     onUpdateLiveState({
@@ -276,7 +275,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
           <h1 className="text-[8vh] font-bold playfair-font text-amber-400 mb-12">Join Your Team</h1>
           <div className="flex gap-8 mb-16">
             {teams.map((t: any) => {
-              const membersCount = Object.values(rosters || {}).filter(id => id === t.id).length;
+              const membersCount = Object.values(rosters || {}).filter((id: any) => id === t.id).length;
               return (
                 <div key={t.id} className={`${t.color} p-8 rounded-3xl text-center min-w-[250px] shadow-2xl border-4 border-white/20`}>
                   <h2 className="text-3xl font-black mb-4">{t.name}</h2>
@@ -428,7 +427,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       {/* Rack Area */}
       <div className="mt-2 bg-[#8b7355] rounded-xl p-2 border-b-4 border-[#5c4a35] w-full">
          <div className="flex gap-1 bg-[#4a3b29] p-2 rounded-lg w-full justify-center min-h-[3.5rem]">
-            {rack.map((tile, idx) => (
+            {rack.map((tile: any, idx: number) => (
               <div 
                 key={idx} 
                 onClick={() => handleRackClick(idx)}
