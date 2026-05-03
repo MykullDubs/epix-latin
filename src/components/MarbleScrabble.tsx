@@ -38,7 +38,6 @@ const createInitialBag = () => {
       bag.push({ id: `tile_${idCounter++}`, letter, value: data.value });
     }
   });
-  // Fisher-Yates Shuffle
   for (let i = bag.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [bag[i], bag[j]] = [bag[j], bag[i]];
@@ -78,7 +77,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const teams = block?.teams || [];
   const timeLimit = block?.timePerTurnSeconds || 60;
 
-  // Global Styles Injection
   useEffect(() => {
     if (!document.getElementById('marble-styles')) {
       const style = document.createElement('style');
@@ -106,7 +104,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   useEffect(() => {
     if (isProjector && !liveState?.gameStatus) {
       onUpdateLiveState({
-        gameStatus: 'lobby', // 'lobby' -> 'playing'
+        gameStatus: 'lobby', 
         board: Array(BOARD_SIZE * BOARD_SIZE).fill(null),
         bag: createInitialBag(),
         scores: Object.fromEntries(teams.map((t: any) => [t.id, 0])),
@@ -131,7 +129,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       const remaining = Math.max(0, Math.floor((turnEndTime - Date.now()) / 1000));
       setTimeLeft(remaining);
       if (remaining === 0 && isProjector && gameStatus === 'playing') {
-        passTurn(); // Instructor forcefully passes turn when time runs out
+        passTurn(); 
       }
     }, 1000);
     return () => clearInterval(interval);
@@ -144,7 +142,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const [rack, setRack] = useState<any[]>(Array(7).fill(null));
   const [selectedItem, setSelectedItem] = useState<{ type: 'rack'|'board', index: number } | null>(null);
 
-  // Sync local board when global board updates (i.e. another team plays)
   useEffect(() => {
     if (globalBoard) {
       setLocalBoard(globalBoard);
@@ -152,7 +149,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     }
   }, [globalBoard]);
 
-  // Fill rack initially for students
   useEffect(() => {
     if (!isProjector && isMyTurn && rack.every((t: any) => t === null) && globalBag?.length > 0) {
       drawTiles();
@@ -167,7 +163,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       return slot;
     });
     setRack(newRack);
-    // Silent update to global bag so teammates don't draw the exact same tiles
     onUpdateLiveState({ bag: newBag });
   };
 
@@ -177,11 +172,10 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   };
 
   const handleBoardClick = (index: number) => {
-    if (localBoard[index]?.isLocked) return; // Can't touch committed tiles
+    if (localBoard[index]?.isLocked) return; 
     
-    // Placing a tile from the rack
     if (selectedItem?.type === 'rack') {
-      if (localBoard[index]) return; // Space occupied
+      if (localBoard[index]) return; 
       const newBoard = [...localBoard];
       const newRack = [...rack];
       newBoard[index] = { ...newRack[selectedItem.index], isLocked: false };
@@ -190,10 +184,9 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       setRack(newRack);
       setSelectedItem(null);
     } 
-    // Recalling a tile from the board back to the rack
     else if (localBoard[index]) {
       const emptyRackIndex = rack.findIndex((t: any) => t === null);
-      if (emptyRackIndex === -1) return; // Rack full
+      if (emptyRackIndex === -1) return; 
       const newRack = [...rack];
       const newBoard = [...localBoard];
       newRack[emptyRackIndex] = newBoard[index];
@@ -222,10 +215,13 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   };
 
   // ==========================================
-  // GAMEPLAY ACTIONS
+  // GAMEPLAY ACTIONS (🔥 FIXED FIREBASE MERGE QUIRKS)
   // ==========================================
   const joinTeam = (teamId: string) => {
-    onUpdateLiveState({ [`rosters.${studentId}`]: teamId });
+    // Pass the full nested rosters object to avoid setDoc root-level string creation
+    onUpdateLiveState({ 
+        rosters: { ...(liveState?.rosters || {}), [studentId]: teamId } 
+    });
   };
 
   const startGame = () => {
@@ -243,7 +239,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   };
 
   const commitTurn = () => {
-    // 1. Calculate points (basic MVP: sum of values of newly placed tiles)
     let turnScore = 0;
     localBoard.forEach((tile: any, idx: number) => {
       if (tile && !tile.isLocked) {
@@ -251,15 +246,13 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       }
     });
 
-    if (turnScore === 0) return; // No tiles placed
-
-    // 2. Lock tiles
+    if (turnScore === 0) return; 
     const lockedBoard = localBoard.map((t: any) => t && !t.isLocked ? { ...t, isLocked: true } : t);
 
-    // 3. Pass turn and update score
+    // Pass the full nested scores object
     onUpdateLiveState({
       board: lockedBoard,
-      [`scores.${myTeamId}`]: (scores[myTeamId] || 0) + turnScore,
+      scores: { ...(liveState?.scores || {}), [myTeamId]: (scores[myTeamId] || 0) + turnScore },
       activeTeamIndex: (activeTeamIndex + 1) % teams.length,
       turnEndTime: Date.now() + timeLimit * 1000
     });
