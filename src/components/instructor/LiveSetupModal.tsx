@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
     X, Play, Users, Layers, MonitorPlay, 
-    Gamepad2, Brain, Zap, TabletSmartphone, BookOpen, Lock, Crown, Type
+    Gamepad2, Brain, Zap, TabletSmartphone, BookOpen, Lock, Type
 } from 'lucide-react';
 
 export default function LiveSetupModal({ 
@@ -12,16 +12,13 @@ export default function LiveSetupModal({
     decks = {}, 
     lessons = [], 
     onDeploy, 
-    preselectedContent,
-    isPro,              // 🔥 NEW PROP: Checks if user is premium
-    onUpgradeRequest    // 🔥 NEW PROP: Triggers the upgrade modal
+    preselectedContent
 }: any) {
     const [selectedClassId, setSelectedClassId] = useState('');
-    // 🔥 UPDATED: Added 'marble_scrabble' to the mode types
     const [selectedMode, setSelectedMode] = useState<'hud' | 'presentation' | 'trivia' | 'connect_four' | 'slipstream' | 'marble_scrabble' | ''>('');
     const [selectedContentId, setSelectedContentId] = useState('');
 
-    // 🔥 Auto-hydrate the modal if opened from the Vault
+    // Auto-hydrate the modal if opened from the Vault
     useEffect(() => {
         if (isOpen) {
             setSelectedClassId('');
@@ -40,7 +37,6 @@ export default function LiveSetupModal({
     const availableDecks = Object.values(decks || {}).filter((d: any) => d.id && d.id !== 'custom');
     
     const requiresLesson = selectedMode === 'hud' || selectedMode === 'presentation';
-    // 🔥 UPDATED: Added marble_scrabble to modes requiring a deck
     const requiresDeck = selectedMode === 'trivia' || selectedMode === 'connect_four' || selectedMode === 'slipstream' || selectedMode === 'marble_scrabble';
 
     const handleDeploy = () => {
@@ -61,19 +57,12 @@ export default function LiveSetupModal({
         }
     };
 
-    // 🔥 UPDATED MODE BUTTON WITH PREMIUM GATING
-    const ModeButton = ({ id, icon: Icon, label, type, colorClass, isPremium = false }: any) => {
+    // Cleaned up ModeButton without freemium checks
+    const ModeButton = ({ id, icon: Icon, label, type, colorClass }: any) => {
         const isSelected = selectedMode === id;
         return (
             <button 
                 onClick={() => {
-                    // 🔥 THE FREEMIUM INTERCEPTOR
-                    if (isPremium && !isPro) {
-                        onClose();
-                        if (onUpgradeRequest) onUpgradeRequest();
-                        return;
-                    }
-
                     const newModeRequiresLesson = id === 'hud' || id === 'presentation';
                     const currentModeRequiresLesson = selectedMode === 'hud' || selectedMode === 'presentation';
                     setSelectedMode(id);
@@ -88,13 +77,6 @@ export default function LiveSetupModal({
                         : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-slate-300 dark:hover:border-slate-700'
                 }`}
             >
-                {/* 🔥 PREMIUM CROWN BADGE */}
-                {isPremium && (
-                    <div className="absolute top-0 right-0 bg-amber-400 text-amber-950 p-1 rounded-bl-lg shadow-sm z-10">
-                        <Crown size={10} strokeWidth={3} />
-                    </div>
-                )}
-
                 <Icon size={24} className="relative z-10" />
                 <div className="relative z-10">
                     <div className="text-xs font-black uppercase tracking-widest">{label}</div>
@@ -146,15 +128,12 @@ export default function LiveSetupModal({
                             <Zap size={14} /> 2. Operating Mode
                         </label>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                            {/* 🟢 FREE MODES */}
                             <ModeButton id="hud" icon={TabletSmartphone} label="Instructor HUD" type="Lesson" colorClass="bg-indigo-600 border-indigo-500 text-white" />
                             <ModeButton id="presentation" icon={MonitorPlay} label="Live Projector" type="Lesson" colorClass="bg-indigo-600 border-indigo-500 text-white" />
                             <ModeButton id="trivia" icon={Brain} label="Arena: Trivia" type="Deck" colorClass="bg-fuchsia-600 border-fuchsia-500 text-white" />
-                            
-                            {/* 👑 PREMIUM MODES */}
-                            <ModeButton id="connect_four" icon={Gamepad2} label="Squad Strike" type="Deck" colorClass="bg-emerald-600 border-emerald-500 text-white" isPremium={true} />
-                            <ModeButton id="slipstream" icon={Zap} label="Slipstream" type="Deck" colorClass="bg-amber-500 border-amber-400 text-white" isPremium={true} />
-                            <ModeButton id="marble_scrabble" icon={Type} label="Scrabble" type="Deck" colorClass="bg-rose-500 border-rose-400 text-white" isPremium={true} />
+                            <ModeButton id="connect_four" icon={Gamepad2} label="Squad Strike" type="Deck" colorClass="bg-emerald-600 border-emerald-500 text-white" />
+                            <ModeButton id="slipstream" icon={Zap} label="Slipstream" type="Deck" colorClass="bg-amber-500 border-amber-400 text-white" />
+                            <ModeButton id="marble_scrabble" icon={Type} label="Scrabble" type="Deck" colorClass="bg-rose-500 border-rose-400 text-white" />
                         </div>
                     </div>
 
