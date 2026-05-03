@@ -17,7 +17,6 @@ export const useLiveClass = (classId: string, isInstructor: boolean = false) => 
     }, [classId]);
 
     // --- INSTRUCTOR CONTROLS ---
-    // ADDED: type and initialQuestion
     const startLiveClass = async (lessonId: string, type: 'lesson' | 'vocab' = 'lesson', initialQuestion: any = null) => {
         if (!isInstructor || !classId) return;
         const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
@@ -37,7 +36,6 @@ export const useLiveClass = (classId: string, isInstructor: boolean = false) => 
         await deleteDoc(doc(db, 'artifacts', appId, 'live_sessions', classId));
     };
 
-    // ADDED: questionPayload
     const changeSlide = async (index: number, questionPayload: any = null) => {
         if (!isInstructor || !classId) return;
         await updateDoc(doc(db, 'artifacts', appId, 'live_sessions', classId), {
@@ -55,5 +53,18 @@ export const useLiveClass = (classId: string, isInstructor: boolean = false) => 
         });
     };
 
-    return { liveState, startLiveClass, endLiveClass, changeSlide, triggerQuiz };
+    // 🔥 ADDED: General state updater for interactive games (Scrabble, etc.)
+    const updateLiveState = async (updates: any) => {
+        if (!classId) return;
+        try {
+            const sessionRef = doc(db, 'artifacts', appId, 'live_sessions', classId);
+            // setDoc with { merge: true } safely pushes partial updates (like new scores or board states)
+            await setDoc(sessionRef, updates, { merge: true }); 
+        } catch (error) {
+            console.error("Error updating live state:", error);
+        }
+    };
+
+    // Make sure updateLiveState is exported here!
+    return { liveState, startLiveClass, endLiveClass, changeSlide, triggerQuiz, updateLiveState };
 };
