@@ -38,6 +38,7 @@ const createInitialBag = () => {
       bag.push({ id: `tile_${idCounter++}`, letter, value: data.value });
     }
   });
+  // Fisher-Yates Shuffle
   for (let i = bag.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [bag[i], bag[j]] = [bag[j], bag[i]];
@@ -77,6 +78,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const teams = block?.teams || [];
   const timeLimit = block?.timePerTurnSeconds || 60;
 
+  // Global Styles Injection
   useEffect(() => {
     if (!document.getElementById('marble-styles')) {
       const style = document.createElement('style');
@@ -140,15 +142,17 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   // ==========================================
   const [localBoard, setLocalBoard] = useState(globalBoard || Array(BOARD_SIZE * BOARD_SIZE).fill(null));
   const [rack, setRack] = useState<any[]>(Array(7).fill(null));
-  const [selectedItem, setSelectedItem] = useState<{ type: 'rack'|'board', index: number } | null>(null);
+  const [targetSquare, setTargetSquare] = useState<number | null>(null);
 
+  // Sync local board when global board updates
   useEffect(() => {
     if (globalBoard) {
       setLocalBoard(globalBoard);
-      setSelectedItem(null);
+      setTargetSquare(null);
     }
   }, [globalBoard]);
 
+  // Fill rack initially for students
   useEffect(() => {
     if (!isProjector && isMyTurn && rack.every((t: any) => t === null) && globalBag?.length > 0) {
       drawTiles();
@@ -166,34 +170,50 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     onUpdateLiveState({ bag: newBag });
   };
 
-  const handleRackClick = (index: number) => {
-    if (!rack[index]) return;
-    setSelectedItem({ type: 'rack', index });
-  };
-
+  // 🔥 NEW: Target-First Board Click Logic
   const handleBoardClick = (index: number) => {
     if (localBoard[index]?.isLocked) return; 
     
-    if (selectedItem?.type === 'rack') {
-      if (localBoard[index]) return; 
-      const newBoard = [...localBoard];
-      const newRack = [...rack];
-      newBoard[index] = { ...newRack[selectedItem.index], isLocked: false };
-      newRack[selectedItem.index] = null;
-      setLocalBoard(newBoard);
-      setRack(newRack);
-      setSelectedItem(null);
-    } 
-    else if (localBoard[index]) {
+    // If the square has one of OUR placed tiles, tapping it recalls it to the rack
+    if (localBoard[index] && !localBoard[index].isLocked) {
       const emptyRackIndex = rack.findIndex((t: any) => t === null);
-      if (emptyRackIndex === -1) return; 
-      const newRack = [...rack];
+      if (emptyRackIndex !== -1) {
+        const newRack = [...rack];
+        const newBoard = [...localBoard];
+        newRack[emptyRackIndex] = newBoard[index];
+        newBoard[index] = null;
+        setRack(newRack);
+        setLocalBoard(newBoard);
+        setTargetSquare(index); // Leave reticle there
+      }
+      return;
+    }
+
+    // Move the targeting reticle to the empty square
+    setTargetSquare(index);
+  };
+
+  // 🔥 NEW: Fire-to-Target Rack Click Logic
+  const handleRackClick = (idx: number) => {
+    if (!rack[idx]) return;
+
+    if (targetSquare !== null && !localBoard[targetSquare]) {
       const newBoard = [...localBoard];
-      newRack[emptyRackIndex] = newBoard[index];
-      newBoard[index] = null;
-      setRack(newRack);
+      const newRack = [...rack];
+      
+      newBoard[targetSquare] = { ...newRack[idx], isLocked: false };
+      newRack[idx] = null;
+      
       setLocalBoard(newBoard);
-      setSelectedItem(null);
+      setRack(newRack);
+
+      // Auto-advance the reticle one square to the right
+      const nextSquare = targetSquare + 1;
+      if (targetSquare % BOARD_SIZE !== BOARD_SIZE - 1 && !newBoard[nextSquare]) {
+         setTargetSquare(nextSquare);
+      } else {
+         setTargetSquare(null);
+      }
     }
   };
 
@@ -211,14 +231,13 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     });
     setLocalBoard(newBoard);
     setRack(newRack);
-    setSelectedItem(null);
+    setTargetSquare(null);
   };
 
   // ==========================================
-  // GAMEPLAY ACTIONS (🔥 FIXED FIREBASE MERGE QUIRKS)
+  // GAMEPLAY ACTIONS (FIREBASE SYNC)
   // ==========================================
   const joinTeam = (teamId: string) => {
-    // Pass the full nested rosters object to avoid setDoc root-level string creation
     onUpdateLiveState({ 
         rosters: { ...(liveState?.rosters || {}), [studentId]: teamId } 
     });
@@ -247,9 +266,9 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     });
 
     if (turnScore === 0) return; 
+
     const lockedBoard = localBoard.map((t: any) => t && !t.isLocked ? { ...t, isLocked: true } : t);
 
-    // Pass the full nested scores object
     onUpdateLiveState({
       board: lockedBoard,
       scores: { ...(liveState?.scores || {}), [myTeamId]: (scores[myTeamId] || 0) + turnScore },
@@ -383,32 +402,41 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
          <span className="text-amber-400 font-bold playfair-font">Your Turn</span>
       </div>
 
-      {/* Mini Board (Scrollable) */}
-      <div className="flex-1 overflow-auto rounded-xl shadow-inner bg-[#d0c8b6] p-2 border-4 border-[#8b7355] relative no-scrollbar">
-        <div className="board-grid absolute">
+      {/* Mini Board (Scrollable Viewport) */}
+      <div className="flex-1 overflow-auto rounded-xl shadow-inner bg-[#d0c8b6] border-4 border-[#8b7355] relative no-scrollbar">
+        {/* FORCE MINIMUM WIDTH SO SQUARES ARE MASSIVE ON MOBILE */}
+        <div className="board-grid absolute min-w-[750px] min-h-[750px] p-2">
           {(localBoard || []).map((tile: any, index: number) => {
             const r = Math.floor(index / BOARD_SIZE);
             const c = index % BOARD_SIZE;
             const type = getSquareType(r, c);
+            
             let bgClass = "bg-[#e8e4d9]";
             if (type === 'TW') bgClass = "bg-[#d9534f]";
             else if (type === 'DW') bgClass = "bg-[#f0ad4e]";
             else if (type === 'TL') bgClass = "bg-[#5bc0de]";
             else if (type === 'DL') bgClass = "bg-[#a3c2c2]";
 
+            const isTargeted = targetSquare === index;
+
             return (
               <div 
                 key={index} 
                 onClick={() => handleBoardClick(index)}
-                className={`w-10 h-10 border border-[#c4bcab] ${bgClass} shadow-inner flex items-center justify-center`}
+                className={`w-full h-full aspect-square border border-[#c4bcab] ${bgClass} shadow-inner flex items-center justify-center relative transition-all ${isTargeted ? 'ring-4 ring-inset ring-amber-400 z-20 bg-amber-100/50' : ''}`}
               >
-                {!tile && type === 'CT' && <Star className="text-amber-100 opacity-70 w-5 h-5" fill="currentColor" />}
+                {!tile && type === 'CT' && <Star className="text-amber-100 opacity-70 w-8 h-8" fill="currentColor" />}
+                
+                {/* The Glowing Reticle Overlay */}
+                {isTargeted && !tile && (
+                    <div className="absolute inset-0 m-2 border-2 border-dashed border-amber-500 rounded-md animate-pulse" />
+                )}
+
                 {tile && (
                   <MarbleTile 
                     tile={tile} 
                     isLocked={tile.isLocked} 
-                    isSelected={selectedItem?.type === 'board' && selectedItem.index === index}
-                    className="w-[95%] h-[95%]" 
+                    className="w-[90%] h-[90%]" 
                   />
                 )}
               </div>
@@ -418,7 +446,18 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       </div>
 
       {/* Rack Area */}
-      <div className="mt-2 bg-[#8b7355] rounded-xl p-2 border-b-4 border-[#5c4a35] w-full">
+      <div className="mt-2 bg-[#8b7355] rounded-xl p-2 border-b-4 border-[#5c4a35] w-full z-10 shadow-[0_-10px_20px_rgba(0,0,0,0.5)]">
+         {/* Instructional Text */}
+         {targetSquare === null ? (
+            <p className="text-center text-amber-200/50 text-[10px] font-black uppercase tracking-widest mb-2 animate-pulse">
+                Tap board to target square
+            </p>
+         ) : (
+            <p className="text-center text-emerald-400 text-[10px] font-black uppercase tracking-widest mb-2">
+                Tap letter to deploy
+            </p>
+         )}
+
          <div className="flex gap-1 bg-[#4a3b29] p-2 rounded-lg w-full justify-center min-h-[3.5rem]">
             {rack.map((tile: any, idx: number) => (
               <div 
@@ -426,7 +465,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                 onClick={() => handleRackClick(idx)}
                 className={`w-10 h-10 rounded-md transition-all ${!tile ? 'bg-black/20' : ''}`}
               >
-                 {tile && <MarbleTile tile={tile} isSelected={selectedItem?.type === 'rack' && selectedItem.index === idx} className="w-full h-full" />}
+                 {tile && <MarbleTile tile={tile} className="w-full h-full" />}
               </div>
             ))}
          </div>
