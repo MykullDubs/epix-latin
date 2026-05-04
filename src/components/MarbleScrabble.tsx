@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool, User, MessageSquare } from 'lucide-react';
+import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool, User, MessageSquare, Shuffle } from 'lucide-react';
 
 // ==========================================
 // GAME DATA & CONSTANTS
@@ -163,6 +163,9 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const [pendingSentence, setPendingSentence] = useState(false);
   const [sentenceText, setSentenceText] = useState("");
 
+  // 🔥 NEW: Rack Rearrangement State
+  const [selectedRackIndex, setSelectedRackIndex] = useState<number | null>(null);
+
   useEffect(() => {
     if (globalBoard) {
       setLocalBoard(globalBoard);
@@ -171,10 +174,37 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       setPlayDirection(null);
       setPendingSentence(false);
       setSentenceText("");
+      setSelectedRackIndex(null);
     }
   }, [globalBoard]);
 
-  // 🔥 INITIAL DRAW: Only happens once per player when their first turn starts
+  // Clean up any uncommitted board tiles if the turn ends abruptly
+  useEffect(() => {
+    if (!isProjector && !isMyTurn) {
+        let newRack = [...rack];
+        let newBoard = [...localBoard];
+        let recalled = false;
+        newBoard.forEach((tile: any, index: number) => {
+           if (tile && !tile.isLocked) {
+               const emptyIdx = newRack.findIndex(t => t === null);
+               if (emptyIdx !== -1) {
+                   newRack[emptyIdx] = tile;
+                   newBoard[index] = null;
+                   recalled = true;
+               }
+           }
+        });
+        if (recalled) {
+            setRack(newRack);
+            setLocalBoard(newBoard);
+        }
+        setTargetSquare(null);
+        setLastPlacedIndex(null);
+        setPlayDirection(null);
+        setSelectedRackIndex(null);
+    }
+  }, [isMyTurn]);
+
   useEffect(() => {
     if (!isProjector && isMyTurn && !hasDrawnInitialHand && globalBag?.length > 0) {
       let newBag = [...globalBag];
@@ -190,8 +220,22 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     }
   }, [isMyTurn, hasDrawnInitialHand, globalBag, isProjector]);
 
+  const shuffleRack = () => {
+      let newRack = [...rack];
+      for (let i = newRack.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [newRack[i], newRack[j]] = [newRack[j], newRack[i]];
+      }
+      setRack(newRack);
+      setSelectedRackIndex(null);
+  };
+
   const handleBoardClick = (index: number) => {
+    if (!isMyTurn) return; // Cannot place on board if not turn
+    setSelectedRackIndex(null); // Clear rack selection if clicking board
+
     if (localBoard[index]?.isLocked) return; 
+    
     if (localBoard[index] && !localBoard[index].isLocked) {
       const emptyRackIndex = rack.findIndex((t: any) => t === null);
       if (emptyRackIndex !== -1) {
@@ -211,40 +255,64 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   };
 
   const handleRackClick = (idx: number) => {
-    if (!rack[idx]) return;
-    if (targetSquare !== null && !localBoard[targetSquare]) {
-      const newBoard = [...localBoard];
-      const newRack = [...rack];
-      newBoard[targetSquare] = { ...newRack[idx], isLocked: false };
-      newRack[idx] = null;
-      setLocalBoard(newBoard);
-      setRack(newRack);
+    // SCENARIO 1: We are actively placing tiles on the board
+    if (targetSquare !== null) {
+      if (!isMyTurn) return;
+      if (!rack[idx]) return;
 
-      let currentDirection = playDirection;
-      if (lastPlacedIndex !== null) {
-          const delta = targetSquare - lastPlacedIndex;
-          if (delta === 1 || delta === BOARD_SIZE) {
-              currentDirection = delta;
-              setPlayDirection(delta);
-          } else {
-              currentDirection = null;
-              setPlayDirection(null);
-          }
-      }
-      setLastPlacedIndex(targetSquare);
+      if (!localBoard[targetSquare]) {
+        const newBoard = [...localBoard];
+        const newRack = [...rack];
+        newBoard[targetSquare] = { ...newRack[idx], isLocked: false };
+        newRack[idx] = null;
+        setLocalBoard(newBoard);
+        setRack(newRack);
 
-      if (currentDirection !== null) {
-          const nextSquare = targetSquare + currentDirection;
-          const isHorizontalValid = currentDirection === 1 && (targetSquare % BOARD_SIZE !== BOARD_SIZE - 1);
-          const isVerticalValid = currentDirection === BOARD_SIZE && (targetSquare + BOARD_SIZE < BOARD_SIZE * BOARD_SIZE);
-          if ((isHorizontalValid || isVerticalValid) && !newBoard[nextSquare]) {
-              setTargetSquare(nextSquare);
-          } else {
-              setTargetSquare(null);
-          }
-      } else {
-          setTargetSquare(null);
+        let currentDirection = playDirection;
+        if (lastPlacedIndex !== null) {
+            const delta = targetSquare - lastPlacedIndex;
+            if (delta === 1 || delta === BOARD_SIZE) {
+                currentDirection = delta;
+                setPlayDirection(delta);
+            } else {
+                currentDirection = null;
+                setPlayDirection(null);
+            }
+        }
+        setLastPlacedIndex(targetSquare);
+
+        if (currentDirection !== null) {
+            const nextSquare = targetSquare + currentDirection;
+            const isHorizontalValid = currentDirection === 1 && (targetSquare % BOARD_SIZE !== BOARD_SIZE - 1);
+            const isVerticalValid = currentDirection === BOARD_SIZE && (targetSquare + BOARD_SIZE < BOARD_SIZE * BOARD_SIZE);
+            if ((isHorizontalValid || isVerticalValid) && !newBoard[nextSquare]) {
+                setTargetSquare(nextSquare);
+            } else {
+                setTargetSquare(null);
+            }
+        } else {
+            setTargetSquare(null);
+        }
       }
+      return;
+    }
+
+    // SCENARIO 2: We are rearranging the rack
+    if (selectedRackIndex === null) {
+        if (rack[idx]) {
+            setSelectedRackIndex(idx);
+        }
+    } else {
+        if (selectedRackIndex === idx) {
+            setSelectedRackIndex(null); // Deselect
+        } else {
+            const newRack = [...rack];
+            const temp = newRack[idx];
+            newRack[idx] = newRack[selectedRackIndex];
+            newRack[selectedRackIndex] = temp;
+            setRack(newRack);
+            setSelectedRackIndex(null);
+        }
     }
   };
 
@@ -310,7 +378,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   };
 
   const passTurn = () => {
-    if (!isProjector) recallAll(); // Bring tiles back to rack if player skips
     if (teamArray.length === 0) return;
     onUpdateLiveState({
       activeTeamIndex: (activeTeamIndex + 1) % teamArray.length,
@@ -393,7 +460,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     const currentTeamWords = teamWords[myTeamId] || [];
     const updatedTeamWords = { ...teamWords, [myTeamId]: [...currentTeamWords, ...extractedWords] };
 
-    // 🔥 ATOMIC RACK REFILL: Draw new tiles instantly from globalBag and bundle it into the payload
     let newBag = [...(globalBag || [])];
     let newRack = rack.map((slot: any) => {
       if (slot === null && newBag.length > 0) {
@@ -407,7 +473,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       board: lockedBoard,
       scores: updatedScores,
       teamWords: updatedTeamWords, 
-      bag: newBag, // Update network bag atomically
+      bag: newBag, 
       activeTeamIndex: teamArray.length > 1 ? (activeTeamIndex + 1) % teamArray.length : 0,
       turnEndTime: Date.now() + timeLimit * 1000
     };
@@ -653,28 +719,18 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     );
   }
 
-  if (!isMyTurn) {
-    return (
-      <div className="flex flex-col h-full w-full wood-bg p-6 justify-center items-center text-center">
-        <ShieldAlert size={80} className={`${activeTeam?.textColor || 'text-slate-400'} mb-8 opacity-50`} />
-        <h2 className={`text-3xl font-black uppercase tracking-widest ${activeTeam?.textColor || 'text-slate-400'} mb-2`}>{activeTeam?.name || 'Unknown'}'s Turn</h2>
-        <p className="text-lg font-bold text-slate-400 mb-8 italic">Plotting next move...</p>
-        <div className="mt-8 flex items-center gap-3 bg-slate-900/50 backdrop-blur-md px-6 py-3 rounded-full border border-slate-700 shadow-inner">
-            <Clock className="text-amber-500 w-5 h-5" />
-            <span className="text-3xl font-mono font-bold text-amber-100">{timeLeft}s</span>
-        </div>
-      </div>
-    );
-  }
-
+  // MAIN GAME RENDER (ACTIVE & SPECTATOR)
   return (
     <div className="flex flex-col h-full w-full wood-bg p-2 overflow-hidden border-4 border-emerald-500/50">
-      <div className="flex justify-between items-center mb-2 bg-emerald-900/60 p-3 rounded-xl border border-emerald-500/50">
-         <span className="text-emerald-100 font-black uppercase tracking-widest animate-pulse flex items-center gap-2 text-sm">
+      <div className={`flex justify-between items-center mb-2 p-3 rounded-xl border transition-colors ${isMyTurn ? 'bg-emerald-900/60 border-emerald-500/50' : 'bg-slate-900/60 border-slate-700'}`}>
+         <span className={`${isMyTurn ? 'text-emerald-100 animate-pulse' : 'text-slate-400'} font-black uppercase tracking-widest flex items-center gap-2 text-sm transition-colors`}>
             <Clock size={16} /> {timeLeft}s Left
          </span>
-         <span className="text-amber-400 font-bold playfair-font truncate ml-4 max-w-[120px] text-right">{myTeamEntry?.name}</span>
+         <span className={`${isMyTurn ? 'text-amber-400' : 'text-slate-500'} font-bold playfair-font truncate ml-4 max-w-[120px] text-right transition-colors`}>
+            {isMyTurn ? "Your Turn" : `${activeTeam?.name}'s Turn`}
+         </span>
       </div>
+
       <div className="flex-1 overflow-auto rounded-xl shadow-inner bg-[#d0c8b6] border-4 border-[#8b7355] relative no-scrollbar">
         <div className="board-grid absolute min-w-[750px] min-h-[750px] p-2">
           {(localBoard || []).map((tile: any, index: number) => {
@@ -697,23 +753,47 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
           })}
         </div>
       </div>
+
       <div className="mt-2 bg-[#8b7355] rounded-xl p-2 border-b-4 border-[#5c4a35] w-full z-10 shadow-[0_-10px_20px_rgba(0,0,0,0.5)]">
-         {targetSquare === null ? (
-            <p className="text-center text-amber-200/50 text-[10px] font-black uppercase tracking-widest mb-2 animate-pulse">Tap board to target square</p>
-         ) : (
-            <p className="text-center text-emerald-400 text-[10px] font-black uppercase tracking-widest mb-2">Tap letter to deploy</p>
-         )}
+         <div className="flex justify-between items-end mb-2 px-1">
+             <p className={`text-[10px] font-black uppercase tracking-widest ${isMyTurn ? 'text-amber-200/50 animate-pulse' : 'text-slate-400'}`}>
+                {isMyTurn ? (targetSquare === null ? 'Tap board to target' : 'Tap letter to deploy') : 'Rearrange your rack'}
+             </p>
+             <button onClick={shuffleRack} className="p-1.5 bg-slate-800 text-slate-400 hover:text-white rounded-lg active:scale-95 transition-colors border border-slate-700 shadow-sm">
+                 <Shuffle size={14} />
+             </button>
+         </div>
+
          <div className="flex gap-1 bg-[#4a3b29] p-2 rounded-lg w-full justify-center min-h-[3.5rem]">
-            {rack.map((tile: any, idx: number) => (
-              <div key={idx} onClick={() => handleRackClick(idx)} className={`w-10 h-10 rounded-md transition-all ${!tile ? 'bg-black/20' : ''}`}>
-                 {tile && <MarbleTile tile={tile} className="w-full h-full" />}
-              </div>
-            ))}
+            {rack.map((tile: any, idx: number) => {
+              const isRackSelected = selectedRackIndex === idx;
+              return (
+                <div 
+                  key={idx} 
+                  onClick={() => handleRackClick(idx)} 
+                  className={`w-10 h-10 rounded-md transition-all ${!tile ? 'bg-black/20' : ''} ${isRackSelected ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-[#4a3b29] scale-105' : ''}`}
+                >
+                   {tile && <MarbleTile tile={tile} className="w-full h-full" />}
+                </div>
+              );
+            })}
          </div>
       </div>
+
       <div className="flex gap-2 mt-2 pb-2">
-         <button onClick={recallAll} className="flex-1 py-3 bg-slate-700 text-white rounded-xl font-bold flex justify-center items-center gap-2 active:scale-95"><ArrowDownToLine size={18}/> Recall</button>
-         <button onClick={handleInitiateCommit} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg active:scale-95 border-b-4 border-emerald-800"><CheckCircle2 size={18}/> Play Word</button>
+         <button onClick={recallAll} className="flex-1 py-3 bg-slate-700 text-white rounded-xl font-bold flex justify-center items-center gap-2 active:scale-95 transition-colors hover:bg-slate-600">
+             <ArrowDownToLine size={18}/> Recall
+         </button>
+         
+         {isMyTurn ? (
+             <button onClick={handleInitiateCommit} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg active:scale-95 border-b-4 border-emerald-800 transition-colors hover:bg-emerald-500">
+                 <CheckCircle2 size={18}/> Play Word
+             </button>
+         ) : (
+             <div className="flex-1 py-3 bg-slate-800 text-slate-400 rounded-xl font-bold flex justify-center items-center gap-2 border-b-4 border-slate-900">
+                 Waiting...
+             </div>
+         )}
       </div>
     </div>
   );
