@@ -112,7 +112,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   useEffect(() => {
     if (isProjector && !liveState?.gameStatus) {
       onUpdateLiveState({
-        gameStatus: 'lobby_join', // lobby_join -> lobby_naming -> playing
+        gameStatus: 'lobby_join', 
         players: {}, 
         teams: {}, 
         board: Array(BOARD_SIZE * BOARD_SIZE).fill(null),
@@ -124,9 +124,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     }
   }, [isProjector, liveState]);
 
-  // ==========================================
-  // TYPE-SAFE DESTRUCTURING (Fixes TS2339 errors)
-  // ==========================================
+  // Type-safe destructuring
   const gameStatus = liveState?.gameStatus;
   const players: Record<string, any> = liveState?.players || {};
   const teams: Record<string, any> = liveState?.teams || {};
@@ -166,7 +164,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
   const [lastPlacedIndex, setLastPlacedIndex] = useState<number | null>(null);
   const [playDirection, setPlayDirection] = useState<number | null>(null);
-  
   const [customTeamName, setCustomTeamName] = useState("");
 
   useEffect(() => {
@@ -204,7 +201,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
   const handleBoardClick = (index: number) => {
     if (localBoard[index]?.isLocked) return; 
-    
     if (localBoard[index] && !localBoard[index].isLocked) {
       const emptyRackIndex = rack.findIndex((t: any) => t === null);
       if (emptyRackIndex !== -1) {
@@ -225,14 +221,11 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
   const handleRackClick = (idx: number) => {
     if (!rack[idx]) return;
-
     if (targetSquare !== null && !localBoard[targetSquare]) {
       const newBoard = [...localBoard];
       const newRack = [...rack];
-      
       newBoard[targetSquare] = { ...newRack[idx], isLocked: false };
       newRack[idx] = null;
-      
       setLocalBoard(newBoard);
       setRack(newRack);
 
@@ -247,14 +240,12 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
               setPlayDirection(null);
           }
       }
-
       setLastPlacedIndex(targetSquare);
 
       if (currentDirection !== null) {
           const nextSquare = targetSquare + currentDirection;
           const isHorizontalValid = currentDirection === 1 && (targetSquare % BOARD_SIZE !== BOARD_SIZE - 1);
           const isVerticalValid = currentDirection === BOARD_SIZE && (targetSquare + BOARD_SIZE < BOARD_SIZE * BOARD_SIZE);
-
           if ((isHorizontalValid || isVerticalValid) && !newBoard[nextSquare]) {
               setTargetSquare(nextSquare);
           } else {
@@ -288,11 +279,15 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   // ==========================================
   // MATCHMAKING & GAMEPLAY ACTIONS
   // ==========================================
+  
+  // 🔥 FIXED: Passes the entire players object to ensure nested merge
   const joinLobby = () => {
     const displayName = studentId.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ');
-    onUpdateLiveState({ 
-        [`players.${studentId}`]: { id: studentId, name: displayName.charAt(0).toUpperCase() + displayName.slice(1) } 
-    });
+    const newPlayers = { 
+        ...players, 
+        [studentId]: { id: studentId, name: displayName.charAt(0).toUpperCase() + displayName.slice(1) } 
+    };
+    onUpdateLiveState({ players: newPlayers });
   };
 
   const generateTeams = (numTeams: number) => {
@@ -327,7 +322,9 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
   const submitTeamName = () => {
     if (customTeamName.trim() && myTeamId) {
-        onUpdateLiveState({ [`teams.${myTeamId}.name`]: customTeamName });
+        const updatedTeams = { ...teams };
+        updatedTeams[myTeamId].name = customTeamName;
+        onUpdateLiveState({ teams: updatedTeams });
         setCustomTeamName("");
     }
   };
@@ -353,14 +350,14 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         turnScore += tile.value;
       }
     });
-
     if (turnScore === 0) return; 
 
     const lockedBoard = localBoard.map((t: any) => t && !t.isLocked ? { ...t, isLocked: true } : t);
+    const updatedScores = { ...scores, [myTeamId]: (scores[myTeamId] || 0) + turnScore };
 
     onUpdateLiveState({
       board: lockedBoard,
-      scores: { ...(scores), [myTeamId]: (scores[myTeamId] || 0) + turnScore },
+      scores: updatedScores,
       activeTeamIndex: (activeTeamIndex + 1) % teamArray.length,
       turnEndTime: Date.now() + timeLimit * 1000
     });
@@ -407,7 +404,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                         Begin Battle
                     </button>
                 </div>
-                
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-8 overflow-y-auto custom-scrollbar pb-8">
                     {teamArray.map((t: any) => (
                         <div key={t.id} className={`${t.color} p-8 rounded-3xl shadow-xl border-4 border-white/20 animate-in zoom-in-95 duration-500`}>
@@ -428,19 +424,16 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
     return (
       <div className="w-full h-full flex p-12 wood-bg text-white gap-12 overflow-hidden">
-        {/* Board Area */}
         <div className="flex-1 flex flex-col items-center justify-center">
-          
           <div className="mb-8 flex items-center gap-4 animate-in slide-in-from-top-8">
-             <div className={`px-6 py-2 rounded-full border-2 shadow-lg text-white font-black uppercase tracking-widest text-sm ${activeTeam?.color} border-white/20`}>
-                {activeTeam?.name}'s Turn
+             <div className={`px-6 py-2 rounded-full border-2 shadow-lg text-white font-black uppercase tracking-widest text-sm ${activeTeam?.color || 'bg-slate-700'} border-white/20`}>
+                {activeTeam?.name || 'Waiting'}'s Turn
              </div>
              <div className="bg-slate-900/80 backdrop-blur-md px-5 py-2 rounded-full border border-slate-700 shadow-xl flex items-center gap-3">
                 <Clock className="text-amber-400 w-4 h-4" />
                 <span className="text-xl font-mono font-bold text-amber-100">{timeLeft}s</span>
              </div>
           </div>
-          
           <div className="board-grid bg-[#d0c8b6] p-2 rounded-lg shadow-2xl border-[4px] border-[#8b7355]">
             {(globalBoard || []).map((tile: any, index: number) => {
                const r = Math.floor(index / BOARD_SIZE);
@@ -451,7 +444,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                else if (type === 'DW') bgClass = "bg-[#f0ad4e]";
                else if (type === 'TL') bgClass = "bg-[#5bc0de]";
                else if (type === 'DL') bgClass = "bg-[#a3c2c2]";
-               
                return (
                  <div key={index} className={`w-10 h-10 lg:w-14 lg:h-14 relative flex items-center justify-center border border-[#c4bcab] ${bgClass} shadow-inner`}>
                    {!tile && type === 'CT' && <Star className="text-amber-100 opacity-70 w-6 h-6" fill="currentColor" />}
@@ -461,13 +453,11 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
             })}
           </div>
         </div>
-
-        {/* Sidebar */}
         <div className="w-[400px] flex flex-col gap-6 pt-24">
           <div className="bg-slate-800/80 backdrop-blur-md p-8 rounded-3xl border border-slate-700/50 shadow-xl">
             <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-700">
               <h2 className="text-2xl font-bold flex items-center gap-3"><Trophy className="text-amber-400"/> Scores</h2>
-              <span className="text-slate-400 font-mono text-sm">{globalBag?.length || 0} tiles in bag</span>
+              <span className="text-slate-400 font-mono text-sm">{globalBag?.length || 0} tiles left</span>
             </div>
             <div className="space-y-4">
               {teamArray.map((t: any) => (
@@ -516,7 +506,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
   if (gameStatus === 'lobby_naming') {
     if (!myTeamEntry) return <div className="wood-bg w-full h-full flex items-center justify-center text-slate-400">Spectator Mode</div>;
-    
     return (
         <div className="flex flex-col h-full w-full wood-bg p-6 text-center">
             <div className={`p-8 rounded-[2.5rem] ${myTeamEntry.color} border-4 border-white/20 shadow-2xl mb-8`}>
@@ -533,7 +522,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                     </div>
                 </div>
             </div>
-
             <div className="bg-slate-900/80 backdrop-blur-md p-6 rounded-3xl border border-slate-700 shadow-xl">
                 <label className="text-[10px] font-black uppercase tracking-widest text-amber-500 mb-4 block flex items-center justify-center gap-2">
                     <PenTool size={14}/> Rename your squad
@@ -555,7 +543,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                     </button>
                 </div>
             </div>
-            
             <p className="mt-auto text-amber-200/50 font-bold animate-pulse text-sm">Awaiting deployment...</p>
         </div>
     );
@@ -567,7 +554,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         <ShieldAlert size={80} className={`${activeTeam?.textColor || 'text-slate-400'} mb-8 opacity-50`} />
         <h2 className={`text-3xl font-black uppercase tracking-widest ${activeTeam?.textColor || 'text-slate-400'} mb-2`}>{activeTeam?.name || 'Unknown'}'s Turn</h2>
         <p className="text-lg font-bold text-slate-400 mb-8">Discuss strategy. Wait for your turn.</p>
-        
         <div className="mt-8 flex items-center gap-3 bg-slate-900/50 backdrop-blur-md px-6 py-3 rounded-full border border-slate-700 shadow-inner">
             <Clock className="text-amber-500 w-5 h-5" />
             <span className="text-3xl font-mono font-bold text-amber-100">{timeLeft}s</span>
@@ -584,71 +570,42 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
          </span>
          <span className="text-amber-400 font-bold playfair-font truncate ml-4 max-w-[120px] text-right">{myTeamEntry?.name}</span>
       </div>
-
       <div className="flex-1 overflow-auto rounded-xl shadow-inner bg-[#d0c8b6] border-4 border-[#8b7355] relative no-scrollbar">
         <div className="board-grid absolute min-w-[750px] min-h-[750px] p-2">
           {(localBoard || []).map((tile: any, index: number) => {
             const r = Math.floor(index / BOARD_SIZE);
             const c = index % BOARD_SIZE;
             const type = getSquareType(r, c);
-            
             let bgClass = "bg-[#e8e4d9]";
             if (type === 'TW') bgClass = "bg-[#d9534f]";
             else if (type === 'DW') bgClass = "bg-[#f0ad4e]";
             else if (type === 'TL') bgClass = "bg-[#5bc0de]";
             else if (type === 'DL') bgClass = "bg-[#a3c2c2]";
-
             const isTargeted = targetSquare === index;
-
             return (
-              <div 
-                key={index} 
-                onClick={() => handleBoardClick(index)}
-                className={`w-full h-full aspect-square border border-[#c4bcab] ${bgClass} shadow-inner flex items-center justify-center relative transition-all ${isTargeted ? 'ring-4 ring-inset ring-amber-400 z-20 bg-amber-100/50' : ''}`}
-              >
+              <div key={index} onClick={() => handleBoardClick(index)} className={`w-full h-full aspect-square border border-[#c4bcab] ${bgClass} shadow-inner flex items-center justify-center relative transition-all ${isTargeted ? 'ring-4 ring-inset ring-amber-400 z-20 bg-amber-100/50' : ''}`}>
                 {!tile && type === 'CT' && <Star className="text-amber-100 opacity-70 w-8 h-8" fill="currentColor" />}
-                
-                {isTargeted && !tile && (
-                    <div className="absolute inset-0 m-2 border-2 border-dashed border-amber-500 rounded-md animate-pulse" />
-                )}
-
-                {tile && (
-                  <MarbleTile 
-                    tile={tile} 
-                    isLocked={tile.isLocked} 
-                    className="w-[90%] h-[90%]" 
-                  />
-                )}
+                {isTargeted && !tile && <div className="absolute inset-0 m-2 border-2 border-dashed border-amber-500 rounded-md animate-pulse" />}
+                {tile && <MarbleTile tile={tile} isLocked={tile.isLocked} className="w-[90%] h-[90%]" />}
               </div>
             );
           })}
         </div>
       </div>
-
       <div className="mt-2 bg-[#8b7355] rounded-xl p-2 border-b-4 border-[#5c4a35] w-full z-10 shadow-[0_-10px_20px_rgba(0,0,0,0.5)]">
          {targetSquare === null ? (
-            <p className="text-center text-amber-200/50 text-[10px] font-black uppercase tracking-widest mb-2 animate-pulse">
-                Tap board to target square
-            </p>
+            <p className="text-center text-amber-200/50 text-[10px] font-black uppercase tracking-widest mb-2 animate-pulse">Tap board to target square</p>
          ) : (
-            <p className="text-center text-emerald-400 text-[10px] font-black uppercase tracking-widest mb-2">
-                Tap letter to deploy
-            </p>
+            <p className="text-center text-emerald-400 text-[10px] font-black uppercase tracking-widest mb-2">Tap letter to deploy</p>
          )}
-
          <div className="flex gap-1 bg-[#4a3b29] p-2 rounded-lg w-full justify-center min-h-[3.5rem]">
             {rack.map((tile: any, idx: number) => (
-              <div 
-                key={idx} 
-                onClick={() => handleRackClick(idx)}
-                className={`w-10 h-10 rounded-md transition-all ${!tile ? 'bg-black/20' : ''}`}
-              >
+              <div key={idx} onClick={() => handleRackClick(idx)} className={`w-10 h-10 rounded-md transition-all ${!tile ? 'bg-black/20' : ''}`}>
                  {tile && <MarbleTile tile={tile} className="w-full h-full" />}
               </div>
             ))}
          </div>
       </div>
-
       <div className="flex gap-2 mt-2 pb-2">
          <button onClick={recallAll} className="flex-1 py-3 bg-slate-700 text-white rounded-xl font-bold flex justify-center items-center gap-2 active:scale-95"><ArrowDownToLine size={18}/> Recall</button>
          <button onClick={commitTurn} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg active:scale-95 border-b-4 border-emerald-800"><CheckCircle2 size={18}/> Play Word</button>
