@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool, User } from 'lucide-react';
+import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool, User, MessageSquare } from 'lucide-react';
 
 // ==========================================
 // GAME DATA & CONSTANTS
@@ -125,6 +125,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const scores: Record<string, number> = liveState?.scores || {};
   const activeTeamIndex = liveState?.activeTeamIndex || 0;
   const turnEndTime = liveState?.turnEndTime;
+  const latestSentence = liveState?.latestSentence;
   
   const teamArray = Object.values(teams).sort((a: any, b: any) => a.order - b.order);
   const activeTeam: any = teamArray[activeTeamIndex] || teamArray[0] || {};
@@ -146,11 +147,19 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     return () => clearInterval(interval);
   }, [turnEndTime, isProjector, gameStatus]);
 
+  // ==========================================
+  // STUDENT INTERACTION STATE
+  // ==========================================
   const [localBoard, setLocalBoard] = useState(globalBoard || Array(BOARD_SIZE * BOARD_SIZE).fill(null));
   const [rack, setRack] = useState<any[]>(Array(7).fill(null));
   const [targetSquare, setTargetSquare] = useState<number | null>(null);
   const [lastPlacedIndex, setLastPlacedIndex] = useState<number | null>(null);
   const [playDirection, setPlayDirection] = useState<number | null>(null);
+  const [customTeamName, setCustomTeamName] = useState("");
+  
+  // 🔥 BONUS SENTENCE STATE
+  const [pendingSentence, setPendingSentence] = useState(false);
+  const [sentenceText, setSentenceText] = useState("");
 
   useEffect(() => {
     if (globalBoard) {
@@ -158,6 +167,8 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       setTargetSquare(null);
       setLastPlacedIndex(null);
       setPlayDirection(null);
+      setPendingSentence(false);
+      setSentenceText("");
     }
   }, [globalBoard]);
 
@@ -178,7 +189,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       }
       return slot;
     });
-    
     if (changed) {
       setRack(newRack);
       onUpdateLiveState({ bag: newBag });
@@ -262,17 +272,15 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     setPlayDirection(null);
   };
 
-  // 🔥 NEW: MATCHMAKING ACTIONS
+  // ==========================================
+  // MATCHMAKING & GAMEPLAY ACTIONS
+  // ==========================================
   const joinLobby = () => {
     const displayName = studentId.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ');
-    const newPlayers = { 
-        ...players, 
-        [studentId]: { id: studentId, name: displayName.charAt(0).toUpperCase() + displayName.slice(1) } 
-    };
+    const newPlayers = { ...players, [studentId]: { id: studentId, name: displayName.charAt(0).toUpperCase() + displayName.slice(1) } };
     onUpdateLiveState({ players: newPlayers });
   };
 
-  // 🔥 UPDATED: Dynamic Free-For-All Matchmaking
   const initializeFFA = () => {
     const playerIds = Object.keys(players);
     const newTeams: any = {};
@@ -283,19 +291,15 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         newTeams[tId] = {
             id: tId,
             order: idx,
-            name: players[pId].name, // Default to their name
+            name: players[pId].name, 
             color: INDIVIDUAL_COLORS[idx % INDIVIDUAL_COLORS.length].color,
             textColor: INDIVIDUAL_COLORS[idx % INDIVIDUAL_COLORS.length].textColor,
-            members: [pId] // One player per "team"
+            members: [pId] 
         };
         newScores[tId] = 0;
     });
 
-    onUpdateLiveState({
-        gameStatus: 'lobby_naming',
-        teams: newTeams,
-        scores: newScores
-    });
+    onUpdateLiveState({ gameStatus: 'lobby_naming', teams: newTeams, scores: newScores });
   };
 
   const submitTeamName = (name: string) => {
@@ -307,10 +311,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   };
 
   const startGame = () => {
-    onUpdateLiveState({
-      gameStatus: 'playing',
-      turnEndTime: Date.now() + timeLimit * 1000
-    });
+    onUpdateLiveState({ gameStatus: 'playing', turnEndTime: Date.now() + timeLimit * 1000 });
   };
 
   const passTurn = () => {
@@ -321,24 +322,58 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     });
   };
 
-  const commitTurn = () => {
+  // 🔥 INTERCEPT TURN LOGIC
+  const handleInitiateCommit = () => {
     let turnScore = 0;
-    localBoard.forEach((tile: any, idx: number) => {
-      if (tile && !tile.isLocked) {
-        turnScore += tile.value;
-      }
+    localBoard.forEach((tile: any) => { if (tile && !tile.isLocked) turnScore += tile.value; });
+    
+    // Only proceed if they actually placed tiles
+    if (turnScore > 0) {
+        setPendingSentence(true);
+    }
+  };
+
+  const commitTurn = (withSentence: boolean) => {
+    let turnScore = 0;
+    localBoard.forEach((tile: any) => {
+      if (tile && !tile.isLocked) turnScore += tile.value;
     });
-    if (turnScore === 0) return; 
+    if (turnScore === 0) {
+        setPendingSentence(false);
+        return; 
+    }
+
+    let bonus = 0;
+    let sentencePayload = null;
+
+    if (withSentence && sentenceText.trim().length > 3) {
+        bonus = 5;
+        sentencePayload = {
+            playerName: myTeamEntry?.name || players[studentId]?.name || "Combatant",
+            text: sentenceText.trim(),
+            timestamp: Date.now(),
+            bonusAmount: bonus
+        };
+    }
 
     const lockedBoard = localBoard.map((t: any) => t && !t.isLocked ? { ...t, isLocked: true } : t);
-    const updatedScores = { ...scores, [myTeamId]: (scores[myTeamId] || 0) + turnScore };
+    const updatedScores = { ...scores, [myTeamId]: (scores[myTeamId] || 0) + turnScore + bonus };
 
-    onUpdateLiveState({
+    const payload: any = {
       board: lockedBoard,
       scores: updatedScores,
       activeTeamIndex: teamArray.length > 1 ? (activeTeamIndex + 1) % teamArray.length : 0,
       turnEndTime: Date.now() + timeLimit * 1000
-    });
+    };
+
+    if (sentencePayload) {
+        payload.latestSentence = sentencePayload;
+    }
+
+    onUpdateLiveState(payload);
+    
+    setPendingSentence(false);
+    setSentenceText("");
   };
 
   // ==========================================
@@ -358,9 +393,8 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
              onClick={initializeFFA}
              className="px-12 py-8 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-[2.5rem] font-black text-3xl shadow-[0_20px_50px_rgba(79,70,229,0.4)] transition-all border-4 border-indigo-400 active:scale-95 flex items-center gap-4"
           >
-             Initialize Individual Duel <FastForward size={32} />
+             Initialize Duel <FastForward size={32} />
           </button>
-          <p className="mt-8 text-slate-500 font-bold uppercase tracking-widest text-sm">Supports 1 to 6 Individual Profiles</p>
         </div>
       );
     }
@@ -429,7 +463,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
               <h2 className="text-2xl font-bold flex items-center gap-3"><Trophy className="text-amber-400"/> Scores</h2>
               <span className="text-slate-400 font-mono text-sm">{globalBag?.length || 0} tiles left</span>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-[40vh] overflow-y-auto custom-scrollbar pr-2">
               {teamArray.map((t: any) => (
                 <div key={t.id} className={`flex justify-between items-center p-4 rounded-2xl border-2 transition-colors ${activeTeamIndex === t.order ? 'border-white bg-white/10 shadow-[0_0_20px_rgba(255,255,255,0.2)]' : 'border-transparent bg-slate-900/50'}`}>
                   <span className={`font-bold text-xl ${t.textColor}`}>{t.name}</span>
@@ -438,7 +472,23 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
               ))}
             </div>
           </div>
-          <button onClick={passTurn} className="py-4 bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white rounded-2xl font-bold flex justify-center items-center gap-2 transition-colors border border-rose-500/30">
+          
+          {/* 🔥 LATEST SENTENCE PROJECTOR CARD */}
+          {latestSentence && (
+            <div className="bg-amber-900/20 backdrop-blur-md p-6 rounded-3xl border-2 border-amber-500/50 shadow-[0_0_30px_rgba(245,158,11,0.15)] animate-in slide-in-from-right duration-500">
+              <h3 className="text-amber-400 font-black text-sm uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <Star size={16} fill="currentColor" /> Bonus Claimed (+{latestSentence.bonusAmount})
+              </h3>
+              <p className="text-white text-xl font-medium italic mb-4 leading-snug">
+                  "{latestSentence.text}"
+              </p>
+              <p className="text-amber-200/50 text-xs font-bold uppercase tracking-widest text-right">
+                  — {latestSentence.playerName}
+              </p>
+            </div>
+          )}
+
+          <button onClick={passTurn} className="mt-auto py-4 bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white rounded-2xl font-bold flex justify-center items-center gap-2 transition-colors border border-rose-500/30">
             <FastForward size={20}/> Skip Turn
           </button>
         </div>
@@ -505,6 +555,46 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     );
   }
 
+  // 🔥 BONUS SENTENCE SCREEN
+  if (isMyTurn && pendingSentence) {
+    return (
+        <div className="flex flex-col h-full w-full wood-bg p-6 text-center animate-in zoom-in-95">
+            <div className="flex-1 flex flex-col justify-center items-center max-w-sm mx-auto w-full">
+                <div className="relative">
+                    <div className="absolute inset-0 bg-amber-500 blur-2xl opacity-20 rounded-full" />
+                    <Star size={72} className="text-amber-400 mb-6 relative z-10" fill="currentColor" />
+                </div>
+                
+                <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tight">Bonus XP!</h2>
+                <p className="text-amber-200/70 font-bold mb-8 text-sm px-4">Optional: Write a sentence using your newly placed word to earn +5 extra points.</p>
+                
+                <textarea 
+                    value={sentenceText}
+                    onChange={e => setSentenceText(e.target.value)}
+                    placeholder="Type your sentence here..."
+                    className="w-full bg-slate-950/80 border-2 border-slate-700 rounded-2xl p-5 text-white text-lg font-medium outline-none focus:border-amber-500 transition-colors mb-8 min-h-[140px] shadow-inner"
+                />
+
+                <div className="flex flex-col gap-3 w-full">
+                    <button 
+                        onClick={() => commitTurn(true)}
+                        disabled={sentenceText.trim().length < 5}
+                        className="w-full py-4 bg-amber-500 hover:bg-amber-400 disabled:bg-slate-800 disabled:text-slate-600 text-amber-950 font-black uppercase tracking-widest rounded-xl transition-all shadow-[0_0_20px_rgba(245,158,11,0.3)] disabled:shadow-none flex items-center justify-center gap-2"
+                    >
+                        <MessageSquare size={18} /> Submit & Claim +5 XP
+                    </button>
+                    <button 
+                        onClick={() => commitTurn(false)}
+                        className="w-full py-4 bg-transparent text-slate-500 hover:text-slate-300 font-black uppercase tracking-widest rounded-xl transition-colors"
+                    >
+                        Skip Bonus
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+  }
+
   if (!isMyTurn) {
     return (
       <div className="flex flex-col h-full w-full wood-bg p-6 justify-center items-center text-center">
@@ -565,7 +655,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       </div>
       <div className="flex gap-2 mt-2 pb-2">
          <button onClick={recallAll} className="flex-1 py-3 bg-slate-700 text-white rounded-xl font-bold flex justify-center items-center gap-2 active:scale-95"><ArrowDownToLine size={18}/> Recall</button>
-         <button onClick={commitTurn} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg active:scale-95 border-b-4 border-emerald-800"><CheckCircle2 size={18}/> Play Word</button>
+         <button onClick={handleInitiateCommit} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg active:scale-95 border-b-4 border-emerald-800"><CheckCircle2 size={18}/> Play Word</button>
       </div>
     </div>
   );
