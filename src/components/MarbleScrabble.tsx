@@ -157,7 +157,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const [playDirection, setPlayDirection] = useState<number | null>(null);
   const [customTeamName, setCustomTeamName] = useState("");
   
-  // 🔥 BONUS SENTENCE STATE
   const [pendingSentence, setPendingSentence] = useState(false);
   const [sentenceText, setSentenceText] = useState("");
 
@@ -172,11 +171,12 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     }
   }, [globalBoard]);
 
+  // 🔥 FIXED: Added `turnEndTime` to dependencies so Solo players get a rack refill!
   useEffect(() => {
     if (!isProjector && isMyTurn && rack.some((t: any) => t === null) && globalBag?.length > 0) {
       drawTiles();
     }
-  }, [isMyTurn]);
+  }, [isMyTurn, turnEndTime]);
 
   const drawTiles = () => {
     if (!globalBag || globalBag.length === 0) return;
@@ -322,12 +322,10 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     });
   };
 
-  // 🔥 INTERCEPT TURN LOGIC
   const handleInitiateCommit = () => {
     let turnScore = 0;
     localBoard.forEach((tile: any) => { if (tile && !tile.isLocked) turnScore += tile.value; });
     
-    // Only proceed if they actually placed tiles
     if (turnScore > 0) {
         setPendingSentence(true);
     }
@@ -473,7 +471,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
             </div>
           </div>
           
-          {/* 🔥 LATEST SENTENCE PROJECTOR CARD */}
           {latestSentence && (
             <div className="bg-amber-900/20 backdrop-blur-md p-6 rounded-3xl border-2 border-amber-500/50 shadow-[0_0_30px_rgba(245,158,11,0.15)] animate-in slide-in-from-right duration-500">
               <h3 className="text-amber-400 font-black text-sm uppercase tracking-widest mb-3 flex items-center gap-2">
@@ -555,7 +552,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     );
   }
 
-  // 🔥 BONUS SENTENCE SCREEN
   if (isMyTurn && pendingSentence) {
     return (
         <div className="flex flex-col h-full w-full wood-bg p-6 text-center animate-in zoom-in-95">
