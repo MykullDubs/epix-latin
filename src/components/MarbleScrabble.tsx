@@ -124,11 +124,20 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     }
   }, [isProjector, liveState]);
 
-  // Global State sync
-  const { gameStatus, players = {}, teams = {}, board: globalBoard, bag: globalBag, scores, activeTeamIndex, turnEndTime } = liveState || {};
+  // ==========================================
+  // TYPE-SAFE DESTRUCTURING (Fixes TS2339 errors)
+  // ==========================================
+  const gameStatus = liveState?.gameStatus;
+  const players: Record<string, any> = liveState?.players || {};
+  const teams: Record<string, any> = liveState?.teams || {};
+  const globalBoard = liveState?.board;
+  const globalBag = liveState?.bag;
+  const scores: Record<string, number> = liveState?.scores || {};
+  const activeTeamIndex = liveState?.activeTeamIndex || 0;
+  const turnEndTime = liveState?.turnEndTime;
   
   const teamArray = Object.values(teams).sort((a: any, b: any) => a.order - b.order);
-  const activeTeam = teamArray[activeTeamIndex] || teamArray[0];
+  const activeTeam: any = teamArray[activeTeamIndex] || teamArray[0] || {};
   
   const myTeamEntry: any = Object.values(teams).find((t: any) => t.members.includes(studentId));
   const myTeamId = myTeamEntry?.id;
@@ -351,7 +360,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
     onUpdateLiveState({
       board: lockedBoard,
-      scores: { ...(liveState?.scores || {}), [myTeamId]: (scores[myTeamId] || 0) + turnScore },
+      scores: { ...(scores), [myTeamId]: (scores[myTeamId] || 0) + turnScore },
       activeTeamIndex: (activeTeamIndex + 1) % teamArray.length,
       turnEndTime: Date.now() + timeLimit * 1000
     });
@@ -422,7 +431,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         {/* Board Area */}
         <div className="flex-1 flex flex-col items-center justify-center">
           
-          {/* REFINED SMALLER TIMER UI */}
           <div className="mb-8 flex items-center gap-4 animate-in slide-in-from-top-8">
              <div className={`px-6 py-2 rounded-full border-2 shadow-lg text-white font-black uppercase tracking-widest text-sm ${activeTeam?.color} border-white/20`}>
                 {activeTeam?.name}'s Turn
@@ -556,11 +564,10 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   if (!isMyTurn) {
     return (
       <div className="flex flex-col h-full w-full wood-bg p-6 justify-center items-center text-center">
-        <ShieldAlert size={80} className={`${activeTeam?.textColor} mb-8 opacity-50`} />
-        <h2 className={`text-3xl font-black uppercase tracking-widest ${activeTeam?.textColor} mb-2`}>{activeTeam?.name}'s Turn</h2>
+        <ShieldAlert size={80} className={`${activeTeam?.textColor || 'text-slate-400'} mb-8 opacity-50`} />
+        <h2 className={`text-3xl font-black uppercase tracking-widest ${activeTeam?.textColor || 'text-slate-400'} mb-2`}>{activeTeam?.name || 'Unknown'}'s Turn</h2>
         <p className="text-lg font-bold text-slate-400 mb-8">Discuss strategy. Wait for your turn.</p>
         
-        {/* REFINED SMALLER TIMER UI FOR SPECTATORS */}
         <div className="mt-8 flex items-center gap-3 bg-slate-900/50 backdrop-blur-md px-6 py-3 rounded-full border border-slate-700 shadow-inner">
             <Clock className="text-amber-500 w-5 h-5" />
             <span className="text-3xl font-mono font-bold text-amber-100">{timeLeft}s</span>
@@ -578,9 +585,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
          <span className="text-amber-400 font-bold playfair-font truncate ml-4 max-w-[120px] text-right">{myTeamEntry?.name}</span>
       </div>
 
-      {/* Mini Board (Scrollable Viewport) */}
       <div className="flex-1 overflow-auto rounded-xl shadow-inner bg-[#d0c8b6] border-4 border-[#8b7355] relative no-scrollbar">
-        {/* FORCE MINIMUM WIDTH SO SQUARES ARE MASSIVE ON MOBILE */}
         <div className="board-grid absolute min-w-[750px] min-h-[750px] p-2">
           {(localBoard || []).map((tile: any, index: number) => {
             const r = Math.floor(index / BOARD_SIZE);
@@ -603,7 +608,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
               >
                 {!tile && type === 'CT' && <Star className="text-amber-100 opacity-70 w-8 h-8" fill="currentColor" />}
                 
-                {/* The Glowing Reticle Overlay */}
                 {isTargeted && !tile && (
                     <div className="absolute inset-0 m-2 border-2 border-dashed border-amber-500 rounded-md animate-pulse" />
                 )}
@@ -621,9 +625,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         </div>
       </div>
 
-      {/* Rack Area */}
       <div className="mt-2 bg-[#8b7355] rounded-xl p-2 border-b-4 border-[#5c4a35] w-full z-10 shadow-[0_-10px_20px_rgba(0,0,0,0.5)]">
-         {/* Instructional Text */}
          {targetSquare === null ? (
             <p className="text-center text-amber-200/50 text-[10px] font-black uppercase tracking-widest mb-2 animate-pulse">
                 Tap board to target square
@@ -647,7 +649,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
          </div>
       </div>
 
-      {/* Action Controls */}
       <div className="flex gap-2 mt-2 pb-2">
          <button onClick={recallAll} className="flex-1 py-3 bg-slate-700 text-white rounded-xl font-bold flex justify-center items-center gap-2 active:scale-95"><ArrowDownToLine size={18}/> Recall</button>
          <button onClick={commitTurn} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg active:scale-95 border-b-4 border-emerald-800"><CheckCircle2 size={18}/> Play Word</button>
