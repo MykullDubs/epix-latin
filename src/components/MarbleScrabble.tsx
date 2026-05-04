@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool, User, MessageSquare, Shuffle } from 'lucide-react';
+import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool, User, MessageSquare, Shuffle, Loader2, AlertTriangle } from 'lucide-react';
 
 // ==========================================
 // GAME DATA & CONSTANTS
@@ -77,10 +77,7 @@ const MarbleTile = ({ tile, isSelected, isLocked, onClick, className = '' }: any
 };
 
 export default function MarbleScrabble({ block, isProjector, liveState, studentId, onUpdateLiveState }: any) {
-  // 🔥 Extract timeLimit from liveState if set, otherwise fallback to block settings or 60s
   const timeLimit = liveState?.timeLimit || block?.timePerTurnSeconds || 60;
-  
-  // 🔥 Local state for the instructor to select time before launch
   const [selectedTime, setSelectedTime] = useState(60);
 
   useEffect(() => {
@@ -163,11 +160,15 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const [playDirection, setPlayDirection] = useState<number | null>(null);
   const [customTeamName, setCustomTeamName] = useState("");
   const [hasDrawnInitialHand, setHasDrawnInitialHand] = useState(false);
+  const [selectedRackIndex, setSelectedRackIndex] = useState<number | null>(null);
   
+  // 🔥 BONUS & VALIDATION STATE
   const [pendingSentence, setPendingSentence] = useState(false);
   const [sentenceText, setSentenceText] = useState("");
-
-  const [selectedRackIndex, setSelectedRackIndex] = useState<number | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
+  const [invalidWords, setInvalidWords] = useState<string[]>([]);
+  const [currentTurnWords, setCurrentTurnWords] = useState<string[]>([]);
+  const [currentTurnScore, setCurrentTurnScore] = useState(0);
 
   useEffect(() => {
     if (globalBoard) {
@@ -178,6 +179,8 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       setPendingSentence(false);
       setSentenceText("");
       setSelectedRackIndex(null);
+      setInvalidWords([]);
+      setCurrentTurnWords([]);
     }
   }, [globalBoard]);
 
@@ -204,6 +207,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         setLastPlacedIndex(null);
         setPlayDirection(null);
         setSelectedRackIndex(null);
+        setInvalidWords([]);
     }
   }, [isMyTurn]);
 
@@ -233,8 +237,9 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   };
 
   const handleBoardClick = (index: number) => {
-    if (!isMyTurn) return; 
+    if (!isMyTurn || isValidating) return; 
     setSelectedRackIndex(null); 
+    setInvalidWords([]); // Clear errors on interaction
 
     if (localBoard[index]?.isLocked) return; 
     
@@ -257,6 +262,9 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   };
 
   const handleRackClick = (idx: number) => {
+    if (isValidating) return;
+    setInvalidWords([]); 
+
     if (targetSquare !== null) {
       if (!isMyTurn) return;
       if (!rack[idx]) return;
@@ -317,6 +325,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   };
 
   const recallAll = () => {
+    if (isValidating) return;
     const newRack = [...rack];
     const newBoard = [...localBoard];
     newBoard.forEach((tile: any, index: number) => {
@@ -333,6 +342,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     setTargetSquare(null);
     setLastPlacedIndex(null);
     setPlayDirection(null);
+    setInvalidWords([]);
   };
 
   // ==========================================
@@ -366,7 +376,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         gameStatus: 'lobby_naming', 
         teams: newTeams, 
         scores: newScores,
-        timeLimit: selectedTime // 🔥 Push custom time limit
+        timeLimit: selectedTime 
     });
   };
 
@@ -383,6 +393,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   };
 
   const passTurn = () => {
+    if (!isProjector) recallAll(); 
     if (teamArray.length === 0) return;
     onUpdateLiveState({
       activeTeamIndex: (activeTeamIndex + 1) % teamArray.length,
@@ -390,16 +401,8 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     });
   };
 
-  const handleInitiateCommit = () => {
-    let turnScore = 0;
-    localBoard.forEach((tile: any) => { if (tile && !tile.isLocked) turnScore += tile.value; });
-    
-    if (turnScore > 0) {
-        setPendingSentence(true);
-    }
-  };
-
-  const commitTurn = (withSentence: boolean) => {
+  // 🔥 DICTIONARY VALIDATION ENGINE
+  const handleInitiateCommit = async () => {
     let turnScore = 0;
     const placedIndices: number[] = [];
 
@@ -410,18 +413,20 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       }
     });
 
-    if (turnScore === 0) {
-        setPendingSentence(false);
-        return; 
-    }
+    if (turnScore === 0) return; 
+
+    setIsValidating(true);
+    setInvalidWords([]);
 
     const foundWords = new Set<string>();
     const getTile = (r: number, c: number) => r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE ? localBoard[r * BOARD_SIZE + c] : null;
 
+    // Scan for words
     placedIndices.forEach(idx => {
         const r = Math.floor(idx / BOARD_SIZE);
         const c = idx % BOARD_SIZE;
 
+        // Horizontals
         let left = c, right = c;
         while (left > 0 && getTile(r, left - 1)) left--;
         while (right < BOARD_SIZE - 1 && getTile(r, right + 1)) right++;
@@ -431,6 +436,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
             foundWords.add(word);
         }
 
+        // Verticals
         let top = r, bottom = r;
         while (top > 0 && getTile(top - 1, c)) top--;
         while (bottom < BOARD_SIZE - 1 && getTile(bottom + 1, c)) bottom++;
@@ -443,9 +449,40 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
     let extractedWords = Array.from(foundWords);
     if (extractedWords.length === 0 && placedIndices.length > 0) {
+        // Fallback if they placed an isolated tile
         extractedWords = [placedIndices.map(idx => localBoard[idx].letter).join('')];
     }
 
+    // Ping Dictionary API
+    const failedWords: string[] = [];
+    
+    await Promise.all(extractedWords.map(async (word) => {
+        if (word.length < 2) return; // API fails on single letters, which are technically not words anyway
+        try {
+            const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+            if (!res.ok) {
+                failedWords.push(word);
+            }
+        } catch (err) {
+            console.error("Dictionary API failed:", err);
+            // Ignore network errors so game doesn't hard-lock if API is down
+        }
+    }));
+
+    setIsValidating(false);
+
+    if (failedWords.length > 0) {
+        setInvalidWords(failedWords);
+        return; // Halt turn
+    }
+
+    // Success! Save extracted words and proceed
+    setCurrentTurnScore(turnScore);
+    setCurrentTurnWords(extractedWords);
+    setPendingSentence(true);
+  };
+
+  const commitTurn = (withSentence: boolean) => {
     let bonus = 0;
     let sentencePayload = null;
 
@@ -460,9 +497,9 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     }
 
     const lockedBoard = localBoard.map((t: any) => t && !t.isLocked ? { ...t, isLocked: true } : t);
-    const updatedScores = { ...scores, [myTeamId]: (scores[myTeamId] || 0) + turnScore + bonus };
-    const currentTeamWords = teamWords[myTeamId] || [];
-    const updatedTeamWords = { ...teamWords, [myTeamId]: [...currentTeamWords, ...extractedWords] };
+    const updatedScores = { ...scores, [myTeamId]: (scores[myTeamId] || 0) + currentTurnScore + bonus };
+    const currentTeamWordsLog = teamWords[myTeamId] || [];
+    const updatedTeamWords = { ...teamWords, [myTeamId]: [...currentTeamWordsLog, ...currentTurnWords] };
 
     let newBag = [...(globalBag || [])];
     let newRack = rack.map((slot: any) => {
@@ -490,6 +527,8 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     
     setPendingSentence(false);
     setSentenceText("");
+    setCurrentTurnWords([]);
+    setCurrentTurnScore(0);
   };
 
   // ==========================================
@@ -506,7 +545,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
              <Users size={48} className="text-emerald-400 animate-pulse" /> {joinedCount} {joinedCount === 1 ? 'Player' : 'Players'} in Lobby
           </div>
 
-          {/* 🔥 TIME SELECTOR FOR INSTRUCTOR */}
           <div className="mb-12 flex flex-col items-center animate-in slide-in-from-bottom-4">
              <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">Select Turn Duration</p>
              <div className="flex gap-4">
@@ -750,7 +788,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     );
   }
 
-  // MAIN GAME RENDER
   return (
     <div className="flex flex-col h-full w-full wood-bg p-2 overflow-hidden border-4 border-emerald-500/50">
       <div className={`flex justify-between items-center mb-2 p-3 rounded-xl border transition-colors ${isMyTurn ? 'bg-emerald-900/60 border-emerald-500/50' : 'bg-slate-900/60 border-slate-700'}`}>
@@ -786,6 +823,14 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       </div>
 
       <div className="mt-2 bg-[#8b7355] rounded-xl p-2 border-b-4 border-[#5c4a35] w-full z-10 shadow-[0_-10px_20px_rgba(0,0,0,0.5)]">
+         
+         {/* 🔥 ERROR BANNER */}
+         {invalidWords.length > 0 && (
+             <div className="bg-rose-500/90 text-white px-3 py-2 rounded-lg mb-2 flex items-center gap-2 text-xs font-bold shadow-sm animate-in slide-in-from-bottom-2">
+                 <AlertTriangle size={14} /> Dictionary rejected: {invalidWords.join(', ')}
+             </div>
+         )}
+
          <div className="flex justify-between items-end mb-2 px-1">
              <p className={`text-[10px] font-black uppercase tracking-widest ${isMyTurn ? 'text-amber-200/50 animate-pulse' : 'text-slate-400'}`}>
                 {isMyTurn ? (targetSquare === null ? 'Tap board to target' : 'Tap letter to deploy') : 'Rearrange your rack'}
@@ -812,13 +857,14 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       </div>
 
       <div className="flex gap-2 mt-2 pb-2">
-         <button onClick={recallAll} className="flex-1 py-3 bg-slate-700 text-white rounded-xl font-bold flex justify-center items-center gap-2 active:scale-95 transition-colors hover:bg-slate-600">
+         <button onClick={recallAll} disabled={isValidating} className="flex-1 py-3 bg-slate-700 text-white rounded-xl font-bold flex justify-center items-center gap-2 active:scale-95 transition-colors hover:bg-slate-600 disabled:opacity-50">
              <ArrowDownToLine size={18}/> Recall
          </button>
          
          {isMyTurn ? (
-             <button onClick={handleInitiateCommit} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg active:scale-95 border-b-4 border-emerald-800 transition-colors hover:bg-emerald-500">
-                 <CheckCircle2 size={18}/> Play Word
+             <button onClick={handleInitiateCommit} disabled={isValidating} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg active:scale-95 border-b-4 border-emerald-800 transition-colors hover:bg-emerald-500 disabled:opacity-50 disabled:border-emerald-600">
+                 {isValidating ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18}/>} 
+                 {isValidating ? 'Checking...' : 'Play Word'}
              </button>
          ) : (
              <div className="flex-1 py-3 bg-slate-800 text-slate-400 rounded-xl font-bold flex justify-center items-center gap-2 border-b-4 border-slate-900">
