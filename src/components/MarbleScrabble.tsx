@@ -111,7 +111,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         board: Array(BOARD_SIZE * BOARD_SIZE).fill(null),
         bag: createInitialBag(),
         scores: {},
-        teamWords: {}, // 🔥 Added tracker container
+        teamWords: {}, 
         activeTeamIndex: 0,
         turnEndTime: null,
       });
@@ -124,7 +124,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const globalBoard = liveState?.board;
   const globalBag = liveState?.bag;
   const scores: Record<string, number> = liveState?.scores || {};
-  const teamWords: Record<string, string[]> = liveState?.teamWords || {}; // 🔥 Word State
+  const teamWords: Record<string, string[]> = liveState?.teamWords || {}; 
   const activeTeamIndex = liveState?.activeTeamIndex || 0;
   const turnEndTime = liveState?.turnEndTime;
   const latestSentence = liveState?.latestSentence;
@@ -158,6 +158,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const [lastPlacedIndex, setLastPlacedIndex] = useState<number | null>(null);
   const [playDirection, setPlayDirection] = useState<number | null>(null);
   const [customTeamName, setCustomTeamName] = useState("");
+  const [hasDrawnInitialHand, setHasDrawnInitialHand] = useState(false);
   
   const [pendingSentence, setPendingSentence] = useState(false);
   const [sentenceText, setSentenceText] = useState("");
@@ -173,28 +174,21 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     }
   }, [globalBoard]);
 
+  // 🔥 INITIAL DRAW: Only happens once per player when their first turn starts
   useEffect(() => {
-    if (!isProjector && isMyTurn && rack.some((t: any) => t === null) && globalBag?.length > 0) {
-      drawTiles();
-    }
-  }, [isMyTurn, turnEndTime]);
-
-  const drawTiles = () => {
-    if (!globalBag || globalBag.length === 0) return;
-    let newBag = [...globalBag];
-    let changed = false;
-    const newRack = rack.map((slot: any) => {
-      if (slot === null && newBag.length > 0) {
-        changed = true;
-        return newBag.pop();
-      }
-      return slot;
-    });
-    if (changed) {
+    if (!isProjector && isMyTurn && !hasDrawnInitialHand && globalBag?.length > 0) {
+      let newBag = [...globalBag];
+      const newRack = rack.map((slot: any) => {
+        if (slot === null && newBag.length > 0) {
+          return newBag.pop();
+        }
+        return slot;
+      });
       setRack(newRack);
+      setHasDrawnInitialHand(true);
       onUpdateLiveState({ bag: newBag });
     }
-  };
+  }, [isMyTurn, hasDrawnInitialHand, globalBag, isProjector]);
 
   const handleBoardClick = (index: number) => {
     if (localBoard[index]?.isLocked) return; 
@@ -316,6 +310,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   };
 
   const passTurn = () => {
+    if (!isProjector) recallAll(); // Bring tiles back to rack if player skips
     if (teamArray.length === 0) return;
     onUpdateLiveState({
       activeTeamIndex: (activeTeamIndex + 1) % teamArray.length,
@@ -348,7 +343,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         return; 
     }
 
-    // 🔥 BOARD SCANNER: Extract full words formed by the newly placed tiles
+    // Extract Words
     const foundWords = new Set<string>();
     const getTile = (r: number, c: number) => r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE ? localBoard[r * BOARD_SIZE + c] : null;
 
@@ -356,7 +351,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         const r = Math.floor(idx / BOARD_SIZE);
         const c = idx % BOARD_SIZE;
 
-        // Scan Horizontal Word
         let left = c, right = c;
         while (left > 0 && getTile(r, left - 1)) left--;
         while (right < BOARD_SIZE - 1 && getTile(r, right + 1)) right++;
@@ -366,7 +360,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
             foundWords.add(word);
         }
 
-        // Scan Vertical Word
         let top = r, bottom = r;
         while (top > 0 && getTile(top - 1, c)) top--;
         while (bottom < BOARD_SIZE - 1 && getTile(bottom + 1, c)) bottom++;
@@ -377,7 +370,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         }
     });
 
-    // Fallback: If they placed a tile that doesn't connect to anything, just record the tiles they dropped
     let extractedWords = Array.from(foundWords);
     if (extractedWords.length === 0 && placedIndices.length > 0) {
         extractedWords = [placedIndices.map(idx => localBoard[idx].letter).join('')];
@@ -398,14 +390,24 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
     const lockedBoard = localBoard.map((t: any) => t && !t.isLocked ? { ...t, isLocked: true } : t);
     const updatedScores = { ...scores, [myTeamId]: (scores[myTeamId] || 0) + turnScore + bonus };
-    
     const currentTeamWords = teamWords[myTeamId] || [];
     const updatedTeamWords = { ...teamWords, [myTeamId]: [...currentTeamWords, ...extractedWords] };
+
+    // 🔥 ATOMIC RACK REFILL: Draw new tiles instantly from globalBag and bundle it into the payload
+    let newBag = [...(globalBag || [])];
+    let newRack = rack.map((slot: any) => {
+      if (slot === null && newBag.length > 0) {
+        return newBag.pop();
+      }
+      return slot;
+    });
+    setRack(newRack);
 
     const payload: any = {
       board: lockedBoard,
       scores: updatedScores,
-      teamWords: updatedTeamWords, // 🔥 Sync extracted words to Firebase
+      teamWords: updatedTeamWords, 
+      bag: newBag, // Update network bag atomically
       activeTeamIndex: teamArray.length > 1 ? (activeTeamIndex + 1) % teamArray.length : 0,
       turnEndTime: Date.now() + timeLimit * 1000
     };
@@ -508,7 +510,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
               <span className="text-slate-400 font-mono text-sm">{globalBag?.length || 0} tiles left</span>
             </div>
             
-            {/* 🔥 UPDATED: Leaderboard now displays the words each player formed */}
             <div className="space-y-4 max-h-[40vh] overflow-y-auto custom-scrollbar pr-2">
               {teamArray.map((t: any) => {
                 const playerWords = teamWords[t.id] || [];
