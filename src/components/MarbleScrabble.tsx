@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool } from 'lucide-react';
+import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool, User } from 'lucide-react';
 
 // ==========================================
 // GAME DATA & CONSTANTS
@@ -17,13 +17,13 @@ const LETTER_DISTRIBUTIONS: Record<string, { count: number, value: number }> = {
   Y: { count: 2, value: 4 }, Z: { count: 1, value: 10 }
 };
 
-const TEAM_COLORS = [
+const INDIVIDUAL_COLORS = [
+  { color: "bg-indigo-500", textColor: "text-indigo-500" },
   { color: "bg-rose-500", textColor: "text-rose-500" },
-  { color: "bg-blue-500", textColor: "text-blue-500" },
-  { color: "bg-emerald-500", textColor: "text-emerald-500" },
   { color: "bg-amber-500", textColor: "text-amber-500" },
-  { color: "bg-purple-500", textColor: "text-purple-500" },
-  { color: "bg-cyan-500", textColor: "text-cyan-500" },
+  { color: "bg-emerald-500", textColor: "text-emerald-500" },
+  { color: "bg-blue-500", textColor: "text-blue-500" },
+  { color: "bg-fuchsia-500", textColor: "text-fuchsia-500" },
 ];
 
 const getSquareType = (r: number, c: number) => {
@@ -54,9 +54,6 @@ const createInitialBag = () => {
   return bag;
 };
 
-// ==========================================
-// MARBLE TILE UI COMPONENT
-// ==========================================
 const MarbleTile = ({ tile, isSelected, isLocked, onClick, className = '' }: any) => {
   if (!tile) return null;
   return (
@@ -79,9 +76,6 @@ const MarbleTile = ({ tile, isSelected, isLocked, onClick, className = '' }: any
   );
 };
 
-// ==========================================
-// MAIN MAGISTER OS COMPONENT
-// ==========================================
 export default function MarbleScrabble({ block, isProjector, liveState, studentId, onUpdateLiveState }: any) {
   const timeLimit = block?.timePerTurnSeconds || 60;
 
@@ -108,7 +102,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     }
   }, []);
 
-  // 1. INSTRUCTOR INIT
   useEffect(() => {
     if (isProjector && !liveState?.gameStatus) {
       onUpdateLiveState({
@@ -124,7 +117,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     }
   }, [isProjector, liveState]);
 
-  // Type-safe destructuring
   const gameStatus = liveState?.gameStatus;
   const players: Record<string, any> = liveState?.players || {};
   const teams: Record<string, any> = liveState?.teams || {};
@@ -141,7 +133,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const myTeamId = myTeamEntry?.id;
   const isMyTurn = myTeamId === activeTeam?.id && gameStatus === 'playing';
 
-  // Timer logic
   const [timeLeft, setTimeLeft] = useState(0);
   useEffect(() => {
     if (!turnEndTime) return;
@@ -155,16 +146,11 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     return () => clearInterval(interval);
   }, [turnEndTime, isProjector, gameStatus]);
 
-  // ==========================================
-  // STUDENT INTERACTION STATE
-  // ==========================================
   const [localBoard, setLocalBoard] = useState(globalBoard || Array(BOARD_SIZE * BOARD_SIZE).fill(null));
   const [rack, setRack] = useState<any[]>(Array(7).fill(null));
   const [targetSquare, setTargetSquare] = useState<number | null>(null);
-
   const [lastPlacedIndex, setLastPlacedIndex] = useState<number | null>(null);
   const [playDirection, setPlayDirection] = useState<number | null>(null);
-  const [customTeamName, setCustomTeamName] = useState("");
 
   useEffect(() => {
     if (globalBoard) {
@@ -276,11 +262,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     setPlayDirection(null);
   };
 
-  // ==========================================
-  // MATCHMAKING & GAMEPLAY ACTIONS
-  // ==========================================
-  
-  // 🔥 FIXED: Passes the entire players object to ensure nested merge
+  // 🔥 NEW: MATCHMAKING ACTIONS
   const joinLobby = () => {
     const displayName = studentId.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ');
     const newPlayers = { 
@@ -290,27 +272,23 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     onUpdateLiveState({ players: newPlayers });
   };
 
-  const generateTeams = (numTeams: number) => {
-    const playerIds = Object.keys(players).sort(() => 0.5 - Math.random());
+  // 🔥 UPDATED: Dynamic Free-For-All Matchmaking
+  const initializeFFA = () => {
+    const playerIds = Object.keys(players);
     const newTeams: any = {};
     const newScores: any = {};
 
-    for (let i = 0; i < numTeams; i++) {
-        const tId = `team_${i}`;
+    playerIds.forEach((pId, idx) => {
+        const tId = `p_${idx}`;
         newTeams[tId] = {
             id: tId,
-            order: i,
-            name: `Squad ${i + 1}`,
-            color: TEAM_COLORS[i % TEAM_COLORS.length].color,
-            textColor: TEAM_COLORS[i % TEAM_COLORS.length].textColor,
-            members: []
+            order: idx,
+            name: players[pId].name, // Default to their name
+            color: INDIVIDUAL_COLORS[idx % INDIVIDUAL_COLORS.length].color,
+            textColor: INDIVIDUAL_COLORS[idx % INDIVIDUAL_COLORS.length].textColor,
+            members: [pId] // One player per "team"
         };
         newScores[tId] = 0;
-    }
-
-    playerIds.forEach((pId, idx) => {
-        const tId = `team_${idx % numTeams}`;
-        newTeams[tId].members.push(pId);
     });
 
     onUpdateLiveState({
@@ -320,12 +298,11 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     });
   };
 
-  const submitTeamName = () => {
-    if (customTeamName.trim() && myTeamId) {
+  const submitTeamName = (name: string) => {
+    if (name.trim() && myTeamId) {
         const updatedTeams = { ...teams };
-        updatedTeams[myTeamId].name = customTeamName;
+        updatedTeams[myTeamId].name = name;
         onUpdateLiveState({ teams: updatedTeams });
-        setCustomTeamName("");
     }
   };
 
@@ -337,6 +314,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   };
 
   const passTurn = () => {
+    if (teamArray.length === 0) return;
     onUpdateLiveState({
       activeTeamIndex: (activeTeamIndex + 1) % teamArray.length,
       turnEndTime: Date.now() + timeLimit * 1000
@@ -358,7 +336,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     onUpdateLiveState({
       board: lockedBoard,
       scores: updatedScores,
-      activeTeamIndex: (activeTeamIndex + 1) % teamArray.length,
+      activeTeamIndex: teamArray.length > 1 ? (activeTeamIndex + 1) % teamArray.length : 0,
       turnEndTime: Date.now() + timeLimit * 1000
     });
   };
@@ -371,23 +349,18 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       const joinedCount = Object.keys(players).length;
       return (
         <div className="w-full h-full flex flex-col items-center justify-center p-12 wood-bg text-white">
-          <h1 className="text-[10vh] font-bold playfair-font text-amber-400 mb-4 drop-shadow-2xl">Matchmaking</h1>
+          <h1 className="text-[10vh] font-bold playfair-font text-amber-400 mb-4 drop-shadow-2xl">Littera Marmoris</h1>
           <div className="flex items-center gap-4 text-4xl font-black mb-16 text-slate-300">
-             <Users size={48} className="text-emerald-400 animate-pulse" /> {joinedCount} Players in Lobby
+             <Users size={48} className="text-emerald-400 animate-pulse" /> {joinedCount} {joinedCount === 1 ? 'Player' : 'Players'} in Lobby
           </div>
-          <p className="text-xl font-black text-slate-400 uppercase tracking-widest mb-6">Instructor: Auto-Group Teams</p>
-          <div className="flex gap-4">
-             {[2, 3, 4, 5].map(n => (
-                 <button 
-                    key={n} 
-                    disabled={joinedCount < n}
-                    onClick={() => generateTeams(n)}
-                    className="px-8 py-6 bg-slate-800 hover:bg-indigo-600 disabled:opacity-50 disabled:hover:bg-slate-800 text-white rounded-2xl font-black text-2xl shadow-xl transition-colors border-2 border-slate-700 hover:border-indigo-400"
-                 >
-                    {n} Teams
-                 </button>
-             ))}
-          </div>
+          <button 
+             disabled={joinedCount < 1}
+             onClick={initializeFFA}
+             className="px-12 py-8 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-[2.5rem] font-black text-3xl shadow-[0_20px_50px_rgba(79,70,229,0.4)] transition-all border-4 border-indigo-400 active:scale-95 flex items-center gap-4"
+          >
+             Initialize Individual Duel <FastForward size={32} />
+          </button>
+          <p className="mt-8 text-slate-500 font-bold uppercase tracking-widest text-sm">Supports 1 to 6 Individual Profiles</p>
         </div>
       );
     }
@@ -397,24 +370,21 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
             <div className="w-full h-full flex flex-col p-12 wood-bg text-white overflow-hidden">
                 <div className="flex justify-between items-center mb-12">
                     <div>
-                        <h1 className="text-[6vh] font-bold playfair-font text-amber-400 drop-shadow-lg">Identify Yourselves</h1>
-                        <p className="text-xl font-bold text-slate-400 uppercase tracking-widest">Look at your devices to name your squad</p>
+                        <h1 className="text-[6vh] font-bold playfair-font text-amber-400 drop-shadow-lg">Establish Your Legend</h1>
+                        <p className="text-xl font-bold text-slate-400 uppercase tracking-widest">Players: Name your profile or keep your alias</p>
                     </div>
-                    <button onClick={startGame} className="px-12 py-6 bg-emerald-500 hover:bg-emerald-400 text-white rounded-full font-black text-2xl uppercase tracking-widest shadow-[0_0_30px_rgba(16,185,129,0.5)] transition-transform active:scale-95">
-                        Begin Battle
+                    <button onClick={startGame} className="px-12 py-6 bg-emerald-500 hover:bg-emerald-400 text-white rounded-full font-black text-2xl uppercase tracking-widest shadow-[0_0_30px_rgba(16,185,129,0.5)] transition-transform active:scale-95 flex items-center gap-3">
+                        <CheckCircle2 size={24}/> Begin Duel
                     </button>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-8 overflow-y-auto custom-scrollbar pb-8">
                     {teamArray.map((t: any) => (
-                        <div key={t.id} className={`${t.color} p-8 rounded-3xl shadow-xl border-4 border-white/20 animate-in zoom-in-95 duration-500`}>
-                            <h2 className="text-3xl font-black mb-6 uppercase tracking-tight">{t.name}</h2>
-                            <ul className="space-y-3">
-                                {t.members.map((mId: string) => (
-                                    <li key={mId} className="flex items-center gap-3 text-lg font-bold text-white/90 bg-black/20 p-3 rounded-xl">
-                                        <UserPlus size={20} className="opacity-70" /> {players[mId]?.name || mId}
-                                    </li>
-                                ))}
-                            </ul>
+                        <div key={t.id} className={`${t.color} p-8 rounded-[2.5rem] shadow-xl border-4 border-white/20 animate-in zoom-in-95 duration-500 flex flex-col items-center justify-center text-center`}>
+                            <div className="w-20 h-20 bg-black/20 rounded-full flex items-center justify-center mb-4">
+                                <User size={40} className="text-white" />
+                            </div>
+                            <h2 className="text-3xl font-black uppercase tracking-tight leading-tight">{t.name}</h2>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-white/50 mt-2">Active Combatant</p>
                         </div>
                     ))}
                 </div>
@@ -469,7 +439,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
             </div>
           </div>
           <button onClick={passTurn} className="py-4 bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white rounded-2xl font-bold flex justify-center items-center gap-2 transition-colors border border-rose-500/30">
-            <FastForward size={20}/> Force Skip Turn
+            <FastForward size={20}/> Skip Turn
           </button>
         </div>
       </div>
@@ -483,21 +453,21 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     const hasJoined = players[studentId];
     return (
       <div className="flex flex-col h-full w-full wood-bg p-6 justify-center items-center text-center">
-        <h2 className="text-4xl font-bold text-amber-100 playfair-font mb-8">Littera Marmoris</h2>
+        <h2 className="text-4xl font-bold text-amber-100 playfair-font mb-8 italic">Littera Marmoris</h2>
         {hasJoined ? (
             <div className="animate-in zoom-in duration-500 flex flex-col items-center">
-                <div className="w-24 h-24 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mb-6 border-4 border-emerald-500/50">
+                <div className="w-24 h-24 bg-emerald-500/20 text-emerald-400 rounded-[35%] flex items-center justify-center mb-6 border-4 border-emerald-500/50 shadow-[0_0_30px_rgba(16,185,129,0.3)]">
                     <CheckCircle2 size={48} />
                 </div>
-                <p className="text-2xl font-black text-white uppercase tracking-widest mb-4">Signal Secured</p>
-                <p className="text-amber-200/50 font-bold animate-pulse">Awaiting team allocation...</p>
+                <p className="text-2xl font-black text-white uppercase tracking-widest mb-4">Profile Synced</p>
+                <p className="text-amber-200/50 font-bold animate-pulse">Awaiting duel initialization...</p>
             </div>
         ) : (
             <button 
               onClick={joinLobby}
-              className="p-8 bg-indigo-600 hover:bg-indigo-500 rounded-3xl font-black text-2xl uppercase tracking-widest shadow-[0_0_40px_rgba(79,70,229,0.5)] transition-transform active:scale-95 text-white border-2 border-indigo-400"
+              className="p-8 bg-indigo-600 hover:bg-indigo-500 rounded-[2.5rem] font-black text-2xl uppercase tracking-widest shadow-[0_0_40px_rgba(79,70,229,0.5)] transition-transform active:scale-95 text-white border-4 border-indigo-400"
             >
-              Enter Matchmaking
+              Join the Duel
             </button>
         )}
       </div>
@@ -508,42 +478,29 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     if (!myTeamEntry) return <div className="wood-bg w-full h-full flex items-center justify-center text-slate-400">Spectator Mode</div>;
     return (
         <div className="flex flex-col h-full w-full wood-bg p-6 text-center">
-            <div className={`p-8 rounded-[2.5rem] ${myTeamEntry.color} border-4 border-white/20 shadow-2xl mb-8`}>
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-2">You have joined</h3>
-                <h2 className="text-4xl font-black text-white mb-6 uppercase tracking-tight">{myTeamEntry.name}</h2>
-                <div className="bg-black/20 rounded-2xl p-4 text-left">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-3 border-b border-white/10 pb-2">Your Squad</p>
-                    <div className="flex flex-wrap gap-2">
-                        {myTeamEntry.members.map((mId: string) => (
-                            <span key={mId} className="px-3 py-1 bg-white/10 rounded-lg text-sm font-bold text-white">
-                                {players[mId]?.name}
-                            </span>
-                        ))}
-                    </div>
+            <div className={`p-10 rounded-[3rem] ${myTeamEntry.color} border-4 border-white/20 shadow-2xl mb-8 flex flex-col items-center`}>
+                <div className="w-20 h-20 bg-black/20 rounded-full flex items-center justify-center mb-6">
+                    <User size={40} className="text-white" />
                 </div>
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-2">Authenticated As</h3>
+                <h2 className="text-4xl font-black text-white uppercase tracking-tight">{myTeamEntry.name}</h2>
             </div>
-            <div className="bg-slate-900/80 backdrop-blur-md p-6 rounded-3xl border border-slate-700 shadow-xl">
+            <div className="bg-slate-900/80 backdrop-blur-md p-8 rounded-[2.5rem] border border-slate-700 shadow-xl">
                 <label className="text-[10px] font-black uppercase tracking-widest text-amber-500 mb-4 block flex items-center justify-center gap-2">
-                    <PenTool size={14}/> Rename your squad
+                    <PenTool size={14}/> Customize Alias
                 </label>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-4">
                     <input 
-                        value={customTeamName} 
-                        onChange={(e) => setCustomTeamName(e.target.value)} 
+                        defaultValue={myTeamEntry.name}
+                        onBlur={(e) => submitTeamName(e.target.value)} 
                         maxLength={15}
-                        placeholder="e.g. Word Wizards" 
-                        className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white font-bold outline-none focus:border-amber-500 transition-colors"
+                        placeholder="Your Legend Name" 
+                        className="w-full bg-slate-950 border-2 border-slate-700 rounded-2xl px-5 py-4 text-white text-xl font-bold outline-none focus:border-amber-500 transition-colors text-center"
                     />
-                    <button 
-                        onClick={submitTeamName}
-                        disabled={!customTeamName.trim()}
-                        className="px-6 py-3 bg-amber-600 disabled:bg-slate-700 disabled:text-slate-500 text-white font-black uppercase tracking-widest rounded-xl transition-colors"
-                    >
-                        Save
-                    </button>
+                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Name updates automatically on blur</p>
                 </div>
             </div>
-            <p className="mt-auto text-amber-200/50 font-bold animate-pulse text-sm">Awaiting deployment...</p>
+            <p className="mt-auto text-amber-200/50 font-bold animate-pulse text-sm">Waiting for Instructor to start...</p>
         </div>
     );
   }
@@ -553,7 +510,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       <div className="flex flex-col h-full w-full wood-bg p-6 justify-center items-center text-center">
         <ShieldAlert size={80} className={`${activeTeam?.textColor || 'text-slate-400'} mb-8 opacity-50`} />
         <h2 className={`text-3xl font-black uppercase tracking-widest ${activeTeam?.textColor || 'text-slate-400'} mb-2`}>{activeTeam?.name || 'Unknown'}'s Turn</h2>
-        <p className="text-lg font-bold text-slate-400 mb-8">Discuss strategy. Wait for your turn.</p>
+        <p className="text-lg font-bold text-slate-400 mb-8 italic">Plotting next move...</p>
         <div className="mt-8 flex items-center gap-3 bg-slate-900/50 backdrop-blur-md px-6 py-3 rounded-full border border-slate-700 shadow-inner">
             <Clock className="text-amber-500 w-5 h-5" />
             <span className="text-3xl font-mono font-bold text-amber-100">{timeLeft}s</span>
