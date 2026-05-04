@@ -77,7 +77,11 @@ const MarbleTile = ({ tile, isSelected, isLocked, onClick, className = '' }: any
 };
 
 export default function MarbleScrabble({ block, isProjector, liveState, studentId, onUpdateLiveState }: any) {
-  const timeLimit = block?.timePerTurnSeconds || 60;
+  // 🔥 Extract timeLimit from liveState if set, otherwise fallback to block settings or 60s
+  const timeLimit = liveState?.timeLimit || block?.timePerTurnSeconds || 60;
+  
+  // 🔥 Local state for the instructor to select time before launch
+  const [selectedTime, setSelectedTime] = useState(60);
 
   useEffect(() => {
     if (!document.getElementById('marble-styles')) {
@@ -163,7 +167,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const [pendingSentence, setPendingSentence] = useState(false);
   const [sentenceText, setSentenceText] = useState("");
 
-  // 🔥 NEW: Rack Rearrangement State
   const [selectedRackIndex, setSelectedRackIndex] = useState<number | null>(null);
 
   useEffect(() => {
@@ -178,7 +181,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     }
   }, [globalBoard]);
 
-  // Clean up any uncommitted board tiles if the turn ends abruptly
   useEffect(() => {
     if (!isProjector && !isMyTurn) {
         let newRack = [...rack];
@@ -231,8 +233,8 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   };
 
   const handleBoardClick = (index: number) => {
-    if (!isMyTurn) return; // Cannot place on board if not turn
-    setSelectedRackIndex(null); // Clear rack selection if clicking board
+    if (!isMyTurn) return; 
+    setSelectedRackIndex(null); 
 
     if (localBoard[index]?.isLocked) return; 
     
@@ -255,7 +257,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   };
 
   const handleRackClick = (idx: number) => {
-    // SCENARIO 1: We are actively placing tiles on the board
     if (targetSquare !== null) {
       if (!isMyTurn) return;
       if (!rack[idx]) return;
@@ -297,14 +298,13 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       return;
     }
 
-    // SCENARIO 2: We are rearranging the rack
     if (selectedRackIndex === null) {
         if (rack[idx]) {
             setSelectedRackIndex(idx);
         }
     } else {
         if (selectedRackIndex === idx) {
-            setSelectedRackIndex(null); // Deselect
+            setSelectedRackIndex(null); 
         } else {
             const newRack = [...rack];
             const temp = newRack[idx];
@@ -362,7 +362,12 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         newScores[tId] = 0;
     });
 
-    onUpdateLiveState({ gameStatus: 'lobby_naming', teams: newTeams, scores: newScores });
+    onUpdateLiveState({ 
+        gameStatus: 'lobby_naming', 
+        teams: newTeams, 
+        scores: newScores,
+        timeLimit: selectedTime // 🔥 Push custom time limit
+    });
   };
 
   const submitTeamName = (name: string) => {
@@ -410,7 +415,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         return; 
     }
 
-    // Extract Words
     const foundWords = new Set<string>();
     const getTile = (r: number, c: number) => r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE ? localBoard[r * BOARD_SIZE + c] : null;
 
@@ -497,13 +501,40 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       return (
         <div className="w-full h-full flex flex-col items-center justify-center p-12 wood-bg text-white">
           <h1 className="text-[10vh] font-bold playfair-font text-amber-400 mb-4 drop-shadow-2xl">Littera Marmoris</h1>
-          <div className="flex items-center gap-4 text-4xl font-black mb-16 text-slate-300">
+          
+          <div className="flex items-center gap-4 text-4xl font-black mb-12 text-slate-300">
              <Users size={48} className="text-emerald-400 animate-pulse" /> {joinedCount} {joinedCount === 1 ? 'Player' : 'Players'} in Lobby
           </div>
+
+          {/* 🔥 TIME SELECTOR FOR INSTRUCTOR */}
+          <div className="mb-12 flex flex-col items-center animate-in slide-in-from-bottom-4">
+             <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">Select Turn Duration</p>
+             <div className="flex gap-4">
+                 {[
+                     { label: '1 Min', val: 60 },
+                     { label: '2 Min', val: 120 },
+                     { label: '5 Min', val: 300 },
+                     { label: '10 Min', val: 600 }
+                 ].map(t => (
+                     <button 
+                         key={t.val} 
+                         onClick={() => setSelectedTime(t.val)}
+                         className={`px-8 py-3 rounded-2xl font-black text-lg transition-all border-2 ${
+                             selectedTime === t.val 
+                             ? 'bg-amber-500 border-amber-400 text-amber-950 shadow-[0_0_20px_rgba(245,158,11,0.4)] scale-105' 
+                             : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-amber-500/50 hover:text-amber-200'
+                         }`}
+                     >
+                         {t.label}
+                     </button>
+                 ))}
+             </div>
+          </div>
+
           <button 
              disabled={joinedCount < 1}
              onClick={initializeFFA}
-             className="px-12 py-8 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-[2.5rem] font-black text-3xl shadow-[0_20px_50px_rgba(79,70,229,0.4)] transition-all border-4 border-indigo-400 active:scale-95 flex items-center gap-4"
+             className="px-12 py-6 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-[2.5rem] font-black text-3xl shadow-[0_20px_50px_rgba(79,70,229,0.4)] transition-all border-4 border-indigo-400 active:scale-95 flex items-center gap-4"
           >
              Initialize Duel <FastForward size={32} />
           </button>
@@ -719,7 +750,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     );
   }
 
-  // MAIN GAME RENDER (ACTIVE & SPECTATOR)
+  // MAIN GAME RENDER
   return (
     <div className="flex flex-col h-full w-full wood-bg p-2 overflow-hidden border-4 border-emerald-500/50">
       <div className={`flex justify-between items-center mb-2 p-3 rounded-xl border transition-colors ${isMyTurn ? 'bg-emerald-900/60 border-emerald-500/50' : 'bg-slate-900/60 border-slate-700'}`}>
