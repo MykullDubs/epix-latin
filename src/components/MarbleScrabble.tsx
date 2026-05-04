@@ -111,6 +111,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         board: Array(BOARD_SIZE * BOARD_SIZE).fill(null),
         bag: createInitialBag(),
         scores: {},
+        teamWords: {}, // 🔥 Added tracker container
         activeTeamIndex: 0,
         turnEndTime: null,
       });
@@ -123,6 +124,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const globalBoard = liveState?.board;
   const globalBag = liveState?.bag;
   const scores: Record<string, number> = liveState?.scores || {};
+  const teamWords: Record<string, string[]> = liveState?.teamWords || {}; // 🔥 Word State
   const activeTeamIndex = liveState?.activeTeamIndex || 0;
   const turnEndTime = liveState?.turnEndTime;
   const latestSentence = liveState?.latestSentence;
@@ -171,7 +173,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     }
   }, [globalBoard]);
 
-  // 🔥 FIXED: Added `turnEndTime` to dependencies so Solo players get a rack refill!
   useEffect(() => {
     if (!isProjector && isMyTurn && rack.some((t: any) => t === null) && globalBag?.length > 0) {
       drawTiles();
@@ -333,12 +334,53 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
   const commitTurn = (withSentence: boolean) => {
     let turnScore = 0;
-    localBoard.forEach((tile: any) => {
-      if (tile && !tile.isLocked) turnScore += tile.value;
+    const placedIndices: number[] = [];
+
+    localBoard.forEach((tile: any, idx: number) => {
+      if (tile && !tile.isLocked) {
+        turnScore += tile.value;
+        placedIndices.push(idx);
+      }
     });
+
     if (turnScore === 0) {
         setPendingSentence(false);
         return; 
+    }
+
+    // 🔥 BOARD SCANNER: Extract full words formed by the newly placed tiles
+    const foundWords = new Set<string>();
+    const getTile = (r: number, c: number) => r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE ? localBoard[r * BOARD_SIZE + c] : null;
+
+    placedIndices.forEach(idx => {
+        const r = Math.floor(idx / BOARD_SIZE);
+        const c = idx % BOARD_SIZE;
+
+        // Scan Horizontal Word
+        let left = c, right = c;
+        while (left > 0 && getTile(r, left - 1)) left--;
+        while (right < BOARD_SIZE - 1 && getTile(r, right + 1)) right++;
+        if (right > left) {
+            let word = '';
+            for (let i = left; i <= right; i++) word += getTile(r, i)?.letter || '';
+            foundWords.add(word);
+        }
+
+        // Scan Vertical Word
+        let top = r, bottom = r;
+        while (top > 0 && getTile(top - 1, c)) top--;
+        while (bottom < BOARD_SIZE - 1 && getTile(bottom + 1, c)) bottom++;
+        if (bottom > top) {
+            let word = '';
+            for (let i = top; i <= bottom; i++) word += getTile(i, c)?.letter || '';
+            foundWords.add(word);
+        }
+    });
+
+    // Fallback: If they placed a tile that doesn't connect to anything, just record the tiles they dropped
+    let extractedWords = Array.from(foundWords);
+    if (extractedWords.length === 0 && placedIndices.length > 0) {
+        extractedWords = [placedIndices.map(idx => localBoard[idx].letter).join('')];
     }
 
     let bonus = 0;
@@ -356,10 +398,14 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
     const lockedBoard = localBoard.map((t: any) => t && !t.isLocked ? { ...t, isLocked: true } : t);
     const updatedScores = { ...scores, [myTeamId]: (scores[myTeamId] || 0) + turnScore + bonus };
+    
+    const currentTeamWords = teamWords[myTeamId] || [];
+    const updatedTeamWords = { ...teamWords, [myTeamId]: [...currentTeamWords, ...extractedWords] };
 
     const payload: any = {
       board: lockedBoard,
       scores: updatedScores,
+      teamWords: updatedTeamWords, // 🔥 Sync extracted words to Firebase
       activeTeamIndex: teamArray.length > 1 ? (activeTeamIndex + 1) % teamArray.length : 0,
       turnEndTime: Date.now() + timeLimit * 1000
     };
@@ -456,18 +502,33 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
           </div>
         </div>
         <div className="w-[400px] flex flex-col gap-6 pt-24">
-          <div className="bg-slate-800/80 backdrop-blur-md p-8 rounded-3xl border border-slate-700/50 shadow-xl">
-            <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-700">
+          <div className="bg-slate-800/80 backdrop-blur-md p-8 rounded-3xl border border-slate-700/50 shadow-xl flex flex-col">
+            <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-700 shrink-0">
               <h2 className="text-2xl font-bold flex items-center gap-3"><Trophy className="text-amber-400"/> Scores</h2>
               <span className="text-slate-400 font-mono text-sm">{globalBag?.length || 0} tiles left</span>
             </div>
+            
+            {/* 🔥 UPDATED: Leaderboard now displays the words each player formed */}
             <div className="space-y-4 max-h-[40vh] overflow-y-auto custom-scrollbar pr-2">
-              {teamArray.map((t: any) => (
-                <div key={t.id} className={`flex justify-between items-center p-4 rounded-2xl border-2 transition-colors ${activeTeamIndex === t.order ? 'border-white bg-white/10 shadow-[0_0_20px_rgba(255,255,255,0.2)]' : 'border-transparent bg-slate-900/50'}`}>
-                  <span className={`font-bold text-xl ${t.textColor}`}>{t.name}</span>
-                  <span className="text-3xl font-black">{scores?.[t.id] || 0}</span>
+              {teamArray.map((t: any) => {
+                const playerWords = teamWords[t.id] || [];
+                return (
+                <div key={t.id} className={`flex flex-col p-4 rounded-2xl border-2 transition-colors ${activeTeamIndex === t.order ? 'border-white bg-white/10 shadow-[0_0_20px_rgba(255,255,255,0.2)]' : 'border-transparent bg-slate-900/50'}`}>
+                  <div className="flex justify-between items-center">
+                      <span className={`font-bold text-xl ${t.textColor}`}>{t.name}</span>
+                      <span className="text-3xl font-black">{scores?.[t.id] || 0}</span>
+                  </div>
+                  {playerWords.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-white/10">
+                          {playerWords.map((w: string, i: number) => (
+                              <span key={i} className="px-2 py-1 bg-black/30 rounded-md text-[10px] uppercase font-black tracking-widest text-slate-300">
+                                  {w}
+                              </span>
+                          ))}
+                      </div>
+                  )}
                 </div>
-              ))}
+              )})}
             </div>
           </div>
           
