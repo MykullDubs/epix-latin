@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool, User, MessageSquare, Shuffle, Loader2, AlertTriangle, Zap, Rocket, BookOpen } from 'lucide-react';
+import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool, User, MessageSquare, Shuffle, Loader2, AlertTriangle, Zap, Rocket, BookOpen, RefreshCw } from 'lucide-react';
 
 // ==========================================
 // GAME DATA & CONSTANTS
@@ -129,7 +129,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         bag: createInitialBag(),
         scores: {},
         teamWords: {}, 
-        latestDiscoveries: [], // 🔥 Firebase storage for definitions
+        latestDiscoveries: [], 
         activeTeamIndex: 0,
         turnEndTime: null,
         isExtraTurn: false,
@@ -185,8 +185,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const [sentenceText, setSentenceText] = useState("");
   const [isValidating, setIsValidating] = useState(false);
   const [invalidWords, setInvalidWords] = useState<string[]>([]);
-  
-  // 🔥 UPDATED: Stores validated words AND their definitions
   const [currentTurnWords, setCurrentTurnWords] = useState<{word: string, def: string}[]>([]);
   const [currentTurnScore, setCurrentTurnScore] = useState(0);
 
@@ -365,6 +363,63 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     setInvalidWords([]);
   };
 
+  // 🔥 NEW: MULLIGAN / PURGE FUNCTION
+  const handlePurge = () => {
+    if (!isMyTurn || isValidating) return;
+    if ((scores[myTeamId] || 0) < 10) return;
+
+    // 1. Gather all unplayed tiles (from rack + unlocked on board)
+    let tilesToReturn: any[] = [];
+    const newBoard = [...localBoard];
+    
+    newBoard.forEach((tile: any, index: number) => {
+        if (tile && !tile.isLocked) {
+            tilesToReturn.push(tile);
+            newBoard[index] = null;
+        }
+    });
+
+    rack.forEach(tile => {
+        if (tile) tilesToReturn.push(tile);
+    });
+
+    // 2. Mix into bag
+    let newBag = [...(globalBag || []), ...tilesToReturn];
+    
+    // Fisher-Yates shuffle new bag
+    for (let i = newBag.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newBag[i], newBag[j]] = [newBag[j], newBag[i]];
+    }
+
+    // 3. Draw new hand
+    let newRack = Array(7).fill(null);
+    newRack = newRack.map(() => {
+        if (newBag.length > 0) return newBag.pop();
+        return null;
+    });
+
+    // 4. Update local state instantly
+    setRack(newRack);
+    setLocalBoard(newBoard);
+    setTargetSquare(null);
+    setLastPlacedIndex(null);
+    setPlayDirection(null);
+    setInvalidWords([]);
+    setSelectedRackIndex(null);
+
+    // 5. Update global state (deduct points and pass turn)
+    const updatedScores = { ...scores, [myTeamId]: (scores[myTeamId] || 0) - 10 };
+    
+    onUpdateLiveState({
+        bag: newBag,
+        scores: updatedScores,
+        activeTeamIndex: teamArray.length > 1 ? (activeTeamIndex + 1) % teamArray.length : 0,
+        turnEndTime: Date.now() + timeLimit * 1000,
+        isExtraTurn: false
+    });
+  };
+
   // ==========================================
   // MATCHMAKING & GAMEPLAY ACTIONS
   // ==========================================
@@ -431,7 +486,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     });
   };
 
-  // 🔥 TRUE SCRABBLE SCORING ENGINE & DUAL-API DICTIONARY VALIDATION
   const handleInitiateCommit = async () => {
     const placedIndices: number[] = [];
     localBoard.forEach((tile: any, idx: number) => {
@@ -577,13 +631,11 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     const validWordsData: {word: string, def: string}[] = [];
     const failedWords: string[] = [];
     
-    // 🔥 DUAL-API VALIDATION WITH DEFINITION EXTRACTION
     await Promise.all(extractedWords.map(async (word) => {
-        if (word.length < 2) return; // Standard Scrabble rules ignore single letter connections in processing
+        if (word.length < 2) return; 
         
         let foundDefinition = false;
 
-        // API 1: Free Dictionary API (Primary, Best Definitions)
         try {
             const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
             const data = await res.json();
@@ -597,7 +649,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
             console.warn("Primary Dictionary API failed for", word, err);
         }
 
-        // API 2: Datamuse Fallback (In case of CORS or network block)
         if (!foundDefinition) {
             try {
                 const res2 = await fetch(`https://api.datamuse.com/words?sp=${word}&md=d&max=1`);
@@ -606,7 +657,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                 if (data2 && data2.length > 0 && data2[0].word.toLowerCase() === word.toLowerCase()) {
                     let def = "Definition securely archived.";
                     if (data2[0].defs && data2[0].defs.length > 0) {
-                        // Datamuse format is "n\tA feline..." so we split it
                         def = data2[0].defs[0].split('\t').pop() || def;
                     }
                     validWordsData.push({ word: word.toUpperCase(), def });
@@ -617,7 +667,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
             }
         }
 
-        // If both failed or returned 404, the word is fake
         if (!foundDefinition) {
             failedWords.push(word.toUpperCase());
         }
@@ -630,7 +679,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         return; 
     }
 
-    // Success! Lock the definitions into the current turn
     setCurrentTurnScore(totalCalculatedScore);
     setCurrentTurnWords(validWordsData);
     setPendingSentence(true);
@@ -681,7 +729,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       board: lockedBoard,
       scores: updatedScores,
       teamWords: updatedTeamWords, 
-      latestDiscoveries: currentTurnWords, // 🔥 Broadcast the definitions to the projector!
+      latestDiscoveries: currentTurnWords, 
       bag: newBag, 
       activeTeamIndex: triggeredDP ? activeTeamIndex : (teamArray.length > 1 ? (activeTeamIndex + 1) % teamArray.length : 0),
       turnEndTime: Date.now() + timeLimit * 1000,
@@ -700,9 +748,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     setCurrentTurnScore(0);
   };
 
-  // ==========================================
-  // HELPER: GET SQUARE SCIFI CLASSES
-  // ==========================================
   const getSquareClasses = (r: number, c: number, tile: any, isTargeted: boolean) => {
       const type = getSquareType(r, c);
       let base = "bg-slate-800/40 border-slate-700/50"; 
@@ -805,7 +850,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       <div className="w-full h-full flex p-8 scifi-bg text-white gap-8 overflow-hidden relative">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-5 pointer-events-none mix-blend-overlay" />
         
-        {/* Main Board Container */}
         <div className="flex-1 flex flex-col items-center justify-center relative z-10">
           <div className="mb-6 flex items-center gap-4 animate-in slide-in-from-top-8">
              <div className={`pl-2 pr-6 py-2 rounded-full border shadow-lg text-white font-black uppercase tracking-widest text-sm bg-slate-900/60 backdrop-blur-md border-slate-700 flex items-center gap-3`}>
@@ -841,7 +885,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
           </div>
         </div>
 
-        {/* Tactical Sidebar */}
         <div className="w-[400px] flex flex-col gap-6 relative z-10">
           <div className="bg-slate-900/80 backdrop-blur-xl p-8 rounded-3xl border border-slate-700 shadow-2xl flex flex-col min-h-[40vh]">
             <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-800 shrink-0">
@@ -876,7 +919,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
             </div>
           </div>
           
-          {/* 🔥 LATEST DEFINITIONS DISPLAY */}
           {(latestDiscoveries.length > 0 || latestSentence) && (
             <div className="bg-indigo-900/20 backdrop-blur-xl p-6 rounded-3xl border border-indigo-500/30 shadow-[0_0_30px_rgba(99,102,241,0.15)] animate-in slide-in-from-right duration-500 flex flex-col gap-4">
               
@@ -886,7 +928,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                         <BookOpen size={14} fill="currentColor" /> Lexicon Databanks 
                     </h3>
                     <div className="space-y-3">
-                        {latestDiscoveries.map((disc, idx) => (
+                        {latestDiscoveries.map((disc: any, idx: number) => (
                             <div key={idx} className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 shadow-inner">
                                 <span className="font-black text-indigo-300 tracking-widest block mb-1">{disc.word}</span>
                                 <span className="text-xs text-slate-300 font-medium leading-relaxed block">{disc.def}</span>
@@ -983,7 +1025,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     );
   }
 
-  // 🔥 UPDATED BONUS SCREEN (Shows what they discovered!)
   if (isMyTurn && pendingSentence) {
     return (
         <div className="flex flex-col h-full w-full scifi-bg p-6 text-center animate-in zoom-in-95 relative overflow-y-auto">
@@ -997,7 +1038,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                 
                 <div className="bg-slate-900/80 border border-slate-700 rounded-2xl w-full p-4 mb-6 shadow-inner text-left">
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3 border-b border-slate-800 pb-2">Valid Database Entries Found</p>
-                    {currentTurnWords.map((disc, idx) => (
+                    {currentTurnWords.map((disc: any, idx: number) => (
                         <div key={idx} className="mb-3 last:mb-0">
                             <span className="font-black text-indigo-300 block text-sm">{disc.word}</span>
                             <span className="text-xs text-slate-300 font-medium">{disc.def}</span>
@@ -1109,9 +1150,20 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
              <p className={`text-[9px] font-black uppercase tracking-widest ${isMyTurn ? 'text-indigo-400 animate-pulse' : 'text-slate-500'}`}>
                 {isMyTurn ? (targetSquare === null ? 'Select orbital coordinate' : 'Tap Astro-Tile to deploy') : 'Sort your tiles'}
              </p>
-             <button onClick={shuffleRack} className="p-1.5 bg-slate-950 text-slate-400 hover:text-white rounded-lg active:scale-95 transition-colors border border-slate-800 shadow-sm">
-                 <Shuffle size={14} />
-             </button>
+             <div className="flex gap-2">
+                 {/* 🔥 MULLIGAN / DATA PURGE BUTTON */}
+                 <button 
+                     onClick={handlePurge} 
+                     disabled={!isMyTurn || isValidating || (scores[myTeamId] || 0) < 10}
+                     title="Purge Hand (-10 XP)"
+                     className="p-1.5 bg-rose-500/20 text-rose-400 hover:text-white hover:bg-rose-500/40 rounded-lg active:scale-95 transition-colors border border-rose-500/30 shadow-sm disabled:opacity-30 disabled:hover:bg-rose-500/20 disabled:hover:text-rose-400"
+                 >
+                     <RefreshCw size={14} />
+                 </button>
+                 <button onClick={shuffleRack} className="p-1.5 bg-slate-950 text-slate-400 hover:text-white rounded-lg active:scale-95 transition-colors border border-slate-800 shadow-sm">
+                     <Shuffle size={14} />
+                 </button>
+             </div>
          </div>
 
          <div className="flex gap-2 bg-black/60 p-2.5 rounded-xl w-full justify-center min-h-[4rem] border border-slate-800/80 shadow-inner">
