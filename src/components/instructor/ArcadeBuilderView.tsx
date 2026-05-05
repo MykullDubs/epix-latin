@@ -1,6 +1,6 @@
 // src/components/instructor/ArcadeBuilderView.tsx
 import React from 'react';
-import { Gamepad2, Plus, Settings, Users, Bot, Trophy, Database, Check } from 'lucide-react';
+import { Gamepad2, Plus, Settings, Users, Bot, Trophy, Database, Check, Rocket, Globe } from 'lucide-react';
 
 // ============================================================================
 //  ARCADE BUILDER (Game Template Configurator)
@@ -70,99 +70,120 @@ export default function ArcadeBuilderView({ data, setData, availableDecks = [] }
                         <p className="text-xs font-bold text-slate-500 leading-snug">A strategic 4x5 grid battle powered by rapid vocabulary recall.</p>
                     </button>
 
-                    <div className="p-6 rounded-[2rem] border-4 border-dashed border-slate-100 bg-slate-50/50 text-left opacity-70">
-                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4 bg-slate-200 text-slate-400">
-                            <Plus size={24} />
+                    <button 
+                        onClick={() => updateField('gameTemplate', 'astrogram')}
+                        className={`p-6 rounded-[2rem] border-4 text-left transition-all ${gameData.gameTemplate === 'astrogram' ? 'border-indigo-500 bg-indigo-50 shadow-lg' : 'border-slate-100 bg-white hover:border-indigo-200'}`}
+                    >
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 ${gameData.gameTemplate === 'astrogram' ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                            <Rocket size={24} />
                         </div>
-                        <h4 className="text-xl font-black text-slate-400 mb-1">Word Invaders</h4>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">In Development</p>
-                    </div>
+                        <h4 className="text-xl font-black text-slate-800 mb-1">Astrogram</h4>
+                        <p className="text-xs font-bold text-slate-500 leading-snug">A cosmic anagram arena with live global dictionary validation.</p>
+                    </button>
                 </div>
             </div>
 
-            {/* 3. RULESET CONFIGURATOR */}
-            <div className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm space-y-8">
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-50 pb-4">
-                    <Settings size={14} /> Ruleset & Mechanics
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-3">
-                        <label className="text-xs font-bold text-slate-800 block">Opponent Type</label>
-                        <div className="flex bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
-                            <button 
-                                onClick={() => updateField('mode', 'pvp')}
-                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${gameData.mode === 'pvp' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                            >
-                                <Users size={16}/> Pass & Play
-                            </button>
-                            <button 
-                                onClick={() => updateField('mode', 'pvc')}
-                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${gameData.mode === 'pvc' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                            >
-                                <Bot size={16}/> vs CPU
-                            </button>
+            {/* 🔥 CONDITIONAL CONFIGURATION LOGIC */}
+            
+            {/* IF CONNECT THREE IS SELECTED */}
+            {gameData.gameTemplate === 'connect-three' && (
+                <>
+                    {/* 3. RULESET CONFIGURATOR */}
+                    <div className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm space-y-8 animate-in fade-in zoom-in-95">
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-50 pb-4">
+                            <Settings size={14} /> Ruleset & Mechanics
+                        </h3>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-3">
+                                <label className="text-xs font-bold text-slate-800 block">Opponent Type</label>
+                                <div className="flex bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
+                                    <button 
+                                        onClick={() => updateField('mode', 'pvp')}
+                                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${gameData.mode === 'pvp' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                    >
+                                        <Users size={16}/> Pass & Play
+                                    </button>
+                                    <button 
+                                        onClick={() => updateField('mode', 'pvc')}
+                                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${gameData.mode === 'pvc' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                    >
+                                        <Bot size={16}/> vs CPU
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                                    Target Score to Win
+                                    <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg flex items-center gap-1">
+                                        <Trophy size={14}/> {gameData.targetScore}
+                                    </span>
+                                </label>
+                                <input 
+                                    type="range" 
+                                    min="1" max="10" 
+                                    value={gameData.targetScore} 
+                                    onChange={(e) => updateField('targetScore', parseInt(e.target.value))}
+                                    className="w-full accent-indigo-600"
+                                />
+                            </div>
                         </div>
                     </div>
 
-                    <div className="space-y-4">
-                        <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
-                            Target Score to Win
-                            <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg flex items-center gap-1">
-                                <Trophy size={14}/> {gameData.targetScore}
+                    {/* 4. DECK BINDING (The Ammo) */}
+                    <div className="space-y-4 animate-in fade-in zoom-in-95">
+                        <div className="flex justify-between items-end px-2">
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <Database size={14} /> Connect Vocabulary Decks
+                            </h3>
+                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2 py-1 rounded-md">
+                                {safeDeckIds.length} Linked
                             </span>
-                        </label>
-                        <input 
-                            type="range" 
-                            min="1" max="10" 
-                            value={gameData.targetScore} 
-                            onChange={(e) => updateField('targetScore', parseInt(e.target.value))}
-                            className="w-full accent-indigo-600"
-                        />
+                        </div>
+                        
+                        {safeDecks.length === 0 ? (
+                            <div className="bg-rose-50 border border-rose-100 p-6 rounded-3xl text-center">
+                                <p className="text-sm font-bold text-rose-600">Create some flashcards first!</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto custom-scrollbar p-1">
+                                {safeDecks.map((deck: any) => {
+                                    const isLinked = safeDeckIds.includes(deck.id);
+                                    return (
+                                        <button 
+                                            key={deck.id}
+                                            onClick={() => toggleDeck(deck.id)}
+                                            className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left ${isLinked ? 'border-indigo-500 bg-indigo-50 shadow-md' : 'border-slate-100 bg-white hover:border-indigo-200'}`}
+                                        >
+                                            <div>
+                                                <h4 className={`font-bold text-sm ${isLinked ? 'text-indigo-900' : 'text-slate-700'}`}>{deck.title}</h4>
+                                                <p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${isLinked ? 'text-indigo-400' : 'text-slate-400'}`}>
+                                                    {deck.cards?.length || 0} Terms
+                                                </p>
+                                            </div>
+                                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isLinked ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300'}`}>
+                                                {isLinked && <Check size={12} strokeWidth={4} />}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
-                </div>
-            </div>
+                </>
+            )}
 
-            {/* 4. DECK BINDING (The Ammo) */}
-            <div className="space-y-4">
-                <div className="flex justify-between items-end px-2">
-                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                        <Database size={14} /> Connect Vocabulary Decks
-                    </h3>
-                    <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2 py-1 rounded-md">
-                        {safeDeckIds.length} Linked
-                    </span>
+            {/* IF ASTROGRAM IS SELECTED */}
+            {gameData.gameTemplate === 'astrogram' && (
+                <div className="bg-indigo-50/50 p-8 rounded-[2.5rem] border-2 border-indigo-100/50 shadow-sm space-y-4 text-center animate-in fade-in zoom-in-95">
+                    <Globe className="w-12 h-12 text-indigo-400 mx-auto mb-4" />
+                    <h3 className="text-xl font-black text-indigo-900">No Decks Required</h3>
+                    <p className="text-sm font-bold text-indigo-700/70 max-w-md mx-auto leading-relaxed">
+                        Astrogram generates tiles universally and validates entries via live dictionary API. Turn timers and matchmaking are handled instantly inside the launch lobby.
+                    </p>
                 </div>
-                
-                {safeDecks.length === 0 ? (
-                    <div className="bg-rose-50 border border-rose-100 p-6 rounded-3xl text-center">
-                        <p className="text-sm font-bold text-rose-600">Create some flashcards first!</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto custom-scrollbar p-1">
-                        {safeDecks.map((deck: any) => {
-                            const isLinked = safeDeckIds.includes(deck.id);
-                            return (
-                                <button 
-                                    key={deck.id}
-                                    onClick={() => toggleDeck(deck.id)}
-                                    className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left ${isLinked ? 'border-indigo-500 bg-indigo-50 shadow-md' : 'border-slate-100 bg-white hover:border-indigo-200'}`}
-                                >
-                                    <div>
-                                        <h4 className={`font-bold text-sm ${isLinked ? 'text-indigo-900' : 'text-slate-700'}`}>{deck.title}</h4>
-                                        <p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${isLinked ? 'text-indigo-400' : 'text-slate-400'}`}>
-                                            {deck.cards?.length || 0} Terms
-                                        </p>
-                                    </div>
-                                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isLinked ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300'}`}>
-                                        {isLinked && <Check size={12} strokeWidth={4} />}
-                                    </div>
-                                </button>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
+            )}
         </div>
     );
 }
