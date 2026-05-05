@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool, User, MessageSquare, Shuffle, Loader2, AlertTriangle, Zap } from 'lucide-react';
+import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool, User, MessageSquare, Shuffle, Loader2, AlertTriangle, Rocket } from 'lucide-react';
 
 // ==========================================
 // GAME DATA & CONSTANTS
@@ -59,7 +59,7 @@ const createInitialBag = () => {
 };
 
 // ==========================================
-// MAGISTER OS DATA TILE COMPONENT
+// ASTROGRAM DATA TILE COMPONENT
 // ==========================================
 const DataTile = ({ tile, isSelected, isLocked, onClick, className = '' }: any) => {
   if (!tile) return null;
@@ -84,12 +84,13 @@ const DataTile = ({ tile, isSelected, isLocked, onClick, className = '' }: any) 
 };
 
 // ==========================================
-// MAIN MAGISTER OS COMPONENT
+// MAIN ASTROGRAM COMPONENT
 // ==========================================
 export default function MarbleScrabble({ block, isProjector, liveState, studentId, onUpdateLiveState }: any) {
   const timeLimit = liveState?.timeLimit || block?.timePerTurnSeconds || 60;
   const [selectedTime, setSelectedTime] = useState(60);
 
+  // SCIFI STYLES INJECTION
   useEffect(() => {
     if (!document.getElementById('marble-styles')) {
       const style = document.createElement('style');
@@ -107,8 +108,8 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         .scifi-bg { 
             background-color: #020617; 
             background-image: 
-                radial-gradient(circle at 50% 0%, rgba(79,70,229,0.15) 0%, transparent 70%), 
-                radial-gradient(circle at 100% 100%, rgba(16,185,129,0.1) 0%, transparent 50%); 
+                radial-gradient(circle at 50% 0%, rgba(99,102,241,0.15) 0%, transparent 70%), 
+                radial-gradient(circle at 100% 100%, rgba(217,70,239,0.1) 0%, transparent 50%); 
         }
         .board-grid { display: grid; grid-template-columns: repeat(${BOARD_SIZE}, minmax(0, 1fr)); gap: 3px; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -175,7 +176,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const [targetSquare, setTargetSquare] = useState<number | null>(null);
   const [lastPlacedIndex, setLastPlacedIndex] = useState<number | null>(null);
   const [playDirection, setPlayDirection] = useState<number | null>(null);
-  const [customTeamName, setCustomTeamName] = useState("");
   const [hasDrawnInitialHand, setHasDrawnInitialHand] = useState(false);
   const [selectedRackIndex, setSelectedRackIndex] = useState<number | null>(null);
   
@@ -207,7 +207,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         let recalled = false;
         newBoard.forEach((tile: any, index: number) => {
            if (tile && !tile.isLocked) {
-               const emptyIdx = newRack.findIndex(t => t === null);
+               const emptyIdx = newRack.findIndex((t: any) => t === null);
                if (emptyIdx !== -1) {
                    newRack[emptyIdx] = tile;
                    newBoard[index] = null;
@@ -418,7 +418,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     });
   };
 
-  // 🔥 TRUE SCRABBLE SCORING ENGINE & DICTIONARY VALIDATION
   const handleInitiateCommit = async () => {
     const placedIndices: number[] = [];
     localBoard.forEach((tile: any, idx: number) => {
@@ -430,9 +429,8 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     setIsValidating(true);
     setInvalidWords([]);
 
-    // 1. RULE: Single Row or Column check
-    const rows = Array.from(new Set(placedIndices.map(idx => Math.floor(idx / BOARD_SIZE))));
-    const cols = Array.from(new Set(placedIndices.map(idx => idx % BOARD_SIZE)));
+    const rows = Array.from(new Set(placedIndices.map((idx: number) => Math.floor(idx / BOARD_SIZE))));
+    const cols = Array.from(new Set(placedIndices.map((idx: number) => idx % BOARD_SIZE)));
     
     if (rows.length > 1 && cols.length > 1) {
         setInvalidWords(["Tiles must be placed in a single row or column."]);
@@ -442,7 +440,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
     const getTile = (r: number, c: number) => r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE ? localBoard[r * BOARD_SIZE + c] : null;
 
-    // 2. RULE: Contiguous sequence check
     let hasGap = false;
     if (rows.length === 1) {
         const r = rows[0];
@@ -466,10 +463,9 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         return;
     }
 
-    // 3. RULE: Connection to center or existing tiles
-    const isFirstTurn = !localBoard.some(t => t && t.isLocked);
+    const isFirstTurn = !localBoard.some((t: any) => t && t.isLocked);
     if (isFirstTurn) {
-        if (!placedIndices.includes(112)) { // 112 is r=7, c=7
+        if (!placedIndices.includes(112)) { 
             setInvalidWords(["The first word must cover the center star."]);
             setIsValidating(false);
             return;
@@ -481,7 +477,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         }
     } else {
         let touchesLocked = false;
-        placedIndices.forEach(idx => {
+        placedIndices.forEach((idx: number) => {
             const r = Math.floor(idx / BOARD_SIZE);
             const c = idx % BOARD_SIZE;
             if (getTile(r-1, c)?.isLocked || getTile(r+1, c)?.isLocked || getTile(r, c-1)?.isLocked || getTile(r, c+1)?.isLocked) {
@@ -495,12 +491,11 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         }
     }
 
-    // 4. Word Extraction & Scoring
     const scannedWords = new Set<string>();
     const foundWordsList: { word: string; score: number }[] = [];
     let totalCalculatedScore = 0;
 
-    placedIndices.forEach(idx => {
+    placedIndices.forEach((idx: number) => {
         const r = Math.floor(idx / BOARD_SIZE);
         const c = idx % BOARD_SIZE;
 
@@ -566,12 +561,10 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     const extractedWords = foundWordsList.map(w => w.word);
     const failedWords: string[] = [];
     
-    // 5. Dual-API Validation Protocol
     await Promise.all(extractedWords.map(async (word) => {
         try {
             const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
             if (!res.ok) {
-                // Primary Failed: Fallback to Datamuse API
                 const fallbackRes = await fetch(`https://api.datamuse.com/words?sp=${word}&max=1`);
                 const fallbackData = await fallbackRes.json();
                 if (!fallbackData || fallbackData.length === 0 || fallbackData[0].word.toLowerCase() !== word.toLowerCase()) {
@@ -580,7 +573,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
             }
         } catch (err) {
             console.error("Dictionary API failed:", err);
-            failedWords.push(word); // Reject on hard network failure
+            failedWords.push(word); 
         }
     }));
 
@@ -614,7 +607,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     if (withSentence && sentenceText.trim().length > 3) {
         bonus = 5;
         sentencePayload = {
-            playerName: myTeamEntry?.name || players[studentId]?.name || "Combatant",
+            playerName: myTeamEntry?.name || players[studentId]?.name || "Explorer",
             text: sentenceText.trim(),
             timestamp: Date.now(),
             bonusAmount: bonus
@@ -684,21 +677,21 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       return (
         <div className="w-full h-full flex flex-col items-center justify-center p-12 scifi-bg text-white relative overflow-hidden">
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10 pointer-events-none mix-blend-overlay" />
-          <h1 className="text-[10vh] font-black magister-font text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400 mb-4 drop-shadow-2xl">DATA MARBLES</h1>
+          <h1 className="text-[10vh] font-black magister-font text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400 mb-4 drop-shadow-2xl">ASTROGRAM</h1>
           
           <div className="flex items-center gap-4 text-4xl font-black mb-12 text-slate-300 relative z-10">
-             <Users size={48} className="text-emerald-400 animate-pulse" /> {joinedCount} {joinedCount === 1 ? 'Agent' : 'Agents'} Connected
+             <Users size={48} className="text-emerald-400 animate-pulse" /> {joinedCount} {joinedCount === 1 ? 'Explorer' : 'Explorers'} Connected
           </div>
 
           <div className="mb-12 flex flex-col items-center animate-in slide-in-from-bottom-4 relative z-10">
-             <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">Set Operation Timer</p>
+             <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">Set Turn Duration</p>
              <div className="flex gap-4">
                  {[
                      { label: '1 Min', val: 60 },
                      { label: '2 Min', val: 120 },
                      { label: '5 Min', val: 300 },
                      { label: '10 Min', val: 600 }
-                 ].map(t => (
+                 ].map((t: any) => (
                      <button 
                          key={t.val} 
                          onClick={() => setSelectedTime(t.val)}
@@ -719,7 +712,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
              onClick={initializeFFA}
              className="relative z-10 px-12 py-6 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-3xl font-black text-3xl shadow-[0_0_40px_rgba(79,70,229,0.4)] transition-all border border-indigo-400 active:scale-95 flex items-center gap-4 group"
           >
-             Initialize Grid <Zap className="group-hover:animate-pulse" size={32} />
+             Launch Astrogram <Rocket className="group-hover:animate-pulse" size={32} />
           </button>
         </div>
       );
@@ -731,11 +724,11 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10 pointer-events-none mix-blend-overlay" />
                 <div className="flex justify-between items-center mb-12 relative z-10">
                     <div>
-                        <h1 className="text-[6vh] font-black magister-font text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-rose-400 drop-shadow-lg">Awaiting Protocols</h1>
-                        <p className="text-xl font-bold text-slate-400 uppercase tracking-widest mt-2">Agents: Configure your combat alias on your devices</p>
+                        <h1 className="text-[6vh] font-black magister-font text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-rose-400 drop-shadow-lg">Awaiting Launch</h1>
+                        <p className="text-xl font-bold text-slate-400 uppercase tracking-widest mt-2">Explorers: Configure your cosmic alias on your devices</p>
                     </div>
                     <button onClick={startGame} className="px-12 py-6 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/50 backdrop-blur-md rounded-full font-black text-2xl uppercase tracking-widest shadow-[0_0_30px_rgba(16,185,129,0.2)] transition-transform active:scale-95 flex items-center gap-3">
-                        <CheckCircle2 size={24}/> Begin Deployment
+                        <CheckCircle2 size={24}/> Launch Expedition
                     </button>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-8 overflow-y-auto custom-scrollbar pb-8 relative z-10">
@@ -746,7 +739,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                                 <User size={32} className={t.textColor} />
                             </div>
                             <h2 className="text-3xl font-black uppercase tracking-tight leading-tight text-white">{t.name}</h2>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-2">Authenticated</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-2">Ready</p>
                         </div>
                     ))}
                 </div>
@@ -793,8 +786,8 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         <div className="w-[400px] flex flex-col gap-6 relative z-10">
           <div className="bg-slate-900/80 backdrop-blur-xl p-8 rounded-3xl border border-slate-700 shadow-2xl flex flex-col">
             <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-800 shrink-0">
-              <h2 className="text-2xl font-black magister-font flex items-center gap-3 text-slate-100"><Trophy className="text-indigo-400"/> LEADERBOARD</h2>
-              <span className="text-slate-500 font-mono text-xs font-bold bg-slate-950 px-3 py-1 rounded-full border border-slate-800">{globalBag?.length || 0} DATA FRAGMENTS</span>
+              <h2 className="text-2xl font-black magister-font flex items-center gap-3 text-slate-100"><Trophy className="text-indigo-400"/> RANKINGS</h2>
+              <span className="text-slate-500 font-mono text-xs font-bold bg-slate-950 px-3 py-1 rounded-full border border-slate-800">{globalBag?.length || 0} ASTRO-TILES</span>
             </div>
             
             <div className="space-y-4 max-h-[40vh] overflow-y-auto custom-scrollbar pr-2">
@@ -824,7 +817,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
           {latestSentence && (
             <div className="bg-indigo-900/20 backdrop-blur-xl p-6 rounded-3xl border border-indigo-500/30 shadow-[0_0_30px_rgba(99,102,241,0.15)] animate-in slide-in-from-right duration-500">
               <h3 className="text-indigo-400 font-black text-[10px] uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <Star size={14} fill="currentColor" /> Intelligence Acquired (+{latestSentence.bonusAmount} XP)
+                  <Star size={14} fill="currentColor" /> Cosmic Discovery (+{latestSentence.bonusAmount} XP)
               </h3>
               <p className="text-slate-100 text-lg font-medium italic mb-4 leading-relaxed">
                   "{latestSentence.text}"
@@ -836,7 +829,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
           )}
 
           <button onClick={passTurn} className="mt-auto py-4 bg-slate-900/50 hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 rounded-2xl font-black uppercase tracking-widest flex justify-center items-center gap-2 transition-colors border border-slate-800 hover:border-rose-500/30">
-            <FastForward size={16}/> Force Override Turn
+            <FastForward size={16}/> Skip Turn
           </button>
         </div>
       </div>
@@ -850,21 +843,21 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     const hasJoined = players[studentId];
     return (
       <div className="flex flex-col h-full w-full scifi-bg p-6 justify-center items-center text-center relative">
-        <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400 magister-font mb-8">DATA MARBLES</h2>
+        <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400 magister-font mb-8">ASTROGRAM</h2>
         {hasJoined ? (
             <div className="animate-in zoom-in duration-500 flex flex-col items-center">
                 <div className="w-24 h-24 bg-emerald-500/10 text-emerald-400 rounded-2xl flex items-center justify-center mb-6 border border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
                     <CheckCircle2 size={48} />
                 </div>
-                <p className="text-xl font-black text-slate-200 uppercase tracking-widest mb-4">Signal Secured</p>
-                <p className="text-indigo-400/50 text-sm font-bold uppercase tracking-widest animate-pulse">Awaiting Server Init...</p>
+                <p className="text-xl font-black text-slate-200 uppercase tracking-widest mb-4">Connection Established</p>
+                <p className="text-indigo-400/50 text-sm font-bold uppercase tracking-widest animate-pulse">Awaiting Launch Sequence...</p>
             </div>
         ) : (
             <button 
               onClick={joinLobby}
               className="p-8 bg-indigo-600/20 hover:bg-indigo-600/40 backdrop-blur-md rounded-[2rem] font-black text-xl uppercase tracking-widest shadow-[0_0_40px_rgba(79,70,229,0.3)] transition-all active:scale-95 text-indigo-100 border border-indigo-500/50"
             >
-              Establish Uplink
+              Join the Stars
             </button>
         )}
       </div>
@@ -879,7 +872,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                 <div className="w-20 h-20 bg-slate-950 rounded-full flex items-center justify-center mb-6 border border-slate-800 shadow-inner">
                     <User size={32} className={myTeamEntry.textColor} />
                 </div>
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Authenticated Alias</h3>
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Explorer Alias</h3>
                 <h2 className={`text-3xl font-black uppercase tracking-tight ${myTeamEntry.textColor}`}>{myTeamEntry.name}</h2>
             </div>
             <div className="bg-slate-900/80 backdrop-blur-md p-8 rounded-[2rem] border border-slate-800 shadow-xl">
@@ -891,13 +884,13 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                         defaultValue={myTeamEntry.name}
                         onBlur={(e) => submitTeamName(e.target.value)} 
                         maxLength={15}
-                        placeholder="Agent Alias" 
+                        placeholder="Your Name" 
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-5 py-4 text-white text-lg font-mono font-bold outline-none focus:border-indigo-500 transition-colors text-center shadow-inner"
                     />
                     <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Auto-syncs on blur</p>
                 </div>
             </div>
-            <p className="mt-auto text-indigo-400/50 font-bold uppercase tracking-widest text-xs animate-pulse">Awaiting deployment...</p>
+            <p className="mt-auto text-indigo-400/50 font-bold uppercase tracking-widest text-xs animate-pulse">Awaiting launch...</p>
         </div>
     );
   }
@@ -911,8 +904,8 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                     <Star size={72} className="text-indigo-400 mb-6 relative z-10" fill="currentColor" />
                 </div>
                 
-                <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tight magister-font">INTELLIGENCE BONUS</h2>
-                <p className="text-slate-400 font-medium mb-8 text-sm px-4">Provide context for the deployed data sequence to earn +5 XP.</p>
+                <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tight magister-font">COSMIC DISCOVERY</h2>
+                <p className="text-slate-400 font-medium mb-8 text-sm px-4">Write a sentence using your newly formed word to earn +5 Star Power (XP).</p>
                 
                 <textarea 
                     value={sentenceText}
@@ -927,7 +920,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                         disabled={sentenceText.trim().length < 5}
                         className="w-full py-4 bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/50 disabled:bg-slate-900 disabled:border-slate-800 disabled:text-slate-600 text-indigo-100 font-black uppercase tracking-widest rounded-xl transition-all shadow-lg disabled:shadow-none flex items-center justify-center gap-2"
                     >
-                        <MessageSquare size={16} /> Submit Intelligence
+                        <MessageSquare size={16} /> Submit Discovery
                     </button>
                     <button 
                         onClick={() => commitTurn(false)}
@@ -972,7 +965,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                 {/* 🔥 ORBITAL RETICLE (Only for Active Player) */}
                 {isTargeted && !tile && isMyTurn && (
                     <div className="absolute top-1/2 left-1/2 w-0 h-0 z-[100]">
-                        {rack.map((rackTile, rackIdx) => {
+                        {rack.map((rackTile: any, rackIdx: number) => {
                             if (!rackTile) return null;
                             const angle = (rackIdx / 7) * Math.PI * 2 - (Math.PI / 2);
                             const radius = 90; 
@@ -999,7 +992,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         </div>
       </div>
 
-      {/* THE HUD UPLINK RACK */}
       <div className="relative z-10 mt-3 bg-slate-900/80 backdrop-blur-xl rounded-2xl p-3 border border-slate-700 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] w-full ring-1 ring-white/5">
          
          {invalidWords.length > 0 && (
@@ -1010,7 +1002,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
          <div className="flex justify-between items-end mb-3 px-2">
              <p className={`text-[9px] font-black uppercase tracking-widest ${isMyTurn ? 'text-indigo-400 animate-pulse' : 'text-slate-500'}`}>
-                {isMyTurn ? (targetSquare === null ? 'Select deployment coordinate' : 'Tap data fragment to deploy') : 'Sort your fragments'}
+                {isMyTurn ? (targetSquare === null ? 'Select orbital coordinate' : 'Tap Astro-Tile to deploy') : 'Sort your tiles'}
              </p>
              <button onClick={shuffleRack} className="p-1.5 bg-slate-950 text-slate-400 hover:text-white rounded-lg active:scale-95 transition-colors border border-slate-800 shadow-sm">
                  <Shuffle size={14} />
@@ -1041,7 +1033,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
          {isMyTurn ? (
              <button onClick={handleInitiateCommit} disabled={isValidating} className="flex-1 py-3.5 bg-indigo-600/20 text-indigo-300 hover:text-white rounded-xl font-black uppercase tracking-widest text-xs flex justify-center items-center gap-2 shadow-lg active:scale-95 border border-indigo-500/50 transition-colors hover:bg-indigo-600/40 disabled:opacity-50">
                  {isValidating ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16}/>} 
-                 {isValidating ? 'Validating...' : 'Commit Run'}
+                 {isValidating ? 'Validating...' : 'Play Word'}
              </button>
          ) : (
              <div className="flex-1 py-3.5 bg-slate-950/80 text-slate-600 rounded-xl font-black uppercase tracking-widest text-xs flex justify-center items-center gap-2 border border-slate-800/50">
