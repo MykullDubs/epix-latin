@@ -37,7 +37,6 @@ const getSquareType = (r: number, c: number) => {
   const dlPoints = [[0,3], [0,11], [2,6], [2,8], [3,0], [3,7], [3,14], [6,2], [6,6], [6,8], [6,12], [7,3], [7,11], [8,2], [8,6], [8,8], [8,12], [11,0], [11,7], [11,14], [12,6], [12,8], [14,3], [14,11]];
   if (dlPoints.some(([tr, tc]) => tr === r && tc === c)) return 'DL';
   
-  // 🔥 NEW: Double Play (DP) Extra Turn Squares
   const dpPoints = [[1,7], [7,1], [7,13], [13,7]];
   if (dpPoints.some(([tr, tc]) => tr === r && tc === c)) return 'DP';
   
@@ -91,7 +90,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const timeLimit = liveState?.timeLimit || block?.timePerTurnSeconds || 60;
   const [selectedTime, setSelectedTime] = useState(60);
 
-  // SCIFI STYLES INJECTION
   useEffect(() => {
     if (!document.getElementById('marble-styles')) {
       const style = document.createElement('style');
@@ -416,17 +414,15 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     onUpdateLiveState({
       activeTeamIndex: (activeTeamIndex + 1) % teamArray.length,
       turnEndTime: Date.now() + timeLimit * 1000,
-      isExtraTurn: false // Reset DP flag
+      isExtraTurn: false 
     });
   };
 
+  // 🔥 TRUE SCRABBLE SCORING ENGINE & DICTIONARY VALIDATION
   const handleInitiateCommit = async () => {
     const placedIndices: number[] = [];
-
     localBoard.forEach((tile: any, idx: number) => {
-      if (tile && !tile.isLocked) {
-        placedIndices.push(idx);
-      }
+      if (tile && !tile.isLocked) placedIndices.push(idx);
     });
 
     if (placedIndices.length === 0) return; 
@@ -434,17 +430,80 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     setIsValidating(true);
     setInvalidWords([]);
 
+    // 1. RULE: Single Row or Column check
+    const rows = Array.from(new Set(placedIndices.map(idx => Math.floor(idx / BOARD_SIZE))));
+    const cols = Array.from(new Set(placedIndices.map(idx => idx % BOARD_SIZE)));
+    
+    if (rows.length > 1 && cols.length > 1) {
+        setInvalidWords(["Tiles must be placed in a single row or column."]);
+        setIsValidating(false);
+        return;
+    }
+
+    const getTile = (r: number, c: number) => r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE ? localBoard[r * BOARD_SIZE + c] : null;
+
+    // 2. RULE: Contiguous sequence check
+    let hasGap = false;
+    if (rows.length === 1) {
+        const r = rows[0];
+        const minC = Math.min(...cols);
+        const maxC = Math.max(...cols);
+        for (let c = minC; c <= maxC; c++) {
+            if (!getTile(r, c)) hasGap = true;
+        }
+    } else if (cols.length === 1) {
+        const c = cols[0];
+        const minR = Math.min(...rows);
+        const maxR = Math.max(...rows);
+        for (let r = minR; r <= maxR; r++) {
+            if (!getTile(r, c)) hasGap = true;
+        }
+    }
+
+    if (hasGap) {
+        setInvalidWords(["Tiles must form a contiguous word without gaps."]);
+        setIsValidating(false);
+        return;
+    }
+
+    // 3. RULE: Connection to center or existing tiles
+    const isFirstTurn = !localBoard.some(t => t && t.isLocked);
+    if (isFirstTurn) {
+        if (!placedIndices.includes(112)) { // 112 is r=7, c=7
+            setInvalidWords(["The first word must cover the center star."]);
+            setIsValidating(false);
+            return;
+        }
+        if (placedIndices.length < 2) {
+            setInvalidWords(["The first word must be at least 2 letters long."]);
+            setIsValidating(false);
+            return;
+        }
+    } else {
+        let touchesLocked = false;
+        placedIndices.forEach(idx => {
+            const r = Math.floor(idx / BOARD_SIZE);
+            const c = idx % BOARD_SIZE;
+            if (getTile(r-1, c)?.isLocked || getTile(r+1, c)?.isLocked || getTile(r, c-1)?.isLocked || getTile(r, c+1)?.isLocked) {
+                touchesLocked = true;
+            }
+        });
+        if (!touchesLocked) {
+            setInvalidWords(["New tiles must connect to an existing word."]);
+            setIsValidating(false);
+            return;
+        }
+    }
+
+    // 4. Word Extraction & Scoring
     const scannedWords = new Set<string>();
     const foundWordsList: { word: string; score: number }[] = [];
     let totalCalculatedScore = 0;
-
-    const getTile = (r: number, c: number) => r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE ? localBoard[r * BOARD_SIZE + c] : null;
 
     placedIndices.forEach(idx => {
         const r = Math.floor(idx / BOARD_SIZE);
         const c = idx % BOARD_SIZE;
 
-        // Horizontals
         let left = c, right = c;
         while (left > 0 && getTile(r, left - 1)) left--;
         while (right < BOARD_SIZE - 1 && getTile(r, right + 1)) right++;
@@ -474,7 +533,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
             }
         }
 
-        // Verticals
         let top = r, bottom = r;
         while (top > 0 && getTile(top - 1, c)) top--;
         while (bottom < BOARD_SIZE - 1 && getTile(bottom + 1, c)) bottom++;
@@ -505,41 +563,24 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         }
     });
 
-    let extractedWords = foundWordsList.map(w => w.word);
-
-    // Fallback: If they placed isolated tiles that don't touch anything
-    if (extractedWords.length === 0 && placedIndices.length > 0) {
-        let fallbackScore = 0;
-        let wordStr = '';
-        let wordMult = 1;
-        placedIndices.forEach(idx => {
-            const r = Math.floor(idx / BOARD_SIZE);
-            const c = idx % BOARD_SIZE;
-            const t = localBoard[idx];
-            let lVal = t.value;
-            const sq = getSquareType(r, c);
-            if (sq === 'DL') lVal *= 2;
-            if (sq === 'TL') lVal *= 3;
-            if (sq === 'DW' || sq === 'CT') wordMult *= 2;
-            if (sq === 'TW') wordMult *= 3;
-
-            fallbackScore += lVal;
-            wordStr += t.letter;
-        });
-        extractedWords = [wordStr];
-        totalCalculatedScore = fallbackScore * wordMult;
-    }
-
+    const extractedWords = foundWordsList.map(w => w.word);
     const failedWords: string[] = [];
+    
+    // 5. Dual-API Validation Protocol
     await Promise.all(extractedWords.map(async (word) => {
-        if (word.length < 2) return; 
         try {
             const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
             if (!res.ok) {
-                failedWords.push(word);
+                // Primary Failed: Fallback to Datamuse API
+                const fallbackRes = await fetch(`https://api.datamuse.com/words?sp=${word}&max=1`);
+                const fallbackData = await fallbackRes.json();
+                if (!fallbackData || fallbackData.length === 0 || fallbackData[0].word.toLowerCase() !== word.toLowerCase()) {
+                    failedWords.push(word);
+                }
             }
         } catch (err) {
             console.error("Dictionary API failed:", err);
+            failedWords.push(word); // Reject on hard network failure
         }
     }));
 
@@ -560,7 +601,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     let sentencePayload = null;
     let triggeredDP = false;
 
-    // 🔥 Check for Double Play activation
     localBoard.forEach((tile: any, idx: number) => {
       if (tile && !tile.isLocked) {
          const r = Math.floor(idx / BOARD_SIZE);
@@ -600,10 +640,9 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       scores: updatedScores,
       teamWords: updatedTeamWords, 
       bag: newBag, 
-      // 🔥 If DP is triggered, keep the activeTeamIndex the same. Otherwise pass to next player.
       activeTeamIndex: triggeredDP ? activeTeamIndex : (teamArray.length > 1 ? (activeTeamIndex + 1) % teamArray.length : 0),
       turnEndTime: Date.now() + timeLimit * 1000,
-      isExtraTurn: triggeredDP // Announce to the UI
+      isExtraTurn: triggeredDP 
     };
 
     if (sentencePayload) {
@@ -962,6 +1001,13 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
       {/* THE HUD UPLINK RACK */}
       <div className="relative z-10 mt-3 bg-slate-900/80 backdrop-blur-xl rounded-2xl p-3 border border-slate-700 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] w-full ring-1 ring-white/5">
+         
+         {invalidWords.length > 0 && (
+             <div className="bg-rose-500/90 text-white px-3 py-2 rounded-lg mb-2 flex items-center gap-2 text-xs font-bold shadow-sm animate-in slide-in-from-bottom-2">
+                 <AlertTriangle size={14} /> Sequence Invalid: {invalidWords.join(', ')}
+             </div>
+         )}
+
          <div className="flex justify-between items-end mb-3 px-2">
              <p className={`text-[9px] font-black uppercase tracking-widest ${isMyTurn ? 'text-indigo-400 animate-pulse' : 'text-slate-500'}`}>
                 {isMyTurn ? (targetSquare === null ? 'Select deployment coordinate' : 'Tap data fragment to deploy') : 'Sort your fragments'}
