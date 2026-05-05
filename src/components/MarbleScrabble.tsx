@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool, User, MessageSquare, Shuffle, Loader2, AlertTriangle } from 'lucide-react';
+import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool, User, MessageSquare, Shuffle, Loader2, AlertTriangle, Zap } from 'lucide-react';
 
 // ==========================================
 // GAME DATA & CONSTANTS
@@ -54,48 +54,60 @@ const createInitialBag = () => {
   return bag;
 };
 
-const MarbleTile = ({ tile, isSelected, isLocked, onClick, className = '' }: any) => {
+// ==========================================
+// MAGISTER OS DATA TILE COMPONENT
+// ==========================================
+const DataTile = ({ tile, isSelected, isLocked, onClick, className = '' }: any) => {
   if (!tile) return null;
   return (
     <div
       onClick={!isLocked ? onClick : undefined}
-      className={`relative flex items-center justify-center rounded-md transition-all duration-200 marble-tile select-none ${
-        isSelected ? 'ring-4 ring-amber-400 ring-offset-2 scale-110 z-10 shadow-xl cursor-pointer' 
-        : isLocked ? 'shadow-sm brightness-[0.85] cursor-default' 
-        : 'hover:scale-105 shadow-md cursor-pointer group'
+      className={`relative flex items-center justify-center rounded-lg transition-all duration-300 data-tile select-none overflow-hidden ${
+        isSelected ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-slate-900 scale-110 z-10 shadow-[0_0_20px_rgba(99,102,241,0.5)] cursor-pointer' 
+        : isLocked ? 'opacity-90 cursor-default' 
+        : 'hover:scale-105 hover:shadow-[0_0_15px_rgba(255,255,255,0.2)] cursor-pointer group'
       } ${className}`}
     >
-      <span className="playfair-font font-bold letterpress tracking-tighter text-xl">
+      <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none mix-blend-overlay" />
+      <span className="magister-font font-bold data-text text-xl relative z-10">
         {tile.letter}
       </span>
-      <span className="absolute bottom-0.5 right-1 text-[10px] playfair-font font-bold text-slate-700 opacity-80">
+      <span className="absolute bottom-1 right-1.5 text-[9px] font-mono font-bold text-indigo-300 opacity-80 relative z-10">
         {tile.value}
       </span>
-      <div className="absolute inset-0 rounded-md bg-gradient-to-tr from-white/0 via-white/20 to-white/60 pointer-events-none mix-blend-overlay"></div>
     </div>
   );
 };
 
+// ==========================================
+// MAIN MAGISTER OS COMPONENT
+// ==========================================
 export default function MarbleScrabble({ block, isProjector, liveState, studentId, onUpdateLiveState }: any) {
   const timeLimit = liveState?.timeLimit || block?.timePerTurnSeconds || 60;
   const [selectedTime, setSelectedTime] = useState(60);
 
+  // SCIFI STYLES INJECTION
   useEffect(() => {
     if (!document.getElementById('marble-styles')) {
       const style = document.createElement('style');
       style.id = 'marble-styles';
       style.innerHTML = `
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap');
-        .playfair-font { font-family: 'Playfair Display', serif; }
-        .marble-tile {
-          background-color: #fcfbf9;
-          background-image: linear-gradient(45deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0) 30%, rgba(0,0,0,0.02) 50%, rgba(255,255,255,0) 70%, rgba(255,255,255,0.6) 100%), radial-gradient(circle at 80% 20%, rgba(0,0,0,0.02) 0%, transparent 20%), radial-gradient(circle at 20% 80%, rgba(0,0,0,0.03) 0%, transparent 30%);
-          box-shadow: inset 1px 1px 2px rgba(255,255,255,0.9), inset -1px -1px 3px rgba(0,0,0,0.15), 2px 3px 5px rgba(0,0,0,0.3);
-          border: 1px solid #e2ddce;
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syncopate:wght@700&display=swap');
+        .magister-font { font-family: 'Syncopate', sans-serif; letter-spacing: -1px; }
+        .data-tile {
+          background-color: rgba(15, 23, 42, 0.8);
+          backdrop-filter: blur(8px);
+          box-shadow: inset 0 1px 1px rgba(255,255,255,0.2), inset 0 -1px 4px rgba(0,0,0,0.5), 0 4px 6px rgba(0,0,0,0.4);
+          border: 1px solid rgba(99, 102, 241, 0.3);
         }
-        .letterpress { color: #1a202c; text-shadow: -1px -1px 1px rgba(0,0,0,0.4), 1px 1px 1px rgba(255,255,255,0.8); }
-        .wood-bg { background-color: #1e293b; background-image: radial-gradient(circle at center, #334155 0%, #0f172a 100%); }
-        .board-grid { display: grid; grid-template-columns: repeat(${BOARD_SIZE}, minmax(0, 1fr)); gap: 2px; }
+        .data-text { color: #f8fafc; text-shadow: 0 0 10px rgba(255,255,255,0.6); }
+        .scifi-bg { 
+            background-color: #020617; 
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(79,70,229,0.15) 0%, transparent 70%), 
+                radial-gradient(circle at 100% 100%, rgba(16,185,129,0.1) 0%, transparent 50%); 
+        }
+        .board-grid { display: grid; grid-template-columns: repeat(${BOARD_SIZE}, minmax(0, 1fr)); gap: 3px; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `;
@@ -523,21 +535,39 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   };
 
   // ==========================================
+  // HELPER: GET SQUARE SCIFI CLASSES
+  // ==========================================
+  const getSquareClasses = (r: number, c: number, tile: any, isTargeted: boolean) => {
+      const type = getSquareType(r, c);
+      let base = "bg-slate-800/40 border-slate-700/50"; 
+      
+      if (type === 'TW') base = "bg-rose-500/20 border-rose-500/40 shadow-[inset_0_0_15px_rgba(244,63,94,0.3)]";
+      else if (type === 'DW') base = "bg-amber-500/20 border-amber-500/40 shadow-[inset_0_0_15px_rgba(245,158,11,0.3)]";
+      else if (type === 'TL') base = "bg-cyan-500/20 border-cyan-500/40 shadow-[inset_0_0_15px_rgba(6,182,212,0.3)]";
+      else if (type === 'DL') base = "bg-emerald-500/20 border-emerald-500/40 shadow-[inset_0_0_15px_rgba(16,185,129,0.3)]";
+      else if (type === 'CT') base = "bg-indigo-500/20 border-indigo-500/40 shadow-[inset_0_0_15px_rgba(99,102,241,0.3)]";
+
+      if (isTargeted) return `${base} ring-2 ring-inset ring-amber-400 z-20 bg-amber-500/20 shadow-[inset_0_0_20px_rgba(245,158,11,0.4)]`;
+      return base;
+  };
+
+  // ==========================================
   // RENDER: PROJECTOR VIEW
   // ==========================================
   if (isProjector) {
     if (gameStatus === 'lobby_join') {
       const joinedCount = Object.keys(players).length;
       return (
-        <div className="w-full h-full flex flex-col items-center justify-center p-12 wood-bg text-white">
-          <h1 className="text-[10vh] font-bold playfair-font text-amber-400 mb-4 drop-shadow-2xl">Littera Marmoris</h1>
+        <div className="w-full h-full flex flex-col items-center justify-center p-12 scifi-bg text-white relative overflow-hidden">
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10 pointer-events-none mix-blend-overlay" />
+          <h1 className="text-[10vh] font-black magister-font text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400 mb-4 drop-shadow-2xl">DATA MARBLES</h1>
           
-          <div className="flex items-center gap-4 text-4xl font-black mb-12 text-slate-300">
-             <Users size={48} className="text-emerald-400 animate-pulse" /> {joinedCount} {joinedCount === 1 ? 'Player' : 'Players'} in Lobby
+          <div className="flex items-center gap-4 text-4xl font-black mb-12 text-slate-300 relative z-10">
+             <Users size={48} className="text-emerald-400 animate-pulse" /> {joinedCount} {joinedCount === 1 ? 'Agent' : 'Agents'} Connected
           </div>
 
-          <div className="mb-12 flex flex-col items-center animate-in slide-in-from-bottom-4">
-             <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">Select Turn Duration</p>
+          <div className="mb-12 flex flex-col items-center animate-in slide-in-from-bottom-4 relative z-10">
+             <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">Set Operation Timer</p>
              <div className="flex gap-4">
                  {[
                      { label: '1 Min', val: 60 },
@@ -548,10 +578,10 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                      <button 
                          key={t.val} 
                          onClick={() => setSelectedTime(t.val)}
-                         className={`px-8 py-3 rounded-2xl font-black text-lg transition-all border-2 ${
+                         className={`px-8 py-3 rounded-2xl font-black text-lg transition-all border border-slate-700/50 backdrop-blur-md ${
                              selectedTime === t.val 
-                             ? 'bg-amber-500 border-amber-400 text-amber-950 shadow-[0_0_20px_rgba(245,158,11,0.4)] scale-105' 
-                             : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-amber-500/50 hover:text-amber-200'
+                             ? 'bg-indigo-500/20 text-indigo-300 shadow-[inset_0_0_20px_rgba(99,102,241,0.5)] ring-2 ring-indigo-400 scale-105' 
+                             : 'bg-slate-900/50 text-slate-500 hover:text-indigo-300'
                          }`}
                      >
                          {t.label}
@@ -563,9 +593,9 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
           <button 
              disabled={joinedCount < 1}
              onClick={initializeFFA}
-             className="px-12 py-6 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-[2.5rem] font-black text-3xl shadow-[0_20px_50px_rgba(79,70,229,0.4)] transition-all border-4 border-indigo-400 active:scale-95 flex items-center gap-4"
+             className="relative z-10 px-12 py-6 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-3xl font-black text-3xl shadow-[0_0_40px_rgba(79,70,229,0.4)] transition-all border border-indigo-400 active:scale-95 flex items-center gap-4 group"
           >
-             Initialize Duel <FastForward size={32} />
+             Initialize Grid <Zap className="group-hover:animate-pulse" size={32} />
           </button>
         </div>
       );
@@ -573,24 +603,26 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
     if (gameStatus === 'lobby_naming') {
         return (
-            <div className="w-full h-full flex flex-col p-12 wood-bg text-white overflow-hidden">
-                <div className="flex justify-between items-center mb-12">
+            <div className="w-full h-full flex flex-col p-12 scifi-bg text-white overflow-hidden relative">
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10 pointer-events-none mix-blend-overlay" />
+                <div className="flex justify-between items-center mb-12 relative z-10">
                     <div>
-                        <h1 className="text-[6vh] font-bold playfair-font text-amber-400 drop-shadow-lg">Establish Your Legend</h1>
-                        <p className="text-xl font-bold text-slate-400 uppercase tracking-widest">Players: Name your profile or keep your alias</p>
+                        <h1 className="text-[6vh] font-black magister-font text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-rose-400 drop-shadow-lg">Awaiting Protocols</h1>
+                        <p className="text-xl font-bold text-slate-400 uppercase tracking-widest mt-2">Agents: Configure your combat alias on your devices</p>
                     </div>
-                    <button onClick={startGame} className="px-12 py-6 bg-emerald-500 hover:bg-emerald-400 text-white rounded-full font-black text-2xl uppercase tracking-widest shadow-[0_0_30px_rgba(16,185,129,0.5)] transition-transform active:scale-95 flex items-center gap-3">
-                        <CheckCircle2 size={24}/> Begin Duel
+                    <button onClick={startGame} className="px-12 py-6 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/50 backdrop-blur-md rounded-full font-black text-2xl uppercase tracking-widest shadow-[0_0_30px_rgba(16,185,129,0.2)] transition-transform active:scale-95 flex items-center gap-3">
+                        <CheckCircle2 size={24}/> Begin Deployment
                     </button>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-8 overflow-y-auto custom-scrollbar pb-8">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-8 overflow-y-auto custom-scrollbar pb-8 relative z-10">
                     {teamArray.map((t: any) => (
-                        <div key={t.id} className={`${t.color} p-8 rounded-[2.5rem] shadow-xl border-4 border-white/20 animate-in zoom-in-95 duration-500 flex flex-col items-center justify-center text-center`}>
-                            <div className="w-20 h-20 bg-black/20 rounded-full flex items-center justify-center mb-4">
-                                <User size={40} className="text-white" />
+                        <div key={t.id} className={`p-8 rounded-3xl shadow-xl border border-slate-700/50 bg-slate-900/40 backdrop-blur-md animate-in zoom-in-95 duration-500 flex flex-col items-center justify-center text-center relative overflow-hidden`}>
+                            <div className={`absolute top-0 left-0 w-full h-1 ${t.color}`} />
+                            <div className="w-20 h-20 bg-slate-950 rounded-full flex items-center justify-center mb-4 border border-slate-800 shadow-inner">
+                                <User size={32} className={t.textColor} />
                             </div>
-                            <h2 className="text-3xl font-black uppercase tracking-tight leading-tight">{t.name}</h2>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-white/50 mt-2">Active Combatant</p>
+                            <h2 className="text-3xl font-black uppercase tracking-tight leading-tight text-white">{t.name}</h2>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-2">Authenticated</p>
                         </div>
                     ))}
                 </div>
@@ -599,56 +631,60 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     }
 
     return (
-      <div className="w-full h-full flex p-12 wood-bg text-white gap-12 overflow-hidden">
-        <div className="flex-1 flex flex-col items-center justify-center">
-          <div className="mb-8 flex items-center gap-4 animate-in slide-in-from-top-8">
-             <div className={`px-6 py-2 rounded-full border-2 shadow-lg text-white font-black uppercase tracking-widest text-sm ${activeTeam?.color || 'bg-slate-700'} border-white/20`}>
-                {activeTeam?.name || 'Waiting'}'s Turn
+      <div className="w-full h-full flex p-8 scifi-bg text-white gap-8 overflow-hidden relative">
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-5 pointer-events-none mix-blend-overlay" />
+        
+        {/* Main Board Container */}
+        <div className="flex-1 flex flex-col items-center justify-center relative z-10">
+          <div className="mb-6 flex items-center gap-4 animate-in slide-in-from-top-8">
+             <div className={`px-6 py-2 rounded-full border shadow-lg text-white font-black uppercase tracking-widest text-sm bg-slate-900/60 backdrop-blur-md border-slate-700`}>
+                <span className={activeTeam?.textColor}>{activeTeam?.name || 'Waiting'}</span>'s Turn
              </div>
-             <div className="bg-slate-900/80 backdrop-blur-md px-5 py-2 rounded-full border border-slate-700 shadow-xl flex items-center gap-3">
+             <div className="bg-slate-900/80 backdrop-blur-md px-5 py-2 rounded-full border border-slate-700 shadow-[0_0_20px_rgba(0,0,0,0.5)] flex items-center gap-3">
                 <Clock className="text-amber-400 w-4 h-4" />
                 <span className="text-xl font-mono font-bold text-amber-100">{timeLeft}s</span>
              </div>
           </div>
-          <div className="board-grid bg-[#d0c8b6] p-2 rounded-lg shadow-2xl border-[4px] border-[#8b7355]">
-            {(globalBoard || []).map((tile: any, index: number) => {
-               const r = Math.floor(index / BOARD_SIZE);
-               const c = index % BOARD_SIZE;
-               const type = getSquareType(r, c);
-               let bgClass = "bg-[#e8e4d9]";
-               if (type === 'TW') bgClass = "bg-[#d9534f]";
-               else if (type === 'DW') bgClass = "bg-[#f0ad4e]";
-               else if (type === 'TL') bgClass = "bg-[#5bc0de]";
-               else if (type === 'DL') bgClass = "bg-[#a3c2c2]";
-               return (
-                 <div key={index} className={`w-10 h-10 lg:w-14 lg:h-14 relative flex items-center justify-center border border-[#c4bcab] ${bgClass} shadow-inner`}>
-                   {!tile && type === 'CT' && <Star className="text-amber-100 opacity-70 w-6 h-6" fill="currentColor" />}
-                   {tile && <MarbleTile tile={tile} isLocked={true} className="w-[95%] h-[95%]" />}
-                 </div>
-               );
-            })}
+          
+          <div className="bg-slate-900/60 backdrop-blur-xl p-3 rounded-2xl shadow-2xl border border-slate-700/50">
+            <div className="board-grid">
+                {(globalBoard || []).map((tile: any, index: number) => {
+                const r = Math.floor(index / BOARD_SIZE);
+                const c = index % BOARD_SIZE;
+                const type = getSquareType(r, c);
+                return (
+                    <div key={index} className={`w-10 h-10 lg:w-14 lg:h-14 relative flex items-center justify-center transition-colors ${getSquareClasses(r, c, tile, false)}`}>
+                    {!tile && type === 'CT' && <Star className="text-indigo-400 opacity-50 w-6 h-6 animate-pulse" fill="currentColor" />}
+                    {tile && <DataTile tile={tile} isLocked={true} className="w-[90%] h-[90%]" />}
+                    </div>
+                );
+                })}
+            </div>
           </div>
         </div>
-        <div className="w-[400px] flex flex-col gap-6 pt-24">
-          <div className="bg-slate-800/80 backdrop-blur-md p-8 rounded-3xl border border-slate-700/50 shadow-xl flex flex-col">
-            <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-700 shrink-0">
-              <h2 className="text-2xl font-bold flex items-center gap-3"><Trophy className="text-amber-400"/> Scores</h2>
-              <span className="text-slate-400 font-mono text-sm">{globalBag?.length || 0} tiles left</span>
+
+        {/* Tactical Sidebar */}
+        <div className="w-[400px] flex flex-col gap-6 relative z-10">
+          <div className="bg-slate-900/80 backdrop-blur-xl p-8 rounded-3xl border border-slate-700 shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-800 shrink-0">
+              <h2 className="text-2xl font-black magister-font flex items-center gap-3 text-slate-100"><Trophy className="text-indigo-400"/> LEADERBOARD</h2>
+              <span className="text-slate-500 font-mono text-xs font-bold bg-slate-950 px-3 py-1 rounded-full border border-slate-800">{globalBag?.length || 0} DATA FRAGMENTS</span>
             </div>
             
             <div className="space-y-4 max-h-[40vh] overflow-y-auto custom-scrollbar pr-2">
               {teamArray.map((t: any) => {
                 const playerWords = teamWords[t.id] || [];
+                const isActive = activeTeamIndex === t.order;
                 return (
-                <div key={t.id} className={`flex flex-col p-4 rounded-2xl border-2 transition-colors ${activeTeamIndex === t.order ? 'border-white bg-white/10 shadow-[0_0_20px_rgba(255,255,255,0.2)]' : 'border-transparent bg-slate-900/50'}`}>
+                <div key={t.id} className={`flex flex-col p-4 rounded-2xl border transition-all ${isActive ? 'bg-slate-800/80 border-slate-600 shadow-[0_0_20px_rgba(0,0,0,0.3)] scale-[1.02]' : 'border-transparent bg-slate-950/50'}`}>
                   <div className="flex justify-between items-center">
-                      <span className={`font-bold text-xl ${t.textColor}`}>{t.name}</span>
-                      <span className="text-3xl font-black">{scores?.[t.id] || 0}</span>
+                      <span className={`font-black uppercase tracking-widest text-sm ${t.textColor}`}>{t.name}</span>
+                      <span className="text-2xl font-mono font-black text-slate-100">{scores?.[t.id] || 0}</span>
                   </div>
                   {playerWords.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-white/10">
+                      <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-slate-800/50">
                           {playerWords.map((w: string, i: number) => (
-                              <span key={i} className="px-2 py-1 bg-black/30 rounded-md text-[10px] uppercase font-black tracking-widest text-slate-300">
+                              <span key={i} className="px-2 py-1 bg-slate-900 rounded-md text-[9px] font-mono font-bold tracking-widest text-slate-400 border border-slate-800">
                                   {w}
                               </span>
                           ))}
@@ -660,21 +696,21 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
           </div>
           
           {latestSentence && (
-            <div className="bg-amber-900/20 backdrop-blur-md p-6 rounded-3xl border-2 border-amber-500/50 shadow-[0_0_30px_rgba(245,158,11,0.15)] animate-in slide-in-from-right duration-500">
-              <h3 className="text-amber-400 font-black text-sm uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <Star size={16} fill="currentColor" /> Bonus Claimed (+{latestSentence.bonusAmount})
+            <div className="bg-indigo-900/20 backdrop-blur-xl p-6 rounded-3xl border border-indigo-500/30 shadow-[0_0_30px_rgba(99,102,241,0.15)] animate-in slide-in-from-right duration-500">
+              <h3 className="text-indigo-400 font-black text-[10px] uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <Star size={14} fill="currentColor" /> Intelligence Acquired (+{latestSentence.bonusAmount} XP)
               </h3>
-              <p className="text-white text-xl font-medium italic mb-4 leading-snug">
+              <p className="text-slate-100 text-lg font-medium italic mb-4 leading-relaxed">
                   "{latestSentence.text}"
               </p>
-              <p className="text-amber-200/50 text-xs font-bold uppercase tracking-widest text-right">
+              <p className="text-indigo-300/50 text-[10px] font-bold uppercase tracking-widest text-right">
                   — {latestSentence.playerName}
               </p>
             </div>
           )}
 
-          <button onClick={passTurn} className="mt-auto py-4 bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white rounded-2xl font-bold flex justify-center items-center gap-2 transition-colors border border-rose-500/30">
-            <FastForward size={20}/> Skip Turn
+          <button onClick={passTurn} className="mt-auto py-4 bg-slate-900/50 hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 rounded-2xl font-black uppercase tracking-widest flex justify-center items-center gap-2 transition-colors border border-slate-800 hover:border-rose-500/30">
+            <FastForward size={16}/> Force Override Turn
           </button>
         </div>
       </div>
@@ -687,22 +723,22 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   if (gameStatus === 'lobby_join') {
     const hasJoined = players[studentId];
     return (
-      <div className="flex flex-col h-full w-full wood-bg p-6 justify-center items-center text-center">
-        <h2 className="text-4xl font-bold text-amber-100 playfair-font mb-8 italic">Littera Marmoris</h2>
+      <div className="flex flex-col h-full w-full scifi-bg p-6 justify-center items-center text-center relative">
+        <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400 magister-font mb-8">DATA MARBLES</h2>
         {hasJoined ? (
             <div className="animate-in zoom-in duration-500 flex flex-col items-center">
-                <div className="w-24 h-24 bg-emerald-500/20 text-emerald-400 rounded-[35%] flex items-center justify-center mb-6 border-4 border-emerald-500/50 shadow-[0_0_30px_rgba(16,185,129,0.3)]">
+                <div className="w-24 h-24 bg-emerald-500/10 text-emerald-400 rounded-2xl flex items-center justify-center mb-6 border border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
                     <CheckCircle2 size={48} />
                 </div>
-                <p className="text-2xl font-black text-white uppercase tracking-widest mb-4">Profile Synced</p>
-                <p className="text-amber-200/50 font-bold animate-pulse">Awaiting duel initialization...</p>
+                <p className="text-xl font-black text-slate-200 uppercase tracking-widest mb-4">Signal Secured</p>
+                <p className="text-indigo-400/50 text-sm font-bold uppercase tracking-widest animate-pulse">Awaiting Server Init...</p>
             </div>
         ) : (
             <button 
               onClick={joinLobby}
-              className="p-8 bg-indigo-600 hover:bg-indigo-500 rounded-[2.5rem] font-black text-2xl uppercase tracking-widest shadow-[0_0_40px_rgba(79,70,229,0.5)] transition-transform active:scale-95 text-white border-4 border-indigo-400"
+              className="p-8 bg-indigo-600/20 hover:bg-indigo-600/40 backdrop-blur-md rounded-[2rem] font-black text-xl uppercase tracking-widest shadow-[0_0_40px_rgba(79,70,229,0.3)] transition-all active:scale-95 text-indigo-100 border border-indigo-500/50"
             >
-              Join the Duel
+              Establish Uplink
             </button>
         )}
       </div>
@@ -710,68 +746,68 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   }
 
   if (gameStatus === 'lobby_naming') {
-    if (!myTeamEntry) return <div className="wood-bg w-full h-full flex items-center justify-center text-slate-400">Spectator Mode</div>;
+    if (!myTeamEntry) return <div className="scifi-bg w-full h-full flex items-center justify-center text-slate-500 font-bold uppercase tracking-widest">Spectator Mode</div>;
     return (
-        <div className="flex flex-col h-full w-full wood-bg p-6 text-center">
-            <div className={`p-10 rounded-[3rem] ${myTeamEntry.color} border-4 border-white/20 shadow-2xl mb-8 flex flex-col items-center`}>
-                <div className="w-20 h-20 bg-black/20 rounded-full flex items-center justify-center mb-6">
-                    <User size={40} className="text-white" />
+        <div className="flex flex-col h-full w-full scifi-bg p-6 text-center relative">
+            <div className={`p-10 rounded-[2.5rem] bg-slate-900/60 backdrop-blur-xl border border-slate-700 shadow-2xl mb-8 flex flex-col items-center`}>
+                <div className="w-20 h-20 bg-slate-950 rounded-full flex items-center justify-center mb-6 border border-slate-800 shadow-inner">
+                    <User size={32} className={myTeamEntry.textColor} />
                 </div>
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-2">Authenticated As</h3>
-                <h2 className="text-4xl font-black text-white uppercase tracking-tight">{myTeamEntry.name}</h2>
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Authenticated Alias</h3>
+                <h2 className={`text-3xl font-black uppercase tracking-tight ${myTeamEntry.textColor}`}>{myTeamEntry.name}</h2>
             </div>
-            <div className="bg-slate-900/80 backdrop-blur-md p-8 rounded-[2.5rem] border border-slate-700 shadow-xl">
-                <label className="text-[10px] font-black uppercase tracking-widest text-amber-500 mb-4 block flex items-center justify-center gap-2">
-                    <PenTool size={14}/> Customize Alias
+            <div className="bg-slate-900/80 backdrop-blur-md p-8 rounded-[2rem] border border-slate-800 shadow-xl">
+                <label className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-4 block flex items-center justify-center gap-2">
+                    <PenTool size={14}/> Reconfigure Identifier
                 </label>
                 <div className="flex flex-col gap-4">
                     <input 
                         defaultValue={myTeamEntry.name}
                         onBlur={(e) => submitTeamName(e.target.value)} 
                         maxLength={15}
-                        placeholder="Your Legend Name" 
-                        className="w-full bg-slate-950 border-2 border-slate-700 rounded-2xl px-5 py-4 text-white text-xl font-bold outline-none focus:border-amber-500 transition-colors text-center"
+                        placeholder="Agent Alias" 
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-5 py-4 text-white text-lg font-mono font-bold outline-none focus:border-indigo-500 transition-colors text-center shadow-inner"
                     />
-                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Name updates automatically on blur</p>
+                    <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Auto-syncs on blur</p>
                 </div>
             </div>
-            <p className="mt-auto text-amber-200/50 font-bold animate-pulse text-sm">Waiting for Instructor to start...</p>
+            <p className="mt-auto text-indigo-400/50 font-bold uppercase tracking-widest text-xs animate-pulse">Awaiting deployment...</p>
         </div>
     );
   }
 
   if (isMyTurn && pendingSentence) {
     return (
-        <div className="flex flex-col h-full w-full wood-bg p-6 text-center animate-in zoom-in-95">
-            <div className="flex-1 flex flex-col justify-center items-center max-w-sm mx-auto w-full">
+        <div className="flex flex-col h-full w-full scifi-bg p-6 text-center animate-in zoom-in-95 relative">
+            <div className="flex-1 flex flex-col justify-center items-center max-w-sm mx-auto w-full relative z-10">
                 <div className="relative">
-                    <div className="absolute inset-0 bg-amber-500 blur-2xl opacity-20 rounded-full" />
-                    <Star size={72} className="text-amber-400 mb-6 relative z-10" fill="currentColor" />
+                    <div className="absolute inset-0 bg-indigo-500 blur-2xl opacity-20 rounded-full" />
+                    <Star size={72} className="text-indigo-400 mb-6 relative z-10" fill="currentColor" />
                 </div>
                 
-                <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tight">Bonus XP!</h2>
-                <p className="text-amber-200/70 font-bold mb-8 text-sm px-4">Optional: Write a sentence using your newly placed word to earn +5 extra points.</p>
+                <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tight magister-font">INTELLIGENCE BONUS</h2>
+                <p className="text-slate-400 font-medium mb-8 text-sm px-4">Provide context for the deployed data sequence to earn +5 XP.</p>
                 
                 <textarea 
                     value={sentenceText}
                     onChange={e => setSentenceText(e.target.value)}
-                    placeholder="Type your sentence here..."
-                    className="w-full bg-slate-950/80 border-2 border-slate-700 rounded-2xl p-5 text-white text-lg font-medium outline-none focus:border-amber-500 transition-colors mb-8 min-h-[140px] shadow-inner"
+                    placeholder="Input contextual sentence..."
+                    className="w-full bg-slate-900/80 backdrop-blur-md border border-slate-700 rounded-2xl p-5 text-slate-200 text-lg font-medium outline-none focus:border-indigo-500 transition-colors mb-8 min-h-[140px] shadow-inner"
                 />
 
                 <div className="flex flex-col gap-3 w-full">
                     <button 
                         onClick={() => commitTurn(true)}
                         disabled={sentenceText.trim().length < 5}
-                        className="w-full py-4 bg-amber-500 hover:bg-amber-400 disabled:bg-slate-800 disabled:text-slate-600 text-amber-950 font-black uppercase tracking-widest rounded-xl transition-all shadow-[0_0_20px_rgba(245,158,11,0.3)] disabled:shadow-none flex items-center justify-center gap-2"
+                        className="w-full py-4 bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/50 disabled:bg-slate-900 disabled:border-slate-800 disabled:text-slate-600 text-indigo-100 font-black uppercase tracking-widest rounded-xl transition-all shadow-lg disabled:shadow-none flex items-center justify-center gap-2"
                     >
-                        <MessageSquare size={18} /> Submit & Claim +5 XP
+                        <MessageSquare size={16} /> Submit Intelligence
                     </button>
                     <button 
                         onClick={() => commitTurn(false)}
                         className="w-full py-4 bg-transparent text-slate-500 hover:text-slate-300 font-black uppercase tracking-widest rounded-xl transition-colors"
                     >
-                        Skip Bonus
+                        Bypass Bonus
                     </button>
                 </div>
             </div>
@@ -779,33 +815,29 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     );
   }
 
-  // MAIN GAME RENDER (ACTIVE & SPECTATOR)
+  // MAIN GAME RENDER (MOBILE APP)
   return (
-    <div className="flex flex-col h-full w-full wood-bg p-2 overflow-hidden border-4 border-emerald-500/50">
-      <div className={`flex justify-between items-center mb-2 p-3 rounded-xl border transition-colors ${isMyTurn ? 'bg-emerald-900/60 border-emerald-500/50' : 'bg-slate-900/60 border-slate-700'}`}>
-         <span className={`${isMyTurn ? 'text-emerald-100 animate-pulse' : 'text-slate-400'} font-black uppercase tracking-widest flex items-center gap-2 text-sm transition-colors`}>
-            <Clock size={16} /> {timeLeft}s Left
+    <div className="flex flex-col h-full w-full scifi-bg p-2 overflow-hidden relative">
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-5 pointer-events-none mix-blend-overlay" />
+      
+      <div className={`relative z-10 flex justify-between items-center mb-3 p-3 rounded-2xl border backdrop-blur-md transition-colors ${isMyTurn ? 'bg-indigo-900/20 border-indigo-500/30' : 'bg-slate-900/40 border-slate-800'}`}>
+         <span className={`${isMyTurn ? 'text-indigo-300 animate-pulse' : 'text-slate-500'} font-black uppercase tracking-widest flex items-center gap-2 text-xs transition-colors`}>
+            <Clock size={14} /> {timeLeft}s
          </span>
-         <span className={`${isMyTurn ? 'text-amber-400' : 'text-slate-500'} font-bold playfair-font truncate ml-4 max-w-[120px] text-right transition-colors`}>
+         <span className={`${isMyTurn ? 'text-white' : 'text-slate-400'} font-black uppercase tracking-widest truncate ml-4 max-w-[150px] text-right text-xs transition-colors`}>
             {isMyTurn ? "Your Turn" : `${activeTeam?.name}'s Turn`}
          </span>
       </div>
 
-      <div className="flex-1 overflow-auto rounded-xl shadow-inner bg-[#d0c8b6] border-4 border-[#8b7355] relative no-scrollbar">
-        <div className="board-grid absolute min-w-[750px] min-h-[750px] p-2">
+      <div className="relative z-10 flex-1 overflow-auto rounded-2xl shadow-inner bg-slate-900/40 backdrop-blur-md border border-slate-700/50 no-scrollbar">
+        <div className="board-grid absolute min-w-[750px] min-h-[750px] p-3">
           {(localBoard || []).map((tile: any, index: number) => {
             const r = Math.floor(index / BOARD_SIZE);
             const c = index % BOARD_SIZE;
-            const type = getSquareType(r, c);
-            let bgClass = "bg-[#e8e4d9]";
-            if (type === 'TW') bgClass = "bg-[#d9534f]";
-            else if (type === 'DW') bgClass = "bg-[#f0ad4e]";
-            else if (type === 'TL') bgClass = "bg-[#5bc0de]";
-            else if (type === 'DL') bgClass = "bg-[#a3c2c2]";
             const isTargeted = targetSquare === index;
             return (
-              <div key={index} onClick={() => handleBoardClick(index)} className={`w-full h-full aspect-square border border-[#c4bcab] ${bgClass} shadow-inner flex items-center justify-center relative transition-all ${isTargeted ? 'ring-4 ring-inset ring-amber-400 z-20 bg-amber-100/50' : ''}`}>
-                {!tile && type === 'CT' && <Star className="text-amber-100 opacity-70 w-8 h-8" fill="currentColor" />}
+              <div key={index} onClick={() => handleBoardClick(index)} className={`w-full h-full aspect-square relative flex items-center justify-center transition-all rounded-md ${getSquareClasses(r, c, tile, isTargeted)}`}>
+                {!tile && getSquareType(r, c) === 'CT' && <Star className="text-indigo-400 opacity-30 w-8 h-8" fill="currentColor" />}
                 
                 {/* 🔥 ORBITAL RETICLE (Only for Active Player) */}
                 {isTargeted && !tile && isMyTurn && (
@@ -819,77 +851,64 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                             return (
                                 <div
                                     key={`orbit_${rackIdx}`}
-                                    onClick={(e) => {
-                                        e.stopPropagation(); 
-                                        handleRackClick(rackIdx);
-                                    }}
+                                    onClick={(e) => { e.stopPropagation(); handleRackClick(rackIdx); }}
                                     className="absolute w-12 h-12 -ml-6 -mt-6 transition-all duration-300 animate-in zoom-in spin-in"
                                     style={{ transform: `translate(${x}px, ${y}px)` }}
                                 >
-                                    <MarbleTile tile={rackTile} className="w-full h-full shadow-[0_10px_20px_rgba(0,0,0,0.6)]" />
+                                    <DataTile tile={rackTile} className="w-full h-full shadow-[0_10px_30px_rgba(0,0,0,0.8)]" />
                                 </div>
                             )
                         })}
                     </div>
                 )}
                 
-                {/* Reticle glow when NOT active player or target empty */}
-                {isTargeted && !tile && !isMyTurn && (
-                    <div className="absolute inset-0 m-2 border-2 border-dashed border-amber-500 rounded-md animate-pulse" />
-                )}
-
-                {tile && <MarbleTile tile={tile} isLocked={tile.isLocked} className="w-[90%] h-[90%]" />}
+                {tile && <DataTile tile={tile} isLocked={tile.isLocked} className="w-[90%] h-[90%]" />}
               </div>
             );
           })}
         </div>
       </div>
 
-      <div className="mt-2 bg-[#8b7355] rounded-xl p-2 border-b-4 border-[#5c4a35] w-full z-10 shadow-[0_-10px_20px_rgba(0,0,0,0.5)]">
-         {invalidWords.length > 0 && (
-             <div className="bg-rose-500/90 text-white px-3 py-2 rounded-lg mb-2 flex items-center gap-2 text-xs font-bold shadow-sm animate-in slide-in-from-bottom-2">
-                 <AlertTriangle size={14} /> Dictionary rejected: {invalidWords.join(', ')}
-             </div>
-         )}
-
-         <div className="flex justify-between items-end mb-2 px-1">
-             <p className={`text-[10px] font-black uppercase tracking-widest ${isMyTurn ? 'text-amber-200/50 animate-pulse' : 'text-slate-400'}`}>
-                {isMyTurn ? (targetSquare === null ? 'Tap board to target' : 'Tap letter to deploy') : 'Rearrange your rack'}
+      {/* THE HUD UPLINK RACK */}
+      <div className="relative z-10 mt-3 bg-slate-900/80 backdrop-blur-xl rounded-2xl p-3 border border-slate-700 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] w-full ring-1 ring-white/5">
+         <div className="flex justify-between items-end mb-3 px-2">
+             <p className={`text-[9px] font-black uppercase tracking-widest ${isMyTurn ? 'text-indigo-400 animate-pulse' : 'text-slate-500'}`}>
+                {isMyTurn ? (targetSquare === null ? 'Select deployment coordinate' : 'Tap data fragment to deploy') : 'Sort your fragments'}
              </p>
-             <button onClick={shuffleRack} className="p-1.5 bg-slate-800 text-slate-400 hover:text-white rounded-lg active:scale-95 transition-colors border border-slate-700 shadow-sm">
+             <button onClick={shuffleRack} className="p-1.5 bg-slate-950 text-slate-400 hover:text-white rounded-lg active:scale-95 transition-colors border border-slate-800 shadow-sm">
                  <Shuffle size={14} />
              </button>
          </div>
 
-         <div className="flex gap-1 bg-[#4a3b29] p-2 rounded-lg w-full justify-center min-h-[3.5rem]">
+         <div className="flex gap-2 bg-black/60 p-2.5 rounded-xl w-full justify-center min-h-[4rem] border border-slate-800/80 shadow-inner">
             {rack.map((tile: any, idx: number) => {
               const isRackSelected = selectedRackIndex === idx;
               return (
                 <div 
                   key={idx} 
                   onClick={() => handleRackClick(idx)} 
-                  className={`w-10 h-10 rounded-md transition-all ${!tile ? 'bg-black/20' : ''} ${isRackSelected ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-[#4a3b29] scale-105' : ''}`}
+                  className={`w-10 h-10 rounded-lg transition-all ${!tile ? 'bg-white/5 border border-white/5' : ''} ${isRackSelected ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-black scale-105' : ''}`}
                 >
-                   {tile && <MarbleTile tile={tile} className="w-full h-full" />}
+                   {tile && <DataTile tile={tile} className="w-full h-full" />}
                 </div>
               );
             })}
          </div>
       </div>
 
-      <div className="flex gap-2 mt-2 pb-2">
-         <button onClick={recallAll} disabled={isValidating} className="flex-1 py-3 bg-slate-700 text-white rounded-xl font-bold flex justify-center items-center gap-2 active:scale-95 transition-colors hover:bg-slate-600 disabled:opacity-50">
-             <ArrowDownToLine size={18}/> Recall
+      <div className="relative z-10 flex gap-2 mt-3 pb-2">
+         <button onClick={recallAll} disabled={isValidating} className="flex-1 py-3.5 bg-slate-900/80 text-slate-300 rounded-xl font-black uppercase tracking-widest text-xs flex justify-center items-center gap-2 active:scale-95 transition-colors hover:bg-slate-800 border border-slate-700 disabled:opacity-50">
+             <ArrowDownToLine size={16}/> Recall
          </button>
          
          {isMyTurn ? (
-             <button onClick={handleInitiateCommit} disabled={isValidating} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg active:scale-95 border-b-4 border-emerald-800 transition-colors hover:bg-emerald-500 disabled:opacity-50 disabled:border-emerald-600">
-                 {isValidating ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18}/>} 
-                 {isValidating ? 'Checking...' : 'Play Word'}
+             <button onClick={handleInitiateCommit} disabled={isValidating} className="flex-1 py-3.5 bg-indigo-600/20 text-indigo-300 hover:text-white rounded-xl font-black uppercase tracking-widest text-xs flex justify-center items-center gap-2 shadow-lg active:scale-95 border border-indigo-500/50 transition-colors hover:bg-indigo-600/40 disabled:opacity-50">
+                 {isValidating ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16}/>} 
+                 {isValidating ? 'Validating...' : 'Commit Run'}
              </button>
          ) : (
-             <div className="flex-1 py-3 bg-slate-800 text-slate-400 rounded-xl font-bold flex justify-center items-center gap-2 border-b-4 border-slate-900">
-                 Waiting...
+             <div className="flex-1 py-3.5 bg-slate-950/80 text-slate-600 rounded-xl font-black uppercase tracking-widest text-xs flex justify-center items-center gap-2 border border-slate-800/50">
+                 Standby...
              </div>
          )}
       </div>
