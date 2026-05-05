@@ -36,6 +36,11 @@ const getSquareType = (r: number, c: number) => {
   if (tlPoints.some(([tr, tc]) => tr === r && tc === c)) return 'TL';
   const dlPoints = [[0,3], [0,11], [2,6], [2,8], [3,0], [3,7], [3,14], [6,2], [6,6], [6,8], [6,12], [7,3], [7,11], [8,2], [8,6], [8,8], [8,12], [11,0], [11,7], [11,14], [12,6], [12,8], [14,3], [14,11]];
   if (dlPoints.some(([tr, tc]) => tr === r && tc === c)) return 'DL';
+  
+  // 🔥 NEW: Double Play (DP) Extra Turn Squares
+  const dpPoints = [[1,7], [7,1], [7,13], [13,7]];
+  if (dpPoints.some(([tr, tc]) => tr === r && tc === c)) return 'DP';
+  
   return null;
 };
 
@@ -127,6 +132,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         teamWords: {}, 
         activeTeamIndex: 0,
         turnEndTime: null,
+        isExtraTurn: false,
       });
     }
   }, [isProjector, liveState]);
@@ -141,6 +147,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const activeTeamIndex = liveState?.activeTeamIndex || 0;
   const turnEndTime = liveState?.turnEndTime;
   const latestSentence = liveState?.latestSentence;
+  const isExtraTurn = liveState?.isExtraTurn || false;
   
   const teamArray = Object.values(teams).sort((a: any, b: any) => a.order - b.order);
   const activeTeam: any = teamArray[activeTeamIndex] || teamArray[0] || {};
@@ -408,11 +415,11 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     if (teamArray.length === 0) return;
     onUpdateLiveState({
       activeTeamIndex: (activeTeamIndex + 1) % teamArray.length,
-      turnEndTime: Date.now() + timeLimit * 1000
+      turnEndTime: Date.now() + timeLimit * 1000,
+      isExtraTurn: false // Reset DP flag
     });
   };
 
-  // 🔥 TRUE SCRABBLE SCORING ENGINE & DICTIONARY VALIDATION
   const handleInitiateCommit = async () => {
     const placedIndices: number[] = [];
 
@@ -433,7 +440,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
     const getTile = (r: number, c: number) => r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE ? localBoard[r * BOARD_SIZE + c] : null;
 
-    // Scan for words and calculate multipliers dynamically
     placedIndices.forEach(idx => {
         const r = Math.floor(idx / BOARD_SIZE);
         const c = idx % BOARD_SIZE;
@@ -453,7 +459,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                 for (let i = left; i <= right; i++) {
                     const t = getTile(r, i);
                     let lVal = t.value;
-                    if (!t.isLocked) { // Multipliers only apply to newly placed tiles
+                    if (!t.isLocked) { 
                         const sq = getSquareType(r, i);
                         if (sq === 'DL') lVal *= 2;
                         if (sq === 'TL') lVal *= 3;
@@ -524,9 +530,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         totalCalculatedScore = fallbackScore * wordMult;
     }
 
-    // Ping Dictionary API
     const failedWords: string[] = [];
-    
     await Promise.all(extractedWords.map(async (word) => {
         if (word.length < 2) return; 
         try {
@@ -554,6 +558,18 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const commitTurn = (withSentence: boolean) => {
     let bonus = 0;
     let sentencePayload = null;
+    let triggeredDP = false;
+
+    // 🔥 Check for Double Play activation
+    localBoard.forEach((tile: any, idx: number) => {
+      if (tile && !tile.isLocked) {
+         const r = Math.floor(idx / BOARD_SIZE);
+         const c = idx % BOARD_SIZE;
+         if (getSquareType(r, c) === 'DP') {
+             triggeredDP = true;
+         }
+      }
+    });
 
     if (withSentence && sentenceText.trim().length > 3) {
         bonus = 5;
@@ -584,8 +600,10 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       scores: updatedScores,
       teamWords: updatedTeamWords, 
       bag: newBag, 
-      activeTeamIndex: teamArray.length > 1 ? (activeTeamIndex + 1) % teamArray.length : 0,
-      turnEndTime: Date.now() + timeLimit * 1000
+      // 🔥 If DP is triggered, keep the activeTeamIndex the same. Otherwise pass to next player.
+      activeTeamIndex: triggeredDP ? activeTeamIndex : (teamArray.length > 1 ? (activeTeamIndex + 1) % teamArray.length : 0),
+      turnEndTime: Date.now() + timeLimit * 1000,
+      isExtraTurn: triggeredDP // Announce to the UI
     };
 
     if (sentencePayload) {
@@ -612,6 +630,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       else if (type === 'TL') base = "bg-cyan-500/20 border-cyan-500/40 shadow-[inset_0_0_15px_rgba(6,182,212,0.3)]";
       else if (type === 'DL') base = "bg-emerald-500/20 border-emerald-500/40 shadow-[inset_0_0_15px_rgba(16,185,129,0.3)]";
       else if (type === 'CT') base = "bg-indigo-500/20 border-indigo-500/40 shadow-[inset_0_0_15px_rgba(99,102,241,0.3)]";
+      else if (type === 'DP') base = "bg-fuchsia-500/20 border-fuchsia-500/40 shadow-[inset_0_0_15px_rgba(217,70,239,0.3)]";
 
       if (isTargeted) return `${base} ring-2 ring-inset ring-amber-400 z-20 bg-amber-500/20 shadow-[inset_0_0_20px_rgba(245,158,11,0.4)]`;
       return base;
@@ -700,10 +719,12 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       <div className="w-full h-full flex p-8 scifi-bg text-white gap-8 overflow-hidden relative">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-5 pointer-events-none mix-blend-overlay" />
         
+        {/* Main Board Container */}
         <div className="flex-1 flex flex-col items-center justify-center relative z-10">
           <div className="mb-6 flex items-center gap-4 animate-in slide-in-from-top-8">
-             <div className={`px-6 py-2 rounded-full border shadow-lg text-white font-black uppercase tracking-widest text-sm bg-slate-900/60 backdrop-blur-md border-slate-700`}>
+             <div className={`px-6 py-2 rounded-full border shadow-lg text-white font-black uppercase tracking-widest text-sm bg-slate-900/60 backdrop-blur-md border-slate-700 flex items-center gap-2`}>
                 <span className={activeTeam?.textColor}>{activeTeam?.name || 'Waiting'}</span>'s Turn
+                {isExtraTurn && <span className="bg-fuchsia-500 text-white text-[10px] px-2 py-0.5 rounded-md flex items-center gap-1 ml-2"><FastForward size={12}/> DOUBLE PLAY</span>}
              </div>
              <div className="bg-slate-900/80 backdrop-blur-md px-5 py-2 rounded-full border border-slate-700 shadow-[0_0_20px_rgba(0,0,0,0.5)] flex items-center gap-3">
                 <Clock className="text-amber-400 w-4 h-4" />
@@ -720,6 +741,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                 return (
                     <div key={index} className={`w-10 h-10 lg:w-14 lg:h-14 relative flex items-center justify-center transition-colors ${getSquareClasses(r, c, tile, false)}`}>
                     {!tile && type === 'CT' && <Star className="text-indigo-400 opacity-50 w-6 h-6 animate-pulse" fill="currentColor" />}
+                    {!tile && type === 'DP' && <FastForward className="text-fuchsia-400 opacity-50 w-5 h-5 animate-pulse" fill="currentColor" />}
                     {tile && <DataTile tile={tile} isLocked={true} className="w-[90%] h-[90%]" />}
                     </div>
                 );
@@ -728,6 +750,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
           </div>
         </div>
 
+        {/* Tactical Sidebar */}
         <div className="w-[400px] flex flex-col gap-6 relative z-10">
           <div className="bg-slate-900/80 backdrop-blur-xl p-8 rounded-3xl border border-slate-700 shadow-2xl flex flex-col">
             <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-800 shrink-0">
@@ -879,6 +902,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     );
   }
 
+  // MAIN GAME RENDER (MOBILE APP)
   return (
     <div className="flex flex-col h-full w-full scifi-bg p-2 overflow-hidden relative">
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-5 pointer-events-none mix-blend-overlay" />
@@ -887,7 +911,8 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
          <span className={`${isMyTurn ? 'text-indigo-300 animate-pulse' : 'text-slate-500'} font-black uppercase tracking-widest flex items-center gap-2 text-xs transition-colors`}>
             <Clock size={14} /> {timeLeft}s
          </span>
-         <span className={`${isMyTurn ? 'text-white' : 'text-slate-400'} font-black uppercase tracking-widest truncate ml-4 max-w-[150px] text-right text-xs transition-colors`}>
+         <span className={`${isMyTurn ? 'text-white' : 'text-slate-400'} font-black uppercase tracking-widest truncate ml-4 max-w-[150px] text-right text-xs transition-colors flex items-center justify-end gap-2`}>
+            {isExtraTurn && isMyTurn && <FastForward size={14} className="text-fuchsia-400 animate-pulse" />}
             {isMyTurn ? "Your Turn" : `${activeTeam?.name}'s Turn`}
          </span>
       </div>
@@ -898,10 +923,14 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
             const r = Math.floor(index / BOARD_SIZE);
             const c = index % BOARD_SIZE;
             const isTargeted = targetSquare === index;
+            const type = getSquareType(r, c);
+            
             return (
               <div key={index} onClick={() => handleBoardClick(index)} className={`w-full h-full aspect-square relative flex items-center justify-center transition-all rounded-md ${getSquareClasses(r, c, tile, isTargeted)}`}>
-                {!tile && getSquareType(r, c) === 'CT' && <Star className="text-indigo-400 opacity-30 w-8 h-8" fill="currentColor" />}
+                {!tile && type === 'CT' && <Star className="text-indigo-400 opacity-30 w-8 h-8" fill="currentColor" />}
+                {!tile && type === 'DP' && <FastForward className="text-fuchsia-400 opacity-50 w-6 h-6 animate-pulse" fill="currentColor" />}
                 
+                {/* 🔥 ORBITAL RETICLE (Only for Active Player) */}
                 {isTargeted && !tile && isMyTurn && (
                     <div className="absolute top-1/2 left-1/2 w-0 h-0 z-[100]">
                         {rack.map((rackTile, rackIdx) => {
@@ -931,14 +960,8 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         </div>
       </div>
 
+      {/* THE HUD UPLINK RACK */}
       <div className="relative z-10 mt-3 bg-slate-900/80 backdrop-blur-xl rounded-2xl p-3 border border-slate-700 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] w-full ring-1 ring-white/5">
-         
-         {invalidWords.length > 0 && (
-             <div className="bg-rose-500/90 text-white px-3 py-2 rounded-lg mb-2 flex items-center gap-2 text-xs font-bold shadow-sm animate-in slide-in-from-bottom-2">
-                 <AlertTriangle size={14} /> Sequence Invalid: {invalidWords.join(', ')}
-             </div>
-         )}
-
          <div className="flex justify-between items-end mb-3 px-2">
              <p className={`text-[9px] font-black uppercase tracking-widest ${isMyTurn ? 'text-indigo-400 animate-pulse' : 'text-slate-500'}`}>
                 {isMyTurn ? (targetSquare === null ? 'Select deployment coordinate' : 'Tap data fragment to deploy') : 'Sort your fragments'}
