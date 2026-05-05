@@ -412,53 +412,119 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     });
   };
 
+  // 🔥 TRUE SCRABBLE SCORING ENGINE & DICTIONARY VALIDATION
   const handleInitiateCommit = async () => {
-    let turnScore = 0;
     const placedIndices: number[] = [];
 
     localBoard.forEach((tile: any, idx: number) => {
       if (tile && !tile.isLocked) {
-        turnScore += tile.value;
         placedIndices.push(idx);
       }
     });
 
-    if (turnScore === 0) return; 
+    if (placedIndices.length === 0) return; 
 
     setIsValidating(true);
     setInvalidWords([]);
 
-    const foundWords = new Set<string>();
+    const scannedWords = new Set<string>();
+    const foundWordsList: { word: string; score: number }[] = [];
+    let totalCalculatedScore = 0;
+
     const getTile = (r: number, c: number) => r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE ? localBoard[r * BOARD_SIZE + c] : null;
 
+    // Scan for words and calculate multipliers dynamically
     placedIndices.forEach(idx => {
         const r = Math.floor(idx / BOARD_SIZE);
         const c = idx % BOARD_SIZE;
 
+        // Horizontals
         let left = c, right = c;
         while (left > 0 && getTile(r, left - 1)) left--;
         while (right < BOARD_SIZE - 1 && getTile(r, right + 1)) right++;
         if (right > left) {
-            let word = '';
-            for (let i = left; i <= right; i++) word += getTile(r, i)?.letter || '';
-            foundWords.add(word);
+            const wordKey = `H-${r}-${left}-${right}`;
+            if (!scannedWords.has(wordKey)) {
+                scannedWords.add(wordKey);
+                let wordStr = '';
+                let wordScore = 0;
+                let wordMult = 1;
+
+                for (let i = left; i <= right; i++) {
+                    const t = getTile(r, i);
+                    let lVal = t.value;
+                    if (!t.isLocked) { // Multipliers only apply to newly placed tiles
+                        const sq = getSquareType(r, i);
+                        if (sq === 'DL') lVal *= 2;
+                        if (sq === 'TL') lVal *= 3;
+                        if (sq === 'DW' || sq === 'CT') wordMult *= 2;
+                        if (sq === 'TW') wordMult *= 3;
+                    }
+                    wordScore += lVal;
+                    wordStr += t.letter;
+                }
+                foundWordsList.push({ word: wordStr, score: wordScore * wordMult });
+                totalCalculatedScore += (wordScore * wordMult);
+            }
         }
 
+        // Verticals
         let top = r, bottom = r;
         while (top > 0 && getTile(top - 1, c)) top--;
         while (bottom < BOARD_SIZE - 1 && getTile(bottom + 1, c)) bottom++;
         if (bottom > top) {
-            let word = '';
-            for (let i = top; i <= bottom; i++) word += getTile(i, c)?.letter || '';
-            foundWords.add(word);
+            const wordKey = `V-${c}-${top}-${bottom}`;
+            if (!scannedWords.has(wordKey)) {
+                scannedWords.add(wordKey);
+                let wordStr = '';
+                let wordScore = 0;
+                let wordMult = 1;
+
+                for (let i = top; i <= bottom; i++) {
+                    const t = getTile(i, c);
+                    let lVal = t.value;
+                    if (!t.isLocked) {
+                        const sq = getSquareType(i, c);
+                        if (sq === 'DL') lVal *= 2;
+                        if (sq === 'TL') lVal *= 3;
+                        if (sq === 'DW' || sq === 'CT') wordMult *= 2;
+                        if (sq === 'TW') wordMult *= 3;
+                    }
+                    wordScore += lVal;
+                    wordStr += t.letter;
+                }
+                foundWordsList.push({ word: wordStr, score: wordScore * wordMult });
+                totalCalculatedScore += (wordScore * wordMult);
+            }
         }
     });
 
-    let extractedWords = Array.from(foundWords);
+    let extractedWords = foundWordsList.map(w => w.word);
+
+    // Fallback: If they placed isolated tiles that don't touch anything
     if (extractedWords.length === 0 && placedIndices.length > 0) {
-        extractedWords = [placedIndices.map(idx => localBoard[idx].letter).join('')];
+        let fallbackScore = 0;
+        let wordStr = '';
+        let wordMult = 1;
+        placedIndices.forEach(idx => {
+            const r = Math.floor(idx / BOARD_SIZE);
+            const c = idx % BOARD_SIZE;
+            const t = localBoard[idx];
+            let lVal = t.value;
+            const sq = getSquareType(r, c);
+            if (sq === 'DL') lVal *= 2;
+            if (sq === 'TL') lVal *= 3;
+            if (sq === 'DW' || sq === 'CT') wordMult *= 2;
+            if (sq === 'TW') wordMult *= 3;
+
+            fallbackScore += lVal;
+            wordStr += t.letter;
+        });
+        extractedWords = [wordStr];
+        totalCalculatedScore = fallbackScore * wordMult;
     }
 
+    // Ping Dictionary API
     const failedWords: string[] = [];
     
     await Promise.all(extractedWords.map(async (word) => {
@@ -480,7 +546,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         return; 
     }
 
-    setCurrentTurnScore(turnScore);
+    setCurrentTurnScore(totalCalculatedScore);
     setCurrentTurnWords(extractedWords);
     setPendingSentence(true);
   };
@@ -634,7 +700,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       <div className="w-full h-full flex p-8 scifi-bg text-white gap-8 overflow-hidden relative">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-5 pointer-events-none mix-blend-overlay" />
         
-        {/* Main Board Container */}
         <div className="flex-1 flex flex-col items-center justify-center relative z-10">
           <div className="mb-6 flex items-center gap-4 animate-in slide-in-from-top-8">
              <div className={`px-6 py-2 rounded-full border shadow-lg text-white font-black uppercase tracking-widest text-sm bg-slate-900/60 backdrop-blur-md border-slate-700`}>
@@ -663,7 +728,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
           </div>
         </div>
 
-        {/* Tactical Sidebar */}
         <div className="w-[400px] flex flex-col gap-6 relative z-10">
           <div className="bg-slate-900/80 backdrop-blur-xl p-8 rounded-3xl border border-slate-700 shadow-2xl flex flex-col">
             <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-800 shrink-0">
@@ -815,7 +879,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     );
   }
 
-  // MAIN GAME RENDER (MOBILE APP)
   return (
     <div className="flex flex-col h-full w-full scifi-bg p-2 overflow-hidden relative">
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-5 pointer-events-none mix-blend-overlay" />
@@ -839,7 +902,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
               <div key={index} onClick={() => handleBoardClick(index)} className={`w-full h-full aspect-square relative flex items-center justify-center transition-all rounded-md ${getSquareClasses(r, c, tile, isTargeted)}`}>
                 {!tile && getSquareType(r, c) === 'CT' && <Star className="text-indigo-400 opacity-30 w-8 h-8" fill="currentColor" />}
                 
-                {/* 🔥 ORBITAL RETICLE (Only for Active Player) */}
                 {isTargeted && !tile && isMyTurn && (
                     <div className="absolute top-1/2 left-1/2 w-0 h-0 z-[100]">
                         {rack.map((rackTile, rackIdx) => {
@@ -869,8 +931,14 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         </div>
       </div>
 
-      {/* THE HUD UPLINK RACK */}
       <div className="relative z-10 mt-3 bg-slate-900/80 backdrop-blur-xl rounded-2xl p-3 border border-slate-700 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] w-full ring-1 ring-white/5">
+         
+         {invalidWords.length > 0 && (
+             <div className="bg-rose-500/90 text-white px-3 py-2 rounded-lg mb-2 flex items-center gap-2 text-xs font-bold shadow-sm animate-in slide-in-from-bottom-2">
+                 <AlertTriangle size={14} /> Sequence Invalid: {invalidWords.join(', ')}
+             </div>
+         )}
+
          <div className="flex justify-between items-end mb-3 px-2">
              <p className={`text-[9px] font-black uppercase tracking-widest ${isMyTurn ? 'text-indigo-400 animate-pulse' : 'text-slate-500'}`}>
                 {isMyTurn ? (targetSquare === null ? 'Select deployment coordinate' : 'Tap data fragment to deploy') : 'Sort your fragments'}
