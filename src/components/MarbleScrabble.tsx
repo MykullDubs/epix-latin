@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool, User, MessageSquare, Shuffle, Loader2, AlertTriangle, Zap, Rocket, BookOpen, RefreshCw, ZoomIn, ZoomOut, LocateFixed } from 'lucide-react';
+import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool, User, MessageSquare, Shuffle, Loader2, AlertTriangle, Zap, Rocket, BookOpen, RefreshCw, ZoomIn, ZoomOut, LocateFixed, Pause, Play, Power } from 'lucide-react';
 
 // ==========================================
 // GAME DATA & CONSTANTS
@@ -135,6 +135,8 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         activeTeamIndex: 0,
         turnEndTime: null,
         isExtraTurn: false,
+        isTimerPaused: false,
+        remainingPausedTime: 0
       });
     }
   }, [isProjector, liveState]);
@@ -152,6 +154,10 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const latestSentence = liveState?.latestSentence;
   const isExtraTurn = liveState?.isExtraTurn || false;
   
+  // 🔥 TEACHER CONTROLS STATE
+  const isTimerPaused = liveState?.isTimerPaused || false;
+  const remainingPausedTime = liveState?.remainingPausedTime || 0;
+  
   const teamArray = Object.values(teams).sort((a: any, b: any) => a.order - b.order);
   const activeTeam: any = teamArray[activeTeamIndex] || teamArray[0] || {};
   
@@ -160,8 +166,15 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const isMyTurn = myTeamId === activeTeam?.id && gameStatus === 'playing';
 
   const [timeLeft, setTimeLeft] = useState(0);
+
+  // TIMER LOGIC (UPDATED FOR PAUSING)
   useEffect(() => {
+    if (isTimerPaused) {
+        setTimeLeft(remainingPausedTime);
+        return;
+    }
     if (!turnEndTime) return;
+    
     const interval = setInterval(() => {
       const remaining = Math.max(0, Math.floor((turnEndTime - Date.now()) / 1000));
       setTimeLeft(remaining);
@@ -170,7 +183,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [turnEndTime, isProjector, gameStatus]);
+  }, [turnEndTime, isProjector, gameStatus, isTimerPaused, remainingPausedTime]);
 
   // ==========================================
   // STUDENT INTERACTION STATE
@@ -190,7 +203,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const [currentTurnWords, setCurrentTurnWords] = useState<{word: string, def: string}[]>([]);
   const [currentTurnScore, setCurrentTurnScore] = useState(0);
 
-  // 🔥 TACTICAL HUD ZOOM STATE
+  // TACTICAL HUD ZOOM STATE
   const [zoomLevel, setZoomLevel] = useState(1);
   const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.2, 1.8));
   const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.2, 0.6));
@@ -263,7 +276,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   };
 
   const handleBoardClick = (index: number) => {
-    if (!isMyTurn || isValidating) return; 
+    if (!isMyTurn || isValidating || isTimerPaused) return; 
     setSelectedRackIndex(null); 
     setInvalidWords([]); 
 
@@ -288,7 +301,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   };
 
   const handleRackClick = (idx: number) => {
-    if (isValidating) return;
+    if (isValidating || isTimerPaused) return;
     setInvalidWords([]); 
 
     if (targetSquare !== null) {
@@ -351,7 +364,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   };
 
   const recallAll = () => {
-    if (isValidating) return;
+    if (isValidating || isTimerPaused) return;
     const newRack = [...rack];
     const newBoard = [...localBoard];
     newBoard.forEach((tile: any, index: number) => {
@@ -372,7 +385,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   };
 
   const handlePurge = () => {
-    if (!isMyTurn || isValidating) return;
+    if (!isMyTurn || isValidating || isTimerPaused) return;
     if ((scores[myTeamId] || 0) < 10) return;
 
     let tilesToReturn: any[] = [];
@@ -417,7 +430,8 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         scores: updatedScores,
         activeTeamIndex: teamArray.length > 1 ? (activeTeamIndex + 1) % teamArray.length : 0,
         turnEndTime: Date.now() + timeLimit * 1000,
-        isExtraTurn: false
+        isExtraTurn: false,
+        isTimerPaused: false
     });
   };
 
@@ -483,8 +497,22 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     onUpdateLiveState({
       activeTeamIndex: (activeTeamIndex + 1) % teamArray.length,
       turnEndTime: Date.now() + timeLimit * 1000,
-      isExtraTurn: false 
+      isExtraTurn: false,
+      isTimerPaused: false
     });
+  };
+
+  // 🔥 TEACHER OVERRIDE COMMANDS
+  const togglePause = () => {
+      if (isTimerPaused) {
+          onUpdateLiveState({ isTimerPaused: false, turnEndTime: Date.now() + remainingPausedTime * 1000 });
+      } else {
+          onUpdateLiveState({ isTimerPaused: true, remainingPausedTime: timeLeft });
+      }
+  };
+
+  const forceEndGame = () => {
+      onUpdateLiveState({ gameStatus: 'finished' });
   };
 
   const handleInitiateCommit = async () => {
@@ -734,7 +762,8 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       bag: newBag, 
       activeTeamIndex: triggeredDP ? activeTeamIndex : (teamArray.length > 1 ? (activeTeamIndex + 1) % teamArray.length : 0),
       turnEndTime: Date.now() + timeLimit * 1000,
-      isExtraTurn: triggeredDP 
+      isExtraTurn: triggeredDP,
+      isTimerPaused: false
     };
 
     if (sentencePayload) {
@@ -847,6 +876,37 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         );
     }
 
+    if (gameStatus === 'finished') {
+        const sortedTeams = [...teamArray].sort((a, b) => (scores[b.id] || 0) - (scores[a.id] || 0));
+        return (
+            <div className="w-full h-full flex flex-col items-center justify-center p-12 scifi-bg text-white relative overflow-hidden">
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10 pointer-events-none mix-blend-overlay" />
+                <h1 className="text-[8vh] font-black magister-font text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-rose-400 mb-12 drop-shadow-2xl">EXPEDITION COMPLETE</h1>
+                <div className="flex gap-8 items-end relative z-10">
+                    {sortedTeams.slice(0,3).map((t: any, idx: number) => (
+                        <div key={t.id} className={`flex flex-col items-center animate-in slide-in-from-bottom-${(3-idx)*4} duration-700`}>
+                            <div className="mb-4 relative">
+                                {idx === 0 && <Trophy className="absolute -top-10 left-1/2 -translate-x-1/2 text-amber-400 w-12 h-12 drop-shadow-[0_0_15px_rgba(245,158,11,0.5)]" />}
+                                {t.avatar ? (
+                                    <img src={t.avatar} className={`w-32 h-32 rounded-full border-4 ${idx === 0 ? 'border-amber-400' : 'border-slate-600'} shadow-2xl bg-slate-900`} />
+                                ) : (
+                                    <div className={`w-32 h-32 rounded-full border-4 ${idx === 0 ? 'border-amber-400' : 'border-slate-600'} flex items-center justify-center bg-slate-900`}>
+                                        <User size={48} className={t.textColor}/>
+                                    </div>
+                                )}
+                            </div>
+                            <div className={`bg-slate-900/80 backdrop-blur-md border border-slate-700 p-6 rounded-t-3xl w-48 text-center flex flex-col items-center shadow-[0_-10px_20px_rgba(0,0,0,0.5)]`} style={{ height: `${250 - (idx * 40)}px` }}>
+                                <span className={`font-black text-2xl uppercase tracking-widest truncate w-full ${t.textColor}`}>{t.name}</span>
+                                <span className="text-4xl font-mono font-black text-white mt-2">{scores[t.id] || 0}</span>
+                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Star Power</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
     return (
       <div className="w-full h-full flex p-8 scifi-bg text-white gap-8 overflow-hidden relative">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-5 pointer-events-none mix-blend-overlay" />
@@ -862,9 +922,9 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                 <span className={activeTeam?.textColor}>{activeTeam?.name || 'Waiting'}</span>'s Turn
                 {isExtraTurn && <span className="bg-fuchsia-500 text-white text-[10px] px-2 py-0.5 rounded-md flex items-center gap-1 ml-2"><FastForward size={12}/> DOUBLE PLAY</span>}
              </div>
-             <div className="bg-slate-900/80 backdrop-blur-md px-5 py-2 rounded-full border border-slate-700 shadow-[0_0_20px_rgba(0,0,0,0.5)] flex items-center gap-3">
-                <Clock className="text-amber-400 w-4 h-4" />
-                <span className="text-xl font-mono font-bold text-amber-100">{timeLeft}s</span>
+             <div className={`backdrop-blur-md px-5 py-2 rounded-full border shadow-[0_0_20px_rgba(0,0,0,0.5)] flex items-center gap-3 transition-colors ${isTimerPaused ? 'bg-amber-900/40 border-amber-500/50' : 'bg-slate-900/80 border-slate-700'}`}>
+                {isTimerPaused ? <Pause className="text-amber-400 w-4 h-4 animate-pulse" /> : <Clock className="text-indigo-400 w-4 h-4" />}
+                <span className={`text-xl font-mono font-bold ${isTimerPaused ? 'text-amber-400' : 'text-indigo-100'}`}>{isTimerPaused ? 'PAUSED' : `${timeLeft}s`}</span>
              </div>
           </div>
           
@@ -884,6 +944,26 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                 })}
             </div>
           </div>
+
+          {/* 🔥 INSTRUCTOR OVERRIDE CONSOLE */}
+          <div className="absolute bottom-4 left-4 flex bg-slate-900/90 backdrop-blur-xl border border-slate-700 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in slide-in-from-bottom-8">
+              <div className="px-4 py-3 bg-indigo-900/30 border-r border-slate-700 flex items-center justify-center" title="Instructor Override Panel">
+                  <ShieldAlert className="text-indigo-400 w-5 h-5" />
+              </div>
+              <button onClick={togglePause} className="px-5 py-3 hover:bg-slate-800 transition-colors flex items-center gap-2 border-r border-slate-700">
+                  {isTimerPaused ? <Play size={16} className="text-emerald-400"/> : <Pause size={16} className="text-amber-400"/>}
+                  <span className="text-xs font-bold uppercase tracking-widest text-slate-300">{isTimerPaused ? 'Resume' : 'Pause'}</span>
+              </button>
+              <button onClick={passTurn} className="px-5 py-3 hover:bg-slate-800 transition-colors flex items-center gap-2 border-r border-slate-700">
+                  <FastForward size={16} className="text-slate-400"/>
+                  <span className="text-xs font-bold uppercase tracking-widest text-slate-300">Force Skip</span>
+              </button>
+              <button onClick={forceEndGame} className="px-5 py-3 hover:bg-rose-900/30 transition-colors flex items-center gap-2">
+                  <Power size={16} className="text-rose-400"/>
+                  <span className="text-xs font-bold uppercase tracking-widest text-rose-400">End Game</span>
+              </button>
+          </div>
+
         </div>
 
         <div className="w-[400px] flex flex-col gap-6 relative z-10">
@@ -954,10 +1034,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
               )}
             </div>
           )}
-
-          <button onClick={passTurn} className="mt-auto py-4 bg-slate-900/50 hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 rounded-2xl font-black uppercase tracking-widest flex justify-center items-center gap-2 transition-colors border border-slate-800 hover:border-rose-500/30">
-            <FastForward size={16}/> Skip Turn
-          </button>
         </div>
       </div>
     );
@@ -1026,6 +1102,28 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     );
   }
 
+  if (gameStatus === 'finished') {
+    const myScore = scores[myTeamId] || 0;
+    const sortedTeams = [...teamArray].sort((a, b) => (scores[b.id] || 0) - (scores[a.id] || 0));
+    const myRank = sortedTeams.findIndex((t: any) => t.id === myTeamId) + 1;
+    
+    return (
+        <div className="flex flex-col h-full w-full scifi-bg p-6 justify-center items-center text-center relative">
+            <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-rose-400 magister-font mb-8">OPERATION COMPLETE</h2>
+            
+            <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-700 p-8 rounded-[3rem] shadow-2xl flex flex-col items-center">
+                {myTeamEntry?.avatar && <img src={myTeamEntry.avatar} className="w-24 h-24 bg-slate-950 rounded-full mb-6 border border-slate-800 shadow-inner" />}
+                <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-1">Final Star Power</p>
+                <h3 className="text-6xl font-mono font-black text-white mb-6">{myScore}</h3>
+                <div className="bg-slate-950 border border-slate-800 px-6 py-3 rounded-full flex items-center gap-3">
+                    <Trophy className="text-amber-400 w-5 h-5"/>
+                    <span className="font-black text-slate-300 uppercase tracking-widest text-sm">Rank: #{myRank}</span>
+                </div>
+            </div>
+        </div>
+    );
+  }
+
   if (isMyTurn && pendingSentence) {
     return (
         <div className="flex flex-col h-full w-full scifi-bg p-6 text-center animate-in zoom-in-95 relative overflow-y-auto">
@@ -1081,9 +1179,10 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     <div className="flex flex-col h-full w-full scifi-bg p-2 overflow-hidden relative">
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-5 pointer-events-none mix-blend-overlay" />
       
-      <div className={`relative z-10 flex justify-between items-center mb-3 p-3 rounded-2xl border backdrop-blur-md transition-colors ${isMyTurn ? 'bg-indigo-900/20 border-indigo-500/30' : 'bg-slate-900/40 border-slate-800'}`}>
-         <span className={`${isMyTurn ? 'text-indigo-300 animate-pulse' : 'text-slate-500'} font-black uppercase tracking-widest flex items-center gap-2 text-xs transition-colors`}>
-            <Clock size={14} /> {timeLeft}s
+      <div className={`relative z-10 flex justify-between items-center mb-3 p-3 rounded-2xl border backdrop-blur-md transition-colors ${isMyTurn ? 'bg-indigo-900/20 border-indigo-500/30' : (isTimerPaused ? 'bg-amber-900/20 border-amber-500/30' : 'bg-slate-900/40 border-slate-800')}`}>
+         <span className={`${isMyTurn ? 'text-indigo-300 animate-pulse' : (isTimerPaused ? 'text-amber-400 animate-pulse' : 'text-slate-500')} font-black uppercase tracking-widest flex items-center gap-2 text-xs transition-colors`}>
+            {isTimerPaused ? <Pause size={14} /> : <Clock size={14} />} 
+            {isTimerPaused ? 'PAUSED' : `${timeLeft}s`}
          </span>
          
          <div className="flex items-center gap-2">
@@ -1129,7 +1228,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                     {!tile && type === 'DP' && <FastForward className="text-fuchsia-400 opacity-50 w-6 h-6 animate-pulse" fill="currentColor" />}
                     
                     {/* ORBITAL RETICLE */}
-                    {isTargeted && !tile && isMyTurn && (
+                    {isTargeted && !tile && isMyTurn && !isTimerPaused && (
                         <div className="absolute top-1/2 left-1/2 w-0 h-0 z-[100]" style={{ transform: `scale(${1/zoomLevel})` }}>
                             {rack.map((rackTile: any, rackIdx: number) => {
                                 if (!rackTile) return null;
@@ -1169,18 +1268,18 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
          <div className="flex justify-between items-end mb-3 px-2">
              <p className={`text-[9px] font-black uppercase tracking-widest ${isMyTurn ? 'text-indigo-400 animate-pulse' : 'text-slate-500'}`}>
-                {isMyTurn ? (targetSquare === null ? 'Select orbital coordinate' : 'Tap Astro-Tile to deploy') : 'Sort your tiles'}
+                {isTimerPaused ? 'OPERATION PAUSED BY INSTRUCTOR' : (isMyTurn ? (targetSquare === null ? 'Select orbital coordinate' : 'Tap Astro-Tile to deploy') : 'Sort your tiles')}
              </p>
              <div className="flex gap-2">
                  <button 
                      onClick={handlePurge} 
-                     disabled={!isMyTurn || isValidating || (scores[myTeamId] || 0) < 10}
+                     disabled={!isMyTurn || isValidating || isTimerPaused || (scores[myTeamId] || 0) < 10}
                      title="Purge Hand (-10 XP)"
                      className="p-1.5 bg-rose-500/20 text-rose-400 hover:text-white hover:bg-rose-500/40 rounded-lg active:scale-95 transition-colors border border-rose-500/30 shadow-sm disabled:opacity-30 disabled:hover:bg-rose-500/20 disabled:hover:text-rose-400"
                  >
                      <RefreshCw size={14} />
                  </button>
-                 <button onClick={shuffleRack} className="p-1.5 bg-slate-950 text-slate-400 hover:text-white rounded-lg active:scale-95 transition-colors border border-slate-800 shadow-sm">
+                 <button onClick={shuffleRack} disabled={isTimerPaused} className="p-1.5 bg-slate-950 text-slate-400 hover:text-white rounded-lg active:scale-95 transition-colors border border-slate-800 shadow-sm disabled:opacity-30">
                      <Shuffle size={14} />
                  </button>
              </div>
@@ -1193,7 +1292,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                 <div 
                   key={idx} 
                   onClick={() => handleRackClick(idx)} 
-                  className={`w-10 h-10 rounded-lg transition-all ${!tile ? 'bg-white/5 border border-white/5' : ''} ${isRackSelected ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-black scale-105' : ''}`}
+                  className={`w-10 h-10 rounded-lg transition-all ${!tile ? 'bg-white/5 border border-white/5' : ''} ${isRackSelected ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-black scale-105' : ''} ${isTimerPaused ? 'opacity-50 pointer-events-none' : ''}`}
                 >
                    {tile && <DataTile tile={tile} className="w-full h-full" />}
                 </div>
@@ -1203,12 +1302,12 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       </div>
 
       <div className="relative z-10 flex gap-2 mt-3 pb-2">
-         <button onClick={recallAll} disabled={isValidating} className="flex-1 py-3.5 bg-slate-900/80 text-slate-300 rounded-xl font-black uppercase tracking-widest text-xs flex justify-center items-center gap-2 active:scale-95 transition-colors hover:bg-slate-800 border border-slate-700 disabled:opacity-50">
+         <button onClick={recallAll} disabled={isValidating || isTimerPaused} className="flex-1 py-3.5 bg-slate-900/80 text-slate-300 rounded-xl font-black uppercase tracking-widest text-xs flex justify-center items-center gap-2 active:scale-95 transition-colors hover:bg-slate-800 border border-slate-700 disabled:opacity-50">
              <ArrowDownToLine size={16}/> Recall
          </button>
          
          {isMyTurn ? (
-             <button onClick={handleInitiateCommit} disabled={isValidating} className="flex-1 py-3.5 bg-indigo-600/20 text-indigo-300 hover:text-white rounded-xl font-black uppercase tracking-widest text-xs flex justify-center items-center gap-2 shadow-lg active:scale-95 border border-indigo-500/50 transition-colors hover:bg-indigo-600/40 disabled:opacity-50">
+             <button onClick={handleInitiateCommit} disabled={isValidating || isTimerPaused} className="flex-1 py-3.5 bg-indigo-600/20 text-indigo-300 hover:text-white rounded-xl font-black uppercase tracking-widest text-xs flex justify-center items-center gap-2 shadow-lg active:scale-95 border border-indigo-500/50 transition-colors hover:bg-indigo-600/40 disabled:opacity-50 disabled:border-indigo-800">
                  {isValidating ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16}/>} 
                  {isValidating ? 'Validating...' : 'Play Sequence'}
              </button>
