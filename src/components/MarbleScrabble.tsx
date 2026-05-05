@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool, User, MessageSquare, Shuffle, Loader2, AlertTriangle, Zap, Rocket, BookOpen, RefreshCw } from 'lucide-react';
+import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool, User, MessageSquare, Shuffle, Loader2, AlertTriangle, Zap, Rocket, BookOpen, RefreshCw, ZoomIn, ZoomOut, LocateFixed } from 'lucide-react';
 
 // ==========================================
 // GAME DATA & CONSTANTS
@@ -188,6 +188,12 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const [currentTurnWords, setCurrentTurnWords] = useState<{word: string, def: string}[]>([]);
   const [currentTurnScore, setCurrentTurnScore] = useState(0);
 
+  // 🔥 TACTICAL HUD ZOOM STATE
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.2, 1.8));
+  const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.2, 0.6));
+  const handleZoomReset = () => setZoomLevel(1);
+
   useEffect(() => {
     if (globalBoard) {
       setLocalBoard(globalBoard);
@@ -363,12 +369,10 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     setInvalidWords([]);
   };
 
-  // 🔥 NEW: MULLIGAN / PURGE FUNCTION
   const handlePurge = () => {
     if (!isMyTurn || isValidating) return;
     if ((scores[myTeamId] || 0) < 10) return;
 
-    // 1. Gather all unplayed tiles (from rack + unlocked on board)
     let tilesToReturn: any[] = [];
     const newBoard = [...localBoard];
     
@@ -383,23 +387,19 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         if (tile) tilesToReturn.push(tile);
     });
 
-    // 2. Mix into bag
     let newBag = [...(globalBag || []), ...tilesToReturn];
     
-    // Fisher-Yates shuffle new bag
     for (let i = newBag.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [newBag[i], newBag[j]] = [newBag[j], newBag[i]];
     }
 
-    // 3. Draw new hand
     let newRack = Array(7).fill(null);
     newRack = newRack.map(() => {
         if (newBag.length > 0) return newBag.pop();
         return null;
     });
 
-    // 4. Update local state instantly
     setRack(newRack);
     setLocalBoard(newBoard);
     setTargetSquare(null);
@@ -408,7 +408,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     setInvalidWords([]);
     setSelectedRackIndex(null);
 
-    // 5. Update global state (deduct points and pass turn)
     const updatedScores = { ...scores, [myTeamId]: (scores[myTeamId] || 0) - 10 };
     
     onUpdateLiveState({
@@ -498,7 +497,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     setInvalidWords([]);
 
     const rows = Array.from(new Set(placedIndices.map((idx: number) => Math.floor(idx / BOARD_SIZE))));
-    const cols = Array.from(new Set(placedIndices.map((idx: number) => idx % BOARD_SIZE)));
+    const cols = Array.from(new Set(placedIndices.map((idx: number) => idx % BOARD_SIZE))));
     
     if (rows.length > 1 && cols.length > 1) {
         setInvalidWords(["Tiles must be placed in a single row or column."]);
@@ -1097,44 +1096,64 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       </div>
 
       <div className="relative z-10 flex-1 overflow-auto rounded-2xl shadow-inner bg-slate-900/40 backdrop-blur-md border border-slate-700/50 no-scrollbar">
-        <div className="board-grid absolute min-w-[750px] min-h-[750px] p-3">
-          {(localBoard || []).map((tile: any, index: number) => {
-            const r = Math.floor(index / BOARD_SIZE);
-            const c = index % BOARD_SIZE;
-            const isTargeted = targetSquare === index;
-            const type = getSquareType(r, c);
-            
-            return (
-              <div key={index} onClick={() => handleBoardClick(index)} className={`w-full h-full aspect-square relative flex items-center justify-center transition-all rounded-md ${getSquareClasses(r, c, tile, isTargeted)}`}>
-                {!tile && type === 'CT' && <Star className="text-indigo-400 opacity-30 w-8 h-8" fill="currentColor" />}
-                {!tile && type === 'DP' && <FastForward className="text-fuchsia-400 opacity-50 w-6 h-6 animate-pulse" fill="currentColor" />}
+        
+        {/* 🔥 NEW TACTICAL ZOOM HUD */}
+        <div className="sticky top-2 right-2 float-right z-50 flex flex-col gap-2 bg-slate-950/80 backdrop-blur-md p-2 rounded-xl border border-slate-800 shadow-[0_0_15px_rgba(0,0,0,0.5)] mr-2">
+            <button onClick={handleZoomIn} className="text-slate-400 hover:text-indigo-400 active:scale-95 transition-all">
+                <ZoomIn size={18} />
+            </button>
+            <div className="w-full h-[1px] bg-slate-800"></div>
+            <button onClick={handleZoomReset} className="text-slate-400 hover:text-indigo-400 active:scale-95 transition-all">
+                <LocateFixed size={18} />
+            </button>
+            <div className="w-full h-[1px] bg-slate-800"></div>
+            <button onClick={handleZoomOut} className="text-slate-400 hover:text-indigo-400 active:scale-95 transition-all">
+                <ZoomOut size={18} />
+            </button>
+        </div>
+
+        {/* 🔥 SMART SCALING WRAPPER */}
+        <div className="relative origin-top-left transition-transform duration-300" style={{ transform: `scale(${zoomLevel})`, width: `${750 * zoomLevel}px`, height: `${750 * zoomLevel}px` }}>
+            <div className="board-grid absolute top-0 left-0 w-[750px] h-[750px] p-3">
+            {(localBoard || []).map((tile: any, index: number) => {
+                const r = Math.floor(index / BOARD_SIZE);
+                const c = index % BOARD_SIZE;
+                const isTargeted = targetSquare === index;
+                const type = getSquareType(r, c);
                 
-                {isTargeted && !tile && isMyTurn && (
-                    <div className="absolute top-1/2 left-1/2 w-0 h-0 z-[100]">
-                        {rack.map((rackTile: any, rackIdx: number) => {
-                            if (!rackTile) return null;
-                            const angle = (rackIdx / 7) * Math.PI * 2 - (Math.PI / 2);
-                            const radius = 90; 
-                            const x = Math.cos(angle) * radius;
-                            const y = Math.sin(angle) * radius;
-                            return (
-                                <div
-                                    key={`orbit_${rackIdx}`}
-                                    onClick={(e) => { e.stopPropagation(); handleRackClick(rackIdx); }}
-                                    className="absolute w-12 h-12 -ml-6 -mt-6 transition-all duration-300 animate-in zoom-in spin-in"
-                                    style={{ transform: `translate(${x}px, ${y}px)` }}
-                                >
-                                    <DataTile tile={rackTile} className="w-full h-full shadow-[0_10px_30px_rgba(0,0,0,0.8)]" />
-                                </div>
-                            )
-                        })}
-                    </div>
-                )}
-                
-                {tile && <DataTile tile={tile} isLocked={tile.isLocked} className="w-[90%] h-[90%]" />}
-              </div>
-            );
-          })}
+                return (
+                <div key={index} onClick={() => handleBoardClick(index)} className={`w-full h-full aspect-square relative flex items-center justify-center transition-all rounded-md ${getSquareClasses(r, c, tile, isTargeted)}`}>
+                    {!tile && type === 'CT' && <Star className="text-indigo-400 opacity-30 w-8 h-8" fill="currentColor" />}
+                    {!tile && type === 'DP' && <FastForward className="text-fuchsia-400 opacity-50 w-6 h-6 animate-pulse" fill="currentColor" />}
+                    
+                    {/* ORBITAL RETICLE */}
+                    {isTargeted && !tile && isMyTurn && (
+                        <div className="absolute top-1/2 left-1/2 w-0 h-0 z-[100]" style={{ transform: `scale(${1/zoomLevel})` }}>
+                            {rack.map((rackTile: any, rackIdx: number) => {
+                                if (!rackTile) return null;
+                                const angle = (rackIdx / 7) * Math.PI * 2 - (Math.PI / 2);
+                                const radius = 90; 
+                                const x = Math.cos(angle) * radius;
+                                const y = Math.sin(angle) * radius;
+                                return (
+                                    <div
+                                        key={`orbit_${rackIdx}`}
+                                        onClick={(e) => { e.stopPropagation(); handleRackClick(rackIdx); }}
+                                        className="absolute w-12 h-12 -ml-6 -mt-6 transition-all duration-300 animate-in zoom-in spin-in"
+                                        style={{ transform: `translate(${x}px, ${y}px)` }}
+                                    >
+                                        <DataTile tile={rackTile} className="w-full h-full shadow-[0_10px_30px_rgba(0,0,0,0.8)]" />
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
+                    
+                    {tile && <DataTile tile={tile} isLocked={tile.isLocked} className="w-[90%] h-[90%]" />}
+                </div>
+                );
+            })}
+            </div>
         </div>
       </div>
 
@@ -1151,7 +1170,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                 {isMyTurn ? (targetSquare === null ? 'Select orbital coordinate' : 'Tap Astro-Tile to deploy') : 'Sort your tiles'}
              </p>
              <div className="flex gap-2">
-                 {/* 🔥 MULLIGAN / DATA PURGE BUTTON */}
                  <button 
                      onClick={handlePurge} 
                      disabled={!isMyTurn || isValidating || (scores[myTeamId] || 0) < 10}
