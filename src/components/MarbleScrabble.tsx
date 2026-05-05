@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool, User, MessageSquare, Shuffle, Loader2, AlertTriangle, Rocket } from 'lucide-react';
+import { Trophy, Clock, CheckCircle2, ShieldAlert, FastForward, ArrowDownToLine, Star, Users, UserPlus, PenTool, User, MessageSquare, Shuffle, Loader2, AlertTriangle, Zap, Rocket, BookOpen } from 'lucide-react';
 
 // ==========================================
 // GAME DATA & CONSTANTS
@@ -129,6 +129,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         bag: createInitialBag(),
         scores: {},
         teamWords: {}, 
+        latestDiscoveries: [], // 🔥 Firebase storage for definitions
         activeTeamIndex: 0,
         turnEndTime: null,
         isExtraTurn: false,
@@ -143,6 +144,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const globalBag = liveState?.bag;
   const scores: Record<string, number> = liveState?.scores || {};
   const teamWords: Record<string, string[]> = liveState?.teamWords || {}; 
+  const latestDiscoveries: {word: string, def: string}[] = liveState?.latestDiscoveries || [];
   const activeTeamIndex = liveState?.activeTeamIndex || 0;
   const turnEndTime = liveState?.turnEndTime;
   const latestSentence = liveState?.latestSentence;
@@ -183,7 +185,9 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const [sentenceText, setSentenceText] = useState("");
   const [isValidating, setIsValidating] = useState(false);
   const [invalidWords, setInvalidWords] = useState<string[]>([]);
-  const [currentTurnWords, setCurrentTurnWords] = useState<string[]>([]);
+  
+  // 🔥 UPDATED: Stores validated words AND their definitions
+  const [currentTurnWords, setCurrentTurnWords] = useState<{word: string, def: string}[]>([]);
   const [currentTurnScore, setCurrentTurnScore] = useState(0);
 
   useEffect(() => {
@@ -366,7 +370,15 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   // ==========================================
   const joinLobby = () => {
     const displayName = studentId.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ');
-    const newPlayers = { ...players, [studentId]: { id: studentId, name: displayName.charAt(0).toUpperCase() + displayName.slice(1) } };
+    const avatarUrl = `https://api.dicebear.com/7.x/bottts/svg?seed=${studentId}&backgroundColor=transparent`;
+    const newPlayers = { 
+        ...players, 
+        [studentId]: { 
+            id: studentId, 
+            name: displayName.charAt(0).toUpperCase() + displayName.slice(1),
+            avatar: avatarUrl 
+        } 
+    };
     onUpdateLiveState({ players: newPlayers });
   };
 
@@ -381,6 +393,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
             id: tId,
             order: idx,
             name: players[pId].name, 
+            avatar: players[pId].avatar, 
             color: INDIVIDUAL_COLORS[idx % INDIVIDUAL_COLORS.length].color,
             textColor: INDIVIDUAL_COLORS[idx % INDIVIDUAL_COLORS.length].textColor,
             members: [pId] 
@@ -418,6 +431,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     });
   };
 
+  // 🔥 TRUE SCRABBLE SCORING ENGINE & DUAL-API DICTIONARY VALIDATION
   const handleInitiateCommit = async () => {
     const placedIndices: number[] = [];
     localBoard.forEach((tile: any, idx: number) => {
@@ -559,21 +573,53 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     });
 
     const extractedWords = foundWordsList.map(w => w.word);
+    
+    const validWordsData: {word: string, def: string}[] = [];
     const failedWords: string[] = [];
     
+    // 🔥 DUAL-API VALIDATION WITH DEFINITION EXTRACTION
     await Promise.all(extractedWords.map(async (word) => {
+        if (word.length < 2) return; // Standard Scrabble rules ignore single letter connections in processing
+        
+        let foundDefinition = false;
+
+        // API 1: Free Dictionary API (Primary, Best Definitions)
         try {
             const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
-            if (!res.ok) {
-                const fallbackRes = await fetch(`https://api.datamuse.com/words?sp=${word}&max=1`);
-                const fallbackData = await fallbackRes.json();
-                if (!fallbackData || fallbackData.length === 0 || fallbackData[0].word.toLowerCase() !== word.toLowerCase()) {
-                    failedWords.push(word);
-                }
+            const data = await res.json();
+            
+            if (res.ok && Array.isArray(data)) {
+                let def = data[0]?.meanings?.[0]?.definitions?.[0]?.definition || "Definition acquired.";
+                validWordsData.push({ word: word.toUpperCase(), def });
+                foundDefinition = true;
             }
         } catch (err) {
-            console.error("Dictionary API failed:", err);
-            failedWords.push(word); 
+            console.warn("Primary Dictionary API failed for", word, err);
+        }
+
+        // API 2: Datamuse Fallback (In case of CORS or network block)
+        if (!foundDefinition) {
+            try {
+                const res2 = await fetch(`https://api.datamuse.com/words?sp=${word}&md=d&max=1`);
+                const data2 = await res2.json();
+                
+                if (data2 && data2.length > 0 && data2[0].word.toLowerCase() === word.toLowerCase()) {
+                    let def = "Definition securely archived.";
+                    if (data2[0].defs && data2[0].defs.length > 0) {
+                        // Datamuse format is "n\tA feline..." so we split it
+                        def = data2[0].defs[0].split('\t').pop() || def;
+                    }
+                    validWordsData.push({ word: word.toUpperCase(), def });
+                    foundDefinition = true;
+                }
+            } catch (err) {
+                console.warn("Fallback Datamuse API failed for", word, err);
+            }
+        }
+
+        // If both failed or returned 404, the word is fake
+        if (!foundDefinition) {
+            failedWords.push(word.toUpperCase());
         }
     }));
 
@@ -584,8 +630,9 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         return; 
     }
 
+    // Success! Lock the definitions into the current turn
     setCurrentTurnScore(totalCalculatedScore);
-    setCurrentTurnWords(extractedWords);
+    setCurrentTurnWords(validWordsData);
     setPendingSentence(true);
   };
 
@@ -616,8 +663,10 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
     const lockedBoard = localBoard.map((t: any) => t && !t.isLocked ? { ...t, isLocked: true } : t);
     const updatedScores = { ...scores, [myTeamId]: (scores[myTeamId] || 0) + currentTurnScore + bonus };
+    
     const currentTeamWordsLog = teamWords[myTeamId] || [];
-    const updatedTeamWords = { ...teamWords, [myTeamId]: [...currentTeamWordsLog, ...currentTurnWords] };
+    const extractedWordStrings = currentTurnWords.map(w => w.word);
+    const updatedTeamWords = { ...teamWords, [myTeamId]: [...currentTeamWordsLog, ...extractedWordStrings] };
 
     let newBag = [...(globalBag || [])];
     let newRack = rack.map((slot: any) => {
@@ -632,6 +681,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       board: lockedBoard,
       scores: updatedScores,
       teamWords: updatedTeamWords, 
+      latestDiscoveries: currentTurnWords, // 🔥 Broadcast the definitions to the projector!
       bag: newBag, 
       activeTeamIndex: triggeredDP ? activeTeamIndex : (teamArray.length > 1 ? (activeTeamIndex + 1) % teamArray.length : 0),
       turnEndTime: Date.now() + timeLimit * 1000,
@@ -735,9 +785,13 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                     {teamArray.map((t: any) => (
                         <div key={t.id} className={`p-8 rounded-3xl shadow-xl border border-slate-700/50 bg-slate-900/40 backdrop-blur-md animate-in zoom-in-95 duration-500 flex flex-col items-center justify-center text-center relative overflow-hidden`}>
                             <div className={`absolute top-0 left-0 w-full h-1 ${t.color}`} />
-                            <div className="w-20 h-20 bg-slate-950 rounded-full flex items-center justify-center mb-4 border border-slate-800 shadow-inner">
-                                <User size={32} className={t.textColor} />
-                            </div>
+                            {t.avatar ? (
+                                <img src={t.avatar} className="w-20 h-20 bg-slate-950 rounded-full mb-4 border border-slate-800 shadow-inner" alt={t.name} />
+                            ) : (
+                                <div className="w-20 h-20 bg-slate-950 rounded-full flex items-center justify-center mb-4 border border-slate-800 shadow-inner">
+                                    <User size={32} className={t.textColor} />
+                                </div>
+                            )}
                             <h2 className="text-3xl font-black uppercase tracking-tight leading-tight text-white">{t.name}</h2>
                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-2">Ready</p>
                         </div>
@@ -754,7 +808,12 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
         {/* Main Board Container */}
         <div className="flex-1 flex flex-col items-center justify-center relative z-10">
           <div className="mb-6 flex items-center gap-4 animate-in slide-in-from-top-8">
-             <div className={`px-6 py-2 rounded-full border shadow-lg text-white font-black uppercase tracking-widest text-sm bg-slate-900/60 backdrop-blur-md border-slate-700 flex items-center gap-2`}>
+             <div className={`pl-2 pr-6 py-2 rounded-full border shadow-lg text-white font-black uppercase tracking-widest text-sm bg-slate-900/60 backdrop-blur-md border-slate-700 flex items-center gap-3`}>
+                {activeTeam?.avatar ? (
+                    <img src={activeTeam.avatar} className="w-8 h-8 rounded-full bg-slate-800 border border-slate-600" />
+                ) : (
+                    <User className="w-8 h-8 p-1 rounded-full bg-slate-800" />
+                )}
                 <span className={activeTeam?.textColor}>{activeTeam?.name || 'Waiting'}</span>'s Turn
                 {isExtraTurn && <span className="bg-fuchsia-500 text-white text-[10px] px-2 py-0.5 rounded-md flex items-center gap-1 ml-2"><FastForward size={12}/> DOUBLE PLAY</span>}
              </div>
@@ -784,20 +843,23 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
         {/* Tactical Sidebar */}
         <div className="w-[400px] flex flex-col gap-6 relative z-10">
-          <div className="bg-slate-900/80 backdrop-blur-xl p-8 rounded-3xl border border-slate-700 shadow-2xl flex flex-col">
+          <div className="bg-slate-900/80 backdrop-blur-xl p-8 rounded-3xl border border-slate-700 shadow-2xl flex flex-col min-h-[40vh]">
             <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-800 shrink-0">
               <h2 className="text-2xl font-black magister-font flex items-center gap-3 text-slate-100"><Trophy className="text-indigo-400"/> RANKINGS</h2>
               <span className="text-slate-500 font-mono text-xs font-bold bg-slate-950 px-3 py-1 rounded-full border border-slate-800">{globalBag?.length || 0} ASTRO-TILES</span>
             </div>
             
-            <div className="space-y-4 max-h-[40vh] overflow-y-auto custom-scrollbar pr-2">
+            <div className="space-y-4 overflow-y-auto custom-scrollbar pr-2 flex-1">
               {teamArray.map((t: any) => {
                 const playerWords = teamWords[t.id] || [];
                 const isActive = activeTeamIndex === t.order;
                 return (
                 <div key={t.id} className={`flex flex-col p-4 rounded-2xl border transition-all ${isActive ? 'bg-slate-800/80 border-slate-600 shadow-[0_0_20px_rgba(0,0,0,0.3)] scale-[1.02]' : 'border-transparent bg-slate-950/50'}`}>
                   <div className="flex justify-between items-center">
-                      <span className={`font-black uppercase tracking-widest text-sm ${t.textColor}`}>{t.name}</span>
+                      <div className="flex items-center gap-3">
+                          {t.avatar && <img src={t.avatar} className="w-8 h-8 rounded-full bg-slate-900 border border-slate-700" alt="avatar" />}
+                          <span className={`font-black uppercase tracking-widest text-sm ${t.textColor}`}>{t.name}</span>
+                      </div>
                       <span className="text-2xl font-mono font-black text-slate-100">{scores?.[t.id] || 0}</span>
                   </div>
                   {playerWords.length > 0 && (
@@ -814,17 +876,39 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
             </div>
           </div>
           
-          {latestSentence && (
-            <div className="bg-indigo-900/20 backdrop-blur-xl p-6 rounded-3xl border border-indigo-500/30 shadow-[0_0_30px_rgba(99,102,241,0.15)] animate-in slide-in-from-right duration-500">
-              <h3 className="text-indigo-400 font-black text-[10px] uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <Star size={14} fill="currentColor" /> Cosmic Discovery (+{latestSentence.bonusAmount} XP)
-              </h3>
-              <p className="text-slate-100 text-lg font-medium italic mb-4 leading-relaxed">
-                  "{latestSentence.text}"
-              </p>
-              <p className="text-indigo-300/50 text-[10px] font-bold uppercase tracking-widest text-right">
-                  — {latestSentence.playerName}
-              </p>
+          {/* 🔥 LATEST DEFINITIONS DISPLAY */}
+          {(latestDiscoveries.length > 0 || latestSentence) && (
+            <div className="bg-indigo-900/20 backdrop-blur-xl p-6 rounded-3xl border border-indigo-500/30 shadow-[0_0_30px_rgba(99,102,241,0.15)] animate-in slide-in-from-right duration-500 flex flex-col gap-4">
+              
+              {latestDiscoveries.length > 0 && (
+                 <div>
+                    <h3 className="text-cyan-400 font-black text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <BookOpen size={14} fill="currentColor" /> Lexicon Databanks 
+                    </h3>
+                    <div className="space-y-3">
+                        {latestDiscoveries.map((disc, idx) => (
+                            <div key={idx} className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 shadow-inner">
+                                <span className="font-black text-indigo-300 tracking-widest block mb-1">{disc.word}</span>
+                                <span className="text-xs text-slate-300 font-medium leading-relaxed block">{disc.def}</span>
+                            </div>
+                        ))}
+                    </div>
+                 </div>
+              )}
+
+              {latestSentence && (
+                 <div className="border-t border-indigo-500/20 pt-4 mt-2">
+                    <h3 className="text-amber-400 font-black text-[10px] uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <Star size={14} fill="currentColor" /> Intel Bonus (+{latestSentence.bonusAmount} XP)
+                    </h3>
+                    <p className="text-slate-100 text-sm font-medium italic mb-2 leading-relaxed">
+                        "{latestSentence.text}"
+                    </p>
+                    <p className="text-indigo-300/50 text-[10px] font-bold uppercase tracking-widest text-right">
+                        — {latestSentence.playerName}
+                    </p>
+                 </div>
+              )}
             </div>
           )}
 
@@ -869,9 +953,13 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     return (
         <div className="flex flex-col h-full w-full scifi-bg p-6 text-center relative">
             <div className={`p-10 rounded-[2.5rem] bg-slate-900/60 backdrop-blur-xl border border-slate-700 shadow-2xl mb-8 flex flex-col items-center`}>
-                <div className="w-20 h-20 bg-slate-950 rounded-full flex items-center justify-center mb-6 border border-slate-800 shadow-inner">
-                    <User size={32} className={myTeamEntry.textColor} />
-                </div>
+                {myTeamEntry.avatar ? (
+                    <img src={myTeamEntry.avatar} className="w-20 h-20 bg-slate-950 rounded-full mb-6 border border-slate-800 shadow-inner" alt="Avatar" />
+                ) : (
+                    <div className="w-20 h-20 bg-slate-950 rounded-full flex items-center justify-center mb-6 border border-slate-800 shadow-inner">
+                        <User size={32} className={myTeamEntry.textColor} />
+                    </div>
+                )}
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Explorer Alias</h3>
                 <h2 className={`text-3xl font-black uppercase tracking-tight ${myTeamEntry.textColor}`}>{myTeamEntry.name}</h2>
             </div>
@@ -895,23 +983,35 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     );
   }
 
+  // 🔥 UPDATED BONUS SCREEN (Shows what they discovered!)
   if (isMyTurn && pendingSentence) {
     return (
-        <div className="flex flex-col h-full w-full scifi-bg p-6 text-center animate-in zoom-in-95 relative">
-            <div className="flex-1 flex flex-col justify-center items-center max-w-sm mx-auto w-full relative z-10">
+        <div className="flex flex-col h-full w-full scifi-bg p-6 text-center animate-in zoom-in-95 relative overflow-y-auto">
+            <div className="flex-1 flex flex-col justify-center items-center max-w-sm mx-auto w-full relative z-10 py-12">
                 <div className="relative">
                     <div className="absolute inset-0 bg-indigo-500 blur-2xl opacity-20 rounded-full" />
                     <Star size={72} className="text-indigo-400 mb-6 relative z-10" fill="currentColor" />
                 </div>
                 
                 <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tight magister-font">COSMIC DISCOVERY</h2>
-                <p className="text-slate-400 font-medium mb-8 text-sm px-4">Write a sentence using your newly formed word to earn +5 Star Power (XP).</p>
+                
+                <div className="bg-slate-900/80 border border-slate-700 rounded-2xl w-full p-4 mb-6 shadow-inner text-left">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3 border-b border-slate-800 pb-2">Valid Database Entries Found</p>
+                    {currentTurnWords.map((disc, idx) => (
+                        <div key={idx} className="mb-3 last:mb-0">
+                            <span className="font-black text-indigo-300 block text-sm">{disc.word}</span>
+                            <span className="text-xs text-slate-300 font-medium">{disc.def}</span>
+                        </div>
+                    ))}
+                </div>
+
+                <p className="text-slate-400 font-medium mb-4 text-sm px-4">Write a sentence using one of your newly formed words to earn +5 Star Power.</p>
                 
                 <textarea 
                     value={sentenceText}
                     onChange={e => setSentenceText(e.target.value)}
                     placeholder="Input contextual sentence..."
-                    className="w-full bg-slate-900/80 backdrop-blur-md border border-slate-700 rounded-2xl p-5 text-slate-200 text-lg font-medium outline-none focus:border-indigo-500 transition-colors mb-8 min-h-[140px] shadow-inner"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-2xl p-5 text-slate-200 text-lg font-medium outline-none focus:border-indigo-500 transition-colors mb-8 min-h-[120px] shadow-inner"
                 />
 
                 <div className="flex flex-col gap-3 w-full">
@@ -943,10 +1043,16 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
          <span className={`${isMyTurn ? 'text-indigo-300 animate-pulse' : 'text-slate-500'} font-black uppercase tracking-widest flex items-center gap-2 text-xs transition-colors`}>
             <Clock size={14} /> {timeLeft}s
          </span>
-         <span className={`${isMyTurn ? 'text-white' : 'text-slate-400'} font-black uppercase tracking-widest truncate ml-4 max-w-[150px] text-right text-xs transition-colors flex items-center justify-end gap-2`}>
+         
+         <div className="flex items-center gap-2">
             {isExtraTurn && isMyTurn && <FastForward size={14} className="text-fuchsia-400 animate-pulse" />}
-            {isMyTurn ? "Your Turn" : `${activeTeam?.name}'s Turn`}
-         </span>
+            <span className={`${isMyTurn ? 'text-white' : 'text-slate-400'} font-black uppercase tracking-widest truncate max-w-[150px] text-right text-xs transition-colors`}>
+                {isMyTurn ? "Your Turn" : `${activeTeam?.name}'s Turn`}
+            </span>
+            {activeTeam?.avatar && !isMyTurn && (
+                <img src={activeTeam.avatar} className="w-5 h-5 rounded-full bg-slate-800" alt="Active Player" />
+            )}
+         </div>
       </div>
 
       <div className="relative z-10 flex-1 overflow-auto rounded-2xl shadow-inner bg-slate-900/40 backdrop-blur-md border border-slate-700/50 no-scrollbar">
@@ -962,7 +1068,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
                 {!tile && type === 'CT' && <Star className="text-indigo-400 opacity-30 w-8 h-8" fill="currentColor" />}
                 {!tile && type === 'DP' && <FastForward className="text-fuchsia-400 opacity-50 w-6 h-6 animate-pulse" fill="currentColor" />}
                 
-                {/* 🔥 ORBITAL RETICLE (Only for Active Player) */}
                 {isTargeted && !tile && isMyTurn && (
                     <div className="absolute top-1/2 left-1/2 w-0 h-0 z-[100]">
                         {rack.map((rackTile: any, rackIdx: number) => {
@@ -1033,7 +1138,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
          {isMyTurn ? (
              <button onClick={handleInitiateCommit} disabled={isValidating} className="flex-1 py-3.5 bg-indigo-600/20 text-indigo-300 hover:text-white rounded-xl font-black uppercase tracking-widest text-xs flex justify-center items-center gap-2 shadow-lg active:scale-95 border border-indigo-500/50 transition-colors hover:bg-indigo-600/40 disabled:opacity-50">
                  {isValidating ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16}/>} 
-                 {isValidating ? 'Validating...' : 'Play Word'}
+                 {isValidating ? 'Validating...' : 'Play Sequence'}
              </button>
          ) : (
              <div className="flex-1 py-3.5 bg-slate-950/80 text-slate-600 rounded-xl font-black uppercase tracking-widest text-xs flex justify-center items-center gap-2 border border-slate-800/50">
