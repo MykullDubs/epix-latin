@@ -59,7 +59,7 @@ const createInitialBag = () => {
 };
 
 // ==========================================
-// ASTROGRAM DATA TILE COMPONENT
+// ASTROGRAM DATA TILE COMPONENT (UI UPDATED)
 // ==========================================
 const DataTile = ({ tile, isSelected, isLocked, onClick, className = '' }: any) => {
   if (!tile) return null;
@@ -73,12 +73,18 @@ const DataTile = ({ tile, isSelected, isLocked, onClick, className = '' }: any) 
       } ${className}`}
     >
       <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none mix-blend-overlay" />
-      <span className="magister-font font-bold data-text text-xl relative z-10">
+      
+      {/* Enhanced Letter Readability */}
+      <span className="magister-font font-black text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)] text-xl relative z-10 mb-0.5 mr-0.5">
         {tile.letter}
       </span>
-      <span className="absolute bottom-1 right-1.5 text-[9px] font-mono font-bold text-indigo-300 opacity-80 relative z-10">
-        {tile.value}
-      </span>
+      
+      {/* High-Contrast Score Badge */}
+      <div className="absolute bottom-0.5 right-0.5 bg-slate-950/90 rounded border border-slate-700/50 px-[3px] py-[1px] shadow-md z-20 flex items-center justify-center min-w-[14px]">
+        <span className="text-[10px] font-black font-mono text-amber-400 leading-none drop-shadow-sm">
+          {tile.value}
+        </span>
+      </div>
     </div>
   );
 };
@@ -497,7 +503,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     setInvalidWords([]);
 
     const rows = Array.from(new Set(placedIndices.map((idx: number) => Math.floor(idx / BOARD_SIZE))));
-    const cols = Array.from(new Set(placedIndices.map((idx: number) => idx % BOARD_SIZE))); // 🔥 Fixed: removed extra parenthesis
+    const cols = Array.from(new Set(placedIndices.map((idx: number) => idx % BOARD_SIZE))));
     
     if (rows.length > 1 && cols.length > 1) {
         setInvalidWords(["Tiles must be placed in a single row or column."]);
