@@ -497,7 +497,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     setInvalidWords([]);
 
     const rows = Array.from(new Set(placedIndices.map((idx: number) => Math.floor(idx / BOARD_SIZE))));
-    const cols = Array.from(new Set(placedIndices.map((idx: number) => idx % BOARD_SIZE))));
+    const cols = Array.from(new Set(placedIndices.map((idx: number) => idx % BOARD_SIZE))); // 🔥 Fixed: removed extra parenthesis
     
     if (rows.length > 1 && cols.length > 1) {
         setInvalidWords(["Tiles must be placed in a single row or column."]);
@@ -1097,7 +1097,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
       <div className="relative z-10 flex-1 overflow-auto rounded-2xl shadow-inner bg-slate-900/40 backdrop-blur-md border border-slate-700/50 no-scrollbar">
         
-        {/* 🔥 NEW TACTICAL ZOOM HUD */}
+        {/* 🔥 TACTICAL ZOOM HUD */}
         <div className="sticky top-2 right-2 float-right z-50 flex flex-col gap-2 bg-slate-950/80 backdrop-blur-md p-2 rounded-xl border border-slate-800 shadow-[0_0_15px_rgba(0,0,0,0.5)] mr-2">
             <button onClick={handleZoomIn} className="text-slate-400 hover:text-indigo-400 active:scale-95 transition-all">
                 <ZoomIn size={18} />
