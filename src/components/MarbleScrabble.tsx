@@ -162,7 +162,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const [hasDrawnInitialHand, setHasDrawnInitialHand] = useState(false);
   const [selectedRackIndex, setSelectedRackIndex] = useState<number | null>(null);
   
-  // 🔥 BONUS & VALIDATION STATE
   const [pendingSentence, setPendingSentence] = useState(false);
   const [sentenceText, setSentenceText] = useState("");
   const [isValidating, setIsValidating] = useState(false);
@@ -239,7 +238,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
   const handleBoardClick = (index: number) => {
     if (!isMyTurn || isValidating) return; 
     setSelectedRackIndex(null); 
-    setInvalidWords([]); // Clear errors on interaction
+    setInvalidWords([]); 
 
     if (localBoard[index]?.isLocked) return; 
     
@@ -401,7 +400,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     });
   };
 
-  // 🔥 DICTIONARY VALIDATION ENGINE
   const handleInitiateCommit = async () => {
     let turnScore = 0;
     const placedIndices: number[] = [];
@@ -421,12 +419,10 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     const foundWords = new Set<string>();
     const getTile = (r: number, c: number) => r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE ? localBoard[r * BOARD_SIZE + c] : null;
 
-    // Scan for words
     placedIndices.forEach(idx => {
         const r = Math.floor(idx / BOARD_SIZE);
         const c = idx % BOARD_SIZE;
 
-        // Horizontals
         let left = c, right = c;
         while (left > 0 && getTile(r, left - 1)) left--;
         while (right < BOARD_SIZE - 1 && getTile(r, right + 1)) right++;
@@ -436,7 +432,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
             foundWords.add(word);
         }
 
-        // Verticals
         let top = r, bottom = r;
         while (top > 0 && getTile(top - 1, c)) top--;
         while (bottom < BOARD_SIZE - 1 && getTile(bottom + 1, c)) bottom++;
@@ -449,15 +444,13 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
     let extractedWords = Array.from(foundWords);
     if (extractedWords.length === 0 && placedIndices.length > 0) {
-        // Fallback if they placed an isolated tile
         extractedWords = [placedIndices.map(idx => localBoard[idx].letter).join('')];
     }
 
-    // Ping Dictionary API
     const failedWords: string[] = [];
     
     await Promise.all(extractedWords.map(async (word) => {
-        if (word.length < 2) return; // API fails on single letters, which are technically not words anyway
+        if (word.length < 2) return; 
         try {
             const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
             if (!res.ok) {
@@ -465,7 +458,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
             }
         } catch (err) {
             console.error("Dictionary API failed:", err);
-            // Ignore network errors so game doesn't hard-lock if API is down
         }
     }));
 
@@ -473,10 +465,9 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
 
     if (failedWords.length > 0) {
         setInvalidWords(failedWords);
-        return; // Halt turn
+        return; 
     }
 
-    // Success! Save extracted words and proceed
     setCurrentTurnScore(turnScore);
     setCurrentTurnWords(extractedWords);
     setPendingSentence(true);
@@ -788,6 +779,7 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
     );
   }
 
+  // MAIN GAME RENDER (ACTIVE & SPECTATOR)
   return (
     <div className="flex flex-col h-full w-full wood-bg p-2 overflow-hidden border-4 border-emerald-500/50">
       <div className={`flex justify-between items-center mb-2 p-3 rounded-xl border transition-colors ${isMyTurn ? 'bg-emerald-900/60 border-emerald-500/50' : 'bg-slate-900/60 border-slate-700'}`}>
@@ -814,7 +806,38 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
             return (
               <div key={index} onClick={() => handleBoardClick(index)} className={`w-full h-full aspect-square border border-[#c4bcab] ${bgClass} shadow-inner flex items-center justify-center relative transition-all ${isTargeted ? 'ring-4 ring-inset ring-amber-400 z-20 bg-amber-100/50' : ''}`}>
                 {!tile && type === 'CT' && <Star className="text-amber-100 opacity-70 w-8 h-8" fill="currentColor" />}
-                {isTargeted && !tile && <div className="absolute inset-0 m-2 border-2 border-dashed border-amber-500 rounded-md animate-pulse" />}
+                
+                {/* 🔥 ORBITAL RETICLE (Only for Active Player) */}
+                {isTargeted && !tile && isMyTurn && (
+                    <div className="absolute top-1/2 left-1/2 w-0 h-0 z-[100]">
+                        {rack.map((rackTile, rackIdx) => {
+                            if (!rackTile) return null;
+                            const angle = (rackIdx / 7) * Math.PI * 2 - (Math.PI / 2);
+                            const radius = 90; 
+                            const x = Math.cos(angle) * radius;
+                            const y = Math.sin(angle) * radius;
+                            return (
+                                <div
+                                    key={`orbit_${rackIdx}`}
+                                    onClick={(e) => {
+                                        e.stopPropagation(); 
+                                        handleRackClick(rackIdx);
+                                    }}
+                                    className="absolute w-12 h-12 -ml-6 -mt-6 transition-all duration-300 animate-in zoom-in spin-in"
+                                    style={{ transform: `translate(${x}px, ${y}px)` }}
+                                >
+                                    <MarbleTile tile={rackTile} className="w-full h-full shadow-[0_10px_20px_rgba(0,0,0,0.6)]" />
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
+                
+                {/* Reticle glow when NOT active player or target empty */}
+                {isTargeted && !tile && !isMyTurn && (
+                    <div className="absolute inset-0 m-2 border-2 border-dashed border-amber-500 rounded-md animate-pulse" />
+                )}
+
                 {tile && <MarbleTile tile={tile} isLocked={tile.isLocked} className="w-[90%] h-[90%]" />}
               </div>
             );
@@ -823,8 +846,6 @@ export default function MarbleScrabble({ block, isProjector, liveState, studentI
       </div>
 
       <div className="mt-2 bg-[#8b7355] rounded-xl p-2 border-b-4 border-[#5c4a35] w-full z-10 shadow-[0_-10px_20px_rgba(0,0,0,0.5)]">
-         
-         {/* 🔥 ERROR BANNER */}
          {invalidWords.length > 0 && (
              <div className="bg-rose-500/90 text-white px-3 py-2 rounded-lg mb-2 flex items-center gap-2 text-xs font-bold shadow-sm animate-in slide-in-from-bottom-2">
                  <AlertTriangle size={14} /> Dictionary rejected: {invalidWords.join(', ')}
