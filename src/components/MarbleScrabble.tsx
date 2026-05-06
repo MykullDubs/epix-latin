@@ -3,7 +3,8 @@ import {
   Trophy, Clock, CheckCircle2, FastForward, ArrowDownToLine,
   Star, Users, User, MessageSquare, Shuffle, Loader2,
   AlertTriangle, Rocket, RefreshCw, ZoomIn, ZoomOut,
-  LocateFixed, Pause, Play, Power, ShieldAlert, BookOpen, Layers
+  LocateFixed, Pause, Play, Power, ShieldAlert, BookOpen, Layers,
+  PenTool
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────
@@ -315,6 +316,21 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   const [viewAngle, setViewAngle] = useState(0); 
   const [showJournal, setShowJournal] = useState(false);
 
+  // 🔥 GLOBAL TRANSFORM HELPERS
+  const activeAngle = liveAngles[activeTeam?.id] || 0;
+  
+  const getProjectorTransform = () => {
+    if (activeAngle === 1) return 'rotateX(45deg) rotateZ(2.5deg)';
+    if (activeAngle === 2) return 'rotateX(60deg) scale(0.9) rotateZ(2.5deg)';
+    return 'rotateZ(2.5deg)';
+  };
+
+  const getTransform = () => {
+    if (viewAngle === 1) return 'rotateX(45deg)';
+    if (viewAngle === 2) return 'rotateX(60deg) scale(0.9)';
+    return 'none';
+  };
+
   // 🔥 DECOUPLED SYNC TO PREVENT MID-TURN ERASURES
   const globalBoardString = JSON.stringify(globalBoard);
   useEffect(() => {
@@ -334,7 +350,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
           racks: { ...(liveState?.racks || {}), [myTeamId]: JSON.parse(rackString) }
       });
     }
-  }, [rackString]); // Removed myTeamId/gameStatus from deps to prevent loops
+  }, [rackString]); 
 
   const handleSetViewAngle = (angle: number) => {
     setViewAngle(angle);
@@ -864,15 +880,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
       );
     }
 
-    const activeAngle = liveAngles[activeTeam?.id] || 0;
-    
-    // 🔥 FIXED PROJECTOR TRANSFORM
-    const getProjectorTransform = () => {
-      if (activeAngle === 1) return 'rotateX(45deg) rotateZ(2.5deg)';
-      if (activeAngle === 2) return 'rotateX(60deg) scale(0.9) rotateZ(2.5deg)';
-      return 'rotateZ(2.5deg)';
-    };
-
     return (
       <div className="wf-root" style={{ ...bg, position: 'relative', overflow: 'hidden', height: '100vh', width: '100vw' }}>
         
@@ -982,7 +989,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
                     <span style={{ fontFamily:"'DM Serif Display', serif", fontSize:26, color: isActive ? '#f8fafc' : 'rgba(255,255,255,0.5)' }}>{scores[t.id]||0}</span>
                   </div>
                   
-                  {/* 🔥 RENDER MINI LIVE RACK */}
                   {teamRack.length > 0 && (
                     <div style={{ display: 'flex', gap: 4, marginTop: 12, justifyContent: 'center' }}>
                       {teamRack.map((rt: any, ri: number) => (
@@ -1054,34 +1060,79 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
 
   if (gameStatus === 'lobby_naming') {
     if (!myTeamEntry) return <div className="wf-root wf-scroll" style={{ ...bg, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.3)', fontSize:13 }}>Spectator mode</div>;
+    
+    const teamColor = myTeamEntry.color?.bg || '#4f46e5';
+    const teamMuted = myTeamEntry.color?.muted || 'rgba(79,70,229,0.15)';
+    
     return (
-      <div className="wf-root wf-scroll" style={{ ...bg, display:'flex', flexDirection:'column', padding:24, color:'#f8fafc' }}>
-        <div style={{ padding:24, borderRadius:20, background:'rgba(255,255,255,0.04)', border:`1px solid ${myTeamEntry.color?.border||'rgba(255,255,255,0.1)'}`, display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center', marginBottom:20 }}>
-          {myTeamEntry.avatar && <img src={myTeamEntry.avatar} style={{width:64,height:64,borderRadius:'50%',marginBottom:12,background:'rgba(255,255,255,0.05)'}} />}
-          <span style={{ fontSize:11, color:'rgba(255,255,255,0.3)', textTransform:'uppercase', letterSpacing:2, display:'block', marginBottom:4 }}>Your name</span>
-          <span style={{ fontFamily:"'DM Serif Display', serif", fontSize:28, color:myTeamEntry.color?.bg||'#f8fafc' }}>{myTeamEntry.name}</span>
+      <div className="wf-root wf-scroll" style={{ ...bg, display:'flex', flexDirection:'column', padding:24, color:'#f8fafc', minHeight: '100vh' }}>
+        <div style={{ marginBottom: 32, textAlign: 'center' }}>
+          <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 32, margin: 0, color: '#f8fafc' }}>Identify Player</h2>
+          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 2, marginTop: 4 }}>Configure your pilot profile</p>
         </div>
-        <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, padding:20 }}>
-          <label style={{ fontSize:11, color:'rgba(255,255,255,0.3)', textTransform:'uppercase', letterSpacing:2, display:'block', marginBottom:10 }}>Update name</label>
-          <input
-            defaultValue={myTeamEntry.name}
-            onBlur={e => {
-              const v = e.target.value.trim();
-              if (v && myTeamId) {
-                const upd = { ...teams }; upd[myTeamId].name = v;
-                onUpdateLiveState({ teams: upd });
-              }
-            }}
-            maxLength={15}
-            style={{
-              width:'100%', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)',
-              borderRadius:10, padding:'12px 16px', color:'#f8fafc', fontSize:16, fontFamily:"'DM Sans', sans-serif",
-              outline:'none', boxSizing:'border-box', textAlign:'center'
-            }}
-          />
-          <p style={{ fontSize:10, color:'rgba(255,255,255,0.2)', textAlign:'center', marginTop:8 }}>Saved automatically</p>
+
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{
+              width: '100%', maxWidth: 340,
+              background: 'linear-gradient(145deg, rgba(30,41,59,0.8), rgba(15,23,42,0.95))',
+              border: `1px solid rgba(255,255,255,0.1)`,
+              borderRadius: 24, padding: 32,
+              boxShadow: `0 20px 40px rgba(0,0,0,0.6), inset 0 0 30px ${teamMuted}`,
+              position: 'relative', overflow: 'hidden'
+          }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 6, background: teamColor, boxShadow: `0 0 10px ${teamColor}` }} />
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 32 }}>
+                  <div style={{ width: 80, height: 80, borderRadius: 16, background: 'rgba(0,0,0,0.3)', border: `1px solid ${myTeamEntry.color?.border}`, padding: 4 }}>
+                      {myTeamEntry.avatar && <img src={myTeamEntry.avatar} style={{width:'100%',height:'100%',borderRadius:12}} />}
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 2, display: 'block', marginBottom: 4 }}>Uplink Status</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#4ade80', display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', background: 'rgba(74,222,128,0.1)', padding: '4px 8px', borderRadius: 8 }}>
+                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 8px #4ade80' }} className="animate-pulse" />
+                          SECURE
+                      </span>
+                  </div>
+              </div>
+
+              <div style={{ marginBottom: 32 }}>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 2, display: 'flex', alignItems:'center', gap: 6, marginBottom: 8 }}>
+                      <User size={12}/> Operative Name
+                  </span>
+                  <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 36, color: '#f8fafc', lineHeight: 1, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
+                      {myTeamEntry.name}
+                  </span>
+              </div>
+
+              <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 12, padding: 16, border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 2, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                      <PenTool size={12} /> Edit Callsign
+                  </label>
+                  <input
+                      defaultValue={myTeamEntry.name}
+                      onBlur={e => {
+                          const v = e.target.value.trim();
+                          if (v && myTeamId) {
+                              const upd = { ...teams }; upd[myTeamId].name = v;
+                              onUpdateLiveState({ teams: upd });
+                          }
+                      }}
+                      maxLength={15}
+                      style={{
+                          width: '100%', background: 'transparent', border: 'none', borderBottom: `2px solid ${teamColor}`,
+                          color: '#f8fafc', fontSize: 20, fontFamily: "'DM Sans', sans-serif", fontWeight: 700,
+                          outline: 'none', padding: '4px 0', transition: 'border-color 0.2s', textAlign: 'left'
+                      }}
+                  />
+                  <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 8, fontStyle: 'italic' }}>* Changes sync immediately to central mainframe.</p>
+              </div>
+          </div>
+          
+          <div style={{ marginTop: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+             <Loader2 size={24} className="animate-spin" style={{ color: teamColor }} />
+             <p style={{ color: teamColor, fontSize: 11, textTransform: 'uppercase', letterSpacing: 3, fontWeight: 700 }}>Awaiting Host Authorization</p>
+          </div>
         </div>
-        <p style={{ color:'rgba(255,255,255,0.2)', fontSize:11, textTransform:'uppercase', letterSpacing:2, textAlign:'center', marginTop:'auto', paddingTop:24 }}>Waiting for the teacher to start...</p>
       </div>
     );
   }
@@ -1164,13 +1215,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     );
   }
 
-  // 🔥 FIXED STUDENT TRANSFORM
-  const getTransform = () => {
-    if (viewAngle === 1) return 'rotateX(45deg)';
-    if (viewAngle === 2) return 'rotateX(60deg) scale(0.9)';
-    return 'none';
-  };
-
   // ── MAIN GAME (Student) ──
   const myJournal = journals[myTeamId] || [];
 
@@ -1179,7 +1223,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
 
       {showJournal && <JournalPanel words={myJournal} onClose={() => setShowJournal(false)} />}
 
-      {/* Floating Header */}
       <div style={{
         position: 'absolute', top: 10, left: 10, right: 10, zIndex: 50,
         display:'flex', alignItems:'center', justifyContent:'space-between',
@@ -1207,10 +1250,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
         </button>
       </div>
 
-      {/* Full Background Board */}
       <div style={{ position: 'absolute', inset: 0, overflow:'auto', zIndex: 1, perspective: '1200px', paddingTop: 80, paddingBottom: 220 }} className="wf-scroll">
-        
-        {/* 🔥 TACTICAL HUD */}
         <div style={{
           position:'fixed', top: 70, right: 10, zIndex:50,
           display:'flex', flexDirection:'column', gap:0,
@@ -1252,7 +1292,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
 
                   {isTarget && !tile && isMyTurn && !isTimerPaused && (
                     <div style={{ position:'absolute', top:'50%', left:'50%', width:0, height:0, zIndex:100, transform:`scale(${1/zoom}) ${viewAngle > 0 ? 'translateZ(40px)' : ''}`, transformStyle: 'preserve-3d' }}>
-                      <div style={{ position: 'absolute', width: 280, height: 280, left: -140, top: -140, background: 'radial-gradient(circle, rgba(0,0,0,0.85) 20%, rgba(0,0,0,0.4) 50%, transparent 70%)', zIndex: 10, pointerEvents: 'none', borderRadius: '50%' }} />
+                      <div style={{ position: 'absolute', width: 280, height: 280, left: -140, top: -140, border: '1px dashed rgba(255,255,255,0.15)', borderRadius: '50%', pointerEvents: 'none', zIndex: 10 }} />
                       
                       {rack.map((rt: any, ri: number) => {
                         if (!rt) return null;
@@ -1277,7 +1317,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
         </div>
       </div>
 
-      {/* Floating Controls Overlay */}
       <div style={{ position: 'absolute', bottom: 10, left: 10, right: 10, zIndex: 50, display: 'flex', flexDirection: 'column', gap: 8 }}>
           
           {invalidWords.length > 0 && (
@@ -1286,7 +1325,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
             </div>
           )}
 
-          {/* Floating Rack */}
           <div style={{ background:'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(12px)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:14, padding:'10px 12px', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
               <span style={{ fontSize:10, textTransform:'uppercase', letterSpacing:2, color: isMyTurn ? 'rgba(165,180,252,0.8)' : 'rgba(255,255,255,0.5)' }}>
