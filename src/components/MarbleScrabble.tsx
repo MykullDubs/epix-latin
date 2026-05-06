@@ -3,8 +3,7 @@ import {
   Trophy, Clock, CheckCircle2, FastForward, ArrowDownToLine,
   Star, Users, User, MessageSquare, Shuffle, Loader2,
   AlertTriangle, Rocket, RefreshCw, ZoomIn, ZoomOut,
-  LocateFixed, Pause, Play, Power, ShieldAlert, BookOpen, Layers,
-  PanelBottom
+  LocateFixed, Pause, Play, Power, ShieldAlert, BookOpen, Layers
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────
@@ -80,13 +79,12 @@ const createBag = () => {
 };
 
 // ─────────────────────────────────────────────
-// 3D TILE COMPONENT (With Rack 3D Support)
+// 3D TILE COMPONENT
 // ─────────────────────────────────────────────
 const Tile = ({ tile, selected, locked, onClick, size = 'md', isBoardTile = false, isSolid = false, isRack3D = false }: any) => {
   if (!tile) return null;
   const sz = size === 'sm' ? 'w-8 h-8 text-sm' : size === 'lg' ? 'w-14 h-14 text-xl' : 'w-10 h-10 text-base';
   
-  // Calculate Z-Depth based on context (Board vs Flat Rack vs 3D Rack)
   let zDepth = 'none';
   if (isBoardTile) {
       zDepth = selected ? 'translateZ(25px) scale(1.1)' : 'translateZ(10px)';
@@ -305,13 +303,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   const [zoom, setZoom] = useState(1);
   const [viewAngle, setViewAngle] = useState(0); 
   const [showJournal, setShowJournal] = useState(false);
-  const [rackAngle, setRackAngle] = useState(0); // 🔥 New: 3D Rack Toggle State
-
-  const getTransform = () => {
-    if (viewAngle === 1) return 'rotateX(45deg)';
-    if (viewAngle === 2) return 'rotateX(60deg) scale(0.9)';
-    return 'none';
-  };
 
   useEffect(() => {
     if (isProjector && !liveState?.gameStatus) {
@@ -509,6 +500,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     }
   };
 
+  // 🔥 VALIDATION ENGINE WITH ANTI-UNDEFINED PAYLOAD SAFEGUARDS
   const handleCommit = async () => {
     const placed = localBoard.reduce((acc: number[], t: any, i: number) => {
       if (t && !t.isLocked) acc.push(i); return acc;
@@ -605,7 +597,8 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
         } catch(e) {}
     }
 
-    const wordList: { word: string; rawSum: number; finalScore: number; isStanza?: boolean }[] = [];
+    // Initialize with explicit false to avoid Firestore undefined rejection
+    const wordList: { word: string; rawSum: number; finalScore: number; isStanza: boolean }[] = [];
     let totalScore = 0;
 
     if (isStanza) {
@@ -637,7 +630,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
                     scored += lv;
                 }
                 const fs = scored * mult;
-                wordList.push({ word, rawSum: raw, finalScore: fs });
+                wordList.push({ word, rawSum: raw, finalScore: fs, isStanza: false });
                 totalScore += fs;
             });
         });
@@ -647,7 +640,9 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     await Promise.all(wordList.map(async ({ word, rawSum, finalScore, isStanza }) => {
       if (word.length < 2) return;
       const tier = assignTier(word, rawSum);
-      let entry: any = { word: word.toUpperCase(), tier, finalScore, isStanza };
+      
+      // Explicitly coalesce isStanza to avoid undefined
+      let entry: any = { word: word.toUpperCase(), tier, finalScore, isStanza: isStanza || false };
       let found = false;
       try {
         const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
@@ -657,6 +652,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
             const d0 = data[0];
             const m0 = d0.meanings?.[0];
             const def0 = m0?.definitions?.[0];
+            // Explicitly coalesce to null to avoid undefined
             entry.def = def0?.definition || 'Definition found.';
             entry.example = def0?.example || null;
             entry.pos = m0?.partOfSpeech || null;
@@ -672,6 +668,8 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
           if (d2?.[0]?.word?.toLowerCase() === word.toLowerCase()) {
             entry.def = d2[0].defs?.[0]?.split('\t').pop() || 'Definition secured.';
             entry.pos = d2[0].defs?.[0]?.split('\t')[0] || null;
+            entry.example = null;
+            entry.phonetic = null;
             found = true;
           }
         } catch {}
@@ -717,13 +715,20 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     const payload: any = {
       board: lockedBoard, scores: updatedScores, journals: updatedJournals,
       latestDiscoveries: currentWords, bag: newBag,
+      // Pass null to safely clear out the sentence payload if one wasn't provided
+      latestSentence: sentencePayload || null,
       activeTeamIndex: triggeredDP ? activeTeamIndex : (activeTeamIndex + 1) % teamArray.length,
       turnEndTime: Date.now() + timeLimit * 1000,
       isExtraTurn: triggeredDP, isTimerPaused: false
     };
-    if (sentencePayload) payload.latestSentence = sentencePayload;
     onUpdateLiveState(payload);
     setPendingSentence(false); setSentenceText(''); setCurrentWords([]); setCurrentScore(0);
+  };
+
+  const getTransform = () => {
+    if (viewAngle === 1) return 'rotateX(45deg)';
+    if (viewAngle === 2) return 'rotateX(60deg) scale(0.9)';
+    return 'none';
   };
 
   // ─────────────────────────────────────────────
@@ -847,7 +852,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
 
     return (
       <div className="wf-root" style={{ ...bg, display:'flex', height:'100%', padding:24, gap:24, color:'#f8fafc', overflow:'hidden' }}>
-        {/* Projector Board */}
         <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', position:'relative' }}>
           <div style={{ marginBottom:16, display:'flex', alignItems:'center', gap:12 }}>
             <div style={{
@@ -1228,14 +1232,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
             {isTimerPaused ? 'Paused by instructor' : (isMyTurn ? (targetSquare !== null ? 'Tap a tile to place' : 'Tap board to pick a square') : 'Waiting...')}
           </span>
           <div style={{ display:'flex', gap:6 }}>
-            {/* 🔥 NEW TRAY PERSPECTIVE TOGGLE */}
-            <button 
-                onClick={() => setRackAngle(p => p === 0 ? 1 : 0)} 
-                title="Toggle Rack Perspective"
-                style={{ width:28, height:28, borderRadius:7, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color: rackAngle === 1 ? '#a5b4fc' : 'rgba(255,255,255,0.4)' }}
-            >
-                <PanelBottom size={13} />
-            </button>
             <button 
                 onClick={handlePurge} 
                 disabled={!isMyTurn || isValidating || isTimerPaused || (scores[myTeamId] || 0) < 10}
@@ -1250,32 +1246,12 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
           </div>
         </div>
 
-        {/* 🔥 NEW 3D TRAY RACK */}
-        <div style={{ perspective: '600px', width: '100%', margin: '0 auto' }}>
-            <div style={{ 
-                display:'flex', gap:6, justifyContent:'center', minHeight:44, position: 'relative',
-                transformStyle: 'preserve-3d',
-                transform: rackAngle === 1 ? 'rotateX(40deg)' : 'none',
-                transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
-            }}>
-                {rack.map((tile: any, i: number) => (
-                    <div key={i} onClick={() => handleRackClick(i)} style={{ width:40, height:40, borderRadius:8, background: tile ? undefined : 'rgba(255,255,255,0.02)', border: tile ? undefined : '1px dashed rgba(255,255,255,0.06)', opacity: isTimerPaused ? 0.4 : 1, transformStyle: 'preserve-3d' }}>
-                        {tile && <Tile tile={tile} selected={selectedRack===i} size="md" isSolid={true} isRack3D={rackAngle === 1} />}
-                    </div>
-                ))}
-                
-                {/* 3D Ledge for Tray */}
-                {rackAngle === 1 && (
-                    <div style={{
-                        position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%) translateZ(-5px)',
-                        width: '100%', maxWidth: 350, height: 12,
-                        background: 'linear-gradient(to bottom, rgba(255,255,255,0.08), rgba(0,0,0,0.4))',
-                        borderTop: '1px solid rgba(255,255,255,0.1)',
-                        borderBottom: '2px solid rgba(0,0,0,0.8)',
-                        borderRadius: '4px', pointerEvents: 'none'
-                    }} />
-                )}
+        <div style={{ display:'flex', gap:6, justifyContent:'center', minHeight:44 }}>
+          {rack.map((tile: any, i: number) => (
+            <div key={i} onClick={() => handleRackClick(i)} style={{ width:40, height:40, borderRadius:8, background: tile ? undefined : 'rgba(255,255,255,0.02)', border: tile ? undefined : '1px dashed rgba(255,255,255,0.06)', opacity: isTimerPaused ? 0.4 : 1 }}>
+              {tile && <Tile tile={tile} selected={selectedRack===i} size="md" isSolid={true} />}
             </div>
+          ))}
         </div>
       </div>
 
