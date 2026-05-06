@@ -206,7 +206,7 @@ const squareStyle = (r: number, c: number, targeted: boolean) => {
   else if (type === 'TL') { bg = 'rgba(8,145,178,0.18)'; border = 'rgba(8,145,178,0.4)'; }
   else if (type === 'DL') { bg = 'rgba(5,150,105,0.18)'; border = 'rgba(5,150,105,0.4)'; }
   else if (type === 'CT') { bg = 'rgba(79,70,229,0.2)'; border = 'rgba(79,70,229,0.45)'; }
-  else if (type === 'DP') { bg = 'rgba(217,70,239,0.18)'; border = 'rgba(217,70,239,0.4)'; } // 🔥 Restored DP style
+  else if (type === 'DP') { bg = 'rgba(217,70,239,0.18)'; border = 'rgba(217,70,239,0.4)'; }
 
   if (targeted) { bg = 'rgba(245,208,90,0.15)'; border = 'rgba(245,208,90,0.6)'; }
   return { background: bg, border: `1px solid ${border}`, borderRadius: 4 };
@@ -243,7 +243,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   const globalBoard = liveState?.board;
   const globalBag = liveState?.bag;
   const scores: Record<string, number> = liveState?.scores || {};
-  // journals: per-team array of WordCard-compatible entries
   const journals: Record<string, any[]> = liveState?.journals || {};
   const latestDiscoveries: any[] = liveState?.latestDiscoveries || [];
   const latestSentence = liveState?.latestSentence;
@@ -408,7 +407,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     setRack(nr); setSelectedRack(null);
   };
 
-  // 🔥 RESTORED DATA PURGE FUNCTION
+  // 🔥 UPDATED: DATA PURGE
   const handlePurge = () => {
     if (!isMyTurn || isValidating || isTimerPaused) return;
     if ((scores[myTeamId] || 0) < 10) return;
@@ -443,10 +442,10 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     setRack(newRack);
     setLocalBoard(newBoard);
     setTargetSquare(null);
-    setLastPlacedIndex(null);
-    setPlayDirection(null);
+    setLastPlaced(null);
+    setPlayDir(null);
     setInvalidWords([]);
-    setSelectedRackIndex(null);
+    setSelectedRack(null);
 
     const updatedScores = { ...scores, [myTeamId]: (scores[myTeamId] || 0) - 10 };
     
@@ -639,7 +638,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     let bonus = 0, sentencePayload = null;
     let triggeredDP = false;
 
-    // 🔥 RESTORED DP CHECK
+    // 🔥 DP CHECK
     localBoard.forEach((tile: any, idx: number) => {
       if (tile && !tile.isLocked) {
          const r = Math.floor(idx / BOARD_SIZE);
@@ -817,7 +816,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
               {activeTeam?.avatar && <img src={activeTeam.avatar} style={{width:28,height:28,borderRadius:'50%'}} />}
               <span style={{ fontWeight:600, color: activeTeam?.color?.bg||'#f8fafc', fontSize:14 }}>{activeTeam?.name || '—'}</span>
               <span style={{ color:'rgba(255,255,255,0.5)', fontSize:13 }}>is playing</span>
-              {isExtraTurn && <span style={{ background:'#d946ef', color:'white', fontSize:10, padding:'2px 6px', borderRadius:4, display:'flex', alignItems:'center', gap:4, marginLeft:8 }}><FastForward size={10}/> DOUBLE PLAY</span>}
             </div>
             <div style={{
               display:'flex', alignItems:'center', gap:8, padding:'8px 16px',
@@ -952,7 +950,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   if (gameStatus === 'lobby_join') {
     const joined = !!players[studentId];
     return (
-      <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:32, textAlign:'center', color:'#f8fafc' }}>
+      <div className="wf-root wf-scroll" style={{ ...bg, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:32, textAlign:'center', color:'#f8fafc' }}>
         <div style={{ fontFamily:"'DM Serif Display', serif", fontSize:42, marginBottom:6 }}>WordForge</div>
         <p style={{ color:'rgba(255,255,255,0.3)', fontSize:12, letterSpacing:3, textTransform:'uppercase', marginBottom:40 }}>Vocabulary Discovery</p>
         {joined ? (
@@ -977,9 +975,9 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   }
 
   if (gameStatus === 'lobby_naming') {
-    if (!myTeamEntry) return <div className="wf-root" style={{ ...bg, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.3)', fontSize:13 }}>Spectator mode</div>;
+    if (!myTeamEntry) return <div className="wf-root wf-scroll" style={{ ...bg, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.3)', fontSize:13 }}>Spectator mode</div>;
     return (
-      <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', padding:24, color:'#f8fafc' }}>
+      <div className="wf-root wf-scroll" style={{ ...bg, display:'flex', flexDirection:'column', padding:24, color:'#f8fafc' }}>
         <div style={{ padding:24, borderRadius:20, background:'rgba(255,255,255,0.04)', border:`1px solid ${myTeamEntry.color?.border||'rgba(255,255,255,0.1)'}`, display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center', marginBottom:20 }}>
           {myTeamEntry.avatar && <img src={myTeamEntry.avatar} style={{width:64,height:64,borderRadius:'50%',marginBottom:12,background:'rgba(255,255,255,0.05)'}} />}
           <span style={{ fontSize:11, color:'rgba(255,255,255,0.3)', textTransform:'uppercase', letterSpacing:2, display:'block', marginBottom:4 }}>Your name</span>
@@ -1016,7 +1014,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     const rank = sorted.findIndex((t: any) => t.id === myTeamId)+1;
     const myJournal = journals[myTeamId]||[];
     return (
-      <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', padding:24, color:'#f8fafc', overflowY:'auto' }}>
+      <div className="wf-root wf-scroll" style={{ ...bg, display:'flex', flexDirection:'column', padding:24, color:'#f8fafc', overflowY:'auto' }}>
         <div style={{ fontFamily:"'DM Serif Display', serif", fontSize:32, marginBottom:4 }}>Session Complete</div>
         <p style={{ color:'rgba(255,255,255,0.35)', fontSize:12, marginBottom:24 }}>Here's what you discovered</p>
         <div style={{ padding:24, borderRadius:20, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)', textAlign:'center', marginBottom:24 }}>
@@ -1036,7 +1034,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   // ── Sentence Bonus Screen ──
   if (isMyTurn && pendingSentence) {
     return (
-      <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', padding:24, color:'#f8fafc', overflowY:'auto' }} className="wf-scroll">
+      <div className="wf-root wf-scroll" style={{ ...bg, display:'flex', flexDirection:'column', padding:24, color:'#f8fafc', overflowY:'auto' }}>
         <div style={{ fontFamily:"'DM Serif Display', serif", fontSize:28, marginBottom:4 }}>Words found!</div>
         <p style={{ fontSize:13, color:'rgba(255,255,255,0.4)', marginBottom:20 }}>Earn +5 points by writing a sentence using one of these words.</p>
         <div style={{ marginBottom:20 }}>
@@ -1100,12 +1098,10 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
             {isTimerPaused ? 'Paused' : `${timeLeft}s`}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-            {isExtraTurn && isMyTurn && <FastForward size={14} className="text-fuchsia-400 animate-pulse" />}
-            <span style={{ fontSize:12, fontWeight:600, color: isMyTurn ? '#a5b4fc' : 'rgba(255,255,255,0.4)' }}>
-                {isMyTurn ? 'Your turn' : `${activeTeam?.name}'s turn`}
-            </span>
-        </div>
+        <span style={{ fontSize:12, fontWeight:600, color: isMyTurn ? '#a5b4fc' : 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: 6 }}>
+          {isExtraTurn && isMyTurn && <FastForward size={12} style={{color:'#d946ef'}} />}
+          {isMyTurn ? 'Your turn' : `${activeTeam?.name}'s turn`}
+        </span>
         <button onClick={() => setShowJournal(true)} style={{
           display:'flex', alignItems:'center', gap:6, padding:'5px 10px', borderRadius:8,
           background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)',
