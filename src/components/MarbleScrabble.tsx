@@ -315,28 +315,26 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   const [viewAngle, setViewAngle] = useState(0); 
   const [showJournal, setShowJournal] = useState(false);
 
-  // 🔥 GLOBAL TRANSFORM HELPERS
-  const activeAngle = liveAngles[activeTeam?.id] || 0;
-  
-  const getProjectorTransform = () => {
-    if (activeAngle === 1) return 'rotateX(45deg) rotateZ(2.5deg)';
-    if (activeAngle === 2) return 'rotateX(60deg) scale(0.9) rotateZ(2.5deg)';
-    return 'rotateZ(2.5deg)';
-  };
-
-  const getTransform = () => {
-    if (viewAngle === 1) return 'rotateX(45deg)';
-    if (viewAngle === 2) return 'rotateX(60deg) scale(0.9)';
-    return 'none';
-  };
-
+  // 🔥 DECOUPLED SYNC TO PREVENT MID-TURN ERASURES
+  const globalBoardString = JSON.stringify(globalBoard);
   useEffect(() => {
-    if (myTeamId && gameStatus === 'playing' && rack) {
+    if (globalBoardString && globalBoardString !== "undefined") {
+      setLocalBoard(JSON.parse(globalBoardString));
+      setTargetSquare(null); setLastPlaced(null); setPlayDir(null);
+      setPendingSentence(false); setSentenceText('');
+      setSelectedRack(null); setInvalidWords([]); setCurrentWords([]);
+    }
+  }, [globalBoardString]);
+
+  // 🔥 RACK TELEMETRY PING
+  const rackString = JSON.stringify(rack);
+  useEffect(() => {
+    if (myTeamId && gameStatus === 'playing') {
       onUpdateLiveState({
-          racks: { ...(liveState?.racks || {}), [myTeamId]: rack }
+          racks: { ...(liveState?.racks || {}), [myTeamId]: JSON.parse(rackString) }
       });
     }
-  }, [rack, myTeamId, gameStatus]);
+  }, [rackString]); // Removed myTeamId/gameStatus from deps to prevent loops
 
   const handleSetViewAngle = (angle: number) => {
     setViewAngle(angle);
@@ -359,15 +357,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
       });
     }
   }, [isProjector, liveState]);
-
-  useEffect(() => {
-    if (globalBoard) {
-      setLocalBoard(globalBoard);
-      setTargetSquare(null); setLastPlaced(null); setPlayDir(null);
-      setPendingSentence(false); setSentenceText('');
-      setSelectedRack(null); setInvalidWords([]); setCurrentWords([]);
-    }
-  }, [globalBoard]);
 
   useEffect(() => {
     if (!isProjector && !isMyTurn) {
@@ -875,6 +864,15 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
       );
     }
 
+    const activeAngle = liveAngles[activeTeam?.id] || 0;
+    
+    // 🔥 FIXED PROJECTOR TRANSFORM
+    const getProjectorTransform = () => {
+      if (activeAngle === 1) return 'rotateX(45deg) rotateZ(2.5deg)';
+      if (activeAngle === 2) return 'rotateX(60deg) scale(0.9) rotateZ(2.5deg)';
+      return 'rotateZ(2.5deg)';
+    };
+
     return (
       <div className="wf-root" style={{ ...bg, position: 'relative', overflow: 'hidden', height: '100vh', width: '100vw' }}>
         
@@ -1166,6 +1164,13 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     );
   }
 
+  // 🔥 FIXED STUDENT TRANSFORM
+  const getTransform = () => {
+    if (viewAngle === 1) return 'rotateX(45deg)';
+    if (viewAngle === 2) return 'rotateX(60deg) scale(0.9)';
+    return 'none';
+  };
+
   // ── MAIN GAME (Student) ──
   const myJournal = journals[myTeamId] || [];
 
@@ -1245,7 +1250,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
                   {!tile && type === 'DL' && <span style={{fontSize:6,fontWeight:700,color:'rgba(5,150,105,0.5)',textTransform:'uppercase', transform: viewAngle > 0 ? 'translateZ(2px)' : 'none'}}>2L</span>}
                   {!tile && type === 'DP' && <FastForward size={14} style={{color:'rgba(217,70,239,0.5)', transform: viewAngle > 0 ? 'translateZ(2px)' : 'none'}} fill="currentColor"/>}
 
-                  {/* Orbital tile selector */}
                   {isTarget && !tile && isMyTurn && !isTimerPaused && (
                     <div style={{ position:'absolute', top:'50%', left:'50%', width:0, height:0, zIndex:100, transform:`scale(${1/zoom}) ${viewAngle > 0 ? 'translateZ(40px)' : ''}`, transformStyle: 'preserve-3d' }}>
                       <div style={{ position: 'absolute', width: 280, height: 280, left: -140, top: -140, background: 'radial-gradient(circle, rgba(0,0,0,0.85) 20%, rgba(0,0,0,0.4) 50%, transparent 70%)', zIndex: 10, pointerEvents: 'none', borderRadius: '50%' }} />
