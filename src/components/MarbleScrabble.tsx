@@ -85,7 +85,6 @@ const Tile = ({ tile, selected, locked, onClick, size = 'md', isBoardTile = fals
   if (!tile) return null;
   const sz = size === 'sm' ? 'w-8 h-8 text-sm' : size === 'lg' ? 'w-14 h-14 text-xl' : 'w-10 h-10 text-base';
   
-  // Give tiles physical Z-depth when on the board to make the 3D angles pop
   const zDepth = isBoardTile ? (selected ? 'translateZ(25px) scale(1.1)' : 'translateZ(10px)') : (selected ? 'translateY(-3px) scale(1.08)' : 'none');
   
   return (
@@ -131,7 +130,12 @@ const WordCard = ({ entry }: any) => {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
         <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 18, color: '#f8fafc', letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
           {entry.word}
-          {entry.isStanza && <Layers size={14} style={{ color: '#d946ef' }} title="Stanza Stack" />}
+          {/* 🔥 FIXED LUCIDE TITLE PROP */}
+          {entry.isStanza && (
+            <span title="Stanza Stack" style={{ display: 'flex', alignItems: 'center' }}>
+                <Layers size={14} style={{ color: '#d946ef' }} />
+            </span>
+          )}
         </span>
         <span style={{
           fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
@@ -221,7 +225,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   const timeLimit = liveState?.timeLimit || block?.timePerTurnSeconds || 90;
   const [selectedTime, setSelectedTime] = useState(90);
 
-  // Inject fonts
   useEffect(() => {
     if (!document.getElementById('wf-fonts')) {
       const s = document.createElement('style');
@@ -286,9 +289,10 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   const [currentWords, setCurrentWords] = useState<any[]>([]);
   const [currentScore, setCurrentScore] = useState(0);
 
-  // 🔥 ADVANCED 3D TACTICAL HUD STATE
+  // 🔥 RESTORED ALL HUD UI STATES
   const [zoom, setZoom] = useState(1);
-  const [viewAngle, setViewAngle] = useState(0); // 0 = Flat, 1 = Tilt, 2 = Deep Iso
+  const [viewAngle, setViewAngle] = useState(0); 
+  const [showJournal, setShowJournal] = useState(false);
 
   useEffect(() => {
     if (isProjector && !liveState?.gameStatus) {
@@ -703,6 +707,12 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
     setPendingSentence(false); setSentenceText(''); setCurrentWords([]); setCurrentScore(0);
   };
 
+  const getTransform = () => {
+    if (viewAngle === 1) return 'rotateX(45deg)';
+    if (viewAngle === 2) return 'rotateX(60deg) scale(0.9)';
+    return 'none';
+  };
+
   // ─────────────────────────────────────────────
   // PROJECTOR VIEWS
   // ─────────────────────────────────────────────
@@ -742,6 +752,45 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
           }}>
             <Rocket size={20}/> Begin Session
           </button>
+          <div style={{ marginTop:48, display:'flex', flexWrap:'wrap', gap:12, justifyContent:'center', maxWidth:600 }}>
+            {Object.values(players).map((p: any) => (
+              <div key={p.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 16px', borderRadius:30, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)' }}>
+                {p.avatar && <img src={p.avatar} style={{width:24,height:24,borderRadius:'50%'}} />}
+                <span style={{fontSize:13, color:'rgba(255,255,255,0.7)'}}>{p.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (gameStatus === 'lobby_naming') {
+      return (
+        <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', padding:40, color:'#f8fafc' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:40 }}>
+            <div>
+              <div style={{ fontFamily:"'DM Serif Display', serif", fontSize:40, color:'#f8fafc' }}>Ready to forge words?</div>
+              <p style={{ color:'rgba(255,255,255,0.35)', fontSize:13, marginTop:4 }}>Confirm your name on your device</p>
+            </div>
+            <button onClick={startGame} style={{
+              padding:'12px 28px', borderRadius:10, fontSize:15, fontWeight:600, cursor:'pointer',
+              background:'rgba(74,222,128,0.15)', border:'1px solid rgba(74,222,128,0.4)',
+              color:'#4ade80', display:'flex', alignItems:'center', gap:8
+            }}>
+              <CheckCircle2 size={18}/> Start Game
+            </button>
+          </div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:16 }}>
+            {teamArray.map((t: any) => (
+              <div key={t.id} style={{ padding:'24px 28px', borderRadius:16, background:'rgba(255,255,255,0.04)', border:`1px solid ${t.color.border}`, display:'flex', alignItems:'center', gap:14, minWidth:200 }}>
+                {t.avatar && <img src={t.avatar} style={{width:48,height:48,borderRadius:'50%',background:'rgba(255,255,255,0.05)'}} />}
+                <div>
+                  <div style={{ fontFamily:"'DM Serif Display', serif", fontSize:22, color:'#f8fafc' }}>{t.name}</div>
+                  <div style={{ fontSize:11, color:'rgba(255,255,255,0.3)', marginTop:2 }}>Ready</div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       );
     }
@@ -785,7 +834,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
 
     return (
       <div className="wf-root" style={{ ...bg, display:'flex', height:'100%', padding:24, gap:24, color:'#f8fafc', overflow:'hidden' }}>
-        {/* Projector Board */}
         <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', position:'relative' }}>
           <div style={{ marginBottom:16, display:'flex', alignItems:'center', gap:12 }}>
             <div style={{
@@ -850,7 +898,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
           </div>
         </div>
 
-        {/* Sidebar */}
         <div style={{ width:360, display:'flex', flexDirection:'column', gap:16, overflowY:'auto' }} className="wf-scroll">
           {latestDiscoveries.some((e: any) => e.isStanza) && (
             <div style={{ background:'rgba(217,70,239,0.15)', border:'1px solid rgba(217,70,239,0.4)', borderRadius:16, padding:'16px', textAlign:'center' }}>
@@ -917,7 +964,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   if (gameStatus === 'lobby_join') {
     const joined = !!players[studentId];
     return (
-      <div className="wf-root wf-scroll" style={{ ...bg, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24, textAlign:'center', color:'#f8fafc' }}>
+      <div className="wf-root wf-scroll" style={{ ...bg, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:32, textAlign:'center', color:'#f8fafc' }}>
         <div style={{ fontFamily:"'DM Serif Display', serif", fontSize:42, marginBottom:6 }}>WordForge</div>
         <p style={{ color:'rgba(255,255,255,0.3)', fontSize:12, letterSpacing:3, textTransform:'uppercase', marginBottom:40 }}>Vocabulary Discovery</p>
         {joined ? (
@@ -1057,7 +1104,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   // ── MAIN GAME (Student) ──
   const myJournal = journals[myTeamId] || [];
   
-  // View Angle calculations for 3D Board
   const getTransform = () => {
     if (viewAngle === 1) return 'rotateX(45deg)';
     if (viewAngle === 2) return 'rotateX(60deg) scale(0.9)';
@@ -1096,7 +1142,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
         </button>
       </div>
 
-      {/* Board area with Mobile Optimization & 3D Engine */}
+      {/* Board area with 3D Engine */}
       <div style={{ flex:1, overflow:'auto', borderRadius:12, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)', position:'relative', marginBottom:8, perspective: '1200px' }} className="wf-scroll">
         
         {/* 🔥 TACTICAL HUD */}
@@ -1180,7 +1226,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
             {isTimerPaused ? 'Paused by instructor' : (isMyTurn ? (targetSquare !== null ? 'Tap a tile to place' : 'Tap board to pick a square') : 'Waiting...')}
           </span>
           <div style={{ display:'flex', gap:6 }}>
-            {/* 🔥 MULLIGAN / DATA PURGE BUTTON */}
             <button 
                 onClick={handlePurge} 
                 disabled={!isMyTurn || isValidating || isTimerPaused || (scores[myTeamId] || 0) < 10}
