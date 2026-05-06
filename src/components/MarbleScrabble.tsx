@@ -3,7 +3,8 @@ import {
   Trophy, Clock, CheckCircle2, FastForward, ArrowDownToLine,
   Star, Users, User, MessageSquare, Shuffle, Loader2,
   AlertTriangle, Rocket, RefreshCw, ZoomIn, ZoomOut,
-  LocateFixed, Pause, Play, Power, ShieldAlert, BookOpen, Layers
+  LocateFixed, Pause, Play, Power, ShieldAlert, BookOpen, Layers,
+  PanelBottom
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────
@@ -79,15 +80,22 @@ const createBag = () => {
 };
 
 // ─────────────────────────────────────────────
-// 3D TILE COMPONENT (With isSolid Readability Prop)
+// 3D TILE COMPONENT (With Rack 3D Support)
 // ─────────────────────────────────────────────
-const Tile = ({ tile, selected, locked, onClick, size = 'md', isBoardTile = false, isSolid = false }: any) => {
+const Tile = ({ tile, selected, locked, onClick, size = 'md', isBoardTile = false, isSolid = false, isRack3D = false }: any) => {
   if (!tile) return null;
   const sz = size === 'sm' ? 'w-8 h-8 text-sm' : size === 'lg' ? 'w-14 h-14 text-xl' : 'w-10 h-10 text-base';
   
-  const zDepth = isBoardTile ? (selected ? 'translateZ(25px) scale(1.1)' : 'translateZ(10px)') : (selected ? 'translateY(-3px) scale(1.08)' : 'none');
+  // Calculate Z-Depth based on context (Board vs Flat Rack vs 3D Rack)
+  let zDepth = 'none';
+  if (isBoardTile) {
+      zDepth = selected ? 'translateZ(25px) scale(1.1)' : 'translateZ(10px)';
+  } else if (isRack3D) {
+      zDepth = selected ? 'translateZ(20px) translateY(-10px) scale(1.1)' : 'translateZ(0px)';
+  } else {
+      zDepth = selected ? 'translateY(-3px) scale(1.08)' : 'none';
+  }
   
-  // 🔥 Conditional rendering for Solid vs Glass
   const defaultBg = isSolid ? '#0f172a' : 'rgba(255,255,255,0.06)';
   const defaultBorder = isSolid ? '1px solid rgba(148, 163, 184, 0.3)' : '1px solid rgba(255,255,255,0.12)';
   const selectedBg = isSolid ? '#78350f' : 'rgba(245,208,90,0.2)'; 
@@ -166,7 +174,7 @@ const WordCard = ({ entry }: any) => {
 };
 
 // ─────────────────────────────────────────────
-// JOURNAL PANEL (student's personal word log)
+// JOURNAL PANEL
 // ─────────────────────────────────────────────
 const JournalPanel = ({ words, onClose }: any) => {
   const byTier = [5,4,3,2,1].map(t => ({
@@ -297,6 +305,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   const [zoom, setZoom] = useState(1);
   const [viewAngle, setViewAngle] = useState(0); 
   const [showJournal, setShowJournal] = useState(false);
+  const [rackAngle, setRackAngle] = useState(0); // 🔥 New: 3D Rack Toggle State
 
   const getTransform = () => {
     if (viewAngle === 1) return 'rotateX(45deg)';
@@ -1108,14 +1117,12 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
 
   // ── MAIN GAME (Student) ──
   const myJournal = journals[myTeamId] || [];
-  
+
   return (
     <div className="wf-root" style={{ ...bg, display:'flex', flexDirection:'column', height:'100%', padding:10, overflow:'hidden', position:'relative' }}>
 
-      {/* Journal overlay */}
       {showJournal && <JournalPanel words={myJournal} onClose={() => setShowJournal(false)} />}
 
-      {/* Header bar */}
       <div style={{
         display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8,
         padding:'8px 12px', borderRadius:12,
@@ -1141,10 +1148,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
         </button>
       </div>
 
-      {/* Board area with Mobile Optimization & 3D Engine */}
       <div style={{ flex:1, overflow:'auto', borderRadius:12, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)', position:'relative', marginBottom:8, perspective: '1200px' }} className="wf-scroll">
-        
-        {/* 🔥 TACTICAL HUD */}
         <div style={{
           position:'sticky', top:8, left:'calc(100% - 44px)', float:'right', zIndex:50,
           display:'flex', flexDirection:'column', gap:0,
@@ -1164,7 +1168,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
           ))}
         </div>
 
-        {/* 🔥 3D BOARD WRAPPER */}
         <div style={{ transformOrigin:'top left', transform:`scale(${zoom})`, width:`${720*zoom}px`, height:`${720*zoom}px` }}>
           <div className="wf-board" style={{ 
               width:720, height:720, padding:8, boxSizing:'border-box',
@@ -1185,10 +1188,8 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
                   {!tile && type === 'DL' && <span style={{fontSize:6,fontWeight:700,color:'rgba(5,150,105,0.5)',textTransform:'uppercase', transform: viewAngle > 0 ? 'translateZ(2px)' : 'none'}}>2L</span>}
                   {!tile && type === 'DP' && <FastForward size={14} style={{color:'rgba(217,70,239,0.5)', transform: viewAngle > 0 ? 'translateZ(2px)' : 'none'}} fill="currentColor"/>}
 
-                  {/* Orbital tile selector */}
                   {isTarget && !tile && isMyTurn && !isTimerPaused && (
                     <div style={{ position:'absolute', top:'50%', left:'50%', width:0, height:0, zIndex:100, transform:`scale(${1/zoom}) ${viewAngle > 0 ? 'translateZ(40px)' : ''}`, transformStyle: 'preserve-3d' }}>
-                      {/* 🔥 NEW: Radial gradient eclipse to separate orbital menu from board */}
                       <div style={{ position: 'absolute', width: 280, height: 280, left: -140, top: -140, background: 'radial-gradient(circle, rgba(0,0,0,0.85) 20%, rgba(0,0,0,0.4) 50%, transparent 70%)', zIndex: 10, pointerEvents: 'none', borderRadius: '50%' }} />
                       
                       {rack.map((rt: any, ri: number) => {
@@ -1199,7 +1200,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
                         return (
                           <div key={`orb_${ri}`} onClick={e => { e.stopPropagation(); handleRackClick(ri); }}
                             style={{ position:'absolute', width:40, height:40, marginLeft:-20, marginTop:-20, transform:`translate(${x}px,${y}px)`, zIndex:200 }}>
-                            {/* 🔥 NEW: Passed isSolid to orbital tiles */}
                             <Tile tile={rt} size="md" isSolid={true} />
                           </div>
                         );
@@ -1215,20 +1215,27 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
         </div>
       </div>
 
-      {/* Error banner */}
       {invalidWords.length > 0 && (
         <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 14px', borderRadius:10, background:'rgba(220,38,38,0.15)', border:'1px solid rgba(220,38,38,0.3)', marginBottom:6, fontSize:12, color:'#fca5a5' }}>
           <AlertTriangle size={13}/> {invalidWords.join(', ')} — not found in dictionary
         </div>
       )}
 
-      {/* Rack */}
+      {/* Rack Container */}
       <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:14, padding:'10px 12px', marginBottom:8 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
           <span style={{ fontSize:10, textTransform:'uppercase', letterSpacing:2, color: isMyTurn ? 'rgba(165,180,252,0.6)' : 'rgba(255,255,255,0.2)' }}>
             {isTimerPaused ? 'Paused by instructor' : (isMyTurn ? (targetSquare !== null ? 'Tap a tile to place' : 'Tap board to pick a square') : 'Waiting...')}
           </span>
           <div style={{ display:'flex', gap:6 }}>
+            {/* 🔥 NEW TRAY PERSPECTIVE TOGGLE */}
+            <button 
+                onClick={() => setRackAngle(p => p === 0 ? 1 : 0)} 
+                title="Toggle Rack Perspective"
+                style={{ width:28, height:28, borderRadius:7, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color: rackAngle === 1 ? '#a5b4fc' : 'rgba(255,255,255,0.4)' }}
+            >
+                <PanelBottom size={13} />
+            </button>
             <button 
                 onClick={handlePurge} 
                 disabled={!isMyTurn || isValidating || isTimerPaused || (scores[myTeamId] || 0) < 10}
@@ -1242,17 +1249,36 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
             </button>
           </div>
         </div>
-        <div style={{ display:'flex', gap:6, justifyContent:'center', minHeight:44 }}>
-          {rack.map((tile: any, i: number) => (
-            <div key={i} onClick={() => handleRackClick(i)} style={{ width:40, height:40, borderRadius:8, background: tile ? undefined : 'rgba(255,255,255,0.02)', border: tile ? undefined : '1px dashed rgba(255,255,255,0.06)', opacity: isTimerPaused ? 0.4 : 1 }}>
-              {/* 🔥 NEW: Passed isSolid to rack tiles */}
-              {tile && <Tile tile={tile} selected={selectedRack===i} size="md" isSolid={true} />}
+
+        {/* 🔥 NEW 3D TRAY RACK */}
+        <div style={{ perspective: '600px', width: '100%', margin: '0 auto' }}>
+            <div style={{ 
+                display:'flex', gap:6, justifyContent:'center', minHeight:44, position: 'relative',
+                transformStyle: 'preserve-3d',
+                transform: rackAngle === 1 ? 'rotateX(40deg)' : 'none',
+                transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+            }}>
+                {rack.map((tile: any, i: number) => (
+                    <div key={i} onClick={() => handleRackClick(i)} style={{ width:40, height:40, borderRadius:8, background: tile ? undefined : 'rgba(255,255,255,0.02)', border: tile ? undefined : '1px dashed rgba(255,255,255,0.06)', opacity: isTimerPaused ? 0.4 : 1, transformStyle: 'preserve-3d' }}>
+                        {tile && <Tile tile={tile} selected={selectedRack===i} size="md" isSolid={true} isRack3D={rackAngle === 1} />}
+                    </div>
+                ))}
+                
+                {/* 3D Ledge for Tray */}
+                {rackAngle === 1 && (
+                    <div style={{
+                        position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%) translateZ(-5px)',
+                        width: '100%', maxWidth: 350, height: 12,
+                        background: 'linear-gradient(to bottom, rgba(255,255,255,0.08), rgba(0,0,0,0.4))',
+                        borderTop: '1px solid rgba(255,255,255,0.1)',
+                        borderBottom: '2px solid rgba(0,0,0,0.8)',
+                        borderRadius: '4px', pointerEvents: 'none'
+                    }} />
+                )}
             </div>
-          ))}
         </div>
       </div>
 
-      {/* Action buttons */}
       <div style={{ display:'flex', gap:8 }}>
         <button onClick={recallAll} disabled={isValidating||isTimerPaused} style={{
           flex:1, padding:'12px 0', borderRadius:12, fontSize:12, fontWeight:600, cursor:'pointer',
