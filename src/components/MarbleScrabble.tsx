@@ -315,6 +315,21 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
   const [viewAngle, setViewAngle] = useState(0); 
   const [showJournal, setShowJournal] = useState(false);
 
+  // 🔥 GLOBAL TRANSFORM HELPERS
+  const activeAngle = liveAngles[activeTeam?.id] || 0;
+  
+  const getProjectorTransform = () => {
+    if (activeAngle === 1) return 'rotateX(45deg) rotateZ(2.5deg)';
+    if (activeAngle === 2) return 'rotateX(60deg) scale(0.9) rotateZ(2.5deg)';
+    return 'rotateZ(2.5deg)';
+  };
+
+  const getTransform = () => {
+    if (viewAngle === 1) return 'rotateX(45deg)';
+    if (viewAngle === 2) return 'rotateX(60deg) scale(0.9)';
+    return 'none';
+  };
+
   useEffect(() => {
     if (myTeamId && gameStatus === 'playing' && rack) {
       onUpdateLiveState({
@@ -860,13 +875,6 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
       );
     }
 
-    const activeAngle = liveAngles[activeTeam?.id] || 0;
-    const projectorTransform = () => {
-      if (activeAngle === 1) return 'rotateX(45deg) rotateZ(2.5deg)';
-      if (activeAngle === 2) return 'rotateX(60deg) scale(0.9) rotateZ(2.5deg)';
-      return 'rotateZ(2.5deg)';
-    };
-
     return (
       <div className="wf-root" style={{ ...bg, position: 'relative', overflow: 'hidden', height: '100vh', width: '100vw' }}>
         
@@ -877,7 +885,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
                 width: 720, height: 720,
                 transformStyle: 'preserve-3d',
                 transformOrigin: 'center center',
-                transform: projectorTransform(),
+                transform: getProjectorTransform(),
                 transition: 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)'
             }}>
               {(globalBoard||[]).map((tile: any, i: number) => {
@@ -976,6 +984,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
                     <span style={{ fontFamily:"'DM Serif Display', serif", fontSize:26, color: isActive ? '#f8fafc' : 'rgba(255,255,255,0.5)' }}>{scores[t.id]||0}</span>
                   </div>
                   
+                  {/* 🔥 RENDER MINI LIVE RACK */}
                   {teamRack.length > 0 && (
                     <div style={{ display: 'flex', gap: 4, marginTop: 12, justifyContent: 'center' }}>
                       {teamRack.map((rt: any, ri: number) => (
@@ -1236,6 +1245,7 @@ export default function WordForge({ block, isProjector, liveState, studentId, on
                   {!tile && type === 'DL' && <span style={{fontSize:6,fontWeight:700,color:'rgba(5,150,105,0.5)',textTransform:'uppercase', transform: viewAngle > 0 ? 'translateZ(2px)' : 'none'}}>2L</span>}
                   {!tile && type === 'DP' && <FastForward size={14} style={{color:'rgba(217,70,239,0.5)', transform: viewAngle > 0 ? 'translateZ(2px)' : 'none'}} fill="currentColor"/>}
 
+                  {/* Orbital tile selector */}
                   {isTarget && !tile && isMyTurn && !isTimerPaused && (
                     <div style={{ position:'absolute', top:'50%', left:'50%', width:0, height:0, zIndex:100, transform:`scale(${1/zoom}) ${viewAngle > 0 ? 'translateZ(40px)' : ''}`, transformStyle: 'preserve-3d' }}>
                       <div style={{ position: 'absolute', width: 280, height: 280, left: -140, top: -140, background: 'radial-gradient(circle, rgba(0,0,0,0.85) 20%, rgba(0,0,0,0.4) 50%, transparent 70%)', zIndex: 10, pointerEvents: 'none', borderRadius: '50%' }} />
